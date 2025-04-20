@@ -125,7 +125,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
             ssize_t res;
             do
             {
-                res = ::read(async.fileDescriptor, fakeBuffer, sizeof(fakeBuffer));
+                res = ::read(async.handle, fakeBuffer, sizeof(fakeBuffer));
             } while (res < 0 and errno == EINTR);
 
             if (res >= 0 and (static_cast<size_t>(res) == sizeof(fakeBuffer)))
@@ -866,10 +866,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] Result setupAsync(AsyncFileRead& async)
     {
         bool canBeWatched;
-        SC_TRY(isDescriptorReadWatchable(async.fileDescriptor, canBeWatched));
+        SC_TRY(isDescriptorReadWatchable(async.handle, canBeWatched));
         if (canBeWatched)
         {
-            return setEventWatcher(async, async.fileDescriptor, INPUT_EVENTS_MASK);
+            return setEventWatcher(async, async.handle, INPUT_EVENTS_MASK);
         }
         else
         {
@@ -885,7 +885,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] static Result cancelAsync(AsyncFileRead& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, INPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.handle, INPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result teardownAsync(AsyncFileRead*, AsyncTeardown& teardown)
@@ -902,11 +902,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             if (async.useOffset)
             {
-                res = ::pread(async.fileDescriptor, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
+                res = ::pread(async.handle, span.data(), span.sizeInBytes(), static_cast<off_t>(async.offset));
             }
             else
             {
-                res = ::read(async.fileDescriptor, span.data(), span.sizeInBytes());
+                res = ::read(async.handle, span.data(), span.sizeInBytes());
             }
         } while ((res == -1) and (errno == EINTR));
 
@@ -925,10 +925,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] Result setupAsync(AsyncFileWrite& async)
     {
         bool canBeWatched;
-        SC_TRY(isDescriptorWriteWatchable(async.fileDescriptor, canBeWatched));
+        SC_TRY(isDescriptorWriteWatchable(async.handle, canBeWatched));
         if (canBeWatched)
         {
-            return setEventWatcher(async, async.fileDescriptor, OUTPUT_EVENTS_MASK);
+            return setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK);
         }
         else
         {
@@ -944,7 +944,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] static Result cancelAsync(AsyncFileWrite& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.fileDescriptor, OUTPUT_EVENTS_MASK);
+        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.handle, OUTPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
@@ -963,11 +963,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             {
                 if (async.useOffset)
                 {
-                    res = ::pwrite(async.fileDescriptor, async.buffer.data(), async.buffer.sizeInBytes(), offset);
+                    res = ::pwrite(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), offset);
                 }
                 else
                 {
-                    res = ::write(async.fileDescriptor, async.buffer.data(), async.buffer.sizeInBytes());
+                    res = ::write(async.handle, async.buffer.data(), async.buffer.sizeInBytes());
                 }
             }
             else
@@ -978,11 +978,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 const int    numVectors = static_cast<int>(async.buffers.sizeInElements());
                 if (async.useOffset)
                 {
-                    res = ::pwritev(async.fileDescriptor, ioVectors, numVectors, offset);
+                    res = ::pwritev(async.handle, ioVectors, numVectors, offset);
                 }
                 else
                 {
-                    res = ::writev(async.fileDescriptor, ioVectors, numVectors);
+                    res = ::writev(async.handle, ioVectors, numVectors);
                 }
             }
         } while ((res == -1) and (errno == EINTR));
@@ -998,7 +998,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncFilePoll& async)
     {
-        return setEventWatcher(async, async.fileDescriptor, INPUT_EVENTS_MASK);
+        return setEventWatcher(async, async.handle, INPUT_EVENTS_MASK);
     }
 
     [[nodiscard]] static Result teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
@@ -1018,7 +1018,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
-        async.code = ::close(async.fileDescriptor);
+        async.code = ::close(async.handle);
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
     }

@@ -508,7 +508,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         const DWORD bufSize = static_cast<DWORD>(buffer.sizeInBytes());
 
-        const FileDescriptor::Handle fileDescriptor = async.fileDescriptor;
+        const FileDescriptor::Handle fileDescriptor = async.handle;
 
         DWORD numBytes;
         if (func(fileDescriptor, buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
@@ -562,7 +562,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         OVERLAPPED& overlapped  = result.getAsync().overlapped.get().overlapped;
         DWORD       transferred = 0;
-        if (::GetOverlappedResult(result.getAsync().fileDescriptor, &overlapped, &transferred, FALSE) == FALSE)
+        if (::GetOverlappedResult(result.getAsync().handle, &overlapped, &transferred, FALSE) == FALSE)
         {
             if (::GetLastError() == ERROR_HANDLE_EOF)
             {
@@ -682,7 +682,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
-        async.code = ::CloseHandle(async.fileDescriptor) == FALSE ? -1 : 0;
+        async.code = ::CloseHandle(async.handle) == FALSE ? -1 : 0;
         SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
     }

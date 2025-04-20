@@ -255,7 +255,7 @@ SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescrip
 SC::Result SC::AsyncFileRead::start(AsyncEventLoop& loop)
 {
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead::start - Zero sized read buffer");
-    SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileRead::start - Invalid file descriptor");
+    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileRead::start - Invalid file descriptor");
     SC_TRY(validateAsync());
     // Only use the async tasks for operations and backends that are not io_uring
     if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
@@ -276,7 +276,7 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop)
     {
         SC_TRY_MSG(not buffers.empty() and not buffers[0].empty(), "AsyncFileWrite::start - Zero sized write buffer");
     }
-    SC_TRY_MSG(fileDescriptor != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
+    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileWrite::start - Invalid file descriptor");
     SC_TRY(validateAsync());
     totalBytesWritten = 0;
 
@@ -306,7 +306,7 @@ SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, Span<const char> data
 SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
-    fileDescriptor = fd;
+    handle = fd;
     queueSubmission(loop);
     return SC::Result(true);
 }
@@ -314,7 +314,7 @@ SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handl
 SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
 {
     SC_TRY(validateAsync());
-    fileDescriptor = fd;
+    handle = fd;
     queueSubmission(loop);
     return SC::Result(true);
 }
@@ -1190,10 +1190,10 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
     case AsyncRequest::Type::SocketClose:   teardown.socketHandle = static_cast<AsyncSocketClose&>(async).handle; break;
 
     // File
-    case AsyncRequest::Type::FileRead:      teardown.fileHandle = static_cast<AsyncFileRead&>(async).fileDescriptor; break;
-    case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).fileDescriptor; break;
-    case AsyncRequest::Type::FileClose:     teardown.fileHandle = static_cast<AsyncFileClose&>(async).fileDescriptor; break;
-    case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).fileDescriptor; break;
+    case AsyncRequest::Type::FileRead:      teardown.fileHandle = static_cast<AsyncFileRead&>(async).handle; break;
+    case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).handle; break;
+    case AsyncRequest::Type::FileClose:     teardown.fileHandle = static_cast<AsyncFileClose&>(async).handle; break;
+    case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).handle; break;
     }
     // clang-format on
 }

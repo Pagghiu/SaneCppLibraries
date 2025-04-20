@@ -53,8 +53,8 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
         SC_TEST_EXPECT(res.get(writtenBytes));
         SC_TEST_EXPECT(writtenBytes == 4);
     };
-    asyncWriteFile.fileDescriptor = handle;
-    asyncWriteFile.buffer         = StringView("test").toCharSpan();
+    asyncWriteFile.handle = handle;
+    asyncWriteFile.buffer = StringView("test").toCharSpan();
     if (useThreadPool)
     {
         SC_TEST_EXPECT(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncWriteTask));
@@ -100,9 +100,9 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
             SC_TEST_EXPECT(readData.empty()); // EOF
         }
     };
-    char buffer[1]               = {0};
-    asyncReadFile.fileDescriptor = handle;
-    asyncReadFile.buffer         = {buffer, sizeof(buffer)};
+    char buffer[1]       = {0};
+    asyncReadFile.handle = handle;
+    asyncReadFile.buffer = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
         SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
@@ -201,9 +201,9 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
         }
         context.readCount++;
     };
-    char buffer[512]             = {0};
-    asyncReadFile.fileDescriptor = handle;
-    asyncReadFile.buffer         = {buffer, sizeof(buffer)};
+    char buffer[512]     = {0};
+    asyncReadFile.handle = handle;
+    asyncReadFile.buffer = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
         SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
@@ -281,7 +281,7 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
         SC_TEST_EXPECT(writtenBytes == 8);
     };
     Span<const char> buffers[] = {{"PING", 4}, {"PONG", 4}};
-    fileWrite.fileDescriptor   = handle;
+    fileWrite.handle           = handle;
     SC_TEST_EXPECT(fileWrite.start(eventLoop, buffers));
 
     SC_TEST_EXPECT(eventLoop.run());

@@ -10,12 +10,15 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
 {
     static bool isEnded(AsyncFileRead::Result& result) { return result.completionData.endOfFile; }
     static bool isEnded(AsyncSocketReceive::Result& result) { return result.completionData.disconnected; }
-    static SocketDescriptor::Handle& getDescriptor(AsyncSocketReceive& async) { return async.handle; }
-    static FileDescriptor::Handle&   getDescriptor(AsyncFileRead& async) { return async.fileDescriptor; }
+    template <typename T>
+    static auto& getDescriptor(T& async)
+    {
+        return async.handle;
+    }
 
     static Result closeDescriptor(AsyncFileRead& async)
     {
-        return detail::FileDescriptorDefinition::releaseHandle(async.fileDescriptor);
+        return detail::FileDescriptorDefinition::releaseHandle(async.handle);
     }
 
     static Result closeDescriptor(AsyncSocketReceive& async)
@@ -123,12 +126,15 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
 template <typename AsyncWriteRequest>
 struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
 {
-    static SocketDescriptor::Handle& getDescriptor(AsyncSocketSend& async) { return async.handle; }
-    static FileDescriptor::Handle&   getDescriptor(AsyncFileWrite& async) { return async.fileDescriptor; }
+    template <typename T>
+    static auto& getDescriptor(T& async)
+    {
+        return async.handle;
+    }
 
     static Result closeDescriptor(AsyncFileWrite& async)
     {
-        return detail::FileDescriptorDefinition::releaseHandle(async.fileDescriptor);
+        return detail::FileDescriptorDefinition::releaseHandle(async.handle);
     }
 
     static Result closeDescriptor(AsyncSocketSend& async)

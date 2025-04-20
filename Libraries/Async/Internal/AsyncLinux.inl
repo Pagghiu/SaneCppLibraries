@@ -541,8 +541,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_read(submission, async.fileDescriptor, async.buffer.data(),
-                                          async.buffer.sizeInBytes(), async.useOffset ? async.offset : -1);
+        globalLibURing.io_uring_prep_read(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(),
+                                          async.useOffset ? async.offset : -1);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
@@ -568,7 +568,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         const __u64 off = async.useOffset ? async.offset : -1;
         if (async.singleBuffer)
         {
-            globalLibURing.io_uring_prep_write(submission, async.fileDescriptor, async.buffer.data(),
+            globalLibURing.io_uring_prep_write(submission, async.handle, async.buffer.data(),
                                                async.buffer.sizeInBytes(), off);
         }
         else
@@ -577,7 +577,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
             const iovec*   vecs  = reinterpret_cast<const iovec*>(async.buffers.data());
             const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
-            globalLibURing.io_uring_prep_writev(submission, async.fileDescriptor, vecs, nVecs, off);
+            globalLibURing.io_uring_prep_writev(submission, async.handle, vecs, nVecs, off);
         }
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
@@ -596,7 +596,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_close(submission, async.fileDescriptor);
+        globalLibURing.io_uring_prep_close(submission, async.handle);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
@@ -617,7 +617,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         // poll operation is completed, it will have to be resubmitted."
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(async, submission));
-        globalLibURing.io_uring_prep_poll_add(submission, async.fileDescriptor, POLLIN);
+        globalLibURing.io_uring_prep_poll_add(submission, async.handle, POLLIN);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }

@@ -744,7 +744,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileReadSnippet
 struct AsyncFileRead : public AsyncRequest
 {
-    AsyncFileRead() : AsyncRequest(Type::FileRead) { fileDescriptor = FileDescriptor::Invalid; }
+    AsyncFileRead() : AsyncRequest(Type::FileRead) { handle = FileDescriptor::Invalid; }
 
     /// @brief Completion data for AsyncFileRead
     struct CompletionData : public AsyncCompletionData
@@ -779,9 +779,9 @@ struct AsyncFileRead : public AsyncRequest
 
     Function<void(Result&)> callback; /// Callback called when some data has been read from the file into the buffer
 
-    Span<char>             buffer;         /// The writeable span of memory where to data will be written
-    FileDescriptor::Handle fileDescriptor; /// The file/pipe descriptor handle to read data from.
-                                           /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+    Span<char>             buffer; /// The writeable span of memory where to data will be written
+    FileDescriptor::Handle handle; /// The file/pipe descriptor handle to read data from.
+                                   /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     /// @brief Returns the last offset set with AsyncFileRead::setOffset
     uint64_t getOffset() const { return offset; }
@@ -823,7 +823,7 @@ struct AsyncFileRead : public AsyncRequest
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
 struct AsyncFileWrite : public AsyncRequest
 {
-    AsyncFileWrite() : AsyncRequest(Type::FileWrite) { fileDescriptor = FileDescriptor::Invalid; }
+    AsyncFileWrite() : AsyncRequest(Type::FileWrite) { handle = FileDescriptor::Invalid; }
 
     /// @brief Completion data for AsyncFileWrite
     struct CompletionData : public AsyncCompletionData
@@ -871,8 +871,8 @@ struct AsyncFileWrite : public AsyncRequest
 
     Function<void(Result&)> callback; ///< Callback called when descriptor is ready to be written with more data
 
-    FileDescriptor::Handle fileDescriptor; ///< The file/pipe descriptor to write data to.
-                                           ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+    FileDescriptor::Handle handle; ///< The file/pipe descriptor to write data to.
+                                   ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     Span<const char>       buffer;              ///< The read-only span of memory where to read the data from
     Span<Span<const char>> buffers;             ///< The read-only spans of memory where to read the data from
@@ -924,7 +924,7 @@ struct AsyncFileClose : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
 };
 
 /// @brief Starts an handle polling operation.
@@ -953,7 +953,7 @@ struct AsyncFilePoll : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
 
-    FileDescriptor::Handle fileDescriptor = FileDescriptor::Invalid;
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
