@@ -891,8 +891,9 @@ struct AsyncFileWrite : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    bool     useOffset = false;
-    uint64_t offset    = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
+    bool     isWatchable = false;
+    bool     useOffset   = false;
+    uint64_t offset      = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
 
     size_t totalBytesWritten = 0;
 #if SC_PLATFORM_WINDOWS

@@ -13,19 +13,19 @@
 #include <sys/epoll.h>    // For epoll functions
 #include <sys/signalfd.h> // For signalfd functions
 #include <sys/socket.h>   // For socket-related functions
-#include <sys/stat.h>
-#include <sys/uio.h> // writev, pwritev
+#include <sys/stat.h>     // fstat
+#include <sys/uio.h>      // writev, pwritev
 
 #else
 
 #include <errno.h>     // For error handling
-#include <netdb.h>     // socketlen_t/getsocketopt/send/recv
+#include <netdb.h>     // socklen_t/getsockopt/recv
 #include <sys/event.h> // kqueue
-#include <sys/stat.h>
-#include <sys/time.h> // timespec
-#include <sys/uio.h>  // writev, pwritev
-#include <sys/wait.h> // WIFEXITED / WEXITSTATUS
-#include <unistd.h>   // read/write/pread/pwrite
+#include <sys/stat.h>  // fstat
+#include <sys/time.h>  // timespec
+#include <sys/uio.h>   // writev, pwritev
+#include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
+#include <unistd.h>    // read/write/pread/pwrite
 #endif
 
 struct SC::AsyncEventLoop::Internal::KernelQueuePosix
@@ -922,74 +922,41 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncFileWrite& async)
+
+    static Result setupAsync(AsyncFileWrite& async)
     {
-        bool canBeWatched;
-        SC_TRY(isDescriptorWriteWatchable(async.handle, canBeWatched));
-        if (canBeWatched)
-        {
-            return setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK);
-        }
-        else
-        {
-            async.flags |= Internal::Flag_ManualCompletion; // on epoll regular files are not watchable
-            return Result(true);
-        }
+        return Result(isDescriptorWriteWatchable(async.handle, async.isWatchable));
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncFileWrite::Result& result)
+    static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
     {
-        return executeOperation(result.getAsync(), result.completionData);
+        return posixWriteCancel(*teardown.eventLoop, teardown.fileHandle, teardown.flags,
+                                teardown.eventLoop->internal.activeFileWrites.front);
     }
 
-    [[nodiscard]] static Result cancelAsync(AsyncFileWrite& async)
+    Result activateAsync(AsyncFileWrite& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*async.eventLoop, async.handle, OUTPUT_EVENTS_MASK);
+        return posixWriteActivate(async, async.useOffset ? static_cast<off_t>(async.offset) : -1, async.isWatchable);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
+    static Result cancelAsync(AsyncFileWrite& async)
     {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
-                                                            OUTPUT_EVENTS_MASK);
+        return posixWriteCancel(*async.eventLoop, async.handle, async.flags,
+                                async.eventLoop->internal.activeFileWrites.front);
     }
 
-    [[nodiscard]] static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
+    static Result completeAsync(AsyncFileWrite::Result& result)
     {
-        ssize_t res;
-        off_t   offset = static_cast<off_t>(async.offset);
-        do
-        {
-            if (async.singleBuffer)
-            {
-                if (async.useOffset)
-                {
-                    res = ::pwrite(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), offset);
-                }
-                else
-                {
-                    res = ::write(async.handle, async.buffer.data(), async.buffer.sizeInBytes());
-                }
-            }
-            else
-            {
-                // Span has same underling representation as iovec (void*, size_t)
-                static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
-                const iovec* ioVectors  = reinterpret_cast<const iovec*>(async.buffers.data());
-                const int    numVectors = static_cast<int>(async.buffers.sizeInElements());
-                if (async.useOffset)
-                {
-                    res = ::pwritev(async.handle, ioVectors, numVectors, offset);
-                }
-                else
-                {
-                    res = ::writev(async.handle, ioVectors, numVectors);
-                }
-            }
-        } while ((res == -1) and (errno == EINTR));
-        SC_TRY_MSG(res >= 0, "::write or ::pwrite failed");
-        completionData.numBytes = static_cast<size_t>(res);
-        SC_TRY_MSG(completionData.numBytes == Internal::getSummedSizeOfBuffers(async),
-                   "Partial write (disk full or RLIMIT_FSIZE reached)");
+        AsyncFileWrite& async = result.getAsync();
+        return posixWriteCompleteAsync<AsyncFileWrite>(result, async.useOffset ? static_cast<off_t>(async.offset) : -1);
+    }
+
+    static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
+    {
+        const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
+        SC_TRY((posixTryWrite(async, totalBytesToSend, async.useOffset ? static_cast<off_t>(async.offset) : -1)));
+        completionData.numBytes = async.totalBytesWritten;
+        SC_TRY_MSG(completionData.numBytes == totalBytesToSend, "Partial write (disk full or RLIMIT_FSIZE reached)");
         return Result(true);
     }
 
