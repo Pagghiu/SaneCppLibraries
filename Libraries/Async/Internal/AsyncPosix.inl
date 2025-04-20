@@ -637,7 +637,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             {
                 if (handle == current->handle and (current->flags & Internal::Flag_WatcherSet))
                 {
-                    current->flags |= Internal::Flag_WatcherSet;
                     return Result(KernelQueuePosix::startSingleWatcherImmediate(*current->eventLoop, current->handle,
                                                                                 OUTPUT_EVENTS_MASK));
                 }
@@ -735,15 +734,16 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         SC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
         if (not posixTryWrite(async, totalBytesToSend, offset))
         {
-            // Not all bytes have been written
+            // Not all bytes have been written, so if descriptor supports watching
+            // start monitoring it, otherwise just return error
             if (watchable)
             {
-                // setup a writable state watcher for this handle
                 async.flags |= Internal::Flag_WatcherSet;
                 return Result(setEventWatcher(async, async.handle, OUTPUT_EVENTS_MASK));
             }
             return Result::Error("Error in posixTryWrite");
         }
+        // Write has finished synchronously so force a manual invocation of its completion
         async.flags |= Internal::Flag_ManualCompletion;
         return Result(true);
     }
@@ -776,6 +776,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static Result posixWriteManualActivateWithSameHandle(T& async, T* current)
     {
         // Activate all asyncs on the same socket descriptor too
+        // TODO: This linear search is not great
         while (current)
         {
             if (current->handle == async.handle)
@@ -784,6 +785,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 async.flags |= Internal::Flag_ManualCompletion;
                 async.eventLoop->internal.manualCompletions.queueBack(*current);
             }
+            current = static_cast<T*>(current->next);
         }
         return Result(true);
     }
@@ -808,9 +810,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result completeAsync(AsyncSocketSend::Result& result)
     {
+        AsyncSocketSend& async = result.getAsync();
         SC_TRY(posixWriteCompleteAsync<AsyncSocketSend>(result, -1));
-        return posixWriteManualActivateWithSameHandle(result.getAsync(),
-                                                      result.getAsync().eventLoop->internal.activeSocketSends.front);
+        return posixWriteManualActivateWithSameHandle(async, async.eventLoop->internal.activeSocketSends.front);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -947,14 +949,17 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result completeAsync(AsyncFileWrite::Result& result)
     {
-        AsyncFileWrite& async = result.getAsync();
-        return posixWriteCompleteAsync<AsyncFileWrite>(result, async.useOffset ? static_cast<off_t>(async.offset) : -1);
+        AsyncFileWrite& async  = result.getAsync();
+        const off_t     offset = async.useOffset ? static_cast<off_t>(async.offset) : -1;
+        SC_TRY(posixWriteCompleteAsync<AsyncFileWrite>(result, offset));
+        return posixWriteManualActivateWithSameHandle(async, async.eventLoop->internal.activeFileWrites.front);
     }
 
     static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
     {
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
-        SC_TRY((posixTryWrite(async, totalBytesToSend, async.useOffset ? static_cast<off_t>(async.offset) : -1)));
+        const off_t  offset           = async.useOffset ? static_cast<off_t>(async.offset) : -1;
+        SC_TRY(posixTryWrite(async, totalBytesToSend, offset));
         completionData.numBytes = async.totalBytesWritten;
         SC_TRY_MSG(completionData.numBytes == totalBytesToSend, "Partial write (disk full or RLIMIT_FSIZE reached)");
         return Result(true);
