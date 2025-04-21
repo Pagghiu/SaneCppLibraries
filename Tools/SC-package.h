@@ -23,6 +23,7 @@ struct Download
 
     SmallString<255> packageName;
     SmallString<255> packageVersion;
+    SmallString<255> shallowClone;
     SmallString<255> packagePlatform;
     SmallString<255> url;
     SmallString<255> fileMD5;
@@ -203,13 +204,55 @@ struct CustomFunctions
 
         if (download.isGitClone)
         {
-            Process process[2];
-            SC_TRY_MSG(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}),
-                       "git is missing");
-            SC_TRY_MSG(process[0].getExitStatus() == 0, "git clone failed");
-            SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
-            SC_TRY(process[1].exec({"git", "checkout", download.packageVersion.view()}));
-            SC_TRY_MSG(process[1].getExitStatus() == 0, "git checkout failed");
+            Process    process[4];
+            StringView params[10];
+            size_t     numParams;
+
+            if (download.shallowClone.isEmpty())
+            {
+                SC_TRY_MSG(process[0].exec({"git", "clone", download.url.view(), package.packageLocalDirectory.view()}),
+                           "git is missing");
+                SC_TRY_MSG(process[0].getExitStatus() == 0, "git clone failed");
+                SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
+
+                SC_TRY(process[3].setWorkingDirectory(package.packageLocalDirectory.view()));
+                SC_TRY(process[3].exec({"git", "checkout", download.packageVersion.view()}));
+                SC_TRY_MSG(process[3].getExitStatus() == 0, "git checkout failed");
+            }
+            else
+            {
+
+                // git init
+                // git remote add origin <url>
+                // git fetch --depth 1 origin <sha1>
+                // git checkout FETCH_HEAD
+                SC_TRY(process[0].setWorkingDirectory(package.packageLocalDirectory.view()));
+                SC_TRY_MSG(process[0].exec({"git", "init"}), "git is missing");
+                SC_TRY_MSG(process[0].getExitStatus() == 0, "git init failed");
+                numParams           = 0;
+                params[numParams++] = "git";
+                params[numParams++] = "remote";
+                params[numParams++] = "add";
+                params[numParams++] = "origin";
+                params[numParams++] = download.url.view();
+                SC_TRY(process[1].setWorkingDirectory(package.packageLocalDirectory.view()));
+                SC_TRY_MSG(process[1].exec({params, numParams}), "git is missing");
+                SC_TRY_MSG(process[1].getExitStatus() == 0, "git remote add failed");
+
+                numParams           = 0;
+                params[numParams++] = "git";
+                params[numParams++] = "fetch";
+                params[numParams++] = "--depth=1";
+                params[numParams++] = "origin";
+                params[numParams++] = download.shallowClone.view(); // Needs the entire Hash
+                SC_TRY(process[2].setWorkingDirectory(package.packageLocalDirectory.view()));
+                SC_TRY_MSG(process[2].exec({params, numParams}), "git is missing");
+                SC_TRY_MSG(process[2].getExitStatus() == 0, "git fetch failed");
+
+                SC_TRY(process[3].setWorkingDirectory(package.packageLocalDirectory.view()));
+                SC_TRY(process[3].exec({"git", "checkout", "FETCH_HEAD"}));
+                SC_TRY_MSG(process[3].getExitStatus() == 0, "git checkout failed");
+            }
         }
         else
         {
