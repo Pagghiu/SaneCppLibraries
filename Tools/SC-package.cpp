@@ -108,6 +108,7 @@ namespace Tools
     download.packageVersion = "df83fbf"; //"v2.2.1";
     download.url            = "https://github.com/jothepro/doxygen-awesome-css.git";
     download.isGitClone     = true;
+    download.shallowClone   = "568f56cde6ac78b6dfcc14acd380b2e745c301ea";
     package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
 
     CustomFunctions functions;
