@@ -631,12 +631,15 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         {
             builder.append(" -fprofile-instr-generate -fcoverage-mapping");
         }
-        if (not compileFlags.enableStdCpp)
-        {
-            builder.append(" -nostdlib++"); // This is only Clang and GCC 13+
-        }
         builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
 
+        if (not compileFlags.enableStdCpp)
+        {
+            // We still need to figure out how to make nostdlib++ work on Clang / Linux
+            builder.append("\nifneq ($(TARGET_OS),linux)");
+            builder.append("\n{0}_COMPILER_LDFLAGS += -nostdlib++", makeTarget); // This is only Clang and GCC 13+
+            builder.append("\nendif");
+        }
         builder.append("\nelse");
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
@@ -735,6 +738,16 @@ $({0}_TARGET_DIR):
         CompileFlags        compileFlags;
         const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
         SC_TRY(CompileFlags::merge(compileSources, compileFlags));
+        if (compileFlags.enableCoverage)
+        {
+            builder.append(
+                R"delimiter(
+ifeq ($(CLANG_DETECTED),yes)
+else
+$(error "Coverage is supported only when using clang")
+endif
+            )delimiter");
+        }
         appendIntermediateDir(builder, makeTarget, relativeDirectories, configName,
                               configuration.intermediatesPath.view());
         appendTargetDir(builder, makeTarget, relativeDirectories, configName, configuration.outputPath.view());
