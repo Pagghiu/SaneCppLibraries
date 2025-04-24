@@ -637,10 +637,10 @@ struct SC::Build::Action::Internal
 {
     static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
     static Result coverage(StringView projectFileName, const Action& action);
-    static Result executeInternal(StringView projectFileName, const Action& action, String* outputExecutable = nullptr);
+    static Result executeInternal(StringView projectFileName, const Action& action, Span<StringView> environment = {},
+                                  String* outputExecutable = nullptr);
 
-    [[nodiscard]] static Result toVisualStudioArchitecture(Architecture::Type architectureType,
-                                                           StringView&        architecture)
+    static Result toVisualStudioArchitecture(Architecture::Type architectureType, StringView& architecture)
     {
         switch (architectureType)
         {
@@ -655,7 +655,7 @@ struct SC::Build::Action::Internal
         return Result(true);
     }
 
-    [[nodiscard]] static Result toXCodeArchitecture(Architecture::Type architectureType, StringView& architecture)
+    static Result toXCodeArchitecture(Architecture::Type architectureType, StringView& architecture)
     {
         switch (architectureType)
         {
@@ -669,7 +669,7 @@ struct SC::Build::Action::Internal
         return Result(true);
     }
 
-    [[nodiscard]] static Result toMakefileArchitecture(Architecture::Type architectureType, StringView& architecture)
+    static Result toMakefileArchitecture(Architecture::Type architectureType, StringView& architecture)
     {
         switch (architectureType)
         {
@@ -712,12 +712,13 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     String executablePath;
 
     // Build the configuration with coverage information
-    newAction.action = Action::Compile;
-    SC_TRY(executeInternal(projectFileName, newAction));
+    newAction.action         = Action::Compile;
+    StringView environment[] = {"CC", "clang", "CXX", "clang++"};
+    SC_TRY(executeInternal(projectFileName, newAction, environment));
 
     // Get coverage configuration executable path
     newAction.action = Action::Print;
-    SC_TRY(executeInternal(projectFileName, newAction, &executablePath));
+    SC_TRY(executeInternal(projectFileName, newAction, environment, &executablePath));
     String coverageDirectory;
     SC_TRY(Path::join(coverageDirectory, {action.parameters.directories.projectsDirectory.view(), "..", "_Coverage"}));
 
@@ -737,7 +738,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         Process process;
         SC_TRY(process.setEnvironment("LLVM_PROFILE_FILE", "profile.profraw"));
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        SC_TRY(process.exec({executablePath.view()}));
+        SC_TRY_MSG(process.exec({executablePath.view()}), "Cannot find instrumented executable");
         SC_TRY_MSG(process.getExitStatus() == 0, "Error executing instrumented executable");
     }
 
@@ -746,25 +747,54 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
 
     size_t numArguments  = 0;
     size_t baseArguments = 0;
+
+    String llvmProfData = "llvm-profdata";
+    String llvmCov      = "llvm-cov";
     switch (HostPlatform)
     {
     case SC::Platform::Apple:
         arguments[numArguments++] = "xcrun"; // 1
         baseArguments             = 1;
         break;
-    default: break;
+    default: {
+        String version;
+        SC_TRY_MSG(Process().exec({"clang", "--version"}, version), "Cannot run clang --version");
+        StringViewTokenizer tokenizer(version.view());
+        int                 major = -1;
+
+        while (tokenizer.tokenizeNext({' '}))
+        {
+            StringViewTokenizer subTokenizer(tokenizer.component);
+            if (not subTokenizer.tokenizeNext({'.'}))
+            {
+                continue;
+            }
+            if (subTokenizer.component.parseInt32(major))
+            {
+                break;
+            }
+        }
+
+        if (major > 0)
+        {
+            SC_TRY(StringBuilder(llvmProfData, StringBuilder::DoNotClear).append("-{}", major));
+            SC_TRY(StringBuilder(llvmCov, StringBuilder::DoNotClear).append("-{}", major));
+        }
+
+        break;
+    }
     }
     {
         numArguments = baseArguments;
         Process process;
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        arguments[numArguments++] = "llvm-profdata";    // 2
-        arguments[numArguments++] = "merge";            // 3
-        arguments[numArguments++] = "-sparse";          // 4
-        arguments[numArguments++] = "profile.profraw";  // 5
-        arguments[numArguments++] = "-o";               // 6
-        arguments[numArguments++] = "profile.profdata"; // 7
-        SC_TRY(process.exec({arguments, numArguments}));
+        arguments[numArguments++] = llvmProfData.view(); // 2
+        arguments[numArguments++] = "merge";             // 3
+        arguments[numArguments++] = "-sparse";           // 4
+        arguments[numArguments++] = "profile.profraw";   // 5
+        arguments[numArguments++] = "-o";                // 6
+        arguments[numArguments++] = "profile.profdata";  // 7
+        SC_TRY_MSG(process.exec({arguments, numArguments}), "llvm-profdata missing");
         SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-profdata");
     }
     // Generate HTML excluding all tests and SC::Tools
@@ -772,10 +802,10 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         numArguments = baseArguments;
         Process process;
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        arguments[numArguments++] = "llvm-cov"; // 2
-        arguments[numArguments++] = "show";     // 3
-        arguments[numArguments++] = "-format";  // 4
-        arguments[numArguments++] = "html";     // 5
+        arguments[numArguments++] = llvmCov.view(); // 2
+        arguments[numArguments++] = "show";         // 3
+        arguments[numArguments++] = "-format";      // 4
+        arguments[numArguments++] = "html";         // 5
         // TODO: De-hardcode this filter and pass it as a parameter
         arguments[numArguments++] = "-ignore-filename-regex=" // 6
                                     "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
@@ -784,7 +814,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         arguments[numArguments++] = "coverage";                        // 8
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
         arguments[numArguments++] = executablePath.view();             // 10
-        SC_TRY(process.exec({arguments, numArguments}));
+        SC_TRY_MSG(process.exec({arguments, numArguments}), "llvm-cov is missing");
         SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov show");
     }
     // Extract report data to generate badge
@@ -794,8 +824,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         // Generate coverage report
         Process process;
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
-        arguments[numArguments++] = "llvm-cov"; // 2
-        arguments[numArguments++] = "report";   // 3
+        arguments[numArguments++] = llvmCov.view(); // 2
+        arguments[numArguments++] = "report";       // 3
         // TODO: De-hardcode this filter and pass it as a parameter
         arguments[numArguments++] = "-ignore-filename-regex=" // 6
                                     "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
@@ -804,7 +834,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
         arguments[numArguments++] = executablePath.view();             // 10
 
         String output;
-        SC_TRY(process.exec({arguments, numArguments}, output));
+        SC_TRY_MSG(process.exec({arguments, numArguments}, output), "llvm-cov is missing");
         SC_TRY_MSG(process.getExitStatus() == 0, "Error executing llvm-cov report");
 
         // Parse coverage report
@@ -850,7 +880,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
 }
 
 SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileName, const Action& action,
-                                                        String* outputExecutable)
+                                                        Span<StringView> environment, String* outputExecutable)
 {
     const StringView configuration  = action.configuration.isEmpty() ? "Debug" : action.configuration;
     const StringView selectedTarget = action.target.isEmpty() ? projectFileName : action.target;
@@ -1053,6 +1083,13 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
             arguments[numArgs++] = architecture; // 7
         }
         SC_TRY(process.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
+        if (environment.sizeInElements() % 2 == 0)
+        {
+            for (size_t idx = 0; idx < environment.sizeInElements(); idx += 2)
+            {
+                SC_TRY(process.setEnvironment(environment[idx], environment[idx + 1]));
+            }
+        }
         if (action.action == Action::Print)
         {
             SC_TRY(process.exec({arguments, numArgs}, *outputExecutable));
