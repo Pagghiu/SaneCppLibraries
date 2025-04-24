@@ -126,8 +126,25 @@ struct CustomFunctions
     if (not fs.existsAndIsFile(localFile) or not checkFileMD5(localFile, localFileMD5))
     {
         Process process;
-        SC_TRY(process.exec({"curl", "-L", "-o", localFile, remoteURL}));
-        SC_TRY_MSG(process.getExitStatus() == 0, "Cannot download file");
+        String  output;
+        Result  res = process.exec({"curl", "-L", "-o", localFile, remoteURL}, output);
+        if (res)
+        {
+            SC_TRY_MSG(process.getExitStatus() == 0, "Cannot download file");
+        }
+        Process process2;
+        if (not res)
+        {
+            res = process2.exec({"wget", "-O", localFile, remoteURL}, output);
+            if (res)
+            {
+                SC_TRY_MSG(process2.getExitStatus() == 0, "Cannot download file");
+            }
+        }
+        if (not res)
+        {
+            return Result::Error("Cannot find neither curl nor wget");
+        }
         SC_TRY(checkFileMD5(localFile, localFileMD5));
     }
     return Result(true);
