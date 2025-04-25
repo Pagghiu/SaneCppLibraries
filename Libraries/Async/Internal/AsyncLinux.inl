@@ -387,7 +387,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         if (continueProcessing and completion.res < 0)
         {
             continueProcessing = false;
-            return Result::Error("Error in processing event");
+            return Result::Error("Error in processing event (io uring)");
         }
         return Result(true);
     }

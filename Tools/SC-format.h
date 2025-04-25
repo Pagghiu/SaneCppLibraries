@@ -64,7 +64,10 @@ struct ProcessLimiter
         {
             availableProcessMonitors.queueBack(processMonitors[idx]);
         }
-        return eventLoop.create();
+        // TODO: Investigate why ProcessLimiter fails on uring backend
+        AsyncEventLoop::Options options;
+        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+        return eventLoop.create(options);
     }
 
     /// @brief Waits for any process still running and free the resources created by event loop
