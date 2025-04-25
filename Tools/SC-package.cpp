@@ -126,11 +126,11 @@ namespace Tools
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "7zip";
-    download.packageVersion = "24.05";
+    download.packageVersion = "24.09";
 
     download.packagePlatform = "windows";
     download.url             = "https://www.7-zip.org/a/7zr.exe";
-    download.fileMD5         = "e877ed2d9463e6729db5768f23640aa4";
+    download.fileMD5         = "9f018e5feb96aae0e893a739c83a8b1f";
     download.createLink      = false;
 
     CustomFunctions functions;
@@ -175,7 +175,8 @@ namespace Tools
     }
     break;
     case Platform::Windows: {
-        SC_TRY(install7ZipR(packagesCacheDirectory, packagesInstallDirectory, sevenZipRPackage));
+        Result res = install7ZipR(packagesCacheDirectory, packagesInstallDirectory, sevenZipRPackage);
+        SC_TRY_MSG(res, "7zr install has failed (check if its hash must be updated)");
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64:
