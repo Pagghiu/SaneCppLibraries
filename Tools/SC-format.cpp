@@ -60,7 +60,7 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
 [[nodiscard]] Result runFormatTool(Tool::Arguments& arguments)
 {
     SmallString<256> clangFormat;
-    if (not Tools::findSystemClangFormat(arguments.console, "15", clangFormat))
+    if (not Tools::findSystemClangFormat(arguments.console, "19", clangFormat))
     {
         StringView      additionalArgs[1];
         Tool::Arguments args = arguments;
@@ -68,11 +68,12 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
         args.action          = "install";
         additionalArgs[0]    = "clang";
         args.arguments       = {additionalArgs};
-        // If no system installed clang-format (matching version 15) has been found, we install a local copy
+        // If no system installed clang-format (matching version 19) has been found, we install a local copy
         Tools::Package clangPackage;
         SC_TRY(runPackageTool(args, &clangPackage));
         SC_TRY(StringBuilder(clangFormat).format("{}/bin/clang-format", clangPackage.installDirectoryLink));
     }
+    arguments.console.print("Using: {}\n", clangFormat);
 
     if (arguments.action == "execute")
     {

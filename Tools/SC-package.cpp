@@ -268,6 +268,19 @@ namespace Tools
     return Result(true);
 }
 
+Result clangFormatMatchesVersion(StringView versionString, StringView wantedMajorVersion)
+{
+    StringViewTokenizer tokenizer(versionString);
+    SC_TRY_MSG(tokenizer.tokenizeNext({'-'}), "clang-format tokenize error"); // component = "clang-"
+    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "format"
+    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "version"
+    SC_TRY_MSG(tokenizer.tokenizeNext({' '}), "clang-format tokenize error"); // component = "x.y.z\n"
+    tokenizer = StringViewTokenizer(tokenizer.component.trimAnyOf({'\n', '\r'}));
+    SC_TRY_MSG(tokenizer.tokenizeNext({'.'}), "clang-format tokenize error");
+    SC_TRY_MSG(tokenizer.component == wantedMajorVersion, "clang-format major version doesn't match wanted one");
+    return Result(true);
+}
+
 [[nodiscard]] Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
 {
     StringView       clangFormatExecutable;
@@ -329,15 +342,7 @@ namespace Tools
     console.print(foundPath.view());
     console.print("\" ");
     console.print(version.view());
-    StringViewTokenizer tokenizer(version.view());
-    SC_TRY(tokenizer.tokenizeNext({'-'})); // component = "clang-"
-    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "format"
-    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "version"
-    SC_TRY(tokenizer.tokenizeNext({' '})); // component = "15.0.7\n"
-    tokenizer = StringViewTokenizer(tokenizer.component.trimAnyOf({'\n', '\r'}));
-    SC_TRY(tokenizer.tokenizeNext({'.'}));
-    SC_TRY_MSG(tokenizer.component == wantedMajorVersion, "clang-format was not at required major version");
-    return Result(true);
+    return clangFormatMatchesVersion(version.view(), wantedMajorVersion);
 }
 
 [[nodiscard]] Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
@@ -345,33 +350,31 @@ namespace Tools
 {
     Package         sevenZipPackage;
     CustomFunctions functions;
-    functions.extractFunction = [](StringView sourceFile, StringView destinationDirectory)
-    { return tarExpandTo(sourceFile, destinationDirectory, 1); };
 
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "clang-binaries";
-    download.packageVersion = "23.01";
+    download.packageVersion = "25.04";
 
+    StringView wantedVersion = "19";
     switch (HostPlatform)
     {
     case Platform::Apple: {
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64:
-
             download.packagePlatform = "macos_arm64";
-            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.7/"
-                                       "clang+llvm-15.0.7-arm64-apple-darwin22.0.tar.xz";
-            download.fileMD5         = "b822d9e4689bd8ed7f19eacec8143dc3";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-macOS-ARM64.tar.xz";
+            download.fileMD5         = "6d28d32e6b74dfbc138483c145acf791";
             break;
         case InstructionSet::Intel64:
             download.packagePlatform = "macos_intel64";
-            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.7/"
-                                       "clang+llvm-15.0.7-x86_64-apple-darwin21.0.tar.xz";
-            download.fileMD5         = "a9ea8150a82f2627cac5b7719e7ba7ff";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-macOS-X64.tar.xz";
+            download.fileMD5         = "a07342bacdaf5ec9964798ca1d8c6315";
             break;
         case InstructionSet::Intel32: {
             return Result::Error("Unsupported platform");
@@ -385,15 +388,15 @@ namespace Tools
         {
         case InstructionSet::ARM64:
             download.packagePlatform = "linux_arm64";
-            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/"
-                                       "clang+llvm-15.0.6-aarch64-linux-gnu.tar.xz";
-            download.fileMD5         = "50a5bf00744ea7c4951fba14a381ad3e";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "clang+llvm-19.1.7-aarch64-linux-gnu.tar.xz";
+            download.fileMD5         = "f1996d9754e1e29b655475c44517401d";
             break;
         case InstructionSet::Intel64:
             download.packagePlatform = "linux_intel64";
-            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/"
-                                       "clang+llvm-15.0.6-x86_64-linux-gnu-ubuntu-18.04.tar.xz";
-            download.fileMD5         = "a48464533ddabc180d830df7e13e82ae";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-Linux-X64.tar.xz";
+            download.fileMD5         = "1d50ec07e8b02b3edd798ae8cfded860";
             break;
         case InstructionSet::Intel32: {
             return Result::Error("Unsupported platform");
@@ -405,36 +408,26 @@ namespace Tools
 
     case Platform::Windows: {
         SC_TRY(install7Zip(packagesCacheDirectory, packagesInstallDirectory, sevenZipPackage));
-        functions.extractFunction = [&sevenZipPackage](StringView fileName, StringView directory) -> Result
-        {
-            Process          process;
-            SmallString<255> outputDirectory;
-            SC_TRY(StringBuilder(outputDirectory).format("-o\"{}\"", directory));
-            SmallString<255> toolFile;
-            SC_TRY(StringBuilder(toolFile).format("{}/7z.exe", sevenZipPackage.installDirectoryLink));
-            SC_TRY(process.exec({toolFile.view(), "x", fileName, outputDirectory.view()}));
-            return Result(process.getExitStatus() == 0);
-        };
 
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64:
             download.packagePlatform = "windows_arm64";
-            download.url =
-                "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/LLVM-15.0.6-woa64.exe";
-            download.fileMD5 = "cb44a9d9646cdbfb42f2eec1c7dbe16b";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-woa64.exe";
+            download.fileMD5         = "780795d36a58ccfee79ea74252d7741e";
             break;
         case InstructionSet::Intel64:
             download.packagePlatform = "windows_intel64";
-            download.url =
-                "https://github.com/llvm/llvm-project/releases/download/llvmorg-15.0.6/LLVM-15.0.6-win64.exe";
-            download.fileMD5 = "61cb3189c02e1582d1703ab1351adb0f";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-win64.exe";
+            download.fileMD5         = "d4c4bed41b38c1427888e070f651908b";
             break;
         case InstructionSet::Intel32:
             download.packagePlatform = "windows_intel32";
-            download.url =
-                "https://github.com/llvm/llvm-project/releases/download/llvmorg-16.0.5/LLVM-16.0.5-win32.exe";
-            download.fileMD5 = "c1a4c346c7c445c263554f954bba62dd";
+            download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-19.1.7/"
+                                       "LLVM-19.1.7-win32.exe";
+            download.fileMD5         = "a710a064915752191366b3c79c71ff57";
             break;
         }
     }
@@ -443,16 +436,40 @@ namespace Tools
         return Result::Error("Unsupported platform");
     }
     }
+    const bool isWindows = HostPlatform == Platform::Windows; // avoids MSVC 'conditial expression is constant'
+    if (isWindows)
+    {
+        functions.extractFunction = [&sevenZipPackage](StringView fileName, StringView directory) -> Result
+        {
+            Process          process;
+            SmallString<255> outputDirectory;
+            SC_TRY(StringBuilder(outputDirectory).format("-o\"{}\"", directory));
+            SmallString<255> toolFile;
+            SC_TRY(StringBuilder(toolFile).format("{}/7z.exe", sevenZipPackage.installDirectoryLink));
+            SC_TRY(process.exec({toolFile.view(), "x", fileName, outputDirectory.view(), "bin/clang-format.exe"}));
+            return Result(process.getExitStatus() == 0);
+        };
+    }
+    else
+    {
+        StringView tarballFile    = Path::basename(Path::basename(download.url.view(), Path::Type::AsPosix), ".tar.xz");
+        functions.extractFunction = [&tarballFile](StringView sourceFile, StringView destinationDirectory)
+        {
+            String clangFile = format("{}/bin/clang-format", tarballFile);
+            return tarExpandSingleFileTo(sourceFile, destinationDirectory, clangFile.view(), 1);
+        };
+    }
 
     // To verify the successful extraction we try to format some stdin with clang-format
-    functions.testFunction = [](const Download&, const Package& package)
+    functions.testFunction = [&wantedVersion](const Download&, const Package& package)
     {
-        String  formatExecutable = format("{}/bin/clang-format", package.installDirectoryLink);
-        Process process;
         String  result;
-        SC_TRY(process.exec({formatExecutable.view()}, result, "int    asd=0;"));
-        SC_TRY_MSG(result == "int asd = 0;", "clang-format doesn't work");
-        return Result(process.getExitStatus() == 0);
+        String  formatExecutable;
+        Process process;
+        formatExecutable = format("{}/bin/clang-format", package.installDirectoryLink);
+        SC_TRY(process.exec({formatExecutable.view(), "--version"}, result));
+        SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
+        return clangFormatMatchesVersion(result.view(), wantedVersion);
     };
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);

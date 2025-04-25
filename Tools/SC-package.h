@@ -159,6 +159,16 @@ struct CustomFunctions
     return Result(process.getExitStatus() == 0);
 }
 
+[[nodiscard]] inline Result tarExpandSingleFileTo(StringView fileName, StringView directory, StringView singleFilePath,
+                                                  int stripComponents)
+{
+    Process          process;
+    SmallString<255> stripString;
+    SC_TRY(StringBuilder(stripString).format("--strip-components={}", stripComponents));
+    SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view(), singleFilePath}));
+    return Result(process.getExitStatus() == 0);
+}
+
 [[nodiscard]] inline Result packageInstall(const Download& download, Package& package, CustomFunctions functions)
 {
     SC_TRY_MSG(not download.packageName.isEmpty(), "Missing packageName");
