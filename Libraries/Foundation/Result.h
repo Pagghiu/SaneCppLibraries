@@ -48,10 +48,7 @@ struct [[nodiscard]] Result
 #define SC_TRY(expression)                                                                                             \
     {                                                                                                                  \
         if (auto _exprResConv = SC::Result(expression))                                                                \
-            SC_LANGUAGE_LIKELY                                                                                         \
-            {                                                                                                          \
-                (void)0;                                                                                               \
-            }                                                                                                          \
+            SC_LANGUAGE_LIKELY { (void)0; }                                                                            \
         else                                                                                                           \
         {                                                                                                              \
             return _exprResConv;                                                                                       \
@@ -61,10 +58,7 @@ struct [[nodiscard]] Result
 /// @brief Checks the value of the given expression and if failed, returns a result with failedMessage to caller
 #define SC_TRY_MSG(expression, failedMessage)                                                                          \
     if (not(expression))                                                                                               \
-        SC_LANGUAGE_UNLIKELY                                                                                           \
-        {                                                                                                              \
-            return SC::Result::Error(failedMessage);                                                                   \
-        }
+        SC_LANGUAGE_UNLIKELY { return SC::Result::Error(failedMessage); }
 
 /// @brief Asserts that the given result is valid
 #define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)

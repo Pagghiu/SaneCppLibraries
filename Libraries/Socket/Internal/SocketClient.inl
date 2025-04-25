@@ -84,7 +84,7 @@ SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readDa
 #if SC_PLATFORM_WINDOWS
     int maxFd = -1;
 #else
-    int        maxFd       = nativeSocket;
+    int maxFd = nativeSocket;
 #endif
     const auto result = ::select(maxFd + 1, &fds, nullptr, nullptr, &tv);
     if (result == SOCKET_ERROR)

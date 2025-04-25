@@ -226,7 +226,7 @@ struct SchemaBuilder
     constexpr SchemaBuilder(Type* output, const uint32_t capacity) : currentLinkID(0), types(output, capacity) {}
 
     template <typename R, typename T, int N>
-    [[nodiscard]] constexpr bool operator()(uint8_t memberTag, R T::*field, const char (&name)[N], size_t offset)
+    [[nodiscard]] constexpr bool operator()(uint8_t memberTag, R T::* field, const char (&name)[N], size_t offset)
     {
         currentLinkID++;
         return types.writeAndAdvance(Type::createMember(memberTag, field, name, offset));

@@ -160,8 +160,8 @@ SC::Time::HighResolutionCounter& SC::Time::HighResolutionCounter::snap()
                   "Change part1");
     static_assert(static_cast<decltype(ts.tv_nsec)>(MaxValue()) <= static_cast<decltype(part2)>(MaxValue()),
                   "Change part2");
-    part1                                       = ts.tv_sec;
-    part2                                       = ts.tv_nsec;
+    part1 = ts.tv_sec;
+    part2 = ts.tv_nsec;
 #endif
     return *this;
 }

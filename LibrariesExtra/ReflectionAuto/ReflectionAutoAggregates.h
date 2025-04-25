@@ -34,7 +34,7 @@ struct DescribeLoopholeVisitor
     template <int MemberTag, typename R>
     constexpr bool visit()
     {
-        R T::*ptr = nullptr;
+        R T::* ptr = nullptr;
         // Simulate offsetof(T, f) under assumption that user is not manipulating members packing.
         currentOffset          = (currentOffset + alignof(R) - 1) & ~(alignof(R) - 1);
         const auto fieldOffset = currentOffset;

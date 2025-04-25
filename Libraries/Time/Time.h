@@ -31,7 +31,7 @@ struct Seconds;
 struct SC::Time::Nanoseconds
 {
     constexpr Nanoseconds() : ns(0) {}
-    constexpr explicit Nanoseconds(int64_t ns) : ns(ns){};
+    constexpr explicit Nanoseconds(int64_t ns) : ns(ns) {};
     int64_t ns;
 
     [[nodiscard]] bool operator>(const Nanoseconds other) const { return ns > other.ns; }
@@ -43,7 +43,7 @@ struct SC::Time::Nanoseconds
 struct SC::Time::Milliseconds
 {
     constexpr Milliseconds() : ms(0) {}
-    constexpr explicit Milliseconds(int64_t ms) : ms(ms){};
+    constexpr explicit Milliseconds(int64_t ms) : ms(ms) {};
     int64_t ms;
 
     [[nodiscard]] bool operator>(const Milliseconds other) const { return ms > other.ms; }
@@ -55,7 +55,7 @@ struct SC::Time::Milliseconds
 struct SC::Time::Seconds
 {
     constexpr Seconds() : sec(0) {}
-    constexpr explicit Seconds(int64_t sec) : sec(sec){};
+    constexpr explicit Seconds(int64_t sec) : sec(sec) {};
     int64_t sec;
 
     [[nodiscard]] bool operator>(const Seconds other) const { return sec > other.sec; }

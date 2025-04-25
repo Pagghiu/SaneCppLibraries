@@ -229,9 +229,9 @@ struct SC::FileSystem::Internal
         {
             return false;
         }
-        auto closeInput = MakeDeferred([&] { ::close(inputDescriptor); });
+        auto        closeInput = MakeDeferred([&] { ::close(inputDescriptor); });
         struct stat inputStat;
-        int res = ::fstat(inputDescriptor, &inputStat);
+        int         res = ::fstat(inputDescriptor, &inputStat);
         if (res < 0)
         {
             return false;

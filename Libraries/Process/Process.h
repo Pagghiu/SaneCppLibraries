@@ -362,7 +362,7 @@ struct SC::ProcessEnvironment
     StringView envStrings[MAX_ENVIRONMENTS];
     wchar_t*   environment = nullptr;
 #else
-    char**    environment = nullptr;
+    char** environment = nullptr;
 #endif
 };
 

@@ -40,7 +40,7 @@ struct ProjectWriter
 struct SC::Build::CompileFlags::Internal
 {
     template <typename FieldType, typename FlagsClass>
-    static void writeStrongest(FieldType FlagsClass::*ptr, const SC::Span<const FlagsClass*> opinions,
+    static void writeStrongest(FieldType FlagsClass::* ptr, const SC::Span<const FlagsClass*> opinions,
                                FlagsClass& flags)
     {
         for (const FlagsClass* opinion : opinions)

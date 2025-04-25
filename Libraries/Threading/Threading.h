@@ -79,14 +79,14 @@ struct SC::ConditionVariable
     static constexpr int OpaqueCVSize      = 40 + sizeof(long);
     static constexpr int OpaqueCVAlignment = alignof(long);
 #elif SC_PLATFORM_WINDOWS
-    static constexpr int OpaqueCVSize         = sizeof(void*);
-    static constexpr int OpaqueCVAlignment    = alignof(void*);
+    static constexpr int OpaqueCVSize      = sizeof(void*);
+    static constexpr int OpaqueCVAlignment = alignof(void*);
 #elif SC_PLATFORM_EMSCRIPTEN
-    static constexpr int OpaqueCVSize         = sizeof(void*) * 12;
-    static constexpr int OpaqueCVAlignment    = alignof(long);
+    static constexpr int OpaqueCVSize      = sizeof(void*) * 12;
+    static constexpr int OpaqueCVAlignment = alignof(long);
 #else
-    static constexpr int OpaqueCVSize         = sizeof(void*) * 6;
-    static constexpr int OpaqueCVAlignment    = alignof(long);
+    static constexpr int OpaqueCVSize      = sizeof(void*) * 6;
+    static constexpr int OpaqueCVAlignment = alignof(long);
 #endif
 
     //  Wrap native condition variable as opaque array of bytes

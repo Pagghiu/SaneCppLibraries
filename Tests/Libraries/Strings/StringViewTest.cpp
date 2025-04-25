@@ -264,8 +264,8 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(sv[0] == "1");
             SC_TEST_EXPECT(sv[1] == "2");
             SC_TEST_EXPECT(sv[2] == "3");
-            Algorithms::bubbleSort(
-                sv, sv + 3, [](StringView a, StringView b) { return a.compare(b) == StringView::Comparison::Bigger; });
+            Algorithms::bubbleSort(sv, sv + 3, [](StringView a, StringView b)
+                                   { return a.compare(b) == StringView::Comparison::Bigger; });
             SC_TEST_EXPECT(sv[0] == "3");
             SC_TEST_EXPECT(sv[1] == "2");
             SC_TEST_EXPECT(sv[2] == "1");

@@ -221,8 +221,7 @@ struct SC::Build::WriterInternal
                 }
             }
         }
-        Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(),
-                               [](const RenderItem& a1, const RenderItem& a2)
+        Algorithms::bubbleSort(outputFiles.begin(), outputFiles.end(), [](const RenderItem& a1, const RenderItem& a2)
                                { return a1.path.view().compare(a2.path.view()) == StringView::Comparison::Smaller; });
         return Result(true);
     }

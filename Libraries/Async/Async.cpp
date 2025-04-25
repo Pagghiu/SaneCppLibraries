@@ -1497,7 +1497,7 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
         }
     }
     break;
-    // clang-format off
+        // clang-format off
     case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
     case AsyncRequest::Type::LoopWork:      activeLoopWork.queueBack(*static_cast<AsyncLoopWork*>(&async));             break;
     case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;

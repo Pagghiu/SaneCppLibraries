@@ -35,7 +35,7 @@ struct SerializerBinaryReadWriteExact
         T&            object;
 
         template <typename R, int N>
-        constexpr bool operator()(int /*memberTag*/, R T::*field, const char (&/*name*/)[N], size_t offset) const
+        constexpr bool operator()(int /*memberTag*/, R T::* field, const char (& /*name*/)[N], size_t offset) const
         {
             SC_COMPILER_UNUSED(offset);
             return SerializerBinaryReadWriteExact<BinaryStream, R>::serialize(object.*field, stream);

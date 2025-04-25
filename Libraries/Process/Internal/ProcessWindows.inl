@@ -306,7 +306,7 @@ extern "C"
     constexpr LONG RTL_CLONE_CHILD  = 297;
 
     typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
-#define NtCurrentProcess() ((HANDLE)(LONG_PTR)-1)
+#define NtCurrentProcess() ((HANDLE)(LONG_PTR) - 1)
     NTSYSAPI NTSTATUS NTAPI RtlCloneUserProcess(_In_ ULONG                          ProcessFlags,
                                                 _In_opt_ PSECURITY_DESCRIPTOR       ProcessSecurityDescriptor,
                                                 _In_opt_ PSECURITY_DESCRIPTOR       ThreadSecurityDescriptor,

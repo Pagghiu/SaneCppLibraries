@@ -40,7 +40,7 @@ bool SC::VirtualMemory::reserve(size_t maxCapacityInBytes)
 #if SC_PLATFORM_WINDOWS
     memory = ::VirtualAlloc(nullptr, maxCapacityInBytes, MEM_RESERVE, PAGE_NOACCESS);
 #else
-    memory                       = ::mmap(nullptr, reservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    memory = ::mmap(nullptr, reservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (memory == MAP_FAILED)
         memory = nullptr;
 #endif

@@ -196,7 +196,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         // First part of events memory is dedicated to eventPointers, second part to actual events
         eventPointers = reinterpret_cast<decltype(eventPointers)>(kernelEvents.eventsMemory.data());
         events        = reinterpret_cast<decltype(events)>(kernelEvents.eventsMemory.data() +
-                                                    totalNumEvents * sizeof(io_uring_cqe*));
+                                                           totalNumEvents * sizeof(io_uring_cqe*));
     }
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)

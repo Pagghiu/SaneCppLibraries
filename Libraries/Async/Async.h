@@ -467,7 +467,7 @@ struct AsyncProcessExit : public AsyncRequest
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
 #elif SC_PLATFORM_LINUX
-    FileDescriptor     pidFd;
+    FileDescriptor pidFd;
 #endif
 };
 

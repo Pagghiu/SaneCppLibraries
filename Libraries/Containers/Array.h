@@ -50,7 +50,7 @@ template <typename T, int N>
 struct Array : public Segment<detail::ArrayVTable<T, N>>
 {
     using Parent = Segment<detail::ArrayVTable<T, N>>;
-    Array() : Parent(sizeof(T) * N){};
+    Array() : Parent(sizeof(T) * N) {};
     // clang-format off
     Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(Parent::template assign<T>({list.begin(), list.size()})); }
     Array(const Array& other) : Array() { SC_ASSERT_RELEASE(Parent::append(other.toSpanConst())); }

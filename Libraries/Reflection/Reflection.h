@@ -314,7 +314,7 @@ struct ExtendedStructTypeInfo
     }
 
     template <typename R, int N>
-    constexpr bool operator()(int memberTag, R T::*member, const char (&name)[N], size_t offset)
+    constexpr bool operator()(int memberTag, R T::* member, const char (&name)[N], size_t offset)
     {
         SC_COMPILER_UNUSED(memberTag);
         SC_COMPILER_UNUSED(name);

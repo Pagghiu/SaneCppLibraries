@@ -64,7 +64,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #if SC_ASYNC_USE_EPOLL
         const int newQueue = ::epoll_create1(O_CLOEXEC);
 #else
-        const int     newQueue = ::kqueue();
+        const int newQueue = ::kqueue();
 #endif
         if (newQueue == -1)
         {
@@ -274,7 +274,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #else
         struct kevent kev;
         EV_SET(&kev, handle, filter, VALUE, 0, 0, nullptr);
-        const int      res   = ::kevent(loopFd, &kev, 1, 0, 0, nullptr);
+        const int res = ::kevent(loopFd, &kev, 1, 0, 0, nullptr);
 #endif
         if (res == 0 or (errno == EBADF or errno == ENOENT))
         {
@@ -382,7 +382,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
 #else
-    static constexpr short INPUT_EVENTS_MASK = EVFILT_READ;
+    static constexpr short INPUT_EVENTS_MASK  = EVFILT_READ;
     static constexpr short OUTPUT_EVENTS_MASK = EVFILT_WRITE;
 
     [[nodiscard]] Result setEventWatcher(AsyncRequest& async, int fileDescriptor, short filter,
@@ -424,7 +424,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     [[nodiscard]] Result validateEvent(uint32_t idx, bool& continueProcessing)
     {
         const struct kevent& event = events[idx];
-        continueProcessing = (event.flags & EV_DELETE) == 0;
+        continueProcessing         = (event.flags & EV_DELETE) == 0;
         if ((event.flags & EV_ERROR) != 0)
         {
             const AsyncRequest* request = getAsyncRequest(idx);

@@ -17,15 +17,9 @@
 
 #if SC_PLUGIN_LIBRARY
 #define SC_PLUGIN_LINKER_OPERATORS                                                                                     \
-    void* operator new(SC::size_t len)                                                                                 \
-    {                                                                                                                  \
-        return SC::Memory::allocate(len, 8);                                                                           \
-    }                                                                                                                  \
-    void* operator new[](SC::size_t len)                                                                               \
-    {                                                                                                                  \
-        return SC::Memory::allocate(len, 8);                                                                           \
-    }                                                                                                                  \
-    void operator delete(void* p, SC::size_t) noexcept                                                                 \
+    void* operator new(SC::size_t len) { return SC::Memory::allocate(len, 8); }                                        \
+    void* operator new[](SC::size_t len) { return SC::Memory::allocate(len, 8); }                                      \
+    void  operator delete(void* p, SC::size_t) noexcept                                                                \
     {                                                                                                                  \
         if (p != 0)                                                                                                    \
         {                                                                                                              \
@@ -43,16 +37,9 @@
 #if SC_COMPILER_MSVC
 #define SC_PLUGIN_LINKER_DEFINITIONS                                                                                   \
     SC_PLUGIN_LINKER_OPERATORS                                                                                         \
-    extern "C" void __CxxFrameHandler4()                                                                               \
-    {                                                                                                                  \
-    }                                                                                                                  \
-    extern "C" void __CxxFrameHandler3()                                                                               \
-    {                                                                                                                  \
-    }                                                                                                                  \
-    int __stdcall DllMain(void*, unsigned int, void*)                                                                  \
-    {                                                                                                                  \
-        return 1;                                                                                                      \
-    }                                                                                                                  \
+    extern "C" void __CxxFrameHandler4() {}                                                                            \
+    extern "C" void __CxxFrameHandler3() {}                                                                            \
+    int __stdcall DllMain(void*, unsigned int, void*) { return 1; }                                                    \
     extern "C" int _fltused = 0;
 #else
 // Cannot use builtin like __builtin_bzero as they will generate an infinite loop

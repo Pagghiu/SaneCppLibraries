@@ -51,7 +51,7 @@ static constexpr Platform HostPlatform = Platform::Apple;
 #define SC_PLATFORM_LINUX      0 ///< True (1) when code is compiled on Linux
 #define SC_PLATFORM_WINDOWS    1 ///< True (1) when code is compiled on Windows
 #define SC_PLATFORM_EMSCRIPTEN 0 ///< True (1) when code is compiled on Emscripten
-static constexpr Platform       HostPlatform       = Platform::Windows;
+static constexpr Platform HostPlatform = Platform::Windows;
 
 #elif defined(__EMSCRIPTEN__)
 

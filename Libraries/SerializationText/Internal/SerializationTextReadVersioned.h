@@ -48,7 +48,7 @@ struct SerializationTextReadVersioned
         bool consumedWithSuccess = false;
 
         template <typename R, int N>
-        constexpr bool operator()(int, R T::*field, const char (&name)[N], size_t)
+        constexpr bool operator()(int, R T::* field, const char (&name)[N], size_t)
         {
             const StringView fieldName = StringView({name, N - 1}, true, StringEncoding::Ascii);
             if (fieldName == fieldToFind)
