@@ -300,6 +300,10 @@ struct CustomFunctions
             SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
             if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
             {
+                if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+                {
+                    SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+                }
                 SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
                 createPackageFile = false;
             }
@@ -315,11 +319,11 @@ struct CustomFunctions
     return Result(true);
 }
 
-inline Result verifyGitCommitHash(const Download& download, const Package& package)
+inline Result verifyGitCommitForDirectory(const Download& download, StringView sourceDirectory)
 {
     String  result;
     Process process;
-    SC_TRY(process.setWorkingDirectory(package.packageLocalDirectory.view()));
+    SC_TRY(process.setWorkingDirectory(sourceDirectory));
     SC_TRY_MSG(process.exec(
                    {
                        "git",
@@ -329,6 +333,15 @@ inline Result verifyGitCommitHash(const Download& download, const Package& packa
                    result),
                "git not installed on current system");
     return Result(result.view().startsWith(download.packageVersion.view()));
+}
+
+inline Result verifyGitCommitHashCache(const Download& download, const Package& package)
+{
+    return verifyGitCommitForDirectory(download, package.packageLocalDirectory.view());
+}
+inline Result verifyGitCommitHashInstall(const Download& download, const Package& package)
+{
+    return verifyGitCommitForDirectory(download, package.installDirectoryLink.view());
 }
 
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";

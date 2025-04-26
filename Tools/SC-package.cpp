@@ -11,9 +11,10 @@ namespace Tools
 [[nodiscard]] Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                     Package& package)
 {
-    static constexpr StringView packageVersion     = "1.9.2";
-    static constexpr StringView packageVersionDash = "1_9_2";
-    static constexpr StringView testVersion        = "1.9.2 (caa4e3de211fbbef2c3adf58a6bd4c86d0eb7cb8";
+    // https://github.com/doxygen/doxygen/releases/download/Release_1_12_0/Doxygen-1.12.0.dmg
+    static constexpr StringView packageVersion     = "1.12.0";
+    static constexpr StringView packageVersionDash = "1_12_0";
+    static constexpr StringView testVersion        = "1.12.0 (c73f5d30f9e8b1df5ba15a1d064ff2067cbb8267";
     static constexpr StringView baseURL            = "https://github.com/doxygen/doxygen/releases/download";
 
     Download download;
@@ -33,7 +34,7 @@ namespace Tools
     case Platform::Apple:
         SC_TRY(sb.append("Doxygen-{0}.dmg", download.packageVersion));
         download.packagePlatform  = "macos";
-        download.fileMD5          = "dbf10cfda8f5128ce7d2b2fc1fa1ce1f";
+        download.fileMD5          = "354ee835cf03e8a0187460a1456eb108";
         package.packageBaseName   = format("Doxygen-{0}.dmg", download.packageVersion);
         functions.extractFunction = [](StringView fileName, StringView directory) -> Result
         {
@@ -55,20 +56,17 @@ namespace Tools
         case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
         default: break;
         }
-        // TODO: Linux official doxygen binary dynamically links libclang-9
-        if (not SystemDynamicLibrary().load("libclang-9"))
-        {
-            return Result::Error("Doxygen: Unsupported platform (Linux) due to missing libclang-9");
-        }
         SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", download.packageVersion));
-        download.packagePlatform = "linux";
-        download.fileMD5         = "c0662ebb72dca6c4a83477b8d354d2fe";
-        package.packageBaseName  = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
+        download.packagePlatform  = "linux";
+        download.fileMD5          = "fd96a5defa535dfe2e987b46540844a4";
+        package.packageBaseName   = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
+        functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+        { return tarExpandSingleFileTo(fileName, directory, "doxygen-1.12.0/bin/doxygen", 2); };
         break;
     case Platform::Windows:
         SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", download.packageVersion));
         download.packagePlatform = "windows";
-        download.fileMD5         = "9a85b8c746af5133852975fc54d74d51";
+        download.fileMD5         = "d014a212331693ffcf72ad99b2087ea0";
         package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", download.packageVersion);
         break;
     case Platform::Emscripten: return Result::Error("Unsupported platform");
@@ -81,16 +79,14 @@ namespace Tools
         String path;
         switch (HostPlatform)
         {
+        case Platform::Linux: //
         case Platform::Apple: //
             path = format("{0}/doxygen", package.installDirectoryLink);
-            break;
-        case Platform::Linux: //
-            path = format("{0}/doxygen-{1}/bin/doxygen", package.installDirectoryLink, download.packageVersion);
             break;
         case Platform::Windows: path = format("{0}/doxygen.exe", package.installDirectoryLink); break;
         case Platform::Emscripten: return Result::Error("Unsupported platform");
         }
-        SC_TRY(Process().exec({path.view(), "-v"}, result));
+        SC_TRY_MSG(Process().exec({path.view(), "-v"}, result), "Cannot run doxygen executable");
         return Result(result.view().startsWith(testVersion));
     };
     SC_TRY(packageInstall(download, package, functions));
@@ -105,14 +101,14 @@ namespace Tools
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "doxygen-awesome-css";
-    download.packageVersion = "df83fbf"; //"v2.2.1";
+    download.packageVersion = "568f56c"; // corresponds to "v2.3.4";
     download.url            = "https://github.com/jothepro/doxygen-awesome-css.git";
     download.isGitClone     = true;
     download.shallowClone   = "568f56cde6ac78b6dfcc14acd380b2e745c301ea";
     package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
 
     CustomFunctions functions;
-    functions.testFunction = &verifyGitCommitHash;
+    functions.testFunction = &verifyGitCommitHashInstall;
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
 }

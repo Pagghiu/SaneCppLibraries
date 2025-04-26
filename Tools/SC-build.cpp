@@ -21,7 +21,7 @@ namespace Tools
     package.packageBaseName = "sokol";
 
     CustomFunctions functions;
-    functions.testFunction = &verifyGitCommitHash;
+    functions.testFunction = &verifyGitCommitHashCache;
 
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
@@ -42,7 +42,7 @@ namespace Tools
     package.packageBaseName = "dear-imgui";
 
     CustomFunctions functions;
-    functions.testFunction = &verifyGitCommitHash;
+    functions.testFunction = &verifyGitCommitHashCache;
 
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);

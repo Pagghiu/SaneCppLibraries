@@ -103,7 +103,7 @@ struct SC::TaggedUnion
     }
 
     using EnumType = typename TypeTraits::RemoveConst<decltype(TypeAt<0>::value)>::type;
-
+#if !DOXYGEN
     /// @brief Extracts type `T` corresponding to enumeration wantedEnum at compile time
     template <EnumType wantedEnum, int StartIndex = NumTypes>
     struct EnumToType
@@ -123,6 +123,7 @@ struct SC::TaggedUnion
         using type                 = typename TypeAt<0>::type;
         static constexpr int index = 0;
     };
+#endif
 
     /// @brief Returns enumeration value of currently active union type
     EnumType getType() const { return type; }

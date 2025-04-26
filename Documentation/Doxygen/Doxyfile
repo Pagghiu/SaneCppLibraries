@@ -75,12 +75,24 @@ Reflect<*> \
 IsPrimitive<*> \
 detail::* \
 Atomic<*> \
+Vector<*> \
+SmallVector<*> \
+ReflectStruct<*> \
+ReflectStruct<*> \
 VectorArrayVTable<*> \
-SegmentHeaderBase \
-SegmentItems  \
-SegmentOperations \
-VectorAllocator \
-ArrayAllocator \
+TaggedUnion<*> \
+ArrayWithSize<*> \
+AlignedStorage<*> \
+Reflection::* \
+ObjectVTable<*> \
+VectorVTable<*> \
+SegmentHeaderOffset \
+SegmentSelfRelativePointer \
+SegmentBuffer \
+SegmentTrivial<*> \
+UniqueHandle<*> \
+VTable \
+SegmentBuffer \
 
 
 USE_MDFILE_AS_MAINPAGE = ../../Documentation/Pages/Index.md
@@ -105,3 +117,4 @@ COLLABORATION_GRAPH    = NO
 DOT_IMAGE_FORMAT       = svg
 WARN_IF_UNDOCUMENTED   = NO
 USE_PDFLATEX           = NO
+HTML_COLORSTYLE        = LIGHT 

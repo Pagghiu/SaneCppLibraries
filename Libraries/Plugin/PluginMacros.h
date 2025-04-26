@@ -114,6 +114,7 @@
         return SC::PluginCastInterface<PluginName, __VA_ARGS__>()(plugin, hash, pluginInterface);                      \
     }
 
+#if !DOXYGEN
 namespace SC
 {
 template <typename PluginClass, typename... InterfaceClasses>
@@ -138,4 +139,5 @@ struct PluginCastInterface<PluginClass, InterfaceClass, InterfaceClasses...>
         return PluginCastInterface<PluginClass, InterfaceClasses...>()(plugin, hash, pluginInterface);
     }
 };
+#endif
 } // namespace SC
