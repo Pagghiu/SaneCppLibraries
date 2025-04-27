@@ -507,6 +507,10 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
             SC_TRY(
                 Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
         }
+        else if (packageName == "7zip")
+        {
+            SC_TRY(Tools::install7Zip(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
         else
         {
             return Result::Error("Invalid package name");

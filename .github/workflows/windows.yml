@@ -18,6 +18,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    # Install 7zip just to check that links are still valid
+    - name: package install 7zip
+      shell: cmd
+      run: SC.bat package install 7zip
     - name: configure
       shell: cmd
       run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }}

@@ -24,6 +24,9 @@ jobs:
     - name: install
       run: sudo apt install -y liburing-dev
       if: matrix.params.os == 'ubuntu-latest'
+    # Install 7zip just to check that links are still valid
+    - name: package install 7zip
+      run: ./SC.sh package install 7zip
     - name: configure
       run: ./SC.sh build configure SCTest ${{ matrix.config }}
     - name: build
