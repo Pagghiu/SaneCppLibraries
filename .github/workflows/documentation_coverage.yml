@@ -28,11 +28,12 @@ concurrency:
 jobs:
   # Build job
   build:
-    # TODO: To use Linux we should figure out how to install libclang-9 for Doxygen 1.9.6 to work
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
     - uses: actions/checkout@v4
+    - name: install
+      run: sudo apt install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev
     - name: clang-format
       run: ./SC.sh format check
     - name: build documentation

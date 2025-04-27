@@ -21,8 +21,6 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: clang-format
-      run: ./SC.sh format check
     - name: install
       run: sudo apt install -y liburing-dev
       if: matrix.params.os == 'ubuntu-latest'
