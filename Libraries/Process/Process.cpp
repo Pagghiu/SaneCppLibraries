@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
+#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl"
 #include "../File/File.h"
 #include "../Strings/StringConverter.h"
 

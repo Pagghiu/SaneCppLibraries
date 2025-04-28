@@ -3,7 +3,7 @@
 #pragma once
 
 #include "../Async/Async.h" // AsyncLoopWakeUp
-#include "../Containers/IntrusiveDoubleLinkedList.h"
+#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"

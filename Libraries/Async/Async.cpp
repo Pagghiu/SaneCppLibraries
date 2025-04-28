@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl"
 #include "../Foundation/Platform.h"
 #include "../Socket/Socket.h"
 

@@ -3,6 +3,7 @@
 
 // TODO: Figure out a way to avoid this macro
 
+#include "../Libraries/Containers/Internal/IntrusiveDoubleLinkedList.inl"
 #include "SC-package.h"
 
 #if !defined(SC_LIBRARY_PATH)
