@@ -13,7 +13,12 @@
 #include "../File/FileDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
-
+namespace SC
+{
+struct ThreadPool;
+struct ThreadPoolTask;
+struct EventObject;
+} // namespace SC
 //! @defgroup group_async Async
 //! @copybrief library_async (see @ref library_async for more details)
 //! Async is a multi-platform / event-driven asynchronous I/O library.
@@ -38,31 +43,15 @@
 ///
 /// If an async operation is not supported by the OS, the caller can provide a SC::ThreadPool to run it on a thread.
 /// See SC::AsyncFileRead / SC::AsyncFileWrite for an example.
+
+//! @addtogroup group_async
+//! @{
 namespace SC
 {
-// Forward Declarations
-struct ThreadPool;
-struct ThreadPoolTask;
-
-struct EventObject;
-struct AsyncKernelEvents;
-struct AsyncEventLoopListeners;
 struct AsyncEventLoop;
-struct AsyncEventLoopMonitor;
-
-struct AsyncRequest;
 struct AsyncResult;
-template <typename T, typename C>
-struct AsyncResultOf;
-struct AsyncCompletionData;
-
 struct AsyncTask;
-template <typename AsyncType>
-struct AsyncTaskOf;
-} // namespace SC
 
-namespace SC
-{
 namespace detail
 {
 struct AsyncWinOverlapped;
@@ -86,10 +75,6 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 {
 };
 } // namespace detail
-} // namespace SC
-
-//! @addtogroup group_async
-//! @{
 
 /// @brief Base class for all async requests, holding state and type.
 /// An async operation is struct derived from AsyncRequest asking for some I/O to be done made to the OS. @n
@@ -129,7 +114,7 @@ struct WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 /// 3. Async in Active state (so after setupAsync and activateAsync) --> will receive cancelAsync and teardownAsync
 ///
 /// Any other case is considered an error (trying to cancel an async already being cancelled or being teardown).
-struct SC::AsyncRequest
+struct AsyncRequest
 {
     AsyncRequest* next = nullptr;
     AsyncRequest* prev = nullptr;
@@ -229,13 +214,13 @@ struct SC::AsyncRequest
 };
 
 /// @brief Empty base struct for all AsyncRequest-derived CompletionData (internal) structs.
-struct SC::AsyncCompletionData
+struct AsyncCompletionData
 {
 };
 
 /// @brief Base class for all async results (argument of completion callbacks).
 /// It holds Result (returnCode) and re-activation flag.
-struct SC::AsyncResult
+struct AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
     AsyncResult(AsyncRequest& request, SC::Result&& res) : async(request), returnCode(move(res)) {}
@@ -265,7 +250,7 @@ struct SC::AsyncResult
 /// @tparam T Type of the request class associated to this result
 /// @tparam C Type of the CompletionData derived class associated to this result
 template <typename T, typename C>
-struct SC::AsyncResultOf : public AsyncResult
+struct AsyncResultOf : public AsyncResult
 {
     T&       getAsync() { return static_cast<T&>(AsyncResult::async); }
     const T& getAsync() const { return static_cast<const T&>(AsyncResult::async); }
@@ -281,7 +266,7 @@ struct SC::AsyncResultOf : public AsyncResult
 /// @note Operations that support to be executed in background thread, accept an SC::AsyncTask in their `start` method.
 /// @warning The SC::ThreadPool::Task cannot be shared with other requests and it cannot be reused until the completion
 /// callback has been called.
-struct SC::AsyncTask
+struct AsyncTask
 {
     AsyncTask(AsyncCompletionData& asyncCompletionData) : completionData(asyncCompletionData) {}
 
@@ -305,16 +290,11 @@ struct SC::AsyncTask
 /// You don't use this class directly but probably call the aliases like SC::AsyncFileRead::Task
 /// @tparam AsyncType Type of the request class associated to this result
 template <typename AsyncType>
-struct SC::AsyncTaskOf : public AsyncTask
+struct AsyncTaskOf : public AsyncTask
 {
     typename AsyncType::CompletionData asyncCompletionData;
     AsyncTaskOf() : AsyncTask(asyncCompletionData) {}
 };
-
-namespace SC
-{
-//! @addtogroup group_async
-//! @{
 
 /// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.
 /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
@@ -781,7 +761,7 @@ struct AsyncFileRead : public AsyncRequest
 
     Span<char>             buffer; /// The writeable span of memory where to data will be written
     FileDescriptor::Handle handle; /// The file/pipe descriptor handle to read data from.
-                                   /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+    /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     /// @brief Returns the last offset set with AsyncFileRead::setOffset
     uint64_t getOffset() const { return offset; }
@@ -872,7 +852,7 @@ struct AsyncFileWrite : public AsyncRequest
     Function<void(Result&)> callback; ///< Callback called when descriptor is ready to be written with more data
 
     FileDescriptor::Handle handle; ///< The file/pipe descriptor to write data to.
-                                   ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+    ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
 
     Span<const char>       buffer;              ///< The read-only span of memory where to read the data from
     Span<Span<const char>> buffers;             ///< The read-only spans of memory where to read the data from
@@ -960,14 +940,10 @@ struct AsyncFilePoll : public AsyncRequest
 #endif
 };
 
-//! @}
-
-} // namespace SC
-
 /// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from
 /// AsyncEventLoop::runOnce. Such events can then be later passed to AsyncEventLoop::dispatchCompletions.
 /// @see AsyncEventLoop::runOnce
-struct SC::AsyncKernelEvents
+struct AsyncKernelEvents
 {
     Span<uint8_t> eventsMemory; ///< User supplied block of memory used to store kernel I/O events
 
@@ -977,7 +953,7 @@ struct SC::AsyncKernelEvents
 };
 
 /// @brief Allow library user to provide callbacks signaling different phases of async event loop cycle
-struct SC::AsyncEventLoopListeners
+struct AsyncEventLoopListeners
 {
     Function<void(AsyncEventLoop&)> beforeBlockingPoll;
     Function<void(AsyncEventLoop&)> afterBlockingPoll;
@@ -989,7 +965,7 @@ struct SC::AsyncEventLoopListeners
 ///
 /// Basic lifetime for an event loop is:
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncEventLoopSnippet
-struct SC::AsyncEventLoop
+struct AsyncEventLoop
 {
     /// @brief Options given to AsyncEventLoop::create
     struct Options
@@ -1160,7 +1136,7 @@ struct SC::AsyncEventLoop
 /// @brief Monitors Async I/O events from a background thread using a blocking kernel function (no CPU usage on idle).
 /// AsyncEventLoopMonitor makes it easy to integrate AsyncEventLoop within a GUI event loop or another I/O event loop.
 /// This pattern avoids constantly polling the kernel, using virtually 0% of CPU time when waiting for events.
-struct SC::AsyncEventLoopMonitor
+struct AsyncEventLoopMonitor
 {
     Function<void(void)> onNewEventsAvailable; ///< Informs to call dispatchCompletions on GUI Event Loop
 
@@ -1211,4 +1187,5 @@ struct SC::AsyncEventLoopMonitor
     Result monitoringLoopThread(Thread& thread);
 };
 
+} // namespace SC
 //! @}
