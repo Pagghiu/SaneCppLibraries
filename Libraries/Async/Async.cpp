@@ -1071,9 +1071,8 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
     template <typename T>
     static void executeThreadPoolOperation(T& async)
     {
-        AsyncTask& task           = *async.asyncTask;
-        auto&      completionData = static_cast<typename T::CompletionData&>(task.completionData);
-        task.returnCode           = KernelEvents::executeOperation(async, completionData);
+        AsyncTask& task = *async.asyncTask;
+        task.returnCode = KernelEvents::executeOperation(async, task.completion.construct(async));
         async.eventLoop->internal.manualThreadPoolCompletions.push(async);
         SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
     }
@@ -1135,7 +1134,7 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
             {
                 AsyncTask* asyncTask  = result.getAsync().asyncTask;
                 result.returnCode     = asyncTask->returnCode;
-                result.completionData = move(static_cast<AsyncCompletion&>(asyncTask->completionData));
+                result.completionData = move(asyncTask->completion.getCompletion(async));
                 // The task is already finished but we need waitForTask to make it available for next runs.
                 SC_TRY(asyncTask->threadPool->waitForTask(asyncTask->task));
                 asyncTask->freeTask();
@@ -1552,4 +1551,30 @@ template <>
 void SC::AsyncEventLoop::Internal::KernelQueueOpaque::destruct(Object& obj)
 {
     obj.~Object();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncCompletionVariant
+//-------------------------------------------------------------------------------------------------------
+
+void SC::detail::AsyncCompletionVariant::destroy()
+{
+    if (not inited)
+        return;
+    switch (type)
+    {
+    case AsyncRequest::Type::LoopWork: dtor(completionDataLoopWork); break;
+    case AsyncRequest::Type::LoopTimeout: dtor(completionDataLoopTimeout); break;
+    case AsyncRequest::Type::LoopWakeUp: dtor(completionDataLoopWakeUp); break;
+    case AsyncRequest::Type::ProcessExit: dtor(completionDataProcessExit); break;
+    case AsyncRequest::Type::SocketAccept: dtor(completionDataSocketAccept); break;
+    case AsyncRequest::Type::SocketConnect: dtor(completionDataSocketConnect); break;
+    case AsyncRequest::Type::SocketSend: dtor(completionDataSocketSend); break;
+    case AsyncRequest::Type::SocketReceive: dtor(completionDataSocketReceive); break;
+    case AsyncRequest::Type::SocketClose: dtor(completionDataSocketClose); break;
+    case AsyncRequest::Type::FileRead: dtor(completionDataFileRead); break;
+    case AsyncRequest::Type::FileWrite: dtor(completionDataFileWrite); break;
+    case AsyncRequest::Type::FileClose: dtor(completionDataFileClose); break;
+    case AsyncRequest::Type::FilePoll: dtor(completionDataFilePoll); break;
+    }
 }

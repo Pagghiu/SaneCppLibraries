@@ -429,7 +429,7 @@ asyncReadFile.buffer = {buffer, sizeof(buffer)};
 SC_TRY(fd.get(asyncReadFile.handle, Result::Error("Invalid handle")));
 
 // Start the operation on a thread pool
-AsyncFileRead::Task asyncFileTask;
+AsyncTask asyncFileTask;
 SC_TRY(asyncReadFile.setThreadPoolAndTask(threadPool, asyncFileTask));
 SC_TRY(asyncReadFile.start(eventLoop));
 
@@ -477,7 +477,7 @@ asyncWriteFile.buffer = StringView("test").toCharSpan();
 // AsyncFileWrite::buffers and AsyncFileWrite::singleBuffer = false
     
 // Start the operation in a thread pool
-AsyncFileWrite::Task asyncFileTask;
+AsyncTask asyncFileTask;
 SC_TRY(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncFileTask));
 SC_TRY(asyncWriteFile.start(eventLoop));
 

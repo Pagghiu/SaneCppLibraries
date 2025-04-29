@@ -260,42 +260,6 @@ struct AsyncResultOf : public AsyncResult
     C completionData;
 };
 
-/// @brief Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a background
-/// thread This object lifetime is the same as the SC::AsyncRequest it's associated with, like SC::AsyncFileRead or
-/// SC::AsyncFileWrite.
-/// @note Operations that support to be executed in background thread, accept an SC::AsyncTask in their `start` method.
-/// @warning The SC::ThreadPool::Task cannot be shared with other requests and it cannot be reused until the completion
-/// callback has been called.
-struct AsyncTask
-{
-    AsyncTask(AsyncCompletionData& asyncCompletionData) : completionData(asyncCompletionData) {}
-
-  protected:
-    ThreadPoolTask task;
-    ThreadPool*    threadPool = nullptr;
-
-    void freeTask() { async = nullptr; }
-    bool isFree() const { return async == nullptr; }
-
-    friend struct AsyncEventLoop;
-    friend struct AsyncRequest;
-
-    AsyncCompletionData& completionData;
-
-    SC::Result    returnCode = SC::Result(true);
-    AsyncRequest* async      = nullptr;
-};
-
-/// @brief Create an async Callback result for a given AsyncRequest-derived class.
-/// You don't use this class directly but probably call the aliases like SC::AsyncFileRead::Task
-/// @tparam AsyncType Type of the request class associated to this result
-template <typename AsyncType>
-struct AsyncTaskOf : public AsyncTask
-{
-    typename AsyncType::CompletionData asyncCompletionData;
-    AsyncTaskOf() : AsyncTask(asyncCompletionData) {}
-};
-
 /// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.
 /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
 ///
@@ -373,37 +337,6 @@ struct AsyncLoopWakeUp : public AsyncRequest
 
     EventObject* eventObject = nullptr;
     Atomic<bool> pending     = false;
-};
-
-/// @brief Executes work in a thread pool and then invokes a callback on the event loop thread. @n
-/// AsyncLoopWork::work is invoked on one of the thread supplied by the ThreadPool passed during AsyncLoopWork::start.
-/// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
-///
-/// \snippet Tests/Libraries/Async/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
-struct AsyncLoopWork : public AsyncRequest
-{
-    AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
-
-    /// @brief Completion data for AsyncLoopWakeUp
-    using CompletionData = AsyncCompletionData;
-
-    /// @brief Callback result for AsyncLoopWakeUp
-    using Result = AsyncResultOf<AsyncLoopWork, CompletionData>;
-
-    /// @brief Sets the ThreadPool that will supply the thread to run the async work on
-    /// @note Always call this method at least once before AsyncLoopWork::start
-    SC::Result setThreadPool(ThreadPool& threadPool);
-
-    /// @brief Schedule work to be executed on a background thread, notifying the event loop when it's finished.
-    /// @param eventLoop The AsyncEventLoop where to schedule this work on
-    /// @note Remember to call AsyncLoopWork::setThreadPool at least once before calling AsyncLoopWork::start
-    SC::Result start(AsyncEventLoop& eventLoop);
-
-    Function<SC::Result()>  work;     /// Called to execute the work in a background threadpool thread
-    Function<void(Result&)> callback; /// Called after work is done, on the thread calling EventLoop::run()
-
-  private:
-    AsyncTaskOf<AsyncLoopWork> task;
 };
 
 /// @brief Starts monitoring a process, notifying about its termination.
@@ -745,8 +678,6 @@ struct AsyncFileRead : public AsyncRequest
         }
     };
 
-    using Task = AsyncTaskOf<AsyncFileRead>;
-
     /// @brief Starts a file receive operation, that completes when data has been read from file / pipe.
     /// @param eventLoop The EventLoop to run this operation on
     /// @note
@@ -822,8 +753,6 @@ struct AsyncFileWrite : public AsyncRequest
             return returnCode;
         }
     };
-
-    using Task = AsyncTaskOf<AsyncFileWrite>;
 
     /// @brief Starts a file write operation that completes when it's ready to receive more bytes.
     /// @param eventLoop The EventLoop to run this operation on
@@ -938,6 +867,122 @@ struct AsyncFilePoll : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
+};
+
+struct AsyncLoopWork; // forward declared because it must be defined after AsyncTask
+
+namespace detail
+{
+// A simple hand-made variant of all completion types
+struct AsyncCompletionVariant
+{
+    AsyncCompletionVariant() {}
+    ~AsyncCompletionVariant() { destroy(); }
+
+    AsyncCompletionVariant(const AsyncCompletionVariant&)            = delete;
+    AsyncCompletionVariant(AsyncCompletionVariant&&)                 = delete;
+    AsyncCompletionVariant& operator=(const AsyncCompletionVariant&) = delete;
+    AsyncCompletionVariant& operator=(AsyncCompletionVariant&&)      = delete;
+
+    bool               inited = false;
+    AsyncRequest::Type type;
+    union
+    {
+        AsyncCompletionData                completionDataLoopWork; // Defined after AsyncCompletionVariant / AsyncTask
+        AsyncLoopTimeout::CompletionData   completionDataLoopTimeout;
+        AsyncLoopWakeUp::CompletionData    completionDataLoopWakeUp;
+        AsyncProcessExit::CompletionData   completionDataProcessExit;
+        AsyncSocketAccept::CompletionData  completionDataSocketAccept;
+        AsyncSocketConnect::CompletionData completionDataSocketConnect;
+        AsyncSocketSend::CompletionData    completionDataSocketSend;
+        AsyncSocketReceive::CompletionData completionDataSocketReceive;
+        AsyncSocketClose::CompletionData   completionDataSocketClose;
+        AsyncFileRead::CompletionData      completionDataFileRead;
+        AsyncFileWrite::CompletionData     completionDataFileWrite;
+        AsyncFileClose::CompletionData     completionDataFileClose;
+        AsyncFilePoll::CompletionData      completionDataFilePoll;
+    };
+
+    auto& getCompletion(AsyncLoopWork&) { return completionDataLoopWork; }
+    auto& getCompletion(AsyncLoopTimeout&) { return completionDataLoopTimeout; }
+    auto& getCompletion(AsyncLoopWakeUp&) { return completionDataLoopWakeUp; }
+    auto& getCompletion(AsyncProcessExit&) { return completionDataProcessExit; }
+    auto& getCompletion(AsyncSocketAccept&) { return completionDataSocketAccept; }
+    auto& getCompletion(AsyncSocketConnect&) { return completionDataSocketConnect; }
+    auto& getCompletion(AsyncSocketSend&) { return completionDataSocketSend; }
+    auto& getCompletion(AsyncSocketReceive&) { return completionDataSocketReceive; }
+    auto& getCompletion(AsyncSocketClose&) { return completionDataSocketClose; }
+    auto& getCompletion(AsyncFileRead&) { return completionDataFileRead; }
+    auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
+    auto& getCompletion(AsyncFileClose&) { return completionDataFileClose; }
+    auto& getCompletion(AsyncFilePoll&) { return completionDataFilePoll; }
+
+    template <typename T>
+    auto& construct(T& t)
+    {
+        destroy();
+        placementNew(getCompletion(t));
+        inited = true;
+        type   = t.getType();
+        return getCompletion(t);
+    }
+    void destroy();
+};
+} // namespace detail
+
+/// @brief Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a background
+/// thread This object lifetime is the same as the SC::AsyncRequest it's associated with, like SC::AsyncFileRead or
+/// SC::AsyncFileWrite.
+/// @note Operations that support to be executed in background thread, accept an SC::AsyncTask in their `start` method.
+/// @warning The SC::ThreadPool::Task cannot be shared with other requests and it cannot be reused until the completion
+/// callback has been called.
+struct AsyncTask
+{
+  protected:
+    ThreadPoolTask task;
+    ThreadPool*    threadPool = nullptr;
+    AsyncRequest*  async      = nullptr;
+
+    friend struct AsyncEventLoop;
+    friend struct AsyncRequest;
+
+    void freeTask() { async = nullptr; }
+    bool isFree() const { return async == nullptr; }
+
+    detail::AsyncCompletionVariant completion;
+
+    SC::Result returnCode = SC::Result(true);
+};
+
+/// @brief Executes work in a thread pool and then invokes a callback on the event loop thread. @n
+/// AsyncLoopWork::work is invoked on one of the thread supplied by the ThreadPool passed during AsyncLoopWork::start.
+/// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
+///
+/// \snippet Tests/Libraries/Async/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
+struct AsyncLoopWork : public AsyncRequest
+{
+    AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
+
+    /// @brief Completion data for AsyncLoopWakeUp
+    using CompletionData = AsyncCompletionData;
+
+    /// @brief Callback result for AsyncLoopWakeUp
+    using Result = AsyncResultOf<AsyncLoopWork, CompletionData>;
+
+    /// @brief Sets the ThreadPool that will supply the thread to run the async work on
+    /// @note Always call this method at least once before AsyncLoopWork::start
+    SC::Result setThreadPool(ThreadPool& threadPool);
+
+    /// @brief Schedule work to be executed on a background thread, notifying the event loop when it's finished.
+    /// @param eventLoop The AsyncEventLoop where to schedule this work on
+    /// @note Remember to call AsyncLoopWork::setThreadPool at least once before calling AsyncLoopWork::start
+    SC::Result start(AsyncEventLoop& eventLoop);
+
+    Function<SC::Result()>  work;     /// Called to execute the work in a background threadpool thread
+    Function<void(Result&)> callback; /// Called after work is done, on the thread calling EventLoop::run()
+
+  private:
+    AsyncTask task;
 };
 
 /// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from

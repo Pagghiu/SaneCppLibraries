@@ -43,8 +43,8 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
     // 5. Create and start the write operation
-    AsyncFileWrite       asyncWriteFile;
-    AsyncFileWrite::Task asyncWriteTask;
+    AsyncFileWrite asyncWriteFile;
+    AsyncTask      asyncWriteTask;
 
     asyncWriteFile.setDebugName("FileWrite");
     asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -79,9 +79,9 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
         int  readCount     = 0;
         char readBuffer[4] = {0};
     };
-    Params              params;
-    AsyncFileRead       asyncReadFile;
-    AsyncFileRead::Task asyncReadTask;
+    Params        params;
+    AsyncFileRead asyncReadFile;
+    AsyncTask     asyncReadTask;
     asyncReadFile.setDebugName("FileRead");
     asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
     {
@@ -174,8 +174,8 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
         int    readCount = 0;
         size_t readSize  = 0;
     } context;
-    AsyncFileRead       asyncReadFile;
-    AsyncFileRead::Task asyncReadTask;
+    AsyncFileRead asyncReadFile;
+    AsyncTask     asyncReadTask;
     asyncReadFile.setDebugName("FileRead");
     asyncReadFile.callback = [this, &context](AsyncFileRead::Result& res)
     {
@@ -267,8 +267,8 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
 
     // 5. Write the file using two buffers
-    AsyncFileWrite       fileWrite;
-    AsyncFileWrite::Task fileWriteTask;
+    AsyncFileWrite fileWrite;
+    AsyncTask      fileWriteTask;
     if (useThreadPool)
     {
         SC_TEST_EXPECT(fileWrite.setThreadPoolAndTask(threadPool, fileWriteTask));
