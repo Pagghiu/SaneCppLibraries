@@ -8,10 +8,15 @@ They leverage the growing shell, system and network programming capabilities of 
 
 Another way to look at them is just as small _C++ scripts_ for which you don't need to setup or maintain a build system, as long as you only use Sane C++ Libraries.
 
-Check the [March 2024 Blog update post](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html) for more details.
-
 @note Name is `SC::Tools` and not `SC::Scripts` because they're still just small programs.  
 If the system will be generalized even more, maybe acquiring more advanced capabilities from [SC::Plugin](@ref library_plugin) and [SC::Build](@ref library_build) or sandboxing capabilities, this naming will be re-evaluated and/or changed.
+
+# Blog
+
+Some relevant blog posts are:
+
+- [March 2024 Blog update post](https://pagghiu.github.io/site/blog/2024-03-27-SaneCppLibrariesUpdate.html)
+- [April 2025 Update](https://pagghiu.github.io/site/blog/2025-04-30-SaneCppLibrariesUpdate.html)
 
 # Reasons
 
