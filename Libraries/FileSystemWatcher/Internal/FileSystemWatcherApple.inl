@@ -52,7 +52,7 @@ struct SC::FileSystemWatcher::Internal
         eventLoopRunner = &runner;
         auto& async     = eventLoopRunner->eventLoopAsync;
         async.callback.bind<Internal, &Internal::onMainLoop>(*this);
-        return async.start(*eventLoopRunner->eventLoop, &eventLoopRunner->eventObject);
+        return async.start(*eventLoopRunner->eventLoop, eventLoopRunner->eventObject);
     }
 
     [[nodiscard]] Result initThread()

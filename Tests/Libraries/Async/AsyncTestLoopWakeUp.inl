@@ -109,7 +109,7 @@ void SC::AsyncTest::loopWakeUpEventObject()
         callbackThreadID = Thread::CurrentThreadID();
         params.notifier1Called++;
     };
-    SC_TEST_EXPECT(wakeUp.start(eventLoop, &params.eventObject));
+    SC_TEST_EXPECT(wakeUp.start(eventLoop, params.eventObject));
     Thread newThread1;
     auto   threadLambda = [&params, &wakeUp](Thread& thread)
     {

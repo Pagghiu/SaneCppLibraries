@@ -189,7 +189,7 @@ wakeUpWaiting.callback = [&](AsyncLoopWakeUp::Result& result)
     result.reactivateRequest(true); // To allow waking-up it again later
 };
 EventObject eventObject;
-SC_TRY(wakeUpWaiting.start(eventLoop, &eventObject));
+SC_TRY(wakeUpWaiting.start(eventLoop, eventObject));
 eventObject.wait(); // Wait until callback has been fully run inside event loop thread
 // From here on we know for sure that callback has been called
 //! [AsyncLoopWakeUpSnippet2]
