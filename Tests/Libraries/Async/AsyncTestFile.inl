@@ -43,8 +43,8 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fd.get(handle, Result::Error("asd")));
 
     // 5. Create and start the write operation
-    AsyncFileWrite asyncWriteFile;
-    AsyncTask      asyncWriteTask;
+    AsyncFileWrite    asyncWriteFile;
+    AsyncTaskSequence asyncWriteTask;
 
     asyncWriteFile.setDebugName("FileWrite");
     asyncWriteFile.callback = [&](AsyncFileWrite::Result& res)
@@ -57,7 +57,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     asyncWriteFile.buffer = StringView("test").toCharSpan();
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncWriteTask));
+        SC_TEST_EXPECT(asyncWriteFile.executeOn(asyncWriteTask, threadPool));
     }
     SC_TEST_EXPECT(asyncWriteFile.start(eventLoop));
 
@@ -79,9 +79,9 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
         int  readCount     = 0;
         char readBuffer[4] = {0};
     };
-    Params        params;
-    AsyncFileRead asyncReadFile;
-    AsyncTask     asyncReadTask;
+    Params            params;
+    AsyncFileRead     asyncReadFile;
+    AsyncTaskSequence asyncReadTask;
     asyncReadFile.setDebugName("FileRead");
     asyncReadFile.callback = [this, &params](AsyncFileRead::Result& res)
     {
@@ -105,7 +105,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     asyncReadFile.buffer = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.executeOn(asyncReadTask, threadPool));
     }
     SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
 
@@ -174,8 +174,8 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
         int    readCount = 0;
         size_t readSize  = 0;
     } context;
-    AsyncFileRead asyncReadFile;
-    AsyncTask     asyncReadTask;
+    AsyncFileRead     asyncReadFile;
+    AsyncTaskSequence asyncReadTask;
     asyncReadFile.setDebugName("FileRead");
     asyncReadFile.callback = [this, &context](AsyncFileRead::Result& res)
     {
@@ -206,7 +206,7 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     asyncReadFile.buffer = {buffer, sizeof(buffer)};
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.executeOn(asyncReadTask, threadPool));
     }
     SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
 
@@ -214,7 +214,7 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     SC_TEST_EXPECT(context.readCount == 2);
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(asyncReadFile.setThreadPoolAndTask(threadPool, asyncReadTask));
+        SC_TEST_EXPECT(asyncReadFile.executeOn(asyncReadTask, threadPool));
     }
     SC_TEST_EXPECT(asyncReadFile.start(eventLoop));
     SC_TEST_EXPECT(eventLoop.run());
@@ -266,23 +266,38 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("handle")));
 
-    // 5. Write the file using two buffers
-    AsyncFileWrite fileWrite;
-    AsyncTask      fileWriteTask;
+    // 5. Write the file using two requests on the same sequence (that ensures ordering)
+    AsyncFileWrite    fileWrite[2];
+    AsyncTaskSequence fileWriteTask;
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(fileWrite.setThreadPoolAndTask(threadPool, fileWriteTask));
+        SC_TEST_EXPECT(fileWrite[0].executeOn(fileWriteTask, threadPool)); // executed first
+        SC_TEST_EXPECT(fileWrite[1].executeOn(fileWriteTask, threadPool)); // executed second
+    }
+    else
+    {
+        fileWrite[0].executeOn(fileWriteTask); // executed first
+        fileWrite[1].executeOn(fileWriteTask); // executed second
     }
 
-    fileWrite.callback = [&](AsyncFileWrite::Result& res)
+    fileWrite[0].callback = [&](AsyncFileWrite::Result& res)
     {
         size_t writtenBytes = 0;
         SC_TEST_EXPECT(res.get(writtenBytes));
         SC_TEST_EXPECT(writtenBytes == 8);
     };
-    Span<const char> buffers[] = {{"PING", 4}, {"PONG", 4}};
-    fileWrite.handle           = handle;
-    SC_TEST_EXPECT(fileWrite.start(eventLoop, buffers));
+    fileWrite[1].callback = [&](AsyncFileWrite::Result& res)
+    {
+        size_t writtenBytes = 0;
+        SC_TEST_EXPECT(res.get(writtenBytes));
+        SC_TEST_EXPECT(writtenBytes == 8);
+    };
+    fileWrite[0].handle         = handle;
+    fileWrite[1].handle         = handle;
+    Span<const char> buffers1[] = {{"PING", 4}, {"PONG", 4}};
+    SC_TEST_EXPECT(fileWrite[0].start(eventLoop, buffers1));
+    Span<const char> buffers2[] = {{"PENG", 4}, {"PANG", 4}};
+    SC_TEST_EXPECT(fileWrite[1].start(eventLoop, buffers2));
 
     SC_TEST_EXPECT(eventLoop.run());
 
@@ -291,7 +306,8 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     // 6. Verify file contents
     String contents;
     SC_TEST_EXPECT(fs.read(filePath.view(), contents, StringEncoding::Ascii));
-    SC_TEST_EXPECT(contents.view() == "PINGPONG");
+    StringView sv = contents.view();
+    SC_TEST_EXPECT(sv == "PINGPONGPENGPANG");
 
     // 7. Cleanup
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));

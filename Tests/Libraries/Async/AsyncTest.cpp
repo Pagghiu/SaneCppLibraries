@@ -429,8 +429,8 @@ asyncReadFile.buffer = {buffer, sizeof(buffer)};
 SC_TRY(fd.get(asyncReadFile.handle, Result::Error("Invalid handle")));
 
 // Start the operation on a thread pool
-AsyncTask asyncFileTask;
-SC_TRY(asyncReadFile.setThreadPoolAndTask(threadPool, asyncFileTask));
+AsyncTaskSequence asyncFileTask;
+SC_TRY(asyncReadFile.executeOn(asyncFileTask, threadPool));
 SC_TRY(asyncReadFile.start(eventLoop));
 
 // Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted
@@ -477,8 +477,14 @@ asyncWriteFile.buffer = StringView("test").toCharSpan();
 // AsyncFileWrite::buffers and AsyncFileWrite::singleBuffer = false
     
 // Start the operation in a thread pool
-AsyncTask asyncFileTask;
-SC_TRY(asyncWriteFile.setThreadPoolAndTask(threadPool, asyncFileTask));
+AsyncTaskSequence asyncFileTask;
+SC_TRY(asyncWriteFile.executeOn(asyncFileTask, threadPool));
+SC_TRY(asyncWriteFile.start(eventLoop));
+
+// Execute another file write AFTER the previous one is finished on the same threadPool
+AsyncFileWrite asyncWriteFileLater;
+asyncWriteFileLater.buffer = StringView("AFTER").toCharSpan();
+SC_TRY(asyncWriteFileLater.executeOn(asyncFileTask, threadPool));
 SC_TRY(asyncWriteFile.start(eventLoop));
 
 // Alternatively if the file is opened with blocking == false, AsyncFileRead can be omitted

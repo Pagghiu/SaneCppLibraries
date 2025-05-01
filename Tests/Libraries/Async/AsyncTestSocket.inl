@@ -283,32 +283,58 @@ void SC::AsyncTest::socketSendMultiple()
     SocketDescriptor client, serverSideClient;
     createTCPSocketPair(eventLoop, client, serverSideClient);
 
-    Span<const char> sendData[] = {{"PING", 4}, {"PONG", 4}};
-
     int             sendCount = 0;
-    AsyncSocketSend sendAsync;
-    sendAsync.callback = [&](AsyncSocketSend::Result& res)
+    AsyncSocketSend sendAsync[2];
+    AsyncSequence   sendSequence;
+    sendAsync[0].callback = [&](AsyncSocketSend::Result& res)
     {
         SC_TEST_EXPECT(res.isValid());
         sendCount++;
     };
+    sendAsync[1].callback = sendAsync[0].callback;
 
-    SC_TEST_EXPECT(sendAsync.start(eventLoop, client, sendData));
+    // Use an AsyncSequence to enforce order of execution
+    sendAsync[0].executeOn(sendSequence); // executed first
+    sendAsync[1].executeOn(sendSequence); // executed second
+
+    Span<const char> sendData1[] = {{"PING", 4}, {"PONG", 4}};
+    SC_TEST_EXPECT(sendAsync[0].start(eventLoop, client, sendData1));
+    Span<const char> sendData2[] = {{"PENG", 4}, {"PANG", 4}};
+    SC_TEST_EXPECT(sendAsync[1].start(eventLoop, client, sendData2));
     SC_TEST_EXPECT(eventLoop.runOnce());
 
     AsyncSocketReceive receiveAsync;
-    receiveAsync.callback = [this, &client](AsyncSocketReceive::Result& res)
+
+    struct Context
+    {
+        SocketDescriptor& client;
+        Buffer            finalString  = {};
+        int               receiveCount = 0;
+    } context = {client};
+
+    receiveAsync.callback = [this, &context](AsyncSocketReceive::Result& res)
     {
         Span<char> readData;
         SC_TEST_EXPECT(res.get(readData));
-        SC_TEST_EXPECT(client.close()); // Causes EOF
+        Span<const char> constData = readData;
+        SC_TEST_EXPECT(context.finalString.append(constData));
         SC_TEST_EXPECT(readData.sizeInBytes() == 8);
+        if (context.finalString.size() < 16)
+        {
+            res.reactivateRequest(true);
+        }
+        else
+        {
+            SC_TEST_EXPECT(context.client.close()); // Causes EOF
+        }
     };
     char       receiveBuffer[8] = {0};
     Span<char> receiveData      = {receiveBuffer, sizeof(receiveBuffer)};
     SC_TEST_EXPECT(receiveAsync.start(eventLoop, serverSideClient, receiveData));
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(StringView({receiveBuffer, 8}, false, StringEncoding::Ascii) == "PINGPONG");
+    SC_TEST_EXPECT(sendCount == 2);
+    StringView finalString(context.finalString.toSpanConst(), false, StringEncoding::Ascii);
+    SC_TEST_EXPECT(finalString == "PINGPONGPENGPANG");
 }
 
 void SC::AsyncTest::socketClose()

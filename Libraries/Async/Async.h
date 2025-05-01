@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Span.h"
@@ -50,7 +51,8 @@ namespace SC
 {
 struct AsyncEventLoop;
 struct AsyncResult;
-struct AsyncTask;
+struct AsyncSequence;
+struct AsyncTaskSequence;
 
 namespace detail
 {
@@ -128,13 +130,16 @@ struct AsyncRequest
     /// Used to cache eventLoop pointer before starting the AsyncRequest.
     void cacheInternalEventLoop(AsyncEventLoop& loop) { eventLoop = &loop; }
 
-    /// @brief Sets the thread pool and task to use for this request
+    /// @brief Adds the request to be executed on a specific AsyncSequence
+    void executeOn(AsyncSequence& sequence);
+
+    /// @brief Adds the request to be executed on a specific AsyncTaskSequence
     /// @see AsyncFileRead
     /// @see AsyncFileWrite
-    Result setThreadPoolAndTask(ThreadPool& pool, AsyncTask& task);
+    Result executeOn(AsyncTaskSequence& task, ThreadPool& pool);
 
-    /// @brief Resets anything previously set with setThreadPoolAndTask
-    void resetThreadPoolAndTask();
+    /// @brief Disables the thread-pool usage for this request
+    void disableThreadPool();
 
     /// @brief Type of async request
     enum class Type : uint8_t
@@ -181,12 +186,14 @@ struct AsyncRequest
     Result start(AsyncEventLoop& loop);
 
   protected:
-    [[nodiscard]] Result checkState();
+    Result checkState();
 
     void queueSubmission(AsyncEventLoop& eventLoop);
 
     AsyncEventLoop* eventLoop = nullptr;
-    AsyncTask*      asyncTask = nullptr;
+    AsyncSequence*  sequence  = nullptr;
+
+    AsyncTaskSequence* getTask();
 
   private:
     Function<void(AsyncResult&)>* closeCallback = nullptr;
@@ -214,6 +221,25 @@ struct AsyncRequest
     Type    type;       // 1 byte
     int16_t flags;      // 2 bytes
     int32_t eventIndex; // 4 bytes
+};
+
+/// @brief Execute AsyncRequests serially, by submitting the next one after the previous one is completed.
+/// Requests are being queued on a sequence using AsyncRequest::executeOn.
+/// AsyncTaskSequence can be used to force running asyncs on a thread (useful for buffered files)
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
+struct AsyncSequence
+{
+    AsyncSequence* next = nullptr;
+    AsyncSequence* prev = nullptr;
+
+    bool clearSequenceOnCancel = true; ///< Do not queue next requests in the sequence when current one is cancelled
+    bool clearSequenceOnError  = true; ///< Do not queue next requests in the sequence when current one returns error
+  private:
+    friend struct AsyncEventLoop;
+    bool runningAsync = false; // true if an async from this sequence is being run
+    bool tracked      = false;
+
+    IntrusiveDoubleLinkedList<AsyncRequest> submissions;
 };
 
 /// @brief Empty base struct for all AsyncRequest-derived CompletionData (internal) structs.
@@ -273,6 +299,7 @@ struct AsyncLoopTimeout : public AsyncRequest
 
     using CompletionData = AsyncCompletionData;
     using Result         = AsyncResultOf<AsyncLoopTimeout, CompletionData>;
+    using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds relativeTimeout);
@@ -577,7 +604,7 @@ struct AsyncSocketClose : public AsyncRequest
 /// @brief Starts a file read operation, reading bytes from a file (or pipe).
 /// Callback will be called when the data read from the file (or pipe) is available. @n
 ///
-/// Call AsyncRequest::setThreadPoolAndTask to set a thread pool if this is a buffered file and not a pipe.
+/// Call AsyncRequest::executeOn to set a thread pool if this is a buffered file and not a pipe.
 /// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a file (or pipe) descriptor handle.
@@ -647,7 +674,7 @@ struct AsyncFileRead : public AsyncRequest
 /// @brief Starts a file write operation, writing bytes to a file (or pipe).
 /// Callback will be called when the file is ready to receive more bytes to write. @n
 ///
-/// Call AsyncRequest::setThreadPoolAndTask to set a thread pool if this is a buffered file and not a pipe.
+/// Call AsyncRequest::executeOn to set a thread pool if this is a buffered file and not a pipe.
 /// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
@@ -783,7 +810,7 @@ struct AsyncFilePoll : public AsyncRequest
 #endif
 };
 
-struct AsyncLoopWork; // forward declared because it must be defined after AsyncTask
+struct AsyncLoopWork; // forward declared because it must be defined after AsyncTaskSequence
 
 namespace detail
 {
@@ -802,7 +829,7 @@ struct AsyncCompletionVariant
     AsyncRequest::Type type;
     union
     {
-        AsyncCompletionData                completionDataLoopWork; // Defined after AsyncCompletionVariant / AsyncTask
+        AsyncCompletionData completionDataLoopWork; // Defined after AsyncCompletionVariant / AsyncTaskSequence
         AsyncLoopTimeout::CompletionData   completionDataLoopTimeout;
         AsyncLoopWakeUp::CompletionData    completionDataLoopWakeUp;
         AsyncProcessExit::CompletionData   completionDataProcessExit;
@@ -844,24 +871,17 @@ struct AsyncCompletionVariant
 };
 } // namespace detail
 
-/// @brief Holds (reference to) a SC::ThreadPool and SC::ThreadPool::Task to execute an SC::AsyncRequest in a background
-/// thread This object lifetime is the same as the SC::AsyncRequest it's associated with, like SC::AsyncFileRead or
-/// SC::AsyncFileWrite.
-/// @note Operations that support to be executed in background thread, accept an SC::AsyncTask in their `start` method.
-/// @warning The SC::ThreadPool::Task cannot be shared with other requests and it cannot be reused until the completion
-/// callback has been called.
-struct AsyncTask
+/// @brief An AsyncSequence using a SC::ThreadPool to execute one or more SC::AsyncRequest in a background thread.
+/// Calling SC::AsyncRequest::executeOn on multiple requests with the same SC::AsyncTaskSequence queues them to be
+/// serially executed on the same thread.
+struct AsyncTaskSequence : public AsyncSequence
 {
   protected:
     ThreadPoolTask task;
     ThreadPool*    threadPool = nullptr;
-    AsyncRequest*  async      = nullptr;
 
     friend struct AsyncEventLoop;
     friend struct AsyncRequest;
-
-    void freeTask() { async = nullptr; }
-    bool isFree() const { return async == nullptr; }
 
     detail::AsyncCompletionVariant completion;
 
@@ -892,8 +912,8 @@ struct AsyncLoopWork : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    SC::Result validate(AsyncEventLoop&);
-    AsyncTask  task;
+    SC::Result        validate(AsyncEventLoop&);
+    AsyncTaskSequence task;
 };
 
 /// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from
@@ -1066,14 +1086,17 @@ struct AsyncEventLoop
     /// @return true if liburing has been loaded, false otherwise (and on any non-Linux os)
     [[nodiscard]] static bool tryLoadingLiburing();
 
+    /// @brief Clears the sequence
+    void clearSequence(AsyncSequence& sequence);
+
     struct Internal;
 
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 488;
-        static constexpr int Apple   = 480;
-        static constexpr int Linux   = 688;
+        static constexpr int Windows = 504;
+        static constexpr int Apple   = 496;
+        static constexpr int Linux   = 704;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

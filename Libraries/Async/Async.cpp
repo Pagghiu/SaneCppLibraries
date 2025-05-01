@@ -65,25 +65,30 @@ void SC::AsyncRequest::setDebugName(const char* newDebugName)
 #endif
 }
 
-SC::Result SC::AsyncRequest::setThreadPoolAndTask(ThreadPool& pool, AsyncTask& task)
+void SC::AsyncRequest::executeOn(AsyncSequence& task) { sequence = &task; }
+
+SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool)
 {
-    if (task.async != nullptr)
+    if (flags & AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse)
     {
-        return Result::Error("AsyncTask is bound to a different async being started");
+        return Result::Error("AsyncTaskSequence is bound to a different async being started");
     }
     task.threadPool = &pool;
-    asyncTask       = &task;
-    task.async      = this;
+    sequence        = &task;
+    flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequence;
+    flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
     return Result(true);
 }
 
-void SC::AsyncRequest::resetThreadPoolAndTask()
+void SC::AsyncRequest::disableThreadPool()
 {
+    AsyncTaskSequence* asyncTask = getTask();
     if (asyncTask)
     {
-        asyncTask->async      = nullptr;
+        // Preserve AsyncSequence but disable AsyncTaskSequence
         asyncTask->threadPool = nullptr;
-        asyncTask             = nullptr;
+        flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
+        flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequence;
     }
 }
 
@@ -102,6 +107,15 @@ void SC::AsyncRequest::markAsFree()
 }
 
 void SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { loop.internal.queueSubmission(loop, *this); }
+
+SC::AsyncTaskSequence* SC::AsyncRequest::getTask()
+{
+    if (flags & AsyncEventLoop::Internal::Flag_AsyncTaskSequence)
+    {
+        return static_cast<AsyncTaskSequence*>(sequence);
+    }
+    return nullptr;
+}
 
 SC::Result SC::AsyncRequest::stop(Function<void(AsyncResult&)>* onClose)
 {
@@ -161,11 +175,11 @@ SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExte
 SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(work.isValid(), "AsyncLoopWork::start - Invalid work callback");
-    SC_TRY_MSG(asyncTask != nullptr, "AsyncLoopWork::start - setThreadPool not called");
+    SC_TRY_MSG(sequence != nullptr, "AsyncLoopWork::start - setThreadPool not called");
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool) { return setThreadPoolAndTask(threadPool, task); }
+SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool) { return executeOn(task, threadPool); }
 
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
 {
@@ -273,7 +287,7 @@ SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& loop)
     // Only use the async tasks for operations and backends that are not io_uring
     if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
     {
-        resetThreadPoolAndTask();
+        disableThreadPool();
     }
     return SC::Result(true);
 }
@@ -308,7 +322,7 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& loop)
     // Only use the async tasks for operations and backends that are not io_uring
     if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
     {
-        resetThreadPoolAndTask();
+        disableThreadPool();
     }
 
     return SC::Result(true);
@@ -535,6 +549,8 @@ SC::Result SC::AsyncEventLoop::start(AsyncRequest& async)
                                   });
 }
 
+void SC::AsyncEventLoop::clearSequence(AsyncSequence& sequence) { internal.clearSequence(sequence); }
+
 //-------------------------------------------------------------------------------------------------------
 // AsyncEventLoopMonitor
 //-------------------------------------------------------------------------------------------------------
@@ -625,6 +641,17 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     return Result(true);
 }
 
+void SC::AsyncEventLoop::Internal::popNextInSequence(AsyncSequence& sequence)
+{
+    sequence.runningAsync = true;
+    submissions.queueBack(*sequence.submissions.dequeueFront());
+    numberOfSubmissions += 1;
+    if (sequence.submissions.isEmpty())
+    {
+        clearSequence(sequence);
+    }
+}
+
 //-------------------------------------------------------------------------------------------------------
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
@@ -633,8 +660,49 @@ void SC::AsyncEventLoop::Internal::queueSubmission(AsyncEventLoop& loop, AsyncRe
 {
     async.eventLoop = &loop;
     async.state     = AsyncRequest::State::Setup;
-    submissions.queueBack(async);
-    numberOfSubmissions += 1;
+    if (async.sequence)
+    {
+        AsyncSequence& sequence = *async.sequence;
+        sequence.submissions.queueBack(async);
+        if (sequence.runningAsync)
+        {
+            if (not sequence.tracked)
+            {
+                sequences.queueBack(sequence);
+                sequence.tracked = true;
+            }
+        }
+        else
+        {
+            popNextInSequence(sequence);
+        }
+    }
+    else
+    {
+        submissions.queueBack(async);
+        numberOfSubmissions += 1;
+    }
+}
+
+void SC::AsyncEventLoop::Internal::resumeSequence(AsyncSequence& sequence)
+{
+    if (not sequence.runningAsync)
+    {
+        if (not sequence.submissions.isEmpty())
+        {
+            popNextInSequence(sequence);
+        }
+    }
+}
+
+void SC::AsyncEventLoop::Internal::clearSequence(AsyncSequence& sequence)
+{
+    sequence.submissions.clear();
+    if (sequence.tracked)
+    {
+        sequences.remove(sequence);
+        sequence.tracked = false;
+    }
 }
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
@@ -719,13 +787,14 @@ SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleL
     // Wait for all thread pool tasks
     for (T* it = linkedList.front; it != nullptr; it = static_cast<T*>(it->next))
     {
-        if (it->asyncTask != nullptr)
+        AsyncTaskSequence* asyncTask = it->getTask();
+        if (asyncTask != nullptr)
         {
-            if (not it->asyncTask->threadPool->waitForTask(it->asyncTask->task))
+            if (not asyncTask->threadPool->waitForTask(asyncTask->task))
             {
                 res = Result::Error("Threadpool was already stopped");
             }
-            it->asyncTask->freeTask();
+            it->flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
         }
     }
     return res;
@@ -744,6 +813,13 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
 
     if (not threadPoolRes2)
         res = threadPoolRes2;
+
+    // Clear the never submitted requests of all sequences
+    for (AsyncSequence* sequence = sequences.front; sequence != nullptr; sequence = sequence->next)
+    {
+        clearSequence(*sequence);
+    }
+    sequences.clear();
 
     // TODO: Consolidate this list with enumerateRequests
     stopRequests(submissions);
@@ -805,6 +881,10 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
         AsyncTeardown teardown;
         prepareTeardown(async, teardown);
         SC_TRY(teardownAsync(teardown));
+        if (teardown.sequence and teardown.sequence->clearSequenceOnCancel)
+        {
+            clearSequence(*teardown.sequence);
+        }
         async.markAsFree(); // This may still come up in kernel events
         if (async.closeCallback)
         {
@@ -832,6 +912,10 @@ struct SC::AsyncEventLoop::Internal::ReactivateAsyncPhase
     SC::Result operator()(T& async)
     {
         async.state = AsyncRequest::State::Submitting;
+        if (async.sequence)
+        {
+            async.sequence->runningAsync = true;
+        }
         if (KernelEvents::needsSubmissionWhenReactivating(async))
         {
             async.eventLoop->internal.submissions.queueBack(async);
@@ -861,6 +945,10 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     else
     {
         SC_TRY(teardownAsync(teardown));
+        if (teardown.sequence)
+        {
+            resumeSequence(*teardown.sequence);
+        }
     }
     if (not returnCode)
     {
@@ -1065,7 +1153,7 @@ struct SC::AsyncEventLoop::Internal::SetupAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
-        if (async.asyncTask)
+        if (async.getTask())
         {
             return Result(true);
         }
@@ -1084,9 +1172,9 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
-        if (async.asyncTask)
+        AsyncTaskSequence* asyncTask = async.getTask();
+        if (asyncTask)
         {
-            AsyncTask* asyncTask     = async.asyncTask;
             asyncTask->task.function = [&async] { executeThreadPoolOperation(async); };
             return asyncTask->threadPool->queueTask(asyncTask->task);
         }
@@ -1102,8 +1190,8 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
     template <typename T>
     static void executeThreadPoolOperation(T& async)
     {
-        AsyncTask& task = *async.asyncTask;
-        task.returnCode = KernelEvents::executeOperation(async, task.completion.construct(async));
+        AsyncTaskSequence& task = *async.getTask();
+        task.returnCode         = KernelEvents::executeOperation(async, task.completion.construct(async));
         async.eventLoop->internal.manualThreadPoolCompletions.push(async);
         SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
     }
@@ -1117,15 +1205,16 @@ struct SC::AsyncEventLoop::Internal::CancelAsyncPhase
     template <typename T>
     SC::Result operator()(T& async)
     {
-        if (async.asyncTask)
+        AsyncTaskSequence* asyncTask = async.getTask();
+        if (asyncTask)
         {
             // Waiting here is not ideal but we need it to be able to reliably know that
             // the task can be reused soon after cancelling an async that uses it.
-            SC_TRY(async.asyncTask->threadPool->waitForTask(async.asyncTask->task));
+            SC_TRY(asyncTask->threadPool->waitForTask(asyncTask->task));
 
             // Prevent this async from going in the CompleteAsyncPhase and mark task as free
             async.eventLoop->internal.manualThreadPoolCompletions.remove(async);
-            async.asyncTask->freeTask();
+            async.flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
             return Result(true);
         }
 
@@ -1161,14 +1250,14 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
         AsyncResultType result(async, forward<Result>(returnCode));
         if (result.returnCode)
         {
-            if (result.getAsync().asyncTask)
+            AsyncTaskSequence* asyncTask = async.getTask();
+            if (asyncTask)
             {
-                AsyncTask* asyncTask  = result.getAsync().asyncTask;
                 result.returnCode     = asyncTask->returnCode;
                 result.completionData = move(asyncTask->completion.getCompletion(async));
                 // The task is already finished but we need waitForTask to make it available for next runs.
                 SC_TRY(asyncTask->threadPool->waitForTask(asyncTask->task));
-                asyncTask->freeTask();
+                async.flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
             }
             else
             {
@@ -1190,6 +1279,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
     teardown.eventLoop = async.eventLoop;
     teardown.type      = async.type;
     teardown.flags     = async.flags;
+    teardown.sequence  = async.sequence;
 #if SC_CONFIGURATION_DEBUG
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     ::strncpy_s(teardown.debugName, async.debugName, sizeof(teardown.debugName));
@@ -1307,6 +1397,10 @@ void SC::AsyncEventLoop::Internal::reportError(KernelEvents& kernelEvents, Async
     if (async.state == AsyncRequest::State::Active)
     {
         removeActiveHandle(async);
+    }
+    if (async.sequence and async.sequence->clearSequenceOnError)
+    {
+        clearSequence(*async.sequence);
     }
     (void)completeAsync(kernelEvents, async, forward<Result>(returnCode), reactivate);
     async.markAsFree();
@@ -1437,6 +1531,11 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     async.state = AsyncRequest::State::Free;
 
+    if (async.sequence)
+    {
+        async.sequence->runningAsync = false;
+    }
+
     if ((async.flags & Internal::Flag_ManualCompletion) != 0)
     {
         numberOfManualCompletions -= 1;
@@ -1445,7 +1544,7 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles -= 1;
 
-    if (async.asyncTask)
+    if (async.sequence)
     {
         return; // Async flagged to be manually completed for thread pool, are not added to active handles
     }
@@ -1482,7 +1581,7 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles += 1;
 
-    if (async.asyncTask)
+    if (async.sequence)
     {
         return; // Async flagged to be manually completed for thread pool, are not added to active handles
     }

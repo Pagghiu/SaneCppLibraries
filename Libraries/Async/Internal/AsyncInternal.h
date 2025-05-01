@@ -55,6 +55,9 @@ struct SC::AsyncEventLoop::Internal
     int numberOfManualCompletions = 0;
     int numberOfExternals         = 0;
 
+    // Sequences
+    IntrusiveDoubleLinkedList<AsyncSequence> sequences;
+
     // Submitting phase
     IntrusiveDoubleLinkedList<AsyncRequest> submissions;
 
@@ -86,10 +89,12 @@ struct SC::AsyncEventLoop::Internal
     AsyncEventLoopListeners* listeners = nullptr;
 
     // AsyncRequest flags
-    static constexpr int16_t Flag_ManualCompletion       = 1 << 0;
-    static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1;
-    static constexpr int16_t Flag_Internal               = 1 << 2;
-    static constexpr int16_t Flag_WatcherSet             = 1 << 3;
+    static constexpr int16_t Flag_ManualCompletion       = 1 << 0; // Completion is ready
+    static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1; // Does not contribute to active count
+    static constexpr int16_t Flag_Internal               = 1 << 2; // Doesn't get listed by AsyncEventLoop::enumerate
+    static constexpr int16_t Flag_WatcherSet             = 1 << 3; // An event watcher has been set
+    static constexpr int16_t Flag_AsyncTaskSequence      = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
+    static constexpr int16_t Flag_AsyncTaskSequenceInUse = 1 << 5; // AsyncTaskSequence must still be waited
 
     [[nodiscard]] Result close(AsyncEventLoop& loop);
 
@@ -110,8 +115,13 @@ struct SC::AsyncEventLoop::Internal
     // LoopWakeUp
     void executeWakeUps();
 
+    void extracted(AsyncSequence& sequence);
+
     // Setup
     void queueSubmission(AsyncEventLoop& loop, AsyncRequest& async);
+    void popNextInSequence(AsyncSequence& sequence);
+    void resumeSequence(AsyncSequence& sequence);
+    void clearSequence(AsyncSequence& sequence);
 
     // Phases
     [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);
@@ -167,6 +177,7 @@ struct SC::AsyncEventLoop::Internal
         AsyncRequest::Type        type          = AsyncRequest::Type::LoopTimeout;
         int16_t                   flags         = 0;
         AsyncEventLoop*           eventLoop     = nullptr;
+        AsyncSequence*            sequence      = nullptr;
         FileDescriptor::Handle    fileHandle    = FileDescriptor::Invalid;
         SocketDescriptor::Handle  socketHandle  = SocketDescriptor::Invalid;
         ProcessDescriptor::Handle processHandle = ProcessDescriptor::Invalid;

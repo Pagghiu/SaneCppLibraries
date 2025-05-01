@@ -30,6 +30,7 @@ This is the list of supported async operations:
 | [AsyncLoopWork](@ref SC::AsyncLoopWork)           | @copybrief SC::AsyncLoopWork      |
 | [AsyncProcessExit](@ref SC::AsyncProcessExit)     | @copybrief SC::AsyncProcessExit   |
 | [AsyncFilePoll](@ref SC::AsyncFilePoll)           | @copybrief SC::AsyncFilePoll      |
+| [AsyncSequence](@ref SC::AsyncSequence)           | @copybrief SC::AsyncSequence      |
 
 # Status
 🟨 MVP  
@@ -135,6 +136,12 @@ This is very useful to integrate the event loop into applications with other eve
 
 ## AsyncFilePoll
 @copydoc SC::AsyncFilePoll
+
+## AsyncSequence
+@copydoc SC::AsyncSequence
+
+## AsyncTaskSequence
+@copydoc SC::AsyncTaskSequence
 
 # Implementation
 

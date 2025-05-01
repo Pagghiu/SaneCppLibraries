@@ -248,8 +248,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     String             fileName;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "source.txt"}));
     SC_TEST_EXPECT(File(readFd).open(fileName.view(), File::OpenMode::ReadOnly, openOptions));
-    AsyncTask readFileTask;
-    SC_TEST_EXPECT(readFileStream.request.setThreadPoolAndTask(fileThreadPool, readFileTask));
+    AsyncTaskSequence readFileTask;
+    SC_TEST_EXPECT(readFileStream.request.executeOn(readFileTask, fileThreadPool));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(readFileStream.init(buffersPool1, readFileRequests, eventLoop, readFd));
 
@@ -258,8 +258,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     FileDescriptor     writeFd;
     SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "destination.txt"}));
     SC_TEST_EXPECT(File(writeFd).open(fileName.view(), File::OpenMode::WriteCreateTruncate, openOptions));
-    AsyncTask writeFileTask;
-    SC_TEST_EXPECT(writeFileStream.request.setThreadPoolAndTask(fileThreadPool, writeFileTask));
+    AsyncTaskSequence writeFileTask;
+    SC_TEST_EXPECT(writeFileStream.request.executeOn(writeFileTask, fileThreadPool));
 
     // Allocate transient buffers
     AsyncBuffersPool buffersPool2;
