@@ -530,7 +530,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketClose::Result& result)
     {
-        result.returnCode = Result(true);
+        io_uring_cqe& completion   = events[result.getAsync().eventIndex];
+        result.completionData.code = completion.res;
+        result.returnCode          = Result(true);
         return Result(true);
     }
 

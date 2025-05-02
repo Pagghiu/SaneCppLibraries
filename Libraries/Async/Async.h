@@ -582,23 +582,23 @@ struct AsyncSocketClose : public AsyncRequest
 {
     AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
 
-    using CompletionData = AsyncCompletionData;
-    using Result         = AsyncResultOf<AsyncSocketClose, CompletionData>;
     using AsyncRequest::start;
+
+    struct CompletionData : public AsyncCompletionData
+    {
+        int code = 0; ///< Return code of close socket operation
+    };
+    using Result = AsyncResultOf<AsyncSocketClose, CompletionData>;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor);
 
-    // TODO: Move code to CompletionData
-    int code = 0; ///< Return code of close socket operation
-
-    Function<void(Result&)> callback; ///< Callback called after fully closing the socket
+    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
+    Function<void(Result&)>  callback; ///< Callback called after fully closing the socket
 
   private:
     SC::Result validate(AsyncEventLoop&);
     friend struct AsyncEventLoop;
-
-    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
 };
 
 /// @brief Starts a file read operation, reading bytes from a file (or pipe).

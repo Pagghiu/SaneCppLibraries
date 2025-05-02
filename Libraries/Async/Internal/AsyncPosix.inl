@@ -855,11 +855,20 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] Result setupAsync(AsyncSocketClose& async)
     {
-        // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
-        async.code = ::close(async.handle);
-        SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
+    }
+
+    [[nodiscard]] static Result executeOperation(AsyncSocketClose&                 async,
+                                                 AsyncSocketClose::CompletionData& completionData)
+    {
+        completionData.code = ::close(async.handle);
+        return Result(true);
+    }
+
+    [[nodiscard]] Result completeAsync(AsyncSocketClose::Result& result)
+    {
+        return executeOperation(result.getAsync(), result.completionData);
     }
 
     //-------------------------------------------------------------------------------------------------------
