@@ -427,7 +427,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketAccept::Result& res)
     {
-        return res.completionData.acceptedClient.assign(events[res.getAsync().eventIndex].res);
+        return res.completionData.acceptedClient.assign(events[res.eventIndex].res);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -475,7 +475,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketSend::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
 
         size_t totalBytes = 0;
         if (result.getAsync().singleBuffer)
@@ -507,7 +507,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        io_uring_cqe& completion       = events[result.getAsync().eventIndex];
+        io_uring_cqe& completion       = events[result.eventIndex];
         result.completionData.numBytes = static_cast<size_t>(completion.res);
         if (completion.res == 0)
         {
@@ -530,7 +530,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncSocketClose::Result& result)
     {
-        io_uring_cqe& completion   = events[result.getAsync().eventIndex];
+        io_uring_cqe& completion   = events[result.eventIndex];
         result.completionData.code = completion.res;
         result.returnCode          = Result(true);
         return Result(true);
@@ -551,7 +551,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
     {
-        io_uring_cqe& completion       = events[result.getAsync().eventIndex];
+        io_uring_cqe& completion       = events[result.eventIndex];
         result.completionData.numBytes = static_cast<size_t>(completion.res);
         if (completion.res == 0)
         {
@@ -587,7 +587,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     [[nodiscard]] Result completeAsync(AsyncFileWrite::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.getAsync().eventIndex].res);
+        result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
         return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
     }
 

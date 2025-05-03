@@ -129,7 +129,7 @@ struct SC::AsyncEventLoop::Internal
     [[nodiscard]] Result activateAsync(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result cancelAsync(KernelEvents& kernelEvents, AsyncRequest& async);
     [[nodiscard]] Result completeAsync(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
-                                       bool& reactivate);
+                                       bool& reactivate, int32_t eventIndex);
 
     struct SetupAsyncPhase;
     struct ReactivateAsyncPhase;
@@ -137,9 +137,9 @@ struct SC::AsyncEventLoop::Internal
     struct CancelAsyncPhase;
     struct CompleteAsyncPhase;
     [[nodiscard]] Result completeAndEventuallyReactivate(KernelEvents& kernelEvents, AsyncRequest& async,
-                                                         Result&& returnCode);
+                                                         Result&& returnCode, int32_t eventIndex);
 
-    void reportError(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode);
+    void reportError(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode, int32_t eventIndex);
 
     enum class SyncMode
     {

@@ -161,7 +161,7 @@ struct AsyncRequest
 
     /// @brief Constructs a free async request of given type
     /// @param type Type of this specific request
-    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), eventIndex(-1) {}
+    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), unused(-1) {}
 
     /// @brief Ask to stop current async operation
     /// @param afterStopped Optional pointer to a callback called after request is fully stopped.
@@ -217,10 +217,11 @@ struct AsyncRequest
 #if SC_CONFIGURATION_DEBUG
     const char* debugName = "None";
 #endif
-    State   state;      // 1 byte
-    Type    type;       // 1 byte
-    int16_t flags;      // 2 bytes
-    int32_t eventIndex; // 4 bytes
+    State   state; // 1 byte
+    Type    type;  // 1 byte
+    int16_t flags; // 2 bytes
+
+    int32_t unused; // 4 bytes
 };
 
 /// @brief Execute AsyncRequests serially, by submitting the next one after the previous one is completed.
@@ -286,7 +287,8 @@ struct AsyncResultOf : public AsyncResult
 
     using AsyncResult::AsyncResult;
 
-    C completionData;
+    C       completionData;
+    int32_t eventIndex = 0;
 };
 
 /// @brief Starts a Timeout that is invoked only once after expiration (relative) time has passed.

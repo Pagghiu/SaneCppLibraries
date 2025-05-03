@@ -1043,8 +1043,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
     {
-        SC_TRY_MSG(result.getAsync().eventIndex >= 0, "Invalid event Index");
-        const struct kevent event = events[result.getAsync().eventIndex];
+        SC_TRY_MSG(result.eventIndex >= 0, "Invalid event Index");
+        const struct kevent event = events[result.eventIndex];
         // If process exits too early it can happen that we get EV_ERROR with ESRCH
         if ((event.flags & EV_ERROR) != 0 and (event.data == ESRCH))
         {
