@@ -102,7 +102,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     void completeWakeUp(AsyncFilePoll::Result& result)
     {
-        result.getAsync().eventLoop->internal.executeWakeUps();
+        result.eventLoop.internal.executeWakeUps(result.eventLoop);
         result.reactivateRequest(true);
     }
 
@@ -223,29 +223,29 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static bool setupAsync(AsyncLoopTimeout&) { return true; }
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncLoopTimeout&) { return true; }
 
-    Result activateAsync(AsyncLoopTimeout& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
+        async.expirationTime = eventLoop.getLoopTime().offsetBy(async.relativeTimeout);
         return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------
     // WAKEUP
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static bool setupAsync(AsyncLoopWakeUp&) { return true; }
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncLoopWakeUp&) { return true; }
 
     //-------------------------------------------------------------------------------------------------------
     // WORK
     //-------------------------------------------------------------------------------------------------------
-    static bool   setupAsync(AsyncLoopWork&) { return true; }
+    static bool   setupAsync(AsyncEventLoop&, AsyncLoopWork&) { return true; }
     static Result executeOperation(AsyncLoopWork& loopWork, AsyncLoopWork::CompletionData&) { return loopWork.work(); }
 
     //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncSocketAccept& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketAccept& async)
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
 
@@ -285,14 +285,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
         SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed");
         HANDLE loopHandle;
-        SC_TRY(result.getAsync().eventLoop->internal.kernelQueue.get().loopFd.get(
-            loopHandle, Result::Error("completeAsync handle")));
+        SC_TRY(result.eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("completeAsync")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
         return result.completionData.acceptedClient.assign(move(operation.clientSocket));
     }
 
-    [[nodiscard]] Result cancelAsync(AsyncSocketAccept& asyncAccept)
+    [[nodiscard]] Result cancelAsync(AsyncEventLoop&, AsyncSocketAccept& asyncAccept)
     {
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         // This will cause one more event loop run with GetOverlappedIO failing
@@ -339,7 +338,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // Socket CONNECT
     //-------------------------------------------------------------------------------------------------------
 
-    [[nodiscard]] static Result activateAsync(AsyncSocketConnect& asyncConnect)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketConnect& asyncConnect)
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
         OVERLAPPED& overlapped = asyncConnect.overlapped.get().overlapped;
@@ -410,7 +409,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket SEND
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncSocketSend& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketSend& async)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         DWORD       transferred;
@@ -455,7 +454,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncSocketReceive& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketReceive& async)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         WSABUF      buffer;
@@ -486,7 +485,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncSocketClose& async)
+    [[nodiscard]] Result setupAsync(AsyncEventLoop&, AsyncSocketClose& async)
     {
         async.flags |= Internal::Flag_ManualCompletion;
         return Result(true);
@@ -590,7 +589,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncFileRead& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncFileRead& async)
     {
         AsyncFileRead::CompletionData completionData;
         return executeOperation(async, completionData, false); // synchronous == false
@@ -617,7 +616,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncFileWrite& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncFileWrite& async)
     {
         AsyncFileWrite::CompletionData completionData;
         return executeOperation(async, completionData, false); // synchronous == false
@@ -687,7 +686,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncFileClose& async)
+    [[nodiscard]] Result setupAsync(AsyncEventLoop&, AsyncFileClose& async)
     {
         // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
@@ -714,11 +713,14 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
     }
 
-    [[nodiscard]] static Result activateAsync(AsyncProcessExit& async)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
+        async.eventLoop = &eventLoop;
+
         const ProcessDescriptor::Handle processHandle = async.handle;
 
         HANDLE waitHandle;
+
         BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelEvents::processExitCallback, &async,
                                                   INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
         if (result == FALSE)
@@ -741,22 +743,25 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         return Result(true);
     }
 
-    [[nodiscard]] static Result cancelAsync(AsyncProcessExit& async) { return async.waitHandle.close(); }
+    [[nodiscard]] static Result cancelAsync(AsyncEventLoop&, AsyncProcessExit& async)
+    {
+        return async.waitHandle.close();
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // Template
     //-------------------------------------------------------------------------------------------------------
     template <typename T>
-    [[nodiscard]] static bool setupAsync(T& async)
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, T& async)
     {
         async.overlapped.get().userData = &async;
         return true;
     }
 
     // clang-format off
-    template <typename T> [[nodiscard]] bool activateAsync(T&)  { return true; }
+    template <typename T> [[nodiscard]] bool activateAsync(AsyncEventLoop&, T&)  { return true; }
+    template <typename T> [[nodiscard]] bool cancelAsync(AsyncEventLoop&, T&)    { return true; }
     template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
-    template <typename T> [[nodiscard]] bool cancelAsync(T&)    { return true; }
 
     template <typename T> [[nodiscard]] static bool teardownAsync(T*, AsyncTeardown&)  { return true; }
 

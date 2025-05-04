@@ -82,7 +82,7 @@ void SC::AsyncTest::socketAccept()
 
     Function<void(AsyncResult&)> afterStopped = [&](AsyncResult&) { afterStopCalled++; };
 
-    SC_TEST_EXPECT(accept.stop(&afterStopped));
+    SC_TEST_EXPECT(accept.stop(eventLoop, &afterStopped));
     SC_TEST_EXPECT(afterStopCalled == 0);
 
     // on Windows stopAsync generates one more event loop run because
@@ -427,7 +427,7 @@ void SC::AsyncTest::socketSendReceiveError()
 
     SC_TEST_EXPECT(eventLoop.run());
 
-    SC_TEST_EXPECT(not asyncSend.stop());
+    SC_TEST_EXPECT(not asyncSend.stop(eventLoop));
     SC_TEST_EXPECT(eventLoop.run());
 
     SC_TEST_EXPECT(numOnSend == 1);

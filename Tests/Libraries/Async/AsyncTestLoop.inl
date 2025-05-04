@@ -107,7 +107,7 @@ void SC::AsyncTest::loopInterrupt()
         numTimeouts++;
         if (numTimeouts == 2)
         {
-            res.getAsync().getEventLoop()->interrupt();
+            eventLoop.interrupt();
         }
     };
     SC_TEST_EXPECT(timeout.start(eventLoop, 1_ms));

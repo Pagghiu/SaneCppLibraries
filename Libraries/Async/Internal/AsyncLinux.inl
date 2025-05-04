@@ -51,10 +51,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
 
     // clang-format off
-    template <typename T> [[nodiscard]] Result setupAsync(T&);
-    template <typename T> [[nodiscard]] Result activateAsync(T&);
+    template <typename T> [[nodiscard]] Result setupAsync(AsyncEventLoop&, T&);
+    template <typename T> [[nodiscard]] Result activateAsync(AsyncEventLoop&, T&);
+    template <typename T> [[nodiscard]] Result cancelAsync(AsyncEventLoop&, T&);
     template <typename T> [[nodiscard]] Result completeAsync(T&);
-    template <typename T> [[nodiscard]] Result cancelAsync(T&);
 
     template <typename T> [[nodiscard]] static Result teardownAsync(T*, AsyncTeardown&);
 
@@ -212,15 +212,15 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return eventLoop.internal.kernelQueue.get().getUring();
     }
 
-    [[nodiscard]] Result getNewSubmission(AsyncRequest& async, io_uring_sqe*& newSubmission)
+    [[nodiscard]] Result getNewSubmission(AsyncEventLoop& eventLoop, io_uring_sqe*& newSubmission)
     {
-        io_uring& ring = getKernelQueue(*async.eventLoop).ring;
+        io_uring& ring = getKernelQueue(eventLoop).ring;
         // Request a new submission slot
         io_uring_sqe* kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
         if (kernelSubmission == nullptr)
         {
             // No space in the submission kernelEvents, let's try to flush submissions and try again
-            SC_TRY(flushSubmissions(*async.eventLoop, Internal::SyncMode::NoWait, nullptr));
+            SC_TRY(flushSubmissions(eventLoop, Internal::SyncMode::NoWait, nullptr));
             kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
             if (kernelSubmission == nullptr)
             {
@@ -359,7 +359,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     if (newEvents > 0)
                     {
                         // We've freed some slots, let's try again
-                        eventLoop.internal.runStepExecuteCompletions(parentKernelEvents);
+                        eventLoop.internal.runStepExecuteCompletions(eventLoop, parentKernelEvents);
                         continue;
                     }
                     else
@@ -395,9 +395,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
     //-------------------------------------------------------------------------------------------------------
-    Result activateAsync(AsyncLoopTimeout& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime = async.eventLoop->getLoopTime().offsetBy(async.relativeTimeout);
+        async.expirationTime = eventLoop.getLoopTime().offsetBy(async.relativeTimeout);
         return Result(true);
     }
 
@@ -414,10 +414,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncSocketAccept& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         struct sockaddr* sockAddr = &async.sockAddrHandle.reinterpret_as<struct sockaddr>();
         async.sockAddrLen         = sizeof(struct sockaddr);
         globalLibURing.io_uring_prep_accept(submission, async.handle, sockAddr, &async.sockAddrLen, SOCK_CLOEXEC);
@@ -433,10 +433,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket CONNECT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncSocketConnect& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         struct sockaddr* sockAddr = &async.ipAddress.handle.reinterpret_as<struct sockaddr>();
         globalLibURing.io_uring_prep_connect(submission, async.handle, sockAddr, async.ipAddress.sizeOfHandle());
         globalLibURing.io_uring_sqe_set_data(submission, &async);
@@ -452,10 +452,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket SEND
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncSocketSend& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         if (async.singleBuffer)
         {
             globalLibURing.io_uring_prep_write(submission, async.handle, async.buffer.data(),
@@ -496,10 +496,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncSocketReceive& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_recv(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
@@ -519,10 +519,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncSocketClose& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketClose& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_close(submission, async.handle);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
@@ -539,10 +539,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncFileRead& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_read(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(),
                                           async.useOffset ? async.offset : -1);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
@@ -563,10 +563,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncFileWrite& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         const __u64 off = async.useOffset ? async.offset : -1;
         if (async.singleBuffer)
         {
@@ -594,10 +594,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncFileClose& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileClose& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_close(submission, async.handle);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
@@ -612,22 +612,22 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File POLL
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncFilePoll& async)
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
     {
         // Documentation says:
         // "Unlike poll or epoll without EPOLLONESHOT, this interface always works in one-shot mode. That is, once the
         // poll operation is completed, it will have to be resubmitted."
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_poll_add(submission, async.handle, POLLIN);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
 
-    [[nodiscard]] Result cancelAsync(AsyncFilePoll& async)
+    [[nodiscard]] Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_poll_remove(submission, &async);
         // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
         return Result(true);
@@ -636,7 +636,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncProcessExit& async)
+    [[nodiscard]] Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
@@ -645,7 +645,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         }
         SC_TRY(async.pidFd.assign(pidFd));
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_poll_add(submission, pidFd, POLLIN);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
@@ -666,18 +666,18 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     // Templates
     //-------------------------------------------------------------------------------------------------------
     template <typename T>
-    [[nodiscard]] Result cancelAsync(T& async)
+    [[nodiscard]] Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
     {
         io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(async, submission));
+        SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_cancel(submission, &async, 0);
         // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
         return Result(true);
     }
 
     // clang-format off
-    template <typename T> [[nodiscard]] Result setupAsync(T&)     { return Result(true); }
-    template <typename T> [[nodiscard]] Result activateAsync(T&)  { return Result(true); }
+    template <typename T> [[nodiscard]] Result setupAsync(AsyncEventLoop&, T&)     { return Result(true); }
+    template <typename T> [[nodiscard]] Result activateAsync(AsyncEventLoop&, T&)  { return Result(true); }
     template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
 
     template <typename T> [[nodiscard]] static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
@@ -803,10 +803,10 @@ SC::AsyncRequest* SC::AsyncEventLoop::Internal::KernelEvents::getAsyncRequest(ui
 }
 
 // clang-format off
-template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::setupAsync(T& async)    { return isEpoll ? getPosix().setupAsync(async) : getUring().setupAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::activateAsync(T& async) { return isEpoll ? getPosix().activateAsync(async) : getUring().activateAsync(async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::setupAsync(AsyncEventLoop& eventLoop, T& async)    { return isEpoll ? getPosix().setupAsync(eventLoop, async) : getUring().setupAsync(eventLoop, async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::activateAsync(AsyncEventLoop& eventLoop, T& async) { return isEpoll ? getPosix().activateAsync(eventLoop, async) : getUring().activateAsync(eventLoop, async); }
+template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::cancelAsync(AsyncEventLoop& eventLoop, T& async)   { return isEpoll ? getPosix().cancelAsync(eventLoop, async) : getUring().cancelAsync(eventLoop, async); }
 template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::completeAsync(T& async) { return isEpoll ? getPosix().completeAsync(async) : getUring().completeAsync(async); }
-template <typename T>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::cancelAsync(T& async)   { return isEpoll ? getPosix().cancelAsync(async) : getUring().cancelAsync(async); }
 
 template <typename T, typename P>  SC::Result SC::AsyncEventLoop::Internal::KernelEvents::executeOperation(T& async, P& param)   { return KernelEventsPosix::executeOperation(async, param); }
 // clang-format on

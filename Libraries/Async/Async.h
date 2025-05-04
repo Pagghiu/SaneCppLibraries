@@ -123,13 +123,6 @@ struct AsyncRequest
 
     void setDebugName(const char* newDebugName);
 
-    /// @brief Get the event loop associated with this AsyncRequest
-    [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
-
-    /// @brief Caches the event loop associated with this AsyncRequest.
-    /// Used to cache eventLoop pointer before starting the AsyncRequest.
-    void cacheInternalEventLoop(AsyncEventLoop& loop) { eventLoop = &loop; }
-
     /// @brief Adds the request to be executed on a specific AsyncSequence
     void executeOn(AsyncSequence& sequence);
 
@@ -164,11 +157,12 @@ struct AsyncRequest
     AsyncRequest(Type type) : state(State::Free), type(type), flags(0), userFlags(0), unused(0) {}
 
     /// @brief Ask to stop current async operation
+    /// @param eventLoop The event Loop associated with this request
     /// @param afterStopped Optional pointer to a callback called after request is fully stopped.
     /// @return `true` if the stop request has been successfully queued
     /// @note When stopping the request must be valid until afterStopped will be called.
     /// This AsyncRequest cannot be re-used before this callback will be called.
-    [[nodiscard]] Result stop(Function<void(AsyncResult&)>* afterStopped = nullptr);
+    [[nodiscard]] Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
 
     /// @brief Returns `true` if this request is free
     [[nodiscard]] bool isFree() const;
@@ -183,7 +177,7 @@ struct AsyncRequest
     [[nodiscard]] Type getType() const { return type; }
 
     /// @brief Shortcut for AsyncEventLoop::start
-    Result start(AsyncEventLoop& loop);
+    Result start(AsyncEventLoop& eventLoop);
 
     /// @brief Sets user flags, holding some meaningful data for the caller
     void setUserFlags(uint16_t externalFlags) { userFlags = externalFlags; }
@@ -196,8 +190,7 @@ struct AsyncRequest
 
     void queueSubmission(AsyncEventLoop& eventLoop);
 
-    AsyncEventLoop* eventLoop = nullptr;
-    AsyncSequence*  sequence  = nullptr;
+    AsyncSequence* sequence = nullptr;
 
     AsyncTaskSequence* getTask();
 
@@ -260,10 +253,12 @@ struct AsyncCompletionData
 struct AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
-    AsyncResult(AsyncRequest& request, SC::Result&& res) : async(request), returnCode(move(res)) {}
+    AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request, SC::Result&& res)
+        : eventLoop(eventLoop), async(request), returnCode(move(res))
+    {}
 
     /// @brief Constructs an async result from a request
-    AsyncResult(AsyncRequest& request) : async(request) {}
+    AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request) : eventLoop(eventLoop), async(request) {}
 
     /// @brief Ask the event loop to re-activate this request after it was already completed
     /// @param value `true` will reactivate the request
@@ -272,7 +267,8 @@ struct AsyncResult
     /// @brief Check if the returnCode of this result is valid
     [[nodiscard]] const SC::Result& isValid() const { return returnCode; }
 
-    AsyncRequest& async;
+    AsyncEventLoop& eventLoop;
+    AsyncRequest&   async;
 
   protected:
     friend struct AsyncEventLoop;
@@ -350,7 +346,7 @@ struct AsyncLoopWakeUp : public AsyncRequest
     SC::Result start(AsyncEventLoop& eventLoop, EventObject& eventObject);
 
     /// Wakes up event loop, scheduling AsyncLoopWakeUp::callback on next AsyncEventLoop::run (or its variations)
-    SC::Result wakeUp();
+    SC::Result wakeUp(AsyncEventLoop& eventLoop);
 
     Function<void(Result&)> callback; ///< Callback called by SC::AsyncEventLoop::run after SC::AsyncLoopWakeUp::wakeUp
     EventObject* eventObject = nullptr; ///< Optional EventObject to let external threads wait for the callback to end
@@ -400,6 +396,7 @@ struct AsyncProcessExit : public AsyncRequest
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;
+    AsyncEventLoop*             eventLoop = nullptr;
 #elif SC_PLATFORM_LINUX
     FileDescriptor pidFd;
 #endif
@@ -801,7 +798,7 @@ struct AsyncFilePoll : public AsyncRequest
     using Result         = AsyncResultOf<AsyncFilePoll, CompletionData>;
 
     /// Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API
-    SC::Result start(AsyncEventLoop& loop, FileDescriptor::Handle fileDescriptor);
+    SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
 #if SC_PLATFORM_WINDOWS
     [[nodiscard]] auto& getOverlappedOpaque() { return overlapped; }
@@ -1134,7 +1131,7 @@ struct AsyncEventLoopMonitor
 
     /// @brief Create the monitoring thread for an AsyncEventLoop.
     /// To start monitoring events call AsyncEventLoopMonitor::startMonitoring.
-    Result create(AsyncEventLoop& loop);
+    Result create(AsyncEventLoop& eventLoop);
 
     /// @brief Stop monitoring the AsyncEventLoop, disposing all resources
     Result close();

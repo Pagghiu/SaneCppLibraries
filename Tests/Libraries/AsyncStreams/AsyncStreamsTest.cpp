@@ -214,18 +214,18 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
     SC_TEST_EXPECT(readable.init(pool, requests));
+    AsyncEventLoop loop;
     struct Context
     {
+        AsyncEventLoop&      eventLoop;
         AsyncReadableStream& readable;
         size_t               idx;
         size_t               max;
         Vector<size_t>       indices;
-    } context = {readable, 0, 100, {}};
+    } context = {loop, readable, 0, 100, {}};
 
-    AsyncEventLoop loop;
     SC_TEST_EXPECT(loop.create());
     AsyncLoopTimeout timeout;
-    timeout.cacheInternalEventLoop(loop);
     timeout.callback = [&context](AsyncLoopTimeout::Result&)
     {
         AsyncBufferView::ID bufferID;
@@ -244,7 +244,7 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     {
         if (context.idx < context.max)
         {
-            Result res = timeout.start(*timeout.getEventLoop(), Time::Milliseconds(1));
+            Result res = timeout.start(context.eventLoop, Time::Milliseconds(1));
             if (not res)
             {
                 context.readable.emitError(res);

@@ -74,7 +74,7 @@ struct SC::FileSystemWatcher::Internal
     {
         if (eventLoopRunner)
         {
-            SC_TRY(eventLoopRunner->asyncPoll.stop());
+            SC_TRY(eventLoopRunner->asyncPoll.stop(*eventLoopRunner->eventLoop));
         }
 
         for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)

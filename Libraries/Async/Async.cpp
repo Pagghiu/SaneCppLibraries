@@ -106,7 +106,7 @@ void SC::AsyncRequest::markAsFree()
     flags = 0;
 }
 
-void SC::AsyncRequest::queueSubmission(AsyncEventLoop& loop) { loop.internal.queueSubmission(loop, *this); }
+void SC::AsyncRequest::queueSubmission(AsyncEventLoop& eventLoop) { eventLoop.internal.queueSubmission(*this); }
 
 SC::AsyncTaskSequence* SC::AsyncRequest::getTask()
 {
@@ -117,11 +117,9 @@ SC::AsyncTaskSequence* SC::AsyncRequest::getTask()
     return nullptr;
 }
 
-SC::Result SC::AsyncRequest::stop(Function<void(AsyncResult&)>* onClose)
+SC::Result SC::AsyncRequest::stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* onClose)
 {
-    if (eventLoop)
-        return eventLoop->internal.stop(*eventLoop, *this, onClose);
-    return SC::Result::Error("stop failed. eventLoop is nullptr");
+    return eventLoop.internal.stop(*this, onClose);
 }
 
 bool SC::AsyncRequest::isFree() const { return state == State::Free; }
@@ -130,7 +128,7 @@ bool SC::AsyncRequest::isCancelling() const { return state == State::Cancelling;
 
 bool SC::AsyncRequest::isActive() const { return state == State::Active or state == State::Reactivate; }
 
-SC::Result SC::AsyncRequest::start(AsyncEventLoop& loop) { return loop.start(*this); }
+SC::Result SC::AsyncRequest::start(AsyncEventLoop& eventLoop) { return eventLoop.start(*this); }
 
 //-------------------------------------------------------------------------------------------------------
 // AsyncResult
@@ -154,23 +152,23 @@ void SC::AsyncResult::reactivateRequest(bool value)
 //-------------------------------------------------------------------------------------------------------
 SC::Result SC::AsyncLoopTimeout::validate(AsyncEventLoop&) { return SC::Result(true); }
 
-SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& loop, Time::Milliseconds timeout)
+SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& eventLoop, Time::Milliseconds timeout)
 {
     relativeTimeout = timeout;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& loop, EventObject& eo)
+SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, EventObject& eo)
 {
     SC_TRY(checkState());
     eventObject = &eo;
-    queueSubmission(loop);
+    queueSubmission(eventLoop);
     return SC::Result(true);
 }
 
 SC::Result SC::AsyncLoopWakeUp::validate(AsyncEventLoop&) { return SC::Result(true); }
 
-SC::Result SC::AsyncLoopWakeUp::wakeUp() { return getEventLoop()->wakeUpFromExternalThread(*this); }
+SC::Result SC::AsyncLoopWakeUp::wakeUp(AsyncEventLoop& eventLoop) { return eventLoop.wakeUpFromExternalThread(*this); }
 
 SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
 {
@@ -193,12 +191,12 @@ SC::Result SC::AsyncProcessExit::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& loop, const SocketDescriptor& socketDescriptor)
+SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor)
 {
     SC_TRY(checkState());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketAccept::validate(AsyncEventLoop&)
@@ -207,13 +205,13 @@ SC::Result SC::AsyncSocketAccept::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor,
+SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                          SocketIPAddress address)
 {
     SC_TRY(checkState());
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     ipAddress = address;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketConnect::validate(AsyncEventLoop&)
@@ -222,21 +220,22 @@ SC::Result SC::AsyncSocketConnect::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor, Span<const char> data)
+SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                      Span<const char> data)
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer       = data;
     singleBuffer = true;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor,
+SC::Result SC::AsyncSocketSend::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
                                       Span<Span<const char>> data)
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffers      = data;
     singleBuffer = false;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketSend::validate(AsyncEventLoop&)
@@ -254,11 +253,11 @@ SC::Result SC::AsyncSocketSend::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor, Span<char> data)
+SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<char> data)
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer = data;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
@@ -267,11 +266,11 @@ SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& loop, const SocketDescriptor& descriptor)
+SC::Result SC::AsyncSocketClose::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor)
 {
     SC_TRY(checkState());
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncSocketClose::validate(AsyncEventLoop&)
@@ -280,33 +279,33 @@ SC::Result SC::AsyncSocketClose::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& loop)
+SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
 {
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead - Zero sized read buffer");
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileRead - Invalid file descriptor");
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
     {
         disableThreadPool();
     }
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, Span<Span<const char>> data)
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, Span<Span<const char>> data)
 {
     buffers      = data;
     singleBuffer = false;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& loop, Span<const char> data)
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, Span<const char> data)
 {
     buffer       = data;
     singleBuffer = true;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& loop)
+SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& eventLoop)
 {
     if (singleBuffer)
     {
@@ -320,7 +319,7 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& loop)
     totalBytesWritten = 0;
 
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not loop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
     {
         disableThreadPool();
     }
@@ -334,18 +333,18 @@ SC::Result SC::AsyncFileClose::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFileClose::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncFileClose::start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fd)
 {
     SC_TRY(checkState());
     handle = fd;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& loop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fd)
 {
     SC_TRY(checkState());
     handle = fd;
-    return loop.start(*this);
+    return eventLoop.start(*this);
 }
 
 SC::Result SC::AsyncFilePoll::validate(AsyncEventLoop&)
@@ -610,7 +609,7 @@ SC::Result SC::AsyncEventLoopMonitor::stopMonitoringAndDispatchCompletions()
     if (wakeUpMustBeSent)
     {
         wakeUpHasBeenCalled = false;
-        SC_TRY(eventLoopWakeUp.wakeUp());
+        SC_TRY(eventLoopWakeUp.wakeUp(*eventLoop));
     }
     eventObjectExitBlockingMode.wait();
     needsWakeUp.exchange(true);
@@ -636,7 +635,7 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     eventObjectExitBlockingMode.signal();
     SC_TRY(eventLoop->wakeUpFromExternalThread());
     SC_TRY(eventLoopThread.join());
-    SC_TRY(eventLoopWakeUp.stop());
+    SC_TRY(eventLoopWakeUp.stop(*eventLoop));
     eventLoop = nullptr;
     return Result(true);
 }
@@ -656,10 +655,9 @@ void SC::AsyncEventLoop::Internal::popNextInSequence(AsyncSequence& sequence)
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
 
-void SC::AsyncEventLoop::Internal::queueSubmission(AsyncEventLoop& loop, AsyncRequest& async)
+void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
 {
-    async.eventLoop = &loop;
-    async.state     = AsyncRequest::State::Setup;
+    async.state = AsyncRequest::State::Setup;
     if (async.sequence)
     {
         AsyncSequence& sequence = *async.sequence;
@@ -707,7 +705,7 @@ void SC::AsyncEventLoop::Internal::clearSequence(AsyncSequence& sequence)
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
 
-void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::Absolute currentTime)
+void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop, Time::Absolute currentTime)
 {
     AsyncLoopTimeout* async = activeLoopTimeouts.front;
     while (async != nullptr)
@@ -717,7 +715,7 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::Absolute currentTim
         if (currentTime.isLaterThanOrEqualTo(current->expirationTime))
         {
             removeActiveHandle(*current);
-            AsyncLoopTimeout::Result result(*current, Result(true));
+            AsyncLoopTimeout::Result result(eventLoop, *current, Result(true));
             if (current->callback.isValid())
             {
                 current->callback(result);
@@ -748,7 +746,7 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(Time::Absolute currentTim
 }
 
 template <typename T>
-void SC::AsyncEventLoop::Internal::stopRequests(IntrusiveDoubleLinkedList<T>& linkedList)
+void SC::AsyncEventLoop::Internal::stopRequests(AsyncEventLoop& eventLoop, IntrusiveDoubleLinkedList<T>& linkedList)
 {
     auto async = linkedList.front;
     while (async != nullptr)
@@ -756,7 +754,7 @@ void SC::AsyncEventLoop::Internal::stopRequests(IntrusiveDoubleLinkedList<T>& li
         auto asyncNext = static_cast<T*>(async->next);
         if (!async->isCancelling() and not async->isFree())
         {
-            Result res = async->stop();
+            Result res = async->stop(eventLoop);
             (void)res;
             SC_ASSERT_DEBUG(res);
         }
@@ -800,7 +798,7 @@ SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleL
     return res;
 }
 
-SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
+SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
 {
     Result res = Result(true);
 
@@ -822,32 +820,32 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
     sequences.clear();
 
     // TODO: Consolidate this list with enumerateRequests
-    stopRequests(submissions);
+    stopRequests(eventLoop, submissions);
 
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
-        Result stopRes = async->stop();
+        Result stopRes = async->stop(eventLoop);
         (void)stopRes;
         SC_ASSERT_DEBUG(stopRes);
     }
 
-    stopRequests(activeLoopTimeouts);
-    stopRequests(activeLoopWakeUps);
-    stopRequests(activeProcessExits);
-    stopRequests(activeSocketAccepts);
-    stopRequests(activeSocketConnects);
-    stopRequests(activeSocketSends);
-    stopRequests(activeSocketReceives);
-    stopRequests(activeSocketCloses);
-    stopRequests(activeFileReads);
-    stopRequests(activeFileWrites);
-    stopRequests(activeFileCloses);
-    stopRequests(activeFilePolls);
+    stopRequests(eventLoop, activeLoopTimeouts);
+    stopRequests(eventLoop, activeLoopWakeUps);
+    stopRequests(eventLoop, activeProcessExits);
+    stopRequests(eventLoop, activeSocketAccepts);
+    stopRequests(eventLoop, activeSocketConnects);
+    stopRequests(eventLoop, activeSocketSends);
+    stopRequests(eventLoop, activeSocketReceives);
+    stopRequests(eventLoop, activeSocketCloses);
+    stopRequests(eventLoop, activeFileReads);
+    stopRequests(eventLoop, activeFileWrites);
+    stopRequests(eventLoop, activeFileCloses);
+    stopRequests(eventLoop, activeFilePolls);
 
-    stopRequests(manualCompletions);
+    stopRequests(eventLoop, manualCompletions);
 
-    SC_TRY(loop.run());
-    SC_TRY(loop.internal.kernelQueue.get().close());
+    SC_TRY(eventLoop.run());
+    SC_TRY(eventLoop.internal.kernelQueue.get().close());
 
     if (numberOfExternals != 0 or numberOfActiveHandles != 0 or numberOfManualCompletions != 0)
     {
@@ -856,18 +854,19 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& loop)
     return res;
 }
 
-SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::stageSubmission(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                         AsyncRequest& async)
 {
     switch (async.state)
     {
     case AsyncRequest::State::Setup: {
-        SC_TRY(setupAsync(kernelEvents, async));
+        SC_TRY(setupAsync(eventLoop, kernelEvents, async));
         async.state = AsyncRequest::State::Submitting;
-        SC_TRY(activateAsync(kernelEvents, async));
+        SC_TRY(activateAsync(eventLoop, kernelEvents, async));
     }
     break;
     case AsyncRequest::State::Submitting: {
-        SC_TRY(activateAsync(kernelEvents, async));
+        SC_TRY(activateAsync(eventLoop, kernelEvents, async));
     }
     break;
     case AsyncRequest::State::Reactivate:
@@ -877,9 +876,9 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(KernelEvents& kernelEve
     }
     break;
     case AsyncRequest::State::Cancelling: {
-        SC_TRY(cancelAsync(kernelEvents, async));
+        SC_TRY(cancelAsync(eventLoop, kernelEvents, async));
         AsyncTeardown teardown;
-        prepareTeardown(async, teardown);
+        prepareTeardown(eventLoop, async, teardown);
         SC_TRY(teardownAsync(teardown));
         if (teardown.sequence and teardown.sequence->clearSequenceOnCancel)
         {
@@ -908,6 +907,8 @@ int SC::AsyncEventLoop::Internal::getTotalNumberOfActiveHandle() const
 
 struct SC::AsyncEventLoop::Internal::ReactivateAsyncPhase
 {
+    AsyncEventLoop& eventLoop;
+
     template <typename T>
     SC::Result operator()(T& async)
     {
@@ -918,18 +919,19 @@ struct SC::AsyncEventLoop::Internal::ReactivateAsyncPhase
         }
         if (KernelEvents::needsSubmissionWhenReactivating(async))
         {
-            async.eventLoop->internal.submissions.queueBack(async);
-            async.eventLoop->internal.numberOfSubmissions += 1;
+            eventLoop.internal.submissions.queueBack(async);
+            eventLoop.internal.numberOfSubmissions += 1;
         }
         else
         {
-            async.eventLoop->internal.addActiveHandle(async);
+            eventLoop.internal.addActiveHandle(async);
         }
         return Result(true);
     }
 };
 
-SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelEvents& kernelEvents,
+SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(AsyncEventLoop& eventLoop,
+                                                                         KernelEvents&   kernelEvents,
                                                                          AsyncRequest& async, Result&& returnCode,
                                                                          int32_t eventIndex)
 {
@@ -937,11 +939,11 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     bool reactivate = false;
     removeActiveHandle(async);
     AsyncTeardown teardown;
-    prepareTeardown(async, teardown);
-    SC_TRY(completeAsync(kernelEvents, async, move(returnCode), reactivate, eventIndex));
+    prepareTeardown(eventLoop, async, teardown);
+    SC_TRY(completeAsync(eventLoop, kernelEvents, async, move(returnCode), reactivate, eventIndex));
     if (reactivate and async.state == AsyncRequest::State::Reactivate)
     {
-        SC_TRY(Internal::applyOnAsync(async, ReactivateAsyncPhase()));
+        SC_TRY(Internal::applyOnAsync(async, ReactivateAsyncPhase{eventLoop}));
     }
     else
     {
@@ -954,24 +956,24 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndEventuallyReactivate(KernelE
     if (not returnCode)
     {
         // TODO: We shouldn't probably access async if it has not been reactivated...
-        reportError(kernelEvents, async, move(returnCode), eventIndex);
+        reportError(eventLoop, kernelEvents, async, move(returnCode), eventIndex);
     }
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::runStep(AsyncEventLoop& loop, SyncMode syncMode)
+SC::Result SC::AsyncEventLoop::Internal::runStep(AsyncEventLoop& eventLoop, SyncMode syncMode)
 {
     alignas(uint64_t) uint8_t buffer[8 * 1024]; // 8 Kb of kernel events
     AsyncKernelEvents         kernelEvents;
     kernelEvents.eventsMemory = buffer;
-    SC_TRY(submitRequests(loop, kernelEvents));
-    SC_TRY(blockingPoll(loop, syncMode, kernelEvents));
-    return dispatchCompletions(loop, syncMode, kernelEvents);
+    SC_TRY(submitRequests(eventLoop, kernelEvents));
+    SC_TRY(blockingPoll(eventLoop, syncMode, kernelEvents));
+    return dispatchCompletions(eventLoop, syncMode, kernelEvents);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& loop, AsyncKernelEvents& asyncKernelEvents)
+SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& eventLoop, AsyncKernelEvents& asyncKernelEvents)
 {
-    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
+    KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     asyncKernelEvents.numberOfEvents = 0;
     // TODO: Check if it's possible to avoid zeroing kernel events memory
     memset(asyncKernelEvents.eventsMemory.data(), 0, asyncKernelEvents.eventsMemory.sizeInBytes());
@@ -981,24 +983,24 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& loop, As
     while (AsyncRequest* async = submissions.dequeueFront())
     {
         numberOfSubmissions -= 1;
-        auto res = stageSubmission(kernelEvents, *async);
+        auto res = stageSubmission(eventLoop, kernelEvents, *async);
         if (not res)
         {
-            reportError(kernelEvents, *async, move(res), -1);
+            reportError(eventLoop, kernelEvents, *async, move(res), -1);
         }
     }
 
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, SyncMode syncMode,
+SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& eventLoop, SyncMode syncMode,
                                                       AsyncKernelEvents& asyncKernelEvents)
 {
     if (listeners and listeners->beforeBlockingPoll.isValid())
     {
-        listeners->beforeBlockingPoll(loop);
+        listeners->beforeBlockingPoll(eventLoop);
     }
-    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
+    KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     const auto   numActiveHandles = getTotalNumberOfActiveHandle();
     SC_ASSERT_RELEASE(numActiveHandles >= 0);
     if (numActiveHandles > 0 or numberOfManualCompletions != 0)
@@ -1008,25 +1010,25 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& loop, Sync
 
         // If there are manual completions the loop can't block waiting for I/O, to dispatch them immediately
         const bool canBlockForIO = numberOfManualCompletions == 0;
-        SC_TRY(kernelEvents.syncWithKernel(loop, canBlockForIO ? syncMode : SyncMode::NoWait));
+        SC_TRY(kernelEvents.syncWithKernel(eventLoop, canBlockForIO ? syncMode : SyncMode::NoWait));
         SC_LOG_MESSAGE("Active Requests After Poll = {}\n", getTotalNumberOfActiveHandle());
     }
     if (listeners and listeners->afterBlockingPoll.isValid())
     {
-        listeners->afterBlockingPoll(loop);
+        listeners->afterBlockingPoll(eventLoop);
     }
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode,
+SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eventLoop, SyncMode syncMode,
                                                              AsyncKernelEvents& asyncKernelEvents)
 {
     if (interrupted)
     {
         return SC::Result(true);
     }
-    executeCancellationCallbacks();
-    KernelEvents kernelEvents(loop.internal.kernelQueue.get(), asyncKernelEvents);
+    executeCancellationCallbacks(eventLoop);
+    KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     switch (syncMode)
     {
     case SyncMode::NoWait: {
@@ -1034,7 +1036,7 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loo
         // with kernel has not been blocking (as we are in NoWait mode)
         // if (kernelEvents.needsManualTimersProcessing())
         {
-            invokeExpiredTimers(loopTime);
+            invokeExpiredTimers(eventLoop, loopTime);
         }
     }
     break;
@@ -1044,52 +1046,54 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& loo
         if (runTimers)
         {
             runTimers = false;
-            invokeExpiredTimers(loopTime);
+            invokeExpiredTimers(eventLoop, loopTime);
         }
     }
     break;
     }
-    runStepExecuteCompletions(kernelEvents);
-    runStepExecuteManualCompletions(kernelEvents);
-    runStepExecuteManualThreadPoolCompletions(kernelEvents);
+    runStepExecuteCompletions(eventLoop, kernelEvents);
+    runStepExecuteManualCompletions(eventLoop, kernelEvents);
+    runStepExecuteManualThreadPoolCompletions(eventLoop, kernelEvents);
 
     SC_LOG_MESSAGE("Active Requests After Completion = {} ( + {} manual)\n", getTotalNumberOfActiveHandle(),
                    numberOfManualCompletions);
     return SC::Result(true);
 }
 
-void SC::AsyncEventLoop::Internal::executeCancellationCallbacks()
+void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& eventLoop)
 {
     while (AsyncRequest* async = cancellations.dequeueFront())
     {
-        AsyncResult res(*async);
+        AsyncResult res(eventLoop, *async);
         (*async->closeCallback)(res);
     }
 }
 
-void SC::AsyncEventLoop::Internal::runStepExecuteManualCompletions(KernelEvents& kernelEvents)
+void SC::AsyncEventLoop::Internal::runStepExecuteManualCompletions(AsyncEventLoop& eventLoop,
+                                                                   KernelEvents&   kernelEvents)
 {
     while (AsyncRequest* async = manualCompletions.dequeueFront())
     {
-        if (not completeAndEventuallyReactivate(kernelEvents, *async, Result(true), -1))
+        if (not completeAndEventuallyReactivate(eventLoop, kernelEvents, *async, Result(true), -1))
         {
             SC_LOG_MESSAGE("Error completing {}", async->debugName);
         }
     }
 }
 
-void SC::AsyncEventLoop::Internal::runStepExecuteManualThreadPoolCompletions(KernelEvents& kernelEvents)
+void SC::AsyncEventLoop::Internal::runStepExecuteManualThreadPoolCompletions(AsyncEventLoop& eventLoop,
+                                                                             KernelEvents&   kernelEvents)
 {
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
-        if (not completeAndEventuallyReactivate(kernelEvents, *async, Result(true), -1))
+        if (not completeAndEventuallyReactivate(eventLoop, kernelEvents, *async, Result(true), -1))
         {
             SC_LOG_MESSAGE("Error completing {}", async->debugName);
         }
     }
 }
 
-void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kernelEvents)
+void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents)
 {
     for (uint32_t idx = 0; idx < kernelEvents.getNumEvents(); ++idx)
     {
@@ -1108,7 +1112,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
         Result        result = Result(kernelEvents.validateEvent(idx, continueProcessing));
         if (not result)
         {
-            reportError(kernelEvents, async, move(result), eventIndex);
+            reportError(eventLoop, kernelEvents, async, move(result), eventIndex);
             continue;
         }
 
@@ -1125,7 +1129,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
                 // write watcher that must be removed to avoid executing completion two times.
                 manualCompletions.remove(async);
             }
-            if (not completeAndEventuallyReactivate(kernelEvents, async, move(result), eventIndex))
+            if (not completeAndEventuallyReactivate(eventLoop, kernelEvents, async, move(result), eventIndex))
             {
                 SC_LOG_MESSAGE("Error completing {}", async.debugName);
             }
@@ -1148,8 +1152,8 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(KernelEvents& kerne
 
 struct SC::AsyncEventLoop::Internal::SetupAsyncPhase
 {
-    KernelEvents& kernelEvents;
-    SetupAsyncPhase(KernelEvents& kernelEvents) : kernelEvents(kernelEvents) {}
+    AsyncEventLoop& eventLoop;
+    KernelEvents&   kernelEvents;
 
     template <typename T>
     SC::Result operator()(T& async)
@@ -1160,15 +1164,15 @@ struct SC::AsyncEventLoop::Internal::SetupAsyncPhase
         }
         else
         {
-            return Result(kernelEvents.setupAsync(async));
+            return Result(kernelEvents.setupAsync(eventLoop, async));
         }
     }
 };
 
 struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
 {
-    KernelEvents& kernelEvents;
-    ActivateAsyncPhase(KernelEvents& kernelEvents) : kernelEvents(kernelEvents) {}
+    AsyncEventLoop& eventLoop;
+    KernelEvents&   kernelEvents;
 
     template <typename T>
     SC::Result operator()(T& async)
@@ -1176,32 +1180,36 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
         AsyncTaskSequence* asyncTask = async.getTask();
         if (asyncTask)
         {
-            asyncTask->task.function = [&async] { executeThreadPoolOperation(async); };
+            AsyncEventLoop* loop     = &eventLoop;
+            asyncTask->task.function = [&async, loop] { executeThreadPoolOperation(*loop, async); };
             return asyncTask->threadPool->queueTask(asyncTask->task);
         }
 
-        SC_TRY(kernelEvents.activateAsync(async));
+        SC_TRY(kernelEvents.activateAsync(eventLoop, async));
         if (async.flags & Internal::Flag_ManualCompletion)
         {
-            async.eventLoop->internal.scheduleManualCompletion(async);
+            eventLoop.internal.scheduleManualCompletion(async);
         }
         return Result(true);
     }
 
     template <typename T>
-    static void executeThreadPoolOperation(T& async)
+    static void executeThreadPoolOperation(AsyncEventLoop& eventLoop, T& async)
     {
         AsyncTaskSequence& task = *async.getTask();
         task.returnCode         = KernelEvents::executeOperation(async, task.completion.construct(async));
-        async.eventLoop->internal.manualThreadPoolCompletions.push(async);
-        SC_ASSERT_RELEASE(async.eventLoop->wakeUpFromExternalThread());
+        eventLoop.internal.manualThreadPoolCompletions.push(async);
+        SC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
     }
 };
 
 struct SC::AsyncEventLoop::Internal::CancelAsyncPhase
 {
-    KernelEvents& kernelEvents;
-    CancelAsyncPhase(KernelEvents& kernelEvents) : kernelEvents(kernelEvents) {}
+    AsyncEventLoop& eventLoop;
+    KernelEvents&   kernelEvents;
+    CancelAsyncPhase(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents)
+        : eventLoop(eventLoop), kernelEvents(kernelEvents)
+    {}
 
     template <typename T>
     SC::Result operator()(T& async)
@@ -1214,33 +1222,36 @@ struct SC::AsyncEventLoop::Internal::CancelAsyncPhase
             SC_TRY(asyncTask->threadPool->waitForTask(asyncTask->task));
 
             // Prevent this async from going in the CompleteAsyncPhase and mark task as free
-            async.eventLoop->internal.manualThreadPoolCompletions.remove(async);
+            eventLoop.internal.manualThreadPoolCompletions.remove(async);
             async.flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
             return Result(true);
         }
 
         if (async.flags & Internal::Flag_ManualCompletion)
         {
-            async.eventLoop->internal.manualCompletions.remove(async);
+            eventLoop.internal.manualCompletions.remove(async);
             return Result(true);
         }
         else
         {
-            return Result(kernelEvents.cancelAsync(async));
+            return Result(kernelEvents.cancelAsync(eventLoop, async));
         }
     }
 };
 
 struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
 {
-    int32_t       eventIndex;
-    KernelEvents& kernelEvents;
+    int32_t         eventIndex;
+    AsyncEventLoop& eventLoop;
+    KernelEvents&   kernelEvents;
 
     Result&& returnCode;
     bool&    reactivate;
 
-    CompleteAsyncPhase(int32_t eventIndex, KernelEvents& kernelEvents, Result&& result, bool& doReactivate)
-        : eventIndex(eventIndex), kernelEvents(kernelEvents), returnCode(move(result)), reactivate(doReactivate)
+    CompleteAsyncPhase(int32_t eventIndex, AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, Result&& result,
+                       bool& doReactivate)
+        : eventIndex(eventIndex), eventLoop(eventLoop), kernelEvents(kernelEvents), returnCode(move(result)),
+          reactivate(doReactivate)
     {}
 
     template <typename T>
@@ -1249,7 +1260,7 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
         using AsyncType       = T;
         using AsyncResultType = typename AsyncType::Result;
         using AsyncCompletion = typename AsyncType::CompletionData;
-        AsyncResultType result(async, forward<Result>(returnCode));
+        AsyncResultType result(eventLoop, async, forward<Result>(returnCode));
         result.eventIndex = eventIndex;
         if (result.returnCode)
         {
@@ -1277,9 +1288,10 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
     }
 };
 
-void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown)
+void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, AsyncRequest& async,
+                                                   AsyncTeardown& teardown)
 {
-    teardown.eventLoop = async.eventLoop;
+    teardown.eventLoop = &eventLoop;
     teardown.type      = async.type;
     teardown.flags     = async.flags;
     teardown.sequence  = async.sequence;
@@ -1321,21 +1333,23 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncRequest& async, AsyncTea
     }
     // clang-format on
 }
-SC::Result SC::AsyncEventLoop::Internal::setupAsync(KernelEvents& kernelEvents, AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::setupAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                    AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, AsyncRequest::TypeToString(async.type));
     // Reset flags that may have been left by previous activations
     async.flags &= ~Flag_ManualCompletion;
     // Note that we're preserving the Flag_ExcludeFromActiveCount
-    return Internal::applyOnAsync(async, SetupAsyncPhase(kernelEvents));
+    return Internal::applyOnAsync(async, SetupAsyncPhase{eventLoop, kernelEvents});
 }
 
-SC::Result SC::AsyncEventLoop::Internal::activateAsync(KernelEvents& kernelEvents, AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::activateAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                       AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, AsyncRequest::TypeToString(async.type));
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
-    SC_TRY(Internal::applyOnAsync(async, ActivateAsyncPhase(kernelEvents)));
-    async.eventLoop->internal.addActiveHandle(async);
+    SC_TRY(Internal::applyOnAsync(async, ActivateAsyncPhase{eventLoop, kernelEvents}));
+    addActiveHandle(async);
     return Result(true);
 }
 
@@ -1393,8 +1407,8 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
     return Result(true);
 }
 
-void SC::AsyncEventLoop::Internal::reportError(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
-                                               int32_t eventIndex)
+void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                               AsyncRequest& async, Result&& returnCode, int32_t eventIndex)
 {
     SC_LOG_MESSAGE("{} ERROR {}\n", async.debugName, AsyncRequest::TypeToString(async.type));
     bool reactivate = false;
@@ -1406,12 +1420,13 @@ void SC::AsyncEventLoop::Internal::reportError(KernelEvents& kernelEvents, Async
     {
         clearSequence(*async.sequence);
     }
-    (void)completeAsync(kernelEvents, async, forward<Result>(returnCode), reactivate, eventIndex);
+    (void)completeAsync(eventLoop, kernelEvents, async, forward<Result>(returnCode), reactivate, eventIndex);
     async.markAsFree();
 }
 
-SC::Result SC::AsyncEventLoop::Internal::completeAsync(KernelEvents& kernelEvents, AsyncRequest& async,
-                                                       Result&& returnCode, bool& reactivate, int32_t eventIndex)
+SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                       AsyncRequest& async, Result&& returnCode, bool& reactivate,
+                                                       int32_t eventIndex)
 {
     if (returnCode)
     {
@@ -1422,13 +1437,15 @@ SC::Result SC::AsyncEventLoop::Internal::completeAsync(KernelEvents& kernelEvent
         SC_LOG_MESSAGE("{} {} COMPLETE (Error = \"{}\")\n", async.debugName, AsyncRequest::TypeToString(async.type),
                        returnCode.message);
     }
-    return Internal::applyOnAsync(async, CompleteAsyncPhase(eventIndex, kernelEvents, move(returnCode), reactivate));
+    return Internal::applyOnAsync(
+        async, CompleteAsyncPhase(eventIndex, eventLoop, kernelEvents, move(returnCode), reactivate));
 }
 
-SC::Result SC::AsyncEventLoop::Internal::cancelAsync(KernelEvents& kernelEvents, AsyncRequest& async)
+SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                     AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} CANCEL\n", async.debugName, AsyncRequest::TypeToString(async.type));
-    SC_TRY(Internal::applyOnAsync(async, CancelAsyncPhase(kernelEvents)))
+    SC_TRY(Internal::applyOnAsync(async, CancelAsyncPhase{eventLoop, kernelEvents}))
     if (async.state == AsyncRequest::State::Active)
     {
         removeActiveHandle(async);
@@ -1436,11 +1453,9 @@ SC::Result SC::AsyncEventLoop::Internal::cancelAsync(KernelEvents& kernelEvents,
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& loop, AsyncRequest& async,
-                                              Function<void(AsyncResult&)>* onClose)
+SC::Result SC::AsyncEventLoop::Internal::stop(AsyncRequest& async, Function<void(AsyncResult&)>* onClose)
 {
     SC_LOG_MESSAGE("{} {} STOP\n", async.debugName, AsyncRequest::TypeToString(async.type));
-    SC_TRY_MSG(async.eventLoop == &loop, "Trying to stop AsyncRequest belonging to another Loop");
     async.closeCallback = onClose;
     switch (async.state)
     {
@@ -1489,8 +1504,6 @@ void SC::AsyncEventLoop::Internal::updateTime()
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
-    SC_TRY_MSG(async.eventLoop == this,
-               "AsyncEventLoop::wakeUpFromExternalThread - Wakeup belonging to different AsyncEventLoop");
     SC_ASSERT_DEBUG(async.type == AsyncRequest::Type::LoopWakeUp);
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
     if (not notifier.pending.exchange(true))
@@ -1500,7 +1513,7 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
     return Result(true);
 }
 
-void SC::AsyncEventLoop::Internal::executeWakeUps()
+void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
 {
     AsyncLoopWakeUp* async = activeLoopWakeUps.front;
     while (async != nullptr)
@@ -1510,14 +1523,14 @@ void SC::AsyncEventLoop::Internal::executeWakeUps()
         async                    = static_cast<AsyncLoopWakeUp*>(async->next);
         if (current->pending.load() == true)
         {
-            AsyncLoopWakeUp::Result result(*current, Result(true));
+            AsyncLoopWakeUp::Result result(eventLoop, *current, Result(true));
             removeActiveHandle(*current);
             current->callback(result);
 
             if (result.shouldBeReactivated and current->state == AsyncRequest::State::Reactivate)
             {
                 current->state = AsyncRequest::State::Submitting;
-                current->eventLoop->internal.addActiveHandle(*current);
+                addActiveHandle(*current);
             }
 
             if (current->eventObject)
@@ -1651,7 +1664,7 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
 void SC::AsyncEventLoop::Internal::scheduleManualCompletion(AsyncRequest& async)
 {
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Setup or async.state == AsyncRequest::State::Submitting);
-    async.eventLoop->internal.manualCompletions.queueBack(async);
+    manualCompletions.queueBack(async);
 }
 
 template <typename Lambda>

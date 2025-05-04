@@ -109,7 +109,8 @@ SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input,
     savedInput  = input;
     savedOutput = output;
     finalizing  = false;
-    return asyncWork.start(*asyncWork.getEventLoop());
+    SC_TRY_MSG(eventLoop != nullptr, "AsyncZLibTransformStream::setEventLoop not called");
+    return asyncWork.start(*eventLoop);
 }
 
 SC::Result SC::AsyncZLibTransformStream::compressFinalize(Span<char> output)
@@ -117,7 +118,8 @@ SC::Result SC::AsyncZLibTransformStream::compressFinalize(Span<char> output)
     savedInput  = {};
     savedOutput = output;
     finalizing  = true;
-    return asyncWork.start(*asyncWork.getEventLoop());
+    SC_TRY_MSG(eventLoop != nullptr, "AsyncZLibTransformStream::setEventLoop not called");
+    return asyncWork.start(*eventLoop);
 }
 
 SC::Result SC::AsyncZLibTransformStream::work()

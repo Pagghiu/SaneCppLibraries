@@ -96,7 +96,7 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_AsyncTaskSequence      = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
     static constexpr int16_t Flag_AsyncTaskSequenceInUse = 1 << 5; // AsyncTaskSequence must still be waited
 
-    [[nodiscard]] Result close(AsyncEventLoop& loop);
+    [[nodiscard]] Result close(AsyncEventLoop& eventLoop);
 
     [[nodiscard]] int getTotalNumberOfActiveHandle() const;
 
@@ -107,39 +107,40 @@ struct SC::AsyncEventLoop::Internal
     // Timers
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    void invokeExpiredTimers(Time::Absolute currentTime);
+    void invokeExpiredTimers(AsyncEventLoop& eventLoop, Time::Absolute currentTime);
     void updateTime();
 
-    [[nodiscard]] Result stop(AsyncEventLoop& loop, AsyncRequest& async, Function<void(AsyncResult&)>* onClose);
+    [[nodiscard]] Result stop(AsyncRequest& async, Function<void(AsyncResult&)>* onClose);
 
     // LoopWakeUp
-    void executeWakeUps();
+    void executeWakeUps(AsyncEventLoop& eventLoop);
 
     void extracted(AsyncSequence& sequence);
 
     // Setup
-    void queueSubmission(AsyncEventLoop& loop, AsyncRequest& async);
+    void queueSubmission(AsyncRequest& async);
     void popNextInSequence(AsyncSequence& sequence);
     void resumeSequence(AsyncSequence& sequence);
     void clearSequence(AsyncSequence& sequence);
 
     // Phases
-    [[nodiscard]] Result stageSubmission(KernelEvents& kernelEvents, AsyncRequest& async);
-    [[nodiscard]] Result setupAsync(KernelEvents& kernelEvents, AsyncRequest& async);
-    [[nodiscard]] Result activateAsync(KernelEvents& kernelEvents, AsyncRequest& async);
-    [[nodiscard]] Result cancelAsync(KernelEvents& kernelEvents, AsyncRequest& async);
-    [[nodiscard]] Result completeAsync(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
-                                       bool& reactivate, int32_t eventIndex);
+    [[nodiscard]] Result stageSubmission(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result setupAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result cancelAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
+    [[nodiscard]] Result completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async,
+                                       Result&& returnCode, bool& reactivate, int32_t eventIndex);
 
     struct SetupAsyncPhase;
     struct ReactivateAsyncPhase;
     struct ActivateAsyncPhase;
     struct CancelAsyncPhase;
     struct CompleteAsyncPhase;
-    [[nodiscard]] Result completeAndEventuallyReactivate(KernelEvents& kernelEvents, AsyncRequest& async,
-                                                         Result&& returnCode, int32_t eventIndex);
+    [[nodiscard]] Result completeAndEventuallyReactivate(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                         AsyncRequest& async, Result&& returnCode, int32_t eventIndex);
 
-    void reportError(KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode, int32_t eventIndex);
+    void reportError(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
+                     int32_t eventIndex);
 
     enum class SyncMode
     {
@@ -147,21 +148,22 @@ struct SC::AsyncEventLoop::Internal
         ForcedForwardProgress
     };
 
-    [[nodiscard]] Result runStep(AsyncEventLoop& loop, SyncMode syncMode);
+    [[nodiscard]] Result runStep(AsyncEventLoop& eventLoop, SyncMode syncMode);
 
-    [[nodiscard]] Result submitRequests(AsyncEventLoop& loop, AsyncKernelEvents& kernelEvents);
-    [[nodiscard]] Result blockingPoll(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
-    [[nodiscard]] Result dispatchCompletions(AsyncEventLoop& loop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result submitRequests(AsyncEventLoop& eventLoop, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result blockingPoll(AsyncEventLoop& eventLoop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
+    [[nodiscard]] Result dispatchCompletions(AsyncEventLoop& eventLoop, SyncMode syncMode,
+                                             AsyncKernelEvents& kernelEvents);
 
-    void executeCancellationCallbacks();
-    void runStepExecuteCompletions(KernelEvents& kernelEvents);
-    void runStepExecuteManualCompletions(KernelEvents& kernelEvents);
-    void runStepExecuteManualThreadPoolCompletions(KernelEvents& kernelEvents);
+    void executeCancellationCallbacks(AsyncEventLoop& eventLoop);
+    void runStepExecuteCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
+    void runStepExecuteManualCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
+    void runStepExecuteManualThreadPoolCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
 
     friend struct AsyncRequest;
 
     template <typename T>
-    void stopRequests(IntrusiveDoubleLinkedList<T>& linkedList);
+    void stopRequests(AsyncEventLoop& eventLoop, IntrusiveDoubleLinkedList<T>& linkedList);
 
     template <typename T>
     void enumerateRequests(IntrusiveDoubleLinkedList<T>& linkedList, Function<void(AsyncRequest&)>& callback);
@@ -186,7 +188,8 @@ struct SC::AsyncEventLoop::Internal
 #endif
     };
 
-    void                 prepareTeardown(AsyncRequest& async, AsyncTeardown& teardown);
+    void prepareTeardown(AsyncEventLoop& eventLoop, AsyncRequest& async, AsyncTeardown& teardown);
+
     [[nodiscard]] Result teardownAsync(AsyncTeardown& async);
 
     template <typename T>

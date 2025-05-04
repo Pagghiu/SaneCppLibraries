@@ -106,7 +106,7 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop());
+            SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop(*eventLoopRunner->eventLoop));
         }
         closeFileHandle(folderWatcher);
         return Result(true);

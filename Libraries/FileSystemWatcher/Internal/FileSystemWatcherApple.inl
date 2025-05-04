@@ -50,9 +50,10 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
-        auto& async     = eventLoopRunner->eventLoopAsync;
-        async.callback.bind<Internal, &Internal::onMainLoop>(*this);
-        return async.start(*eventLoopRunner->eventLoop, eventLoopRunner->eventObject);
+
+        AsyncLoopWakeUp& wakeUp = eventLoopRunner->asyncWakeUp;
+        wakeUp.callback.bind<Internal, &Internal::onMainLoop>(*this);
+        return wakeUp.start(*eventLoopRunner->eventLoop, eventLoopRunner->eventObject);
     }
 
     [[nodiscard]] Result initThread()
@@ -333,9 +334,11 @@ struct SC::FileSystemWatcher::Internal
 
                 if (internal.eventLoopRunner)
                 {
+                    EventLoopRunner& eventLoopRunner = *internal.eventLoopRunner;
+
                     internal.watcher = watcher;
-                    const Result res = internal.eventLoopRunner->eventLoopAsync.wakeUp();
-                    internal.eventLoopRunner->eventObject.wait();
+                    const Result res = eventLoopRunner.asyncWakeUp.wakeUp(*eventLoopRunner.eventLoop);
+                    eventLoopRunner.eventObject.wait();
                     if (internal.closing.load())
                     {
                         break;

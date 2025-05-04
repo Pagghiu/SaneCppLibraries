@@ -250,7 +250,7 @@ accept.callback = [&](AsyncSocketAccept::Result& res)
 SC_TRY(accept.start(eventLoop, serverSocket));
 // ... at some later point
 // Stop accepting new clients
-SC_TRY(accept.stop());
+SC_TRY(accept.stop(eventLoop));
 //! [AsyncSocketAcceptSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);

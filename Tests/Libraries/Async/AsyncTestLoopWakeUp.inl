@@ -59,29 +59,37 @@ void SC::AsyncTest::loopWakeUp()
     wakeUp2.callback = [this, &context](AsyncLoopWakeUp::Result& res)
     {
         context.wakeUp2Called++;
-        SC_TEST_EXPECT(res.getAsync().stop());
+        SC_TEST_EXPECT(res.getAsync().stop(res.eventLoop));
     };
     SC_TEST_EXPECT(wakeUp2.start(eventLoop));
+
     Thread newThread1;
     Thread newThread2;
-    Result loopRes1 = Result(false);
-    Result loopRes2 = Result(false);
-    auto   action1  = [&](Thread& thread)
+    struct ThreadContext
+    {
+        AsyncEventLoop&  eventLoop;
+        AsyncLoopWakeUp& asyncWakeUp;
+        Result           loopRes = Result(false);
+    };
+    ThreadContext threadContext1 = {eventLoop, wakeUp1};
+    ThreadContext threadContext2 = {eventLoop, wakeUp2};
+
+    auto action1 = [&threadContext1](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("test1"));
-        loopRes1 = wakeUp1.wakeUp();
+        threadContext1.loopRes = threadContext1.asyncWakeUp.wakeUp(threadContext1.eventLoop);
     };
-    auto action2 = [&](Thread& thread)
+    auto action2 = [&threadContext1, &threadContext2](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("test2"));
-        loopRes2 = wakeUp1.wakeUp();
+        threadContext2.loopRes = threadContext1.asyncWakeUp.wakeUp(threadContext1.eventLoop);
     };
     SC_TEST_EXPECT(newThread1.start(action1));
     SC_TEST_EXPECT(newThread2.start(action2));
     SC_TEST_EXPECT(newThread1.join());
     SC_TEST_EXPECT(newThread2.join());
-    SC_TEST_EXPECT(loopRes1);
-    SC_TEST_EXPECT(loopRes2);
+    SC_TEST_EXPECT(threadContext1.loopRes);
+    SC_TEST_EXPECT(threadContext2.loopRes);
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(context.wakeUp1Called == 1);
     SC_TEST_EXPECT(context.wakeUp2Called == 0);
@@ -92,37 +100,38 @@ void SC::AsyncTest::loopWakeUpEventObject()
 {
     struct TestParams
     {
-        int         notifier1Called         = 0;
-        int         observedNotifier1Called = -1;
+        AsyncEventLoop  eventLoop;
+        AsyncLoopWakeUp asyncWakeUp;
+
         EventObject eventObject;
-        Result      loopRes1 = Result(false);
+        Result      wakeUpRes = Result(false);
+
+        int      notifier1Called         = 0;
+        int      observedNotifier1Called = -1;
+        uint64_t callbackThreadID        = 0;
     } params;
 
-    uint64_t callbackThreadID = 0;
+    SC_TEST_EXPECT(params.eventLoop.create(options));
 
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create(options));
-    AsyncLoopWakeUp wakeUp;
-
-    wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
+    params.asyncWakeUp.callback = [&](AsyncLoopWakeUp::Result&)
     {
-        callbackThreadID = Thread::CurrentThreadID();
+        params.callbackThreadID = Thread::CurrentThreadID();
         params.notifier1Called++;
     };
-    SC_TEST_EXPECT(wakeUp.start(eventLoop, params.eventObject));
+    SC_TEST_EXPECT(params.asyncWakeUp.start(params.eventLoop, params.eventObject));
     Thread newThread1;
-    auto   threadLambda = [&params, &wakeUp](Thread& thread)
+    auto   threadLambda = [&params](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("test1"));
-        params.loopRes1 = wakeUp.wakeUp();
+        params.wakeUpRes = params.asyncWakeUp.wakeUp(params.eventLoop);
         params.eventObject.wait();
         params.observedNotifier1Called = params.notifier1Called;
     };
     SC_TEST_EXPECT(newThread1.start(threadLambda));
-    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(params.eventLoop.runOnce());
     SC_TEST_EXPECT(params.notifier1Called == 1);
     SC_TEST_EXPECT(newThread1.join());
-    SC_TEST_EXPECT(params.loopRes1);
+    SC_TEST_EXPECT(params.wakeUpRes);
     SC_TEST_EXPECT(params.observedNotifier1Called == 1);
-    SC_TEST_EXPECT(callbackThreadID == Thread::CurrentThreadID());
+    SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
 }

@@ -17,8 +17,8 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
     Result registerAutoCloseDescriptor(bool value);
 
     AsyncRequestType request; /// AsyncFileRead / AsyncFileWrite / AsyncSocketReceive / AsyncSocketSend
-
   protected:
+    AsyncEventLoop* eventLoop = nullptr;
     struct Internal;
 
     Result read();
@@ -33,7 +33,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     AsyncRequestWritableStream();
 
     template <typename DescriptorType>
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const DescriptorType& descriptor);
 
     /// @brief Registers or unregisters a listener to AsyncWritableStream::eventFinish to close descriptor
@@ -42,6 +42,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     AsyncRequestType request; /// AsyncFileRead / AsyncFileWrite / AsyncSocketReceive / AsyncSocketSend
 
   protected:
+    AsyncEventLoop* eventLoop = nullptr;
     struct Internal;
 
     Function<void(AsyncBufferView::ID)> callback;
@@ -54,28 +55,28 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
 struct ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
 struct WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data from a socket
 struct ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const SocketDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a socket
 struct WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const SocketDescriptor& descriptor);
 };
 

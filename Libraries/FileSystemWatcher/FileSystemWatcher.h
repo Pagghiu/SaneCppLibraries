@@ -150,8 +150,8 @@ struct SC::FileSystemWatcher
         friend struct FileSystemWatcher;
         AsyncEventLoop* eventLoop = nullptr;
 #if SC_PLATFORM_APPLE
-        AsyncLoopWakeUp eventLoopAsync = {};
-        EventObject     eventObject    = {};
+        AsyncLoopWakeUp asyncWakeUp = {};
+        EventObject     eventObject = {};
 #elif SC_PLATFORM_LINUX
         AsyncFilePoll asyncPoll = {};
 #endif

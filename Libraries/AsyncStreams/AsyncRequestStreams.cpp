@@ -28,9 +28,9 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
 
     template <typename DescriptorType>
     static Result init(AsyncRequestReadableStream& self, AsyncBuffersPool& buffersPool, Span<Request> requests,
-                       AsyncEventLoop& loop, const DescriptorType& descriptor)
+                       AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
     {
-        self.request.cacheInternalEventLoop(loop);
+        self.eventLoop = &eventLoop;
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncReadableStream::init(buffersPool, requests);
     }
@@ -74,7 +74,8 @@ SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::read()
     if (getBufferOrPause(0, bufferID, request.buffer))
     {
         request.callback = [this, bufferID](typename AsyncReadRequest::Result& result) { afterRead(result, bufferID); };
-        const Result startResult = request.start(*request.getEventLoop());
+        SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestReadableStream eventLoop == nullptr");
+        const Result startResult = request.start(*eventLoop);
         if (not startResult)
         {
             getBuffersPool().unrefBuffer(bufferID);
@@ -144,9 +145,9 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
 
     template <typename DescriptorType>
     static Result init(AsyncRequestWritableStream& self, AsyncBuffersPool& buffersPool, Span<Request> requests,
-                       AsyncEventLoop& loop, const DescriptorType& descriptor)
+                       AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
     {
-        self.request.cacheInternalEventLoop(loop);
+        self.eventLoop = &eventLoop;
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncWritableStream::init(buffersPool, requests);
     }
@@ -196,7 +197,8 @@ SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::write(AsyncBufferV
         callback          = {};
         AsyncWritableStream::finishedWriting(bufferID, move(callbackCopy), result.isValid());
     };
-    const Result res = request.start(*request.getEventLoop());
+    SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestReadableStream eventLoop == nullptr");
+    const Result res = request.start(*eventLoop);
     if (res)
     {
         getBuffersPool().refBuffer(bufferID);

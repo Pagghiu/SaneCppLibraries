@@ -134,7 +134,7 @@ SC::Result SC::HttpServer::stopAsync()
 {
     if (not internal.asyncServerAccept.isFree())
     {
-        SC_TRY(internal.asyncServerAccept.stop());
+        SC_TRY(internal.asyncServerAccept.stop(*internal.eventLoop));
     }
 
     for (HttpServerClient& it : internal.clients)
@@ -309,11 +309,11 @@ void SC::HttpServer::Internal::closeAsync(HttpServerClient& requestClient)
 {
     if (not requestClient.asyncSend.isFree())
     {
-        (void)requestClient.asyncSend.stop();
+        (void)requestClient.asyncSend.stop(*eventLoop);
     }
     if (not requestClient.asyncReceive.isFree())
     {
-        (void)requestClient.asyncReceive.stop();
+        (void)requestClient.asyncReceive.stop(*eventLoop);
     }
     requestClient.asyncClose.callback.bind<Internal, &Internal::onCloseSocket>(*this);
 

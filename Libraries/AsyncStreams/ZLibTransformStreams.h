@@ -25,7 +25,11 @@ struct AsyncZLibTransformStream : public AsyncTransformStream
     ZLibStream    stream;
     AsyncLoopWork asyncWork;
 
+    void setEventLoop(AsyncEventLoop& loop) { eventLoop = &loop; }
+
   private:
+    AsyncEventLoop* eventLoop = nullptr;
+
     Result compressExecute(Span<const char> input, Span<char> output);
     Result compressFinalize(Span<char> output);
     void   afterWork(AsyncLoopWork::Result& result);

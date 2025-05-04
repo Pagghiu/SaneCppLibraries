@@ -305,7 +305,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(compressStream.init(buffersPool1, compressReadRequests, compressWriteRequests));
     SC_TEST_EXPECT(compressStream.stream.init(ZLibStream::CompressZLib));
     SC_TEST_EXPECT(compressStream.asyncWork.setThreadPool(compressionThreadPool));
-    compressStream.asyncWork.cacheInternalEventLoop(eventLoop);
+    compressStream.setEventLoop(eventLoop);
     compressStream.asyncWork.setDebugName("CompressStream");
 
     // Create first Async Pipeline (file to socket)
@@ -322,7 +322,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(decompressStream.init(buffersPool2, decompressReadRequests, decompressWriteRequests));
     SC_TEST_EXPECT(decompressStream.stream.init(ZLibStream::DecompressZLib));
     SC_TEST_EXPECT(decompressStream.asyncWork.setThreadPool(compressionThreadPool));
-    decompressStream.asyncWork.cacheInternalEventLoop(eventLoop);
+    decompressStream.setEventLoop(eventLoop);
     decompressStream.asyncWork.setDebugName("DecompressStream");
 
     // Create second Async Pipeline (socket to file)
