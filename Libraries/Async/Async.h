@@ -161,7 +161,7 @@ struct AsyncRequest
 
     /// @brief Constructs a free async request of given type
     /// @param type Type of this specific request
-    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), unused(-1) {}
+    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), userFlags(0), unused(0) {}
 
     /// @brief Ask to stop current async operation
     /// @param afterStopped Optional pointer to a callback called after request is fully stopped.
@@ -184,6 +184,12 @@ struct AsyncRequest
 
     /// @brief Shortcut for AsyncEventLoop::start
     Result start(AsyncEventLoop& loop);
+
+    /// @brief Sets user flags, holding some meaningful data for the caller
+    void setUserFlags(uint16_t externalFlags) { userFlags = externalFlags; }
+
+    /// @brief Gets user flags, holding some meaningful data for the caller
+    uint16_t getUserFlags() const { return userFlags; }
 
   protected:
     Result checkState();
@@ -221,7 +227,8 @@ struct AsyncRequest
     Type    type;  // 1 byte
     int16_t flags; // 2 bytes
 
-    int32_t unused; // 4 bytes
+    uint16_t unused;    // 2 bytes
+    uint16_t userFlags; // 2 bytes
 };
 
 /// @brief Execute AsyncRequests serially, by submitting the next one after the previous one is completed.
