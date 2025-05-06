@@ -19,7 +19,6 @@
 #include "../Threading/ThreadPool.h"
 #include "../Threading/Threading.h" // EventObject
 
-#define SC_ASYNC_ENABLE_LOG 0
 #if SC_ASYNC_ENABLE_LOG
 #include "../Strings/Console.h"
 #else
@@ -58,10 +57,9 @@ const char* SC::AsyncRequest::TypeToString(Type type)
 
 void SC::AsyncRequest::setDebugName(const char* newDebugName)
 {
-#if SC_CONFIGURATION_DEBUG
-    debugName = newDebugName;
-#else
     SC_COMPILER_UNUSED(newDebugName);
+#if SC_ASYNC_ENABLE_LOG
+    debugName = newDebugName;
 #endif
 }
 
@@ -1295,7 +1293,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     teardown.type      = async.type;
     teardown.flags     = async.flags;
     teardown.sequence  = async.sequence;
-#if SC_CONFIGURATION_DEBUG
+#if SC_ASYNC_ENABLE_LOG
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     ::strncpy_s(teardown.debugName, async.debugName, sizeof(teardown.debugName));
 #else

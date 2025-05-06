@@ -12,3 +12,4 @@
 #endif
 
 #define SC_LANGUAGE_FORCE_STANDARD_CPP 14
+#define SC_ASYNC_ENABLE_LOG            0

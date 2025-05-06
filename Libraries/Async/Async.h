@@ -14,6 +14,7 @@
 #include "../File/FileDescriptor.h"
 #include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
+
 namespace SC
 {
 struct ThreadPool;
@@ -213,7 +214,7 @@ struct AsyncRequest
         Cancelling, // when in cancellation queue waiting for a cancelAsync (on active async)
     };
 
-#if SC_CONFIGURATION_DEBUG
+#if SC_ASYNC_ENABLE_LOG
     const char* debugName = "None";
 #endif
     State   state; // 1 byte
