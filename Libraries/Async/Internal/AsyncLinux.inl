@@ -418,9 +418,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        struct sockaddr* sockAddr = &async.sockAddrHandle.reinterpret_as<struct sockaddr>();
-        async.sockAddrLen         = sizeof(struct sockaddr);
-        globalLibURing.io_uring_prep_accept(submission, async.handle, sockAddr, &async.sockAddrLen, SOCK_CLOEXEC);
+        struct sockaddr* sockAddr     = &async.acceptData->sockAddrHandle.reinterpret_as<struct sockaddr>();
+        async.acceptData->sockAddrLen = sizeof(struct sockaddr);
+        globalLibURing.io_uring_prep_accept(submission, async.handle, sockAddr, &async.acceptData->sockAddrLen,
+                                            SOCK_CLOEXEC);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }

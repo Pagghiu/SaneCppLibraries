@@ -189,17 +189,25 @@ SC::Result SC::AsyncProcessExit::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor)
+SC::Result SC::detail::AsyncSocketAcceptBase::start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor,
+                                                    detail::AsyncSocketAcceptData& data)
 {
+    acceptData = &data;
     SC_TRY(checkState());
     SC_TRY(socketDescriptor.get(handle, SC::Result::Error("Invalid handle")));
     SC_TRY(socketDescriptor.getAddressFamily(addressFamily));
     return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncSocketAccept::validate(AsyncEventLoop&)
+SC::Result SC::AsyncSocketAccept::start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor)
+{
+    return AsyncSocketAcceptBase::start(eventLoop, socketDescriptor, data);
+}
+
+SC::Result SC::detail::AsyncSocketAcceptBase::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketAccept - Invalid handle");
+    SC_TRY_MSG(acceptData != nullptr, "AsyncSocketAccept - Invalid acceptData");
     return SC::Result(true);
 }
 

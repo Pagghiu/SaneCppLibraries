@@ -245,6 +245,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncSocketAccept& async)
+    {
+        async.acceptData->overlapped.get().userData = &async;
+        return true;
+    }
+
     [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketAccept& async)
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
@@ -253,17 +259,17 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                                            WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed");
         auto deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
-        static_assert(sizeof(AsyncSocketAccept::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
+        static_assert(sizeof(detail::AsyncSocketAcceptData::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
                       "Check acceptBuffer size");
 
-        detail::AsyncWinOverlapped& overlapped = async.overlapped.get();
+        detail::AsyncWinOverlapped& overlapped = async.acceptData->overlapped.get();
 
         DWORD sync_bytes_read = 0;
 
         SC_TRY(ensureAcceptFunction(async));
         BOOL res;
-        res = reinterpret_cast<LPFN_ACCEPTEX>(async.pAcceptEx)(
-            async.handle, clientSocket, async.acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
+        res = reinterpret_cast<LPFN_ACCEPTEX>(async.acceptData->pAcceptEx)(
+            async.handle, clientSocket, async.acceptData->acceptBuffer, 0, sizeof(struct sockaddr_storage) + 16,
             sizeof(struct sockaddr_storage) + 16, &sync_bytes_read, &overlapped.overlapped);
         if (res == FALSE and WSAGetLastError() != WSA_IO_PENDING)
         {
@@ -272,15 +278,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         }
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
-        return async.clientSocket.assign(clientSocket);
+        return async.acceptData->clientSocket.assign(clientSocket);
     }
 
     [[nodiscard]] static Result completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& operation = result.getAsync();
-        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.overlapped.get().overlapped));
+        SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.acceptData->overlapped.get().overlapped));
         SOCKET clientSocket;
-        SC_TRY(operation.clientSocket.get(clientSocket, Result::Error("clientSocket error")));
+        SC_TRY(operation.acceptData->clientSocket.get(clientSocket, Result::Error("clientSocket error")));
         const int socketOpRes = ::setsockopt(clientSocket, SOL_SOCKET, SO_UPDATE_ACCEPT_CONTEXT,
                                              reinterpret_cast<char*>(&operation.handle), sizeof(operation.handle));
         SC_TRY_MSG(socketOpRes == 0, "setsockopt SO_UPDATE_ACCEPT_CONTEXT failed");
@@ -288,14 +294,14 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         SC_TRY(result.eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("completeAsync")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
-        return result.completionData.acceptedClient.assign(move(operation.clientSocket));
+        return result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket));
     }
 
     [[nodiscard]] Result cancelAsync(AsyncEventLoop&, AsyncSocketAccept& asyncAccept)
     {
         HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
         // This will cause one more event loop run with GetOverlappedIO failing
-        SC_TRY(asyncAccept.clientSocket.close());
+        SC_TRY(asyncAccept.acceptData->clientSocket.close());
         struct SC_FILE_COMPLETION_INFORMATION file_completion_info;
         file_completion_info.Key  = NULL;
         file_completion_info.Port = NULL;
@@ -321,13 +327,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     [[nodiscard]] static Result ensureAcceptFunction(AsyncSocketAccept& async)
     {
-        if (async.pAcceptEx == nullptr)
+        if (async.acceptData->pAcceptEx == nullptr)
         {
             DWORD dwBytes;
             GUID  guid = WSAID_ACCEPTEX;
-            static_assert(sizeof(LPFN_ACCEPTEX) == sizeof(async.pAcceptEx), "pAcceptEx");
-            int rc = WSAIoctl(async.handle, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &async.pAcceptEx,
-                              sizeof(LPFN_ACCEPTEX), &dwBytes, NULL, NULL);
+            static_assert(sizeof(LPFN_ACCEPTEX) == sizeof(async.acceptData->pAcceptEx), "pAcceptEx");
+            int rc = WSAIoctl(async.handle, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),
+                              &async.acceptData->pAcceptEx, sizeof(LPFN_ACCEPTEX), &dwBytes, NULL, NULL);
             if (rc != 0)
                 return Result::Error("WSAIoctl failed");
         }

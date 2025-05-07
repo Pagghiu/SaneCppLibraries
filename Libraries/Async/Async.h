@@ -403,18 +403,28 @@ struct AsyncProcessExit : public AsyncRequest
 #endif
 };
 
-/// @brief Starts a socket accept operation, obtaining a new socket from a listening socket. @n
-/// The callback is called with a new socket connected to the given listening endpoint will be returned. @n
-/// @ref library_socket library can be used to create a Socket but the socket should be created with
-/// SC::SocketFlags::NonBlocking and associated to the event loop with
-/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket. @n
-/// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
-/// @note To continue accepting new socket SC::AsyncResult::reactivateRequest must be called.
-///
-/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketAcceptSnippet
-struct AsyncSocketAccept : public AsyncRequest
+struct AsyncSocketAccept;
+namespace detail
 {
-    AsyncSocketAccept() : AsyncRequest(Type::SocketAccept) {}
+/// @brief Support object to Socket Accept.
+/// This has been split out of AsyncSocketAccept because on Windows it's quite big to allow heap allocating it
+struct AsyncSocketAcceptData
+{
+#if SC_PLATFORM_WINDOWS
+    void (*pAcceptEx)() = nullptr;
+    detail::WinOverlappedOpaque overlapped;
+    SocketDescriptor            clientSocket;
+    uint8_t                     acceptBuffer[288] = {0};
+#elif SC_PLATFORM_LINUX
+    AlignedStorage<28> sockAddrHandle;
+    uint32_t           sockAddrLen;
+#endif
+};
+
+/// @brief Base class for AsyncSocketAccept to allow dynamically allocating AsyncSocketAcceptData
+struct AsyncSocketAcceptBase : public AsyncRequest
+{
+    AsyncSocketAcceptBase() : AsyncRequest(Type::SocketAccept) {}
 
     struct CompletionData : public AsyncCompletionData
     {
@@ -434,25 +444,36 @@ struct AsyncSocketAccept : public AsyncRequest
     using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
-
-    Function<void(Result&)> callback; ///< Called when a new socket has been accepted
-
-  private:
-    friend struct AsyncEventLoop;
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor, AsyncSocketAcceptData& data);
     SC::Result validate(AsyncEventLoop&);
 
+    Function<void(Result&)>    callback; ///< Called when a new socket has been accepted
     SocketDescriptor::Handle   handle        = SocketDescriptor::Invalid;
     SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
-#if SC_PLATFORM_WINDOWS
-    void (*pAcceptEx)() = nullptr;
-    detail::WinOverlappedOpaque overlapped;
-    SocketDescriptor            clientSocket;
-    uint8_t                     acceptBuffer[288] = {0};
-#elif SC_PLATFORM_LINUX
-    AlignedStorage<28> sockAddrHandle;
-    uint32_t           sockAddrLen;
-#endif
+    AsyncSocketAcceptData*     acceptData    = nullptr;
+};
+
+} // namespace detail
+
+/// @brief Starts a socket accept operation, obtaining a new socket from a listening socket. @n
+/// The callback is called with a new socket connected to the given listening endpoint will be returned. @n
+/// @ref library_socket library can be used to create a Socket but the socket should be created with
+/// SC::SocketFlags::NonBlocking and associated to the event loop with
+/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket. @n
+/// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
+/// @note To continue accepting new socket SC::AsyncResult::reactivateRequest must be called.
+///
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketAcceptSnippet
+struct AsyncSocketAccept : public detail::AsyncSocketAcceptBase
+{
+    AsyncSocketAccept() { AsyncSocketAcceptBase::acceptData = &data; }
+    using AsyncSocketAcceptBase::start;
+
+    /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& socketDescriptor);
+
+  private:
+    detail::AsyncSocketAcceptData data;
 };
 
 /// @brief Starts a socket connect operation, connecting to a remote endpoint. @n
