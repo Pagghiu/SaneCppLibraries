@@ -45,18 +45,18 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     const KernelEventsPosix&   getPosix() const;
 
     [[nodiscard]] uint32_t getNumEvents() const;
-    [[nodiscard]] Result   syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
-    [[nodiscard]] Result   validateEvent(uint32_t&, bool&);
+    Result                 syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
+    Result                 validateEvent(uint32_t&, bool&);
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
 
     // clang-format off
-    template <typename T> [[nodiscard]] Result setupAsync(AsyncEventLoop&, T&);
-    template <typename T> [[nodiscard]] Result activateAsync(AsyncEventLoop&, T&);
-    template <typename T> [[nodiscard]] Result cancelAsync(AsyncEventLoop&, T&);
-    template <typename T> [[nodiscard]] Result completeAsync(T&);
+    template <typename T> Result setupAsync(AsyncEventLoop&, T&);
+    template <typename T> Result activateAsync(AsyncEventLoop&, T&);
+    template <typename T> Result cancelAsync(AsyncEventLoop&, T&);
+    template <typename T> Result completeAsync(T&);
 
-    template <typename T> [[nodiscard]] static Result teardownAsync(T*, AsyncTeardown&);
+    template <typename T> static Result teardownAsync(T*, AsyncTeardown&);
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
@@ -67,7 +67,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     bool needsManualTimersProcessing() { return isEpoll; }
 
-    template <typename T, typename P> [[nodiscard]] static Result executeOperation(T&, P& p);
+    template <typename T, typename P> static Result executeOperation(T&, P& p);
     // clang-format on
 };
 
@@ -97,7 +97,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 
     ~KernelQueueIoURing() { SC_TRUST_RESULT(close()); }
 
-    [[nodiscard]] Result close()
+    Result close()
     {
         SC_TRY(wakeUpEventFd.close());
         if (ringInited)
@@ -108,7 +108,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result createEventLoop()
+    Result createEventLoop()
     {
         if (not globalLibURing.init())
         {
@@ -128,7 +128,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop& eventLoop)
+    Result createSharedWatchers(AsyncEventLoop& eventLoop)
     {
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
@@ -139,7 +139,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result createWakeup(AsyncEventLoop& eventLoop)
+    Result createWakeup(AsyncEventLoop& eventLoop)
     {
         // Create the non-blocking event file descriptor
         FileDescriptor::Handle newEventFd = ::eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
@@ -212,7 +212,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return eventLoop.internal.kernelQueue.get().getUring();
     }
 
-    [[nodiscard]] Result getNewSubmission(AsyncEventLoop& eventLoop, io_uring_sqe*& newSubmission)
+    Result getNewSubmission(AsyncEventLoop& eventLoop, io_uring_sqe*& newSubmission)
     {
         io_uring& ring = getKernelQueue(eventLoop).ring;
         // Request a new submission slot
@@ -270,7 +270,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         }
     }
 
-    [[nodiscard]] Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
+    Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
         AsyncLoopTimeout*     loopTimeout = nullptr;
         const Time::Absolute* nextTimer   = nullptr;
@@ -287,8 +287,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode,
-                                          const Time::Absolute* nextTimer)
+    Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode, const Time::Absolute* nextTimer)
     {
         KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         while (true)
@@ -379,7 +378,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result validateEvent(uint32_t idx, bool& continueProcessing)
+    Result validateEvent(uint32_t idx, bool& continueProcessing)
     {
         io_uring_cqe& completion = events[idx];
         // Cancellation completions have nullptr user_data
@@ -414,7 +413,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -426,7 +425,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncSocketAccept::Result& res)
+    Result completeAsync(AsyncSocketAccept::Result& res)
     {
         return res.completionData.acceptedClient.assign(events[res.eventIndex].res);
     }
@@ -434,7 +433,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket CONNECT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -444,7 +443,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncSocketConnect::Result& res)
+    Result completeAsync(AsyncSocketConnect::Result& res)
     {
         res.returnCode = Result(true);
         return Result(true);
@@ -453,7 +452,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket SEND
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -474,7 +473,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncSocketSend::Result& result)
+    Result completeAsync(AsyncSocketSend::Result& result)
     {
         result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
 
@@ -497,7 +496,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -506,7 +505,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncSocketReceive::Result& result)
+    Result completeAsync(AsyncSocketReceive::Result& result)
     {
         io_uring_cqe& completion       = events[result.eventIndex];
         result.completionData.numBytes = static_cast<size_t>(completion.res);
@@ -520,7 +519,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Socket CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketClose& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketClose& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -529,7 +528,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncSocketClose::Result& result)
+    Result completeAsync(AsyncSocketClose::Result& result)
     {
         io_uring_cqe& completion   = events[result.eventIndex];
         result.completionData.code = completion.res;
@@ -540,7 +539,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -550,7 +549,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncFileRead::Result& result)
+    Result completeAsync(AsyncFileRead::Result& result)
     {
         io_uring_cqe& completion       = events[result.eventIndex];
         result.completionData.numBytes = static_cast<size_t>(completion.res);
@@ -564,7 +563,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -586,7 +585,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncFileWrite::Result& result)
+    Result completeAsync(AsyncFileWrite::Result& result)
     {
         result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
         return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
@@ -595,7 +594,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileClose& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileClose& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -604,7 +603,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncFileClose::Result& result)
+    Result completeAsync(AsyncFileClose::Result& result)
     {
         result.returnCode = Result(true);
         return Result(true);
@@ -613,7 +612,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File POLL
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result activateAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
     {
         // Documentation says:
         // "Unlike poll or epoll without EPOLLONESHOT, this interface always works in one-shot mode. That is, once the
@@ -625,7 +624,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -637,7 +636,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
@@ -652,12 +651,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    [[nodiscard]] Result completeAsync(AsyncProcessExit::Result& result)
+    Result completeAsync(AsyncProcessExit::Result& result)
     {
         return KernelEventsPosix::completeProcessExitWaitPid(result);
     }
 
-    [[nodiscard]] static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
+    static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
     {
         // pidfd is copied to fileHandle inside prepareTeardown
         return Result(::close(teardown.fileHandle) == 0);
@@ -667,7 +666,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     // Templates
     //-------------------------------------------------------------------------------------------------------
     template <typename T>
-    [[nodiscard]] Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
+    Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -677,11 +676,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     }
 
     // clang-format off
-    template <typename T> [[nodiscard]] Result setupAsync(AsyncEventLoop&, T&)     { return Result(true); }
-    template <typename T> [[nodiscard]] Result activateAsync(AsyncEventLoop&, T&)  { return Result(true); }
-    template <typename T> [[nodiscard]] Result completeAsync(T&)  { return Result(true); }
+    template <typename T> Result setupAsync(AsyncEventLoop&, T&)     { return Result(true); }
+    template <typename T> Result activateAsync(AsyncEventLoop&, T&)  { return Result(true); }
+    template <typename T> Result completeAsync(T&)  { return Result(true); }
 
-    template <typename T> [[nodiscard]] static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
+    template <typename T> static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
     // clang-format on
 };
 

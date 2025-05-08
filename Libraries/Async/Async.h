@@ -163,7 +163,7 @@ struct AsyncRequest
     /// @return `true` if the stop request has been successfully queued
     /// @note When stopping the request must be valid until afterStopped will be called.
     /// This AsyncRequest cannot be re-used before this callback will be called.
-    [[nodiscard]] Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
+    Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
 
     /// @brief Returns `true` if this request is free
     [[nodiscard]] bool isFree() const;
@@ -988,10 +988,10 @@ struct AsyncEventLoop
     AsyncEventLoop();
 
     /// Creates the event loop kernel object
-    [[nodiscard]] Result create(Options options = Options());
+    Result create(Options options = Options());
 
     /// Closes the event loop kernel object
-    [[nodiscard]] Result close();
+    Result close();
 
     /// @brief Queues an async request request that has been correctly setup
     /// @note The request will be validated immediately and activated during next event loop cycle
@@ -1008,7 +1008,7 @@ struct AsyncEventLoop
     /// One example could be a console based app doing socket IO or a web server.
     /// Waiting on kernel events blocks the current thread with 0% CPU utilization.
     /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
-    [[nodiscard]] Result run();
+    Result run();
 
     /// Blocks until at least one request proceeds, ensuring forward progress, dispatching all completions.
     /// It's useful for application where it's needed to run some idle work after every IO event.
@@ -1019,20 +1019,20 @@ struct AsyncEventLoop
     /// - AsyncEventLoop::blockingPoll
     /// - AsyncEventLoop::dispatchCompletions
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
-    [[nodiscard]] Result runOnce();
+    Result runOnce();
 
     /// Process active requests if any, dispatching their completions, or returns immediately without blocking.
     /// It's useful for game-like applications where the event loop runs every frame and one would like to check
     /// and dispatch its I/O callbacks in-between frames.
     /// This call allows poll-checking I/O without blocking.
     /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
-    [[nodiscard]] Result runNoWait();
+    Result runNoWait();
 
     /// Submits all queued async requests.
     /// An AsyncRequest becomes queued after user calls its specific AsyncRequest::start method.
     ///
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
-    [[nodiscard]] Result submitRequests(AsyncKernelEvents& kernelEvents);
+    Result submitRequests(AsyncKernelEvents& kernelEvents);
 
     /// Blocks until at least one event happens, ensuring forward progress, without executing completions.
     /// It's one of the three building blocks of AsyncEventLoop::runOnce allowing co-operation of AsyncEventLoop
@@ -1052,31 +1052,31 @@ struct AsyncEventLoop
     /// @see AsyncEventLoop::submitRequests sends async requests to kernel before calling blockingPoll
     /// @see AsyncEventLoop::dispatchCompletions invokes callbacks associated with kernel events after blockingPoll
     /// @see AsyncEventLoop::setListeners sets function called before and after entering kernel poll
-    [[nodiscard]] Result blockingPoll(AsyncKernelEvents& kernelEvents);
+    Result blockingPoll(AsyncKernelEvents& kernelEvents);
 
     /// Invokes completions for the AsyncKernelEvents collected by a call to AsyncEventLoop::blockingPoll.
     /// This is typically done when user wants to pool for events on a thread (calling AsyncEventLoop::blockingPoll)
     /// and dispatch the callbacks on another thread (calling AsyncEventLoop::dispatchCompletions).
     /// The typical example would be integrating AsyncEventLoop with a GUI event loop.
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
-    [[nodiscard]] Result dispatchCompletions(AsyncKernelEvents& kernelEvents);
+    Result dispatchCompletions(AsyncKernelEvents& kernelEvents);
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked).
     /// The parameter is an AsyncLoopWakeUp that must have been previously started (with AsyncLoopWakeUp::start).
-    [[nodiscard]] Result wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
+    Result wakeUpFromExternalThread(AsyncLoopWakeUp& wakeUp);
 
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked)
-    [[nodiscard]] Result wakeUpFromExternalThread();
+    Result wakeUpFromExternalThread();
 
     /// Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).
     /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
-    [[nodiscard]] Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
+    Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
     /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.
-    [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
+    Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
 
     /// Associates a File descriptor created externally with the eventLoop.
-    [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+    Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
     /// Updates loop time to "now"
     void updateTime();
