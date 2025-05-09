@@ -605,7 +605,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncFileClose::Result& result)
     {
-        result.returnCode = Result(true);
+        io_uring_cqe& completion   = events[result.eventIndex];
+        result.returnCode          = Result(true);
+        result.completionData.code = completion.res;
         return Result(true);
     }
 

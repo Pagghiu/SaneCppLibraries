@@ -692,11 +692,19 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop&, AsyncFileClose& async)
     {
-        // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
-        async.code = ::CloseHandle(async.handle) == FALSE ? -1 : 0;
-        SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
+    }
+
+    static Result executeOperation(AsyncFileClose& async, AsyncFileClose::CompletionData& completionData)
+    {
+        completionData.code = ::CloseHandle(async.handle);
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncFileClose::Result& result)
+    {
+        return executeOperation(result.getAsync(), result.completionData);
     }
 
     //-------------------------------------------------------------------------------------------------------

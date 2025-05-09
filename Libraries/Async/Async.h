@@ -788,16 +788,16 @@ struct AsyncFileClose : public AsyncRequest
     AsyncFileClose() : AsyncRequest(Type::FileClose) {}
 
     /// @brief Completion data for AsyncFileClose
-    using CompletionData = AsyncCompletionData;
+    struct CompletionData : public AsyncCompletionData
+    {
+        int code = 0; ///< Return code of close file operation
+    };
 
     /// @brief Callback result for AsyncFileClose
     using Result = AsyncResultOf<AsyncFileClose, CompletionData>;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
-
-    // TODO: Move code to CompletionData
-    int code = 0; ///< Return code of close socket operation
 
     Function<void(Result&)> callback; ///< Callback called after fully closing the file descriptor
 

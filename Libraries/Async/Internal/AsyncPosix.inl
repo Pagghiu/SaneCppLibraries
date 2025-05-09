@@ -299,7 +299,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 #if SC_ASYNC_USE_EPOLL
         constexpr auto VALUE = EPOLL_CTL_ADD;
 #else
-        constexpr auto VALUE = EV_ADD | EV_ENABLE;
+        constexpr auto VALUE = EV_ADD;
 #endif
         return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter);
     }
@@ -389,7 +389,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, short filter,
                            unsigned int options = 0)
     {
-        EV_SET(events + newEvents, fileDescriptor, filter, EV_ADD | EV_ENABLE, options, 0, &async);
+        EV_SET(events + newEvents, fileDescriptor, filter, EV_ADD, options, 0, &async);
         newEvents += 1;
         if (newEvents >= totalNumEvents)
         {
@@ -1001,11 +1001,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop&, AsyncFileClose& async)
     {
-        // TODO: Allow running close on thread pool
         async.flags |= Internal::Flag_ManualCompletion;
-        async.code = ::close(async.handle);
-        SC_TRY_MSG(async.code == 0, "Close returned error");
         return Result(true);
+    }
+
+    static Result executeOperation(AsyncFileClose& async, AsyncFileClose::CompletionData& completionData)
+    {
+        completionData.code = ::close(async.handle);
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncFileClose::Result& result)
+    {
+        return executeOperation(result.getAsync(), result.completionData);
     }
 
     //-------------------------------------------------------------------------------------------------------
