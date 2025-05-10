@@ -42,6 +42,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
     {
+        SC_TRY(removeAllAssociationsFor(outDescriptor));
         HANDLE loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
         SOCKET socket;
@@ -53,12 +54,48 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
     {
+        SC_TRY(removeAllAssociationsFor(outDescriptor));
         HANDLE loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
         HANDLE handle;
         SC_TRY(outDescriptor.get(handle, Result::Error("Invalid handle")));
         HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
+        return Result(true);
+    }
+
+    static void removeAllAssociationsFor(HANDLE handle)
+    {
+        struct SC_FILE_COMPLETION_INFORMATION file_completion_info;
+        file_completion_info.Key  = NULL;
+        file_completion_info.Port = NULL;
+        struct SC_IO_STATUS_BLOCK status_block;
+        memset(&status_block, 0, sizeof(status_block));
+        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
+        auto    func  = ::GetProcAddress(ntdll, "NtSetInformationFile");
+
+        SC_NtSetInformationFile pNtSetInformationFile;
+        memcpy(&pNtSetInformationFile, &func, sizeof(func));
+
+        NTSTATUS status = pNtSetInformationFile(handle, &status_block, &file_completion_info,
+                                                sizeof(file_completion_info), FileReplaceCompletionInformation);
+        // SC_ASSERT_RELEASE(status == STATUS_SUCCESS);
+        (void)status;
+    }
+
+    static Result removeAllAssociationsFor(SocketDescriptor& descriptor)
+    {
+        SOCKET socket;
+        SC_TRY(descriptor.get(socket, Result::Error("descriptor")));
+        removeAllAssociationsFor(reinterpret_cast<HANDLE>(socket));
+        return Result(true);
+    }
+
+    static Result removeAllAssociationsFor(FileDescriptor& descriptor)
+    {
+        HANDLE handle;
+        SC_TRY(descriptor.get(handle, Result::Error("descriptor")));
+        removeAllAssociationsFor(handle);
         return Result(true);
     }
 

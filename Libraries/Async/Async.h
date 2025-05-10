@@ -1078,6 +1078,12 @@ struct AsyncEventLoop
     /// Associates a File descriptor created externally with the eventLoop.
     Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
+    /// @brief Removes association of a TCP Socket with any event loop
+    static Result removeAllAssociationsFor(SocketDescriptor& outDescriptor);
+
+    /// @brief Removes association of a File Descriptor with any event loop
+    static Result removeAllAssociationsFor(FileDescriptor& outDescriptor);
+
     /// Updates loop time to "now"
     void updateTime();
 

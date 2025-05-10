@@ -461,6 +461,17 @@ SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDesc
 {
     return internal.kernelQueue.get().associateExternallyCreatedFileDescriptor(outDescriptor);
 }
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(SocketDescriptor& outDescriptor)
+{
+    return Internal::KernelQueue::removeAllAssociationsFor(outDescriptor);
+}
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(FileDescriptor& outDescriptor)
+{
+    return Internal::KernelQueue::removeAllAssociationsFor(outDescriptor);
+}
+
 void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }
 
 SC::Time::Monotonic SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }

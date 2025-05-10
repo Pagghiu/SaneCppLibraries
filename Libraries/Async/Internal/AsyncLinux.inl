@@ -23,12 +23,15 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     // On io_uring it doesn't make sense to run operations in a thread pool
     [[nodiscard]] bool makesSenseToRunInThreadPool(AsyncRequest&) { return isEpoll; }
 
-    [[nodiscard]] Result close();
-    [[nodiscard]] Result createEventLoop(AsyncEventLoop::Options options);
-    [[nodiscard]] Result createSharedWatchers(AsyncEventLoop&);
-    [[nodiscard]] Result wakeUpFromExternalThread();
-    [[nodiscard]] Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
-    [[nodiscard]] Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
+    Result close();
+    Result createEventLoop(AsyncEventLoop::Options options);
+    Result createSharedWatchers(AsyncEventLoop&);
+    Result wakeUpFromExternalThread();
+
+    static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
+    static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
+    static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }
 };
 
 struct SC::AsyncEventLoop::Internal::KernelEvents
