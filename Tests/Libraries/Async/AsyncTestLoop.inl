@@ -88,6 +88,9 @@ void SC::AsyncTest::loopFreeActiveOnClose()
 
     // So let's try using them again, and we should get no errors
     SC_TEST_EXPECT(eventLoop.create(options));
+    // Do not forget to re-associate the sockets with newly created loop!
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSocket[0]));
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSocket[1]));
     SC_TEST_EXPECT(asyncAccept[0].start(eventLoop, serverSocket[0]));
     SC_TEST_EXPECT(asyncAccept[1].start(eventLoop, serverSocket[1]));
     SC_TEST_EXPECT(eventLoop.runNoWait());

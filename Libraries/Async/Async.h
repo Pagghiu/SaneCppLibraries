@@ -186,6 +186,9 @@ struct AsyncRequest
     /// @brief Gets user flags, holding some meaningful data for the caller
     uint16_t getUserFlags() const { return userFlags; }
 
+    /// @brief Returns currently set close callback (if any) passed to AsyncRequest::stop
+    [[nodiscard]] Function<void(AsyncResult&)>* getCloseCallback() { return closeCallback; }
+
   protected:
     Result checkState();
 
@@ -262,8 +265,8 @@ struct AsyncResult
     AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request) : eventLoop(eventLoop), async(request) {}
 
     /// @brief Ask the event loop to re-activate this request after it was already completed
-    /// @param value `true` will reactivate the request
-    void reactivateRequest(bool value);
+    /// @param shouldBeReactivated `true` will reactivate the request
+    void reactivateRequest(bool shouldBeReactivated);
 
     /// @brief Check if the returnCode of this result is valid
     [[nodiscard]] const SC::Result& isValid() const { return returnCode; }
@@ -274,8 +277,7 @@ struct AsyncResult
   protected:
     friend struct AsyncEventLoop;
 
-    bool shouldBeReactivated = false;
-    bool shouldCallCallback  = true;
+    bool shouldCallCallback = true;
 
     SC::Result returnCode = SC::Result(true);
 };
@@ -1148,6 +1150,7 @@ struct AsyncEventLoop
     friend struct AsyncRequest;
     friend struct AsyncFileWrite;
     friend struct AsyncFileRead;
+    friend struct AsyncResult;
 };
 
 /// @brief Monitors Async I/O events from a background thread using a blocking kernel function (no CPU usage on idle).

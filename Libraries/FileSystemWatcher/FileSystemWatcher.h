@@ -131,6 +131,9 @@ struct SC::FileSystemWatcher
         /// @return Valid result if directory was unwatched successfully.
         Result stopWatching();
 
+        /// @brief Sets debug name for AsyncFilePoll used on Windows (used only for debug purposes)
+        void setDebugName(const char* debugName);
+
       private:
         friend struct FileSystemWatcher;
         friend struct IntrusiveDoubleLinkedList<FolderWatcher>;

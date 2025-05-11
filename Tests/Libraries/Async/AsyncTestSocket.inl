@@ -85,10 +85,7 @@ void SC::AsyncTest::socketAccept()
     SC_TEST_EXPECT(accept.stop(eventLoop, &afterStopped));
     SC_TEST_EXPECT(afterStopCalled == 0);
 
-    // on Windows stopAsync generates one more event loop run because
-    // of the closing of the client socket used for acceptex, so to unify
-    // the behaviors in the test we do a runNoWait
-    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(afterStopCalled == 1);
 
     SocketDescriptor client3;

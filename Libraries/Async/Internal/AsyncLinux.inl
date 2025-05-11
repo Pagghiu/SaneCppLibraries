@@ -388,8 +388,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         continueProcessing = completion.user_data != 0;
         if (continueProcessing and completion.res < 0)
         {
-            continueProcessing = false;
-            return Result::Error("Error in processing event (io uring)");
+            continueProcessing = false; // Don't process cancellations
+            if (completion.res != -ECANCELED)
+            {
+                return Result::Error("Error in processing event (io uring)");
+            }
         }
         return Result(true);
     }
@@ -634,6 +637,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_poll_remove(submission, &async);
+        eventLoop.internal.hasPendingKernelCancellations = true;
         // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
         return Result(true);
     }
@@ -676,6 +680,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_cancel(submission, &async, 0);
+        eventLoop.internal.hasPendingKernelCancellations = true;
         // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
         return Result(true);
     }

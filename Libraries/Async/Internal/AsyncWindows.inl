@@ -255,7 +255,22 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         return Result(true);
     }
 
-    [[nodiscard]] static bool validateEvent(uint32_t, bool&) { return Result(true); }
+    [[nodiscard]] bool validateEvent(uint32_t idx, bool& continueProcessing)
+    {
+        AsyncRequest* async = getAsyncRequest(idx);
+        if (async != nullptr and async->state == AsyncRequest::State::Cancelling)
+        {
+            continueProcessing = false; // Don't process cancellations
+            switch (async->type)
+            {
+            case AsyncRequest::Type::SocketAccept:
+                SC_TRUST_RESULT(static_cast<AsyncSocketAccept*>(async)->acceptData->clientSocket.close());
+                break;
+            default: break;
+            }
+        }
+        return Result(true);
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // TIMEOUT
@@ -282,13 +297,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket ACCEPT
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncSocketAccept& async)
+    static bool setupAsync(AsyncEventLoop&, AsyncSocketAccept& async)
     {
         async.acceptData->overlapped.get().userData = &async;
         return true;
     }
 
-    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketAccept& async)
+    static Result activateAsync(AsyncEventLoop&, AsyncSocketAccept& async)
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
 
@@ -313,12 +328,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             // TODO: Check AcceptEx WSA error codes
             return Result::Error("AcceptEx failed");
         }
+
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
         return async.acceptData->clientSocket.assign(clientSocket);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncSocketAccept::Result& result)
+    static Result completeAsync(AsyncSocketAccept::Result& result)
     {
         AsyncSocketAccept& operation = result.getAsync();
         SC_TRY(KernelQueue::checkWSAResult(operation.handle, operation.acceptData->overlapped.get().overlapped));
@@ -331,38 +347,23 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         SC_TRY(result.eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("completeAsync")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
+
         return result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket));
     }
 
-    [[nodiscard]] Result cancelAsync(AsyncEventLoop&, AsyncSocketAccept& asyncAccept)
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& asyncAccept)
     {
-        HANDLE listenHandle = reinterpret_cast<HANDLE>(asyncAccept.handle);
-        // This will cause one more event loop run with GetOverlappedIO failing
-        SC_TRY(asyncAccept.acceptData->clientSocket.close());
-        struct SC_FILE_COMPLETION_INFORMATION file_completion_info;
-        file_completion_info.Key  = NULL;
-        file_completion_info.Port = NULL;
-        struct SC_IO_STATUS_BLOCK status_block;
-        memset(&status_block, 0, sizeof(status_block));
-        HMODULE ntdll = GetModuleHandleA("ntdll.dll");
-        auto    func  = ::GetProcAddress(ntdll, "NtSetInformationFile");
-
-        SC_NtSetInformationFile pNtSetInformationFile;
-        memcpy(&pNtSetInformationFile, &func, sizeof(func));
-
-        NTSTATUS status = pNtSetInformationFile(listenHandle, &status_block, &file_completion_info,
-                                                sizeof(file_completion_info), FileReplaceCompletionInformation);
-        if (status != STATUS_SUCCESS)
+        BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(asyncAccept.handle),
+                                &asyncAccept.acceptData->overlapped.get().overlapped);
+        if (res == FALSE)
         {
-            // This will fail if we have a pending AcceptEx call.
-            // I've tried ::CancelIoEx, ::shutdown and of course ::closesocket but nothing works
-            // return Result::Error("FileReplaceCompletionInformation failed");
-            return Result(true);
+            return Result::Error("AsyncSocketAccept: CancelEx failed");
         }
+        eventLoop.internal.hasPendingKernelCancellations = true;
         return Result(true);
     }
 
-    [[nodiscard]] static Result ensureAcceptFunction(AsyncSocketAccept& async)
+    static Result ensureAcceptFunction(AsyncSocketAccept& async)
     {
         if (async.acceptData->pAcceptEx == nullptr)
         {
@@ -380,7 +381,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket CONNECT
     //-------------------------------------------------------------------------------------------------------
-    static Result activateAsync(AsyncEventLoop&, AsyncSocketConnect& asyncConnect)
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketConnect& asyncConnect)
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
         OVERLAPPED& overlapped = asyncConnect.overlapped.get().overlapped;
@@ -496,7 +497,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncSocketReceive& async)
+    static Result activateAsync(AsyncEventLoop&, AsyncSocketReceive& async)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         WSABUF      buffer;
@@ -510,7 +511,19 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         return Result(true);
     }
 
-    [[nodiscard]] static Result completeAsync(AsyncSocketReceive::Result& result)
+    static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
+    {
+        BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
+        if (res == FALSE)
+        {
+            return Result::Error("AsyncSocketReceive: CancelEx failed");
+        }
+        // CancelIoEx queues a cancellation packet on the async queue
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
+    }
+
+    static Result completeAsync(AsyncSocketReceive::Result& result)
     {
         Result res = KernelQueue::checkWSAResult(
             result.getAsync().handle, result.getAsync().overlapped.get().overlapped, &result.completionData.numBytes);
@@ -693,6 +706,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 SC_TRY(executeFileOperation(&::WriteFile, async, buffer, synchronous, writtenBytes, nullptr));
                 currentBufferIndex += 1;
                 async.totalBytesWritten += buffer.sizeInBytes(); // writtenBytes could be == 0 in async case
+                if (synchronous == false)
+                    break; // The same OVERLAPPED cannot be re-used to queue multiple concurrent writes
             }
             completionData.numBytes = async.totalBytesWritten; // completeAsync will not be called in the sync case
             return Result(true);
@@ -722,6 +737,30 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             return Result(true);
         }
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // File POLL
+    //-------------------------------------------------------------------------------------------------------
+    [[nodiscard]] static bool cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& poll)
+    {
+        // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it
+        // doesn't generate a cancellation on the IOCP, setting true here would block forever.
+        if (poll.handle)
+        {
+            eventLoop.internal.hasPendingKernelCancellations = true;
+        }
+        return true;
+    }
+
+    [[nodiscard]] static bool teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
+    {
+        // See comment regarding AsyncFilePoll in cancelAsync
+        if (teardown.fileHandle)
+        {
+            teardown.eventLoop->internal.hasPendingKernelCancellations = true;
+        }
+        return true;
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -805,11 +844,10 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     // clang-format off
-    template <typename T> [[nodiscard]] bool activateAsync(AsyncEventLoop&, T&)  { return true; }
-    template <typename T> [[nodiscard]] bool cancelAsync(AsyncEventLoop&, T&)    { return true; }
-    template <typename T> [[nodiscard]] bool completeAsync(T&)  { return true; }
-
-    template <typename T> [[nodiscard]] static bool teardownAsync(T*, AsyncTeardown&)  { return true; }
+    template <typename T> [[nodiscard]] static bool activateAsync(AsyncEventLoop&, T&) { return true; }
+    template <typename T> [[nodiscard]] static bool cancelAsync(AsyncEventLoop&, T&) { return true; }
+    template <typename T> [[nodiscard]] static bool completeAsync(T&) { return true; }
+    template <typename T> [[nodiscard]] static bool teardownAsync(T*, AsyncTeardown&) { return true; }
 
     // If False, makes re-activation a no-op, that is a lightweight optimization.
     // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.

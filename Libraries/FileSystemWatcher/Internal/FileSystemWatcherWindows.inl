@@ -106,10 +106,19 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
+            // This is not strictly needed as file handle is being closed soon after anyway
+            // FolderWatcherInternal& opaque = folderWatcher.internal.get();
+            // SC_TRUST_RESULT(eventLoopRunner->eventLoop->removeAllAssociationsFor(opaque.fileHandle));
             SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop(*eventLoopRunner->eventLoop));
         }
         closeFileHandle(folderWatcher);
         return Result(true);
+    }
+
+    static void setDebugName(FolderWatcher& folderWatcher, const char* debugName)
+    {
+        FolderWatcherInternal& opaque = folderWatcher.internal.get();
+        opaque.asyncPoll.setDebugName(debugName);
     }
 
     [[nodiscard]] Result startWatching(FolderWatcher* entry)
@@ -150,6 +159,7 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
+            // TODO: Consider associating / removing file handle with IOCP directly inside AsyncFilePoll
             SC_TRY(eventLoopRunner->eventLoop->associateExternallyCreatedFileDescriptor(opaque.fileHandle));
             opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
             auto res = opaque.asyncPoll.start(*eventLoopRunner->eventLoop, newHandle);

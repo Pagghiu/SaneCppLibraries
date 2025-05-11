@@ -249,6 +249,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fs.makeDirectory(path2.view()));
             Thread::Sleep(250); // avoid aggregation of previous events
             FileSystemWatcher::FolderWatcher watcher1, watcher2;
+            watcher1.setDebugName("Watcher1");
+            watcher2.setDebugName("Watcher2");
             struct Params
             {
                 int changes1 = 0;

@@ -37,6 +37,14 @@ SC::Result SC::FileSystemWatcher::FolderWatcher::stopWatching()
     return parent->internal.get().stopWatching(*this);
 }
 
+void SC::FileSystemWatcher::FolderWatcher::setDebugName(const char* debugName)
+{
+    (void)debugName;
+#if SC_PLATFORM_WINDOWS
+    return Internal::setDebugName(*this, debugName);
+#endif
+}
+
 template <>
 void SC::FileSystemWatcher::InternalOpaque::construct(Handle& buffer)
 {
