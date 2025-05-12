@@ -127,6 +127,8 @@ struct SC::SocketIPAddress
     /// @brief Size of the native IP Address representation
     uint32_t sizeOfHandle() const;
 
+    /// @brief Checks if this is a valid IPV4 or IPV6 address
+    bool isValid() const;
     /// @brief Handle to native OS representation of the IP Address
     AlignedStorage<28> handle = {};
 

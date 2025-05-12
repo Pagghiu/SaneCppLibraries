@@ -49,6 +49,34 @@ SC::uint32_t SC::SocketIPAddress::sizeOfHandle() const
     Assert::unreachable();
 }
 
+bool SC::SocketIPAddress::isValid() const
+{
+    const sockaddr* sa = &handle.reinterpret_as<struct sockaddr const>();
+
+    char ipstr[INET6_ADDRSTRLEN];
+
+    if (sa->sa_family == AF_INET)
+    {
+        struct sockaddr_in* sa_in = (struct sockaddr_in*)sa;
+        if (::inet_ntop(AF_INET, &(sa_in->sin_addr), ipstr, sizeof(ipstr)) == nullptr)
+        {
+            return false;
+        }
+        return true;
+    }
+    else if (sa->sa_family == AF_INET6)
+    {
+        struct sockaddr_in6* sa_in6 = (struct sockaddr_in6*)sa;
+        if (::inet_ntop(AF_INET6, &(sa_in6->sin6_addr), ipstr, sizeof(ipstr)) == nullptr)
+        {
+            return false;
+        }
+        return true;
+    }
+
+    return false; // Unknown family
+}
+
 SC::Result SC::SocketIPAddress::fromAddressPort(SpanStringView interfaceAddress, uint16_t port)
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
