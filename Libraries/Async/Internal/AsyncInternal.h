@@ -128,17 +128,17 @@ struct SC::AsyncEventLoop::Internal
     Result setupAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
     Result activateAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
     Result cancelAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
-    Result completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async,
-                         Result&& returnCode, int32_t eventIndex);
+    Result completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async, int32_t eventIndex,
+                         Result result = Result(true), bool* hasBeenReactivated = nullptr);
 
     struct SetupAsyncPhase;
     struct ActivateAsyncPhase;
     struct CancelAsyncPhase;
     struct CompleteAsyncPhase;
     Result completeAndReactivateOrTeardown(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async,
-                                           Result&& returnCode, int32_t eventIndex);
+                                           int32_t eventIndex, Result& returnCode);
 
-    void reportError(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async, Result&& returnCode,
+    void reportError(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async, Result& returnCode,
                      int32_t eventIndex);
 
     enum class SyncMode

@@ -232,7 +232,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
             {
                 if (pid == current->handle)
                 {
-                    AsyncProcessExit::Result processResult(result.eventLoop, *current, Result(true));
+                    Result                   res(true);
+                    AsyncProcessExit::Result processResult(result.eventLoop, *current, res);
                     processResult.completionData.exitStatus.status = WEXITSTATUS(status);
                     result.eventLoop.internal.removeActiveHandle(*current);
                     current->callback(processResult);

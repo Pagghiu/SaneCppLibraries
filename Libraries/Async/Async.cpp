@@ -134,6 +134,8 @@ SC::Result SC::AsyncRequest::start(AsyncEventLoop& eventLoop) { return eventLoop
 
 void SC::AsyncResult::reactivateRequest(bool shouldBeReactivated)
 {
+    if (hasBeenReactivated)
+        *hasBeenReactivated = shouldBeReactivated;
     if (shouldBeReactivated)
     {
         switch (async.state)
@@ -788,7 +790,8 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop
         if (currentTime.isLaterThanOrEqualTo(current->expirationTime))
         {
             removeActiveHandle(*current);
-            AsyncLoopTimeout::Result result(eventLoop, *current, Result(true));
+            Result                   res(true);
+            AsyncLoopTimeout::Result result(eventLoop, *current, res);
             if (current->callback.isValid())
             {
                 current->callback(result);
@@ -970,19 +973,21 @@ int SC::AsyncEventLoop::Internal::getTotalNumberOfActiveHandle() const
 
 SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEventLoop& eventLoop,
                                                                          KernelEvents&   kernelEvents,
-                                                                         AsyncRequest& async, Result&& returnCode,
-                                                                         int32_t eventIndex)
+                                                                         AsyncRequest& async, int32_t eventIndex,
+                                                                         Result& returnCode)
 {
     SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     removeActiveHandle(async);
     AsyncTeardown teardown;
     prepareTeardown(eventLoop, async, teardown);
-    SC_TRY(completeAsync(eventLoop, kernelEvents, async, move(returnCode), eventIndex));
-    if (async.state == AsyncRequest::State::Reactivate)
+    bool hasBeenReactivated = false;
+    SC_TRY(completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode, &hasBeenReactivated));
+    // hasBeenReactivated is required to avoid accessing async when it has been not reactivated (and maybe deallocated)
+    if (hasBeenReactivated and async.state == AsyncRequest::State::Reactivate)
     {
-        if (async.sequence)
+        if (teardown.sequence)
         {
-            async.sequence->runningAsync = true;
+            teardown.sequence->runningAsync = true;
         }
     }
     else
@@ -996,7 +1001,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
     if (not returnCode)
     {
         // TODO: We shouldn't probably access async if it has not been reactivated...
-        reportError(eventLoop, kernelEvents, async, move(returnCode), eventIndex);
+        reportError(eventLoop, kernelEvents, async, returnCode, eventIndex);
     }
     return Result(true);
 }
@@ -1036,7 +1041,7 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& eventLoo
         auto res = stageSubmission(eventLoop, kernelEvents, *async);
         if (not res)
         {
-            reportError(eventLoop, kernelEvents, *async, move(res), -1);
+            reportError(eventLoop, kernelEvents, *async, res, -1);
         }
     }
 
@@ -1125,7 +1130,8 @@ void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& 
         {
             Function<void(AsyncResult&)>& closeCallback = *async->closeCallback;
 
-            AsyncResult res(eventLoop, *async);
+            Result      result(true);
+            AsyncResult res(eventLoop, *async, result);
             closeCallback(res);
         }
         async = next;
@@ -1137,7 +1143,8 @@ void SC::AsyncEventLoop::Internal::runStepExecuteManualCompletions(AsyncEventLoo
 {
     while (AsyncRequest* async = manualCompletions.dequeueFront())
     {
-        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, Result(true), -1))
+        Result res(true);
+        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, -1, res))
         {
             SC_LOG_MESSAGE("Error completing {}", async->debugName);
         }
@@ -1149,7 +1156,8 @@ void SC::AsyncEventLoop::Internal::runStepExecuteManualThreadPoolCompletions(Asy
 {
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
-        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, Result(true), -1))
+        Result res(true);
+        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, -1, res))
         {
             SC_LOG_MESSAGE("Error completing {}", async->debugName);
         }
@@ -1175,7 +1183,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
         Result        result = Result(kernelEvents.validateEvent(idx, continueProcessing));
         if (not result)
         {
-            reportError(eventLoop, kernelEvents, async, move(result), eventIndex);
+            reportError(eventLoop, kernelEvents, async, result, eventIndex);
             continue;
         }
 
@@ -1192,7 +1200,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
                 // write watcher that must be removed to avoid executing completion two times.
                 manualCompletions.remove(async);
             }
-            if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, async, move(result), eventIndex))
+            if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, async, eventIndex, result))
             {
                 SC_LOG_MESSAGE("Error completing {}", async.debugName);
             }
@@ -1301,10 +1309,12 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
     AsyncEventLoop& eventLoop;
     KernelEvents&   kernelEvents;
 
-    Result&& returnCode;
-
-    CompleteAsyncPhase(int32_t eventIndex, AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, Result&& result)
-        : eventIndex(eventIndex), eventLoop(eventLoop), kernelEvents(kernelEvents), returnCode(move(result))
+    Result& returnCode;
+    bool*   hasBeenReactivated;
+    CompleteAsyncPhase(int32_t eventIndex, AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, Result& result,
+                       bool* hasBeenReactivated = nullptr)
+        : eventIndex(eventIndex), eventLoop(eventLoop), kernelEvents(kernelEvents), returnCode(result),
+          hasBeenReactivated(hasBeenReactivated)
     {}
 
     template <typename T>
@@ -1313,7 +1323,7 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
         using AsyncType       = T;
         using AsyncResultType = typename AsyncType::Result;
         using AsyncCompletion = typename AsyncType::CompletionData;
-        AsyncResultType result(eventLoop, async, forward<Result>(returnCode));
+        AsyncResultType result(eventLoop, async, returnCode, hasBeenReactivated);
         result.eventIndex = eventIndex;
         if (result.returnCode)
         {
@@ -1460,7 +1470,7 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
 }
 
 void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
-                                               AsyncRequest& async, Result&& returnCode, int32_t eventIndex)
+                                               AsyncRequest& async, Result& returnCode, int32_t eventIndex)
 {
     SC_LOG_MESSAGE("{} ERROR {}\n", async.debugName, AsyncRequest::TypeToString(async.type));
     if (async.state == AsyncRequest::State::Active)
@@ -1471,7 +1481,7 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
     {
         clearSequence(*async.sequence);
     }
-    (void)completeAsync(eventLoop, kernelEvents, async, forward<Result>(returnCode), eventIndex);
+    (void)completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode);
     if (not async.isCancelling())
     {
         async.markAsFree();
@@ -1479,7 +1489,8 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
 }
 
 SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
-                                                       AsyncRequest& async, Result&& returnCode, int32_t eventIndex)
+                                                       AsyncRequest& async, int32_t eventIndex, Result returnCode,
+                                                       bool* hasBeenReactivated)
 {
     if (returnCode)
     {
@@ -1490,7 +1501,8 @@ SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop
         SC_LOG_MESSAGE("{} {} COMPLETE (Error = \"{}\")\n", async.debugName, AsyncRequest::TypeToString(async.type),
                        returnCode.message);
     }
-    return Internal::applyOnAsync(async, CompleteAsyncPhase(eventIndex, eventLoop, kernelEvents, move(returnCode)));
+    return Internal::applyOnAsync(
+        async, CompleteAsyncPhase(eventIndex, eventLoop, kernelEvents, returnCode, hasBeenReactivated));
 }
 
 SC::Result SC::AsyncEventLoop::Internal::cancelAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
@@ -1583,7 +1595,8 @@ void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
         async                    = static_cast<AsyncLoopWakeUp*>(async->next);
         if (current->pending.load() == true)
         {
-            AsyncLoopWakeUp::Result result(eventLoop, *current, Result(true));
+            Result                  res(true);
+            AsyncLoopWakeUp::Result result(eventLoop, *current, res);
             removeActiveHandle(*current);
             current->callback(result);
             if (current->eventObject)

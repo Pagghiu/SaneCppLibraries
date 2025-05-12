@@ -189,6 +189,8 @@ struct AsyncRequest
     /// @brief Returns currently set close callback (if any) passed to AsyncRequest::stop
     [[nodiscard]] Function<void(AsyncResult&)>* getCloseCallback() { return closeCallback; }
 
+    [[nodiscard]] const Function<void(AsyncResult&)>* getCloseCallback() const { return closeCallback; }
+
   protected:
     Result checkState();
 
@@ -257,12 +259,9 @@ struct AsyncCompletionData
 struct AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
-    AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request, SC::Result&& res)
-        : eventLoop(eventLoop), async(request), returnCode(move(res))
+    AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request, SC::Result& res, bool* hasBeenReactivated = nullptr)
+        : eventLoop(eventLoop), async(request), returnCode(res), hasBeenReactivated(hasBeenReactivated)
     {}
-
-    /// @brief Constructs an async result from a request
-    AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request) : eventLoop(eventLoop), async(request) {}
 
     /// @brief Ask the event loop to re-activate this request after it was already completed
     /// @param shouldBeReactivated `true` will reactivate the request
@@ -277,9 +276,10 @@ struct AsyncResult
   protected:
     friend struct AsyncEventLoop;
 
-    bool shouldCallCallback = true;
+    bool  shouldCallCallback = true;
+    bool* hasBeenReactivated = nullptr;
 
-    SC::Result returnCode = SC::Result(true);
+    SC::Result& returnCode;
 };
 
 /// @brief Helper holding CompletionData for a specific AsyncRequest-derived class
