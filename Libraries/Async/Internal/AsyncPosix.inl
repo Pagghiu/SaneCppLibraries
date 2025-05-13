@@ -572,33 +572,23 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     // Socket CONNECT
     //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
-    {
-        return setEventWatcher(eventLoop, async, async.handle, OUTPUT_EVENTS_MASK);
-    }
-
-    static Result teardownAsync(AsyncSocketConnect*, AsyncTeardown& teardown)
-    {
-        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
-                                                            OUTPUT_EVENTS_MASK);
-    }
-
-    static Result activateAsync(AsyncEventLoop&, AsyncSocketConnect& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketConnect& async)
     {
         SocketDescriptor client;
         SC_TRY(client.assign(async.handle));
         auto detach = MakeDeferred([&] { client.detach(); });
         auto res    = SocketClient(client).connect(async.ipAddress);
-        // we expect connect to fail with
         if (res)
         {
-            return Result::Error("connect failed (succeeded?)");
+            return Result::Error("connect unexpected error");
         }
         if (errno != EAGAIN and errno != EINPROGRESS)
         {
-            return Result::Error("connect failed (socket is in blocking mode)");
+            return Result::Error("connect failed");
         }
-        return Result(true);
+
+        async.flags |= Internal::Flag_WatcherSet;
+        return setEventWatcher(eventLoop, async, async.handle, OUTPUT_EVENTS_MASK);
     }
 
     static Result completeAsync(AsyncSocketConnect::Result& result)
@@ -613,6 +603,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         // And additionally it's stupid as probably WRITE will be subscribed again anyway
         // But probably this means to review the entire process of async stop
         AsyncEventLoop& eventLoop = result.eventLoop;
+        async.flags &= ~Internal::Flag_WatcherSet;
         SC_TRUST_RESULT(KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
         if (socketRes == 0)
         {
@@ -996,8 +987,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
     static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
-
-    static bool needsManualTimersProcessing() { return true; }
 
     //-------------------------------------------------------------------------------------------------------
     // File CLOSE

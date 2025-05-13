@@ -48,8 +48,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     const KernelEventsPosix&   getPosix() const;
 
     [[nodiscard]] uint32_t getNumEvents() const;
-    Result                 syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
-    Result                 validateEvent(uint32_t&, bool&);
+
+    Result syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
+    Result validateEvent(uint32_t&, bool&);
 
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
 
@@ -67,8 +68,6 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         return true;
     }
-
-    bool needsManualTimersProcessing() { return isEpoll; }
 
     template <typename T, typename P> static Result executeOperation(T&, P& p);
     // clang-format on

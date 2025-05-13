@@ -499,12 +499,13 @@ struct AsyncSocketConnect : public AsyncRequest
 
     Function<void(Result&)> callback; ///< Called after socket is finally connected to endpoint
 
+    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
+    SocketIPAddress          ipAddress;
+
   private:
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
 
-    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    SocketIPAddress          ipAddress;
 #if SC_PLATFORM_WINDOWS
     void (*pConnectEx)() = nullptr;
     detail::WinOverlappedOpaque overlapped;

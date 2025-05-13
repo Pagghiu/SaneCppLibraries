@@ -277,6 +277,7 @@ SC::Result SC::AsyncSocketConnect::start(AsyncEventLoop& eventLoop, const Socket
 SC::Result SC::AsyncSocketConnect::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(handle != SocketDescriptor::Invalid, "AsyncSocketConnect - Invalid handle");
+    SC_TRY_MSG(ipAddress.isValid(), "AsyncSocketConnect - Invalid ipaddress");
     return SC::Result(true);
 }
 
@@ -1090,10 +1091,7 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eve
     case SyncMode::NoWait: {
         // No need to update time as it was already updated in submitRequests and syncing
         // with kernel has not been blocking (as we are in NoWait mode)
-        // if (kernelEvents.needsManualTimersProcessing())
-        {
-            invokeExpiredTimers(eventLoop, loopTime);
-        }
+        invokeExpiredTimers(eventLoop, loopTime);
     }
     break;
     case SyncMode::ForcedForwardProgress: {
