@@ -461,7 +461,7 @@ struct AsyncSocketAcceptBase : public AsyncRequest
 /// The callback is called with a new socket connected to the given listening endpoint will be returned. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
 /// SC::SocketFlags::NonBlocking and associated to the event loop with
-/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket. @n
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 /// @note To continue accepting new socket SC::AsyncResult::reactivateRequest must be called.
 ///
@@ -482,7 +482,7 @@ struct AsyncSocketAccept : public detail::AsyncSocketAcceptBase
 /// Callback will be called when the given socket is connected to ipAddress. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
 /// SC::SocketFlags::NonBlocking and associated to the event loop with
-/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket. @n
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketConnectSnippet
@@ -516,7 +516,7 @@ struct AsyncSocketConnect : public AsyncRequest
 /// Callback will be called when the given socket is ready to send more data. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
 /// SC::SocketFlags::NonBlocking and associated to the event loop with
-/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket or though AsyncSocketAccept. @n
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket or though AsyncSocketAccept. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketSendSnippet
@@ -558,7 +558,7 @@ struct AsyncSocketSend : public AsyncRequest
 /// Callback will be called when some data is read from socket. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
 /// SC::SocketFlags::NonBlocking and associated to the event loop with
-/// SC::AsyncEventLoop::associateExternallyCreatedTCPSocket or though AsyncSocketAccept. @n
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket or though AsyncSocketAccept. @n
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
 /// Additional notes:
@@ -1071,14 +1071,16 @@ struct AsyncEventLoop
     /// Wake up the event loop from a thread different than the one where run() is called (and potentially blocked)
     Result wakeUpFromExternalThread();
 
-    /// Helper to creates a TCP socket with AsyncRequest flags of the given family (IPV4 / IPV6).
-    /// It also automatically registers the socket with the eventLoop (associateExternallyCreatedTCPSocket)
+    /// @brief Creates an async TCP (IPV4 / IPV6) socket registered with the eventLoop
     Result createAsyncTCPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
-    /// Associates a TCP Socket created externally (without using createAsyncTCPSocket) with the eventLoop.
-    Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor);
+    /// @brief Creates an async UCP (IPV4 / IPV6) socket registered with the eventLoop
+    Result createAsyncUDPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor);
 
-    /// Associates a File descriptor created externally with the eventLoop.
+    /// @brief Associates a previously created TCP / UDP socket with the eventLoop
+    Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor);
+
+    /// @brief Associates a previously created File Descriptor with the eventLoop.
     Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
 
     /// @brief Removes association of a TCP Socket with any event loop

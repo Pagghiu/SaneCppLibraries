@@ -496,7 +496,15 @@ SC::Result SC::AsyncEventLoop::createAsyncTCPSocket(SocketFlags::AddressFamily f
     auto res = outDescriptor.create(family, SocketFlags::SocketStream, SocketFlags::ProtocolTcp,
                                     SocketFlags::NonBlocking, SocketFlags::NonInheritable);
     SC_TRY(res);
-    return associateExternallyCreatedTCPSocket(outDescriptor);
+    return associateExternallyCreatedSocket(outDescriptor);
+}
+
+SC::Result SC::AsyncEventLoop::createAsyncUDPSocket(SocketFlags::AddressFamily family, SocketDescriptor& outDescriptor)
+{
+    auto res = outDescriptor.create(family, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp,
+                                    SocketFlags::NonBlocking, SocketFlags::NonInheritable);
+    SC_TRY(res);
+    return associateExternallyCreatedSocket(outDescriptor);
 }
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread()
@@ -510,9 +518,9 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread()
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedSocket(SocketDescriptor& outDescriptor)
 {
-    return internal.kernelQueue.get().associateExternallyCreatedTCPSocket(outDescriptor);
+    return internal.kernelQueue.get().associateExternallyCreatedSocket(outDescriptor);
 }
 
 SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)

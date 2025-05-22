@@ -10,7 +10,7 @@ struct SC::AsyncEventLoop::KernelQueue
     Result createEventLoop(AsyncEventLoop::Options) { return Result(true); }
     Result createSharedWatchers(AsyncEventLoop&) { return Result(true); }
     Result wakeUpFromExternalThread() { return Result(true); }
-    Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
+    Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
     Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
     Result makesSenseToRunInThreadPool(AsyncRequest&) { return Result(true); }
 };

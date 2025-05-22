@@ -28,7 +28,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     Result createSharedWatchers(AsyncEventLoop&);
     Result wakeUpFromExternalThread();
 
-    static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
     static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
     static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
     static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }
@@ -174,7 +174,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         return Result(true);
     }
 
-    static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
     static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
 };
 

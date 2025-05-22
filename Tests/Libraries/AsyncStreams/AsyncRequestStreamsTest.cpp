@@ -85,8 +85,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         SC_TEST_EXPECT(client.setBlocking(false));
         SC_TEST_EXPECT(serverSideClient.setBlocking(false));
 
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(client));
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedTCPSocket(serverSideClient));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(client));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(serverSideClient));
     }
 };
 

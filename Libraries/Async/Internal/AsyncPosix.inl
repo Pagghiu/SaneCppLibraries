@@ -305,7 +305,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter);
     }
 
-    static Result associateExternallyCreatedTCPSocket(SocketDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
     static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
     static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
     static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }

@@ -40,7 +40,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     [[nodiscard]] static constexpr bool makesSenseToRunInThreadPool(AsyncRequest&) { return true; }
 
-    Result associateExternallyCreatedTCPSocket(SocketDescriptor& outDescriptor)
+    Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor)
     {
         SC_TRY(removeAllAssociationsFor(outDescriptor));
         HANDLE loopHandle;
@@ -48,7 +48,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         SOCKET socket;
         SC_TRY(outDescriptor.get(socket, Result::Error("Invalid handle")));
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedTCPSocket CreateIoCompletionPort failed");
+        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedSocket CreateIoCompletionPort failed");
         return Result(true);
     }
 
