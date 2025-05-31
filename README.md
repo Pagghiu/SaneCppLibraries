@@ -24,6 +24,8 @@
 
 Visit the [documentation website](https://pagghiu.github.io/SaneCppLibraries/index.html) for more information.
 
+Take a look also at [DeepWiki/SaneCppLibraries](https://deepwiki.com/Pagghiu/SaneCppLibraries) for an AI-guided walkthrough of the project!
+
 # Libraries
 
 Library                                                                                                 | Description
