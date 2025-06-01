@@ -22,8 +22,9 @@ SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress)
 #else
     SC_COMPILER_UNUSED(value);
 #endif
-    if (::bind(listenSocket, &nativeAddress.handle.reinterpret_as<const struct sockaddr>(),
-               nativeAddress.sizeOfHandle()) == SOCKET_ERROR)
+    const struct sockaddr* sa     = &nativeAddress.handle.reinterpret_as<const struct sockaddr>();
+    const socklen_t        saSize = nativeAddress.sizeOfHandle();
+    if (::bind(listenSocket, sa, saSize) == SOCKET_ERROR)
     {
         SC_TRUST_RESULT(socket.close());
         return Result::Error("Could not bind socket to port");

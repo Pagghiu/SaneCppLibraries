@@ -108,15 +108,23 @@ struct SC::SocketFlags
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketIpAddressSnippet
 struct SC::SocketIPAddress
 {
+    /// @brief Maximum length of the ASCII representation of an IP Address
+    static constexpr int MAX_ASCII_STRING_LENGTH = 46;
+
+    /// @brief Buffer for storing the ASCII representation of an IP Address
+    using AsciiBuffer = char[MAX_ASCII_STRING_LENGTH];
+
     /// @brief Constructs an ip address from a given family (IPV4 or IPV6)
     /// @param addressFamily The address family
-    SocketIPAddress(SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4)
-        : addressFamily(addressFamily)
-    {}
+    SocketIPAddress(SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4);
 
     /// @brief Get Address family of this ip address (IPV4 or IPV6)
     /// @return The Ip Address Family of the given SocketDescriptor
-    [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() { return addressFamily; }
+    [[nodiscard]] SocketFlags::AddressFamily getAddressFamily() const;
+
+    /// @brief Get port of this ip address
+    /// @return The port of the given SocketIPAddress
+    [[nodiscard]] uint16_t getPort() const;
 
     /// @brief Builds this SocketIPAddress parsing given address string and port
     /// @param interfaceAddress A valid IPV4 or IPV6 address expressed as a string
@@ -125,18 +133,30 @@ struct SC::SocketIPAddress
     [[nodiscard]] Result fromAddressPort(SpanStringView interfaceAddress, uint16_t port);
 
     /// @brief Size of the native IP Address representation
-    uint32_t sizeOfHandle() const;
+    [[nodiscard]] uint32_t sizeOfHandle() const;
 
     /// @brief Checks if this is a valid IPV4 or IPV6 address
-    bool isValid() const;
+    [[nodiscard]] bool isValid() const;
+
+    /// @brief Returns the text representation of this SocketIPAddress
+    /// @param buffer Buffer to store the ASCII representation of the IP Address
+    /// @return A sub-Span of `buffer` that has the length of actually written bytes
+    /// @note The buffer must be at least `MAX_ASCII_STRING_LENGTH` bytes long
+    template <size_t N>
+    [[nodiscard]] SpanStringView toString(char (&buffer)[N]) const
+    {
+        static_assert(N >= MAX_ASCII_STRING_LENGTH, "Insufficient buffer");
+        return formatAddress(buffer);
+    }
+
     /// @brief Handle to native OS representation of the IP Address
     AlignedStorage<28> handle = {};
 
   private:
+    [[nodiscard]] SpanStringView formatAddress(Span<char> buffer) const;
     friend struct SocketServer;
     friend struct SocketClient;
 
-    SocketFlags::AddressFamily addressFamily = SocketFlags::AddressFamilyIPV4;
     struct Internal;
 };
 
