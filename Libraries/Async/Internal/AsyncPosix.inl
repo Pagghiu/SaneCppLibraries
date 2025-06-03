@@ -351,8 +351,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
 #if SC_ASYNC_USE_EPOLL
 
-    static constexpr int32_t INPUT_EVENTS_MASK  = EPOLLIN;
-    static constexpr int32_t OUTPUT_EVENTS_MASK = EPOLLOUT;
+    static constexpr int32_t INPUT_EVENTS_MASK         = EPOLLIN;
+    static constexpr int32_t OUTPUT_EVENTS_MASK        = EPOLLOUT;
+    static constexpr int32_t SOCKET_INPUT_EVENTS_MASK  = EPOLLIN | EPOLLRDHUP;
+    static constexpr int32_t SOCKET_OUTPUT_EVENTS_MASK = EPOLLOUT;
 
     // In epoll (differently from kqueue) the watcher is immediately added
     static Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, int32_t filter)
@@ -388,6 +390,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #else
     static constexpr short INPUT_EVENTS_MASK  = EVFILT_READ;
     static constexpr short OUTPUT_EVENTS_MASK = EVFILT_WRITE;
+
+    static constexpr short SOCKET_INPUT_EVENTS_MASK  = EVFILT_READ;
+    static constexpr short SOCKET_OUTPUT_EVENTS_MASK = EVFILT_WRITE;
 
     Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, short filter,
                            unsigned int options = 0)
@@ -643,8 +648,83 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return Result(true);
     }
 
-    template <typename T>
-    [[nodiscard]] static bool posixTryWrite(T& async, size_t totalBytesToSend, const off_t offset)
+    struct WriteApiPosixWrite
+    {
+        off_t offset = -1;
+
+        explicit WriteApiPosixWrite(off_t offset) : offset(offset) {};
+
+        ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
+        {
+            if (offset <= 0)
+            {
+                return ::write(fd, data, bytes);
+            }
+            else
+            {
+                return ::pwrite(fd, data, bytes, offset + static_cast<off_t>(totalBytesWritten));
+            }
+        }
+
+        ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
+        {
+            if (offset <= 0)
+            {
+                return ::writev(fd, vec, remainingVectors);
+            }
+            else
+            {
+                return ::pwritev(fd, vec, remainingVectors, offset + static_cast<off_t>(totalBytesWritten));
+            }
+        }
+    };
+
+    struct WriteApiPosixSend
+    {
+        ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
+        {
+            SC_COMPILER_UNUSED(totalBytesWritten);
+            return ::send(fd, data, bytes, 0);
+        }
+
+        ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
+        {
+            SC_COMPILER_UNUSED(totalBytesWritten);
+            return ::writev(fd, vec, remainingVectors);
+        }
+    };
+
+    struct WriteApiPosixSendTo
+    {
+        struct sockaddr* address;
+        socklen_t        addressLen;
+        WriteApiPosixSendTo(AsyncSocketSendTo& async)
+        {
+            address    = &async.address.handle.reinterpret_as<struct sockaddr>();
+            addressLen = async.address.sizeOfHandle();
+        }
+
+        ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
+        {
+            SC_COMPILER_UNUSED(totalBytesWritten);
+            return ::sendto(fd, data, bytes, 0, address, addressLen);
+        }
+
+        ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
+        {
+            SC_COMPILER_UNUSED(totalBytesWritten);
+            msghdr msgs;
+            memset(&msgs, 0, sizeof(msgs));
+            msgs.msg_name    = address;
+            msgs.msg_namelen = addressLen;
+            msgs.msg_iov     = vec;
+            msgs.msg_iovlen  = remainingVectors;
+            return ::sendmsg(fd, &msgs, 1);
+        }
+    };
+
+    template <typename T, typename WriteApi>
+    [[nodiscard]] static bool posixTryWrite(T& async, size_t totalBytesToSend, WriteApi writeApi)
     {
         while (async.totalBytesWritten < totalBytesToSend)
         {
@@ -652,15 +732,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             const size_t remainingBytes = totalBytesToSend - async.totalBytesWritten;
             if (async.singleBuffer)
             {
-                if (offset == -1)
-                {
-                    numBytesSent = ::write(async.handle, async.buffer.data() + async.totalBytesWritten, remainingBytes);
-                }
-                else
-                {
-                    numBytesSent = ::pwrite(async.handle, async.buffer.data() + async.totalBytesWritten, remainingBytes,
-                                            offset + static_cast<off_t>(async.totalBytesWritten));
-                }
+                numBytesSent = writeApi.writeSingle(async.handle, async.buffer.data() + async.totalBytesWritten,
+                                                    remainingBytes, async.totalBytesWritten);
             }
             else
             {
@@ -670,7 +743,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 const int numIoVectors = static_cast<int>(async.buffers.sizeInElements());
 
                 // If coming from a previous partial write, find the iovec that was not fully written or
-                // just compute the index to first iovec that was not yet written at all.
+                // just compute the index to first iovec that has not yet been written at all.
                 // Modify such iovec to the not-written-yet slice of the original and proceed to write
                 // it together with all all io vecs that come after it. Restore the modified iovec (if any).
                 size_t fullyWrittenBytes = 0; // Bytes of already fully written io vecs
@@ -695,15 +768,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                 }
                 // Write everything from indexOfVecToWrite going forward
                 const int remainingVectors = numIoVectors - static_cast<int>(indexOfVecToWrite);
-                if (offset == -1)
-                {
-                    numBytesSent = ::writev(async.handle, ioVectors + indexOfVecToWrite, remainingVectors);
-                }
-                else
-                {
-                    numBytesSent = ::pwritev(async.handle, ioVectors + indexOfVecToWrite, remainingVectors,
-                                             offset + static_cast<off_t>(async.totalBytesWritten));
-                }
+
+                numBytesSent = writeApi.writeMultiple(async.handle, ioVectors + indexOfVecToWrite, remainingVectors,
+                                                      async.totalBytesWritten);
                 if (partiallyWrittenBytes > 0)
                 {
                     ioVectors[indexOfVecToWrite] = backup;
@@ -722,12 +789,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return true;
     }
 
-    template <typename T>
-    Result posixWriteActivate(AsyncEventLoop& eventLoop, T& async, off_t offset, bool watchable)
+    template <typename T, typename WriteApi>
+    Result posixWriteActivate(AsyncEventLoop& eventLoop, T& async, WriteApi writeApi, bool watchable)
     {
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
         SC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
-        if (not posixTryWrite(async, totalBytesToSend, offset))
+        if (not posixTryWrite(async, totalBytesToSend, writeApi))
         {
             // Not all bytes have been written, so if descriptor supports watching
             // start monitoring it, otherwise just return error
@@ -743,13 +810,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return Result(true);
     }
 
-    template <typename T>
-    static Result posixWriteCompleteAsync(typename T::Result& result, off_t offset)
+    template <typename T, typename WriteApi>
+    static Result posixWriteCompleteAsync(typename T::Result& result, WriteApi writeApi)
     {
         T& async = result.getAsync();
         async.flags &= ~Internal::Flag_ManualCompletion;
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
-        if (not posixTryWrite(async, totalBytesToSend, offset))
+        if (not posixTryWrite(async, totalBytesToSend, writeApi))
         {
             const auto writeError = errno;
             if (writeError == EWOULDBLOCK || writeError == EAGAIN)
@@ -797,7 +864,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
     {
-        return posixWriteActivate(eventLoop, async, -1, true);
+        return posixWriteActivate(eventLoop, async, WriteApiPosixSend{}, true);
     }
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
@@ -808,9 +875,36 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static Result completeAsync(AsyncSocketSend::Result& result)
     {
         AsyncSocketSend& async = result.getAsync();
-        SC_TRY(posixWriteCompleteAsync<AsyncSocketSend>(result, -1));
+        if (async.type == AsyncRequest::Type::SocketSendTo)
+        {
+            AsyncSocketSendTo& asyncSendTo = static_cast<AsyncSocketSendTo&>(async);
+            SC_TRY(posixWriteCompleteAsync<AsyncSocketSend>(result, WriteApiPosixSendTo{asyncSendTo}));
+        }
+        else
+        {
+            SC_TRY(posixWriteCompleteAsync<AsyncSocketSend>(result, WriteApiPosixSend{}));
+        }
         return posixWriteManualActivateWithSameHandle(result.eventLoop, async,
                                                       result.eventLoop.internal.activeSocketSends.front);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket SEND TO
+    //-------------------------------------------------------------------------------------------------------
+    static Result teardownAsync(AsyncSocketSendTo*, AsyncTeardown& teardown)
+    {
+        return posixWriteCancel(*teardown.eventLoop, teardown.socketHandle, teardown.flags,
+                                teardown.eventLoop->internal.activeSocketSendsTo.front);
+    }
+
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
+    {
+        return posixWriteActivate(eventLoop, async, WriteApiPosixSendTo{async}, true);
+    }
+
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
+    {
+        return posixWriteCancel(eventLoop, async.handle, async.flags, eventLoop.internal.activeSocketSendsTo.front);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -818,27 +912,33 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
     {
-#if SC_ASYNC_USE_EPOLL
-        return Result(setEventWatcher(eventLoop, async, async.handle, EPOLLIN | EPOLLRDHUP));
-#else
-        return Result(setEventWatcher(eventLoop, async, async.handle, EVFILT_READ));
-#endif
+        return Result(setEventWatcher(eventLoop, async, async.handle, SOCKET_INPUT_EVENTS_MASK));
     }
 
     static Result teardownAsync(AsyncSocketReceive*, AsyncTeardown& teardown)
     {
-#if SC_ASYNC_USE_EPOLL
         return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle,
-                                                            EPOLLIN | EPOLLRDHUP);
-#else
-        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.socketHandle, EVFILT_READ);
-#endif
+                                                            SOCKET_INPUT_EVENTS_MASK);
     }
 
     Result completeAsync(AsyncSocketReceive::Result& result)
     {
-        AsyncSocketReceive& async = result.getAsync();
-        const ssize_t       res   = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
+        ssize_t res;
+        if (result.getAsync().type == AsyncRequest::Type::SocketReceiveFrom)
+        {
+            AsyncSocketReceiveFrom& async = static_cast<AsyncSocketReceiveFrom&>(result.getAsync());
+
+            struct sockaddr* address    = &async.address.handle.reinterpret_as<struct sockaddr>();
+            socklen_t        addressLen = async.address.sizeOfHandle();
+
+            res = ::recvfrom(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0, address, &addressLen);
+        }
+        else
+        {
+            AsyncSocketReceive& async = result.getAsync();
+
+            res = ::recv(async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
+        }
         SC_TRY_MSG(res >= 0, "error in recv");
         result.completionData.numBytes = static_cast<size_t>(res);
         if (res == 0)
@@ -846,6 +946,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             result.completionData.disconnected = true;
         }
         return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket RECEIVE FROM
+    //-------------------------------------------------------------------------------------------------------
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncSocketReceiveFrom& async)
+    {
+        return setupAsync(eventLoop, static_cast<AsyncSocketReceive&>(async));
+    }
+
+    static Result teardownAsync(AsyncSocketReceiveFrom* ptr, AsyncTeardown& teardown)
+    {
+        return teardownAsync(static_cast<AsyncSocketReceive*>(ptr), teardown);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -944,8 +1057,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
     {
-        return posixWriteActivate(eventLoop, async, async.useOffset ? static_cast<off_t>(async.offset) : -1,
-                                  async.isWatchable);
+        const off_t offset = async.useOffset ? static_cast<off_t>(async.offset) : -1;
+        return posixWriteActivate(eventLoop, async, WriteApiPosixWrite{offset}, async.isWatchable);
     }
 
     static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
@@ -957,7 +1070,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         AsyncFileWrite& async  = result.getAsync();
         const off_t     offset = async.useOffset ? static_cast<off_t>(async.offset) : -1;
-        SC_TRY(posixWriteCompleteAsync<AsyncFileWrite>(result, offset));
+        SC_TRY(posixWriteCompleteAsync<AsyncFileWrite>(result, WriteApiPosixWrite{offset}));
         return posixWriteManualActivateWithSameHandle(result.eventLoop, async,
                                                       result.eventLoop.internal.activeFileWrites.front);
     }
@@ -965,8 +1078,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData)
     {
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
-        const off_t  offset           = async.useOffset ? static_cast<off_t>(async.offset) : -1;
-        SC_TRY(posixTryWrite(async, totalBytesToSend, offset));
+        const off_t  offset           = {async.useOffset ? static_cast<off_t>(async.offset) : -1};
+        SC_TRY(posixTryWrite(async, totalBytesToSend, WriteApiPosixWrite{offset}));
         completionData.numBytes = async.totalBytesWritten;
         SC_TRY_MSG(completionData.numBytes == totalBytesToSend, "Partial write (disk full or RLIMIT_FSIZE reached)");
         return Result(true);

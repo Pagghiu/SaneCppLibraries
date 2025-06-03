@@ -67,19 +67,21 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncRequest> cancellations;
 
     // Active phase
-    IntrusiveDoubleLinkedList<AsyncLoopTimeout>   activeLoopTimeouts;
-    IntrusiveDoubleLinkedList<AsyncLoopWakeUp>    activeLoopWakeUps;
-    IntrusiveDoubleLinkedList<AsyncLoopWork>      activeLoopWork;
-    IntrusiveDoubleLinkedList<AsyncProcessExit>   activeProcessExits;
-    IntrusiveDoubleLinkedList<AsyncSocketAccept>  activeSocketAccepts;
-    IntrusiveDoubleLinkedList<AsyncSocketConnect> activeSocketConnects;
-    IntrusiveDoubleLinkedList<AsyncSocketSend>    activeSocketSends;
-    IntrusiveDoubleLinkedList<AsyncSocketReceive> activeSocketReceives;
-    IntrusiveDoubleLinkedList<AsyncSocketClose>   activeSocketCloses;
-    IntrusiveDoubleLinkedList<AsyncFileRead>      activeFileReads;
-    IntrusiveDoubleLinkedList<AsyncFileWrite>     activeFileWrites;
-    IntrusiveDoubleLinkedList<AsyncFileClose>     activeFileCloses;
-    IntrusiveDoubleLinkedList<AsyncFilePoll>      activeFilePolls;
+    IntrusiveDoubleLinkedList<AsyncLoopTimeout>       activeLoopTimeouts;
+    IntrusiveDoubleLinkedList<AsyncLoopWakeUp>        activeLoopWakeUps;
+    IntrusiveDoubleLinkedList<AsyncLoopWork>          activeLoopWork;
+    IntrusiveDoubleLinkedList<AsyncProcessExit>       activeProcessExits;
+    IntrusiveDoubleLinkedList<AsyncSocketAccept>      activeSocketAccepts;
+    IntrusiveDoubleLinkedList<AsyncSocketConnect>     activeSocketConnects;
+    IntrusiveDoubleLinkedList<AsyncSocketSend>        activeSocketSends;
+    IntrusiveDoubleLinkedList<AsyncSocketSendTo>      activeSocketSendsTo;
+    IntrusiveDoubleLinkedList<AsyncSocketReceive>     activeSocketReceives;
+    IntrusiveDoubleLinkedList<AsyncSocketReceiveFrom> activeSocketReceivesFrom;
+    IntrusiveDoubleLinkedList<AsyncSocketClose>       activeSocketCloses;
+    IntrusiveDoubleLinkedList<AsyncFileRead>          activeFileReads;
+    IntrusiveDoubleLinkedList<AsyncFileWrite>         activeFileWrites;
+    IntrusiveDoubleLinkedList<AsyncFileClose>         activeFileCloses;
+    IntrusiveDoubleLinkedList<AsyncFilePoll>          activeFilePolls;
 
     // Manual completions
     IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;

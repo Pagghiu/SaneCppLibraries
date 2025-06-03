@@ -1,4 +1,3 @@
-
 #include <dlfcn.h>
 
 struct AsyncLinuxAPI
@@ -51,6 +50,14 @@ struct AsyncLinuxAPI
 // It's ugly but it (hopefully) works.
 
 #if SC_ASYNC_INCLUDE_LIBURING_HEADER
+
+static inline uint32_t IO_URING_READ_ONCE(const uint32_t& var)
+{
+    uint32_t res;
+    __atomic_load(&var, &res, __ATOMIC_RELAXED);
+    return res;
+}
+
 static inline void IO_URING_WRITE_ONCE(uint32_t& var, uint32_t val)
 {
     // std::atomic_store_explicit(reinterpret_cast<std::atomic<T>*>(&var), val, std::memory_order_relaxed);
@@ -58,6 +65,12 @@ static inline void IO_URING_WRITE_ONCE(uint32_t& var, uint32_t val)
 }
 
 static inline void io_uring_smp_store_release(uint32_t* p, uint32_t v)
+{
+    // std::atomic_store_explicit(reinterpret_cast<std::atomic<T>*>(p), v, std::memory_order_release);
+    __atomic_store(p, &v, __ATOMIC_RELEASE);
+}
+
+static inline void io_uring_smp_store_release(uint16_t* p, uint16_t v)
 {
     // std::atomic_store_explicit(reinterpret_cast<std::atomic<T>*>(p), v, std::memory_order_release);
     __atomic_store(p, &v, __ATOMIC_RELEASE);
@@ -88,14 +101,17 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     void (*io_uring_prep_connect)(struct io_uring_sqe* sqe, int fd, const struct sockaddr* addr, socklen_t addrlen) = nullptr;
     void (*io_uring_prep_send)(struct io_uring_sqe* sqe, int sockfd, const void* buf, size_t len, int flags) = nullptr;
     void (*io_uring_prep_recv)(struct io_uring_sqe* sqe, int sockfd, void* buf, size_t len, int flags) = nullptr;
+    void (*io_uring_prep_sendmsg)(struct io_uring_sqe* sqe, int sockfd, const struct msghdr* msg, unsigned flags) = nullptr;
+    void (*io_uring_prep_recvmsg)(struct io_uring_sqe* sqe, int sockfd, struct msghdr* msg, unsigned flags) = nullptr;
 
     void (*io_uring_prep_close)(struct io_uring_sqe* sqe, int fd) = nullptr;
 
     void (*io_uring_prep_read)(struct io_uring_sqe* sqe, int fd, void* buf, unsigned nbytes, __u64 offset) = nullptr;
     void (*io_uring_prep_write)(struct io_uring_sqe* sqe, int fd, const void* buf, unsigned nbytes, __u64 offset) = nullptr;
+    void (*io_uring_prep_writev)(struct io_uring_sqe* sqe, int fd, const iovec* vecs, unsigned nvecs, __u64 offset) = nullptr;
 
     void (*io_uring_prep_poll_add)(struct io_uring_sqe* sqe, int fd, unsigned poll_mask) = nullptr;
-    void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, void* user_data) = nullptr;
+    void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, __u64 user_data) = nullptr;
     void (*io_uring_prep_cancel)(struct io_uring_sqe* sqe, void* user_data, int flags) = nullptr;
     // clang-format on
     AsyncLinuxLibURingLoader()
@@ -110,9 +126,12 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_prep_connect        = &::io_uring_prep_connect;
         this->io_uring_prep_send           = &::io_uring_prep_send;
         this->io_uring_prep_recv           = &::io_uring_prep_recv;
+        this->io_uring_prep_sendmsg        = &::io_uring_prep_sendmsg;
+        this->io_uring_prep_recvmsg        = &::io_uring_prep_recvmsg;
         this->io_uring_prep_close          = &::io_uring_prep_close;
         this->io_uring_prep_read           = &::io_uring_prep_read;
         this->io_uring_prep_write          = &::io_uring_prep_write;
+        this->io_uring_prep_writev         = &::io_uring_prep_writev;
         this->io_uring_prep_poll_add       = &::io_uring_prep_poll_add;
         this->io_uring_prep_poll_remove    = &::io_uring_prep_poll_remove;
         this->io_uring_prep_cancel         = &::io_uring_prep_cancel;
@@ -303,15 +322,27 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         sqe->poll32_events = static__io_uring_prep_poll_mask(poll_mask);
     }
 
-    static inline void io_uring_prep_poll_remove(struct io_uring_sqe* sqe, void* user_data)
+    static inline void io_uring_prep_poll_remove(struct io_uring_sqe* sqe, __u64 user_data)
     {
-        io_uring_prep_rw(IORING_OP_POLL_REMOVE, sqe, -1, user_data, 0, 0);
+        io_uring_prep_rw(IORING_OP_POLL_REMOVE, sqe, -1, (const void*)user_data, 0, 0);
     }
 
-    static inline void io_uring_prep_cancel(struct io_uring_sqe* sqe, void* user_data, int flags)
+    static inline void io_uring_prep_cancel(struct io_uring_sqe* sqe, const void* user_data, int flags)
     {
         io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, sqe, -1, user_data, 0, 0);
         sqe->cancel_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_sendmsg(struct io_uring_sqe* sqe, int sockfd, const struct msghdr* msg, int flags)
+    {
+        io_uring_prep_rw(IORING_OP_SENDMSG, sqe, sockfd, msg, 1, 0);
+        sqe->msg_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_recvmsg(struct io_uring_sqe* sqe, int sockfd, struct msghdr* msg, int flags)
+    {
+        io_uring_prep_rw(IORING_OP_RECVMSG, sqe, sockfd, msg, 1, 0);
+        sqe->msg_flags = (__u32)flags;
     }
 };
 

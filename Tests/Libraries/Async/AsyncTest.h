@@ -24,23 +24,39 @@ struct SC::AsyncTest : public SC::TestCase
 
     void createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client, SocketDescriptor& serverSideClient);
 
+    // Loop
     void loopFreeSubmittingOnClose();
     void loopFreeActiveOnClose();
     void loopInterrupt();
+
+    // Loop Work
     void loopWork();
+
+    // Timeouts
     void loopTimeout();
+
+    // Loop WakeUp
     void loopWakeUpFromExternalThread();
     void loopWakeUp();
     void loopWakeUpEventObject();
+
+    // Processes
     void processExit();
-    void socketAccept();
-    void socketConnect();
-    void socketSendReceive();
-    void socketSendMultiple();
-    void socketClose();
-    void socketSendReceiveError();
+
+    // Files
     void fileReadWrite(bool useThreadPool);
     void fileEndOfFile(bool useThreadPool);
     void fileWriteMultiple(bool useThreadPool);
     void fileClose();
+
+    // TCP Sockets
+    void socketTCPAccept();
+    void socketTCPConnect();
+    void socketTCPSendReceive();
+    void socketTCPSendMultiple();
+    void socketTCPClose();
+    void socketTCPSendReceiveError();
+
+    // UDP Sockets
+    void socketUDPSendReceive();
 };

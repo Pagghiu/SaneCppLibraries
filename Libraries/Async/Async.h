@@ -138,19 +138,21 @@ struct AsyncRequest
     /// @brief Type of async request
     enum class Type : uint8_t
     {
-        LoopTimeout,   ///< Request is an AsyncLoopTimeout object
-        LoopWakeUp,    ///< Request is an AsyncLoopWakeUp object
-        LoopWork,      ///< Request is an AsyncLoopWork object
-        ProcessExit,   ///< Request is an AsyncProcessExit object
-        SocketAccept,  ///< Request is an AsyncSocketAccept object
-        SocketConnect, ///< Request is an AsyncSocketConnect object
-        SocketSend,    ///< Request is an AsyncSocketSend object
-        SocketReceive, ///< Request is an AsyncSocketReceive object
-        SocketClose,   ///< Request is an AsyncSocketClose object
-        FileRead,      ///< Request is an AsyncFileRead object
-        FileWrite,     ///< Request is an AsyncFileWrite object
-        FileClose,     ///< Request is an AsyncFileClose object
-        FilePoll,      ///< Request is an AsyncFilePoll object
+        LoopTimeout,       ///< Request is an AsyncLoopTimeout object
+        LoopWakeUp,        ///< Request is an AsyncLoopWakeUp object
+        LoopWork,          ///< Request is an AsyncLoopWork object
+        ProcessExit,       ///< Request is an AsyncProcessExit object
+        SocketAccept,      ///< Request is an AsyncSocketAccept object
+        SocketConnect,     ///< Request is an AsyncSocketConnect object
+        SocketSend,        ///< Request is an AsyncSocketSend object
+        SocketSendTo,      ///< Request is an SocketSendTo object
+        SocketReceive,     ///< Request is an AsyncSocketReceive object
+        SocketReceiveFrom, ///< Request is an SocketReceiveFrom object
+        SocketClose,       ///< Request is an AsyncSocketClose object
+        FileRead,          ///< Request is an AsyncFileRead object
+        FileWrite,         ///< Request is an AsyncFileWrite object
+        FileClose,         ///< Request is an AsyncFileClose object
+        FilePoll,          ///< Request is an AsyncFilePoll object
     };
 
     /// @brief Constructs a free async request of given type
@@ -544,13 +546,44 @@ struct AsyncSocketSend : public AsyncRequest
     Span<Span<const char>> buffers;             ///< Spans of bytes to send (singleBuffer == false)
     bool                   singleBuffer = true; ///< Controls if buffer or buffers will be used
 
-  private:
+  protected:
+    AsyncSocketSend(Type type) : AsyncRequest(type) {}
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
 
     size_t totalBytesWritten = 0;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#endif
+};
+
+/// @brief Starts an unconnected socket send to operation, sending bytes to a remote endpoint.
+/// Callback will be called when the given socket is ready to send more data. @n
+/// Typical use case is to send data to an unconnected UDP socket. @n
+/// @ref library_socket library can be used to create a Socket but the socket should be created with
+/// SC::SocketFlags::NonBlocking and associated to the event loop with
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket or though AsyncSocketAccept. @n
+/// Alternatively SC::AsyncEventLoop::createAsyncUDPSocket creates and associates the socket to the loop.
+///
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketSendToSnippet
+struct AsyncSocketSendTo : public AsyncSocketSend
+{
+    AsyncSocketSendTo() : AsyncSocketSend(Type::SocketSendTo) {}
+
+    SocketIPAddress address;
+
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketIPAddress ipAddress,
+                     Span<const char> data);
+
+    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, SocketIPAddress ipAddress,
+                     Span<Span<const char>> data);
+
+  private:
+    using AsyncSocketSend::start;
+    friend struct AsyncEventLoop;
+    SC::Result validate(AsyncEventLoop&);
+#if SC_PLATFORM_LINUX
+    AlignedStorage<56> typeErasedMsgHdr;
 #endif
 };
 
@@ -587,8 +620,11 @@ struct AsyncSocketReceive : public AsyncRequest
             SC_TRY(getAsync().buffer.sliceStartLength(0, completionData.numBytes, outData));
             return returnCode;
         }
+
+        SocketIPAddress getSourceAddress() const;
     };
     using AsyncRequest::start;
+
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<char> data);
 
@@ -597,11 +633,35 @@ struct AsyncSocketReceive : public AsyncRequest
     Span<char>               buffer; ///< The writeable span of memory where to data will be written
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid; /// The Socket Descriptor handle to read data from.
 
-  private:
+  protected:
+    AsyncSocketReceive(Type type) : AsyncRequest(type) {}
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
+#endif
+};
+
+/// @brief Starts a unconnectedsocket receive from operation, receiving bytes from a remote endpoint.
+/// Callback will be called when some data is read from socket. @n
+/// Typical use case is to receive data from an unconnected UDP socket. @n
+/// @ref library_socket library can be used to create a Socket but the socket should be created with
+/// SC::SocketFlags::NonBlocking and associated to the event loop with
+/// SC::AsyncEventLoop::associateExternallyCreatedSocket or though AsyncSocketAccept. @n
+/// Alternatively SC::AsyncEventLoop::createAsyncUDPSocket creates and associates the socket to the loop.
+///
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketReceiveFromSnippet
+struct AsyncSocketReceiveFrom : public AsyncSocketReceive
+{
+    AsyncSocketReceiveFrom() : AsyncSocketReceive(Type::SocketReceiveFrom) {}
+    using AsyncSocketReceive::start;
+
+  private:
+    SocketIPAddress address;
+    friend struct AsyncSocketReceive;
+    friend struct AsyncEventLoop;
+#if SC_PLATFORM_LINUX
+    AlignedStorage<56> typeErasedMsgHdr;
 #endif
 };
 
@@ -861,18 +921,20 @@ struct AsyncCompletionVariant
     union
     {
         AsyncCompletionData completionDataLoopWork; // Defined after AsyncCompletionVariant / AsyncTaskSequence
-        AsyncLoopTimeout::CompletionData   completionDataLoopTimeout;
-        AsyncLoopWakeUp::CompletionData    completionDataLoopWakeUp;
-        AsyncProcessExit::CompletionData   completionDataProcessExit;
-        AsyncSocketAccept::CompletionData  completionDataSocketAccept;
-        AsyncSocketConnect::CompletionData completionDataSocketConnect;
-        AsyncSocketSend::CompletionData    completionDataSocketSend;
-        AsyncSocketReceive::CompletionData completionDataSocketReceive;
-        AsyncSocketClose::CompletionData   completionDataSocketClose;
-        AsyncFileRead::CompletionData      completionDataFileRead;
-        AsyncFileWrite::CompletionData     completionDataFileWrite;
-        AsyncFileClose::CompletionData     completionDataFileClose;
-        AsyncFilePoll::CompletionData      completionDataFilePoll;
+        AsyncLoopTimeout::CompletionData       completionDataLoopTimeout;
+        AsyncLoopWakeUp::CompletionData        completionDataLoopWakeUp;
+        AsyncProcessExit::CompletionData       completionDataProcessExit;
+        AsyncSocketAccept::CompletionData      completionDataSocketAccept;
+        AsyncSocketConnect::CompletionData     completionDataSocketConnect;
+        AsyncSocketSend::CompletionData        completionDataSocketSend;
+        AsyncSocketSendTo::CompletionData      completionDataSocketSendTo;
+        AsyncSocketReceive::CompletionData     completionDataSocketReceive;
+        AsyncSocketReceiveFrom::CompletionData completionDataSocketReceiveFrom;
+        AsyncSocketClose::CompletionData       completionDataSocketClose;
+        AsyncFileRead::CompletionData          completionDataFileRead;
+        AsyncFileWrite::CompletionData         completionDataFileWrite;
+        AsyncFileClose::CompletionData         completionDataFileClose;
+        AsyncFilePoll::CompletionData          completionDataFilePoll;
     };
 
     auto& getCompletion(AsyncLoopWork&) { return completionDataLoopWork; }
@@ -1133,9 +1195,9 @@ struct AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 504;
-        static constexpr int Apple   = 496;
-        static constexpr int Linux   = 704;
+        static constexpr int Windows = 536;
+        static constexpr int Apple   = 528;
+        static constexpr int Linux   = 736;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

@@ -495,6 +495,96 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     //-------------------------------------------------------------------------------------------------------
+    // Socket SEND TO
+    //-------------------------------------------------------------------------------------------------------
+    static Result activateAsync(AsyncEventLoop&, AsyncSocketSendTo& async)
+    {
+        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        DWORD       transferred;
+        int         res;
+
+        if (async.singleBuffer)
+        {
+            WSABUF buffer;
+            // this const_cast is caused by WSABUF being used for both send and receive
+            buffer.buf = const_cast<CHAR*>(async.buffer.data());
+            buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
+
+            const struct sockaddr* sockAddr    = &async.address.handle.reinterpret_as<const struct sockaddr>();
+            const int              sockAddrLen = async.address.sizeOfHandle();
+
+            res = ::WSASendTo(async.handle, &buffer, 1, &transferred, 0, sockAddr, sockAddrLen, &overlapped, nullptr);
+        }
+        else
+        {
+            // TODO: Consider if we should allow user to supply memory for the WSABUF
+            constexpr size_t MaxBuffers = 512;
+            if (async.buffers.sizeInElements() > MaxBuffers)
+            {
+                return Result::Error("Cannot write more than 512 buffers at once");
+            }
+            DWORD  numBuffers = static_cast<DWORD>(async.buffers.sizeInElements());
+            WSABUF buffers[MaxBuffers];
+            for (DWORD idx = 0; idx < numBuffers; ++idx)
+            {
+                buffers[idx].buf = const_cast<CHAR*>(async.buffers[idx].data());
+                buffers[idx].len = static_cast<ULONG>(async.buffers[idx].sizeInBytes());
+            }
+
+            const struct sockaddr* sockAddr    = &async.address.handle.reinterpret_as<const struct sockaddr>();
+            const int              sockAddrLen = async.address.sizeOfHandle();
+
+            res = ::WSASendTo(async.handle, buffers, numBuffers, &transferred, 0, sockAddr, sockAddrLen, &overlapped,
+                              nullptr);
+        }
+        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSASendTo failed");
+        return Result(true);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
+    {
+        BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
+        if (res == FALSE)
+        {
+            return Result::Error("AsyncSocketSendTo: CancelEx failed");
+        }
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket RECEIVE FROM
+    //-------------------------------------------------------------------------------------------------------
+    static Result activateAsync(AsyncEventLoop&, AsyncSocketReceiveFrom& async)
+    {
+        OVERLAPPED& overlapped = async.overlapped.get().overlapped;
+        WSABUF      buffer;
+        buffer.buf = async.buffer.data();
+        buffer.len = static_cast<ULONG>(async.buffer.sizeInBytes());
+        DWORD transferred;
+        DWORD flags = 0;
+
+        struct sockaddr* sockAddr    = &async.address.handle.reinterpret_as<struct sockaddr>();
+        int              sockAddrLen = async.address.sizeOfHandle();
+        ::memset(sockAddr, 0, sockAddrLen);
+        const int res =
+            ::WSARecvFrom(async.handle, &buffer, 1, &transferred, &flags, sockAddr, &sockAddrLen, &overlapped, nullptr);
+        SC_TRY_MSG(res != SOCKET_ERROR or WSAGetLastError() == WSA_IO_PENDING, "WSARecvFrom failed");
+        return Result(true);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketReceiveFrom& async)
+    {
+        BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
+        if (res == FALSE)
+        {
+            return Result::Error("AsyncSocketReceiveFrom: CancelEx failed");
+        }
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
     // Socket RECEIVE
     //-------------------------------------------------------------------------------------------------------
     static Result activateAsync(AsyncEventLoop&, AsyncSocketReceive& async)

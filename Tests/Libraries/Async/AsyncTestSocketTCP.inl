@@ -29,7 +29,7 @@ void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescrip
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(serverSideClient));
 }
 
-void SC::AsyncTest::socketAccept()
+void SC::AsyncTest::socketTCPAccept()
 {
     struct Context
     {
@@ -100,7 +100,7 @@ void SC::AsyncTest::socketAccept()
     SC_TEST_EXPECT(eventLoop.close());
 }
 
-void SC::AsyncTest::socketConnect()
+void SC::AsyncTest::socketTCPConnect()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -180,7 +180,7 @@ void SC::AsyncTest::socketConnect()
     SC_TEST_EXPECT(context.acceptedClient[1].close());
 }
 
-void SC::AsyncTest::socketSendReceive()
+void SC::AsyncTest::socketTCPSendReceive()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -273,7 +273,7 @@ void SC::AsyncTest::socketSendReceive()
     SC_TEST_EXPECT(context.totalNumBytesRead == largeBufferSize);
 }
 
-void SC::AsyncTest::socketSendMultiple()
+void SC::AsyncTest::socketTCPSendMultiple()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -334,7 +334,7 @@ void SC::AsyncTest::socketSendMultiple()
     SC_TEST_EXPECT(finalString == "PINGPONGPENGPANG");
 }
 
-void SC::AsyncTest::socketClose()
+void SC::AsyncTest::socketTCPClose()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
@@ -366,7 +366,7 @@ void SC::AsyncTest::socketClose()
     SC_TEST_EXPECT(numCalledClose2 == 1);
 }
 
-void SC::AsyncTest::socketSendReceiveError()
+void SC::AsyncTest::socketTCPSendReceiveError()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));

@@ -1,5 +1,8 @@
 {
     "search.exclude": {
         "*_/": true
-    }
+    },
+    "clangd.arguments": [
+        "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-arm64-make-clang-Debug/"
+    ]
 }

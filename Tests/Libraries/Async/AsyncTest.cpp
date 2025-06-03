@@ -8,7 +8,8 @@
 #include "AsyncTestLoopWakeUp.inl"
 #include "AsyncTestLoopWork.inl"
 #include "AsyncTestProcess.inl"
-#include "AsyncTestSocket.inl"
+#include "AsyncTestSocketTCP.inl"
+#include "AsyncTestSocketUDP.inl"
 
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {
@@ -57,29 +58,33 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             processExit();
         }
-        if (test_section("socket accept"))
+        if (test_section("socket TCP accept"))
         {
-            socketAccept();
+            socketTCPAccept();
         }
-        if (test_section("socket connect"))
+        if (test_section("socket TCP connect"))
         {
-            socketConnect();
+            socketTCPConnect();
         }
-        if (test_section("socket send/receive"))
+        if (test_section("socket TCP send/receive"))
         {
-            socketSendReceive();
+            socketTCPSendReceive();
         }
-        if (test_section("socket send multiple"))
+        if (test_section("socket TCP send multiple"))
         {
-            socketSendMultiple();
+            socketTCPSendMultiple();
         }
-        if (test_section("error send/receive"))
+        if (test_section("error TCP send/receive"))
         {
-            socketSendReceiveError();
+            socketTCPSendReceiveError();
         }
-        if (test_section("socket close"))
+        if (test_section("socket TCP close"))
         {
-            socketClose();
+            socketTCPClose();
+        }
+        if (test_section("socket UDP send/receive"))
+        {
+            socketUDPSendReceive();
         }
         if (test_section("file read/write"))
         {
@@ -311,6 +316,40 @@ SC_TRY(eventLoop.run());
 return Result(true);
 }
 
+
+SC::Result snippetForSocketSendTo(AsyncEventLoop& eventLoop, Console& console)
+{
+SocketDescriptor client;
+//! [AsyncSocketSendToSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// and a connected or accepted socket named `client`
+// ...
+SocketIPAddress destinationAddress;
+SC_TRY(destinationAddress.fromAddressPort("127.0.0.1", 5051)); // Connect to localhost on port
+const char sendBuffer[] = {123, 111};
+
+// The memory pointed by the span must be valid until callback is called
+Span<const char> sendData = {sendBuffer, sizeof(sendBuffer)};
+
+AsyncSocketSendTo sendAsync;
+sendAsync.callback = [&](AsyncSocketSendTo::Result& res)
+{
+    if(res.isValid())
+    {
+        // Now we could free the data pointed by span and queue new data
+        console.printLine("Ready to send more data");
+    }
+};
+// Assuming client is an unconnected UDP Socket
+SC_TRY(sendAsync.start(eventLoop, client, destinationAddress, sendData));
+// Vectorized writes: use proper start overload or set
+// AsyncSocketSend::buffers and AsyncSocketSend::singleBuffer = false
+
+//! [AsyncSocketSendToSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
 SC::Result snippetForSocketReceive(AsyncEventLoop& eventLoop, Console& console)
 {
 SocketDescriptor client;
@@ -348,6 +387,52 @@ receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
 };
 SC_TRY(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));
 //! [AsyncSocketReceiveSnippet]
+SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSocketReceiveFrom(AsyncEventLoop& eventLoop, Console& console)
+{
+SocketDescriptor client;
+//! [AsyncSocketReceiveFromSnippet]
+// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
+// ...
+char receivedData[100] = {0}; // A buffer to hold data read from the socket
+AsyncSocketReceiveFrom receiveAsync;
+receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
+{
+    Span<char> readData;
+    if(res.get(readData))
+    {
+        if(res.completionData.disconnected)
+        {
+            // Last callback invocation done when other side of the socket has disconnected.
+            // - completionData.disconnected is == true
+            // - readData.sizeInBytes() is == 0
+            console.print("Client disconnected");
+        }
+        else
+        {
+            // readData is a slice of receivedData with the received bytes
+            console.print("{} bytes have been read", readData.sizeInBytes());
+            
+            // Get the source address / port of the received data
+            SocketIPAddress sourceAddress = res.getSourceAddress();
+            SocketIPAddress::AsciiBuffer buffer;
+            console.print("Source address: {}:{}", sourceAddress.toString(buffer), sourceAddress.getPort());
+            
+            // IMPORTANT: Reactivate the request to receive more data
+            res.reactivateRequest(true);
+        }
+    }
+    else
+    {
+        // Some error occurred, check res.returnCode
+    }
+};
+// Assuming client is an unconnected UDP Socket
+SC_TRY(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));
+//! [AsyncSocketReceiveFromSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);
 }

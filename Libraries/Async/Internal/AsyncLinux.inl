@@ -635,7 +635,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_poll_remove(submission, &async);
+        globalLibURing.io_uring_prep_poll_remove(submission, reinterpret_cast<__u64>(&async));
         eventLoop.internal.hasPendingKernelCancellations = true;
         // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
         return Result(true);
@@ -691,6 +691,66 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     template <typename T> static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
     // clang-format on
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket SEND TO
+    //-------------------------------------------------------------------------------------------------------
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
+    {
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+
+        struct msghdr& msg = async.typeErasedMsgHdr.reinterpret_as<struct msghdr>();
+        memset(&msg, 0, sizeof(msg));
+
+        // Setup message header
+        msg.msg_name    = &async.address.handle.reinterpret_as<struct sockaddr>();
+        msg.msg_namelen = async.address.sizeOfHandle();
+
+        // iovec is binary compatible with Span
+        static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+        if (async.singleBuffer)
+        {
+            msg.msg_iov    = reinterpret_cast<struct iovec*>(&async.buffer);
+            msg.msg_iovlen = 1;
+        }
+        else
+        {
+            msg.msg_iov    = reinterpret_cast<struct iovec*>(async.buffers.data());
+            msg.msg_iovlen = static_cast<int>(async.buffers.sizeInElements());
+        }
+
+        globalLibURing.io_uring_prep_sendmsg(submission, async.handle, &msg, 0);
+        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Socket RECEIVE FROM
+    //-------------------------------------------------------------------------------------------------------
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketReceiveFrom& async)
+    {
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+
+        struct msghdr& msg = async.typeErasedMsgHdr.reinterpret_as<struct msghdr>();
+        memset(&msg, 0, sizeof(msg));
+
+        // Setup message header
+        msg.msg_name    = &async.address.handle.reinterpret_as<struct sockaddr>();
+        msg.msg_namelen = async.address.sizeOfHandle();
+
+        // Setup receive buffer
+
+        // iovec is binary compatible with Span
+        static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+        msg.msg_iov    = reinterpret_cast<struct iovec*>(&async.buffer);
+        msg.msg_iovlen = 1;
+
+        globalLibURing.io_uring_prep_recvmsg(submission, async.handle, &msg, 0);
+        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        return Result(true);
+    }
 };
 
 //----------------------------------------------------------------------------------------

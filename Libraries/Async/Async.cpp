@@ -44,7 +44,9 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::SocketAccept: return "SocketAccept";
     case Type::SocketConnect: return "SocketConnect";
     case Type::SocketSend: return "SocketSend";
+    case Type::SocketSendTo: return "SocketSendTo";
     case Type::SocketReceive: return "SocketReceive";
+    case Type::SocketReceiveFrom: return "SocketReceiveFrom";
     case Type::SocketClose: return "SocketClose";
     case Type::FileRead: return "FileRead";
     case Type::FileWrite: return "FileWrite";
@@ -314,11 +316,46 @@ SC::Result SC::AsyncSocketSend::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
+SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                        SocketIPAddress ipAddress, Span<const char> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffer       = data;
+    singleBuffer = true;
+    address      = ipAddress;
+    return eventLoop.start(*this);
+}
+
+SC::Result SC::AsyncSocketSendTo::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor,
+                                        SocketIPAddress ipAddress, Span<Span<const char>> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffers      = data;
+    singleBuffer = false;
+    address      = ipAddress;
+    return eventLoop.start(*this);
+}
+
+SC::Result SC::AsyncSocketSendTo::validate(AsyncEventLoop& eventLoop)
+{
+    SC_TRY(AsyncSocketSend::validate(eventLoop))
+    return SC::Result(true);
+}
+
 SC::Result SC::AsyncSocketReceive::start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor, Span<char> data)
 {
     SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
     buffer = data;
     return eventLoop.start(*this);
+}
+
+SC::SocketIPAddress SC::AsyncSocketReceive::Result::getSourceAddress() const
+{
+    if (getAsync().getType() == Type::SocketReceiveFrom)
+    {
+        return static_cast<const AsyncSocketReceiveFrom&>(getAsync()).address;
+    }
+    return SocketIPAddress();
 }
 
 SC::Result SC::AsyncSocketReceive::validate(AsyncEventLoop&)
@@ -604,7 +641,9 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     internal.enumerateRequests(internal.activeSocketAccepts, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketConnects, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketSends, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketSendsTo, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketReceives, enumerationCallback);
+    internal.enumerateRequests(internal.activeSocketReceivesFrom, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketCloses, enumerationCallback);
     internal.enumerateRequests(internal.activeFileReads, enumerationCallback);
     internal.enumerateRequests(internal.activeFileWrites, enumerationCallback);
@@ -914,7 +953,9 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     stopRequests(eventLoop, activeSocketAccepts);
     stopRequests(eventLoop, activeSocketConnects);
     stopRequests(eventLoop, activeSocketSends);
+    stopRequests(eventLoop, activeSocketSendsTo);
     stopRequests(eventLoop, activeSocketReceives);
+    stopRequests(eventLoop, activeSocketReceivesFrom);
     stopRequests(eventLoop, activeSocketCloses);
     stopRequests(eventLoop, activeFileReads);
     stopRequests(eventLoop, activeFileWrites);
@@ -1390,7 +1431,9 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     case AsyncRequest::Type::SocketAccept:  teardown.socketHandle = static_cast<AsyncSocketAccept&>(async).handle; break;
     case AsyncRequest::Type::SocketConnect: teardown.socketHandle = static_cast<AsyncSocketConnect&>(async).handle; break;
     case AsyncRequest::Type::SocketSend:    teardown.socketHandle = static_cast<AsyncSocketSend&>(async).handle; break;
+    case AsyncRequest::Type::SocketSendTo:  teardown.socketHandle = static_cast<AsyncSocketSendTo&>(async).handle; break;
     case AsyncRequest::Type::SocketReceive: teardown.socketHandle = static_cast<AsyncSocketReceive&>(async).handle; break;
+    case AsyncRequest::Type::SocketReceiveFrom: teardown.socketHandle = static_cast<AsyncSocketReceiveFrom&>(async).handle; break;
     case AsyncRequest::Type::SocketClose:   teardown.socketHandle = static_cast<AsyncSocketClose&>(async).handle; break;
 
     // File
@@ -1448,8 +1491,14 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
     case AsyncRequest::Type::SocketSend:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketSend*>(nullptr), teardown));
         break;
+    case AsyncRequest::Type::SocketSendTo:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketSendTo*>(nullptr), teardown));
+        break;
     case AsyncRequest::Type::SocketReceive:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketReceive*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::SocketReceiveFrom:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketReceiveFrom*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketClose:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketClose*>(nullptr), teardown));
@@ -1647,7 +1696,9 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
         case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.remove(*static_cast<AsyncSocketAccept*>(&async));   break;
         case AsyncRequest::Type::SocketConnect: activeSocketConnects.remove(*static_cast<AsyncSocketConnect*>(&async)); break;
         case AsyncRequest::Type::SocketSend:    activeSocketSends.remove(*static_cast<AsyncSocketSend*>(&async));       break;
+        case AsyncRequest::Type::SocketSendTo:  activeSocketSendsTo.remove(*static_cast<AsyncSocketSendTo*>(&async));   break;
         case AsyncRequest::Type::SocketReceive: activeSocketReceives.remove(*static_cast<AsyncSocketReceive*>(&async)); break;
+        case AsyncRequest::Type::SocketReceiveFrom: activeSocketReceivesFrom.remove(*static_cast<AsyncSocketReceiveFrom*>(&async)); break;
         case AsyncRequest::Type::SocketClose:   activeSocketCloses.remove(*static_cast<AsyncSocketClose*>(&async));     break;
         case AsyncRequest::Type::FileRead:      activeFileReads.remove(*static_cast<AsyncFileRead*>(&async));           break;
         case AsyncRequest::Type::FileWrite:     activeFileWrites.remove(*static_cast<AsyncFileWrite*>(&async));         break;
@@ -1723,7 +1774,9 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
     case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
     case AsyncRequest::Type::SocketSend:    activeSocketSends.queueBack(*static_cast<AsyncSocketSend*>(&async));        break;
+    case AsyncRequest::Type::SocketSendTo:  activeSocketSendsTo.queueBack(*static_cast<AsyncSocketSendTo*>(&async));    break;
     case AsyncRequest::Type::SocketReceive: activeSocketReceives.queueBack(*static_cast<AsyncSocketReceive*>(&async));  break;
+    case AsyncRequest::Type::SocketReceiveFrom: activeSocketReceivesFrom.queueBack(*static_cast<AsyncSocketReceiveFrom*>(&async));  break;
     case AsyncRequest::Type::SocketClose:   activeSocketCloses.queueBack(*static_cast<AsyncSocketClose*>(&async));      break;
     case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
     case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
@@ -1751,7 +1804,9 @@ SC::Result SC::AsyncEventLoop::Internal::applyOnAsync(AsyncRequest& async, Lambd
     case AsyncRequest::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
     case AsyncRequest::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
     case AsyncRequest::Type::SocketSend: SC_TRY(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
+    case AsyncRequest::Type::SocketSendTo: SC_TRY(lambda(*static_cast<AsyncSocketSendTo*>(&async))); break;
     case AsyncRequest::Type::SocketReceive: SC_TRY(lambda(*static_cast<AsyncSocketReceive*>(&async))); break;
+    case AsyncRequest::Type::SocketReceiveFrom: SC_TRY(lambda(*static_cast<AsyncSocketReceiveFrom*>(&async))); break;
     case AsyncRequest::Type::SocketClose: SC_TRY(lambda(*static_cast<AsyncSocketClose*>(&async))); break;
     case AsyncRequest::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
     case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
@@ -1789,7 +1844,9 @@ void SC::detail::AsyncCompletionVariant::destroy()
     case AsyncRequest::Type::SocketAccept: dtor(completionDataSocketAccept); break;
     case AsyncRequest::Type::SocketConnect: dtor(completionDataSocketConnect); break;
     case AsyncRequest::Type::SocketSend: dtor(completionDataSocketSend); break;
+    case AsyncRequest::Type::SocketSendTo: dtor(completionDataSocketSendTo); break;
     case AsyncRequest::Type::SocketReceive: dtor(completionDataSocketReceive); break;
+    case AsyncRequest::Type::SocketReceiveFrom: dtor(completionDataSocketReceiveFrom); break;
     case AsyncRequest::Type::SocketClose: dtor(completionDataSocketClose); break;
     case AsyncRequest::Type::FileRead: dtor(completionDataFileRead); break;
     case AsyncRequest::Type::FileWrite: dtor(completionDataFileWrite); break;
