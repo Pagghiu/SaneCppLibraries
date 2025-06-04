@@ -1,4 +1,8 @@
 #include <dlfcn.h>
+#include <stdint.h>
+#include <string.h>
+#include <sys/uio.h> // for iovec
+#include <unistd.h>
 
 struct AsyncLinuxAPI
 {
@@ -148,7 +152,6 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
 //
 // TODO: Use the liburing-ffi supplied functions if they're available on the system
 
-#include <errno.h>            // errno
 #include <linux/io_uring.h>   // io_uring
 #include <linux/time_types.h> // __kernel_timespec
 

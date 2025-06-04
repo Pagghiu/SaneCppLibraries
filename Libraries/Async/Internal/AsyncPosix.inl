@@ -1,9 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-
 #include "AsyncInternal.h"
 
+#include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
+#include "../../Socket/Socket.h"
+
+#if SC_PLATFORM_LINUX
+#define SC_ASYNC_USE_EPOLL 1 // uses epoll
+#endif
 
 #if SC_ASYNC_USE_EPOLL
 
@@ -15,6 +20,7 @@
 #include <sys/socket.h>   // For socket-related functions
 #include <sys/stat.h>     // fstat
 #include <sys/uio.h>      // writev, pwritev
+#include <sys/wait.h>     // waitpid / WIFEXITED / WEXITSTATUS
 
 #else
 
@@ -189,8 +195,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         struct signalfd_siginfo siginfo;
         FileDescriptor::Handle  sigHandle;
 
-        const KernelQueuePosix& kernelQueue = result.eventLoop.internal.kernelQueue.get().getPosix();
-        Result res = kernelQueue.signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle"));
+        Result res = signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle"));
         if (not res)
         {
             return;

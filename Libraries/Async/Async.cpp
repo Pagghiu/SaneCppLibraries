@@ -1,8 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl"
+#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Foundation/Platform.h"
-#include "../Socket/Socket.h"
 
 #include <string.h> // strncpy
 

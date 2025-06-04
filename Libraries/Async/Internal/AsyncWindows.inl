@@ -8,6 +8,7 @@
 #include <Ws2tcpip.h> // sockadd_in6
 
 #include "../../Foundation/Deferred.h"
+#include "../../Socket/Socket.h"
 #include "AsyncInternal.h"
 #include "AsyncWindows.h"
 #include "AsyncWindowsAPI.h"

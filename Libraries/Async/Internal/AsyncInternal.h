@@ -13,6 +13,31 @@ struct SC::AsyncEventLoop::Internal
     struct KernelEventsIoURing;
     struct KernelQueue;
     struct KernelEvents;
+
+    struct KernelQueue
+    {
+        AlignedStorage<320> storage;
+
+        bool isEpoll = true;
+
+        KernelQueue();
+        ~KernelQueue();
+        KernelQueueIoURing& getUring();
+        KernelQueuePosix&   getPosix();
+
+        // On io_uring it doesn't make sense to run operations in a thread pool
+        [[nodiscard]] bool makesSenseToRunInThreadPool(AsyncRequest&) { return isEpoll; }
+
+        Result close();
+        Result createEventLoop(AsyncEventLoop::Options options);
+        Result createSharedWatchers(AsyncEventLoop&);
+        Result wakeUpFromExternalThread();
+
+        static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
+        static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
+        static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
+        static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }
+    };
 #elif SC_PLATFORM_APPLE
     struct KernelQueuePosix;
     struct KernelEventsPosix;
