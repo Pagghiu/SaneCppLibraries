@@ -1,11 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../FileSystem/FileSystem.h"
-#include "../../FileSystem/Path.h"
-#include "../../FileSystemIterator/FileSystemIterator.h"
-#include "../../Hashing/Hashing.h"
-#include "../../Strings/StringBuilder.h"
 #include "../Build.h"
+
+#include "../../Strings/StringBuilder.h"
 #include "BuildWriter.h"
 
 struct SC::Build::ProjectWriter::WriterMakefile
@@ -274,9 +271,11 @@ endif
 
 $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 	@echo Generate compile_commands.json
+ifeq ($(TARGET_OS),linux)    
+	$(VRBS)sed -e '1s/^/[\n/' -e '$$s/,$$/\n]/' $({0}_INTERMEDIATE_DIR)/*.o.json > $({0}_INTERMEDIATE_DIR)/compile_commands.json
+else
 	$(VRBS)sed -e '1s/^/[\'$$'\n''/' -e '$$s/,$$/\'$$'\n'']/' $({0}_INTERMEDIATE_DIR)/*.o.json > $({0}_INTERMEDIATE_DIR)/compile_commands.json
-# Under GNU sed
-# gsed -e '1s/^/[\n/' -e '$$s/,$$/\n]/' *.o.json > compile_commands.json
+endif
 )delimiter",
                        makeTarget);
         SC_COMPILER_WARNING_POP;

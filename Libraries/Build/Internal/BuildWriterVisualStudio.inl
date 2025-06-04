@@ -1,10 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../FileSystem/Path.h"
-#include "../../Hashing/Hashing.h"
-#include "../../Strings/StringBuilder.h"
-#include "../Build.h"
 #include "BuildWriter.h"
+
+#include "../../Hashing/Hashing.h"
 
 struct SC::Build::ProjectWriter::WriterVisualStudio
 {

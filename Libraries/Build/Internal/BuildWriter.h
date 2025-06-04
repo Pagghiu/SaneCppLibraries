@@ -1,15 +1,40 @@
-// Copyright (c) 2022-2023, Stefano Cristiano
-//
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
 #pragma once
+#include "../Build.h"
+
 #include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/VectorMap.h"
 #include "../../Containers/VectorSet.h"
-#include "../Build.h"
+#include "../../FileSystem/Path.h"
+#include "../../Strings/StringBuilder.h"
 
 namespace SC
 {
 namespace Build
 {
+
+struct FilePathsResolver;
+/// @brief Writes all project files for a given Definition with some Parameters using the provided FilePathsResolver
+struct ProjectWriter
+{
+    const Definition&        definition;
+    const FilePathsResolver& filePathsResolver;
+    const Parameters&        parameters;
+
+    ProjectWriter(const Definition& definition, const FilePathsResolver& filePathsResolver,
+                  const Parameters& parameters)
+        : definition(definition), filePathsResolver(filePathsResolver), parameters(parameters)
+    {}
+
+    /// @brief Write the project file at given directories
+    [[nodiscard]] bool write(StringView filename);
+
+  private:
+    struct WriterXCode;
+    struct WriterVisualStudio;
+    struct WriterMakefile;
+};
 /// @brief Caches file paths by pre-resolving directory filter search masks
 struct FilePathsResolver
 {

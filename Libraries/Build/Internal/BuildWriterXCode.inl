@@ -1,12 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../FileSystem/FileSystem.h"
-#include "../../FileSystem/Path.h"
-#include "../../FileSystemIterator/FileSystemIterator.h"
-#include "../../Hashing/Hashing.h"
-#include "../../Strings/StringBuilder.h"
-#include "../Build.h"
 #include "BuildWriter.h"
+
+#include "../../FileSystem/FileSystem.h" // for FileSystem::existsAndIsFile
+#include "../../Hashing/Hashing.h"
 
 struct SC::Build::ProjectWriter::WriterXCode
 {

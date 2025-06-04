@@ -2,40 +2,14 @@
 // SPDX-License-Identifier: MIT
 #include "Build.h"
 
-#include "../Process/Process.h" // for Actions::compile
-
-namespace SC
-{
-namespace Build
-{
-struct FilePathsResolver;
-/// @brief Writes all project files for a given Definition with some Parameters using the provided FilePathsResolver
-struct ProjectWriter
-{
-    const Definition&        definition;
-    const FilePathsResolver& filePathsResolver;
-    const Parameters&        parameters;
-
-    ProjectWriter(const Definition& definition, const FilePathsResolver& filePathsResolver,
-                  const Parameters& parameters)
-        : definition(definition), filePathsResolver(filePathsResolver), parameters(parameters)
-    {}
-
-    /// @brief Write the project file at given directories
-    [[nodiscard]] bool write(StringView filename);
-
-  private:
-    struct WriterXCode;
-    struct WriterVisualStudio;
-    struct WriterMakefile;
-};
-} // namespace Build
-} // namespace SC
 #include "Internal/BuildWriterMakefile.inl"
 #include "Internal/BuildWriterVisualStudio.inl"
 #include "Internal/BuildWriterXCode.inl"
 
 #include "../Containers/Vector.h"
+#include "../FileSystem/FileSystem.h"
+#include "../FileSystemIterator/FileSystemIterator.h"
+#include "../Process/Process.h" // for Actions::compile
 
 struct SC::Build::CompileFlags::Internal
 {
