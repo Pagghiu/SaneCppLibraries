@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Libraries/Algorithms/AlgorithmFind.h"
 #include "../Libraries/Async/Async.h"
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "../Libraries/Process/Process.h"
@@ -26,7 +27,7 @@ struct FileSystemFinder
             const StringView name = iterator.get().name;
             if (iterator.get().isDirectory())
             {
-                if (not excludeDirectories.contains(name))
+                if (not Algorithms::contains(excludeDirectories, name))
                 {
                     SC_TRY(iterator.recurseSubdirectory());
                 }

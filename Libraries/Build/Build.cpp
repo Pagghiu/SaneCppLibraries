@@ -178,7 +178,7 @@ SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView config
 
 const SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView configurationName) const
 {
-    size_t index;
+    size_t index = 0;
     if (configurations.find([=](auto it) { return it.name == configurationName; }, &index))
     {
         return &configurations[index];

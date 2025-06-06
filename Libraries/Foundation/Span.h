@@ -208,40 +208,6 @@ struct SC::Span
     /// @return `true` if Span is empty
     [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
 
-    /// @brief Check if the current span contains a given value.
-    /// @tparam U Type of the object being searched
-    /// @param value Value being searched
-    /// @param index if passed in != `nullptr`, receives index where item was found.
-    /// Only written if function returns `true`
-    /// @return `true` if the vector contains the given value.
-    template <typename U>
-    [[nodiscard]] constexpr bool contains(const U& value, SizeType* index = nullptr) const
-    {
-        return find([&](auto& current) { return current == value; }, index);
-    }
-
-    /// @brief Finds the first item in span matching criteria given by the lambda
-    /// @tparam Lambda Type of the Lambda passed that declares a `bool operator()(const T&)` operator
-    /// @param lambda The functor or lambda called that evaluates to `true` when item is found
-    /// @param index if passed in != `nullptr`, receives index where item was found.
-    /// @return `true` if the wanted value with given criteria is found.
-    template <typename Lambda>
-    [[nodiscard]] constexpr bool find(Lambda&& lambda, SizeType* index = nullptr) const
-    {
-        for (SizeType idx = 0; idx < sizeElements; ++idx)
-        {
-            if (lambda(items[idx]))
-            {
-                if (index)
-                {
-                    *index = idx;
-                }
-                return true;
-            }
-        }
-        return false;
-    }
-
     // clang-format off
     template <typename U = Type> TypeIfNotVoid<U>& operator[](SizeType idx) { return items[idx]; }
     template <typename U = Type> const TypeIfNotVoid<U>& operator[](SizeType idx) const { return items[idx]; }

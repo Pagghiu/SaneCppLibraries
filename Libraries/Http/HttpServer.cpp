@@ -10,7 +10,7 @@
 // HttpRequest
 bool SC::HttpRequest::find(HttpParser::Result result, StringView& res) const
 {
-    size_t found;
+    size_t found = 0;
     if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
     {
         const HttpHeaderOffset& header = headerOffsets[found];

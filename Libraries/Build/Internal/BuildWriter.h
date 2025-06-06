@@ -266,7 +266,8 @@ struct SC::Build::WriterInternal
         }
         for (RenderItem& it : outputFiles)
         {
-            size_t     index;
+            size_t index = 0;
+
             const bool hasPerFileFlags = filesWithSpecificFlags.find(
                 [&](const RenderItem& item)
                 {

@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Vector.h" // ObjectVTable<T>
-
+#include "../Algorithms/AlgorithmFind.h" // contains
+#include "../Containers/Vector.h"        // ObjectVTable<T>
 namespace SC
 {
 namespace detail
@@ -71,32 +71,23 @@ struct Array : public Segment<detail::ArrayVTable<T, N>>
     // clang-format on
 
     /// @brief Check if the current array contains a given value.
-    /// @tparam U Type of the object being searched
-    /// @param value Value being searched
-    /// @param index if passed in != `nullptr`, receives index where item was found.
-    /// Only written if function returns `true`
-    /// @return `true` if the array contains the given value.
+    /// @see Algorithms::contains
     template <typename U>
     [[nodiscard]] bool contains(const U& value, size_t* index = nullptr) const
     {
-        return Parent::toSpanConst().contains(value, index);
+        return Algorithms::contains(*this, value, index);
     }
 
     /// @brief Finds the first item in array matching criteria given by the lambda
-    /// @tparam Lambda Type of the Lambda passed that declares a `bool operator()(const T&)` operator
-    /// @param lambda The functor or lambda called that evaluates to `true` when item is found
-    /// @param index if passed in != `nullptr`, receives index where item was found.
-    /// @return `true` if the wanted value with given criteria is found.
+    /// @see Algorithms::findIf
     template <typename Lambda>
     [[nodiscard]] bool find(Lambda&& lambda, size_t* index = nullptr) const
     {
-        return Parent::toSpanConst().find(move(lambda), index);
+        return Algorithms::findIf(Parent::begin(), Parent::end(), move(lambda), index) != Parent::end();
     }
 
     /// @brief Removes all items matching criteria given by Lambda
-    /// @tparam Lambda Type of the functor/lambda with a `bool operator()(const T&)` operator
-    /// @param criteria The lambda/functor passed in
-    /// @return `true` if at least one item has been removed
+    /// @see Algorithms::removeIf
     template <typename Lambda>
     [[nodiscard]] bool removeAll(Lambda&& criteria)
     {
@@ -112,9 +103,7 @@ struct Array : public Segment<detail::ArrayVTable<T, N>>
     }
 
     /// @brief Removes all values equal to `value`
-    /// @tparam U Type of the Value
-    /// @param value Value to be removed
-    /// @return `true` if at least one item has been removed
+    /// @see Algorithms::removeIf
     template <typename U>
     [[nodiscard]] bool remove(const U& value)
     {
