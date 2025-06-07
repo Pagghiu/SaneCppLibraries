@@ -59,7 +59,4 @@ struct [[nodiscard]] Result
 #define SC_TRY_MSG(expression, failedMessage)                                                                          \
     if (not(expression))                                                                                               \
         SC_LANGUAGE_UNLIKELY { return SC::Result::Error(failedMessage); }
-
-/// @brief Asserts that the given result is valid
-#define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)
 //! @}

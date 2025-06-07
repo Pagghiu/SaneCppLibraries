@@ -1,12 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Socket.h"
+#include "../../Foundation/Assert.h"
+#include "../../Socket/Socket.h"
+#include "SocketInternal.h"
 
-#if SC_PLATFORM_EMSCRIPTEN
-#include <sys/select.h> // fd_set for emscripten
+#include <errno.h> // errno
+#if !SC_PLATFORM_WINDOWS
+#include <netinet/in.h> // sockaddr_in
+#include <sys/select.h> // select
 #endif
 
-SC::Result SC::SocketClient::connect(SpanStringView address, uint16_t port)
+SC::Result SC::SocketClient::connect(StringViewData address, uint16_t port)
 {
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));

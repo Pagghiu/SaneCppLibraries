@@ -81,4 +81,8 @@ struct SC::Assert
 #else
 #define SC_ASSERT_DEBUG(e) (void)0
 #endif
+
+/// @brief Asserts that the given result is valid
+#define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)
+
 //! @}

@@ -197,7 +197,7 @@ struct SC::Build::WriterInternal
             for (const String& it : *res)
             {
                 RenderItem renderItem;
-                renderItem.name = StringEncoding::Utf8; // To unify hashes
+                renderItem.name = StringView(StringEncoding::Utf8); // To unify hashes
                 SC_TRY(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
                 auto nameView = renderItem.name.view();
                 if (nameView.endsWith(".h"))

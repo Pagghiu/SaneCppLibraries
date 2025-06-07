@@ -1,15 +1,33 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/AsyncStreams/Internal/ZLibStream.h"
-#include "Libraries/Strings/Console.h"
-#include "Libraries/Strings/String.h"
-#include "Libraries/Strings/StringBuilder.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
 {
 struct ZLibStreamTest;
+namespace detail
+{
+/// @brief Creates another Span shorter or equal than the current one such that its end equals other.data().
+/// @param other The other Span that defines length of output slice
+/// @param output The slice extracted from current span
+template <typename T, typename U>
+[[nodiscard]] constexpr bool sliceFromStartUntil(Span<T> source, const Span<U> other, Span<U>& output)
+{
+    const auto diff = other.data() - source.data();
+    if (diff < 0 or static_cast<size_t>(diff) > source.sizeInBytes())
+    {
+        return false;
+    }
+    else
+    {
+        output = Span<U>(source.data(), static_cast<size_t>(diff) / detail::SpanSizeOfType<U>::size);
+        return true;
+    }
 }
+} // namespace detail
+} // namespace SC
 
 struct SC::ZLibStreamTest : public SC::TestCase
 {
@@ -55,6 +73,17 @@ struct SC::ZLibStreamTest : public SC::TestCase
                          const Span<const uint8_t> compressedReference);
     void syncDecompression(ZLibStream::Algorithm compressionAlgorithm, const StringView referenceString,
                            const Span<const uint8_t> compressedReference);
+
+    /// @brief Compares this span with another one byte by byte
+    template <typename T, typename U>
+    [[nodiscard]] static bool memcmpSpans(const Span<T> first, const Span<U> other)
+    {
+        if (first.sizeInBytes() != other.sizeInBytes())
+            return false;
+        if (first.sizeInBytes() == 0)
+            return true;
+        return ::memcmp(first.data(), other.data(), first.sizeInBytes()) == 0;
+    }
 };
 
 void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgorithm, const StringView inputString,
@@ -96,13 +125,13 @@ void SC::ZLibStreamTest::syncCompression(ZLibStream::Algorithm compressionAlgori
 
     // Check that the output is same as expected
     Span<char> output;
-    SC_TEST_EXPECT(writableBuffer.sliceFromStartUntil(destination, output));
+    SC_TEST_EXPECT(detail::sliceFromStartUntil(writableBuffer, destination, output));
     if (compressionAlgorithm == ZLibStream::CompressGZip and output.sizeInBytes() > 9 and
         compressedReference.sizeInBytes() > 9)
     {
         output[9] = static_cast<char>(compressedReference[9]); // Operating System ID will differ on different OS.
     }
-    SC_TEST_EXPECT(compressedReference.memcmpWith(output));
+    SC_TEST_EXPECT(memcmpSpans(compressedReference, output));
 }
 
 void SC::ZLibStreamTest::syncDecompression(ZLibStream::Algorithm algorithm, const StringView referenceString,
@@ -142,7 +171,7 @@ void SC::ZLibStreamTest::syncDecompression(ZLibStream::Algorithm algorithm, cons
 
     // Check that the output is same as expected
     Span<char> output;
-    SC_TEST_EXPECT(writableBuffer.sliceFromStartUntil(destination, output));
+    SC_TEST_EXPECT(detail::sliceFromStartUntil(writableBuffer, destination, output));
     SC_TEST_EXPECT(StringView(output, false, StringEncoding::Ascii) == referenceString);
 }
 namespace SC

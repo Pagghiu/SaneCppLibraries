@@ -4,6 +4,9 @@
 #include "SortedAllocations.inl"
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
 #define _CRTDBG_MAP_ALLOC
+#ifdef _malloca
+#undef _malloca
+#endif
 #include <crtdbg.h>
 #include <stdlib.h>
 #endif

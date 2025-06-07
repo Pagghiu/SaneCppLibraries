@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Socket.h"
+#include "../../Foundation/Assert.h"
+#include "../../Socket/Socket.h"
+#include "SocketInternal.h"
+
+#if !SC_PLATFORM_WINDOWS
+#include <sys/socket.h> // bind
+#endif
 
 SC::Result SC::SocketServer::close() { return socket.close(); }
 

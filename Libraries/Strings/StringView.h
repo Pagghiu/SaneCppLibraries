@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Strings/StringIterator.h"
+#include "Libraries/Foundation/Span.h"
 
 namespace SC
 {
@@ -43,59 +44,25 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
     StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
     @endcode
 */
-struct SC::StringView
+struct SC::StringView : public StringViewData
 {
-    /// @brief Construct an emtpy StringView
-    constexpr StringView();
+    StringView() : StringViewData() {}
 
-    /// @brief Construct a StringView from a Span of bytes.
-    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
-    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span.
-    ///                 On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
-    /// @param encoding The encoding of the text contained in this StringView
-    constexpr StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding);
+    using StringViewData::StringViewData;
 
-    /// @brief Constructs a StringView with a null terminated string terminal
-    /// @tparam N Number of characters in text string literal
-    /// @param text The Null terminated string literal
-    template <size_t N>
-    constexpr StringView(const char (&text)[N]);
+    constexpr StringView(StringViewData ssv) : StringViewData(ssv) {}
 
-#if SC_PLATFORM_WINDOWS || DOXYGEN
-    /// @brief Constructs an UTF16 StringView with a null terminated wide-string terminal
-    /// @tparam N
-    /// @param text The Null terminated wide-string literal
-    template <size_t N>
-    constexpr StringView(const wchar_t (&text)[N]);
-
-    /// @brief Construct an UTF16 StringView from a Span of bytes.
-    /// @param textSpan The span containing the text _EXCLUDING_ eventual null terminator
-    /// @param nullTerm `true` if a null terminator code point is expected to be found after Span (two bytes on UTF16)
-    constexpr StringView(Span<const wchar_t> textSpan, bool nullTerm);
-#endif
-
-    /// @brief Constructs a StringView from a null-terminated C-String
-    /// @param text The null-terminated C-String
-    /// @param encoding The encoding of the text contained in this StringView
-    /// @return The StringView containing text with given encoding
-    static StringView fromNullTerminated(const char* text, StringEncoding encoding);
+    static constexpr StringView fromNullTerminated(const char* text, StringEncoding encoding)
+    {
+        return StringViewData::fromNullTerminated(text, encoding);
+    }
 
 #if SC_PLATFORM_WINDOWS
-    /// @brief Constructs a StringView from a null-terminated C-String
-    /// @param text The null-terminated C-String
-    /// @param encoding The encoding of the text contained in this StringView
-    /// @return The StringView containing text with given encoding
-    static StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding);
+    static constexpr StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding)
+    {
+        return StringViewData::fromNullTerminated(text, encoding);
+    }
 #endif
-
-    /// @brief Get encoding of this StringView
-    /// @return This StringView encoding
-    [[nodiscard]] constexpr StringEncoding getEncoding() const { return static_cast<StringEncoding>(encoding); }
-
-    /// @brief Directly access the memory of this StringView
-    /// @return Pointer to start of StringView memory
-    [[nodiscard]] constexpr const char* bytesWithoutTerminator() const { return text; }
-
     /// @brief Directly access the memory of this null terminated-StringView.
     /// @return Pointer to start of StringView memory
     /// @warning This method will assert if string is not null terminated.
@@ -109,17 +76,6 @@ struct SC::StringView
     ///          On Windows this will assert that encoding is UTF16.
     ///          On other platforms this will assert that encoding is UTF8 or ASCII.
     auto getNullTerminatedNative() const;
-
-    /// @brief Obtain a `const char` Span from this StringView
-    /// @return Span representing this StringView
-    constexpr Span<const char> toCharSpan() const SC_LANGUAGE_LIFETIME_BOUND { return {text, textSizeInBytes}; }
-
-    constexpr operator SpanStringView() const SC_LANGUAGE_LIFETIME_BOUND
-    {
-        if (getEncoding() == StringEncoding::Ascii)
-            return {text, textSizeInBytes};
-        return {};
-    }
 
     /// @brief Obtain a `const uint8_t` Span from this StringView
     /// @return Span representing this StringView
@@ -545,20 +501,6 @@ struct SC::StringView
     [[nodiscard]] bool parseDouble(double& value) const;
 
   private:
-    union
-    {
-        const char*    text;
-        const wchar_t* textWide;
-    };
-    using SizeType = size_t;
-
-    static constexpr SizeType NumOptionBits = 3;
-    static constexpr SizeType MaxLength     = (~static_cast<SizeType>(0)) >> NumOptionBits;
-
-    SizeType textSizeInBytes : sizeof(SizeType) * 8 - NumOptionBits;
-    SizeType encoding    : 2;
-    SizeType hasNullTerm : 1;
-
     template <typename T>
     struct identity
     {
@@ -689,49 +631,18 @@ namespace SC
 {
 constexpr SC::StringView operator""_a8(const char* txt, size_t sz)
 {
-    return SC::StringView({txt, sz}, true, SC::StringEncoding::Ascii);
+    return StringView({txt, sz}, true, StringEncoding::Ascii);
 }
-constexpr SC::StringView operator""_u8(const char* txt, size_t sz)
+constexpr StringView operator""_u8(const char* txt, size_t sz)
 {
-    return SC::StringView({txt, sz}, true, SC::StringEncoding::Utf8);
+    return StringView({txt, sz}, true, StringEncoding::Utf8);
 }
-constexpr SC::StringView operator""_u16(const char* txt, size_t sz)
+constexpr StringView operator""_u16(const char* txt, size_t sz)
 {
     const bool isNullTerminated = sz > 0 and sz % 2 == 1 and txt[sz - 1] == 0;
-    return SC::StringView({txt, isNullTerminated ? sz - 1 : sz}, isNullTerminated, SC::StringEncoding::Utf16);
+    return StringView({txt, isNullTerminated ? sz - 1 : sz}, isNullTerminated, StringEncoding::Utf16);
 }
 } // namespace SC
-
-constexpr SC::StringView::StringView()
-    : text(nullptr), textSizeInBytes(0), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(false)
-{}
-
-constexpr SC::StringView::StringView(Span<const char> textSpan, bool nullTerm, StringEncoding encoding)
-    : text(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
-      encoding(static_cast<SizeType>(encoding)), hasNullTerm(nullTerm)
-{
-    SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
-}
-
-template <SC::size_t N>
-constexpr SC::StringView::StringView(const char (&text)[N])
-    : text(text), textSizeInBytes(N - 1), encoding(static_cast<SizeType>(StringEncoding::Ascii)), hasNullTerm(true)
-{}
-
-#if SC_PLATFORM_WINDOWS
-template <size_t N>
-constexpr SC::StringView::StringView(const wchar_t (&text)[N])
-    : textWide(text), textSizeInBytes((N - 1) * sizeof(wchar_t)), encoding(static_cast<SizeType>(StringEncoding::Wide)),
-      hasNullTerm(true)
-{}
-
-constexpr SC::StringView::StringView(Span<const wchar_t> textSpan, bool nullTerm)
-    : textWide(textSpan.data()), textSizeInBytes(static_cast<SizeType>(textSpan.sizeInBytes())),
-      encoding(static_cast<SizeType>(StringEncoding::Wide)), hasNullTerm(nullTerm)
-{
-    SC_ASSERT_DEBUG(textSpan.sizeInBytes() <= MaxLength);
-}
-#endif
 
 [[nodiscard]] constexpr const char* SC::StringView::bytesIncludingTerminator() const
 {
@@ -802,6 +713,10 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
 
 [[nodiscard]] constexpr bool SC::StringView::operator==(StringView other) const
 {
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#endif
     if (hasCompatibleEncoding(other))
     {
         if (textSizeInBytes != other.textSizeInBytes)
@@ -830,6 +745,9 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
     }
     size_t commonOverlappingPoints = 0;
     return fullyOverlaps(other, commonOverlappingPoints);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 }
 
 constexpr bool SC::StringView::fullyOverlaps(StringView other, size_t& commonOverlappingPoints) const

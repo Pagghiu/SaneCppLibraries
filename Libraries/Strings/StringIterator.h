@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Assert.h" //Assert::unreachable
 #include "../Foundation/Span.h"
+#include "../Foundation/StringViewData.h"
 
 namespace SC
 {
@@ -11,20 +12,6 @@ namespace SC
 
 /// @brief UTF code point (32 bit)
 using StringCodePoint = uint32_t;
-
-/// @brief String Encoding (Ascii, Utf8, Utf16)
-enum class StringEncoding : uint8_t
-{
-    Ascii = 0, ///< Encoding is ASCII
-    Utf8  = 1, ///< Encoding is UTF8
-    Utf16 = 2, ///< Encoding is UTF16-LE
-#if SC_PLATFORM_WINDOWS
-    Native = Utf16, ///< Encoding is UTF16-LE
-    Wide   = Utf16  ///< Encoding is UTF16-LE
-#else
-    Native = Utf8 ///< Encoding is UTF8
-#endif
-};
 
 /// @brief Checks if two encodings have the same utf unit size
 /// @param encoding1 First encoding
@@ -415,8 +402,15 @@ constexpr ssize_t StringIterator<CharIterator>::bytesDistanceFrom(StringIterator
 // StringIteratorASCII
 [[nodiscard]] constexpr bool StringIteratorASCII::advanceUntilMatches(CodePoint c)
 {
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunreachable-code"
+#endif
     return __builtin_is_constant_evaluated() ? StringIterator::advanceUntilMatches(c)
                                              : advanceUntilMatchesNonConstexpr(c);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 }
 
 } // namespace SC

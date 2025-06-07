@@ -15,8 +15,7 @@ Detailed documentation is in the @ref group_foundation topic.
 |:--------------------------|:--------------------------------|
 | SC::Buffer                | @copybrief SC::Buffer
 | SC::Span                  | @copybrief SC::Span
-| SC::SpanString            | @copybrief SC::SpanString
-| SC::SpanStringView        | @copybrief SC::SpanStringView
+| SC::StringViewData        | @copybrief SC::StringViewData
 | SC::Result                | @copybrief SC::Result
 | SC::Function              | @copybrief SC::Function
 | SC::Deferred              | @copybrief SC::Deferred

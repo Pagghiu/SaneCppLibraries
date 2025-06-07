@@ -1,20 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../Socket/Socket.h"
+
 #include "../../File/FileDescriptor.h" // TODO: Remove dependency of File library
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
-#include "../SocketDescriptor.h"
 
 #include <arpa/inet.h> // inet_pton
 #include <errno.h>     // errno
 #include <fcntl.h>     // fcntl
 #include <netdb.h>     // AF_INET / IPPROTO_TCP / AF_UNSPEC
 #include <unistd.h>    // close
-
-namespace SC
-{
-constexpr int SOCKET_ERROR = -1;
-}
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {

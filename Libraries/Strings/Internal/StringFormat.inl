@@ -177,11 +177,11 @@ bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringVi
     return StringFormatterFor<StringView>::format(data, specifier, value.view());
 }
 
-bool StringFormatterFor<SpanStringView>::format(StringFormatOutput& data, const StringView specifier,
-                                                SpanStringView value)
+bool StringFormatterFor<StringViewData>::format(StringFormatOutput& data, const StringView specifier,
+                                                StringViewData value)
 {
     SC_COMPILER_UNUSED(specifier);
-    return data.append(StringView(value.text, false, StringEncoding::Ascii));
+    return data.append(value);
 }
 //-----------------------------------------------------------------------------------------------------------------------
 // StringFormatOutput

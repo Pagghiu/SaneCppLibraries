@@ -1,17 +1,15 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/InitializerList.h"
-#include "../Foundation/LibC.h"       // memcmp
-#include "../Foundation/TypeTraits.h" // SameConstnessAs
+#include "../Foundation/InitializerList.h" // IWYU pragma: keep
+#include "../Foundation/LibC.h"            // IWYU pragma: keep
+#include "../Foundation/TypeTraits.h"      // SameConstnessAs
 
 namespace SC
 {
 template <typename Type>
 struct Span;
 
-struct SpanStringView;
-struct SpanString;
 namespace detail
 {
 // clang-format off
@@ -20,7 +18,6 @@ template<>           struct SpanSizeOfType<void>        { static constexpr auto 
 template<>           struct SpanSizeOfType<const void>  { static constexpr auto size = 1;          };
 // clang-format on
 } // namespace detail
-} // namespace SC
 
 //! @addtogroup group_foundation_utility
 //! @{
@@ -28,7 +25,7 @@ template<>           struct SpanSizeOfType<const void>  { static constexpr auto 
 /// @brief View over a contiguous sequence of items (pointer + size in elements).
 /// @tparam Type Any type
 template <typename Type>
-struct SC::Span
+struct Span
 {
   private:
     // clang-format off
@@ -119,39 +116,22 @@ struct SC::Span
         void* p = data();
         return launder(static_cast<T*>(::memmove(p, p, sizeof(T))));
     }
-    // clang-format on
 
-    /// @brief Returns pointer to first element of the span
-    /// @return pointer to first element of the span
     [[nodiscard]] constexpr const Type* begin() const { return items; }
-
-    /// @brief Returns pointer to one after the last element of the span
-    /// @return Pointer to one after the last element of the span
     [[nodiscard]] constexpr const Type* end() const { return items + sizeElements; }
-
-    /// @brief Returns pointer to first element of the span
-    /// @return pointer to first element of the span
     [[nodiscard]] constexpr const Type* data() const { return items; }
-
-    /// @brief Returns pointer to first element of the span
-    /// @return pointer to first element of the span
     [[nodiscard]] constexpr Type* begin() { return items; }
-
-    /// @brief Returns pointer to one after the last element of the span
-    /// @return Pointer to one after the last element of the span
     [[nodiscard]] constexpr Type* end() { return items + sizeElements; }
-
-    /// @brief Returns pointer to first element of the span
-    /// @return pointer to first element of the span
     [[nodiscard]] constexpr Type* data() { return items; }
 
-    /// @brief Size of Span in elements
-    /// @return The number of elements of the Span
     [[nodiscard]] constexpr SizeType sizeInElements() const { return sizeElements; }
-
-    /// @brief Size of Span in bytes
-    /// @return The number of bytes covering the entire Span
     [[nodiscard]] constexpr SizeType sizeInBytes() const { return sizeElements * detail::SpanSizeOfType<Type>::size; }
+
+    [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
+
+    template <typename U = Type> TypeIfNotVoid<U>& operator[](SizeType idx) {  return items[idx]; }
+    template <typename U = Type> const TypeIfNotVoid<U>& operator[](SizeType idx) const { return items[idx]; }
+    // clang-format on
 
     /// @brief Creates another Span, starting at an offset in elements from current Span, until end.
     /// @param offsetInElements Offset in current Span where destination Span will be starting
@@ -186,117 +166,7 @@ struct SC::Span
         }
         return false;
     }
-
-    /// @brief Creates another Span shorter or equal than the current one such that its end equals other.data().
-    /// @param other The other Span that defines length of output slice
-    /// @param output The slice extracted from current span
-    [[nodiscard]] bool sliceFromStartUntil(Span other, Span& output) const
-    {
-        const auto diff = other.items - items;
-        if (diff < 0 or static_cast<SizeType>(diff) > sizeInBytes())
-        {
-            return false;
-        }
-        else
-        {
-            output = Span(items, static_cast<SizeType>(diff) / detail::SpanSizeOfType<Type>::size);
-            return true;
-        }
-    }
-
-    /// @brief Check if Span is empty
-    /// @return `true` if Span is empty
-    [[nodiscard]] constexpr bool empty() const { return sizeElements == 0; }
-
-    // clang-format off
-    template <typename U = Type> TypeIfNotVoid<U>& operator[](SizeType idx) { return items[idx]; }
-    template <typename U = Type> const TypeIfNotVoid<U>& operator[](SizeType idx) const { return items[idx]; }
-    // clang-format on
-
-    /// @brief Gets the item at given index or nullptr if index is negative or bigger than size
-    template <typename IntType>
-    Type* get(IntType idx)
-    {
-        if (idx >= 0 and idx < static_cast<IntType>(sizeElements))
-            return items + idx;
-        return nullptr;
-    }
-
-    /// @brief Gets the item at given index or nullptr if index is negative or bigger than size
-    template <typename IntType>
-    const Type* get(IntType idx) const
-    {
-        if (idx >= 0 and idx < static_cast<IntType>(sizeElements))
-            return items + idx;
-        return nullptr;
-    }
-
-    /// @brief Compares this span with another one byte by byte
-    template <typename U>
-    [[nodiscard]] bool memcmpWith(const Span<U> other) const
-    {
-        if (sizeInBytes() != other.sizeInBytes())
-            return false;
-        if (sizeInBytes() == 0)
-            return true;
-        return ::memcmp(items, other.data(), sizeInBytes()) == 0;
-    }
-
-    /// @brief Bitwise copies contents of this Span over another (non-overlapping)
-    template <typename U>
-    [[nodiscard]] bool memcpyTo(Span<U>& other) const
-    {
-        if (other.sizeInBytes() < sizeInBytes())
-            return false;
-        ::memcpy(other.data(), items, sizeInBytes());
-        other = {other.data(), sizeInBytes() / sizeof(U)};
-        return true;
-    }
-};
-
-#if SC_PLATFORM_WINDOWS
-#define SC_NATIVE_STR(str) L##str
-#else
-#define SC_NATIVE_STR(str) str
-#endif
-
-/// @brief An read-only view over an ASCII string (to avoid including @ref group_strings library)
-struct SC::SpanStringView
-{
-    constexpr SpanStringView() = default;
-    constexpr SpanStringView(const char* string, size_t stringLength) : text(string, stringLength) {}
-    template <size_t N>
-    constexpr SpanStringView(const char (&charLiteral)[N]) : text(charLiteral)
-    {}
-
-    /// @brief Writes current string view over a sized char array buffer, adding a null terminator
-    template <int N>
-    [[nodiscard]] bool writeNullTerminated(char (&buffer)[N]) const
-    {
-        if (N < text.sizeInElements() + 1)
-            return false;
-        ::memcpy(&buffer[0], text.data(), text.sizeInElements());
-        buffer[N - 1] = 0;
-        return true;
-    }
-
-    Span<const char> text;
-};
-
-/// @brief An writable view over an ASCII string (to avoid including @ref group_strings library)
-struct SC::SpanString
-{
-    template <size_t N>
-    constexpr SpanString(char (&buffer)[N]) : text(buffer)
-    {}
-
-    operator SpanStringView() const
-    {
-        SpanStringView sv;
-        sv.text = text;
-        return sv;
-    }
-
-    SC::Span<char> text;
 };
 //! @}
+
+} // namespace SC

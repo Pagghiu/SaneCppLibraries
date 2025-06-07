@@ -9,14 +9,14 @@
 //-------------------------------------------------------------------------------------------------------
 void SC::AsyncBuffersPool::refBuffer(AsyncBufferView::ID bufferID)
 {
-    AsyncBufferView* buffer = buffers.get(bufferID.identifier);
+    AsyncBufferView* buffer = getBuffer(bufferID);
     SC_ASSERT_RELEASE(buffer);
     buffer->refs++;
 }
 
 void SC::AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
 {
-    AsyncBufferView* buffer = buffers.get(bufferID.identifier);
+    AsyncBufferView* buffer = getBuffer(bufferID);
     SC_ASSERT_RELEASE(buffer);
     SC_ASSERT_RELEASE(buffer->refs != 0);
     buffer->refs--;
@@ -36,7 +36,7 @@ SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<cons
 
 SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char>& data)
 {
-    AsyncBufferView* buffer = buffers.get(bufferID.identifier);
+    AsyncBufferView* buffer = getBuffer(bufferID);
     if (buffer == nullptr)
     {
         return Result::Error("AsyncBuffersPool::getData - Invalid bufferID");
@@ -47,7 +47,9 @@ SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char
 
 SC::AsyncBufferView* SC::AsyncBuffersPool::getBuffer(AsyncBufferView::ID bufferID)
 {
-    return buffers.get(bufferID.identifier);
+    if (bufferID.identifier >= 0 and buffers.sizeInElements() > unsigned(bufferID.identifier))
+        return &buffers[unsigned(bufferID.identifier)];
+    return nullptr;
 }
 
 SC::Result SC::AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBufferView::ID& bufferID,
@@ -68,7 +70,7 @@ SC::Result SC::AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, Asy
 
 void SC::AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes)
 {
-    AsyncBufferView* buffer = buffers.get(bufferID.identifier);
+    AsyncBufferView* buffer = getBuffer(bufferID);
     if (buffer and (newSizeInBytes < buffer->originalData.sizeInBytes()))
     {
         buffer->data = {buffer->data.data(), newSizeInBytes};

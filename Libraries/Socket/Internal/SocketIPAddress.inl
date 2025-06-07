@@ -1,6 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Socket.h"
+
+#include "../../Foundation/Assert.h"
+#include "../../Foundation/Result.h"
+#include "../../Foundation/Span.h"
+#include "../../Socket/SocketDescriptor.h"
+#include "SocketInternal.h"
+
+#if !SC_PLATFORM_WINDOWS
+#include <arpa/inet.h> // inet_pton
+#include <netdb.h>     // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#endif
 
 namespace SC
 {
@@ -8,10 +18,10 @@ struct SocketIPAddressInternal;
 }
 struct SC::SocketIPAddressInternal
 {
-    [[nodiscard]] static Result parseIPV4(SpanStringView ipAddress, uint16_t port, struct sockaddr_in& inaddr)
+    [[nodiscard]] static Result parseIPV4(StringViewData ipAddress, uint16_t port, struct sockaddr_in& inaddr)
     {
         char buffer[64] = {0};
-        SC_TRY_MSG(ipAddress.writeNullTerminated(buffer), "ipAddress too long");
+        SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin_port   = htons(port);
         inaddr.sin_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV4);
@@ -23,10 +33,10 @@ struct SC::SocketIPAddressInternal
         return Result(true);
     }
 
-    [[nodiscard]] static Result parseIPV6(SpanStringView ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
+    [[nodiscard]] static Result parseIPV6(StringViewData ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
     {
         char buffer[64] = {0};
-        SC_TRY_MSG(ipAddress.writeNullTerminated(buffer), "ipAddress too long");
+        SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
         memset(&inaddr, 0, sizeof(inaddr));
         inaddr.sin6_port   = htons(port);
         inaddr.sin6_family = SocketFlags::toNative(SocketFlags::AddressFamilyIPV6);
@@ -101,10 +111,10 @@ bool SC::SocketIPAddress::isValid() const
 {
     static_assert(MAX_ASCII_STRING_LENGTH <= INET6_ADDRSTRLEN, "MAX_ASCII_STRING_LENGTH");
     char ipstr[INET6_ADDRSTRLEN];
-    return not toString(ipstr).text.empty();
+    return not toString(ipstr).isEmpty();
 }
 
-SC::SpanStringView SC::SocketIPAddress::formatAddress(Span<char> inOutString) const
+SC::StringViewData SC::SocketIPAddress::formatAddress(Span<char> inOutString) const
 {
     const sockaddr* sa = &handle.reinterpret_as<struct sockaddr const>();
 
@@ -117,7 +127,7 @@ SC::SpanStringView SC::SocketIPAddress::formatAddress(Span<char> inOutString) co
         {
             return {};
         }
-        return {ipstr, ::strlen(ipstr)};
+        return StringViewData({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
     }
     else if (sa->sa_family == AF_INET6)
     {
@@ -126,15 +136,16 @@ SC::SpanStringView SC::SocketIPAddress::formatAddress(Span<char> inOutString) co
         {
             return {};
         }
-        return {ipstr, ::strlen(ipstr)};
+        return StringViewData({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
     }
     return {};
 }
 
-SC::Result SC::SocketIPAddress::fromAddressPort(SpanStringView interfaceAddress, uint16_t port)
+SC::Result SC::SocketIPAddress::fromAddressPort(StringViewData interfaceAddress, uint16_t port)
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
     static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");
+    SC_TRY_MSG(interfaceAddress.getEncoding() == StringEncoding::Ascii, "Only ASCII encoding is supported");
 
     Result res = SocketIPAddressInternal::parseIPV4(interfaceAddress, port, handle.reinterpret_as<sockaddr_in>());
     if (not res)

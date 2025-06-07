@@ -4,6 +4,7 @@
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/StringViewData.h"
 #include "../Foundation/UniqueHandle.h"
 
 namespace SC
@@ -127,10 +128,10 @@ struct SC::SocketIPAddress
     [[nodiscard]] uint16_t getPort() const;
 
     /// @brief Builds this SocketIPAddress parsing given address string and port
-    /// @param interfaceAddress A valid IPV4 or IPV6 address expressed as a string
+    /// @param interfaceAddress A valid IPV4 or IPV6 address expressed as an ASCII string
     /// @param port The port to connect to
     /// @return A valid Result if the address has been parsed successfully
-    [[nodiscard]] Result fromAddressPort(SpanStringView interfaceAddress, uint16_t port);
+    [[nodiscard]] Result fromAddressPort(StringViewData interfaceAddress, uint16_t port);
 
     /// @brief Size of the native IP Address representation
     [[nodiscard]] uint32_t sizeOfHandle() const;
@@ -143,7 +144,7 @@ struct SC::SocketIPAddress
     /// @return A sub-Span of `buffer` that has the length of actually written bytes
     /// @note The buffer must be at least `MAX_ASCII_STRING_LENGTH` bytes long
     template <size_t N>
-    [[nodiscard]] SpanStringView toString(char (&buffer)[N]) const
+    [[nodiscard]] StringViewData toString(char (&buffer)[N]) const
     {
         static_assert(N >= MAX_ASCII_STRING_LENGTH, "Insufficient buffer");
         return formatAddress(buffer);
@@ -153,7 +154,7 @@ struct SC::SocketIPAddress
     AlignedStorage<28> handle = {};
 
   private:
-    [[nodiscard]] SpanStringView formatAddress(Span<char> buffer) const;
+    [[nodiscard]] StringViewData formatAddress(Span<char> buffer) const;
     friend struct SocketServer;
     friend struct SocketClient;
 

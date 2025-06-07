@@ -60,9 +60,9 @@ void SC::SocketTest::resolveDNS()
 {
     //! [resolveDNSSnippet]
     char       buffer[256] = {0};
-    SpanString ipAddress   = buffer;
+    Span<char> ipAddress   = {buffer};
     SC_TEST_EXPECT(SocketDNS::resolveDNS("localhost", ipAddress));
-    SC_TEST_EXPECT(StringView(ipAddress.text, true, StringEncoding::Ascii) == "127.0.0.1");
+    SC_TEST_EXPECT(StringView(ipAddress, true, StringEncoding::Ascii) == "127.0.0.1");
     //! [resolveDNSSnippet]
 }
 

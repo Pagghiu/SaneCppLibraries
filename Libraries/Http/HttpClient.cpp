@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
-#include "../Socket/Socket.h" // SocketDNS
 #include "HttpURLParser.h"
 
 #include "../Strings/String.h"
@@ -17,11 +16,11 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
     SC_TRY_MSG(parser.protocol == "http", "Invalid protocol");
     // TODO: Make DNS Resolution asynchronous
     char       buffer[256];
-    SpanString ipAddress = buffer;
+    Span<char> ipAddress = {buffer};
     SC_TRY(SocketDNS::resolveDNS(parser.hostname, ipAddress))
     port = parser.port;
     SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort(ipAddress, port));
+    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
     SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
 
     StringBuilder sb(content, StringEncoding::Ascii, StringBuilder::Clear);

@@ -1,7 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
-#include "../Socket.h"
+#include "../../Socket/SocketDescriptor.h"
+
+#if !SC_PLATFORM_WINDOWS
+#include <netdb.h> // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#endif
 
 SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
 {

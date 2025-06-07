@@ -1,10 +1,15 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Socket.h"
+#include "../../Socket/Socket.h"
+#include "SocketInternal.h"
 
+#if !SC_PLATFORM_WINDOWS
+#include <arpa/inet.h> // inet_ntop
+#include <netdb.h>     // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#endif
 #include <string.h>
 
-SC::Result SC::SocketDNS::resolveDNS(SpanStringView host, SpanString& ipAddress)
+SC::Result SC::SocketDNS::resolveDNS(StringViewData host, Span<char>& ipAddress)
 {
     struct addrinfo hints, *res, *p;
 
@@ -14,7 +19,8 @@ SC::Result SC::SocketDNS::resolveDNS(SpanStringView host, SpanString& ipAddress)
     hints.ai_socktype = SOCK_STREAM; // Use SOCK_STREAM for TCP
 
     char nullTerminated[256] = {0};
-    SC_TRY_MSG(host.writeNullTerminated(nullTerminated), "host is too big");
+    SC_TRY_MSG(host.getEncoding() == StringEncoding::Ascii, "Only ASCII encoding is supported");
+    SC_TRY_MSG(detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated), "host is too big");
     // Get address information
     const int status = ::getaddrinfo(nullTerminated, NULL, &hints, &res);
     if (status != 0)
@@ -38,10 +44,10 @@ SC::Result SC::SocketDNS::resolveDNS(SpanStringView host, SpanString& ipAddress)
         if (p->ai_next == NULL) // take the last
         {
             // Convert IP address to a readable string
-            char ipstr[INET6_ADDRSTRLEN];
+            char ipstr[INET6_ADDRSTRLEN + 1] = {0};
             ::inet_ntop(p->ai_family, addr, ipstr, sizeof ipstr);
-            SpanStringView ipOut(ipstr, ::strnlen(ipstr, sizeof(ipstr)));
-            SC_TRY_MSG(ipOut.text.memcpyTo(ipAddress.text), "ipAddress is insufficient");
+            Span<const char> ipOut = {ipstr, ::strnlen(ipstr, sizeof(ipstr) - 1)};
+            SC_TRY_MSG(detail::copyFromTo(ipOut, ipAddress), "ipAddress is insufficient");
         }
     }
 

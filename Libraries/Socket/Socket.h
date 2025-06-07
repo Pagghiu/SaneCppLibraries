@@ -4,6 +4,7 @@
 #include "SocketDescriptor.h"
 
 #include "../Foundation/Span.h"
+#include "../Foundation/StringViewData.h"
 #include "../Time/Time.h" // Milliseconds
 
 namespace SC
@@ -69,11 +70,11 @@ struct SC::SocketClient
     SocketClient(const SocketDescriptor& socket) : socket(socket) {}
 
     /// @brief Connect to a given address and port combination
-    /// @param address Address as string
+    /// @param address Address as ASCII encoded string
     /// @param port Port to start listening to
     /// @return Valid Result if this client successfully connected to the specified address and port
     /// @note Socket descriptor MUST have already been created with SocketDescriptor::create
-    [[nodiscard]] Result connect(SpanStringView address, uint16_t port);
+    [[nodiscard]] Result connect(StringViewData address, uint16_t port);
 
     /// @brief Connect to a given address and port combination
     /// @param ipAddress Address and port to connect to
@@ -109,13 +110,13 @@ struct SC::SocketClient
 struct SC::SocketDNS
 {
     /// @brief Resolve an host string to an ip address (blocking until DNS response arrives)
-    /// @param[in] host The host string (example.com)
-    /// @param[out] ipAddress The ip address of the given host string
+    /// @param[in] host The ASCII encoded host string (example.com)
+    /// @param[out] ipAddress Host ip address (ASCII encoded and null-terminated)
     /// @return Valid Result if ip address for the passed host has been successfully resolved
     ///
     /// Example:
     /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
-    [[nodiscard]] static Result resolveDNS(SpanStringView host, SpanString& ipAddress);
+    [[nodiscard]] static Result resolveDNS(StringViewData host, Span<char>& ipAddress);
 };
 
 /// @brief Networking globals initialization (Winsock2 WSAStartup)

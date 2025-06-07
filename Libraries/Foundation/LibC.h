@@ -4,6 +4,7 @@
 #include "../Foundation/PrimitiveTypes.h"
 #if SC_COMPILER_ENABLE_STD_CPP || SC_LANGUAGE_EXCEPTIONS
 #include <memory.h>
+#include <string.h>
 #else
 #if SC_PLATFORM_WINDOWS
 extern "C"
@@ -13,6 +14,9 @@ extern "C"
     int __cdecl memcmp(const void* s1, const void* s2, size_t n);
     void* __cdecl memset(void* dst, SC::int32_t c, size_t len);
     [[nodiscard]] void const* __cdecl memchr(const void* ptr, SC::int32_t c, size_t count);
+
+    SC::size_t strlen(const char* s);
+    size_t __cdecl wcslen(wchar_t const*);
 }
 #elif SC_PLATFORM_APPLE
 extern "C"
@@ -22,6 +26,8 @@ extern "C"
     int   memcmp(const void* s1, const void* s2, SC::size_t n);
     void* memset(void* dst, SC::int32_t c, SC::size_t len);
     void* memchr(const void* ptr, SC::int32_t c, SC::size_t count);
+
+    SC::size_t strlen(const char* s);
 }
 #elif SC_PLATFORM_LINUX
 extern "C"
@@ -30,6 +36,8 @@ extern "C"
     void* memcpy(void* dst, const void* src, SC::size_t n);
     int   memcmp(const void* s1, const void* s2, SC::size_t n);
     void* memset(void* dst, SC::int32_t c, SC::size_t len);
+
+    SC::size_t strlen(const char* s);
 }
 extern "C++"
 {
