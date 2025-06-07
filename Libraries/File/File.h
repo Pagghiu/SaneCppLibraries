@@ -8,47 +8,23 @@ namespace SC
 {
 struct Buffer;
 struct String;
-} // namespace SC
 //! @addtogroup group_file
 //! @{
 
 /// @brief Wraps a SC::FileDescriptor to open it and use strings / buffers.
 /// Example usage:
 /// \snippet Tests/Libraries/File/FileTest.cpp FileSnippet
-struct SC::File
+struct SC_COMPILER_EXPORT File
 {
     FileDescriptor& fd;
 
     File(FileDescriptor& descriptor) : fd(descriptor) {}
 
-    /// @brief Define mode for opening the file (read, write etc.)
-    enum OpenMode
-    {
-        ReadOnly,            ///< Opens in read-only mode
-        WriteCreateTruncate, ///< Opens in write mode, creating or truncating it if another file exists at same location
-        WriteAppend,         ///< Opens write mode, appending to existing file that must exist at the same location.
-        ReadAndWrite         ///< Opens file for read / write mode
-    };
-
-    /// @brief Additional flags to be set when opening files
-    struct OpenOptions
-    {
-        bool inheritable = false; ///< Set to true to make the file visible to child processes
-        bool blocking    = true;  ///< Set to false if file will be used for Async I/O (see @ref library_async)
-    };
-
     /// @brief Opens file at `path` with a given `mode`
     /// @param path The path to file
     /// @param mode The mode used to open file (read-only, write-append etc.)
     /// @return Valid Result if file is opened successfully
-    [[nodiscard]] Result open(StringView path, OpenMode mode);
-
-    /// @brief Opens file at `path` with a given `mode`
-    /// @param path The path to file
-    /// @param mode The mode used to open file
-    /// @param options Options that can be applied when opening the file (inheritable, blocking etc.)
-    /// @return Valid Result if file is opened successfully
-    [[nodiscard]] Result open(StringView path, OpenMode mode, OpenOptions options);
+    [[nodiscard]] Result open(StringView path, FileOpen mode);
 
     /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
     ///        It works also for non-seekable file descriptors (stdout / in / err).
@@ -64,8 +40,13 @@ struct SC::File
 
   private:
     struct Internal;
-    struct ReadResult;
+    struct ReadResult
+    {
+        size_t actuallyRead = 0;
+        bool   isEOF        = false;
+    };
     Result readUntilEOFTemplate(Buffer& destination);
 };
 
 //! @}
+} // namespace SC

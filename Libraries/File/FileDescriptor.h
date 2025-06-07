@@ -10,18 +10,11 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT FileDescriptor;
-struct SC_COMPILER_EXPORT PipeDescriptor;
 namespace detail
 {
-struct SC_COMPILER_EXPORT FileDescriptorDefinition;
-}
-struct SC_COMPILER_EXPORT File;
-} // namespace SC
-
 #if SC_PLATFORM_WINDOWS
 
-struct SC::detail::FileDescriptorDefinition
+struct SC_COMPILER_EXPORT FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
     static Result releaseHandle(Handle& handle);
@@ -34,7 +27,7 @@ struct SC::detail::FileDescriptorDefinition
 
 #else
 /// @brief Definition used to declare FileDescriptor (as argument to UniqueHandle)
-struct SC::detail::FileDescriptorDefinition
+struct SC_COMPILER_EXPORT FileDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -43,12 +36,35 @@ struct SC::detail::FileDescriptorDefinition
 };
 
 #endif
+} // namespace detail
 
 //! @addtogroup group_file
 //! @{
 
-/// @brief File Descriptor (use SC::File to open and use it with strings and buffers).
-struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDefinition>
+struct FileOpen
+{
+    /// @brief Indicates the mode in which the file should be opened (read, write, append, etc.)
+    enum Mode : uint8_t
+    {
+        Read = 0,   ///< `r`  Open for reading. An error occurs if the file does not exist.
+        ReadWrite,  ///< `r+` Open for reading and writing. An error occurs if the file does not exist.
+        Append,     ///< `a`  Open for appending. The file is created if it does not exist.
+        AppendRead, ///< `a+` Open for reading and appending. The file is created if it does not exist.
+        Write,      ///< `w`  Open for writing. The file is created (if it does not exist) or truncated (if it exists).
+        WriteRead,  ///< `w+` Open for reading and writing. The file is created (if it does not exist) or truncated.
+    };
+
+    FileOpen(Mode mode = Read) : mode(mode) {}
+
+    Mode mode;                ///< Open mode (see FileOpen::Mode)
+    bool inheritable = false; ///< Set to true to make the file visible to child processes
+    bool blocking    = true;  ///< Set to false if file will be used for Async I/O (see @ref library_async)
+    bool sync        = false; ///< Set to true to open file in synchronous mode, bypassing local file system cache
+    bool exclusive   = false; ///< Set to true to fail if the file already exists (like 'x' flag in fopen)
+};
+
+/// @brief File Descriptor (use File to open and use it with strings and buffers).
+struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
 
@@ -149,7 +165,7 @@ struct SC::FileDescriptor : public SC::UniqueHandle<SC::detail::FileDescriptorDe
 };
 
 /// @brief Read / Write pipe (Process stdin/stdout and IPC communication)
-struct SC::PipeDescriptor
+struct SC_COMPILER_EXPORT PipeDescriptor
 {
     /// @brief Specifies a flag for read side of the pipe
     enum InheritableReadFlag
@@ -179,3 +195,4 @@ struct SC::PipeDescriptor
     [[nodiscard]] Result close();
 };
 //! @}
+} // namespace SC

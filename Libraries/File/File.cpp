@@ -2,12 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "File.h"
 
-struct SC::File::ReadResult
-{
-    size_t actuallyRead = 0;
-    bool   isEOF        = false;
-};
-
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileWindows.inl"
 #else
@@ -20,9 +14,9 @@ struct SC::File::ReadResult
 SC::Result SC::FileDescriptor::openForWriteToDevNull()
 {
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(File(*this).open("NUL", File::WriteAppend));
+    SC_TRY(File(*this).open("NUL", FileOpen::Append));
 #else
-    SC_TRY(File(*this).open("/dev/null", File::WriteAppend));
+    SC_TRY(File(*this).open("/dev/null", FileOpen::Append));
 #endif
     return Result(true);
 }
@@ -56,8 +50,6 @@ SC::Result SC::FileDescriptor::write(Span<const uint8_t> data)
 //-------------------------------------------------------------------------------------------------------
 // File
 //-------------------------------------------------------------------------------------------------------
-SC::Result SC::File::open(StringView path, OpenMode mode) { return open(path, mode, OpenOptions()); }
-
 SC::Result SC::File::readUntilEOFTemplate(Buffer& destination)
 {
     char buffer[1024];

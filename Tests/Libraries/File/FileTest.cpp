@@ -41,12 +41,12 @@ void SC::FileTest::testOpen()
 
     // Open a file, write and close it
     FileDescriptor fd;
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::WriteCreateTruncate));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), FileOpen::Write));
     SC_TEST_EXPECT(fd.write(StringView("test").toCharSpan()));
     SC_TEST_EXPECT(fd.close());
 
     // Re-open the file for read
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::ReadOnly));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), FileOpen::Read));
 
     // Read some data from the file
     char       buffer[4] = {0};

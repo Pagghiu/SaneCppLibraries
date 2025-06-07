@@ -104,7 +104,7 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
+SC::Result SC::File::open(StringView path, FileOpen mode)
 {
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
@@ -113,15 +113,27 @@ SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
     if (not filePath.startsWithAnyOf({'/'}))
         return Result::Error("Path must be absolute");
     int flags = 0;
-    switch (mode)
+    switch (mode.mode)
     {
-    case ReadOnly: flags |= O_RDONLY; break;
-    case WriteCreateTruncate: flags |= O_WRONLY | O_CREAT | O_TRUNC; break;
-    case WriteAppend: flags |= O_WRONLY | O_APPEND; break;
-    case ReadAndWrite: flags |= O_RDWR; break;
+    case FileOpen::Read: flags |= O_RDONLY; break;
+    case FileOpen::Write: flags |= O_WRONLY | O_CREAT | O_TRUNC; break;
+    case FileOpen::Append: flags |= O_WRONLY | O_APPEND | O_CREAT; break;
+    case FileOpen::ReadWrite: flags |= O_RDWR; break;
+    case FileOpen::WriteRead: flags |= O_RDWR | O_CREAT | O_TRUNC; break;
+    case FileOpen::AppendRead: flags |= O_RDWR | O_APPEND | O_CREAT; break;
     }
 
-    if (not options.inheritable)
+    if (mode.sync)
+    {
+        flags |= O_SYNC;
+    }
+
+    if (mode.exclusive)
+    {
+        flags |= O_EXCL;
+    }
+
+    if (not mode.inheritable)
     {
         flags |= O_CLOEXEC;
     }
@@ -130,7 +142,7 @@ SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
     const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
     SC_TRY_MSG(fileDescriptor != -1, "open failed");
     SC_TRY(fd.assign(fileDescriptor));
-    if (not options.blocking)
+    if (not mode.blocking)
     {
         SC_TRY(fd.setBlocking(false));
     }

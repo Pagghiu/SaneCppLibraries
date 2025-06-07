@@ -473,9 +473,10 @@ SC_TRY(threadPool.create(4));
 
 // Open the file
 FileDescriptor fd;
-File::OpenOptions options;
-options.blocking = true; // AsyncFileRead::Task enables using regular blocking file descriptors
-SC_TRY(File(fd).open("MyFile.txt", File::ReadOnly, options));
+FileOpen openMode;
+openMode.mode = FileOpen::Read;
+openMode.blocking = true; // AsyncFileRead::Task enables using regular blocking file descriptors
+SC_TRY(File(fd).open("MyFile.txt", openMode));
 
 // Create the async file read request and async task
 AsyncFileRead asyncReadFile;
@@ -540,10 +541,11 @@ SC_TRY(threadPool.create(4));
 // ...
 
 // Open the file (for write)
-File::OpenOptions options;
-options.blocking = true; // AsyncFileWrite::Task enables using regular blocking file descriptors
+FileOpen openMode;
+openMode.mode = FileOpen::Write;
+openMode.blocking = true; // AsyncFileWrite::Task enables using regular blocking file descriptors
 FileDescriptor fd;
-SC_TRY(File(fd).open("MyFile.txt", File::WriteCreateTruncate, options));
+SC_TRY(File(fd).open("MyFile.txt", openMode));
 
 // Create the async file write request
 AsyncFileWrite asyncWriteFile;
@@ -589,9 +591,10 @@ SC::Result snippetForFileClose(AsyncEventLoop& eventLoop, Console& console)
 
 // Open a file and associated it with event loop
 FileDescriptor fd;
-File::OpenOptions options;
-options.blocking = false;
-SC_TRY(File(fd).open("MyFile.txt", File::WriteCreateTruncate, options));
+FileOpen openMode;
+openMode.mode = FileOpen::Write;
+openMode.blocking = false;
+SC_TRY(File(fd).open("MyFile.txt", openMode));
 SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
 // Create the file close request

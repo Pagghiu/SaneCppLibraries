@@ -130,7 +130,7 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 //-------------------------------------------------------------------------------------------------------
 // File
 //-------------------------------------------------------------------------------------------------------
-SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
+SC::Result SC::File::open(StringView path, FileOpen mode)
 {
     StringNative<1024> buffer = StringEncoding::Native;
     StringConverter    convert(buffer);
@@ -144,31 +144,54 @@ SC::Result SC::File::open(StringView path, OpenMode mode, OpenOptions options)
     }
     DWORD accessMode        = 0;
     DWORD createDisposition = 0;
-    switch (mode)
+    DWORD fileFlags         = mode.blocking ? 0 : FILE_FLAG_OVERLAPPED;
+
+    switch (mode.mode)
     {
-    case ReadOnly:
+    case FileOpen::Read:
         accessMode |= FILE_GENERIC_READ;
-        createDisposition |= OPEN_EXISTING;
+        createDisposition = OPEN_EXISTING;
         break;
-    case WriteCreateTruncate:
+    case FileOpen::Write:
         accessMode |= FILE_GENERIC_WRITE;
-        createDisposition |= CREATE_ALWAYS;
+        createDisposition = CREATE_ALWAYS;
         break;
-    case WriteAppend:
-        accessMode |= FILE_GENERIC_WRITE;
-        createDisposition |= CREATE_NEW;
+    case FileOpen::Append:
+        accessMode |= FILE_APPEND_DATA;
+        createDisposition = OPEN_ALWAYS;
         break;
-    case ReadAndWrite: accessMode |= FILE_GENERIC_READ | FILE_GENERIC_WRITE; break;
+    case FileOpen::ReadWrite:
+        accessMode |= FILE_GENERIC_READ | FILE_GENERIC_WRITE;
+        createDisposition = OPEN_ALWAYS;
+        break;
+    case FileOpen::WriteRead:
+        accessMode |= FILE_GENERIC_READ | FILE_GENERIC_WRITE;
+        createDisposition = CREATE_ALWAYS;
+        break;
+    case FileOpen::AppendRead:
+        accessMode |= FILE_GENERIC_READ | FILE_APPEND_DATA;
+        createDisposition = OPEN_ALWAYS;
+        break;
     }
-    DWORD shareMode  = FILE_SHARE_READ | FILE_SHARE_WRITE;
-    DWORD attributes = options.blocking ? 0 : FILE_FLAG_OVERLAPPED;
+
+    if (mode.sync)
+    {
+        fileFlags |= FILE_FLAG_WRITE_THROUGH | FILE_FLAG_NO_BUFFERING;
+    }
+
+    if (mode.exclusive)
+    {
+        createDisposition = CREATE_NEW;
+    }
+
+    DWORD shareMode = FILE_SHARE_READ | FILE_SHARE_WRITE;
 
     SECURITY_ATTRIBUTES security;
     security.nLength              = sizeof(SECURITY_ATTRIBUTES);
-    security.bInheritHandle       = options.inheritable ? TRUE : FALSE;
+    security.bInheritHandle       = mode.inheritable ? TRUE : FALSE;
     security.lpSecurityDescriptor = nullptr;
     HANDLE fileDescriptor         = CreateFileW(filePath.getNullTerminatedNative(), accessMode, shareMode, &security,
-                                                createDisposition, attributes, nullptr);
+                                                createDisposition, fileFlags, nullptr);
     DWORD  lastErr                = ::GetLastError();
     SC_COMPILER_UNUSED(lastErr);
     SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed");

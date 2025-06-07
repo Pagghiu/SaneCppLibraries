@@ -94,7 +94,7 @@ struct CustomFunctions
 [[nodiscard]] inline Result checkFileMD5(StringView fileName, StringView wantedMD5)
 {
     FileDescriptor fd;
-    SC_TRY(File(fd).open(fileName, File::OpenMode::ReadOnly));
+    SC_TRY(File(fd).open(fileName, FileOpen::Read));
     Hashing hashing;
     SC_TRY(hashing.setType(Hashing::TypeMD5));
     for (;;)

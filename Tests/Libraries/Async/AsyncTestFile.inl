@@ -28,12 +28,12 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
     // 4. Open the destination file and associate it with the event loop
-    File::OpenOptions openOptions;
-    openOptions.blocking = useThreadPool;
-
     FileDescriptor fd;
     File           file(fd);
-    SC_TEST_EXPECT(file.open(filePath.view(), File::WriteCreateTruncate, openOptions));
+    FileOpen       openModeWrite;
+    openModeWrite.mode     = FileOpen::Write;
+    openModeWrite.blocking = useThreadPool;
+    SC_TEST_EXPECT(file.open(filePath.view(), openModeWrite));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -66,7 +66,10 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(fd.close());
 
     // 7. Open the file for read now
-    SC_TEST_EXPECT(file.open(filePath.view(), File::ReadOnly, openOptions));
+    FileOpen openModeRead;
+    openModeRead.mode     = FileOpen::Read;
+    openModeRead.blocking = useThreadPool;
+    SC_TEST_EXPECT(file.open(filePath.view(), openModeRead));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -157,12 +160,12 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
         SC_TEST_EXPECT(fs.write(fileName, {data, sizeof(data)}));
     }
 
-    File::OpenOptions openOptions;
-    openOptions.blocking = useThreadPool;
-
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     FileDescriptor         fd;
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::ReadOnly, openOptions));
+    FileOpen               openModeRead;
+    openModeRead.mode     = FileOpen::Read;
+    openModeRead.blocking = useThreadPool;
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), openModeRead));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -252,12 +255,13 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
     // 4. Open the destination file and associate it with the event loop
-    File::OpenOptions openOptions;
-    openOptions.blocking = useThreadPool;
+    FileOpen openModeWrite;
+    openModeWrite.mode     = FileOpen::Write;
+    openModeWrite.blocking = useThreadPool;
 
     FileDescriptor fd;
     File           file(fd);
-    SC_TEST_EXPECT(file.open(filePath.view(), File::WriteCreateTruncate, openOptions));
+    SC_TEST_EXPECT(file.open(filePath.view(), openModeWrite));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -332,11 +336,12 @@ void SC::AsyncTest::fileClose()
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
     SC_TEST_EXPECT(fs.write(filePath.view(), "test"));
 
-    File::OpenOptions openOptions;
-    openOptions.blocking = false;
+    FileOpen openModeWrite;
+    openModeWrite.mode     = FileOpen::Write;
+    openModeWrite.blocking = false;
 
     FileDescriptor fd;
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), File::WriteCreateTruncate, openOptions));
+    SC_TEST_EXPECT(File(fd).open(filePath.view(), openModeWrite));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;

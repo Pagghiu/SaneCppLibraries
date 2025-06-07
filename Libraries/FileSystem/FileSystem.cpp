@@ -99,7 +99,7 @@ SC::Result SC::FileSystem::write(StringView path, Span<const char> data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    SC_TRY(File(fd).open(encodedPath, File::WriteCreateTruncate));
+    SC_TRY(File(fd).open(encodedPath, FileOpen::Write));
     return fd.write(data);
 }
 
@@ -114,7 +114,7 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
     File           file(fd);
-    SC_TRY(file.open(encodedPath, File::ReadOnly));
+    SC_TRY(file.open(encodedPath, FileOpen::Read));
     return file.readUntilEOF(data);
 }
 
@@ -128,7 +128,7 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    SC_TRY(File(fd).open(encodedPath, File::WriteAppend));
+    SC_TRY(File(fd).open(encodedPath, FileOpen::Append));
     return fd.write(text.toCharSpan());
 }
 
@@ -140,7 +140,7 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
     File           file(fd);
-    SC_TRY(file.open(encodedPath, File::ReadOnly));
+    SC_TRY(file.open(encodedPath, FileOpen::Read));
     return file.readUntilEOF(text);
 }
 
