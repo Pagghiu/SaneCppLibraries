@@ -127,20 +127,11 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
     return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
 }
 
-//-------------------------------------------------------------------------------------------------------
-// File
-//-------------------------------------------------------------------------------------------------------
-SC::Result SC::File::open(StringView path, FileOpen mode)
+SC::Result SC::FileDescriptor::openNativeEncoding(StringViewData filePath, FileOpen mode)
 {
-    StringNative<1024> buffer = StringEncoding::Native;
-    StringConverter    convert(buffer);
-    StringView         filePath;
-    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
-    const wchar_t* widePath     = filePath.getNullTerminatedNative();
-    const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(native_char_t);
-    if (not isThreeChars or (widePath[0] != L'\\' and widePath[1] != L':' and filePath != L"NUL"))
+    if (filePath.getEncoding() != StringEncoding::Utf16)
     {
-        return Result::Error("Path must be absolute");
+        return Result::Error("FileDescriptor::openNativeEncoding: Windows supports only UTF16 encoding");
     }
     DWORD accessMode        = 0;
     DWORD createDisposition = 0;
@@ -192,10 +183,30 @@ SC::Result SC::File::open(StringView path, FileOpen mode)
     security.lpSecurityDescriptor = nullptr;
     HANDLE fileDescriptor         = CreateFileW(filePath.getNullTerminatedNative(), accessMode, shareMode, &security,
                                                 createDisposition, fileFlags, nullptr);
-    DWORD  lastErr                = ::GetLastError();
+
+    DWORD lastErr = ::GetLastError();
     SC_COMPILER_UNUSED(lastErr);
     SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed");
-    return fd.assign(fileDescriptor);
+    return assign(fileDescriptor);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// File
+//-------------------------------------------------------------------------------------------------------
+SC::Result SC::File::open(StringView path, FileOpen mode)
+{
+    StringNative<1024> buffer = StringEncoding::Native;
+    StringConverter    convert(buffer);
+    StringView         filePath;
+    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
+    const wchar_t* widePath     = filePath.getNullTerminatedNative();
+    const bool     isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(native_char_t);
+    if (not isThreeChars or (widePath[0] != L'\\' and widePath[1] != L':' and filePath != L"NUL"))
+    {
+        return Result::Error("Path must be absolute");
+    }
+
+    return fd.openNativeEncoding(filePath, mode);
 }
 
 struct SC::File::Internal

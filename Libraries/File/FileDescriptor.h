@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/StringViewData.h"
 #include "../Foundation/UniqueHandle.h"
 
 //! @defgroup group_file File
@@ -41,7 +42,8 @@ struct SC_COMPILER_EXPORT FileDescriptorDefinition
 //! @addtogroup group_file
 //! @{
 
-struct FileOpen
+/// @brief Options used to open a file descriptor
+struct SC_COMPILER_EXPORT FileOpen
 {
     /// @brief Indicates the mode in which the file should be opened (read, write, append, etc.)
     enum Mode : uint8_t
@@ -56,11 +58,16 @@ struct FileOpen
 
     FileOpen(Mode mode = Read) : mode(mode) {}
 
-    Mode mode;                ///< Open mode (see FileOpen::Mode)
+    Mode mode;                ///< Open mode (read, write, append, etc.). See FileOpen::Mode for more details.
     bool inheritable = false; ///< Set to true to make the file visible to child processes
     bool blocking    = true;  ///< Set to false if file will be used for Async I/O (see @ref library_async)
     bool sync        = false; ///< Set to true to open file in synchronous mode, bypassing local file system cache
     bool exclusive   = false; ///< Set to true to fail if the file already exists (like 'x' flag in fopen)
+
+#if !SC_PLATFORM_WINDOWS
+    int toPosixFlags() const;
+    int toPosixAccess() const;
+#endif
 };
 
 /// @brief File Descriptor (use File to open and use it with strings and buffers).
@@ -71,6 +78,13 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @brief Opens a file descriptor handle for writing to /dev/null or equivalent on current OS.
     /// @return `true` if file has been opened successfully
     [[nodiscard]] Result openForWriteToDevNull();
+
+    /// @brief Opens a file descriptor handle for a file path encoded in the native encoding of the current OS.
+    /// @param path The path to file. It MUST be encoded in UTF-8 on Windows, ASCII or UTF-8 on POSIX.
+    /// @param mode The mode used to open file (read-only, write-append etc.)
+    /// @return Valid Result if file is opened successfully
+    /// @see File::open to open files converting path automatically to native encoding
+    [[nodiscard]] Result openNativeEncoding(StringViewData path, FileOpen mode);
 
     /// @brief Set blocking mode (read / write waiting for I/O). Can be set also during open with OpenOptions.
     /// @param blocking `true` to set file to blocking mode

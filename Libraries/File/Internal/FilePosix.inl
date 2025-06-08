@@ -104,16 +104,10 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result SC::File::open(StringView path, FileOpen mode)
+int SC::FileOpen::toPosixFlags() const
 {
-    StringNative<1024> buffer = StringEncoding::Native;
-    StringConverter    convert(buffer);
-    StringView         filePath;
-    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
-    if (not filePath.startsWithAnyOf({'/'}))
-        return Result::Error("Path must be absolute");
     int flags = 0;
-    switch (mode.mode)
+    switch (mode)
     {
     case FileOpen::Read: flags |= O_RDONLY; break;
     case FileOpen::Write: flags |= O_WRONLY | O_CREAT | O_TRUNC; break;
@@ -123,28 +117,40 @@ SC::Result SC::File::open(StringView path, FileOpen mode)
     case FileOpen::AppendRead: flags |= O_RDWR | O_APPEND | O_CREAT; break;
     }
 
-    if (mode.sync)
+    if (sync)
     {
         flags |= O_SYNC;
     }
 
-    if (mode.exclusive)
+    if (exclusive)
     {
         flags |= O_EXCL;
     }
 
-    if (not mode.inheritable)
+    if (not inheritable)
     {
         flags |= O_CLOEXEC;
     }
+    return flags;
+}
 
-    const int access         = S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
+int SC::FileOpen::toPosixAccess() const { return S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; }
+
+SC::Result SC::FileDescriptor::openNativeEncoding(StringViewData filePath, FileOpen mode)
+{
+    if (filePath.getEncoding() == StringEncoding::Utf16)
+    {
+        return Result::Error("FileDescriptor::openNativeEncoding: POSIX supports only UTF8 and ASCII encoding");
+    }
+    const int flags  = mode.toPosixFlags();
+    const int access = mode.toPosixAccess();
+
     const int fileDescriptor = ::open(filePath.getNullTerminatedNative(), flags, access);
     SC_TRY_MSG(fileDescriptor != -1, "open failed");
-    SC_TRY(fd.assign(fileDescriptor));
+    SC_TRY(assign(fileDescriptor));
     if (not mode.blocking)
     {
-        SC_TRY(fd.setBlocking(false));
+        SC_TRY(setBlocking(false));
     }
     return Result(true);
 }
@@ -249,6 +255,17 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 //-------------------------------------------------------------------------------------------------------
 // File
 //-------------------------------------------------------------------------------------------------------
+SC::Result SC::File::open(StringView path, FileOpen mode)
+{
+    StringNative<1024> buffer = StringEncoding::Native;
+    StringConverter    convert(buffer);
+    StringView         filePath;
+    SC_TRY(convert.convertNullTerminateFastPath(path, filePath));
+    if (not filePath.startsWithAnyOf({'/'}))
+        return Result::Error("Path must be absolute");
+    return fd.openNativeEncoding(filePath, mode);
+}
+
 struct SC::File::Internal
 {
     template <typename T, typename U>
