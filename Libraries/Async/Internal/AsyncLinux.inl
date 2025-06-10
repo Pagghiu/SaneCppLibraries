@@ -322,11 +322,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             }
             if (res < 0)
             {
-                if (errno == EINTR)
+                const int err = -res;
+                if (err == EINTR)
                 {
                     continue;
                 }
-                if (errno == EAGAIN or errno == EBUSY)
+                if (err == EAGAIN or err == EBUSY)
                 {
                     // OMG the completion kernelEvents is full, so we can't submit
                     // anything until we free some of the completions slots :-|
