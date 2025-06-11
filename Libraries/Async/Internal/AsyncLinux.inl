@@ -646,28 +646,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // Templates
-    //-------------------------------------------------------------------------------------------------------
-    template <typename T>
-    Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
-    {
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_cancel(submission, &async, 0);
-        eventLoop.internal.hasPendingKernelCancellations = true;
-        // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
-        return Result(true);
-    }
-
-    // clang-format off
-    template <typename T> Result setupAsync(AsyncEventLoop&, T&)     { return Result(true); }
-    template <typename T> Result activateAsync(AsyncEventLoop&, T&)  { return Result(true); }
-    template <typename T> Result completeAsync(T&)  { return Result(true); }
-
-    template <typename T> static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
-    // clang-format on
-
-    //-------------------------------------------------------------------------------------------------------
     // Socket SEND TO
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
@@ -726,6 +704,28 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         globalLibURing.io_uring_sqe_set_data(submission, &async);
         return Result(true);
     }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Templates
+    //-------------------------------------------------------------------------------------------------------
+    template <typename T>
+    Result cancelAsync(AsyncEventLoop& eventLoop, T& async)
+    {
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+        globalLibURing.io_uring_prep_cancel(submission, &async, 0);
+        eventLoop.internal.hasPendingKernelCancellations = true;
+        // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
+        return Result(true);
+    }
+
+    // clang-format off
+    template <typename T> Result setupAsync(AsyncEventLoop&, T&)     { return Result(true); }
+    template <typename T> Result activateAsync(AsyncEventLoop&, T&)  { return Result(true); }
+    template <typename T> Result completeAsync(T&)  { return Result(true); }
+
+    template <typename T> static Result teardownAsync(T*, AsyncTeardown&)  { return Result(true); }
+    // clang-format on
 };
 
 //----------------------------------------------------------------------------------------

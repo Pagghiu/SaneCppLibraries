@@ -11,6 +11,9 @@
 #include "AsyncTestSocketTCP.inl"
 #include "AsyncTestSocketUDP.inl"
 
+#include "Libraries/Process/Process.h"
+#include "Libraries/Socket/Socket.h"
+
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {
     int numTestsToRun = 1;
@@ -355,7 +358,7 @@ SC::Result snippetForSocketReceive(AsyncEventLoop& eventLoop, Console& console)
 SocketDescriptor client;
 //! [AsyncSocketReceiveSnippet]
 // Assuming an already created (and running) AsyncEventLoop named `eventLoop`
-// and a connected or accepted socket named `client`
+// and an unconnected socket named `client`
 // ...
 char receivedData[100] = {0}; // A buffer to hold data read from the socket
 AsyncSocketReceive receiveAsync;
@@ -366,7 +369,8 @@ receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
     {
         if(res.completionData.disconnected)
         {
-            // Last callback invocation done when other side of the socket has disconnected.
+            // Last callback invocation is done when the other side of the socket
+            // has disconnected:
             // - completionData.disconnected is == true
             // - readData.sizeInBytes() is == 0
             console.print("Client disconnected");

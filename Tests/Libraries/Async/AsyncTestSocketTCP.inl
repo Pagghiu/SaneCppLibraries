@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
 #include "Libraries/Foundation/Buffer.h"
+#include "Libraries/Socket/Socket.h"
 
 void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescriptor& client,
                                         SocketDescriptor& serverSideClient)

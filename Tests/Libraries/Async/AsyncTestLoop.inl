@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/Socket/Socket.h"
 
 void SC::AsyncTest::loopFreeSubmittingOnClose()
 {
