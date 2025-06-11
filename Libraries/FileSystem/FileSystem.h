@@ -2,16 +2,10 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Buffer.h"
-#include "../Foundation/Result.h"
 #include "../Strings/String.h"
-#include "../Time/Time.h"
-
+#include "FileSystemOperations.h"
 namespace SC
 {
-struct SC_COMPILER_EXPORT FileSystem;
-struct StringConverter;
-} // namespace SC
-
 //! @defgroup group_file_system FileSystem
 //! @copybrief library_file_system (see  @ref library_file_system for more details)
 
@@ -24,7 +18,7 @@ struct StringConverter;
 /// clauses for each method. Only the specific returned result behaviour of the given method will be described.
 ///
 /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
-struct SC::FileSystem
+struct SC_COMPILER_EXPORT FileSystem
 {
   private:
     StringNative<512> currentDirectory = StringEncoding::Native;
@@ -43,37 +37,7 @@ struct SC::FileSystem
     Result changeDirectory(StringView newDirectory);
 
     /// @brief Specify copy options like overwriting existing files
-    struct CopyFlags
-    {
-        CopyFlags()
-        {
-            overwrite           = false;
-            useCloneIfSupported = true;
-        }
-
-        /// @brief If `true` copy will overwrite existing files in the destination
-        /// @param value `true` if to overwrite
-        /// @return itself
-        CopyFlags& setOverwrite(bool value)
-        {
-            overwrite = value;
-            return *this;
-        }
-
-        /// @brief If `true` copy will use native filesystem clone os api
-        /// @param value `true` if using clone is wanted
-        /// @return itself
-        CopyFlags& setUseCloneIfSupported(bool value)
-        {
-            useCloneIfSupported = value;
-            return *this;
-        }
-
-      private:
-        friend struct FileSystem;
-        bool overwrite;
-        bool useCloneIfSupported;
-    };
+    using CopyFlags = FileSystemCopyFlags;
 
     /// @brief Specify source, destination and flags for a copy operation
     struct CopyOperation
@@ -300,11 +264,8 @@ struct SC::FileSystem
     [[nodiscard]] Result read(StringView file, String& data, StringEncoding encoding);
 
     /// @brief A structure to describe modified time
-    struct FileStat
-    {
-        size_t         fileSize     = 0;
-        Time::Realtime modifiedTime = 0; ///< Time when file was last modified
-    };
+    using FileStat = FileSystemStat;
+
     /// @brief Obtains stats (size, modified time) about a file
     /// @param file Path to the file of interest
     /// @param[out] fileStat Destination structure that will receive statistics about the file
@@ -333,3 +294,4 @@ struct SC::FileSystem
     [[nodiscard]] static Result fallbackRemoveDirectoryRecursive(String& sourceDirectory);
 };
 //! @}
+} // namespace SC
