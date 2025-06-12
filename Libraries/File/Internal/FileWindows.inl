@@ -115,7 +115,7 @@ SC::Result SC::FileDescriptor::write(Span<const char> data)
 SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
-    return read(data, actuallyRead, offset);
+    return read(data, actuallyRead);
 }
 
 SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
