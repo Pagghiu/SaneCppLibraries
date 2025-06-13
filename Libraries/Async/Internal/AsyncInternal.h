@@ -108,6 +108,8 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncFileClose>         activeFileCloses;
     IntrusiveDoubleLinkedList<AsyncFilePoll>          activeFilePolls;
 
+    IntrusiveDoubleLinkedList<AsyncFileSystemOperation> activeFileSystemOperations;
+
     // Manual completions
     IntrusiveDoubleLinkedList<AsyncRequest> manualCompletions;
 

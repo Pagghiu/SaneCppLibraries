@@ -925,6 +925,11 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result cancelAsync(AsyncEventLoop&, AsyncProcessExit& async) { return async.waitHandle.close(); }
 
     //-------------------------------------------------------------------------------------------------------
+    // File System Operation
+    //-------------------------------------------------------------------------------------------------------
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncFileSystemOperation&) { return true; }
+
+    //-------------------------------------------------------------------------------------------------------
     // Template
     //-------------------------------------------------------------------------------------------------------
     template <typename T>

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncInternal.h"
+#include "Libraries/Foundation/Assert.h"
 
 #include <arpa/inet.h>   // sockaddr_in
 #include <stdint.h>      // uint32_t
@@ -702,6 +703,32 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
         globalLibURing.io_uring_prep_recvmsg(submission, async.handle, &msg, 0);
         globalLibURing.io_uring_sqe_set_data(submission, &async);
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // File System Operation
+    //-------------------------------------------------------------------------------------------------------
+    Result activateAsync(AsyncEventLoop&, AsyncFileSystemOperation& async)
+    {
+        switch (async.operation)
+        {
+        case AsyncFileSystemOperation::Operation::None: break;
+        default: Assert::unreachable();
+        }
+
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncFileSystemOperation::Result& result)
+    {
+        io_uring_cqe& completion = events[result.eventIndex];
+        (void)completion;
+        switch (result.getAsync().operation)
+        {
+        case AsyncFileSystemOperation::Operation::None: break;
+        default: Assert::unreachable();
+        }
         return Result(true);
     }
 

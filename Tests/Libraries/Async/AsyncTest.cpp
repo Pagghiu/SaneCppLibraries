@@ -3,6 +3,7 @@
 #include "AsyncTest.h"
 
 #include "AsyncTestFile.inl"
+#include "AsyncTestFileSystemOperation.inl"
 #include "AsyncTestLoop.inl"
 #include "AsyncTestLoopTimeout.inl"
 #include "AsyncTestLoopWakeUp.inl"
@@ -108,6 +109,7 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             fileClose();
         }
+        fileSystemOperations();
         if (numTestsToRun == 2)
         {
             // If on Linux next run will test io_uring backend (if it's installed)

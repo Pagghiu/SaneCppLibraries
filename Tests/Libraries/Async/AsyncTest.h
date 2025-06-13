@@ -52,4 +52,7 @@ struct SC::AsyncTest : public SC::TestCase
 
     // UDP Sockets
     void socketUDPSendReceive();
+
+    // File System Operations
+    void fileSystemOperations();
 };

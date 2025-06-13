@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../Containers/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Foundation/Platform.h"
+#include "Libraries/File/FileDescriptor.h"
 
 #include <string.h> // strncpy
 
@@ -449,6 +450,39 @@ SC::Result SC::AsyncFilePoll::validate(AsyncEventLoop&)
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFilePoll - Invalid file descriptor");
     return SC::Result(true);
 }
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncFileSystemOperation
+//-------------------------------------------------------------------------------------------------------
+SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
+{
+    SC_TRY_MSG(operation != Operation::None, "AsyncFileSystemOperation - No operation set");
+    return SC::Result(true);
+}
+
+void SC::AsyncFileSystemOperation::destroy()
+{
+    switch (operation)
+    {
+    case Operation::None: break;
+    }
+    operation = Operation::None;
+}
+
+void SC::AsyncFileSystemOperation::onOperationCompleted(AsyncLoopWork::Result& res)
+{
+    SC::Result                       result = res.isValid();
+    AsyncFileSystemOperation::Result fsRes(res.eventLoop, *this, result, nullptr);
+    fsRes.completionData = completionData;
+    callback(fsRes);
+    // TODO: should we call reactivateRequest here?
+}
+
+SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool)
+{
+    return loopWork.setThreadPool(threadPool);
+}
+
 //-------------------------------------------------------------------------------------------------------
 // AsyncEventLoop
 //-------------------------------------------------------------------------------------------------------
@@ -1440,6 +1474,9 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).handle; break;
     case AsyncRequest::Type::FileClose:     teardown.fileHandle = static_cast<AsyncFileClose&>(async).handle; break;
     case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).handle; break;
+
+    // FileSystemOperation
+    case AsyncRequest::Type::FileSystemOperation:  break;
     }
     // clang-format on
 }
@@ -1513,6 +1550,9 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
         break;
     case AsyncRequest::Type::FilePoll:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FileSystemOperation:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileSystemOperation*>(nullptr), teardown));
         break;
     }
 
@@ -1703,6 +1743,9 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
         case AsyncRequest::Type::FileWrite:     activeFileWrites.remove(*static_cast<AsyncFileWrite*>(&async));         break;
         case AsyncRequest::Type::FileClose:     activeFileCloses.remove(*static_cast<AsyncFileClose*>(&async));         break;
         case AsyncRequest::Type::FilePoll:      activeFilePolls.remove(*static_cast<AsyncFilePoll*>(&async));           break;
+
+        // FileSystemOperation
+        case AsyncRequest::Type::FileSystemOperation: activeFileSystemOperations.remove(*static_cast<AsyncFileSystemOperation*>(&async)); break;
     }
     // clang-format on
 }
@@ -1781,6 +1824,9 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
     case AsyncRequest::Type::FileClose:     activeFileCloses.queueBack(*static_cast<AsyncFileClose*>(&async));          break;
     case AsyncRequest::Type::FilePoll: 	    activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
+
+    // FileSystemOperation
+    case AsyncRequest::Type::FileSystemOperation: activeFileSystemOperations.queueBack(*static_cast<AsyncFileSystemOperation*>(&async)); break;
     }
     // clang-format on
 }
@@ -1811,6 +1857,9 @@ SC::Result SC::AsyncEventLoop::Internal::applyOnAsync(AsyncRequest& async, Lambd
     case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
     case AsyncRequest::Type::FileClose: SC_TRY(lambda(*static_cast<AsyncFileClose*>(&async))); break;
     case AsyncRequest::Type::FilePoll: SC_TRY(lambda(*static_cast<AsyncFilePoll*>(&async))); break;
+    case AsyncRequest::Type::FileSystemOperation:
+        SC_TRY(lambda(*static_cast<AsyncFileSystemOperation*>(&async)));
+        break;
     }
     return SC::Result(true);
 }
@@ -1851,5 +1900,8 @@ void SC::detail::AsyncCompletionVariant::destroy()
     case AsyncRequest::Type::FileWrite: dtor(completionDataFileWrite); break;
     case AsyncRequest::Type::FileClose: dtor(completionDataFileClose); break;
     case AsyncRequest::Type::FilePoll: dtor(completionDataFilePoll); break;
+
+    // FileSystemOperation
+    case AsyncRequest::Type::FileSystemOperation: dtor(completionDataFileSystemOperation); break;
     }
 }

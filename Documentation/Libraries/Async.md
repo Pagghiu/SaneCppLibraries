@@ -15,24 +15,25 @@ Check @ref library_async_streams for an higher level construct when streaming da
 
 This is the list of supported async operations:
 
-| Async Operation                                           | Description                           |
-|-----------------------------------------------------------|---------------------------------------|
-| [AsyncSocketConnect](@ref SC::AsyncSocketConnect)         | @copybrief SC::AsyncSocketConnect     | 
-| [AsyncSocketAccept](@ref SC::AsyncSocketAccept)           | @copybrief SC::AsyncSocketAccept      |
-| [AsyncSocketSend](@ref SC::AsyncSocketSend)               | @copybrief SC::AsyncSocketSend        |
-| [AsyncSocketReceive](@ref SC::AsyncSocketReceive)         | @copybrief SC::AsyncSocketReceive     |
-| [AsyncSocketSendTo](@ref SC::AsyncSocketSendTo)           | @copybrief SC::AsyncSocketSendTo      |
-| [AsyncSocketReceiveFrom](@ref SC::AsyncSocketReceiveFrom) | @copybrief SC::AsyncSocketReceiveFrom |
-| [AsyncSocketClose](@ref SC::AsyncSocketClose)             | @copybrief SC::AsyncSocketClose       |
-| [AsyncFileRead](@ref SC::AsyncFileRead)                   | @copybrief SC::AsyncFileRead          |
-| [AsyncFileWrite](@ref SC::AsyncFileWrite)                 | @copybrief SC::AsyncFileWrite         |
-| [AsyncFileClose](@ref SC::AsyncFileClose)                 | @copybrief SC::AsyncFileClose         |
-| [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)             | @copybrief SC::AsyncLoopTimeout       |
-| [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)               | @copybrief SC::AsyncLoopWakeUp        |
-| [AsyncLoopWork](@ref SC::AsyncLoopWork)                   | @copybrief SC::AsyncLoopWork          |
-| [AsyncProcessExit](@ref SC::AsyncProcessExit)             | @copybrief SC::AsyncProcessExit       |
-| [AsyncFilePoll](@ref SC::AsyncFilePoll)                   | @copybrief SC::AsyncFilePoll          |
-| [AsyncSequence](@ref SC::AsyncSequence)                   | @copybrief SC::AsyncSequence          |
+| Async Operation                                               | Description                               |
+|---------------------------------------------------------------|-------------------------------------------|
+| [AsyncSocketConnect](@ref SC::AsyncSocketConnect)             | @copybrief SC::AsyncSocketConnect         | 
+| [AsyncSocketAccept](@ref SC::AsyncSocketAccept)               | @copybrief SC::AsyncSocketAccept          |
+| [AsyncSocketSend](@ref SC::AsyncSocketSend)                   | @copybrief SC::AsyncSocketSend            |
+| [AsyncSocketReceive](@ref SC::AsyncSocketReceive)             | @copybrief SC::AsyncSocketReceive         |
+| [AsyncSocketSendTo](@ref SC::AsyncSocketSendTo)               | @copybrief SC::AsyncSocketSendTo          |
+| [AsyncSocketReceiveFrom](@ref SC::AsyncSocketReceiveFrom)     | @copybrief SC::AsyncSocketReceiveFrom     |
+| [AsyncSocketClose](@ref SC::AsyncSocketClose)                 | @copybrief SC::AsyncSocketClose           |
+| [AsyncFileRead](@ref SC::AsyncFileRead)                       | @copybrief SC::AsyncFileRead              |
+| [AsyncFileWrite](@ref SC::AsyncFileWrite)                     | @copybrief SC::AsyncFileWrite             |
+| [AsyncFileClose](@ref SC::AsyncFileClose)                     | @copybrief SC::AsyncFileClose             |
+| [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)                 | @copybrief SC::AsyncLoopTimeout           |
+| [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)                   | @copybrief SC::AsyncLoopWakeUp            |
+| [AsyncLoopWork](@ref SC::AsyncLoopWork)                       | @copybrief SC::AsyncLoopWork              |
+| [AsyncProcessExit](@ref SC::AsyncProcessExit)                 | @copybrief SC::AsyncProcessExit           |
+| [AsyncFilePoll](@ref SC::AsyncFilePoll)                       | @copybrief SC::AsyncFilePoll              |
+| [AsyncSequence](@ref SC::AsyncSequence)                       | @copybrief SC::AsyncSequence              |
+| [AsyncFileSystemOperation](@ref SC::AsyncFileSystemOperation) | @copybrief SC::AsyncFileSystemOperation   |
 
 # Status
 🟨 MVP  
@@ -151,6 +152,9 @@ This is very useful to integrate the event loop into applications with other eve
 
 ## AsyncTaskSequence
 @copydoc SC::AsyncTaskSequence
+
+## AsyncFileSystemOperation
+@copydoc SC::AsyncFileSystemOperation
 
 # Implementation
 

@@ -138,21 +138,22 @@ struct AsyncRequest
     /// @brief Type of async request
     enum class Type : uint8_t
     {
-        LoopTimeout,       ///< Request is an AsyncLoopTimeout object
-        LoopWakeUp,        ///< Request is an AsyncLoopWakeUp object
-        LoopWork,          ///< Request is an AsyncLoopWork object
-        ProcessExit,       ///< Request is an AsyncProcessExit object
-        SocketAccept,      ///< Request is an AsyncSocketAccept object
-        SocketConnect,     ///< Request is an AsyncSocketConnect object
-        SocketSend,        ///< Request is an AsyncSocketSend object
-        SocketSendTo,      ///< Request is an SocketSendTo object
-        SocketReceive,     ///< Request is an AsyncSocketReceive object
-        SocketReceiveFrom, ///< Request is an SocketReceiveFrom object
-        SocketClose,       ///< Request is an AsyncSocketClose object
-        FileRead,          ///< Request is an AsyncFileRead object
-        FileWrite,         ///< Request is an AsyncFileWrite object
-        FileClose,         ///< Request is an AsyncFileClose object
-        FilePoll,          ///< Request is an AsyncFilePoll object
+        LoopTimeout,         ///< Request is an AsyncLoopTimeout object
+        LoopWakeUp,          ///< Request is an AsyncLoopWakeUp object
+        LoopWork,            ///< Request is an AsyncLoopWork object
+        ProcessExit,         ///< Request is an AsyncProcessExit object
+        SocketAccept,        ///< Request is an AsyncSocketAccept object
+        SocketConnect,       ///< Request is an AsyncSocketConnect object
+        SocketSend,          ///< Request is an AsyncSocketSend object
+        SocketSendTo,        ///< Request is an SocketSendTo object
+        SocketReceive,       ///< Request is an AsyncSocketReceive object
+        SocketReceiveFrom,   ///< Request is an SocketReceiveFrom object
+        SocketClose,         ///< Request is an AsyncSocketClose object
+        FileRead,            ///< Request is an AsyncFileRead object
+        FileWrite,           ///< Request is an AsyncFileWrite object
+        FileClose,           ///< Request is an AsyncFileClose object
+        FilePoll,            ///< Request is an AsyncFilePoll object
+        FileSystemOperation, ///< Request is an AsyncFileSystemOperation object
     };
 
     /// @brief Constructs a free async request of given type
@@ -901,7 +902,16 @@ struct AsyncFilePoll : public AsyncRequest
 #endif
 };
 
-struct AsyncLoopWork; // forward declared because it must be defined after AsyncTaskSequence
+// forward declared because it must be defined after AsyncTaskSequence
+struct AsyncLoopWork;
+struct AsyncFileSystemOperation;
+
+struct AsyncFileSystemOperationCompletionData : public AsyncCompletionData
+{
+    FileDescriptor::Handle handle = FileDescriptor::Invalid; // for open
+
+    int code = 0; // for open
+};
 
 namespace detail
 {
@@ -916,7 +926,8 @@ struct AsyncCompletionVariant
     AsyncCompletionVariant& operator=(const AsyncCompletionVariant&) = delete;
     AsyncCompletionVariant& operator=(AsyncCompletionVariant&&)      = delete;
 
-    bool               inited = false;
+    bool inited = false;
+
     AsyncRequest::Type type;
     union
     {
@@ -935,6 +946,8 @@ struct AsyncCompletionVariant
         AsyncFileWrite::CompletionData         completionDataFileWrite;
         AsyncFileClose::CompletionData         completionDataFileClose;
         AsyncFilePoll::CompletionData          completionDataFilePoll;
+
+        AsyncFileSystemOperationCompletionData completionDataFileSystemOperation;
     };
 
     auto& getCompletion(AsyncLoopWork&) { return completionDataLoopWork; }
@@ -950,6 +963,7 @@ struct AsyncCompletionVariant
     auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
     auto& getCompletion(AsyncFileClose&) { return completionDataFileClose; }
     auto& getCompletion(AsyncFilePoll&) { return completionDataFilePoll; }
+    auto& getCompletion(AsyncFileSystemOperation&) { return completionDataFileSystemOperation; }
 
     template <typename T>
     auto& construct(T& t)
@@ -990,11 +1004,8 @@ struct AsyncLoopWork : public AsyncRequest
 {
     AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
 
-    /// @brief Completion data for AsyncLoopWakeUp
     using CompletionData = AsyncCompletionData;
-
-    /// @brief Callback result for AsyncLoopWakeUp
-    using Result = AsyncResultOf<AsyncLoopWork, CompletionData>;
+    using Result         = AsyncResultOf<AsyncLoopWork, CompletionData>;
 
     /// @brief Sets the ThreadPool that will supply the thread to run the async work on
     /// @note Always call this method at least once before AsyncLoopWork::start
@@ -1007,6 +1018,42 @@ struct AsyncLoopWork : public AsyncRequest
     friend struct AsyncEventLoop;
     SC::Result        validate(AsyncEventLoop&);
     AsyncTaskSequence task;
+};
+
+/// @brief Starts an asynchronous file system operation (open, close, read, write, sendFile, stat, lstat, fstat, etc.)
+/// Some operations need a file path and others need a file descriptor.
+/// @note Operations will run on the thread pool set with AsyncFileSystemOperation::setThreadPool on all backends except
+/// when the event loop is using io_uring on Linux.
+/// @warning File paths must be encoded in the native encoding of the OS, that is UTF-8 on Posix and UTF-16 on Windows.
+struct AsyncFileSystemOperation : public AsyncRequest
+{
+    AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
+    ~AsyncFileSystemOperation() { destroy(); }
+
+    enum class Operation
+    {
+        None = 0,
+    };
+
+    using CompletionData = AsyncFileSystemOperationCompletionData;
+    using Result         = AsyncResultOf<AsyncFileSystemOperation, CompletionData>;
+
+    /// @brief Sets the thread pool to use for the operation
+    SC::Result setThreadPool(ThreadPool& threadPool);
+
+    Function<void(Result&)> callback; ///< Called after the operation is completed, on the event loop thread
+
+  private:
+    friend struct AsyncEventLoop;
+    Operation      operation = Operation::None;
+    AsyncLoopWork  loopWork;
+    CompletionData completionData;
+
+    void onOperationCompleted(AsyncLoopWork::Result& res);
+
+    void destroy();
+
+    SC::Result validate(AsyncEventLoop&);
 };
 
 /// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from
@@ -1195,9 +1242,9 @@ struct AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 536;
-        static constexpr int Apple   = 528;
-        static constexpr int Linux   = 736;
+        static constexpr int Windows = 552;
+        static constexpr int Apple   = 544;
+        static constexpr int Linux   = 752;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;
@@ -1215,6 +1262,7 @@ struct AsyncEventLoop
     friend struct AsyncRequest;
     friend struct AsyncFileWrite;
     friend struct AsyncFileRead;
+    friend struct AsyncFileSystemOperation;
     friend struct AsyncResult;
 };
 
