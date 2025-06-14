@@ -1025,6 +1025,10 @@ struct AsyncLoopWork : public AsyncRequest
 /// @note Operations will run on the thread pool set with AsyncFileSystemOperation::setThreadPool on all backends except
 /// when the event loop is using io_uring on Linux.
 /// @warning File paths must be encoded in the native encoding of the OS, that is UTF-8 on Posix and UTF-16 on Windows.
+///
+/// Example of async open operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationOpenSnippet
+///
 struct AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
@@ -1033,6 +1037,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     enum class Operation
     {
         None = 0,
+        Open,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1043,6 +1048,12 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     Function<void(Result&)> callback; ///< Called after the operation is completed, on the event loop thread
 
+    /// @brief Opens a file asynchronously and returns its corresponding file descriptor
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the file to open (encoded in UTF-8 on Posix and UTF-16 on Windows)
+    /// @param mode The mode to open the file in (read, write, read-write, etc.)
+    SC::Result open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1051,8 +1062,20 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     void onOperationCompleted(AsyncLoopWork::Result& res);
 
+    struct OpenData
+    {
+        StringViewData path;
+        FileOpen       mode;
+    };
+
+    union
+    {
+        OpenData openData;
+    };
+
     void destroy();
 
+    SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
     SC::Result validate(AsyncEventLoop&);
 };
 

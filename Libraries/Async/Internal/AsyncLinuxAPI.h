@@ -117,6 +117,8 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     void (*io_uring_prep_poll_add)(struct io_uring_sqe* sqe, int fd, unsigned poll_mask) = nullptr;
     void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, __u64 user_data) = nullptr;
     void (*io_uring_prep_cancel)(struct io_uring_sqe* sqe, void* user_data, int flags) = nullptr;
+    void (*io_uring_prep_openat)(struct io_uring_sqe* sqe, int fd, const char* pathname, int flags, mode_t mode) = nullptr;
+
     // clang-format on
     AsyncLinuxLibURingLoader()
     {
@@ -139,6 +141,7 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_prep_poll_add       = &::io_uring_prep_poll_add;
         this->io_uring_prep_poll_remove    = &::io_uring_prep_poll_remove;
         this->io_uring_prep_cancel         = &::io_uring_prep_cancel;
+        this->io_uring_prep_openat         = &::io_uring_prep_openat;
     }
 };
 
@@ -334,6 +337,13 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     {
         io_uring_prep_rw(IORING_OP_ASYNC_CANCEL, sqe, -1, user_data, 0, 0);
         sqe->cancel_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_openat(struct io_uring_sqe* sqe, int dfd, const char* pathname, int flags,
+                                            mode_t mode)
+    {
+        io_uring_prep_rw(IORING_OP_OPENAT, sqe, dfd, pathname, mode, 0);
+        sqe->open_flags = flags;
     }
 
     static inline void io_uring_prep_sendmsg(struct io_uring_sqe* sqe, int sockfd, const struct msghdr* msg, int flags)

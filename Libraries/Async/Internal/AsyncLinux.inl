@@ -709,10 +709,20 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     // File System Operation
     //-------------------------------------------------------------------------------------------------------
-    Result activateAsync(AsyncEventLoop&, AsyncFileSystemOperation& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileSystemOperation& async)
     {
         switch (async.operation)
         {
+        case AsyncFileSystemOperation::Operation::Open: {
+            io_uring_sqe* submission;
+            SC_TRY(getNewSubmission(eventLoop, submission));
+            const int   flags = async.openData.mode.toPosixFlags();
+            const int   mode  = async.openData.mode.toPosixAccess();
+            const char* path  = async.openData.path.getNullTerminatedNative();
+            globalLibURing.io_uring_prep_openat(submission, AT_FDCWD, path, flags, mode);
+            globalLibURing.io_uring_sqe_set_data(submission, &async);
+        }
+        break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }
@@ -723,9 +733,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     Result completeAsync(AsyncFileSystemOperation::Result& result)
     {
         io_uring_cqe& completion = events[result.eventIndex];
-        (void)completion;
         switch (result.getAsync().operation)
         {
+        case AsyncFileSystemOperation::Operation::Open: result.completionData.handle = completion.res; break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }

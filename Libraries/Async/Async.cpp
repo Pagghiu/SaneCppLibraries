@@ -464,6 +464,7 @@ void SC::AsyncFileSystemOperation::destroy()
 {
     switch (operation)
     {
+    case Operation::Open: dtor(openData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -481,6 +482,29 @@ void SC::AsyncFileSystemOperation::onOperationCompleted(AsyncLoopWork::Result& r
 SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool)
 {
     return loopWork.setThreadPool(threadPool);
+}
+
+SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode)
+{
+    SC_TRY(checkState());
+    operation = Operation::Open;
+    new (&openData, PlacementNew()) OpenData({path, mode});
+    SC_TRY(validate(eventLoop));
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        FileDescriptor fd;
+        SC_TRY(fd.openNativeEncoding(openData.path, openData.mode));
+        auto res = fd.get(completionData.handle, SC::Result::Error("Open returned invalid handle"));
+        fd.detach(); // Detach the file descriptor from the loop work so that it is not closed when the callback ends
+        return res;
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
 }
 
 //-------------------------------------------------------------------------------------------------------

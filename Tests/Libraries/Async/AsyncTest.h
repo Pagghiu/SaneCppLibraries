@@ -55,4 +55,5 @@ struct SC::AsyncTest : public SC::TestCase
 
     // File System Operations
     void fileSystemOperations();
+    void fileSystemOperationOpen();
 };
