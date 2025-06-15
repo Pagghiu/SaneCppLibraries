@@ -1029,6 +1029,9 @@ struct AsyncLoopWork : public AsyncRequest
 /// Example of async open operation:
 /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationOpenSnippet
 ///
+/// Example of async close operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCloseSnippet
+///
 struct AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
@@ -1038,6 +1041,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     {
         None = 0,
         Open,
+        Close,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1054,6 +1058,11 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param mode The mode to open the file in (read, write, read-write, etc.)
     SC::Result open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode);
 
+    /// @brief Closes a file descriptor asynchronously
+    /// @param eventLoop The event loop to use
+    /// @param handle The file descriptor to close
+    SC::Result close(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1062,15 +1071,23 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     void onOperationCompleted(AsyncLoopWork::Result& res);
 
+    struct FileDescriptorData
+    {
+        FileDescriptor::Handle handle;
+    };
+
     struct OpenData
     {
         StringViewData path;
         FileOpen       mode;
     };
 
+    using CloseData = FileDescriptorData;
+
     union
     {
-        OpenData openData;
+        OpenData  openData;
+        CloseData closeData;
     };
 
     void destroy();

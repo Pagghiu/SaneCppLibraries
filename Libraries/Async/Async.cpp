@@ -465,6 +465,7 @@ void SC::AsyncFileSystemOperation::destroy()
     switch (operation)
     {
     case Operation::Open: dtor(openData); break;
+    case Operation::Close: dtor(closeData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -502,6 +503,25 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringV
         auto res = fd.get(completionData.handle, SC::Result::Error("Open returned invalid handle"));
         fd.detach(); // Detach the file descriptor from the loop work so that it is not closed when the callback ends
         return res;
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle)
+{
+    SC_TRY(checkState());
+    operation = Operation::Close;
+    new (&closeData, PlacementNew()) CloseData({handle});
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        FileDescriptor fd(closeData.handle);
+        return fd.close();
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
     return eventLoop.start(loopWork);

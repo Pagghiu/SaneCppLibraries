@@ -13,6 +13,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationOpen();
     }
+    if (test_section("file system operation - close"))
+    {
+        fileSystemOperationClose();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -57,5 +61,54 @@ void SC::AsyncTest::fileSystemOperationOpen()
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationOpen.txt"}));
     SC_TEST_EXPECT(asyncFileSystemOperation.open(eventLoop, path.view(), FileOpen::Read));
     SC_TEST_EXPECT(eventLoop.run());
+
+    // Remove test files
+    SC_TEST_EXPECT(fs.removeFile("FileSystemOperationOpen.txt"));
     //! [AsyncFileSystemOperationOpenSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationClose()
+{
+    //! [AsyncFileSystemOperationCloseSnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test file using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.writeString("FileSystemOperationClose.txt", "FileSystemOperationClose"));
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+
+    int callbackCalled = 0;
+
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        callbackCalled++;
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    FileDescriptor fd;
+    String         path = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationClose.txt"}));
+    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Read));
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    fd.detach();
+    SC_TEST_EXPECT(asyncFileSystemOperation.close(eventLoop, handle));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(callbackCalled == 1);
+
+    // Remove test files
+    SC_TEST_EXPECT(fs.removeFile("FileSystemOperationClose.txt"));
+    //! [AsyncFileSystemOperationCloseSnippet]
 }

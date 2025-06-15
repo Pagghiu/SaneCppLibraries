@@ -723,6 +723,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             globalLibURing.io_uring_sqe_set_data(submission, &async);
         }
         break;
+        case AsyncFileSystemOperation::Operation::Close: {
+            io_uring_sqe* submission;
+            SC_TRY(getNewSubmission(eventLoop, submission));
+            globalLibURing.io_uring_prep_close(submission, async.closeData.handle);
+            globalLibURing.io_uring_sqe_set_data(submission, &async);
+        }
+        break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }
@@ -736,6 +743,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         switch (result.getAsync().operation)
         {
         case AsyncFileSystemOperation::Operation::Open: result.completionData.handle = completion.res; break;
+        case AsyncFileSystemOperation::Operation::Close: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }
