@@ -466,6 +466,7 @@ void SC::AsyncFileSystemOperation::destroy()
     {
     case Operation::Open: dtor(openData); break;
     case Operation::Close: dtor(closeData); break;
+    case Operation::Read: dtor(readData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -522,6 +523,29 @@ SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDe
     {
         FileDescriptor fd(closeData.handle);
         return fd.close();
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle,
+                                              Span<char> buffer, uint64_t offset)
+{
+    SC_TRY(checkState());
+    operation = Operation::Read;
+    new (&readData, PlacementNew()) ReadData({handle, buffer, offset});
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        FileDescriptor fd(readData.handle);
+        Span<char>     actuallyRead;
+        SC_TRY(fd.read(readData.buffer, actuallyRead, readData.offset));
+        completionData.numBytes = actuallyRead.sizeInBytes();
+        return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
     return eventLoop.start(loopWork);

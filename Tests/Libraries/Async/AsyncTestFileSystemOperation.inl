@@ -17,6 +17,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationClose();
     }
+    if (test_section("file system operation - read"))
+    {
+        fileSystemOperationRead();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -111,4 +115,53 @@ void SC::AsyncTest::fileSystemOperationClose()
     // Remove test files
     SC_TEST_EXPECT(fs.removeFile("FileSystemOperationClose.txt"));
     //! [AsyncFileSystemOperationCloseSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationRead()
+{
+    //! [AsyncFileSystemOperationReadSnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test file using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.writeString("FileSystemOperationRead.txt", "FileSystemOperationRead"));
+
+    // Open the file first
+    FileDescriptor fd;
+    String         path = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationRead.txt"}));
+    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Read));
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    fd.detach();
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.numBytes == 23); // Length of "FileSystemOperationRead"
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Read from the file
+    char buffer[32] = {0};
+    SC_TEST_EXPECT(asyncFileSystemOperation.read(eventLoop, handle, Span<char>(buffer, sizeof(buffer)), 0));
+    SC_TEST_EXPECT(eventLoop.run());
+    StringView readContent({buffer, 23}, true, StringEncoding::Ascii);
+    SC_TEST_EXPECT(readContent == StringView("FileSystemOperationRead"));
+
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Remove test files
+    SC_TEST_EXPECT(fs.removeFile("FileSystemOperationRead.txt"));
+    //! [AsyncFileSystemOperationReadSnippet]
 }

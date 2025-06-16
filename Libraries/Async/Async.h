@@ -910,7 +910,8 @@ struct AsyncFileSystemOperationCompletionData : public AsyncCompletionData
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid; // for open
 
-    int code = 0; // for open
+    int    code     = 0; // for open/close
+    size_t numBytes = 0; // for read
 };
 
 namespace detail
@@ -1032,6 +1033,9 @@ struct AsyncLoopWork : public AsyncRequest
 /// Example of async close operation:
 /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCloseSnippet
 ///
+/// Example of async read operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationReadSnippet
+///
 struct AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
@@ -1042,6 +1046,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         None = 0,
         Open,
         Close,
+        Read,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1063,6 +1068,13 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param handle The file descriptor to close
     SC::Result close(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle);
 
+    /// @brief Reads data from a file descriptor at a given offset
+    /// @param eventLoop The event loop to use
+    /// @param handle The file descriptor to read from
+    /// @param buffer The buffer to read into
+    /// @param offset The offset in the file to read from
+    SC::Result read(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<char> buffer, uint64_t offset);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1082,12 +1094,20 @@ struct AsyncFileSystemOperation : public AsyncRequest
         FileOpen       mode;
     };
 
+    struct ReadData
+    {
+        FileDescriptor::Handle handle;
+        Span<char>             buffer;
+        uint64_t               offset;
+    };
+
     using CloseData = FileDescriptorData;
 
     union
     {
         OpenData  openData;
         CloseData closeData;
+        ReadData  readData;
     };
 
     void destroy();
