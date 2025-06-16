@@ -1047,6 +1047,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         Open,
         Close,
         Read,
+        Write,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1075,6 +1076,14 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param offset The offset in the file to read from
     SC::Result read(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<char> buffer, uint64_t offset);
 
+    /// @brief Writes data to a file descriptor at a given offset
+    /// @param eventLoop The event loop to use
+    /// @param handle The file descriptor to write to
+    /// @param buffer The buffer containing data to write
+    /// @param offset The offset in the file to write to
+    SC::Result write(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<const char> buffer,
+                     uint64_t offset);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1101,6 +1110,13 @@ struct AsyncFileSystemOperation : public AsyncRequest
         uint64_t               offset;
     };
 
+    struct WriteData
+    {
+        FileDescriptor::Handle handle;
+        Span<const char>       buffer;
+        uint64_t               offset;
+    };
+
     using CloseData = FileDescriptorData;
 
     union
@@ -1108,6 +1124,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         OpenData  openData;
         CloseData closeData;
         ReadData  readData;
+        WriteData writeData;
     };
 
     void destroy();

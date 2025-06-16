@@ -21,6 +21,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationRead();
     }
+    if (test_section("file system operation - write"))
+    {
+        fileSystemOperationWrite();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -164,4 +168,55 @@ void SC::AsyncTest::fileSystemOperationRead()
     // Remove test files
     SC_TEST_EXPECT(fs.removeFile("FileSystemOperationRead.txt"));
     //! [AsyncFileSystemOperationReadSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationWrite()
+{
+    //! [AsyncFileSystemOperationWriteSnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Open the file first
+    FileDescriptor fd;
+    String         path = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationWrite.txt"}));
+    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Write));
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
+    fd.detach();
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.numBytes == 24); // Length of "FileSystemOperationWrite"
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Write to the file
+    const char* writeData = "FileSystemOperationWrite";
+    SC_TEST_EXPECT(asyncFileSystemOperation.write(eventLoop, handle, Span<const char>(writeData, 24), 0));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Verify the content was written correctly
+    FileDescriptor verifyFd;
+    SC_TEST_EXPECT(verifyFd.openNativeEncoding(path.view(), FileOpen::Read));
+    File   verifyFile(verifyFd);
+    String text;
+    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(text.view() == "FileSystemOperationWrite");
+    SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
+
+    // Remove test files
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.removeFile("FileSystemOperationWrite.txt"));
+    //! [AsyncFileSystemOperationWriteSnippet]
 }

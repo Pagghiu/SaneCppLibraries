@@ -467,6 +467,7 @@ void SC::AsyncFileSystemOperation::destroy()
     case Operation::Open: dtor(openData); break;
     case Operation::Close: dtor(closeData); break;
     case Operation::Read: dtor(readData); break;
+    case Operation::Write: dtor(writeData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -545,6 +546,28 @@ SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDes
         Span<char>     actuallyRead;
         SC_TRY(fd.read(readData.buffer, actuallyRead, readData.offset));
         completionData.numBytes = actuallyRead.sizeInBytes();
+        return SC::Result(true);
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle,
+                                               Span<const char> buffer, uint64_t offset)
+{
+    SC_TRY(checkState());
+    operation = Operation::Write;
+    new (&writeData, PlacementNew()) WriteData({handle, buffer, offset});
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        FileDescriptor fd(writeData.handle);
+        SC_TRY(fd.write(writeData.buffer, writeData.offset));
+        completionData.numBytes = writeData.buffer.sizeInBytes();
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
