@@ -162,6 +162,11 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
     params.eventObject.signal();
     SC_TEST_EXPECT(acceptedClient.readWithTimeout({buf, sizeof(buf)}, readData, 10_sec));
     SC_TEST_EXPECT(buf[0] == testValue + 1);
+    if (socketType == SocketFlags::SocketStream)
+    {
+        // This only makes sense on TCP sockets, it will fail on unconnected UDP sockets
+        SC_TEST_EXPECT(socket.shutdown(SocketFlags::ShutdownBoth));
+    }
     SC_TEST_EXPECT(socket.close());
     SC_TEST_EXPECT(server.close());
     params.eventObject.signal();

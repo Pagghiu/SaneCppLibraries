@@ -43,6 +43,31 @@ SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
     return fd.isInheritable(hasValue);
 }
 
+SC::Result SC::SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
+{
+    int how = 0;
+    switch (shutdownType)
+    {
+    case SocketFlags::ShutdownRead: how = SHUT_RD; break;
+    case SocketFlags::ShutdownWrite: how = SHUT_WR; break;
+    case SocketFlags::ShutdownBoth: how = SHUT_RDWR; break;
+    default: return Result::Error("Invalid shutdown type");
+    }
+    if (::shutdown(handle, how) == 0)
+    {
+        return Result(true);
+    }
+    const int err = errno;
+    switch (err)
+    {
+    case ENOTCONN: return Result::Error("Socket is not connected");
+    case ESHUTDOWN: return Result::Error("Socket is already shutdown");
+    case EINVAL: return Result::Error("Invalid shutdown type");
+    case ENOTSOCK: return Result::Error("Socket is not a socket");
+    default: return Result::Error("Failed to shutdown socket");
+    }
+}
+
 SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,
                                         SocketFlags::InheritableType inheritable)

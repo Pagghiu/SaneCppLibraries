@@ -47,6 +47,22 @@ SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
     hasValue = (flags & HANDLE_FLAG_INHERIT) != 0;
     return Result(true);
 }
+SC::Result SC::SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
+{
+    int how = 0;
+    switch (shutdownType)
+    {
+    case SocketFlags::ShutdownRead: how = SD_RECEIVE; break;
+    case SocketFlags::ShutdownWrite: how = SD_SEND; break;
+    case SocketFlags::ShutdownBoth: how = SD_BOTH; break;
+    default: return Result::Error("Invalid shutdown type");
+    }
+    if (::shutdown(handle, how) == 0)
+    {
+        return Result(true);
+    }
+    return Result::Error("Failed to shutdown socket");
+}
 
 SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
                                         SocketFlags::ProtocolType protocol, SocketFlags::BlockingType blocking,

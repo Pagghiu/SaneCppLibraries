@@ -90,6 +90,14 @@ struct SC::SocketFlags
         ProtocolUdp, ///< The protocol is UDP
     };
 
+    /// @brief Sets the type of shutdown to perform
+    enum ShutdownType
+    {
+        ShutdownRead,  ///< Shuts down the socket for reading
+        ShutdownWrite, ///< Shuts down the socket for writing
+        ShutdownBoth   ///< Shuts down the socket for both reading and writing
+    };
+
   private:
     friend struct SocketDescriptor;
     friend struct SocketDescriptor;
@@ -184,21 +192,26 @@ struct SC::SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefini
     /// @brief Check if socket is inheritable by child processes
     /// @param[out] value if set to `true` indicates that this socket is inheritable by child processes
     /// @return Valid Result if the inheritable status for this socket has been queried successfully
-    [[nodiscard]] Result isInheritable(bool& value) const;
+    Result isInheritable(bool& value) const;
 
     /// @brief Changes the inheritable flag for this socket
     /// @param value `true` if this socket should be made inheritable, `false` for non-inheritable
     /// @return Valid Result if it has been possible changing the inheritable status of this socket
-    [[nodiscard]] Result setInheritable(bool value);
+    Result setInheritable(bool value);
 
     /// @brief Changes the blocking flag for this socket (if IO reads / writes should be blocking or not)
     /// @param value `true` if this socket should be made blocking, `false` for non-blocking
     /// @return Valid Result if it has been possible changing the blocking status of this socket
-    [[nodiscard]] Result setBlocking(bool value);
+    Result setBlocking(bool value);
 
     /// @brief Get address family (IPV4 / IPV6) of this socket
     /// @param[out] addressFamily The address family of this socket (if Result is valid)
     /// @return Valid Result the address family for this socket has been queried successfully
-    [[nodiscard]] Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
+    Result getAddressFamily(SocketFlags::AddressFamily& addressFamily) const;
+
+    /// @brief Shuts down the socket for reading, writing, or both
+    /// @param shutdownType The type of shutdown to perform
+    /// @return Valid Result if the socket has been successfully shut down
+    Result shutdown(SocketFlags::ShutdownType shutdownType);
 };
 //! @}
