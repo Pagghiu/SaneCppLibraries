@@ -629,26 +629,6 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // Socket CLOSE
-    //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop&, AsyncSocketClose& async)
-    {
-        async.flags |= Internal::Flag_ManualCompletion;
-        return Result(true);
-    }
-
-    static Result executeOperation(AsyncSocketClose& async, AsyncSocketClose::CompletionData& completionData)
-    {
-        completionData.code = ::closesocket(async.handle);
-        return Result(true);
-    }
-
-    Result completeAsync(AsyncSocketClose::Result& result)
-    {
-        return executeOperation(result.getAsync(), result.completionData);
-    }
-
-    //-------------------------------------------------------------------------------------------------------
     // File READ / WRITE shared functions
     //-------------------------------------------------------------------------------------------------------
     template <typename Func, typename T>

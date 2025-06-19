@@ -82,10 +82,6 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             socketTCPSendReceiveError();
         }
-        if (test_section("socket TCP close"))
-        {
-            socketTCPClose();
-        }
         if (test_section("socket UDP send/receive"))
         {
             socketUDPSendReceive();
@@ -439,29 +435,6 @@ receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
 // Assuming client is an unconnected UDP Socket
 SC_TRY(receiveAsync.start(eventLoop, client, {receivedData, sizeof(receivedData)}));
 //! [AsyncSocketReceiveFromSnippet]
-SC_TRY(eventLoop.run());
-return Result(true);
-}
-
-SC::Result snippetForSocketClose(AsyncEventLoop& eventLoop, Console& console)
-{
-SocketDescriptor client;
-//! [AsyncSocketCloseSnippet]
-// Assuming an already created (and running) AsyncEventLoop named `eventLoop`
-// and a connected or accepted socket named `client`
-// ...
-AsyncSocketClose asyncClose;
-
-asyncClose.callback = [&](AsyncSocketClose::Result& result)
-{
-    if(result.isValid())
-    {
-        console.printLine("Socket was closed successfully");
-    }
-};
-SC_TRY(asyncClose.start(eventLoop, client));
-
-//! [AsyncSocketCloseSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);
 }

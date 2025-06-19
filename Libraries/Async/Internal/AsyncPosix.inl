@@ -967,26 +967,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // Socket CLOSE
-    //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop&, AsyncSocketClose& async)
-    {
-        async.flags |= Internal::Flag_ManualCompletion;
-        return Result(true);
-    }
-
-    static Result executeOperation(AsyncSocketClose& async, AsyncSocketClose::CompletionData& completionData)
-    {
-        completionData.code = ::close(async.handle);
-        return Result(true);
-    }
-
-    Result completeAsync(AsyncSocketClose::Result& result)
-    {
-        return executeOperation(result.getAsync(), result.completionData);
-    }
-
-    //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)

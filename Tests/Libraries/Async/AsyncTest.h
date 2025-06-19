@@ -47,7 +47,6 @@ struct SC::AsyncTest : public SC::TestCase
     void socketTCPConnect();
     void socketTCPSendReceive();
     void socketTCPSendMultiple();
-    void socketTCPClose();
     void socketTCPSendReceiveError();
 
     // UDP Sockets

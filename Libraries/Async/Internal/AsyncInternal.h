@@ -102,7 +102,6 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncSocketSendTo>      activeSocketSendsTo;
     IntrusiveDoubleLinkedList<AsyncSocketReceive>     activeSocketReceives;
     IntrusiveDoubleLinkedList<AsyncSocketReceiveFrom> activeSocketReceivesFrom;
-    IntrusiveDoubleLinkedList<AsyncSocketClose>       activeSocketCloses;
     IntrusiveDoubleLinkedList<AsyncFileRead>          activeFileReads;
     IntrusiveDoubleLinkedList<AsyncFileWrite>         activeFileWrites;
     IntrusiveDoubleLinkedList<AsyncFileClose>         activeFileCloses;

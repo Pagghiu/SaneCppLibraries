@@ -148,7 +148,6 @@ struct AsyncRequest
         SocketSendTo,        ///< Request is an SocketSendTo object
         SocketReceive,       ///< Request is an AsyncSocketReceive object
         SocketReceiveFrom,   ///< Request is an SocketReceiveFrom object
-        SocketClose,         ///< Request is an AsyncSocketClose object
         FileRead,            ///< Request is an AsyncFileRead object
         FileWrite,           ///< Request is an AsyncFileWrite object
         FileClose,           ///< Request is an AsyncFileClose object
@@ -666,33 +665,6 @@ struct AsyncSocketReceiveFrom : public AsyncSocketReceive
 #endif
 };
 
-/// @brief Starts a socket close operation.
-/// Callback will be called when the socket has been fully closed.
-///
-/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketCloseSnippet
-struct AsyncSocketClose : public AsyncRequest
-{
-    AsyncSocketClose() : AsyncRequest(Type::SocketClose) {}
-
-    using AsyncRequest::start;
-
-    struct CompletionData : public AsyncCompletionData
-    {
-        int code = 0; ///< Return code of close socket operation
-    };
-    using Result = AsyncResultOf<AsyncSocketClose, CompletionData>;
-
-    /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor);
-
-    SocketDescriptor::Handle handle = SocketDescriptor::Invalid;
-    Function<void(Result&)>  callback; ///< Callback called after fully closing the socket
-
-  private:
-    SC::Result validate(AsyncEventLoop&);
-    friend struct AsyncEventLoop;
-};
-
 /// @brief Starts a file read operation, reading bytes from a file (or pipe).
 /// Callback will be called when the data read from the file (or pipe) is available. @n
 ///
@@ -942,7 +914,6 @@ struct AsyncCompletionVariant
         AsyncSocketSendTo::CompletionData      completionDataSocketSendTo;
         AsyncSocketReceive::CompletionData     completionDataSocketReceive;
         AsyncSocketReceiveFrom::CompletionData completionDataSocketReceiveFrom;
-        AsyncSocketClose::CompletionData       completionDataSocketClose;
         AsyncFileRead::CompletionData          completionDataFileRead;
         AsyncFileWrite::CompletionData         completionDataFileWrite;
         AsyncFileClose::CompletionData         completionDataFileClose;
@@ -959,7 +930,6 @@ struct AsyncCompletionVariant
     auto& getCompletion(AsyncSocketConnect&) { return completionDataSocketConnect; }
     auto& getCompletion(AsyncSocketSend&) { return completionDataSocketSend; }
     auto& getCompletion(AsyncSocketReceive&) { return completionDataSocketReceive; }
-    auto& getCompletion(AsyncSocketClose&) { return completionDataSocketClose; }
     auto& getCompletion(AsyncFileRead&) { return completionDataFileRead; }
     auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
     auto& getCompletion(AsyncFileClose&) { return completionDataFileClose; }

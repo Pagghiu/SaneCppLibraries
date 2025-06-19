@@ -335,38 +335,6 @@ void SC::AsyncTest::socketTCPSendMultiple()
     SC_TEST_EXPECT(finalString == "PINGPONGPENGPANG");
 }
 
-void SC::AsyncTest::socketTCPClose()
-{
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create(options));
-    SocketDescriptor client, serverSideClient;
-    createTCPSocketPair(eventLoop, client, serverSideClient);
-
-    AsyncSocketClose asyncClose1;
-
-    int numCalledClose1  = 0;
-    asyncClose1.callback = [&](AsyncSocketClose::Result& result)
-    {
-        numCalledClose1++;
-        SC_TEST_EXPECT(result.isValid());
-    };
-
-    SC_TEST_EXPECT(asyncClose1.start(eventLoop, client));
-
-    AsyncSocketClose asyncClose2;
-
-    int numCalledClose2  = 0;
-    asyncClose2.callback = [&](AsyncSocketClose::Result& result)
-    {
-        numCalledClose2++;
-        SC_TEST_EXPECT(result.isValid());
-    };
-    SC_TEST_EXPECT(asyncClose2.start(eventLoop, serverSideClient));
-    SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(numCalledClose1 == 1);
-    SC_TEST_EXPECT(numCalledClose2 == 1);
-}
-
 void SC::AsyncTest::socketTCPSendReceiveError()
 {
     AsyncEventLoop eventLoop;

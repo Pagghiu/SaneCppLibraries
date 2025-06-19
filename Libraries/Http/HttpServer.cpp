@@ -84,7 +84,6 @@ struct SC::HttpServer::Internal
     void onNewClient(AsyncSocketAccept::Result& result);
     void onReceive(AsyncSocketReceive::Result& result);
     void onAfterSend(AsyncSocketSend::Result& result);
-    void onCloseSocket(AsyncSocketClose::Result& result);
 
     void closeAsync(HttpServerClient& requestClient);
 
@@ -100,7 +99,6 @@ struct SC::HttpServerClient
     SmallString<16>    debugName;
     AsyncSocketReceive asyncReceive;
     AsyncSocketSend    asyncSend;
-    AsyncSocketClose   asyncClose;
 };
 
 SC::HttpServer::HttpServer() : internal(*reinterpret_cast<Internal*>(internalRaw))
@@ -250,7 +248,7 @@ void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
     // This cannot fail because start reports only incorrect API usage (AsyncRequest already in use etc.)
     SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, buffer.toSpan()));
 
-    // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in onCloseSocket)
+    // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(not clients.isFull());
 }
 
@@ -315,22 +313,9 @@ void SC::HttpServer::Internal::closeAsync(HttpServerClient& requestClient)
     {
         (void)requestClient.asyncReceive.stop(*eventLoop);
     }
-    requestClient.asyncClose.callback.bind<Internal, &Internal::onCloseSocket>(*this);
-
-    if (requestClient.asyncClose.isFree())
-    {
-        SC_TRUST_RESULT(requestClient.asyncClose.start(*eventLoop, requestClient.socket));
-    }
-}
-
-void SC::HttpServer::Internal::onCloseSocket(AsyncSocketClose::Result& result)
-{
-    SC_COMPILER_WARNING_PUSH_OFFSETOF
-    HttpServerClient& client = SC_COMPILER_FIELD_OFFSET(HttpServerClient, asyncClose, result.getAsync());
-    SC_COMPILER_WARNING_POP
-
+    SC_TRUST_RESULT(requestClient.socket.close());
     const bool wasFull = clients.isFull();
-    SC_TRUST_RESULT(clients.remove(client.response.key));
+    SC_TRUST_RESULT(clients.remove(requestClient.response.key));
     if (wasFull and not stopping)
     {
         // Arena was full and in onNewClient asyncAccept has been paused (by avoiding reactivation).
