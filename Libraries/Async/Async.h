@@ -1256,9 +1256,9 @@ struct AsyncEventLoop
   private:
     struct InternalDefinition
     {
-        static constexpr int Windows = 552;
-        static constexpr int Apple   = 544;
-        static constexpr int Linux   = 752;
+        static constexpr int Windows = 520;
+        static constexpr int Apple   = 512;
+        static constexpr int Linux   = 720;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

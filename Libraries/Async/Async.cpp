@@ -51,6 +51,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::FileRead: return "FileRead";
     case Type::FileWrite: return "FileWrite";
     case Type::FilePoll: return "FilePoll";
+    case Type::FileSystemOperation: return "FileSystemOperation";
     }
     Assert::unreachable();
 }
@@ -430,6 +431,22 @@ SC::Result SC::AsyncFilePoll::validate(AsyncEventLoop&)
 SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(operation != Operation::None, "AsyncFileSystemOperation - No operation set");
+    switch (operation)
+    {
+    case Operation::Open: SC_TRY_MSG(not openData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path"); break;
+    case Operation::Close:
+        SC_TRY_MSG(closeData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
+        break;
+    case Operation::Read:
+        SC_TRY_MSG(readData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
+        SC_TRY_MSG(readData.buffer.sizeInBytes() > 0, "AsyncFileSystemOperation - Zero sized read buffer");
+        break;
+    case Operation::Write:
+        SC_TRY_MSG(writeData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
+        SC_TRY_MSG(writeData.buffer.sizeInBytes() > 0, "AsyncFileSystemOperation - Zero sized write buffer");
+        break;
+    case Operation::None: break;
+    }
     return SC::Result(true);
 }
 

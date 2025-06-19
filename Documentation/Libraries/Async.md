@@ -166,13 +166,9 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 # Roadmap
 
 🟩 Usable Features:
-- More comprehensive test suite, testing all cancellations
-- FS operations (open stat read write unlink copyfile mkdir chmod etc.)
-- UDP Send/Receive
-- DNS Resolution
+- More AsyncFileSystemOperations
+- Async DNS Resolution
 
 🟦 Complete Features:
 - TTY with ANSI Escape Codes
-
-💡 Unplanned Features:
 - Signal handling
