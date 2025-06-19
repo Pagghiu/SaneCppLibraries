@@ -1087,26 +1087,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
 
     //-------------------------------------------------------------------------------------------------------
-    // File CLOSE
-    //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop&, AsyncFileClose& async)
-    {
-        async.flags |= Internal::Flag_ManualCompletion;
-        return Result(true);
-    }
-
-    static Result executeOperation(AsyncFileClose& async, AsyncFileClose::CompletionData& completionData)
-    {
-        completionData.code = ::close(async.handle);
-        return Result(true);
-    }
-
-    Result completeAsync(AsyncFileClose::Result& result)
-    {
-        return executeOperation(result.getAsync(), result.completionData);
-    }
-
-    //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
     // Used by kevent backend when Process exits too fast (EV_ERROR / ESRCH) and by the io-uring backend

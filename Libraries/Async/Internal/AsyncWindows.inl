@@ -835,26 +835,6 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File CLOSE
-    //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop&, AsyncFileClose& async)
-    {
-        async.flags |= Internal::Flag_ManualCompletion;
-        return Result(true);
-    }
-
-    static Result executeOperation(AsyncFileClose& async, AsyncFileClose::CompletionData& completionData)
-    {
-        completionData.code = ::CloseHandle(async.handle);
-        return Result(true);
-    }
-
-    Result completeAsync(AsyncFileClose::Result& result)
-    {
-        return executeOperation(result.getAsync(), result.completionData);
-    }
-
-    //-------------------------------------------------------------------------------------------------------
     // Process EXIT
     //-------------------------------------------------------------------------------------------------------
     // This is executed on windows thread pool

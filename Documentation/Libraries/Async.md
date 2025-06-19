@@ -25,7 +25,6 @@ This is the list of supported async operations:
 | [AsyncSocketReceiveFrom](@ref SC::AsyncSocketReceiveFrom)     | @copybrief SC::AsyncSocketReceiveFrom     |
 | [AsyncFileRead](@ref SC::AsyncFileRead)                       | @copybrief SC::AsyncFileRead              |
 | [AsyncFileWrite](@ref SC::AsyncFileWrite)                     | @copybrief SC::AsyncFileWrite             |
-| [AsyncFileClose](@ref SC::AsyncFileClose)                     | @copybrief SC::AsyncFileClose             |
 | [AsyncLoopTimeout](@ref SC::AsyncLoopTimeout)                 | @copybrief SC::AsyncLoopTimeout           |
 | [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)                   | @copybrief SC::AsyncLoopWakeUp            |
 | [AsyncLoopWork](@ref SC::AsyncLoopWork)                       | @copybrief SC::AsyncLoopWork              |
@@ -136,9 +135,6 @@ This is very useful to integrate the event loop into applications with other eve
 
 ## AsyncFileWrite
 @copydoc SC::AsyncFileWrite
-
-## AsyncFileClose
-@copydoc SC::AsyncFileClose
 
 ## AsyncFilePoll
 @copydoc SC::AsyncFilePoll

@@ -150,7 +150,6 @@ struct AsyncRequest
         SocketReceiveFrom,   ///< Request is an SocketReceiveFrom object
         FileRead,            ///< Request is an AsyncFileRead object
         FileWrite,           ///< Request is an AsyncFileWrite object
-        FileClose,           ///< Request is an AsyncFileClose object
         FilePoll,            ///< Request is an AsyncFilePoll object
         FileSystemOperation, ///< Request is an AsyncFileSystemOperation object
     };
@@ -814,36 +813,6 @@ struct AsyncFileWrite : public AsyncRequest
 #endif
 };
 
-/// @brief Starts a file close operation, closing the OS file descriptor.
-/// Callback will be called when the file is actually closed. @n
-/// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
-///
-/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileCloseSnippet
-struct AsyncFileClose : public AsyncRequest
-{
-    AsyncFileClose() : AsyncRequest(Type::FileClose) {}
-
-    /// @brief Completion data for AsyncFileClose
-    struct CompletionData : public AsyncCompletionData
-    {
-        int code = 0; ///< Return code of close file operation
-    };
-
-    /// @brief Callback result for AsyncFileClose
-    using Result = AsyncResultOf<AsyncFileClose, CompletionData>;
-
-    /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
-
-    Function<void(Result&)> callback; ///< Callback called after fully closing the file descriptor
-
-  private:
-    friend struct AsyncEventLoop;
-    SC::Result validate(AsyncEventLoop&);
-
-    FileDescriptor::Handle handle = FileDescriptor::Invalid;
-};
-
 /// @brief Starts an handle polling operation.
 /// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
 /// Callback will be called when any of the three API signals readiness events on the given file descriptor.
@@ -916,7 +885,6 @@ struct AsyncCompletionVariant
         AsyncSocketReceiveFrom::CompletionData completionDataSocketReceiveFrom;
         AsyncFileRead::CompletionData          completionDataFileRead;
         AsyncFileWrite::CompletionData         completionDataFileWrite;
-        AsyncFileClose::CompletionData         completionDataFileClose;
         AsyncFilePoll::CompletionData          completionDataFilePoll;
 
         AsyncFileSystemOperationCompletionData completionDataFileSystemOperation;
@@ -932,7 +900,6 @@ struct AsyncCompletionVariant
     auto& getCompletion(AsyncSocketReceive&) { return completionDataSocketReceive; }
     auto& getCompletion(AsyncFileRead&) { return completionDataFileRead; }
     auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
-    auto& getCompletion(AsyncFileClose&) { return completionDataFileClose; }
     auto& getCompletion(AsyncFilePoll&) { return completionDataFilePoll; }
     auto& getCompletion(AsyncFileSystemOperation&) { return completionDataFileSystemOperation; }
 

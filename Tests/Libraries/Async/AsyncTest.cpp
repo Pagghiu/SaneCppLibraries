@@ -101,10 +101,6 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileWriteMultiple(false); // do not use thread-pool
             fileWriteMultiple(true);  // use thread-pool
         }
-        if (test_section("file close"))
-        {
-            fileClose();
-        }
         fileSystemOperations();
         if (numTestsToRun == 2)
         {
@@ -562,35 +558,5 @@ SC_TRY(eventLoop.run());
 return Result(true);
 }
 
-SC::Result snippetForFileClose(AsyncEventLoop& eventLoop, Console& console)
-{
-//! [AsyncFileCloseSnippet]
-// Assuming an already created (and running) AsyncEventLoop named eventLoop
-// ...
-
-// Open a file and associated it with event loop
-FileDescriptor fd;
-FileOpen openMode;
-openMode.mode = FileOpen::Write;
-openMode.blocking = false;
-SC_TRY(File(fd).open("MyFile.txt", openMode));
-SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(fd));
-
-// Create the file close request
-FileDescriptor::Handle handle;
-SC_TRY(fd.get(handle, Result::Error("handle")));
-AsyncFileClose asyncFileClose;
-asyncFileClose.callback = [&](AsyncFileClose::Result& result)
-{
-    if(result.isValid())
-    {
-        console.printLine("File was closed successfully");
-    }
-};
-SC_TRY(asyncFileClose.start(eventLoop, handle));
-//! [AsyncFileCloseSnippet]
-SC_TRY(eventLoop.run());
-return Result(true);
-}
 // clang-format on
 } // namespace SC

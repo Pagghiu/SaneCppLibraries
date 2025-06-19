@@ -553,26 +553,6 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File CLOSE
-    //-------------------------------------------------------------------------------------------------------
-    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileClose& async)
-    {
-        io_uring_sqe* submission;
-        SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_close(submission, async.handle);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
-        return Result(true);
-    }
-
-    Result completeAsync(AsyncFileClose::Result& result)
-    {
-        io_uring_cqe& completion   = events[result.eventIndex];
-        result.returnCode          = Result(true);
-        result.completionData.code = completion.res;
-        return Result(true);
-    }
-
-    //-------------------------------------------------------------------------------------------------------
     // File POLL
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
