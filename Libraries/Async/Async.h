@@ -3,6 +3,7 @@
 #pragma once
 
 #include "../Containers/IntrusiveDoubleLinkedList.h"
+#include "../FileSystem/FileSystemOperations.h" // FileSystemCopyFlags
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Span.h"
@@ -985,6 +986,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         Close,
         Read,
         Write,
+        CopyFile,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1021,6 +1023,14 @@ struct AsyncFileSystemOperation : public AsyncRequest
     SC::Result write(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<const char> buffer,
                      uint64_t offset);
 
+    /// @brief Copies a file from one location to another
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the source file
+    /// @param destinationPath The path to the destination file
+    /// @param copyFlags Flags to control the copy operation
+    SC::Result copyFile(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
+                        FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1054,14 +1064,22 @@ struct AsyncFileSystemOperation : public AsyncRequest
         uint64_t               offset;
     };
 
+    struct CopyFileData
+    {
+        StringViewData      path;
+        StringViewData      destinationPath;
+        FileSystemCopyFlags copyFlags;
+    };
+
     using CloseData = FileDescriptorData;
 
     union
     {
-        OpenData  openData;
-        CloseData closeData;
-        ReadData  readData;
-        WriteData writeData;
+        OpenData     openData;
+        CloseData    closeData;
+        ReadData     readData;
+        WriteData    writeData;
+        CopyFileData copyFileData;
     };
 
     void destroy();

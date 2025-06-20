@@ -25,6 +25,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationWrite();
     }
+    if (test_section("file system operation - copy"))
+    {
+        fileSystemOperationCopy();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -219,4 +223,53 @@ void SC::AsyncTest::fileSystemOperationWrite()
     SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
     SC_TEST_EXPECT(fs.removeFile("FileSystemOperationWrite.txt"));
     //! [AsyncFileSystemOperationWriteSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationCopy()
+{
+    //! [AsyncFileSystemOperationCopySnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test file using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.writeString("FileSystemOperationCopy.txt", "FileSystemOperationCopy"));
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Copy the file
+    String sourcePath = StringEncoding::Native;
+    String destPath   = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "FileSystemOperationCopy.txt"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "FileSystemOperationCopy2.txt"}));
+    SC_TEST_EXPECT(asyncFileSystemOperation.copyFile(eventLoop, sourcePath.view(), destPath.view()));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Verify the content was copied correctly
+    FileDescriptor verifyFd;
+    SC_TEST_EXPECT(verifyFd.openNativeEncoding(destPath.view(), FileOpen::Read));
+    File   verifyFile(verifyFd);
+    String text;
+    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(text.view() == "FileSystemOperationCopy");
+    SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
+
+    // Remove test files
+    SC_TEST_EXPECT(fs.removeFile(sourcePath.view()));
+    SC_TEST_EXPECT(fs.removeFile(destPath.view()));
+    //! [AsyncFileSystemOperationCopySnippet]
 }

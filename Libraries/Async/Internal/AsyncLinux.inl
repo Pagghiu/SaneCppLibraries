@@ -706,6 +706,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             globalLibURing.io_uring_sqe_set_data(submission, &async);
         }
         break;
+        case AsyncFileSystemOperation::Operation::CopyFile: {
+            // TODO: Implement this using two splice submissions with IOSQE_IO_LINK
+            return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
+        }
+        break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }
@@ -726,6 +731,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         case AsyncFileSystemOperation::Operation::Write:
             result.completionData.numBytes = static_cast<size_t>(completion.res);
             break;
+        case AsyncFileSystemOperation::Operation::CopyFile:
+            return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }

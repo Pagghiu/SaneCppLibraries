@@ -445,6 +445,10 @@ SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
         SC_TRY_MSG(writeData.handle != FileDescriptor::Invalid, "AsyncFileSystemOperation - Invalid file descriptor");
         SC_TRY_MSG(writeData.buffer.sizeInBytes() > 0, "AsyncFileSystemOperation - Zero sized write buffer");
         break;
+    case Operation::CopyFile:
+        SC_TRY_MSG(not copyFileData.path.isEmpty(), "AsyncFileSystemOperation - Invalid source path");
+        SC_TRY_MSG(not copyFileData.destinationPath.isEmpty(), "AsyncFileSystemOperation - Invalid destination path");
+        break;
     case Operation::None: break;
     }
     return SC::Result(true);
@@ -458,6 +462,7 @@ void SC::AsyncFileSystemOperation::destroy()
     case Operation::Close: dtor(closeData); break;
     case Operation::Read: dtor(readData); break;
     case Operation::Write: dtor(writeData); break;
+    case Operation::CopyFile: dtor(copyFileData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -558,6 +563,22 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
         FileDescriptor fd(writeData.handle);
         SC_TRY(fd.write(writeData.buffer, writeData.offset));
         completionData.numBytes = writeData.buffer.sizeInBytes();
+        return SC::Result(true);
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, StringViewData path,
+                                                  StringViewData destinationPath, FileSystemCopyFlags copyFlags)
+{
+    SC_TRY(checkState());
+    operation = Operation::CopyFile;
+    new (&copyFileData, PlacementNew()) CopyFileData({path, destinationPath, copyFlags});
+    // TODO: Implement this on io_uring using two splice submissions with IOSQE_IO_LINK
+    loopWork.work = [&]()
+    {
+        SC_TRY(FileSystemOperations::copyFile(copyFileData.path, copyFileData.destinationPath, copyFileData.copyFlags));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
