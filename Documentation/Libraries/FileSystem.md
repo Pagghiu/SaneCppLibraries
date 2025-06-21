@@ -48,6 +48,8 @@ Path is able to parse and manipulate windows and posix paths.
 | SC::FileSystem::exists                        | @copybrief SC::FileSystem::exists                         |
 | SC::FileSystem::existsAndIsFile               | @copybrief SC::FileSystem::existsAndIsFile                |
 | SC::FileSystem::existsAndIsDirectory          | @copybrief SC::FileSystem::existsAndIsDirectory           |
+| **Rename files or directories**               |                                                           |
+| SC::FileSystem::rename                        | @copybrief SC::FileSystem::rename                         |
 | **Read / Change modification time**           |                                                           |
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
@@ -55,6 +57,7 @@ Path is able to parse and manipulate windows and posix paths.
 | Miscellaneous Classes                         |                                                           |
 |:----------------------------------------------|:----------------------------------------------------------|
 | SC::FileSystemDirectories                     | @copybrief SC::FileSystemDirectories                      |
+| SC::FileSystemOperations                      | @copybrief SC::FileSystemOperations                       |
 
 # Status
 🟩 Usable  
@@ -111,6 +114,9 @@ The class wants explicitly to make sure its behavior doesn't implicitly depend o
 ## existsAndIsDirectory
 @copydoc SC::FileSystem::existsAndIsDirectory
 
+## rename
+@copydoc SC::FileSystem::rename
+
 ## write
 @copydoc SC::FileSystem::write
 
@@ -120,25 +126,20 @@ The class wants explicitly to make sure its behavior doesn't implicitly depend o
 # Roadmap
 
 🟦 Complete Features:
-- `stat`
-- `fstat`
-- `rename`
+- `access`
 - `chmod`
 - `chown`
-- `fsync`
-- `link` (hardlink)
-- `symlink`
-- `sendfile`
-
-💡 Unplanned Features:
-There are many fs operations tat can be added
 - `fchmod`
 - `fchown`
-- `lchown`
-- `access`
-- `ftruncate`
-- `lstat`
-- `statfs`
 - `fdatasync`
+- `fstat`
+- `fsync`
 - `ftruncate`
+- `ftruncate`
+- `lchown`
+- `link` (hardlink)
+- `lstat`
 - `readlink`
+- `sendfile`
+- `stat`
+- `statfs`

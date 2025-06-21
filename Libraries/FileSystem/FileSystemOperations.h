@@ -102,6 +102,12 @@ struct FileSystemOperations
     /// @return Result::Error if the file could not be copied
     static Result copyFile(StringViewData srcPath, StringViewData destPath, FileSystemCopyFlags flags);
 
+    /// @brief Rename a file or directory
+    /// @param path The path to the file or directory to rename
+    /// @param newPath The new path to the file or directory
+    /// @return Result::Error if the file or directory could not be renamed
+    static Result rename(StringViewData path, StringViewData newPath);
+
     /// @brief Copy a directory
     /// @param srcPath The source directory to copy
     /// @param destPath The destination directory to copy to

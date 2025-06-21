@@ -287,6 +287,14 @@ SC::Result SC::FileSystem::formatError(int errorNumber, StringView item, bool is
     return Result::FromStableCharPointer(errorMessageBuffer.view().bytesIncludingTerminator());
 }
 
+SC::Result SC::FileSystem::rename(StringView path, StringView newPath)
+{
+    StringView encodedPath1, encodedPath2;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath1));
+    SC_TRY(convert(newPath, fileFormatBuffer2, &encodedPath2));
+    return FileSystemOperations::rename(encodedPath1, encodedPath2);
+}
+
 SC::Result SC::FileSystem::removeFiles(Span<const StringView> files)
 {
     StringView encodedPath;

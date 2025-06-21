@@ -176,6 +176,15 @@ SC::Result SC::FileSystemOperations::setLastModifiedTime(StringViewData path, Ti
     return Result(true);
 }
 
+SC::Result SC::FileSystemOperations::rename(StringViewData path, StringViewData newPath)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
+    SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
+    SC_TRY_WIN32(::MoveFileW(path.getNullTerminatedNative(), newPath.getNullTerminatedNative()),
+                 "rename: Failed to rename");
+    return Result(true);
+}
+
 SC::Result SC::FileSystemOperations::copyFile(StringViewData source, StringViewData destination,
                                               FileSystemCopyFlags flags)
 {

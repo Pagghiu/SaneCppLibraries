@@ -87,6 +87,16 @@ struct SC_COMPILER_EXPORT FileSystem
         return copyDirectories(CopyOperation{source, destination, copyFlags});
     }
 
+    /// @brief Rename a file or directory
+    /// @param path The path to the file or directory to rename
+    /// @param newPath The new path to the file or directory
+    /// @return Valid Result if the file or directory was renamed
+    ///
+    /// Example:
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp renameFileSnippet
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp renameDirectorySnippet
+    [[nodiscard]] Result rename(StringView path, StringView newPath);
+
     /// @brief Remove multiple files
     /// @param files View over a list of paths
     /// @return Valid Result if file was removed

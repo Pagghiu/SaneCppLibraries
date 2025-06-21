@@ -42,6 +42,14 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             removeDirectoryRecursive();
         }
+        if (test_section("Rename File"))
+        {
+            renameFile();
+        }
+        if (test_section("Rename Directory"))
+        {
+            renameDirectory();
+        }
         // TODO: Add tests for createSymbolicLink, existsAndIsLink, removeLinkIfExists and moveDirectory
     }
 
@@ -52,6 +60,8 @@ struct SC::FileSystemTest : public SC::TestCase
     void copyExistsFile();
     void copyDirectoryRecursive();
     void removeDirectoryRecursive();
+    void renameFile();
+    void renameDirectory();
     void snippet();
 };
 
@@ -249,6 +259,74 @@ void SC::FileSystemTest::removeDirectoryRecursive()
     //! [removeDirectoryRecursiveSnippet]
 }
 
+void SC::FileSystemTest::renameFile()
+{
+    //! [renameFileSnippet]
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+
+    // Create a file and check that it exists
+    SC_TEST_EXPECT(fs.writeString("renameTest.txt", "asdf"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameTest.txt"));
+
+    // Rename the file
+    SC_TEST_EXPECT(fs.rename("renameTest.txt", "renameTest2.txt"));
+
+    // Check that the file has been renamed
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameTest2.txt"));
+    SC_TEST_EXPECT(not fs.existsAndIsFile("renameTest.txt"));
+
+    // Rename the file again
+    SC_TEST_EXPECT(fs.rename("renameTest2.txt", "renameTest.txt"));
+
+    // Check that the file has been renamed
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameTest.txt"));
+    SC_TEST_EXPECT(not fs.existsAndIsFile("renameTest2.txt"));
+
+    // Remove all files created by the test
+    SC_TEST_EXPECT(fs.removeFile("renameTest.txt"));
+    //! [renameFileSnippet]
+}
+
+void SC::FileSystemTest::renameDirectory()
+{
+    //! [renameDirectorySnippet]
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+
+    // Create a directory and check that it exists
+    SC_TEST_EXPECT(fs.makeDirectory("renameDirectoryTest"));
+    SC_TEST_EXPECT(fs.existsAndIsDirectory("renameDirectoryTest"));
+    // Create a file in the directory
+    SC_TEST_EXPECT(fs.writeString("renameDirectoryTest/testFile.txt", "asdf"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameDirectoryTest/testFile.txt"));
+    // Create a subdirectory in the directory
+    SC_TEST_EXPECT(fs.makeDirectory("renameDirectoryTest/subdirectory"));
+    SC_TEST_EXPECT(fs.existsAndIsDirectory("renameDirectoryTest/subdirectory"));
+
+    // Create a file in the subdirectory
+    SC_TEST_EXPECT(fs.writeString("renameDirectoryTest/subdirectory/testFile.txt", "asdf"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameDirectoryTest/subdirectory/testFile.txt"));
+
+    // Rename the directory
+    SC_TEST_EXPECT(fs.rename("renameDirectoryTest", "renameDirectoryTest2"));
+
+    // Check that the directory has been renamed
+    SC_TEST_EXPECT(fs.existsAndIsDirectory("renameDirectoryTest2"));
+    SC_TEST_EXPECT(not fs.existsAndIsDirectory("renameDirectoryTest"));
+
+    // Check that the file in the directory has been renamed
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameDirectoryTest2/testFile.txt"));
+    SC_TEST_EXPECT(not fs.existsAndIsFile("renameDirectoryTest/testFile.txt"));
+    // Check that the file in the subdirectory has been renamed
+    SC_TEST_EXPECT(fs.existsAndIsFile("renameDirectoryTest2/subdirectory/testFile.txt"));
+    SC_TEST_EXPECT(not fs.existsAndIsFile("renameDirectoryTest/subdirectory/testFile.txt"));
+
+    // Remove all directories created by the test
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive("renameDirectoryTest2"));
+    //! [renameDirectorySnippet]
+}
+
 void SC::FileSystemTest::snippet()
 {
     // clang-format off
@@ -276,6 +354,16 @@ SC_TEST_EXPECT(not fs.copyDirectory("copyDirectory", "COPY_copyDirectory"));
 // Try copying again but now we ask to overwrite destination
 SC_TEST_EXPECT(fs.copyDirectory("copyDirectory", "COPY_copyDirectory",
                 FileSystem::CopyFlags().setOverwrite(true)));
+
+// Rename the directory (fs.rename works also for files)
+SC_TEST_EXPECT(fs.rename("copyDirectory", "COPY_copyDirectory2"));
+
+// Check that the directory has been renamed
+SC_TEST_EXPECT(fs.existsAndIsDirectory("COPY_copyDirectory2"));
+SC_TEST_EXPECT(not fs.existsAndIsDirectory("copyDirectory"));
+
+// Rename the directory back to the original name
+SC_TEST_EXPECT(fs.rename("COPY_copyDirectory2", "copyDirectory"));
 
 // Remove all files created
 SC_TEST_EXPECT(fs.removeFile("copyDirectory/testFile.txt"));
