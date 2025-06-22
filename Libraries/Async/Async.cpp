@@ -449,6 +449,10 @@ SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
         SC_TRY_MSG(not copyFileData.path.isEmpty(), "AsyncFileSystemOperation - Invalid source path");
         SC_TRY_MSG(not copyFileData.destinationPath.isEmpty(), "AsyncFileSystemOperation - Invalid destination path");
         break;
+    case Operation::Rename:
+        SC_TRY_MSG(not renameData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
+        SC_TRY_MSG(not renameData.newPath.isEmpty(), "AsyncFileSystemOperation - Invalid new path");
+        break;
     case Operation::None: break;
     }
     return SC::Result(true);
@@ -463,6 +467,7 @@ void SC::AsyncFileSystemOperation::destroy()
     case Operation::Read: dtor(readData); break;
     case Operation::Write: dtor(writeData); break;
     case Operation::CopyFile: dtor(copyFileData); break;
+    case Operation::Rename: dtor(renameData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -579,6 +584,25 @@ SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, Str
     loopWork.work = [&]()
     {
         SC_TRY(FileSystemOperations::copyFile(copyFileData.path, copyFileData.destinationPath, copyFileData.copyFlags));
+        return SC::Result(true);
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath)
+{
+    SC_TRY(checkState());
+    operation = Operation::Rename;
+    new (&renameData, PlacementNew()) RenameData({path, newPath});
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        SC_TRY(FileSystemOperations::rename(renameData.path, renameData.newPath));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);

@@ -1,4 +1,5 @@
 #include <dlfcn.h>
+#include <fcntl.h> // for AT_FDCWD
 #include <stdint.h>
 #include <string.h>
 #include <sys/uio.h> // for iovec
@@ -114,6 +115,8 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     void (*io_uring_prep_write)(struct io_uring_sqe* sqe, int fd, const void* buf, unsigned nbytes, __u64 offset) = nullptr;
     void (*io_uring_prep_writev)(struct io_uring_sqe* sqe, int fd, const iovec* vecs, unsigned nvecs, __u64 offset) = nullptr;
 
+    void (*io_uring_prep_rename)(struct io_uring_sqe* sqe, const char* path, const char* new_path) = nullptr;
+    void (*io_uring_prep_renameat)(struct io_uring_sqe* sqe, int olddfd, const char* oldpath, int newdfd, const char* newpath, unsigned flags) = nullptr;
     void (*io_uring_prep_poll_add)(struct io_uring_sqe* sqe, int fd, unsigned poll_mask) = nullptr;
     void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, __u64 user_data) = nullptr;
     void (*io_uring_prep_cancel)(struct io_uring_sqe* sqe, void* user_data, int flags) = nullptr;
@@ -142,6 +145,8 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_prep_poll_remove    = &::io_uring_prep_poll_remove;
         this->io_uring_prep_cancel         = &::io_uring_prep_cancel;
         this->io_uring_prep_openat         = &::io_uring_prep_openat;
+        this->io_uring_prep_rename         = &::io_uring_prep_rename;
+        this->io_uring_prep_renameat       = &::io_uring_prep_renameat;
     }
 };
 
@@ -312,6 +317,18 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
                                             __u64 offset)
     {
         io_uring_prep_rw(IORING_OP_WRITEV, sqe, fd, vecs, nvecs, offset);
+    }
+
+    static inline void io_uring_prep_renameat(struct io_uring_sqe* sqe, int olddfd, const char* oldpath, int newdfd,
+                                              const char* newpath, unsigned int flags)
+    {
+        io_uring_prep_rw(IORING_OP_RENAMEAT, sqe, olddfd, oldpath, (__u32)newdfd, (uint64_t)(uintptr_t)newpath);
+        sqe->rename_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_rename(struct io_uring_sqe* sqe, const char* oldpath, const char* newpath)
+    {
+        io_uring_prep_renameat(sqe, AT_FDCWD, oldpath, AT_FDCWD, newpath, 0);
     }
 
     static inline unsigned static__io_uring_prep_poll_mask(unsigned poll_mask)

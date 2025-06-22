@@ -987,6 +987,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         Read,
         Write,
         CopyFile,
+        Rename,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1031,6 +1032,12 @@ struct AsyncFileSystemOperation : public AsyncRequest
     SC::Result copyFile(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
                         FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
 
+    /// @brief Renames a file
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the source file
+    /// @param newPath The new path to the file
+    SC::Result rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1073,6 +1080,12 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     using CloseData = FileDescriptorData;
 
+    struct RenameData
+    {
+        StringViewData path;
+        StringViewData newPath;
+    };
+
     union
     {
         OpenData     openData;
@@ -1080,6 +1093,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         ReadData     readData;
         WriteData    writeData;
         CopyFileData copyFileData;
+        RenameData   renameData;
     };
 
     void destroy();

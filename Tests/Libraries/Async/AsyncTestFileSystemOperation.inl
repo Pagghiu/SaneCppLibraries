@@ -29,6 +29,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationCopy();
     }
+    if (test_section("file system operation - rename"))
+    {
+        fileSystemOperationRename();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -272,4 +276,52 @@ void SC::AsyncTest::fileSystemOperationCopy()
     SC_TEST_EXPECT(fs.removeFile(sourcePath.view()));
     SC_TEST_EXPECT(fs.removeFile(destPath.view()));
     //! [AsyncFileSystemOperationCopySnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationRename()
+{
+    //! [AsyncFileSystemOperationRenameSnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test file using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.writeString("FileSystemOperationRename.txt", "FileSystemOperationRename"));
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Rename the file
+    String sourcePath = StringEncoding::Native;
+    String destPath   = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "FileSystemOperationRename.txt"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "FileSystemOperationRename2.txt"}));
+    SC_TEST_EXPECT(asyncFileSystemOperation.rename(eventLoop, sourcePath.view(), destPath.view()));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Verify the content was renamed correctly
+    FileDescriptor verifyFd;
+    SC_TEST_EXPECT(verifyFd.openNativeEncoding(destPath.view(), FileOpen::Read));
+    File   verifyFile(verifyFd);
+    String text;
+    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(text.view() == "FileSystemOperationRename");
+    SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
+
+    // Remove test files
+    SC_TEST_EXPECT(fs.removeFile(destPath.view()));
+    //! [AsyncFileSystemOperationRenameSnippet]
 }

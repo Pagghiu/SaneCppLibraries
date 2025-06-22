@@ -59,4 +59,5 @@ struct SC::AsyncTest : public SC::TestCase
     void fileSystemOperationRead();
     void fileSystemOperationWrite();
     void fileSystemOperationCopy();
+    void fileSystemOperationRename();
 };
