@@ -719,6 +719,14 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             globalLibURing.io_uring_sqe_set_data(submission, &async);
         }
         break;
+        case AsyncFileSystemOperation::Operation::RemoveDirectory: {
+            io_uring_sqe* submission;
+            SC_TRY(getNewSubmission(eventLoop, submission));
+            globalLibURing.io_uring_prep_unlink(submission, async.removeData.path.getNullTerminatedNative(),
+                                                AT_REMOVEDIR);
+            globalLibURing.io_uring_sqe_set_data(submission, &async);
+        }
+        break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }
@@ -742,6 +750,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         case AsyncFileSystemOperation::Operation::CopyFile:
             return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
         case AsyncFileSystemOperation::Operation::Rename: result.completionData.code = completion.res; break;
+        case AsyncFileSystemOperation::Operation::RemoveDirectory: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::None: break;
         default: Assert::unreachable();
         }

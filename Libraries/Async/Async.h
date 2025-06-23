@@ -642,7 +642,7 @@ struct AsyncSocketReceive : public AsyncRequest
 #endif
 };
 
-/// @brief Starts a unconnectedsocket receive from operation, receiving bytes from a remote endpoint.
+/// @brief Starts an unconnected socket receive from operation, receiving bytes from a remote endpoint.
 /// Callback will be called when some data is read from socket. @n
 /// Typical use case is to receive data from an unconnected UDP socket. @n
 /// @ref library_socket library can be used to create a Socket but the socket should be created with
@@ -988,6 +988,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         Write,
         CopyFile,
         Rename,
+        RemoveDirectory,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1038,6 +1039,12 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param newPath The new path to the file
     SC::Result rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath);
 
+    /// @brief Removes a directory asynchronously
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the directory to remove
+    /// @note The directory must be empty for this operation to succeed
+    SC::Result removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path);
+
   private:
     friend struct AsyncEventLoop;
     Operation      operation = Operation::None;
@@ -1086,6 +1093,11 @@ struct AsyncFileSystemOperation : public AsyncRequest
         StringViewData newPath;
     };
 
+    struct RemoveData
+    {
+        StringViewData path;
+    };
+
     union
     {
         OpenData     openData;
@@ -1094,6 +1106,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         WriteData    writeData;
         CopyFileData copyFileData;
         RenameData   renameData;
+        RemoveData   removeData;
     };
 
     void destroy();

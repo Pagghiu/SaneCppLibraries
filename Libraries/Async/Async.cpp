@@ -453,6 +453,10 @@ SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
         SC_TRY_MSG(not renameData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
         SC_TRY_MSG(not renameData.newPath.isEmpty(), "AsyncFileSystemOperation - Invalid new path");
         break;
+    case Operation::RemoveDirectory:
+        SC_TRY_MSG(not removeData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
+        break;
+        break;
     case Operation::None: break;
     }
     return SC::Result(true);
@@ -468,6 +472,7 @@ void SC::AsyncFileSystemOperation::destroy()
     case Operation::Write: dtor(writeData); break;
     case Operation::CopyFile: dtor(copyFileData); break;
     case Operation::Rename: dtor(renameData); break;
+    case Operation::RemoveDirectory: dtor(removeData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -603,6 +608,25 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
     loopWork.work = [&]()
     {
         SC_TRY(FileSystemOperations::rename(renameData.path, renameData.newPath));
+        return SC::Result(true);
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path)
+{
+    SC_TRY(checkState());
+    operation = Operation::RemoveDirectory;
+    new (&removeData, PlacementNew()) RemoveData({path});
+    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    {
+        return eventLoop.start(*this);
+    }
+
+    loopWork.work = [&]()
+    {
+        SC_TRY(FileSystemOperations::removeEmptyDirectory(removeData.path));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);

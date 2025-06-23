@@ -33,6 +33,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationRename();
     }
+    if (test_section("file system operation - remove empty directory"))
+    {
+        fileSystemOperationRemoveEmptyDirectory();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -324,4 +328,45 @@ void SC::AsyncTest::fileSystemOperationRename()
     // Remove test files
     SC_TEST_EXPECT(fs.removeFile(destPath.view()));
     //! [AsyncFileSystemOperationRenameSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationRemoveEmptyDirectory()
+{
+    //! [AsyncFileSystemOperationRemoveEmptyDirectorySnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test directory using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    String dirPath = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, "FileSystemOperationRemoveEmptyDirectory"}));
+    SC_TEST_EXPECT(fs.makeDirectory(dirPath.view()));
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    int                      numCallbacks = 0;
+    asyncFileSystemOperation.callback     = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+        numCallbacks++;
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Remove the empty directory
+    SC_TEST_EXPECT(asyncFileSystemOperation.removeEmptyDirectory(eventLoop, dirPath.view()));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(numCallbacks == 1); // Ensure the callback was called
+
+    // Verify the directory was removed
+    SC_TEST_EXPECT(!fs.existsAndIsDirectory(dirPath.view()));
+
+    //! [AsyncFileSystemOperationRemoveEmptyDirectorySnippet]
 }

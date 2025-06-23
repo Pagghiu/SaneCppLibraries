@@ -117,6 +117,8 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
 
     void (*io_uring_prep_rename)(struct io_uring_sqe* sqe, const char* path, const char* new_path) = nullptr;
     void (*io_uring_prep_renameat)(struct io_uring_sqe* sqe, int olddfd, const char* oldpath, int newdfd, const char* newpath, unsigned flags) = nullptr;
+    void (*io_uring_prep_unlink)(struct io_uring_sqe* sqe, const char* pathname, int flags) = nullptr;
+    void (*io_uring_prep_unlinkat)(struct io_uring_sqe* sqe, int dfd, const char* pathname, int flags) = nullptr;
     void (*io_uring_prep_poll_add)(struct io_uring_sqe* sqe, int fd, unsigned poll_mask) = nullptr;
     void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, __u64 user_data) = nullptr;
     void (*io_uring_prep_cancel)(struct io_uring_sqe* sqe, void* user_data, int flags) = nullptr;
@@ -147,6 +149,8 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_prep_openat         = &::io_uring_prep_openat;
         this->io_uring_prep_rename         = &::io_uring_prep_rename;
         this->io_uring_prep_renameat       = &::io_uring_prep_renameat;
+        this->io_uring_prep_unlink         = &::io_uring_prep_unlink;
+        this->io_uring_prep_unlinkat       = &::io_uring_prep_unlinkat;
     }
 };
 
@@ -329,6 +333,18 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     static inline void io_uring_prep_rename(struct io_uring_sqe* sqe, const char* oldpath, const char* newpath)
     {
         io_uring_prep_renameat(sqe, AT_FDCWD, oldpath, AT_FDCWD, newpath, 0);
+    }
+
+    static inline void io_uring_prep_unlinkat(struct io_uring_sqe* sqe, int dfd, const char* pathname,
+                                              unsigned int flags)
+    {
+        io_uring_prep_rw(IORING_OP_UNLINKAT, sqe, dfd, pathname, 0, 0);
+        sqe->unlink_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_unlink(struct io_uring_sqe* sqe, const char* pathname, unsigned int flags)
+    {
+        io_uring_prep_unlinkat(sqe, AT_FDCWD, pathname, flags);
     }
 
     static inline unsigned static__io_uring_prep_poll_mask(unsigned poll_mask)
