@@ -989,6 +989,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         CopyFile,
         Rename,
         RemoveDirectory,
+        RemoveFile,
     };
 
     using CompletionData = AsyncFileSystemOperationCompletionData;
@@ -1044,6 +1045,11 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param path The path to the directory to remove
     /// @note The directory must be empty for this operation to succeed
     SC::Result removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path);
+
+    /// @brief Removes a file asynchronously
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the file to remove
+    SC::Result removeFile(AsyncEventLoop& eventLoop, StringViewData path);
 
   private:
     friend struct AsyncEventLoop;

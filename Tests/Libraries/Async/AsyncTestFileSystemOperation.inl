@@ -37,6 +37,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationRemoveEmptyDirectory();
     }
+    if (test_section("file system operation - remove file"))
+    {
+        fileSystemOperationRemoveFile();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -369,4 +373,42 @@ void SC::AsyncTest::fileSystemOperationRemoveEmptyDirectory()
     SC_TEST_EXPECT(!fs.existsAndIsDirectory(dirPath.view()));
 
     //! [AsyncFileSystemOperationRemoveEmptyDirectorySnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationRemoveFile()
+{
+    //! [AsyncFileSystemOperationRemoveFileSnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test file using FileSystem
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    String filePath = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory, "FileSystemOperationRemoveFile.txt"}));
+    SC_TEST_EXPECT(fs.writeString(filePath.view(), "FileSystemOperationRemoveFile"));
+
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Remove the file
+    SC_TEST_EXPECT(asyncFileSystemOperation.removeFile(eventLoop, filePath.view()));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Verify the file was removed
+    SC_TEST_EXPECT(not fs.existsAndIsFile(filePath.view()));
+
+    //! [AsyncFileSystemOperationRemoveFileSnippet]
 }

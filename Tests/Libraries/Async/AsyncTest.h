@@ -61,4 +61,5 @@ struct SC::AsyncTest : public SC::TestCase
     void fileSystemOperationCopy();
     void fileSystemOperationRename();
     void fileSystemOperationRemoveEmptyDirectory();
+    void fileSystemOperationRemoveFile();
 };
