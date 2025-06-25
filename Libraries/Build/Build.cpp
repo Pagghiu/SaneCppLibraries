@@ -337,9 +337,11 @@ SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView      
         SC_TRY(renderedFilters.push_back(move(file)));
     }
 
+    FileSystemIterator::FolderState entries[16];
+
     FileSystemIterator fsIterator;
     fsIterator.options.forwardSlashes = true;
-    SC_TRY(fsIterator.init(path));
+    SC_TRY(fsIterator.init(path, entries));
 
     while (fsIterator.enumerateNext())
     {

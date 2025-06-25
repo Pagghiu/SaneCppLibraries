@@ -142,10 +142,12 @@ struct SC::FileSystemWatcher::Internal
 
         // Watch all subfolders of current directory.
         // TODO: We should also dynamically add / remove watched directories added after now...
-        StringConverter    converter(opaque.relativePaths, StringEncoding::Utf8);
-        FileSystemIterator iterator;
+        StringConverter converter(opaque.relativePaths, StringEncoding::Utf8);
+
+        FileSystemIterator::FolderState folderStates[16];
+        FileSystemIterator              iterator;
         iterator.options.recursive = true;
-        SC_TRY(iterator.init(encodedPath));
+        SC_TRY(iterator.init(encodedPath, folderStates));
         while (iterator.enumerateNext())
         {
             if (iterator.get().isDirectory())

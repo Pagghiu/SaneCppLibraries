@@ -19,8 +19,10 @@ struct FileSystemFinder
                                             Span<const StringView>         excludeDirectories,
                                             Function<Result(StringView)>&& forEachFunc)
     {
+        FileSystemIterator::FolderState entries[16];
+
         FileSystemIterator iterator;
-        SC_TRY(iterator.init(libraryDirectory));
+        SC_TRY(iterator.init(libraryDirectory, entries));
 
         while (iterator.enumerateNext())
         {

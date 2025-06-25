@@ -1,37 +1,22 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystemIterator.h"
-#include <string.h> //strlen
+#include "../Foundation/Assert.h"
+
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemIteratorWindows.inl"
-#elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/FileSystemIteratorEmscripten.inl"
 #else
 #include "Internal/FileSystemIteratorPosix.inl"
 #endif
 
-template <>
-void SC::FileSystemIterator::InternalOpaque::construct(Handle& buffer)
-{
-    new (&buffer.reinterpret_as<Object>(), PlacementNew()) Object();
-}
-template <>
-void SC::FileSystemIterator::InternalOpaque::destruct(Object& obj)
-{
-    obj.~Object();
-}
+SC::FileSystemIterator::~FileSystemIterator() { Internal::destroy(recurseStack); }
 
-SC::FileSystemIterator::~FileSystemIterator() {}
-
-[[nodiscard]] SC::Result SC::FileSystemIterator::init(StringView directory) { return internal.get().init(directory); }
-
-[[nodiscard]] SC::Result SC::FileSystemIterator::enumerateNext()
+SC::Result SC::FileSystemIterator::enumerateNext()
 {
-    Result res = internal.get().enumerateNext(currentEntry, options);
+    Result res = enumerateNextInternal(currentEntry);
     if (not res)
     {
-        const StringView message = StringView::fromNullTerminated(res.message, StringEncoding::Ascii);
-        if (message != "Iteration Finished"_a8)
+        if (::strcmp(res.message, "Iteration Finished") != 0)
         {
             errorResult   = res;
             errorsChecked = false;
@@ -40,7 +25,7 @@ SC::FileSystemIterator::~FileSystemIterator() {}
     return res;
 }
 
-[[nodiscard]] SC::Result SC::FileSystemIterator::recurseSubdirectory()
+SC::Result SC::FileSystemIterator::recurseSubdirectory()
 {
     if (options.recursive)
     {
@@ -48,5 +33,26 @@ SC::FileSystemIterator::~FileSystemIterator() {}
         errorsChecked = false;
         return errorResult;
     }
-    return internal.get().recurseSubdirectory(currentEntry);
+    return recurseSubdirectoryInternal(currentEntry);
+}
+
+SC::FileSystemIterator::FolderState& SC::FileSystemIterator::RecurseStack::back()
+{
+    SC_ASSERT_RELEASE(currentEntry >= 0);
+    return recursiveEntries[size_t(currentEntry)];
+}
+
+void SC::FileSystemIterator::RecurseStack::pop_back()
+{
+    SC_ASSERT_RELEASE(currentEntry >= 0);
+    currentEntry--;
+}
+
+SC::Result SC::FileSystemIterator::RecurseStack::push_back(const FolderState& other)
+{
+    if (size_t(currentEntry + 1) >= recursiveEntries.sizeInElements())
+        return Result::Error("FileSystemIterator - Not enough space in recurse stack");
+    currentEntry += 1;
+    recursiveEntries.data()[currentEntry] = other;
+    return Result(true);
 }

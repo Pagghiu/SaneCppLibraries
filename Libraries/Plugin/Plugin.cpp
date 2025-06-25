@@ -182,7 +182,8 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
 {
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = false; // Manually recurse only first level dirs
-    SC_TRY(fsIterator.init(directory));
+    FileSystemIterator::FolderState recurseStack[16];
+    SC_TRY(fsIterator.init(directory, recurseStack));
     FileSystem fs;
     SC_TRY(fs.init(directory));
     bool multiplePluginDefinitions = false;
@@ -206,7 +207,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
             SC_TRY(definitions.back().directory.assign(pluginDirectory));
             multiplePluginDefinitions = false;
         }
-        if (item.level == 1 and item.name.endsWith(SC_NATIVE_STR(".cpp")))
+        if (item.level == 1 and StringView(item.name).endsWith(SC_NATIVE_STR(".cpp")))
         {
             if (multiplePluginDefinitions)
             {
@@ -276,9 +277,10 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     StringNative<256> bestCompiler, bestLinker;
     for (const String& basePath : rootPaths)
     {
-        FileSystemIterator fsIterator;
-        StringView         base = basePath.view();
-        if (not fsIterator.init(base))
+        FileSystemIterator::FolderState recurseStack[16];
+        FileSystemIterator              fsIterator;
+        StringView                      base = basePath.view();
+        if (not fsIterator.init(base, recurseStack))
             continue;
         while (fsIterator.enumerateNext())
         {
@@ -608,10 +610,13 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
 {
 #if SC_PLATFORM_WINDOWS
     // TODO: This is clearly semi-hardcoded, and we could get the installed directory by looking at registry
-    StringView         baseDirectory = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10");
-    StringView         baseInclude   = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
+    StringView baseDirectory = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10");
+    StringView baseInclude   = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
+
+    FileSystemIterator::FolderState recurseStack[16];
+
     FileSystemIterator fsIterator;
-    SC_TRY_MSG(fsIterator.init(baseInclude), "Missing Windows Kits 10 directory");
+    SC_TRY_MSG(fsIterator.init(baseInclude, recurseStack), "Missing Windows Kits 10 directory");
     String windowsSdkVersion;
     while (fsIterator.enumerateNext())
     {
