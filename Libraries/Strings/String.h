@@ -34,7 +34,7 @@ struct SC::String
     /// @brief Builds String from a StringView
     /// @param sv StringView to be assigned to this String
     /// @warning This function will assert if StringView::assign fails
-    String(StringView sv) { SC_ASSERT_RELEASE(assign(sv)); }
+    String(StringViewData sv) { SC_ASSERT_RELEASE(assign(sv)); }
 
     /// @brief Builds a String from a buffer ensuring zero termination
     /// @warning This function will assert if StringView::assign fails
@@ -53,13 +53,13 @@ struct SC::String
     /// @brief Checks if the memory pointed by the StringView is owned by this String
     /// @param view StringView to be checked
     /// @return `true` if StringView memory belongs to this String
-    [[nodiscard]] bool owns(StringView view) const;
+    [[nodiscard]] bool owns(StringViewData view) const;
 
     /// @brief Assigns a StringView to this String, replacing existing contents
     /// @param sv StringView to be assigned to this string
     /// @return `true` if StringView is assigned successfully
     /// @note This method will invalidate any `StringView::view` previously obtained
-    [[nodiscard]] bool assign(StringView sv);
+    [[nodiscard]] bool assign(StringViewData sv);
 
     /// @brief Get StringView encoding
     /// @return Current encoding for this String
@@ -94,17 +94,17 @@ struct SC::String
     /// @brief Check if current String is same as other StringView
     /// @param other StringView to be checked
     /// @return `true` if the String and StringView are equal
-    [[nodiscard]] bool operator==(const StringView other) const { return view() == (other); }
+    [[nodiscard]] bool operator==(const StringViewData other) const { return view() == (other); }
 
     /// @brief Check if current String is different from other StringView
     /// @param other StringView to be checked
     /// @return `true` if the String and StringView are different
-    [[nodiscard]] bool operator!=(const StringView other) const { return not operator==(other); }
+    [[nodiscard]] bool operator!=(const StringViewData other) const { return not operator==(other); }
 
     /// @brief Check if current String is smaller to another StringView (using StringView::compare)
     /// @param other StringView to be checked
     /// @return `true` if the String is smaller than StringView (using StringView::compare)
-    [[nodiscard]] bool operator<(const StringView other) const { return view() < other; }
+    [[nodiscard]] bool operator<(const StringViewData other) const { return view() < other; }
 
     /// @brief Check if current String is equal to the ascii string literal
     /// @tparam N Length of string literal, including null terminator
@@ -139,7 +139,7 @@ struct SC::String
 
     /// @brief Assigns (copy) contents of given StringView in current String
     /// @warning Assignment operator will assert if String::assign fails
-    String& operator=(StringView view);
+    String& operator=(StringViewData view);
 
   protected:
     // TODO: nativeWritableBytesIncludingTerminator should be removed
@@ -175,7 +175,7 @@ struct SC::SmallString : public String
 
     SmallString(const String& other) : SmallString(other.getEncoding()) { String::operator=(other); }
     SmallString(String&& other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
-    SmallString(StringView other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
+    SmallString(StringViewData other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, N) {}
     template <size_t Q>
     SmallString(const char (&text)[Q]) : SmallString(StringView({text, Q - 1}, true, StringEncoding::Ascii))

@@ -1,8 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-
-#include "../Foundation/LibC.h"
 #include "../Foundation/Span.h"
 
 namespace SC
@@ -54,7 +52,7 @@ struct SC_COMPILER_EXPORT StringViewData
     constexpr StringViewData(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}
     static constexpr StringViewData fromNullTerminated(const wchar_t* text, StringEncoding encoding) { return text == nullptr ? StringViewData(encoding) : StringViewData({text, ::wcslen(text)}, true); }
 #endif
-
+    constexpr bool operator ==(const StringViewData other) const { return textSizeInBytes == other.textSizeInBytes and ::memcmp(text, other.text, textSizeInBytes) == 0; }
     // clang-format on
 
     /// @brief Obtain a `const char` Span from this StringView
@@ -88,7 +86,16 @@ struct SC_COMPILER_EXPORT StringViewData
 #endif
     }
 
+    /// @brief Maximum size of paths on current native platform
+#if SC_PLATFORM_WINDOWS
+    static constexpr size_t MaxPath = 260;
+#elif SC_PLATFORM_APPLE
+    static constexpr size_t MaxPath = 1024;
+#else
+    static constexpr size_t MaxPath = 4096;
+#endif
   protected:
+    friend struct StringView;
     union
     {
         const char* text;

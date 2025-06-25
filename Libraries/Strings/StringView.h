@@ -165,7 +165,7 @@ struct SC::StringView : public StringViewData
     /// @brief Compare this StringView with another StringView for equality
     /// @param other StringView to be compared with current one
     /// @return 'true' if the two StringView are the same
-    [[nodiscard]] constexpr bool operator==(StringView other) const;
+    [[nodiscard]] constexpr bool operator==(StringViewData other) const;
 
     /// @brief Check if this StringView is equal to other StringView (operates on code points, not on utf graphemes).
     /// Returns the number of code points that are the same in both StringView-s.
@@ -711,7 +711,7 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
 #endif
 }
 
-[[nodiscard]] constexpr bool SC::StringView::operator==(StringView other) const
+[[nodiscard]] constexpr bool SC::StringView::operator==(StringViewData other) const
 {
 #if defined(__clang__)
 #pragma clang diagnostic push

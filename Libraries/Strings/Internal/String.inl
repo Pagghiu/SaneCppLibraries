@@ -19,13 +19,13 @@ SC::String::String(Buffer&& otherData, StringEncoding encoding, uint32_t inlineC
     StringConverter::ensureZeroTermination(data, encoding);
 }
 
-bool SC::String::owns(StringView view) const
+bool SC::String::owns(StringViewData view) const
 {
     return (view.bytesWithoutTerminator() >= this->view().bytesWithoutTerminator()) and
            (view.bytesWithoutTerminator() <= (this->view().bytesWithoutTerminator() + this->view().sizeInBytes()));
 }
 
-bool SC::String::assign(StringView sv)
+bool SC::String::assign(StringViewData sv)
 {
     encoding             = sv.getEncoding();
     const size_t length  = sv.sizeInBytes();
@@ -51,7 +51,7 @@ bool SC::String::assign(StringView sv)
     return true;
 }
 
-SC::String& SC::String::operator=(StringView view)
+SC::String& SC::String::operator=(StringViewData view)
 {
     SC_ASSERT_RELEASE(assign(view));
     return *this;
