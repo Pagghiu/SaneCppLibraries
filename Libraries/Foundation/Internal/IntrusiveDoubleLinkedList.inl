@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Assert.h"
-#include "../IntrusiveDoubleLinkedList.h"
+#include "IntrusiveDoubleLinkedList.h"
 
 template <typename T>
 void SC::IntrusiveDoubleLinkedList<T>::clear()

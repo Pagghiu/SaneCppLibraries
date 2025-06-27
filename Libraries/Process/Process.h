@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Containers/IntrusiveDoubleLinkedList.h"
 #include "../File/FileDescriptor.h"
+#include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Strings/String.h"
 #include "ProcessDescriptor.h"
 

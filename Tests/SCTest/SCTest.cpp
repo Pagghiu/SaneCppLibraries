@@ -10,7 +10,7 @@ void runBuildTest(TestReport& report);
 // Foundation
 void runBaseTest(TestReport& report);
 void runBufferTest(TestReport& report);
-void runArenaMapTest(TestReport& report);
+void runIntrusiveDoubleLinkedListTest(TestReport& report);
 void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
@@ -21,8 +21,8 @@ void runTaggedUnionTest(TestReport& report);
 void runTaggedMapTest(TestReport& report);
 
 // Containers
+void runArenaMapTest(TestReport& report);
 void runArrayTest(TestReport& report);
-void runIntrusiveDoubleLinkedListTest(TestReport& report);
 void runSmallVectorTest(TestReport& report);
 void runVectorMapTest(TestReport& report);
 void runVectorSetTest(TestReport& report);
@@ -146,6 +146,7 @@ int main(int argc, const char* argv[])
     runBaseTest(report);
     runBufferTest(report);
     runFunctionTest(report);
+    runIntrusiveDoubleLinkedListTest(report);
     runVirtualMemoryTest(report);
     runUniqueHandleTest(report);
     runGlobalsTest(report);
@@ -153,7 +154,6 @@ int main(int argc, const char* argv[])
     // Containers tests
     runArenaMapTest(report);
     runArrayTest(report);
-    runIntrusiveDoubleLinkedListTest(report);
     runSmallVectorTest(report);
     runVectorTest(report);
     runVectorMapTest(report);

@@ -15,7 +15,6 @@ Containers is a library holding some commonly used generic data structures.
 | SC::VectorMap                     | @copybrief SC::VectorMap                  |
 | SC::VectorSet                     | @copybrief SC::VectorSet                  |
 | SC::ArenaMap                      | @copybrief SC::ArenaMap                   |
-| SC::IntrusiveDoubleLinkedList     | @copybrief SC::IntrusiveDoubleLinkedList  |
 
 # Status
 🟨 MVP  
@@ -64,10 +63,6 @@ Some relevant blog posts are:
 ## ArenaMap
 
 @copydoc SC::ArenaMap
-
-## IntrusiveDoubleLinkedList
-
-@copydoc SC::IntrusiveDoubleLinkedList
 
 # Details
 - SC::Segment is the class representing a variable and contiguous slice of bytes or objects backing both SC::Vector, SC::SmallVector, SC::Array, SC::Buffer and SC::SmallBuffer.  
