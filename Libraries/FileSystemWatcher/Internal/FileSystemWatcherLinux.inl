@@ -1,19 +1,20 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../FileSystemWatcher/FileSystemWatcher.h"
 
+#include "../../Foundation/Buffer.h"
+#include "../../Foundation/Deferred.h"
+#include "../../Threading/Threading.h"
+
+#include <dirent.h> // opendir, readdir, closedir
 #include <errno.h>
+#include <fcntl.h>       // open, O_RDONLY, O_DIRECTORY
+#include <limits.h>      // PATH_MAX
 #include <string.h>      // strlen
 #include <sys/inotify.h> // inotify
 #include <sys/select.h>  // fd_set / FD_ZERO
 #include <sys/stat.h>    // fstat
 #include <unistd.h>      // read
-
-#include "../../Containers/Array.h"
-#include "../../File/File.h"
-#include "../../FileSystemIterator/FileSystemIterator.h"
-#include "../../Strings/String.h"
-#include "../../Strings/StringConverter.h"
-#include "../../Threading/Threading.h"
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
@@ -25,7 +26,8 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
         bool operator==(Pair other) const { return notifyID == other.notifyID; }
     };
 
-    Array<Pair, FolderWatcherSizes::MaxNumberOfSubdirs> notifyHandles;
+    Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
+    size_t notifyHandlesCount = 0;
 
     Buffer relativePaths;
 
@@ -48,7 +50,7 @@ struct SC::FileSystemWatcher::Internal
 
     FileDescriptor notifyFd;
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
+    Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
@@ -57,7 +59,7 @@ struct SC::FileSystemWatcher::Internal
         return notifyFd.assign(::inotify_init1(IN_CLOEXEC));
     }
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
@@ -70,7 +72,7 @@ struct SC::FileSystemWatcher::Internal
         return runner.asyncPoll.start(*eventLoopRunner->eventLoop, notifyHandle);
     }
 
-    [[nodiscard]] Result close()
+    Result close()
     {
         if (eventLoopRunner)
         {
@@ -98,7 +100,7 @@ struct SC::FileSystemWatcher::Internal
         return Result(true);
     }
 
-    [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
+    Result stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
@@ -108,29 +110,34 @@ struct SC::FileSystemWatcher::Internal
         int rootNotifyFd;
         SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
 
-        for (FolderWatcherInternal::Pair pair : folderInternal.notifyHandles)
+        // for (FolderWatcherInternal::Pair pair : folderInternal.notifyHandles)
+        for (size_t idx = 0; idx < folderInternal.notifyHandlesCount; ++idx)
         {
-            const int res = ::inotify_rm_watch(rootNotifyFd, pair.notifyID);
+            const int res = ::inotify_rm_watch(rootNotifyFd, folderInternal.notifyHandles[idx].notifyID);
             SC_TRY_MSG(res != -1, "inotify_rm_watch");
         }
-        folderInternal.notifyHandles.clear();
+        folderInternal.notifyHandlesCount = 0; // Reset the count to zero
         folderInternal.relativePaths.clear();
         return Result(true);
     }
 
-    [[nodiscard]] Result startWatching(FolderWatcher* entry)
+    Result startWatching(FolderWatcher* entry)
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
-        StringNative<1024> buffer = StringEncoding::Native; // TODO: this needs to go into caller context
-        StringView         encodedPath;
-        SC_TRY(StringConverter(buffer).convertNullTerminateFastPath(entry->path.view(), encodedPath));
+
+        SC_TRY_MSG(entry->path.getEncoding() != StringEncoding::Utf16,
+                   "FolderWatcher on Linux does not support UTF16 encoded paths. Use UTF8 or ASCII encoding instead.");
         FolderWatcherInternal& opaque = entry->internal.get();
+
+        char currentPath[PATH_MAX];
+        ::memcpy(currentPath, entry->path.getNullTerminatedNative(), entry->path.sizeInBytes());
+        currentPath[entry->path.sizeInBytes()] = '\0'; // Ensure null termination
 
         int rootNotifyFd;
         SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
-        const int newHandle = ::inotify_add_watch(rootNotifyFd, encodedPath.getNullTerminatedNative(),
-                                                  IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF |
-                                                      IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO);
+        constexpr int mask =
+            IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
+        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath, mask);
         if (newHandle == -1)
         {
             return Result::Error("inotify_add_watch");
@@ -138,35 +145,117 @@ struct SC::FileSystemWatcher::Internal
         FolderWatcherInternal::Pair pair;
         pair.notifyID   = newHandle;
         pair.nameOffset = 0;
-        SC_TRY(opaque.notifyHandles.push_back(pair));
+        SC_TRY_MSG(opaque.notifyHandlesCount < FolderWatcherSizes::MaxNumberOfSubdirs,
+                   "Too many subdirectories being watched");
+        opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
 
-        // Watch all subfolders of current directory.
-        // TODO: We should also dynamically add / remove watched directories added after now...
-        StringConverter converter(opaque.relativePaths, StringEncoding::Utf8);
-
-        FileSystemIterator::FolderState folderStates[16];
-        FileSystemIterator              iterator;
-        iterator.options.recursive = true;
-        SC_TRY(iterator.init(encodedPath, folderStates));
-        while (iterator.enumerateNext())
+        // Watch all subfolders of current directory using a stack of file descriptors and names
+        constexpr int MaxStackDepth = FolderWatcherSizes::MaxNumberOfSubdirs;
+        struct DirStackEntry
         {
-            if (iterator.get().isDirectory())
+            int fd;
+            int pathLength;
+        };
+        DirStackEntry stack[MaxStackDepth];
+
+        int stackSize = 0;
+
+        // Push the root directory onto the stack
+        DIR* rootDir = ::opendir(currentPath);
+        if (!rootDir)
+        {
+            return Result::Error("Failed to open root directory");
+        }
+        const int rootFd = ::dirfd(rootDir);
+
+        auto closeRootDir = MakeDeferred([rootDir] { ::closedir(rootDir); });
+
+        stack[stackSize++] = {rootFd, static_cast<int>(entry->path.sizeInBytes())};
+
+        const size_t rootPathLength = entry->path.sizeInBytes();
+        // Clean the stack of fd in case any of the return Result::Error below is hit.
+        auto deferredCleanStack = MakeDeferred(
+            [&]
             {
-                int notifyFd = ::inotify_add_watch(rootNotifyFd, iterator.get().path.getNullTerminatedNative(),
-                                                   IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF |
-                                                       IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO);
-                if (notifyFd == -1)
+                for (size_t idx = 0; idx < stackSize; ++idx)
                 {
-                    (void)stopWatching(*entry); // This is to remove notifications for all directories added so far
-                    return Result::Error("inotify_add_watch (subdirectory)");
+                    ::close(stack[idx].fd);
                 }
-                pair.notifyID   = notifyFd;
-                pair.nameOffset = opaque.relativePaths.size();
-                SC_TRY(converter.appendNullTerminated(iterator.get().name, false)); // keep null terminator
-                SC_TRY(opaque.notifyHandles.push_back(pair));
+            });
+        while (stackSize > 0)
+        {
+            DirStackEntry entryStack = stack[--stackSize];
+            // Build the current path
+            if (entryStack.pathLength < PATH_MAX)
+            {
+                currentPath[entryStack.pathLength] = '\0';
+            }
+            DIR* dir = ::fdopendir(entryStack.fd);
+            if (!dir)
+            {
+                ::close(entryStack.fd); // Prevent file descriptor leak if fdopendir fails
+                continue;               // Cannot open directory, just skip it
+            }
+            auto closeDir = MakeDeferred([dir] { ::closedir(dir); });
+
+            struct dirent* subDirectory;
+            while ((subDirectory = ::readdir(dir)) != nullptr)
+            {
+                if (::strcmp(subDirectory->d_name, ".") == 0 || ::strcmp(subDirectory->d_name, "..") == 0)
+                {
+                    continue;
+                }
+                size_t nameLen = ::strlen(subDirectory->d_name);
+                if (entryStack.pathLength + 1 + nameLen >= PATH_MAX)
+                {
+                    continue; // Skip if path is too long
+                }
+                // Append '/' and the subdirectory name
+                currentPath[entryStack.pathLength] = '/';
+                ::memcpy(currentPath + entryStack.pathLength + 1, subDirectory->d_name, nameLen);
+                currentPath[entryStack.pathLength + 1 + nameLen] = '\0';
+                struct stat st;
+                if (::stat(currentPath, &st) != 0)
+                {
+                    continue;
+                }
+                if (S_ISDIR(st.st_mode))
+                {
+                    const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath, mask);
+                    if (newHandle == -1)
+                    {
+                        (void)stopWatching(*entry);
+                        return Result::Error("inotify_add_watch (subdirectory)");
+                    }
+                    if (stackSize < MaxStackDepth)
+                    {
+                        // Open the subdirectory and push onto the stack
+                        const int subFd = ::open(currentPath, O_RDONLY | O_DIRECTORY);
+                        if (subFd != -1)
+                        {
+                            stack[stackSize++] = {subFd, static_cast<int>(entryStack.pathLength + 1 + nameLen)};
+                        }
+                    }
+                    else
+                    {
+                        (void)stopWatching(*entry);
+                        return Result::Error("Exceeded maximum stack depth for nested directories");
+                    }
+                    const char* relativePath = currentPath + rootPathLength;
+                    if (relativePath[0] == '/')
+                    {
+                        relativePath++;
+                    }
+                    pair.notifyID   = newHandle;
+                    pair.nameOffset = opaque.relativePaths.size();
+                    SC_TRY(opaque.relativePaths.append({relativePath, ::strlen(relativePath) + 1}));
+
+                    SC_TRY_MSG(opaque.notifyHandlesCount < FolderWatcherSizes::MaxNumberOfSubdirs,
+                               "Too many subdirectories being watched");
+                    opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
+                }
             }
         }
-        SC_TRY(iterator.checkErrors());
 
         opaque.parentEntry = entry;
 
@@ -245,7 +334,6 @@ struct SC::FileSystemWatcher::Internal
         const struct inotify_event* prevEvent = nullptr;
 
         // Loop through all inotify_event and find the associated FolderWatcher to notify
-        SmallString<1024> bufferString;
         for (const char* iterator = actuallyRead.data();                  //
              iterator < actuallyRead.data() + actuallyRead.sizeInBytes(); //
              iterator += sizeof(*event) + event->len)
@@ -253,14 +341,16 @@ struct SC::FileSystemWatcher::Internal
             event = reinterpret_cast<const struct inotify_event*>(iterator);
             for (const FolderWatcher* entry = watchers.front; entry != nullptr; entry = entry->next)
             {
-                size_t foundIndex;
                 // Check if current FolderWatcher has a watcher matching the one from current event
-                if (entry->internal.get().notifyHandles.contains(FolderWatcherInternal::Pair{event->wd, 0},
-                                                                 &foundIndex))
+                FolderWatcherInternal::Pair pair{event->wd, 0};
+                for (size_t idx = 0; idx < entry->internal.get().notifyHandlesCount; ++idx)
                 {
-                    (void)notifySingleEvent(event, prevEvent, entry, foundIndex, bufferString);
-                    prevEvent = event;
-                    break;
+                    if (entry->internal.get().notifyHandles[idx] == pair)
+                    {
+                        (void)notifySingleEvent(event, prevEvent, entry, idx);
+                        prevEvent = event;
+                        break;
+                    }
                 }
             }
         }
@@ -268,17 +358,19 @@ struct SC::FileSystemWatcher::Internal
 
     [[nodiscard]] static Result notifySingleEvent(const struct inotify_event* event,
                                                   const struct inotify_event* prevEvent, const FolderWatcher* entry,
-                                                  size_t foundIndex, String& bufferString)
+                                                  size_t foundIndex)
     {
+        char         bufferString[StringViewData::MaxPath];
         Notification notification;
 
-        notification.basePath = entry->path.view();
+        notification.basePath = entry->path;
 
         // 1. Compute relative Path
         if (foundIndex == 0)
         {
             // Something changed in the original root folder being watched
-            notification.relativePath = StringView({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
+            notification.relativePath =
+                StringViewData({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
         }
         else
         {
@@ -286,14 +378,19 @@ struct SC::FileSystemWatcher::Internal
             const FolderWatcherInternal& internal = entry->internal.get();
             const char* dirStart = internal.relativePaths.data() + internal.notifyHandles[foundIndex].nameOffset;
 
-            const StringView relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
-            const StringView relativeName({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
+            const StringViewData relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
+            const StringViewData relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
+            if (relativeDirectory.sizeInBytes() + relativeName.sizeInBytes() + 2 > StringViewData::MaxPath)
+            {
+                return Result::Error("Relative path too long");
+            }
+            ::memcpy(bufferString, relativeDirectory.getNullTerminatedNative(), relativeDirectory.sizeInBytes());
+            bufferString[relativeDirectory.sizeInBytes()] = '/'; // Add the separator
+            ::memcpy(bufferString + relativeDirectory.sizeInBytes() + 1, relativeName.getNullTerminatedNative(),
+                     relativeName.sizeInBytes());
+            bufferString[relativeDirectory.sizeInBytes() + 1 + relativeName.sizeInBytes()] = '\0';
 
-            StringConverter converter(bufferString, StringConverter::Clear);
-            SC_TRY(converter.appendNullTerminated(relativeDirectory));
-            SC_TRY(converter.appendNullTerminated("/"));
-            SC_TRY(converter.appendNullTerminated(relativeName));
-            notification.relativePath = bufferString.view();
+            notification.relativePath = {{bufferString, strlen(bufferString)}, true, StringEncoding::Utf8};
         }
 
         // 2. Compute event Type
@@ -318,12 +415,19 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<char> buffer, StringViewData& outStringView) const
 {
-    StringConverter converter(buffer, StringConverter::Clear);
-    SC_TRY(converter.appendNullTerminated(basePath));
-    SC_TRY(converter.appendNullTerminated("/"));
-    SC_TRY(converter.appendNullTerminated(relativePath));
-    outStringView = buffer.view();
+    if (buffer.sizeInBytes() < basePath.sizeInBytes() + relativePath.sizeInBytes() + 2)
+    {
+        return Result::Error("Buffer too small to hold full path");
+    }
+    ::memcpy(buffer.data(), basePath.getNullTerminatedNative(), basePath.sizeInBytes());
+    buffer.data()[basePath.sizeInBytes()] = '/'; // Add the separator
+    ::memcpy(buffer.data() + basePath.sizeInBytes() + 1, relativePath.getNullTerminatedNative(),
+             relativePath.sizeInBytes());
+    buffer.data()[basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()] = '\0'; // Null terminate the string
+
+    outStringView = {
+        {buffer.data(), basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()}, true, StringEncoding::Utf8};
     return Result(true);
 }

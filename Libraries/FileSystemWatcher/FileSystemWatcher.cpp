@@ -1,15 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "FileSystemWatcher.h"
+#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"
 #elif SC_PLATFORM_APPLE
 #include "Internal/FileSystemWatcherApple.inl"
-#elif SC_PLATFORM_LINUX
-#include "Internal/FileSystemWatcherLinux.inl"
 #else
-#include "Internal/FileSystemWatcherEmscripten.inl"
+#include "Internal/FileSystemWatcherLinux.inl"
 #endif
 
 SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner, AsyncEventLoop& eventLoop)
@@ -22,11 +20,33 @@ SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.g
 
 SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
 
-SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringView path)
+SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringViewData path)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent = this;
-    SC_TRY(watcher.path.assign(path));
+    // If on windows convert path to UTF16
+    // anywhere else return error on the path being UTF16
+    SC_TRY_MSG(path.sizeInBytes() / sizeof(native_char_t) < StringViewData::MaxPath, "Path too long");
+#if SC_PLATFORM_WINDOWS
+    if (path.getEncoding() != StringEncoding::Utf16)
+    {
+        const int stringLen =
+            ::MultiByteToWideChar(CP_UTF8, 0, path.bytesWithoutTerminator(), static_cast<int>(path.sizeInBytes()),
+                                  watcher.pathBuffer, StringViewData::MaxPath / sizeof(wchar_t));
+        SC_TRY_MSG(stringLen > 0, "Failed to convert path to UTF16");
+        watcher.pathBuffer[stringLen] = L'\0'; // Ensure null termination
+        watcher.path                  = StringViewData({watcher.pathBuffer, static_cast<size_t>(stringLen)}, true);
+    }
+    else
+#endif
+    {
+        SC_TRY_MSG(path.getEncoding() != StringEncoding::Utf16, "Path cannot be UTF16 on this platform");
+        ::memcpy(watcher.pathBuffer, path.bytesWithoutTerminator(), path.sizeInBytes());
+        watcher.pathBuffer[path.sizeInBytes() / sizeof(native_char_t)] = '\0'; // Ensure null termination
+        watcher.path = StringViewData({reinterpret_cast<const char*>(watcher.pathBuffer), path.sizeInBytes()}, true,
+                                      path.getEncoding());
+    }
+
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }

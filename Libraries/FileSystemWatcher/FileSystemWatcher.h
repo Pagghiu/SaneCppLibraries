@@ -3,18 +3,13 @@
 #pragma once
 
 #include "../Async/Async.h" // AsyncLoopWakeUp
-#include "../Containers/Internal/IntrusiveDoubleLinkedList.inl"
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
-#include "../Strings/String.h"
 #include "../Threading/Threading.h" // EventObject
 
 namespace SC
 {
-struct FileSystemWatcher;
-struct String;
-} // namespace SC
 
 //! @defgroup group_file_system_watcher FileSystem Watcher
 //! @copybrief library_file_system_watcher (see @ref library_file_system_watcher for more details)
@@ -41,7 +36,7 @@ struct String;
 ///
 /// Example using SC::FileSystemWatcher::ThreadRunner:
 /// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
-struct SC::FileSystemWatcher
+struct FileSystemWatcher
 {
   private:
     struct Internal;
@@ -103,20 +98,20 @@ struct SC::FileSystemWatcher
     /// @brief Notification holding type and path
     struct Notification
     {
-        StringView basePath;                        ///< Reference to the watched directory
-        StringView relativePath;                    ///< Relative path of the file being notified from `basePath`
-        Operation  operation = Operation::Modified; ///< Notification type
+        StringViewData basePath;                        ///< Reference to the watched directory
+        StringViewData relativePath;                    ///< Relative path of the file being notified from `basePath`
+        Operation      operation = Operation::Modified; ///< Notification type
 
         /// @brief Get the full path of the file being watched.
-        /// @param[in] bufferString On some platform a String to hold the joined full path is needed.
+        /// @param[in] bufferSpan Space holding full path
         /// @param[out] outFullPath The full path
         /// @return Invalid result if it's not possible building the full path
-        SC::Result getFullPath(String& bufferString, StringView& outFullPath) const;
+        SC::Result getFullPath(Span<native_char_t> bufferSpan, StringViewData& outFullPath) const;
 
       private:
         friend struct Internal;
 #if SC_PLATFORM_APPLE
-        StringView fullPath;
+        StringViewData fullPath;
 #endif
     };
 
@@ -140,7 +135,9 @@ struct SC::FileSystemWatcher
         FileSystemWatcher* parent = nullptr;
         FolderWatcher*     next   = nullptr;
         FolderWatcher*     prev   = nullptr;
-        SmallString<1024>  path;
+
+        native_char_t  pathBuffer[StringViewData::MaxPath];
+        StringViewData path;
 
         OpaqueObject<FolderWatcherSizes> internal;
     };
@@ -166,24 +163,24 @@ struct SC::FileSystemWatcher
     /// @brief Setup watcher to receive notifications from a background thread
     /// @param runner Address of a ThreadRunner object that must be valid until close()
     /// @return Valid Result if the watcher has been initialized correctly
-    [[nodiscard]] Result init(ThreadRunner& runner);
+    Result init(ThreadRunner& runner);
 
     /// @brief Setup watcher to receive async notifications on SC::AsyncEventLoop
     /// @param runner Address of a ThreadRunner object that must be valid until close()
     /// @param eventLoop A valid AsyncEventLoop
     /// @return Valid Result if the watcher has been initialized correctly
-    [[nodiscard]] Result init(EventLoopRunner& runner, AsyncEventLoop& eventLoop);
+    Result init(EventLoopRunner& runner, AsyncEventLoop& eventLoop);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
     /// @return Valid Result if resources have been freed successfully
-    [[nodiscard]] Result close();
+    Result close();
 
     /// @brief Starts watching a single directory, calling FolderWatcher::notifyCallback on file events.
     /// @param watcher Reference to a (not already used) watcher, with a valid FolderWatcher::notifyCallback.
     /// Its address must not change until FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
-    [[nodiscard]] Result watch(FolderWatcher& watcher, StringView path);
+    Result watch(FolderWatcher& watcher, StringViewData path);
 
   private:
     friend decltype(internal);
@@ -192,3 +189,4 @@ struct SC::FileSystemWatcher
 };
 
 //! @}
+} // namespace SC

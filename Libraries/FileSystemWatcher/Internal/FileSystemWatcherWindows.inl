@@ -1,14 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-
-#include "../../Strings/String.h"
-#include "../../Strings/StringBuilder.h"
-#include "../../Strings/StringConverter.h"
+#include "../../FileSystemWatcher/FileSystemWatcher.h"
 #include "../../Threading/Threading.h"
 
 #include "../../Async/Internal/AsyncWindows.h" // AsyncWinOverlapped
+
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
@@ -38,21 +36,21 @@ struct SC::FileSystemWatcher::Internal
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
+    Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
         return Result(true);
     }
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
         return Result(true);
     }
 
-    [[nodiscard]] Result close()
+    Result close()
     {
         if (threadingRunner)
         {
@@ -95,7 +93,7 @@ struct SC::FileSystemWatcher::Internal
         SC_TRUST_RESULT(opaque.fileHandle.close());
     }
 
-    [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
+    Result stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
         folderWatcher.parent = nullptr;
@@ -121,10 +119,8 @@ struct SC::FileSystemWatcher::Internal
         opaque.asyncPoll.setDebugName(debugName);
     }
 
-    [[nodiscard]] Result startWatching(FolderWatcher* entry)
+    Result startWatching(FolderWatcher* entry)
     {
-        StringNative<1024> buffer = StringEncoding::Native; // TODO: this needs to go into caller context
-        StringConverter    converter(buffer);
         if (threadingRunner)
         {
             threadingRunner->numEntries = 0;
@@ -135,9 +131,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
                        "startWatching exceeded MaxWatchablePaths");
         }
-        StringView encodedPath;
-        SC_TRY(converter.convertNullTerminateFastPath(entry->path.view(), encodedPath));
-        HANDLE newHandle = ::CreateFileW(encodedPath.getNullTerminatedNative(),                            //
+        HANDLE newHandle = ::CreateFileW(entry->path.getNullTerminatedNative(),                            //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
                                          nullptr,                                                          //
@@ -152,7 +146,8 @@ struct SC::FileSystemWatcher::Internal
 
         if (threadingRunner)
         {
-            opaque.getOverlapped().hEvent                         = ::CreateEventW(nullptr, FALSE, 0, nullptr);
+            opaque.getOverlapped().hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
+
             threadingRunner->hEvents[threadingRunner->numEntries] = opaque.getOverlapped().hEvent;
             threadingRunner->entries[threadingRunner->numEntries] = entry;
             threadingRunner->numEntries++;
@@ -228,19 +223,15 @@ struct SC::FileSystemWatcher::Internal
         FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
 
         Notification notification;
-        notification.basePath = entry.path.view();
-        while (notification.basePath.sizeInBytes() > 1 and notification.basePath.endsWithAnyOf({'\\'}))
-        {
-            notification.basePath =
-                notification.basePath.sliceStartEndBytes(0, notification.basePath.sizeInBytes() - 1);
-        }
+        notification.basePath = entry.path;
 
         do
         {
-            const Span<const wchar_t> span(event->FileName, event->FileNameLength / sizeof(wchar_t));
-            const StringView          path(span, false);
+            notification.relativePath = {
+                {reinterpret_cast<const char*>(event->FileName), static_cast<size_t>(event->FileNameLength)},
+                true,
+                StringEncoding::Utf16};
 
-            notification.relativePath = path;
             switch (event->Action)
             {
             case FILE_ACTION_MODIFIED: notification.operation = Operation::Modified; break;
@@ -249,6 +240,7 @@ struct SC::FileSystemWatcher::Internal
             entry.notifyCallback(notification);
             if (not event->NextEntryOffset)
                 break;
+
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (true);
 
@@ -272,12 +264,25 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(String& buffer, StringView& outStringView) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<wchar_t> buffer, StringViewData& outStringView) const
 {
-    StringBuilder builder(buffer);
-    SC_TRY(builder.append(basePath));
-    SC_TRY(builder.append("\\"));
-    SC_TRY(builder.append(relativePath));
-    outStringView = buffer.view();
+    // Calculate sizes in terms of wchar_t count rather than bytes
+    const size_t basePathChars     = basePath.sizeInBytes() / sizeof(wchar_t);
+    const size_t relativePathChars = relativePath.sizeInBytes() / sizeof(wchar_t);
+
+    if (buffer.sizeInBytes() / sizeof(wchar_t) < basePathChars + relativePathChars + 2)
+    {
+        return Result::Error("Buffer too small to hold full path");
+    }
+
+    const wchar_t* basePathStr     = basePath.getNullTerminatedNative();
+    const wchar_t* relativePathStr = relativePath.getNullTerminatedNative();
+
+    ::memcpy(buffer.data(), basePathStr, basePathChars * sizeof(wchar_t));
+    buffer.data()[basePathChars] = L'\\'; // Add the separator
+    ::memcpy(buffer.data() + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
+    buffer.data()[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
+
+    outStringView = {{buffer.data(), (basePathChars + 1 + relativePathChars)}, true};
     return Result(true);
 }

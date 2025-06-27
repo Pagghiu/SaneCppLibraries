@@ -131,7 +131,7 @@ struct HotReloadSystem
 
     void onFileChange(const FileSystemWatcher::Notification& notification)
     {
-        if (notification.relativePath.endsWith(".cpp"))
+        if (StringView(notification.relativePath).endsWith(".cpp"))
         {
             auto reload = [this](const PluginIdentifier& plugin) { (void)load(plugin.view()); };
             registry.getPluginsToReloadBecauseOf(notification.relativePath, Time::Milliseconds(500), reload);

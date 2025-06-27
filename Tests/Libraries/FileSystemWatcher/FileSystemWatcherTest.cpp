@@ -48,8 +48,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             struct Params
             {
-                uint64_t    changes          = 0;
-                uint64_t    callbackThreadID = 0;
+                uint64_t changes          = 0;
+                uint64_t callbackThreadID = 0;
+
                 StringView  appDirectory;
                 EventObject eventObject;
             } params;
@@ -59,7 +60,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             {
                 constexpr native_char_t nativeSep = Path::Separator;
 
-                StringNative<1024> fullPathBuffer = StringEncoding::Native;
+                native_char_t fullPathBuffer[StringViewData::MaxPath];
+
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
 
                 params.callbackThreadID = Thread::CurrentThreadID();
@@ -72,9 +74,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 {
                     SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
                 }
-                SC_TEST_EXPECT(notification.basePath == params.appDirectory);
+                SC_TEST_EXPECT(params.appDirectory == notification.basePath);
                 // Comparisons must use the same encoding
-                SC_TEST_EXPECT(notification.relativePath == "test.txt");
+                SC_TEST_EXPECT("test.txt"_a8 == notification.relativePath);
                 StringView fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
 
@@ -135,15 +137,17 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 constexpr native_char_t nativeSep = Path::Separator;
 
                 StringNative<255>  dirBuffer      = StringEncoding::Native;
-                StringNative<1024> fullPathBuffer = StringEncoding::Native;
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
+
+                native_char_t fullPathBuffer[StringViewData::MaxPath];
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
                 SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
-                SC_TEST_EXPECT(notification.basePath == params.appDirectory);
-                SC_TEST_EXPECT(StringBuilder(dirBuffer).format("{}{}{}", "dir", nativeSep, "test.txt"));
-                SC_TEST_EXPECT(notification.relativePath == dirBuffer.view());
+                SC_TEST_EXPECT(params.appDirectory == notification.basePath);
+                SC_TEST_EXPECT(
+                    StringBuilder(dirBuffer).format("{}{}{}{}{}", "dir", nativeSep, "subdir2", nativeSep, "test.txt"));
+                SC_TEST_EXPECT(dirBuffer.view() == notification.relativePath);
 
                 StringView fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
@@ -155,13 +159,13 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(appDirectory));
-            if (not fs.existsAndIsDirectory("dir"))
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists({"dir"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists({"dir/subdir1"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists({"dir/subdir2"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists({"dir2"}));
+            if (fs.existsAndIsFile("dir/subdir2/test.txt"))
             {
-                SC_TEST_EXPECT(fs.makeDirectory({"dir"}));
-            }
-            if (fs.existsAndIsFile("dir/test.txt"))
-            {
-                SC_TEST_EXPECT(fs.removeFile("dir/test.txt"));
+                SC_TEST_EXPECT(fs.removeFile("dir/subdir2/test.txt"));
             }
 
             StringNative<1024> path;
@@ -170,13 +174,13 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
             watcher.notifyCallback = lambda;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
-            SC_TEST_EXPECT(fs.write("dir/test.txt", "content"));
+            SC_TEST_EXPECT(fs.write("dir/subdir2/test.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID == Thread::CurrentThreadID());
-            SC_TEST_EXPECT(fs.removeFile({"dir/test.txt"_a8}));
-            SC_TEST_EXPECT(fs.removeEmptyDirectory({"dir"}));
+            SC_TEST_EXPECT(fs.removeFile({"dir/subdir2/test.txt"_a8}));
+            SC_TEST_EXPECT(fs.removeEmptyDirectories({"dir/subdir1", "dir/subdir2", "dir", "dir2"}));
 #if SC_PLATFORM_WINDOWS
             // We need sleep otherwise windows ReadDirectoryChangesW on the same directory
             // will report events for the two deletions above in the next test even
@@ -190,7 +194,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
     {
         if (test_section("AsyncEventLoop close"))
         {
-
             AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
@@ -356,8 +359,9 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
     auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
     {
         // This callback will be called from the thread calling AsyncEventLoop::run
-        SmallString<1024> buffer;
-        StringView        fullPath;
+        native_char_t buffer[StringViewData::MaxPath];
+
+        StringView fullPath;
         if (notification.getFullPath(buffer, fullPath))
         {
             switch (notification.operation)
@@ -402,8 +406,9 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
     {
         // Warning! This callback is called from a background thread!
         // Make sure to do proper synchronization!
-        SmallString<1024> buffer;
-        StringView        fullPath;
+        native_char_t buffer[StringViewData::MaxPath];
+
+        StringView fullPath;
         if (notification.getFullPath(buffer, fullPath))
         {
             switch (notification.operation)

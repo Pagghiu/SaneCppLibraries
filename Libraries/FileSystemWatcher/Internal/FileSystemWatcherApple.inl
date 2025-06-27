@@ -1,10 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#include "../../FileSystemWatcher/FileSystemWatcher.h"
+
 #include "../../Async/Async.h"
 #include "../../Foundation/Deferred.h"
-#include "../../Strings/String.h"
-#include "../../Strings/StringConverter.h"
 #include "../../Threading/Threading.h"
 #include <CoreServices/CoreServices.h> // FSEvents
 
@@ -39,14 +39,14 @@ struct SC::FileSystemWatcher::Internal
     FolderWatcher* watcher;
     Atomic<bool>   closing = false;
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, ThreadRunner& runner)
+    Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         SC_COMPILER_UNUSED(runner);
         self = &parent;
         return Result(true);
     }
 
-    [[nodiscard]] Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
+    Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
     {
         self            = &parent;
         eventLoopRunner = &runner;
@@ -56,7 +56,7 @@ struct SC::FileSystemWatcher::Internal
         return wakeUp.start(*eventLoopRunner->eventLoop, eventLoopRunner->eventObject);
     }
 
-    [[nodiscard]] Result initThread()
+    Result initThread()
     {
         closing.exchange(false);
         // Create Signal to go from Loop --> CFRunLoop
@@ -81,7 +81,7 @@ struct SC::FileSystemWatcher::Internal
         return Result(true);
     }
 
-    [[nodiscard]] Result close()
+    Result close()
     {
         if (pollingThread.wasStarted())
         {
@@ -128,7 +128,7 @@ struct SC::FileSystemWatcher::Internal
         CFRunLoopRemoveSource(copyRunLoop, refreshSignal, kCFRunLoopDefaultMode);
     }
 
-    [[nodiscard]] Result threadCreateFSEvent()
+    Result threadCreateFSEvent()
     {
         SC_TRY(runLoop);
         CFArrayRef   pathsArray = nullptr;
@@ -148,12 +148,7 @@ struct SC::FileSystemWatcher::Internal
             });
         for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
         {
-            StringNative<1024> buffer;
-            StringConverter    converter(buffer);
-            StringView         encodedPath;
-            SC_TRY(converter.convertNullTerminateFastPath(it->path.view(), encodedPath));
-            watchedPaths[numAllocatedPaths] =
-                CFStringCreateWithFileSystemRepresentation(nullptr, encodedPath.getNullTerminatedNative());
+            watchedPaths[numAllocatedPaths] = CFStringCreateWithFileSystemRepresentation(nullptr, it->pathBuffer);
             if (not watchedPaths[numAllocatedPaths])
                 return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
@@ -216,7 +211,7 @@ struct SC::FileSystemWatcher::Internal
         fsEventStream = nullptr;
     }
 
-    [[nodiscard]] Result stopWatching(FolderWatcher& folderWatcher)
+    Result stopWatching(FolderWatcher& folderWatcher)
     {
         mutex.lock();
         folderWatcher.parent->watchers.remove(folderWatcher);
@@ -225,7 +220,7 @@ struct SC::FileSystemWatcher::Internal
         return startWatching(nullptr);
     }
 
-    [[nodiscard]] Result startWatching(FolderWatcher*)
+    Result startWatching(FolderWatcher*)
     {
         if (not pollingThread.wasStarted())
         {
@@ -269,11 +264,13 @@ struct SC::FileSystemWatcher::Internal
             if (flags & EVENT_SYSTEM)
                 continue;
 
-            const StringView path             = StringView::fromNullTerminated(paths[idx], StringEncoding::Utf8);
-            bool             sendNotification = true;
+            const StringViewData path = StringViewData::fromNullTerminated(paths[idx], StringEncoding::Utf8);
+
+            bool sendNotification = true;
             for (size_t prevIdx = 0; prevIdx < idx; ++prevIdx)
             {
-                const StringView otherPath = StringView::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
+                const StringViewData otherPath =
+                    StringViewData::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
                 if (path == otherPath)
                 {
                     // Filter out multiple events for the same file in this batch
@@ -292,7 +289,7 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    static void notify(const StringView path, Internal& internal, const FSEventStreamEventFlags flags)
+    static void notify(const StringViewData path, Internal& internal, const FSEventStreamEventFlags flags)
     {
         internal.notification.fullPath = path;
 
@@ -323,14 +320,22 @@ struct SC::FileSystemWatcher::Internal
         internal.mutex.unlock();
         while (watcher != nullptr)
         {
-            if (path.startsWith(watcher->path.view())) // TODO: This works only if encodings are the same
-            {
-                internal.notification.basePath = watcher->path.view();
+            Span<const char> rootSpan;
 
+            const bool sliceStart = path.toCharSpan().sliceStartLength(0, watcher->path.sizeInBytes(), rootSpan);
+            internal.notification.basePath = {rootSpan, false, StringEncoding::Utf8};
+            if (sliceStart and watcher->path == internal.notification.basePath)
+            {
+                Span<const char> relativeSpan;
+                (void)path.toCharSpan().sliceStartLength(watcher->path.sizeInBytes(),
+                                                         path.toCharSpan().sizeInBytes() - watcher->path.sizeInBytes(),
+                                                         relativeSpan);
+                if (relativeSpan.data()[0] == '/')
                 {
-                    const StringView relativePath      = path.sliceStartBytes(watcher->path.view().sizeInBytes());
-                    internal.notification.relativePath = relativePath.trimStartAnyOf({'/'});
+                    (void)relativeSpan.sliceStart(1, relativeSpan);
                 }
+                internal.notification.relativePath = {relativeSpan, true, path.getEncoding()};
+                internal.notification.basePath     = watcher->path;
 
                 if (internal.eventLoopRunner)
                 {
@@ -386,7 +391,7 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(String&, StringView& view) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<char>, StringViewData& view) const
 {
     view = fullPath;
     return Result(true);
