@@ -4,7 +4,7 @@
 #include "../Containers/Array.h"
 #include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"
-#include "../Foundation/Buffer.h"
+#include "../Memory/Buffer.h"
 #include "../Strings/String.h"
 #include "Reflection.h"
 

@@ -1,12 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Segment.h"
+#include "../Memory/Segment.h"
 
 namespace SC
 {
 
-//! @addtogroup group_foundation_utility
+//! @addtogroup group_memory
 //! @{
 
 namespace detail
@@ -23,7 +23,7 @@ struct SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePo
 /// SC::Buffer avoids some compile time / executable size bloat because it's not header only.
 ///
 /// Example:
-/// \snippet Tests/Libraries/Foundation/BufferTest.cpp BufferBasicSnippet
+/// \snippet Tests/Libraries/Memory/BufferTest.cpp BufferBasicSnippet
 struct Buffer : public Segment<detail::SegmentBuffer>
 {
     using Segment::Segment;

@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Foundation/Buffer.h"
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
+#include "../../Memory/Buffer.h"
 #include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 

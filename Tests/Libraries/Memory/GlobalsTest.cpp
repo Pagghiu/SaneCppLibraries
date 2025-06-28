@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/Globals.h"
-#include "Libraries/Foundation/VirtualMemory.h"
+#include "Libraries/Memory/Globals.h"
+#include "Libraries/Memory/VirtualMemory.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 namespace SC

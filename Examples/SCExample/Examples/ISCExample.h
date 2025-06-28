@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "Libraries/Foundation/Buffer.h"
 #include "Libraries/Foundation/Function.h"
 #include "Libraries/Foundation/Result.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Plugin/PluginHash.h"
 
 namespace SC

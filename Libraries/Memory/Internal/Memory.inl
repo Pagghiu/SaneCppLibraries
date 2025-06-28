@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Foundation/Globals.h"
-#include "../../Foundation/Memory.h"
+#include "../../Memory/Globals.h"
+#include "../../Memory/Memory.h"
+#include <stdint.h> // uintptr_t
 
 //------------------------------------------------------------------------------------------------------------------
 // Memory

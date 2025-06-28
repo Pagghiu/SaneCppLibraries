@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Globals.h"
-#include "../../Foundation/Memory.h"
-#include "../../Foundation/Segment.h"
+#include "../../Memory/Globals.h"
+#include "../../Memory/Memory.h"
+#include "../../Memory/Segment.h"
 
 template <typename VTable>
 struct SC::Segment<VTable>::Internal

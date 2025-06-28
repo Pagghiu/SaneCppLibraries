@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Foundation/Assert.h"
 #include "Libraries/Foundation/Limits.h"
-#include "Libraries/Foundation/Memory.h"
+#include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

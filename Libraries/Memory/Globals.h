@@ -8,7 +8,7 @@ struct SC_COMPILER_EXPORT GlobalSettings;
 struct SC_COMPILER_EXPORT Globals;
 struct MemoryAllocator;
 } // namespace SC
-//! @addtogroup group_foundation_utility
+//! @addtogroup group_memory
 //! @{
 
 /// @brief Settings to initialize Globals
@@ -26,10 +26,10 @@ struct SC::GlobalSettings
 /// issues.
 ///
 /// Example (Fixed Allocator):
-/// \snippet Tests/Libraries/Foundation/GlobalsTest.cpp GlobalsSnippetFixed
+/// \snippet Tests/Libraries/Memory/GlobalsTest.cpp GlobalsSnippetFixed
 ///
 /// Example (Virtual Allocator):
-/// \snippet Tests/Libraries/Foundation/GlobalsTest.cpp GlobalsSnippetVirtual
+/// \snippet Tests/Libraries/Memory/GlobalsTest.cpp GlobalsSnippetVirtual
 ///
 /// Example (Memory dump):
 /// \snippet Tests/Libraries/Containers/GlobalsContainerTest.cpp GlobalContainerVirtualMemoryDumpSnippet

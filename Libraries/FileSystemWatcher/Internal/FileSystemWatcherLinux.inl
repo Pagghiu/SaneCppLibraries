@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 
-#include "../../Foundation/Buffer.h"
 #include "../../Foundation/Deferred.h"
+#include "../../Memory/Buffer.h"
 #include "../../Threading/Threading.h"
 
 #include <dirent.h> // opendir, readdir, closedir

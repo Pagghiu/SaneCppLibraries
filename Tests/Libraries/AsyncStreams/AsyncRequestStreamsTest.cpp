@@ -9,7 +9,7 @@
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
-#include "Libraries/Foundation/Buffer.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Testing/Testing.h"
 

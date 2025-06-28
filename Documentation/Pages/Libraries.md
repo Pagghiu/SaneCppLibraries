@@ -16,6 +16,7 @@ Library                                     | Description
 @subpage library_foundation                 | @copybrief library_foundation
 @subpage library_hashing                    | @copybrief library_hashing
 @subpage library_http                       | @copybrief library_http
+@subpage library_memory                     | @copybrief library_memory
 @subpage library_plugin                     | @copybrief library_plugin
 @subpage library_process                    | @copybrief library_process
 @subpage library_reflection                 | @copybrief library_reflection

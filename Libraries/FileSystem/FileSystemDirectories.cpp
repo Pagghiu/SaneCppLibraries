@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystemDirectories.h"
-#include "../Foundation/Buffer.h"
 #include "../Foundation/Result.h"
+#include "../Memory/Buffer.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "../FileSystem/Path.h"

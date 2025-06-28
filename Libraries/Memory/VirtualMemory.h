@@ -1,14 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Memory.h" // FixedAllocator
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Memory/Memory.h" // FixedAllocator
 namespace SC
 {
 struct SC_COMPILER_EXPORT VirtualMemory;
 struct SC_COMPILER_EXPORT VirtualAllocator;
 } // namespace SC
-//! @addtogroup group_foundation_utility
+//! @addtogroup group_memory
 //! @{
 
 /// @brief Reserves a contiguous slice of virtual memory committing just a portion of it.
@@ -19,7 +19,7 @@ struct SC_COMPILER_EXPORT VirtualAllocator;
 /// @note Memory must be committed in order to be read or written, occupying physical memory pages.
 /// @warning This class has no defined destructor so memory MUST be released calling VirtualMemory::release
 ///
-/// \snippet Tests/Libraries/Foundation/VirtualMemoryTest.cpp VirtualMemorySnippet
+/// \snippet Tests/Libraries/Memory/VirtualMemoryTest.cpp VirtualMemorySnippet
 struct SC::VirtualMemory
 {
     size_t reservedBytes  = 0; ///< Maximum amount of reserved memory that can be committed

@@ -3,7 +3,7 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Containers/VectorMap.h"
 #include "Libraries/Containers/VectorSet.h"
-#include "Libraries/Foundation/VirtualMemory.h"
+#include "Libraries/Memory/VirtualMemory.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 

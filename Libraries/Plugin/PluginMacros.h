@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Memory.h"
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Memory/Memory.h"
 #include "PluginHash.h"
 
 //

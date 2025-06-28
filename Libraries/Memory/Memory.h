@@ -8,7 +8,7 @@ struct SC_COMPILER_EXPORT Memory;
 struct SC_COMPILER_EXPORT MemoryAllocator;
 struct SC_COMPILER_EXPORT FixedAllocator;
 } // namespace SC
-//! @addtogroup group_foundation_utility
+//! @addtogroup group_memory
 //! @{
 
 /// @brief Centralized functions to allocate, reallocate and deallocate memory

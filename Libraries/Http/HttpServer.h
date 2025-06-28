@@ -5,8 +5,8 @@
 
 #include "../Containers/ArenaMapKey.h"
 #include "../Containers/Vector.h"
-#include "../Foundation/Buffer.h"
 #include "../Foundation/Function.h"
+#include "../Memory/Buffer.h"
 #include "../Strings/StringView.h"
 
 namespace SC

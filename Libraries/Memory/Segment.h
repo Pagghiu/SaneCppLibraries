@@ -6,7 +6,7 @@
 
 namespace SC
 {
-//! @addtogroup group_foundation_utility
+//! @addtogroup group_memory
 //! @{
 enum class SegmentAllocator
 {

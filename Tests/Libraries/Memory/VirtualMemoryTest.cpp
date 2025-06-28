@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/VirtualMemory.h"
+#include "Libraries/Memory/VirtualMemory.h"
 #include "Libraries/Foundation/Deferred.h"
-#include "Libraries/Foundation/Memory.h"
+#include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

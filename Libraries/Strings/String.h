@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Buffer.h"
+#include "../Memory/Buffer.h"
 #include "../Strings/StringView.h"
 
 namespace SC

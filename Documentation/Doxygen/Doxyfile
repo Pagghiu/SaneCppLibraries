@@ -32,6 +32,7 @@ INPUT                  = ../../Documentation/Pages \
                          ../../Libraries/Foundation \
                          ../../Libraries/Hashing \
                          ../../Libraries/Http \
+                         ../../Libraries/Memory \
                          ../../Libraries/Plugin \
                          ../../Libraries/Process \
                          ../../Libraries/Reflection \

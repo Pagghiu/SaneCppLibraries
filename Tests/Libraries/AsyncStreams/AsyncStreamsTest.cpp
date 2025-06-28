@@ -6,7 +6,7 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
-#include "Libraries/Foundation/Buffer.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 

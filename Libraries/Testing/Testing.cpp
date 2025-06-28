@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
 #include "../Foundation/Assert.h"
-#include "../Foundation/Globals.h"
-#include "../Foundation/Memory.h"
+#include "../Memory/Globals.h"
+#include "../Memory/Memory.h"
 #include "../Strings/Console.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen

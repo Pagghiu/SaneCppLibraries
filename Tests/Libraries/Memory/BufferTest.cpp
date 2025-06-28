@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/Buffer.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC
 {

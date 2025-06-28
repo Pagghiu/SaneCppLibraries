@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-//! @addtogroup group_containers
+//! @addtogroup group_foundation_utility
 //! @{
 namespace SC
 {
@@ -12,7 +12,7 @@ namespace SC
 /// Both @ref library_async and @ref library_process use this data structure to store requests.
 /// @note Include `Internal/IntrusiveDoubleLinkedList.inl` in the .cpp where any of the methods will be used.
 ///
-/// \snippet Tests/Libraries/Containers/IntrusiveDoubleLinkedListTest.cpp IntrusiveDoubleLinkedListSnippet
+/// \snippet Tests/Libraries/Foundation/IntrusiveDoubleLinkedListTest.cpp IntrusiveDoubleLinkedListSnippet
 template <typename T>
 struct IntrusiveDoubleLinkedList
 {

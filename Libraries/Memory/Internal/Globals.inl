@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Foundation/Globals.h"
+#include "../../Foundation/Assert.h"
+#include "../../Memory/Globals.h"
+#include "../../Memory/Memory.h"
 #include "SortedAllocations.inl"
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
 #define _CRTDBG_MAP_ALLOC
@@ -8,8 +10,8 @@
 #undef _malloca
 #endif
 #include <crtdbg.h>
-#include <stdlib.h>
 #endif
+#include <stdlib.h>
 
 struct SC::Globals::Internal
 {

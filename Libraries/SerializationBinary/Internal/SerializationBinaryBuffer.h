@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Buffer.h"
 #include "../../Foundation/Span.h"
+#include "../../Memory/Buffer.h"
 
 namespace SC
 {
