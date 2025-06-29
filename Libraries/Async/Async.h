@@ -974,6 +974,24 @@ struct AsyncLoopWork : public AsyncRequest
 /// Example of async read operation:
 /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationReadSnippet
 ///
+/// Example of async write operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationWriteSnippet
+///
+/// Example of async copy operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopySnippet
+///
+/// Example of async copy directory operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopyDirectorySnippet
+///
+/// Example of async rename operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRenameSnippet
+///
+/// Example of async remove empty directory operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveEmptyFolderSnippet
+///
+/// Example of async remove file operation:
+/// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveFileSnippet
+///
 struct AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
@@ -987,6 +1005,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
         Read,
         Write,
         CopyFile,
+        CopyDirectory,
         Rename,
         RemoveDirectory,
         RemoveFile,
@@ -1004,11 +1023,13 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param eventLoop The event loop to use
     /// @param path The path to the file to open (encoded in UTF-8 on Posix and UTF-16 on Windows)
     /// @param mode The mode to open the file in (read, write, read-write, etc.)
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationOpenSnippet
     SC::Result open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode);
 
     /// @brief Closes a file descriptor asynchronously
     /// @param eventLoop The event loop to use
     /// @param handle The file descriptor to close
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCloseSnippet
     SC::Result close(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle);
 
     /// @brief Reads data from a file descriptor at a given offset
@@ -1016,6 +1037,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param handle The file descriptor to read from
     /// @param buffer The buffer to read into
     /// @param offset The offset in the file to read from
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationReadSnippet
     SC::Result read(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<char> buffer, uint64_t offset);
 
     /// @brief Writes data to a file descriptor at a given offset
@@ -1023,6 +1045,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param handle The file descriptor to write to
     /// @param buffer The buffer containing data to write
     /// @param offset The offset in the file to write to
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationWriteSnippet
     SC::Result write(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle, Span<const char> buffer,
                      uint64_t offset);
 
@@ -1031,24 +1054,37 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param path The path to the source file
     /// @param destinationPath The path to the destination file
     /// @param copyFlags Flags to control the copy operation
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopySnippet
     SC::Result copyFile(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
                         FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+
+    /// @brief Copies a directory from one location to another
+    /// @param eventLoop The event loop to use
+    /// @param path The path to the source directory
+    /// @param destinationPath The path to the destination directory
+    /// @param copyFlags Flags to control the copy operation
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopyDirectorySnippet
+    SC::Result copyDirectory(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
+                             FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
 
     /// @brief Renames a file
     /// @param eventLoop The event loop to use
     /// @param path The path to the source file
     /// @param newPath The new path to the file
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRenameSnippet
     SC::Result rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath);
 
     /// @brief Removes a directory asynchronously
     /// @param eventLoop The event loop to use
     /// @param path The path to the directory to remove
     /// @note The directory must be empty for this operation to succeed
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveEmptyFolderSnippet
     SC::Result removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path);
 
     /// @brief Removes a file asynchronously
     /// @param eventLoop The event loop to use
     /// @param path The path to the file to remove
+    /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveFileSnippet
     SC::Result removeFile(AsyncEventLoop& eventLoop, StringViewData path);
 
   private:
@@ -1091,6 +1127,8 @@ struct AsyncFileSystemOperation : public AsyncRequest
         FileSystemCopyFlags copyFlags;
     };
 
+    using CopyDirectoryData = CopyFileData;
+
     using CloseData = FileDescriptorData;
 
     struct RenameData
@@ -1106,13 +1144,14 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     union
     {
-        OpenData     openData;
-        CloseData    closeData;
-        ReadData     readData;
-        WriteData    writeData;
-        CopyFileData copyFileData;
-        RenameData   renameData;
-        RemoveData   removeData;
+        OpenData          openData;
+        CloseData         closeData;
+        ReadData          readData;
+        WriteData         writeData;
+        CopyFileData      copyFileData;
+        CopyDirectoryData copyDirectoryData;
+        RenameData        renameData;
+        RemoveData        removeData;
     };
 
     void destroy();

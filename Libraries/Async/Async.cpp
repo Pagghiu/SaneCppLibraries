@@ -459,6 +459,11 @@ SC::Result SC::AsyncFileSystemOperation::validate(AsyncEventLoop&)
     case Operation::RemoveFile:
         SC_TRY_MSG(not removeData.path.isEmpty(), "AsyncFileSystemOperation - Invalid path");
         break;
+    case Operation::CopyDirectory:
+        SC_TRY_MSG(not copyDirectoryData.path.isEmpty(), "AsyncFileSystemOperation - Invalid source path");
+        SC_TRY_MSG(not copyDirectoryData.destinationPath.isEmpty(),
+                   "AsyncFileSystemOperation - Invalid destination path");
+        break;
     case Operation::None: break;
     }
     return SC::Result(true);
@@ -476,6 +481,7 @@ void SC::AsyncFileSystemOperation::destroy()
     case Operation::Rename: dtor(renameData); break;
     case Operation::RemoveDirectory: dtor(removeData); break;
     case Operation::RemoveFile: dtor(removeData); break;
+    case Operation::CopyDirectory: dtor(copyDirectoryData); break;
     case Operation::None: break;
     }
     operation = Operation::None;
@@ -649,6 +655,22 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
     loopWork.work = [&]()
     {
         SC_TRY(FileSystemOperations::removeFile(removeData.path));
+        return SC::Result(true);
+    };
+    loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
+    return eventLoop.start(loopWork);
+}
+
+SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop, StringViewData path,
+                                                       StringViewData destinationPath, FileSystemCopyFlags copyFlags)
+{
+    SC_TRY(checkState());
+    operation = Operation::CopyDirectory;
+    new (&copyDirectoryData, PlacementNew()) CopyDirectoryData({path, destinationPath, copyFlags});
+    loopWork.work = [&]()
+    {
+        SC_TRY(FileSystemOperations::copyDirectory(copyDirectoryData.path, copyDirectoryData.destinationPath,
+                                                   copyDirectoryData.copyFlags));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);

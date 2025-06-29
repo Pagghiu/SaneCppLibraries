@@ -41,6 +41,10 @@ void SC::AsyncTest::fileSystemOperations()
     {
         fileSystemOperationRemoveFile();
     }
+    if (test_section("file system operation - copy directory"))
+    {
+        fileSystemOperationCopyDirectory();
+    }
 }
 
 void SC::AsyncTest::fileSystemOperationOpen()
@@ -336,7 +340,7 @@ void SC::AsyncTest::fileSystemOperationRename()
 
 void SC::AsyncTest::fileSystemOperationRemoveEmptyDirectory()
 {
-    //! [AsyncFileSystemOperationRemoveEmptyDirectorySnippet]
+    //! [AsyncFileSystemOperationRemoveEmptyFolderSnippet]
     // Create Thread Pool where to run fs operations
     static constexpr int NUM_THREADS = 1;
 
@@ -372,7 +376,7 @@ void SC::AsyncTest::fileSystemOperationRemoveEmptyDirectory()
     // Verify the directory was removed
     SC_TEST_EXPECT(!fs.existsAndIsDirectory(dirPath.view()));
 
-    //! [AsyncFileSystemOperationRemoveEmptyDirectorySnippet]
+    //! [AsyncFileSystemOperationRemoveEmptyFolderSnippet]
 }
 
 void SC::AsyncTest::fileSystemOperationRemoveFile()
@@ -411,4 +415,63 @@ void SC::AsyncTest::fileSystemOperationRemoveFile()
     SC_TEST_EXPECT(not fs.existsAndIsFile(filePath.view()));
 
     //! [AsyncFileSystemOperationRemoveFileSnippet]
+}
+
+void SC::AsyncTest::fileSystemOperationCopyDirectory()
+{
+    //! [AsyncFileSystemOperationCopyDirectorySnippet]
+    // Create Thread Pool where to run fs operations
+    static constexpr int NUM_THREADS = 1;
+
+    ThreadPool threadPool;
+    SC_TEST_EXPECT(threadPool.create(NUM_THREADS));
+
+    // Create Event Loop
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    // Create a test directory structure synchronously
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.makeDirectory("AsyncCopyDir"));
+    SC_TEST_EXPECT(fs.writeString("AsyncCopyDir/file1.txt", "data1"));
+    SC_TEST_EXPECT(fs.makeDirectory("AsyncCopyDir/subdir"));
+    SC_TEST_EXPECT(fs.writeString("AsyncCopyDir/subdir/file2.txt", "data2"));
+
+    // Prepare async copy operation
+    AsyncFileSystemOperation asyncFileSystemOperation;
+    asyncFileSystemOperation.callback = [&](AsyncFileSystemOperation::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        SC_TEST_EXPECT(res.completionData.code == 0);
+    };
+    SC_TEST_EXPECT(asyncFileSystemOperation.setThreadPool(threadPool));
+
+    // Copy the directory
+    String sourcePath = StringEncoding::Native;
+    String destPath   = StringEncoding::Native;
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "AsyncCopyDir"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "AsyncCopyDirCopy"}));
+    SC_TEST_EXPECT(asyncFileSystemOperation.copyDirectory(eventLoop, sourcePath.view(), destPath.view()));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    // Verify the content was copied correctly
+    SC_TEST_EXPECT(fs.existsAndIsFile("AsyncCopyDirCopy/file1.txt"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("AsyncCopyDirCopy/subdir/file2.txt"));
+    String text;
+    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/file1.txt", text, StringEncoding::Ascii));
+    SC_TEST_EXPECT(text.view() == "data1");
+    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/subdir/file2.txt", text, StringEncoding::Ascii));
+    SC_TEST_EXPECT(text.view() == "data2");
+
+    // Cleanup
+    SC_TEST_EXPECT(fs.removeFile("AsyncCopyDir/file1.txt"));
+    SC_TEST_EXPECT(fs.removeFile("AsyncCopyDir/subdir/file2.txt"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("AsyncCopyDir/subdir"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("AsyncCopyDir"));
+    SC_TEST_EXPECT(fs.removeFile("AsyncCopyDirCopy/file1.txt"));
+    SC_TEST_EXPECT(fs.removeFile("AsyncCopyDirCopy/subdir/file2.txt"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("AsyncCopyDirCopy/subdir"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("AsyncCopyDirCopy"));
+    //! [AsyncFileSystemOperationCopyDirectorySnippet]
 }

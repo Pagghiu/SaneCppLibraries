@@ -711,6 +711,10 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
         }
         break;
+        case AsyncFileSystemOperation::Operation::CopyDirectory: {
+            return Result::Error("AsyncFileSystemOperation::CopyDirectory - Not implemented");
+        }
+        break;
         case AsyncFileSystemOperation::Operation::Rename: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
@@ -756,6 +760,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             break;
         case AsyncFileSystemOperation::Operation::CopyFile:
             return Result::Error("AsyncFileSystemOperation::CopyFile - Not implemented");
+        case AsyncFileSystemOperation::Operation::CopyDirectory:
+            return Result::Error("AsyncFileSystemOperation::CopyDirectory - Not implemented");
         case AsyncFileSystemOperation::Operation::Rename: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::RemoveDirectory: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::RemoveFile: result.completionData.code = completion.res; break;
