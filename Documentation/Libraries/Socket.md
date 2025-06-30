@@ -21,6 +21,12 @@
 🟨 MVP  
 Simple synchronous TCP client / server workflow is supported, but it would need better testing.  
 
+# Blog
+
+Some relevant blog posts are:
+
+- [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
+
 # Description
 - SC::SocketDescriptor can create and destroy the OS level socket descriptor.
 - SC::SocketServer can SC::SocketServer::listen on a given port / address and SC::SocketServer::accept a new client socket.

@@ -14,6 +14,12 @@ SC::FileSystemWatcher allows watching directories for changes that happen to the
 🟩 Usable  
 Library does have basic capabilities and it can be used just fine.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
+
 # Description
 
 @copydetails SC::FileSystemWatcher

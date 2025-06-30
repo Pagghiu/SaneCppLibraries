@@ -46,12 +46,15 @@ Such allocators can be just fixed buffers, regular heap memory or reserved SC::V
 
 # Blog
 
-Some relevant blog posts are:
+These blogs have been written before the split from Foundation into the Memory library:
 
-(These blogs were written before the split from Foundation into the Memory library)
 - [February 2025 Update](https://pagghiu.github.io/site/blog/2025-02-28-SaneCppLibrariesUpdate.html)
 - [March 2025 Update](https://pagghiu.github.io/site/blog/2025-03-31-SaneCppLibrariesUpdate.html)
 - [April 2025 Update](https://pagghiu.github.io/site/blog/2025-04-30-SaneCppLibrariesUpdate.html)
+
+These blog posts have been written after the split from foundation:
+
+- [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

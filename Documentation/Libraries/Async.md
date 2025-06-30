@@ -65,6 +65,7 @@ Some relevant blog posts are:
 - [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
 - [April 2025 Update](https://pagghiu.github.io/site/blog/2025-04-30-SaneCppLibrariesUpdate.html)
 - [May 2025 Update](https://pagghiu.github.io/site/blog/2025-05-31-SaneCppLibrariesUpdate.html)
+- [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
 
 # Description
 @copydetails SC::AsyncRequest

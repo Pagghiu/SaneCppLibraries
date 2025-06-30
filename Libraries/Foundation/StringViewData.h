@@ -24,7 +24,9 @@ enum class StringEncoding : uint8_t
 #endif
 };
 
-/// @brief An read-only view over a string (to avoid including @ref group_strings library)
+/// @brief An read-only view over a string (to avoid including @ref group_strings library when parsing is not needed).
+/// The most common use case is to pass it in and out of OS API as is for file system paths.
+/// Some libraries check the encoding and eventually convert the string to a different one when using specific OS api.
 struct SC_COMPILER_EXPORT StringViewData
 {
     // clang-format off

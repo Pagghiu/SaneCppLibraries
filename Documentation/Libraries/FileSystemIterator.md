@@ -1,6 +1,6 @@
 @page library_file_system_iterator File System Iterator
 
-@brief 🟨 Enumerates files and directories inside a given path
+@brief 🟩 Enumerates files and directories inside a given path
 
 [TOC]
 
@@ -13,7 +13,15 @@ SC::FileSystemIterator enumerates files and directories at a given path.
 # Status
 🟩 Usable  
 The library is simple but gets the job done.  
-Thanks to @ref library_strings library it handles UTF16 / UTF8 conversions seamlessly, making less difficult writing cross platform filesystem iteration / manipulation code.
+
+- On Windows it expects paths in UTF8 or UTF16 and outputs paths as UTF16.
+- On Posix it expects and outputs paths in UTF8.
+
+# Blog
+
+Some relevant blog posts are:
+
+- [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
 
 # Description
 @copydetails SC::FileSystemIterator
