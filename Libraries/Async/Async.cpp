@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../File/FileDescriptor.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Foundation/Platform.h"
-#include "Libraries/File/FileDescriptor.h"
 
 #include <string.h> // strncpy
 
@@ -12,8 +12,6 @@
 #include "Internal/AsyncPosix.inl"
 #elif SC_PLATFORM_LINUX
 #include "Internal/AsyncLinux.inl"
-#elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/AsyncEmscripten.inl"
 #endif
 
 #include "../Threading/ThreadPool.h"

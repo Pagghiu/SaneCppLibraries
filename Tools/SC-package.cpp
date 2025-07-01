@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
-#include "../Libraries/Plugin/Internal/DynamicLibrary.h"
 #include "../Libraries/Strings/String.h"
 namespace SC
 {

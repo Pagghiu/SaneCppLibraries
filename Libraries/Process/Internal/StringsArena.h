@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Result.h"
+#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 
 namespace SC

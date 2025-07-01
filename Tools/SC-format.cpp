@@ -3,7 +3,7 @@
 
 // TODO: Figure out a way to avoid this macro
 
-#include "../Libraries/Foundation/Internal/IntrusiveDoubleLinkedList.inl"
+#include "../Libraries/Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "SC-package.h"
 
 #if !defined(SC_LIBRARY_PATH)

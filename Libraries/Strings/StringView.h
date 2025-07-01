@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Span.h"
 #include "../Strings/StringIterator.h"
-#include "Libraries/Foundation/Span.h"
 
 namespace SC
 {

@@ -3,6 +3,14 @@
         "*_/": true
     },
     "clangd.arguments": [
-        "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-arm64-make-clang-Debug/"
+        // Unfortunately one can't scope the compile commands dir to the platform, so just uncomment the one you need
+        // For macOS arm64
+        // "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-arm64-make-clang-Debug/"
+        // For macOS x86_64
+        // "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/macOS-x86_64-make-clang-Debug"
+        // For Linux x86_64
+        // "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/linux-x86_64-make-gcc-Debug"
+        // For Linux arm64
+        // "--compile-commands-dir=${workspaceFolder}/_Build/_Intermediates/SCTest/linux-arm64-make-gcc-Debug"
     ]
 }

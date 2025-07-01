@@ -7,7 +7,7 @@
 #include "ZLibStream.h"
 
 #include "ZLibAPI.h"
-#include "ZLibAPI.inl"
+#include "ZLibAPI.inl" // IWYU pragma: keep
 
 static SC::ZLibAPI zlib;
 

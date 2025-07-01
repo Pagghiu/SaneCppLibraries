@@ -2,15 +2,13 @@
 // SPDX-License-Identifier: MIT
 #include "Process.h"
 #include "../File/File.h"
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl"
+#include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"
-#elif SC_PLATFORM_EMSCRIPTEN
-#include "Internal/ProcessEmscripten.inl"
 #else
-#include "Internal/ProcessPosix.inl"
+#include "Internal/ProcessPosix.inl" // IWYU pragma: keep
 #endif
 
 //-------------------------------------------------------------------------------------------------------

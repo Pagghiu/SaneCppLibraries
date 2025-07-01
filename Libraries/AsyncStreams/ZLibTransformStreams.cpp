@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "ZLibTransformStreams.h"
 
-#include "Internal/ZLibStream.inl"
+#include "Internal/ZLibStream.inl" // IWYU pragma: keep
 //-------------------------------------------------------------------------------------------------------
 // SyncZLibTransformStream
 //-------------------------------------------------------------------------------------------------------

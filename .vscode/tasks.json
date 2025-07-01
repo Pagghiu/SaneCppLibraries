@@ -16,15 +16,24 @@
                 "intel64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -40,18 +49,32 @@
                 "arm64"
             ],
             "linux": {
-                "options": {"env": {"CXX":"g++", "CC":"gcc"}}
+                // Uncomment the following line to use clang on Linux
+                // "options": {"env": {"CXX":"clang++", "CC":"clang"}}
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
             }
         },
         {
@@ -67,15 +90,24 @@
                 "intel64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -90,19 +122,29 @@
                 "default",
                 "arm64"
             ],
-            "linux":{
-                "options": {"env": {"CXX":"g++", "CC":"gcc"}}
+            "linux": {
+                // Uncomment the following line to use clang on Linux
+                // "options": {"env": {"CXX":"clang++", "CC":"clang"}}
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -118,15 +160,24 @@
                 "intel64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -142,15 +193,24 @@
                 "arm64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -166,15 +226,24 @@
                 "intel64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -190,15 +259,24 @@
                 "arm64"
             ],
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ],
             "windows": {
                 "command": "${workspaceRoot}/SC.bat",
-                "properties": {
-                    "problemMatcher": [
-                        "$msvc"
-                    ]
-                }
             }
         },
         {
@@ -213,7 +291,21 @@
                 "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ]
         },
         {
@@ -228,12 +320,22 @@
                 "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
-                "$gcc"
-            ],
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            }
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
+            ]
         },
         {
             "label": "Build Documentation",
@@ -247,7 +349,21 @@
                 "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ]
         },
         {
@@ -264,7 +380,21 @@
                 "command": "${workspaceRoot}/SC.bat"
             },
             "problemMatcher": [
-                "$gcc"
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
             ]
         },
         {

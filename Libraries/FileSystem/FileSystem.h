@@ -297,11 +297,6 @@ struct SC_COMPILER_EXPORT FileSystem
 
     Result formatError(int errorNumber, StringView item, bool isWindowsNativeError);
     struct Internal;
-
-    // Fallbacks
-    [[nodiscard]] static Result fallbackCopyDirectory(String& sourceDirectory, String& destinationDirectory,
-                                                      FileSystem::CopyFlags options);
-    [[nodiscard]] static Result fallbackRemoveDirectoryRecursive(String& sourceDirectory);
 };
 //! @}
 } // namespace SC

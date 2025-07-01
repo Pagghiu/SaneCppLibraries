@@ -7,6 +7,7 @@ namespace SC
 {
 struct Console;
 struct String;
+struct Buffer;
 template <int N>
 struct SmallString;
 template <typename T>

@@ -9,9 +9,9 @@
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
 #include "../Strings/StringBuilder.h"
-#include "../Threading/Threading.h"
 
 #if SC_PLATFORM_WINDOWS
+#include "../Threading/Threading.h"
 #include "Internal/DebuggerWindows.inl"
 #include "Internal/VisualStudioPathFinder.h"
 #endif
