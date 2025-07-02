@@ -136,7 +136,7 @@ struct FileSystemWatcher
         FolderWatcher*     next   = nullptr;
         FolderWatcher*     prev   = nullptr;
 
-        native_char_t  pathBuffer[StringViewData::MaxPath];
+        native_char_t  pathBuffer[StringPath::MaxPath];
         StringViewData path;
 
         OpaqueObject<FolderWatcherSizes> internal;

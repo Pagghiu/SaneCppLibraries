@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Result.h"
+#include "../Foundation/StringPath.h"
 #include "../Strings/Console.h" // SC_COMPILER_DEBUG_BREAK
 #include "../Strings/StringView.h"
 

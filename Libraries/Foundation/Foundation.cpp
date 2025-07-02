@@ -2,3 +2,4 @@
 // SPDX-License-Identifier: MIT
 
 #include "../Foundation/Internal/Assert.inl"
+#include "../Foundation/Internal/StringPath.inl"

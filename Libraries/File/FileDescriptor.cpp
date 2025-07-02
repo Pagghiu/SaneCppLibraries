@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../File/FileDescriptor.h"
+#include "../Foundation/StringPath.h"
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -193,8 +194,8 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 
 SC::Result SC::FileDescriptor::open(StringViewData filePath, FileOpen mode)
 {
-    wchar_t nullTerminatedPath[StringViewData::MaxPath + 1];
-    SC_TRY_MSG(filePath.sizeInBytes() <= StringViewData::MaxPath, "FileDescriptor::open path length > MaxPath");
+    wchar_t nullTerminatedPath[StringPath::MaxPath + 1];
+    SC_TRY_MSG(filePath.sizeInBytes() <= StringPath::MaxPath, "FileDescriptor::open path length > MaxPath");
     if (filePath.getEncoding() == StringEncoding::Utf16)
     {
         ::memcpy(nullTerminatedPath, filePath.bytesWithoutTerminator(), filePath.sizeInBytes());
@@ -204,7 +205,7 @@ SC::Result SC::FileDescriptor::open(StringViewData filePath, FileOpen mode)
     {
         const int stringLen = ::MultiByteToWideChar(CP_UTF8, 0, filePath.bytesWithoutTerminator(),
                                                     static_cast<int>(filePath.sizeInBytes()), nullTerminatedPath,
-                                                    StringViewData::MaxPath / sizeof(wchar_t));
+                                                    StringPath::MaxPath / sizeof(wchar_t));
         SC_TRY_MSG(stringLen > 0, "Failed to convert path to UTF16");
         nullTerminatedPath[stringLen] = L'\0'; // Ensure null termination
     }
@@ -466,8 +467,8 @@ SC::Result SC::FileDescriptor::open(StringViewData filePath, FileOpen mode)
     const int flags  = mode.toPosixFlags();
     const int access = mode.toPosixAccess();
 
-    char nullTerminatedPath[StringViewData::MaxPath + 1];
-    SC_TRY_MSG(filePath.sizeInBytes() <= StringViewData::MaxPath, "FileDescriptor::open path length > MaxPath");
+    char nullTerminatedPath[StringPath::MaxPath + 1];
+    SC_TRY_MSG(filePath.sizeInBytes() <= StringPath::MaxPath, "FileDescriptor::open path length > MaxPath");
     ::memcpy(nullTerminatedPath, filePath.bytesWithoutTerminator(), filePath.sizeInBytes());
     nullTerminatedPath[filePath.sizeInBytes()] = 0;
     if (nullTerminatedPath[0] != '/')

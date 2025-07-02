@@ -26,13 +26,13 @@ SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringViewData p
     watcher.parent = this;
     // If on windows convert path to UTF16
     // anywhere else return error on the path being UTF16
-    SC_TRY_MSG(path.sizeInBytes() / sizeof(native_char_t) < StringViewData::MaxPath, "Path too long");
+    SC_TRY_MSG(path.sizeInBytes() / sizeof(native_char_t) < StringPath::MaxPath, "Path too long");
 #if SC_PLATFORM_WINDOWS
     if (path.getEncoding() != StringEncoding::Utf16)
     {
         const int stringLen =
             ::MultiByteToWideChar(CP_UTF8, 0, path.bytesWithoutTerminator(), static_cast<int>(path.sizeInBytes()),
-                                  watcher.pathBuffer, StringViewData::MaxPath / sizeof(wchar_t));
+                                  watcher.pathBuffer, StringPath::MaxPath / sizeof(wchar_t));
         SC_TRY_MSG(stringLen > 0, "Failed to convert path to UTF16");
         watcher.pathBuffer[stringLen] = L'\0'; // Ensure null termination
         watcher.path                  = StringViewData({watcher.pathBuffer, static_cast<size_t>(stringLen)}, true);

@@ -88,14 +88,6 @@ struct SC_COMPILER_EXPORT StringViewData
 #endif
     }
 
-    /// @brief Maximum size of paths on current native platform
-#if SC_PLATFORM_WINDOWS
-    static constexpr size_t MaxPath = 260;
-#elif SC_PLATFORM_APPLE
-    static constexpr size_t MaxPath = 1024;
-#else
-    static constexpr size_t MaxPath = 4096;
-#endif
   protected:
     friend struct StringView;
     union
@@ -113,4 +105,5 @@ struct SC_COMPILER_EXPORT StringViewData
     size_t encoding    : 2;
     size_t hasNullTerm : 1;
 };
+
 } // namespace SC

@@ -63,7 +63,6 @@ struct SC::FileSystemIterator::Internal
 
 SC::Result SC::FileSystemIterator::init(StringViewData directory, Span<FolderState> recursiveEntries)
 {
-    static_assert(MaxPath >= PATH_MAX, "PATH_MAX");
     Internal::destroy(recurseStack);
     recurseStack.recursiveEntries = recursiveEntries;
     recurseStack.currentEntry     = -1;

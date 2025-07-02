@@ -60,7 +60,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             {
                 constexpr native_char_t nativeSep = Path::Separator;
 
-                native_char_t fullPathBuffer[StringViewData::MaxPath];
+                native_char_t fullPathBuffer[StringPath::MaxPath];
 
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
 
@@ -139,7 +139,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 StringNative<255>  dirBuffer      = StringEncoding::Native;
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
 
-                native_char_t fullPathBuffer[StringViewData::MaxPath];
+                native_char_t fullPathBuffer[StringPath::MaxPath];
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
@@ -359,7 +359,7 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
     auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
     {
         // This callback will be called from the thread calling AsyncEventLoop::run
-        native_char_t buffer[StringViewData::MaxPath];
+        native_char_t buffer[StringPath::MaxPath];
 
         StringView fullPath;
         if (notification.getFullPath(buffer, fullPath))
@@ -406,7 +406,7 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
     {
         // Warning! This callback is called from a background thread!
         // Make sure to do proper synchronization!
-        native_char_t buffer[StringViewData::MaxPath];
+        native_char_t buffer[StringPath::MaxPath];
 
         StringView fullPath;
         if (notification.getFullPath(buffer, fullPath))

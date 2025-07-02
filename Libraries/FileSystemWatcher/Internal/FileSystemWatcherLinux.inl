@@ -360,7 +360,7 @@ struct SC::FileSystemWatcher::Internal
                                                   const struct inotify_event* prevEvent, const FolderWatcher* entry,
                                                   size_t foundIndex)
     {
-        char         bufferString[StringViewData::MaxPath];
+        char         bufferString[StringPath::MaxPath];
         Notification notification;
 
         notification.basePath = entry->path;
@@ -380,7 +380,7 @@ struct SC::FileSystemWatcher::Internal
 
             const StringViewData relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
             const StringViewData relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
-            if (relativeDirectory.sizeInBytes() + relativeName.sizeInBytes() + 2 > StringViewData::MaxPath)
+            if (relativeDirectory.sizeInBytes() + relativeName.sizeInBytes() + 2 > StringPath::MaxPath)
             {
                 return Result::Error("Relative path too long");
             }

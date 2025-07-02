@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Result.h"
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringPath.h"
 
 namespace SC
 {
@@ -112,7 +112,7 @@ struct FileSystemIterator
     Result recurseSubdirectory();
 
   private:
-    static constexpr auto MaxPath = StringViewData::MaxPath;
+    static constexpr auto MaxPath = StringPath::MaxPath;
     struct Internal;
     struct RecurseStack
     {

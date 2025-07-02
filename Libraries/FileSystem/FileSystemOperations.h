@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Result.h"
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringPath.h"
 #include "../Time/Time.h"
 
 namespace SC
