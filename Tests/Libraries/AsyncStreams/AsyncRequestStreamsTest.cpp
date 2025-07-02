@@ -6,7 +6,7 @@
 #include "Libraries/AsyncStreams/AsyncStreams.h"
 #include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/Containers/Vector.h"
-#include "Libraries/File/File.h"
+#include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/Memory/Buffer.h"
@@ -143,7 +143,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     openModeRead.blocking = false; // Windows needs non-blocking flags set
 
     FileDescriptor readDescriptor;
-    SC_TEST_EXPECT(File(readDescriptor).open(readablePath.view(), openModeRead));
+    SC_TEST_EXPECT(readDescriptor.open(readablePath.view(), openModeRead));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(readDescriptor));
 
     FileDescriptor writeDescriptor;
@@ -152,7 +152,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     FileOpen openModeWrite;
     openModeWrite.mode     = FileOpen::Write;
     openModeWrite.blocking = false; // Windows needs non-blocking flags set
-    SC_TEST_EXPECT(File(writeDescriptor).open(writeablePath.view(), openModeWrite));
+    SC_TEST_EXPECT(writeDescriptor.open(writeablePath.view(), openModeWrite));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeDescriptor));
 
     SC_TEST_EXPECT(readable.init(pool, readableRequests, eventLoop, readDescriptor));
@@ -251,7 +251,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     FileOpen openModeRead;
     openModeRead.mode     = FileOpen::Read;
     openModeRead.blocking = true;
-    SC_TEST_EXPECT(File(readFd).open(fileName.view(), openModeRead));
+    SC_TEST_EXPECT(readFd.open(fileName.view(), openModeRead));
     AsyncTaskSequence readFileTask;
     SC_TEST_EXPECT(readFileStream.request.executeOn(readFileTask, fileThreadPool));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
@@ -264,7 +264,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     FileOpen openModeWrite;
     openModeWrite.mode     = FileOpen::Write;
     openModeWrite.blocking = true;
-    SC_TEST_EXPECT(File(writeFd).open(fileName.view(), openModeWrite));
+    SC_TEST_EXPECT(writeFd.open(fileName.view(), openModeWrite));
     AsyncTaskSequence writeFileTask;
     SC_TEST_EXPECT(writeFileStream.request.executeOn(writeFileTask, fileThreadPool));
 

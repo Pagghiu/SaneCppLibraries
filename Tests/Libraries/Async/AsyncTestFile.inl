@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
-#include "Libraries/File/File.h"
+#include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
 
@@ -32,11 +32,10 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
 
     // 4. Open the destination file and associate it with the event loop
     FileDescriptor fd;
-    File           file(fd);
     FileOpen       openModeWrite;
     openModeWrite.mode     = FileOpen::Write;
     openModeWrite.blocking = useThreadPool;
-    SC_TEST_EXPECT(file.open(filePath.view(), openModeWrite));
+    SC_TEST_EXPECT(fd.open(filePath.view(), openModeWrite));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -72,7 +71,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     FileOpen openModeRead;
     openModeRead.mode     = FileOpen::Read;
     openModeRead.blocking = useThreadPool;
-    SC_TEST_EXPECT(file.open(filePath.view(), openModeRead));
+    SC_TEST_EXPECT(fd.open(filePath.view(), openModeRead));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -168,7 +167,7 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     FileOpen               openModeRead;
     openModeRead.mode     = FileOpen::Read;
     openModeRead.blocking = useThreadPool;
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), openModeRead));
+    SC_TEST_EXPECT(fd.open(filePath.view(), openModeRead));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));
@@ -263,8 +262,7 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     openModeWrite.blocking = useThreadPool;
 
     FileDescriptor fd;
-    File           file(fd);
-    SC_TEST_EXPECT(file.open(filePath.view(), openModeWrite));
+    SC_TEST_EXPECT(fd.open(filePath.view(), openModeWrite));
     if (not useThreadPool)
     {
         SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(fd));

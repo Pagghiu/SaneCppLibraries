@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
-#include "../File/File.h"
+#include "../File/FileDescriptor.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Strings/StringConverter.h"
 
@@ -195,12 +195,12 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe: break;
         case StdStream::Operation::FileDescriptor: break;
         case StdStream::Operation::Vector: {
-            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.buffer));
+            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.buffer));
             return pipe.close();
         }
         break;
         case StdStream::Operation::String: {
-            SC_TRY(File(pipe.readPipe).readUntilEOF(*outputObject.string));
+            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.string));
             return pipe.close();
         }
         case StdStream::Operation::WritableSpan: {

@@ -3,7 +3,7 @@
 #pragma once
 #include "Tools.h"
 
-#include "../Libraries/File/File.h"
+#include "../Libraries/File/FileDescriptor.h"
 #include "../Libraries/FileSystem/FileSystem.h"
 #include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Foundation/Function.h"
@@ -94,7 +94,7 @@ struct CustomFunctions
 [[nodiscard]] inline Result checkFileMD5(StringView fileName, StringView wantedMD5)
 {
     FileDescriptor fd;
-    SC_TRY(File(fd).open(fileName, FileOpen::Read));
+    SC_TRY(fd.open(fileName, FileOpen::Read));
     Hashing hashing;
     SC_TRY(hashing.setType(Hashing::TypeMD5));
     for (;;)

@@ -513,7 +513,7 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringV
     loopWork.work = [&]()
     {
         FileDescriptor fd;
-        SC_TRY(fd.openNativeEncoding(openData.path, openData.mode));
+        SC_TRY(fd.open(openData.path, openData.mode));
         auto res = fd.get(completionData.handle, SC::Result::Error("Open returned invalid handle"));
         fd.detach(); // Detach the file descriptor from the loop work so that it is not closed when the callback ends
         return res;

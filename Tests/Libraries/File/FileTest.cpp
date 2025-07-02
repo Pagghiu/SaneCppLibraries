@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/File/File.h"
+#include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/Testing/Testing.h"
@@ -41,12 +41,12 @@ void SC::FileTest::testOpen()
 
     // Open a file, write and close it
     FileDescriptor fd;
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), FileOpen::Write));
+    SC_TEST_EXPECT(fd.open(filePath.view(), FileOpen::Write));
     SC_TEST_EXPECT(fd.write(StringView("test").toCharSpan()));
     SC_TEST_EXPECT(fd.close());
 
     // Re-open the file for read
-    SC_TEST_EXPECT(File(fd).open(filePath.view(), FileOpen::Read));
+    SC_TEST_EXPECT(fd.open(filePath.view(), FileOpen::Read));
 
     // Read some data from the file
     char       buffer[4] = {0};

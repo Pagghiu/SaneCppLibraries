@@ -451,7 +451,7 @@ FileDescriptor fd;
 FileOpen openMode;
 openMode.mode = FileOpen::Read;
 openMode.blocking = true; // AsyncFileRead::Task enables using regular blocking file descriptors
-SC_TRY(File(fd).open("MyFile.txt", openMode));
+SC_TRY(fd.open("MyFile.txt", openMode));
 
 // Create the async file read request and async task
 AsyncFileRead asyncReadFile;
@@ -520,7 +520,7 @@ FileOpen openMode;
 openMode.mode = FileOpen::Write;
 openMode.blocking = true; // AsyncFileWrite::Task enables using regular blocking file descriptors
 FileDescriptor fd;
-SC_TRY(File(fd).open("MyFile.txt", openMode));
+SC_TRY(fd.open("MyFile.txt", openMode));
 
 // Create the async file write request
 AsyncFileWrite asyncWriteFile;

@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
-#include "Libraries/File/File.h"
 #include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
@@ -75,9 +74,8 @@ void SC::AsyncTest::fileSystemOperationOpen()
         // and check that the content is correct. Descriptor is closed automatically by FileDescriptor.
         FileDescriptor fd(res.completionData.handle);
 
-        File   file(fd);
         String text;
-        SC_TEST_EXPECT(file.readUntilEOF(text));
+        SC_TEST_EXPECT(fd.readUntilEOF(text));
         SC_TEST_EXPECT(text.view() == "FileSystemOperationOpen");
     };
     // Set the thread pool where the open operation will be run
@@ -128,7 +126,7 @@ void SC::AsyncTest::fileSystemOperationClose()
     FileDescriptor fd;
     String         path = StringEncoding::Native;
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationClose.txt"}));
-    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Read));
+    SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
     fd.detach();
@@ -163,7 +161,7 @@ void SC::AsyncTest::fileSystemOperationRead()
     FileDescriptor fd;
     String         path = StringEncoding::Native;
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationRead.txt"}));
-    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Read));
+    SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
     fd.detach();
@@ -207,7 +205,7 @@ void SC::AsyncTest::fileSystemOperationWrite()
     FileDescriptor fd;
     String         path = StringEncoding::Native;
     SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationWrite.txt"}));
-    SC_TEST_EXPECT(fd.openNativeEncoding(path.view(), FileOpen::Write));
+    SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Write));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
     fd.detach();
@@ -227,10 +225,9 @@ void SC::AsyncTest::fileSystemOperationWrite()
 
     // Verify the content was written correctly
     FileDescriptor verifyFd;
-    SC_TEST_EXPECT(verifyFd.openNativeEncoding(path.view(), FileOpen::Read));
-    File   verifyFile(verifyFd);
+    SC_TEST_EXPECT(verifyFd.open(path.view(), FileOpen::Read));
     String text;
-    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(verifyFd.readUntilEOF(text));
     SC_TEST_EXPECT(text.view() == "FileSystemOperationWrite");
     SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
 
@@ -277,10 +274,9 @@ void SC::AsyncTest::fileSystemOperationCopy()
 
     // Verify the content was copied correctly
     FileDescriptor verifyFd;
-    SC_TEST_EXPECT(verifyFd.openNativeEncoding(destPath.view(), FileOpen::Read));
-    File   verifyFile(verifyFd);
+    SC_TEST_EXPECT(verifyFd.open(destPath.view(), FileOpen::Read));
     String text;
-    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(verifyFd.readUntilEOF(text));
     SC_TEST_EXPECT(text.view() == "FileSystemOperationCopy");
     SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
 
@@ -326,10 +322,9 @@ void SC::AsyncTest::fileSystemOperationRename()
 
     // Verify the content was renamed correctly
     FileDescriptor verifyFd;
-    SC_TEST_EXPECT(verifyFd.openNativeEncoding(destPath.view(), FileOpen::Read));
-    File   verifyFile(verifyFd);
+    SC_TEST_EXPECT(verifyFd.open(destPath.view(), FileOpen::Read));
     String text;
-    SC_TEST_EXPECT(verifyFile.readUntilEOF(text));
+    SC_TEST_EXPECT(verifyFd.readUntilEOF(text));
     SC_TEST_EXPECT(text.view() == "FileSystemOperationRename");
     SC_TEST_EXPECT(verifyFd.close()); // Close before removing it
 

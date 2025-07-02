@@ -154,6 +154,8 @@ struct SC::String
     friend struct FileSystem;
     template <typename T>
     friend struct Reflection::Reflect;
+    template <typename T>
+    friend struct GrowableBuffer;
     StringEncoding encoding;
     Buffer         data;
 
@@ -198,4 +200,31 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<128 * sizeof(n
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<255 * sizeof(native_char_t)>;
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<512 * sizeof(native_char_t)>;
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(native_char_t)>;
+
+// Enables File library from reading data from file descriptor into a String
+template <>
+struct GrowableBuffer<String> : public IGrowableBuffer
+{
+    String& string;
+    size_t  numZeroes;
+    GrowableBuffer(String& string) : string(string) { numZeroes = StringEncodingGetSize(string.getEncoding()); }
+
+    virtual ~GrowableBuffer() override final
+    {
+        if (string.data.size() + numZeroes <= string.data.capacity())
+        {
+            // Add null-terminator
+            (void)string.data.resize(string.data.size() + numZeroes, 0);
+        }
+    }
+    virtual DirectAccess getDirectAccess() override final
+    {
+        return {string.data.size(), string.data.capacity(), string.data.data()};
+    }
+    virtual bool tryGrowTo(size_t newSize) override final
+    {
+        return string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
+    }
+};
+
 } // namespace SC

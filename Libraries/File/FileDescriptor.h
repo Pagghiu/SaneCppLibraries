@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringViewData.h"
@@ -70,84 +71,94 @@ struct SC_COMPILER_EXPORT FileOpen
 #endif
 };
 
-/// @brief File Descriptor (use File to open and use it with strings and buffers).
+/// @brief Open, read and write to/from a file descriptor (like a file or pipe).
 struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
 
     /// @brief Opens a file descriptor handle for writing to /dev/null or equivalent on current OS.
     /// @return `true` if file has been opened successfully
-    [[nodiscard]] Result openForWriteToDevNull();
+    Result openForWriteToDevNull();
 
-    /// @brief Opens a file descriptor handle for a file path encoded in the native encoding of the current OS.
-    /// @param path The path to file. It MUST be encoded in UTF-8 on Windows, ASCII or UTF-8 on POSIX.
+    /// @brief Opens a file descriptor handle from a file system path.
+    /// @param path The absolute path to file. It MUST be encoded in ASCII,UTF-8/16 on Windows, ASCII,UTF-8 on POSIX.
     /// @param mode The mode used to open file (read-only, write-append etc.)
     /// @return Valid Result if file is opened successfully
-    /// @see File::open to open files converting path automatically to native encoding
-    [[nodiscard]] Result openNativeEncoding(StringViewData path, FileOpen mode);
+    Result open(StringViewData path, FileOpen mode);
 
     /// @brief Set blocking mode (read / write waiting for I/O). Can be set also during open with OpenOptions.
     /// @param blocking `true` to set file to blocking mode
     /// @return `true` if blocking mode has been changed successfully
-    [[nodiscard]] Result setBlocking(bool blocking);
+    Result setBlocking(bool blocking);
 
     /// @brief Set inheritable flag (visibility to child processes). Can be set also during open with OpenOptions.
     /// @param inheritable `true` to set file to blocking mode
     /// @return `true` if blocking mode has been changed successfully
-    [[nodiscard]] Result setInheritable(bool inheritable);
+    Result setInheritable(bool inheritable);
 
     /// @brief Queries the inheritable state of this descriptor
     /// @param hasValue will be set to true if the file descriptor has inheritable file set
     /// @return Valid Result if the inheritable flag has been queried successfully
-    [[nodiscard]] Result isInheritable(bool& hasValue) const;
+    Result isInheritable(bool& hasValue) const;
 
     /// @brief Reads bytes at offset into user supplied span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @param offset Offset from begin of the file descriptor where read should be started
     /// @return Valid result if read succeeded
-    [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
+    Result read(Span<char> data, Span<char>& actuallyRead, uint64_t offset);
 
     /// @brief Reads bytes at offset into user supplied span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @param offset Offset from begin of the file descriptor where read should be started
     /// @return Valid result if read succeeded
-    [[nodiscard]] Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset);
+    Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead, uint64_t offset);
 
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
-    [[nodiscard]] Result read(Span<char> data, Span<char>& actuallyRead);
+    Result read(Span<char> data, Span<char>& actuallyRead);
 
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
     /// @return Valid result if read succeeded
-    [[nodiscard]] Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead);
+    Result read(Span<uint8_t> data, Span<uint8_t>& actuallyRead);
+
+    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
+    ///        It works also for non-seekable file descriptors (stdout / in / err).
+    /// @tparam T Type of the destination buffer implementing IGrowableBuffer interface (String, SmallString, Buffer)
+    /// @param destination A destination buffer to write to (it will be resized as needed)
+    /// @return Valid result if read succeeded until EOF
+    template <typename T>
+    Result readUntilEOF(T& destination)
+    {
+        return readUntilEOFGrowable(GrowableBuffer<T>{destination});
+    }
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @param offset Offset from begin of file descriptor to start writing
     /// @return Valid result if write succeeded
-    [[nodiscard]] Result write(Span<const char> data, uint64_t offset);
+    Result write(Span<const char> data, uint64_t offset);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @param offset Offset from begin of file descriptor to start writing
     /// @return Valid result if write succeeded
-    [[nodiscard]] Result write(Span<const uint8_t> data, uint64_t offset);
+    Result write(Span<const uint8_t> data, uint64_t offset);
 
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @return Valid result if write succeeded
-    [[nodiscard]] Result write(Span<const char> data);
+    Result write(Span<const char> data);
 
     /// @brief Writes bytes from current position (FileDescriptor::seek) of the file descriptor
     /// @param data Span of bytes containing the data to write
     /// @return Valid result if write succeeded
-    [[nodiscard]] Result write(Span<const uint8_t> data);
+    Result write(Span<const uint8_t> data);
 
     /// @brief How the offset to FileDescriptor::seek is defined
     enum SeekMode
@@ -161,21 +172,22 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @param seekMode How the offset is defined (from start, end, current)
     /// @param offset An offset to be applied according to seekMode to this descriptor
     /// @return Valid result if seek succeeds
-    [[nodiscard]] Result seek(SeekMode seekMode, uint64_t offset);
+    Result seek(SeekMode seekMode, uint64_t offset);
 
     /// @brief Gets current descriptor position (if seekable)
     /// @param position (output) current position of file descriptor
     /// @return Valid result if seek succeeds
-    [[nodiscard]] Result currentPosition(size_t& position) const;
+    Result currentPosition(size_t& position) const;
 
     /// @brief Gets total file size in bytes (if seekable)
     /// @param sizeInBytes (output) total size of file
     /// @return Valid result if seek succeeds
-    [[nodiscard]] Result sizeInBytes(size_t& sizeInBytes) const;
+    Result sizeInBytes(size_t& sizeInBytes) const;
 
   private:
     friend struct File;
     struct Internal;
+    Result readUntilEOFGrowable(IGrowableBuffer&& buffer);
 };
 
 /// @brief Read / Write pipe (Process stdin/stdout and IPC communication)
@@ -201,12 +213,12 @@ struct SC_COMPILER_EXPORT PipeDescriptor
     /// @param readFlag Specifies how the read side should be created
     /// @param writeFlag Specifies how the write side should be created
     /// @return Valid Result if pipe creation succeeded
-    [[nodiscard]] Result createPipe(InheritableReadFlag  readFlag  = ReadNonInheritable,
-                                    InheritableWriteFlag writeFlag = WriteNonInheritable);
+    Result createPipe(InheritableReadFlag  readFlag  = ReadNonInheritable,
+                      InheritableWriteFlag writeFlag = WriteNonInheritable);
 
     /// @brief Closes the pipe
     /// @return Valid Result if pipe destruction succeeded
-    [[nodiscard]] Result close();
+    Result close();
 };
 //! @}
 } // namespace SC

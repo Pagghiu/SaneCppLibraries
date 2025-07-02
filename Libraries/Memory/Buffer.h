@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Memory/Segment.h"
 
 namespace SC
@@ -65,5 +66,14 @@ using SmallBufferTL = detail::SegmentCustom<SmallBuffer<N>, Buffer, N, SegmentAl
 struct SC_COMPILER_EXPORT Buffer;
 #endif
 
+// Enables File library from reading data from file descriptor into a Buffer
+template <>
+struct GrowableBuffer<Buffer> : public IGrowableBuffer
+{
+    Buffer& buffer;
+    GrowableBuffer(Buffer& buffer) : buffer(buffer) {}
+    virtual DirectAccess getDirectAccess() override final { return {buffer.size(), buffer.capacity(), buffer.data()}; }
+    virtual bool         tryGrowTo(size_t newSize) override final { return buffer.resizeWithoutInitializing(newSize); }
+};
 //! @}
 } // namespace SC

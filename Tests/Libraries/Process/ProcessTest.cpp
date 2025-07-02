@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Process/Process.h"
 #include "Libraries/Async/Async.h"
-#include "Libraries/File/File.h"
+#include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -274,7 +274,7 @@ void SC::ProcessTest::processChainPipeDual()
     }
     PipeDescriptor outputPipe;
     SC_TEST_EXPECT(chain.launch(outputPipe));
-    SC_TEST_EXPECT(File(outputPipe.readPipe).readUntilEOF(output));
+    SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
     SC_TEST_EXPECT(chain.waitForExitSync());
     SC_TEST_EXPECT(output.view().startsWith(expectedOutput));
     //! [processChainPipeDualSnippet]
@@ -451,7 +451,7 @@ Process process5;
 PipeDescriptor outputPipe;
 process5.launch({"executable.exe", "—argument1", "-argument2"}, outputPipe);
 String output5 = StringEncoding::Ascii; // Could also use SmallString<N>
-File(outputPipe.readPipe).readUntilEOF(output5);
+outputPipe.readPipe.readUntilEOF(output5);
 process5.waitForExitSync(); // call process-getExitStatus() for status code
 //--------------------------------------------------------------------------
 // 6. Executes two processes piping p1 output to p2 input
@@ -531,7 +531,7 @@ SC::Result SC::ProcessTest::processSnippet5()
     PipeDescriptor outputPipe;
     SC_TRY(process.launch({"executable.exe", "--argument1", "--argument2"}, outputPipe));
     String output = StringEncoding::Ascii; // Could also use SmallString<N>
-    SC_TRY(File(outputPipe.readPipe).readUntilEOF(output));
+    SC_TRY(outputPipe.readPipe.readUntilEOF(output));
     SC_TRY(process.waitForExitSync());
     // ... Do something with the 'output' string
     //! [ProcessSnippet5]

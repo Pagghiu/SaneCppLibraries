@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "FileSystem.h"
-#include "../File/File.h"
+#include "../File/FileDescriptor.h"
 #include "../FileSystem/Path.h"
 #include "../Strings/StringConverter.h"
 #include "FileSystemOperations.h"
@@ -208,7 +208,7 @@ SC::Result SC::FileSystem::write(StringView path, Span<const char> data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    SC_TRY(File(fd).open(encodedPath, FileOpen::Write));
+    SC_TRY(fd.open(encodedPath, FileOpen::Write));
     return fd.write(data);
 }
 
@@ -222,9 +222,8 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    File           file(fd);
-    SC_TRY(file.open(encodedPath, FileOpen::Read));
-    return file.readUntilEOF(data);
+    SC_TRY(fd.open(encodedPath, FileOpen::Read));
+    return fd.readUntilEOF(data);
 }
 
 [[nodiscard]] SC::Result SC::FileSystem::writeString(StringView path, StringView text)
@@ -237,7 +236,7 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    SC_TRY(File(fd).open(encodedPath, FileOpen::Append));
+    SC_TRY(fd.open(encodedPath, FileOpen::Append));
     return fd.write(text.toCharSpan());
 }
 
@@ -248,9 +247,8 @@ SC::Result SC::FileSystem::read(StringView path, Buffer& data)
     StringView encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
     FileDescriptor fd;
-    File           file(fd);
-    SC_TRY(file.open(encodedPath, FileOpen::Read));
-    return file.readUntilEOF(text);
+    SC_TRY(fd.open(encodedPath, FileOpen::Read));
+    return fd.readUntilEOF(text);
 }
 
 SC::Result SC::FileSystem::formatError(int errorNumber, StringView item, bool isWindowsNativeError)

@@ -5,7 +5,7 @@
 #include "Libraries/AsyncStreams/AsyncStreams.cpp"
 #include "Libraries/AsyncStreams/ZLibTransformStreams.cpp"
 #include "Libraries/Build/Build.cpp"
-#include "Libraries/File/File.cpp"
+#include "Libraries/File/FileDescriptor.cpp"
 #include "Libraries/FileSystem/FileSystem.cpp"
 #include "Libraries/FileSystem/FileSystemDirectories.cpp"
 #include "Libraries/FileSystem/FileSystemOperations.cpp"
