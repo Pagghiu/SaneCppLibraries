@@ -231,7 +231,7 @@ SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
 
 SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool) { return executeOn(task, threadPool); }
 
-SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::Handle process)
+SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, FileDescriptor::Handle process)
 {
     handle = process;
     return loop.start(*this);
@@ -239,7 +239,7 @@ SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, ProcessDescriptor::
 
 SC::Result SC::AsyncProcessExit::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != ProcessDescriptor::Invalid, "AsyncProcessExit - Invalid handle");
+    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncProcessExit - Invalid handle");
     return SC::Result(true);
 }
 

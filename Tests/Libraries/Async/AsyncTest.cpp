@@ -210,10 +210,10 @@ SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
 AsyncProcessExit processExit; //  Memory lifetime must be valid until callback is called
 processExit.callback = [&](AsyncProcessExit::Result& res)
 {
-    ProcessDescriptor::ExitStatus exitStatus;
+    int exitStatus = -1;
     if(res.get(exitStatus))
     {
-        console.print("Process Exit status = {}", exitStatus.status);
+        console.print("Process Exit status = {}", exitStatus);
     }
 };
 SC_TRY(processExit.start(eventLoop, processHandle));

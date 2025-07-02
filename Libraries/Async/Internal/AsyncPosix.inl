@@ -239,7 +239,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
                 {
                     Result                   res(true);
                     AsyncProcessExit::Result processResult(result.eventLoop, *current, res);
-                    processResult.completionData.exitStatus.status = WEXITSTATUS(status);
+                    processResult.completionData.exitStatus = WEXITSTATUS(status);
                     result.eventLoop.internal.removeActiveHandle(*current);
                     current->callback(processResult);
                     break;
@@ -1104,7 +1104,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         if (WIFEXITED(status) != 0)
         {
-            result.completionData.exitStatus.status = WEXITSTATUS(status);
+            result.completionData.exitStatus = WEXITSTATUS(status);
         }
         return Result(true);
     }
@@ -1138,7 +1138,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             const uint32_t data = static_cast<uint32_t>(event.data);
             if (WIFEXITED(data) != 0)
             {
-                result.completionData.exitStatus.status = WEXITSTATUS(data);
+                result.completionData.exitStatus = WEXITSTATUS(data);
             }
             return Result(true);
         }

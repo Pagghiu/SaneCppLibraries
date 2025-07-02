@@ -856,12 +856,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         async.eventLoop = &eventLoop;
 
-        const ProcessDescriptor::Handle processHandle = async.handle;
+        const FileDescriptor::Handle processHandle = async.handle;
 
         HANDLE waitHandle;
 
-        BOOL result = RegisterWaitForSingleObject(&waitHandle, processHandle, KernelEvents::processExitCallback, &async,
-                                                  INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
+        BOOL result = ::RegisterWaitForSingleObject(&waitHandle, processHandle, KernelEvents::processExitCallback,
+                                                    &async, INFINITE, WT_EXECUTEINWAITTHREAD | WT_EXECUTEONLYONCE);
         if (result == FALSE)
         {
             return Result::Error("RegisterWaitForSingleObject failed");
@@ -878,7 +878,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             return Result::Error("GetExitCodeProcess failed");
         }
-        result.completionData.exitStatus.status = static_cast<int32_t>(processStatus);
+        result.completionData.exitStatus = static_cast<int32_t>(processStatus);
         return Result(true);
     }
 

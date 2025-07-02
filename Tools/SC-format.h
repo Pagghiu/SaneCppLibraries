@@ -101,9 +101,9 @@ struct ProcessLimiter
         // Launch does not wait for the child process to finish so we can monitor it with the event loop
         processExit.callback = [this](AsyncProcessExit::Result& result)
         {
-            ProcessDescriptor::ExitStatus exitStatus;
-            processResult = result.get(exitStatus);
-            if (processResult and exitStatus.status != 0)
+            int exitStatus = -1;
+            processResult  = result.get(exitStatus);
+            if (processResult and exitStatus != 0)
             {
                 processResult = Result::Error("ProcessLimiter::callback - returned non zero");
             }

@@ -27,8 +27,7 @@ void SC::AsyncTest::processExit()
     struct OutParams
     {
         int numCallbackCalled = 0;
-
-        ProcessDescriptor::ExitStatus exitStatus = {-1};
+        int exitStatus        = -1;
     };
     OutParams outParams1;
     OutParams outParams2;
@@ -49,7 +48,7 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(outParams1.numCallbackCalled == 1);
-    SC_TEST_EXPECT(outParams1.exitStatus.status == 0); // Status == Ok
+    SC_TEST_EXPECT(outParams1.exitStatus == 0); // Status == Ok
     SC_TEST_EXPECT(outParams2.numCallbackCalled == 1);
-    SC_TEST_EXPECT(outParams2.exitStatus.status != 0); // Status == Not OK
+    SC_TEST_EXPECT(outParams2.exitStatus != 0); // Status == Not OK
 }

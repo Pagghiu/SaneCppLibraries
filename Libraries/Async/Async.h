@@ -13,7 +13,6 @@
 
 // Descriptors
 #include "../File/FileDescriptor.h"
-#include "../Process/ProcessDescriptor.h"
 #include "../Socket/SocketDescriptor.h"
 
 namespace SC
@@ -373,14 +372,14 @@ struct AsyncProcessExit : public AsyncRequest
 
     struct CompletionData : public AsyncCompletionData
     {
-        ProcessDescriptor::ExitStatus exitStatus;
+        int exitStatus;
     };
 
     struct Result : public AsyncResultOf<AsyncProcessExit, CompletionData>
     {
         using AsyncResultOf<AsyncProcessExit, CompletionData>::AsyncResultOf;
 
-        SC::Result get(ProcessDescriptor::ExitStatus& status)
+        SC::Result get(int& status)
         {
             status = completionData.exitStatus;
             return returnCode;
@@ -389,7 +388,9 @@ struct AsyncProcessExit : public AsyncRequest
     using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, ProcessDescriptor::Handle process);
+    /// @note Using FileDescriptor::Handle instead of ProcessDescriptor::Handle not to depend on
+    /// Process library because their low-level native representation are the same.
+    SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle process);
 
     Function<void(Result&)> callback; ///< Called when process has exited
 
@@ -397,7 +398,7 @@ struct AsyncProcessExit : public AsyncRequest
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
 
-    ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
     detail::WinWaitHandle       waitHandle;

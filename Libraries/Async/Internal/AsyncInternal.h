@@ -202,13 +202,13 @@ struct SC::AsyncEventLoop::Internal
 
     struct AsyncTeardown
     {
-        AsyncRequest::Type        type          = AsyncRequest::Type::LoopTimeout;
-        int16_t                   flags         = 0;
-        AsyncEventLoop*           eventLoop     = nullptr;
-        AsyncSequence*            sequence      = nullptr;
-        FileDescriptor::Handle    fileHandle    = FileDescriptor::Invalid;
-        SocketDescriptor::Handle  socketHandle  = SocketDescriptor::Invalid;
-        ProcessDescriptor::Handle processHandle = ProcessDescriptor::Invalid;
+        AsyncRequest::Type       type          = AsyncRequest::Type::LoopTimeout;
+        int16_t                  flags         = 0;
+        AsyncEventLoop*          eventLoop     = nullptr;
+        AsyncSequence*           sequence      = nullptr;
+        FileDescriptor::Handle   fileHandle    = FileDescriptor::Invalid;
+        SocketDescriptor::Handle socketHandle  = SocketDescriptor::Invalid;
+        FileDescriptor::Handle   processHandle = FileDescriptor::Invalid;
 #if SC_CONFIGURATION_DEBUG
         char debugName[128] = "None";
 #endif
