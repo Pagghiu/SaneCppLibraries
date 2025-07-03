@@ -29,6 +29,8 @@ struct SC::TestReport
     StringView executableFile;           ///< Path to current executable
     StringView applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
 
+    StringPath executableFileStorage;
+    StringPath applicationRootStorage;
     // Options
     bool abortOnFirstFailedTest = true;  ///< If `true` will abort after first failed test
     bool debugBreakOnFailedTest = true;  ///< If `true` will issue a debugger halt when a test fails

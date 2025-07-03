@@ -12,8 +12,10 @@
 #include <sys/stat.h> // mkdir
 #include <unistd.h>   // rmdir
 #if __APPLE__
+#include <CoreFoundation/CoreFoundation.h>
 #include <copyfile.h>
-#include <errno.h> // errno
+#include <errno.h>       // errno
+#include <mach-o/dyld.h> // NSGetExecutablePath
 #include <removefile.h>
 #include <sys/attr.h>
 #include <sys/clonefile.h>
@@ -238,6 +240,39 @@ SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData pat
                  "removeDirectoryRecursive: Failed to remove directory");
     return Result(true);
 }
+
+SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+{
+    uint32_t executableLength = static_cast<uint32_t>(StringPath::MaxPath);
+    if (::_NSGetExecutablePath(executablePath.path, &executableLength) == 0)
+    {
+        executablePath.length = ::strlen(executablePath.path);
+        return executablePath;
+    }
+    return {};
+}
+
+SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+{
+    CFBundleRef mainBundle = CFBundleGetMainBundle();
+    if (mainBundle != nullptr)
+    {
+        CFURLRef bundleURL = CFBundleCopyBundleURL(mainBundle);
+        if (bundleURL != nullptr)
+        {
+            if (CFURLGetFileSystemRepresentation(
+                    bundleURL, true, reinterpret_cast<uint8_t*>(applicationRootDirectory.path), StringPath::MaxPath))
+            {
+                applicationRootDirectory.length = ::strlen(applicationRootDirectory.path);
+                CFRelease(bundleURL);
+                return applicationRootDirectory;
+            }
+            CFRelease(bundleURL);
+        }
+    }
+    return {};
+}
+
 #else
 SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, StringViewData destination,
                                                         FileSystemCopyFlags options, bool isDirectory)
@@ -410,4 +445,35 @@ SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData pat
 
     return Result(true);
 }
+
+SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+{
+    const int pathLength = ::readlink("/proc/self/exe", executablePath.path, StringPath::MaxPath);
+    if (pathLength > 0)
+    {
+        executablePath.length = static_cast<size_t>(pathLength);
+        return executablePath;
+    }
+    return {};
+}
+
+SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+{
+    StringViewData executablePath = getExecutablePath(applicationRootDirectory);
+    if (!executablePath.isEmpty())
+    {
+        // Get the directory part of the executable path
+        const char* lastSlash = ::strrchr(applicationRootDirectory.path, '/');
+        if (lastSlash != nullptr)
+        {
+            applicationRootDirectory.length = static_cast<size_t>(lastSlash - applicationRootDirectory.path);
+            // Null-terminate the path
+            ::memset(applicationRootDirectory.path + applicationRootDirectory.length, 0,
+                     StringPath::MaxPath - applicationRootDirectory.length);
+            return applicationRootDirectory;
+        }
+    }
+    return {};
+}
+
 #endif

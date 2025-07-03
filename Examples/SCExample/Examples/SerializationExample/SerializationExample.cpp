@@ -90,7 +90,6 @@ struct SerializationTextReadVersioned<TextStream, ImVector<T>> : public Serializ
 } // namespace SC
 
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/FileSystem/FileSystemDirectories.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/Process/Process.h"
@@ -193,11 +192,12 @@ struct SC::SerializationExampleView
 {
     SerializationExampleViewState viewState;
 
+    StringPath applicationPath;
+
     Result init()
     {
-        FileSystemDirectories directories;
-        SC_TRY(directories.init());
-        const StringView appPath = SC::Path::dirname(directories.getApplicationPath(), SC::Path::Type::AsNative);
+        FileSystemOperations::getApplicationRootDirectory(applicationPath);
+        const StringView appPath = SC::Path::dirname(applicationPath.view(), SC::Path::Type::AsNative);
         SC_TRY(SC::Path::join(viewState.jsonSerializationPath, {appPath, "state.json"}));
         SC_TRY(SC::Path::join(viewState.binarySerializationPath, {appPath, "state.binary"}));
         return Result(true);

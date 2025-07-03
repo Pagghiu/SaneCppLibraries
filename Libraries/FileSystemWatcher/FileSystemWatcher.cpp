@@ -40,7 +40,6 @@ SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringViewData p
     else
 #endif
     {
-        SC_TRY_MSG(path.getEncoding() != StringEncoding::Utf16, "Path cannot be UTF16 on this platform");
         ::memcpy(watcher.pathBuffer, path.bytesWithoutTerminator(), path.sizeInBytes());
         watcher.pathBuffer[path.sizeInBytes() / sizeof(native_char_t)] = '\0'; // Ensure null termination
         watcher.path = StringViewData({reinterpret_cast<const char*>(watcher.pathBuffer), path.sizeInBytes()}, true,

@@ -351,3 +351,44 @@ SC::Result SC::FileSystemOperations::Internal::removeDirectoryRecursiveInternal(
 
     return Result(true);
 }
+
+SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+{
+    // Use GetModuleFileNameW to get the executable path in UTF-16
+    DWORD length = ::GetModuleFileNameW(nullptr, executablePath.path, static_cast<DWORD>(StringPath::MaxPath));
+    if (length == 0 || length >= StringPath::MaxPath)
+    {
+        executablePath.length = 0;
+        return {};
+    }
+    executablePath.length = length; // length does not include null terminator
+    return executablePath;
+}
+
+SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+{
+    StringViewData exeView = getExecutablePath(applicationRootDirectory);
+    if (exeView.isEmpty())
+        return {};
+    // Find the last path separator (either '\\' or '/')
+    ssize_t lastSeparator = -1;
+    for (size_t i = 0; i < applicationRootDirectory.length; ++i)
+    {
+        if (applicationRootDirectory.path[i] == L'\\' || applicationRootDirectory.path[i] == L'/')
+            lastSeparator = static_cast<ssize_t>(i);
+    }
+    if (lastSeparator < 0)
+    {
+        // No separator found, return empty
+        applicationRootDirectory.length = 0;
+        ::memset(applicationRootDirectory.path, 0, StringPath::MaxPath * sizeof(wchar_t));
+        return {};
+    }
+    const size_t copyLen = static_cast<size_t>(lastSeparator);
+
+    applicationRootDirectory.path[copyLen] = 0;
+    applicationRootDirectory.length        = copyLen;
+    // null terminate the path
+    ::memset(applicationRootDirectory.path + copyLen + 1, 0, (StringPath::MaxPath - copyLen - 1) * sizeof(wchar_t));
+    return applicationRootDirectory;
+}

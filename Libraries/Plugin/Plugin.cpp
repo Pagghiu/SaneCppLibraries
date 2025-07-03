@@ -514,7 +514,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 
     SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/LIBPATH:"), Path::dirname(executablePath, Path::AsNative)}));
 
-    StringView exeName = Path::basename(executablePath, ".exe"_u8);
+    StringView exeName = Path::basename(executablePath, SC_NATIVE_STR(".exe"));
     SC_TRY(arena.appendAsSingleString({exeName, SC_NATIVE_STR(".lib")}));
 
 #else

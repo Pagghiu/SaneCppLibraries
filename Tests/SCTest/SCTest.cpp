@@ -33,7 +33,6 @@ void runGlobalsContainerTest(TestReport& report);
 void runFileTest(TestReport& report);
 
 // FileSystem
-void runFileSystemDirectoriesTest(TestReport& report);
 void runFileSystemTest(TestReport& report);
 void runPathTest(TestReport& report);
 
@@ -106,10 +105,11 @@ void runSupportToolsTest(TestReport& report);
 #endif
 
 #include "Libraries/Containers/Vector.h"
-#include "Libraries/FileSystem/FileSystemDirectories.h"
+#include "Libraries/FileSystem/FileSystemOperations.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
+#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;
@@ -120,15 +120,13 @@ int main(int argc, const char* argv[])
     Globals::init(Globals::Global, {1024 * 1024}); // 1MB for ownership tracking
     SmallBuffer<1024 * sizeof(SC::native_char_t)> globalConsoleConversionBuffer;
     Console::tryAttachingToParentConsole();
-    FileSystemDirectories directories;
-    if (not directories.init())
-        return -2;
     if (not SocketNetworking::initNetworking())
-        return -3;
+        return -2;
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);
-    report.applicationRootDirectory = directories.getApplicationPath();
-    report.executableFile           = directories.getExecutablePath();
+
+    report.executableFile           = FileSystemOperations::getExecutablePath(report.executableFileStorage);
+    report.applicationRootDirectory = FileSystemOperations::getApplicationRootDirectory(report.applicationRootStorage);
 
     SC::SmallString<255> correctedPath;
     {
@@ -169,7 +167,6 @@ int main(int argc, const char* argv[])
 
     // FileSystem tests
     runFileSystemTest(report);
-    runFileSystemDirectoriesTest(report);
     runPathTest(report);
 
     // FileSystemIterator tests

@@ -54,10 +54,12 @@ Path is able to parse and manipulate windows and posix paths.
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
 
-| Miscellaneous Classes                         |                                                           |
-|:----------------------------------------------|:----------------------------------------------------------|
-| SC::FileSystemDirectories                     | @copybrief SC::FileSystemDirectories                      |
-| SC::FileSystemOperations                      | @copybrief SC::FileSystemOperations                       |
+| Miscellaneous Classes                                 |                                                                   |
+|:------------------------------------------------------|:------------------------------------------------------------------|
+| SC::FileSystemOperations                              | @copybrief SC::FileSystemOperations                               |
+| **Get Executable / Application Path**                 |                                                                   |
+| SC::FileSystemOperations::getExecutablePath           | @copybrief SC::FileSystemOperations::getExecutablePath            |
+| SC::FileSystemOperations::getApplicationRootDirectory | @copybrief SC::FileSystemOperations::getApplicationRootDirectory  |
 
 # Status
 🟩 Usable  

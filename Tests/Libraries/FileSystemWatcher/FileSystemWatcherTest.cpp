@@ -102,9 +102,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             watcher.notifyCallback  = lambda;
             const Result res        = fileEventsWatcher.watch(watcher, path.view());
             const bool   fsWriteRes = fs.write("test.txt", "content");
-            params.eventObject.wait();
             SC_TEST_EXPECT(fsWriteRes);
             SC_TEST_EXPECT(res);
+            params.eventObject.wait();
             SC_TEST_EXPECT(params.changes > 0);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID != Thread::CurrentThreadID());

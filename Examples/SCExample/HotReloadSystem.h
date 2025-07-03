@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/FileSystem/FileSystemDirectories.h"
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Plugin/Plugin.h"
@@ -18,7 +17,8 @@ struct HotReloadState
     String libraryRootDirectory;
     String imguiPath;
     String pluginsPath;
-    String executablePath;
+
+    StringPath executablePath;
 
     char isysroot[255];
 };
@@ -33,9 +33,7 @@ struct HotReloadSystem
     {
         eventLoop = &loop;
         // Setup Paths
-        FileSystemDirectories directories;
-        SC_TRY(directories.init());
-        state.executablePath = directories.getExecutablePath();
+        FileSystemOperations::getExecutablePath(state.executablePath);
         SmallVector<StringView, 50> components;
         SC_TRY(Path::normalizeUNCAndTrimQuotes(SC_COMPILER_LIBRARY_PATH, components, state.libraryRootDirectory,
                                                Path::AsNative));

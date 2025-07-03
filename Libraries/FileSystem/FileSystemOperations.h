@@ -47,7 +47,7 @@ struct FileSystemCopyFlags
 
 /// @brief Low level filesystem operations, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
 /// @see SC::FileSystem when an higher level API that also handles paths in a different encoding is needed
-struct FileSystemOperations
+struct SC_COMPILER_EXPORT FileSystemOperations
 {
     /// @brief Create a symbolic link
     /// @param sourceFileOrDirectory The source file or directory to link to
@@ -130,6 +130,13 @@ struct FileSystemOperations
     /// @param time The last modified time to set
     /// @return Result::Error if the last modified time could not be set
     static Result setLastModifiedTime(StringViewData path, Time::Realtime time);
+
+    /// @brief Absolute executable path with extension (UTF16 on Windows, UTF8 elsewhere)
+    static StringViewData getExecutablePath(StringPath& executablePath);
+
+    /// @brief Absolute Application path with extension (UTF16 on Windows, UTF8 elsewhere)
+    /// @note on macOS this is different from FileSystemDirectories::getExecutablePath
+    static StringViewData getApplicationRootDirectory(StringPath& applicationRootDirectory);
 
   private:
     struct Internal;
