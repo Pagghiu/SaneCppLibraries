@@ -9,7 +9,7 @@
 #endif
 #include <string.h>
 
-SC::Result SC::SocketDNS::resolveDNS(StringViewData host, Span<char>& ipAddress)
+SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
 {
     struct addrinfo hints, *res, *p;
 

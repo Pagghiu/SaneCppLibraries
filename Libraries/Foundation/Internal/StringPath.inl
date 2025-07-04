@@ -8,7 +8,7 @@
 #include <limits.h> // PATH_MAX
 #endif
 
-bool SC::StringPath::assign(StringViewData filePath)
+bool SC::StringPath::assign(StringSpan filePath)
 {
 #if SC_PLATFORM_WINDOWS
     static_assert(MaxPath >= MAX_PATH, "MAX_PATH");

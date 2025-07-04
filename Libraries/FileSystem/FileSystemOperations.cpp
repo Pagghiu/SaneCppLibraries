@@ -10,7 +10,7 @@
 
 struct SC::FileSystemOperations::Internal
 {
-    static Result validatePath(StringViewData path)
+    static Result validatePath(StringSpan path)
     {
         if (path.sizeInBytes() == 0)
             return Result::Error("Path is empty");
@@ -19,7 +19,7 @@ struct SC::FileSystemOperations::Internal
         return Result(true);
     }
 
-    static Result copyFile(StringViewData source, StringViewData destination, FileSystemCopyFlags options,
+    static Result copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
                            bool isDirectory = false);
 
     static Result copyDirectoryRecursive(const wchar_t* source, const wchar_t* destination, FileSystemCopyFlags flags);
@@ -35,7 +35,7 @@ struct SC::FileSystemOperations::Internal
         }                                                                                                              \
     }
 
-SC::Result SC::FileSystemOperations::createSymbolicLink(StringViewData sourceFileOrDirectory, StringViewData linkFile)
+SC::Result SC::FileSystemOperations::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFileOrDirectory), "createSymbolicLink: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(linkFile), "createSymbolicLink: Invalid link path");
@@ -48,7 +48,7 @@ SC::Result SC::FileSystemOperations::createSymbolicLink(StringViewData sourceFil
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::makeDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
     SC_TRY_WIN32(::CreateDirectoryW(path.getNullTerminatedNative(), nullptr),
@@ -56,7 +56,7 @@ SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
+SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
     const size_t pathLength = path.sizeInBytes() / sizeof(wchar_t);
@@ -120,14 +120,14 @@ SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::exists(StringViewData path)
+SC::Result SC::FileSystemOperations::exists(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "exists: Invalid path");
     const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
     return Result(res != INVALID_FILE_ATTRIBUTES);
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsDirectory: Invalid path");
     const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
@@ -136,7 +136,7 @@ SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringViewData path)
     return Result((res & FILE_ATTRIBUTE_DIRECTORY) != 0);
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsFile(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsFile: Invalid path");
     const DWORD res = GetFileAttributesW(path.getNullTerminatedNative());
@@ -145,7 +145,7 @@ SC::Result SC::FileSystemOperations::existsAndIsFile(StringViewData path)
     return Result((res & FILE_ATTRIBUTE_DIRECTORY) == 0);
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsLink(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsLink(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsLink: Invalid path");
     const DWORD res = ::GetFileAttributesW(path.getNullTerminatedNative());
@@ -154,7 +154,7 @@ SC::Result SC::FileSystemOperations::existsAndIsLink(StringViewData path)
     return Result((res & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
 }
 
-SC::Result SC::FileSystemOperations::removeEmptyDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::removeEmptyDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeEmptyDirectory: Invalid path");
     SC_TRY_WIN32(::RemoveDirectoryW(path.getNullTerminatedNative()),
@@ -162,7 +162,7 @@ SC::Result SC::FileSystemOperations::removeEmptyDirectory(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::moveDirectory(StringViewData source, StringViewData destination)
+SC::Result SC::FileSystemOperations::moveDirectory(StringSpan source, StringSpan destination)
 {
     SC_TRY_MSG(Internal::validatePath(source), "moveDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "moveDirectory: Invalid destination path");
@@ -172,14 +172,14 @@ SC::Result SC::FileSystemOperations::moveDirectory(StringViewData source, String
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::removeFile(StringViewData path)
+SC::Result SC::FileSystemOperations::removeFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeFile: Invalid path");
     SC_TRY_WIN32(::DeleteFileW(path.getNullTerminatedNative()), "removeFile: Failed to remove file");
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::getFileStat(StringViewData path, FileSystemStat& fileStat)
+SC::Result SC::FileSystemOperations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "getFileStat: Invalid path");
 
@@ -212,7 +212,7 @@ SC::Result SC::FileSystemOperations::getFileStat(StringViewData path, FileSystem
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::setLastModifiedTime(StringViewData path, Time::Realtime time)
+SC::Result SC::FileSystemOperations::setLastModifiedTime(StringSpan path, Time::Realtime time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
 
@@ -241,7 +241,7 @@ SC::Result SC::FileSystemOperations::setLastModifiedTime(StringViewData path, Ti
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::rename(StringViewData path, StringViewData newPath)
+SC::Result SC::FileSystemOperations::rename(StringSpan path, StringSpan newPath)
 {
     SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
     SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
@@ -250,8 +250,7 @@ SC::Result SC::FileSystemOperations::rename(StringViewData path, StringViewData 
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::copyFile(StringViewData source, StringViewData destination,
-                                              FileSystemCopyFlags flags)
+SC::Result SC::FileSystemOperations::copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(source), "copyFile: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "copyFile: Invalid destination path");
@@ -266,8 +265,7 @@ SC::Result SC::FileSystemOperations::copyFile(StringViewData source, StringViewD
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::copyDirectory(StringViewData source, StringViewData destination,
-                                                   FileSystemCopyFlags flags)
+SC::Result SC::FileSystemOperations::copyDirectory(StringSpan source, StringSpan destination, FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(source), "copyDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "copyDirectory: Invalid destination path");
@@ -281,7 +279,7 @@ SC::Result SC::FileSystemOperations::copyDirectory(StringViewData source, String
                                             flags);
 }
 
-SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData path)
+SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
     return Internal::removeDirectoryRecursiveInternal(path.getNullTerminatedNative());
@@ -417,7 +415,7 @@ SC::Result SC::FileSystemOperations::Internal::removeDirectoryRecursiveInternal(
     return Result(true);
 }
 
-SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+SC::StringSpan SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
 {
     // Use GetModuleFileNameW to get the executable path in UTF-16
     DWORD length = ::GetModuleFileNameW(nullptr, executablePath.path, static_cast<DWORD>(StringPath::MaxPath));
@@ -430,9 +428,9 @@ SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& execu
     return executablePath;
 }
 
-SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+SC::StringSpan SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
-    StringViewData exeView = getExecutablePath(applicationRootDirectory);
+    StringSpan exeView = getExecutablePath(applicationRootDirectory);
     if (exeView.isEmpty())
         return {};
     // Find the last path separator (either '\\' or '/')
@@ -480,7 +478,7 @@ SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringP
 #endif
 struct SC::FileSystemOperations::Internal
 {
-    static Result validatePath(StringViewData path)
+    static Result validatePath(StringSpan path)
     {
         if (path.sizeInBytes() == 0)
             return Result::Error("Path is empty");
@@ -488,7 +486,7 @@ struct SC::FileSystemOperations::Internal
             return Result::Error("Path is not native (UTF8)");
         return Result(true);
     }
-    static Result copyFile(StringViewData source, StringViewData destination, FileSystemCopyFlags options,
+    static Result copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
                            bool isDirectory = false);
 };
 
@@ -501,7 +499,7 @@ struct SC::FileSystemOperations::Internal
         }                                                                                                              \
     }
 
-SC::Result SC::FileSystemOperations::createSymbolicLink(StringViewData sourceFileOrDirectory, StringViewData linkFile)
+SC::Result SC::FileSystemOperations::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
 {
     SC_TRY_MSG(Internal::validatePath(sourceFileOrDirectory),
                "createSymbolicLink: Invalid source file or directory path");
@@ -511,7 +509,7 @@ SC::Result SC::FileSystemOperations::createSymbolicLink(StringViewData sourceFil
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::makeDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
     SC_TRY_POSIX(::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH),
@@ -519,7 +517,7 @@ SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
+SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
     const size_t pathLength = path.sizeInBytes();
@@ -557,7 +555,7 @@ SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::exists(StringViewData path)
+SC::Result SC::FileSystemOperations::exists(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "exists: Invalid path");
     struct stat path_stat;
@@ -565,7 +563,7 @@ SC::Result SC::FileSystemOperations::exists(StringViewData path)
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsDirectory: Invalid path");
     struct stat path_stat;
@@ -573,7 +571,7 @@ SC::Result SC::FileSystemOperations::existsAndIsDirectory(StringViewData path)
     return Result(S_ISDIR(path_stat.st_mode));
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsFile(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsFile: Invalid path");
     struct stat path_stat;
@@ -581,7 +579,7 @@ SC::Result SC::FileSystemOperations::existsAndIsFile(StringViewData path)
     return Result(S_ISREG(path_stat.st_mode));
 }
 
-SC::Result SC::FileSystemOperations::existsAndIsLink(StringViewData path)
+SC::Result SC::FileSystemOperations::existsAndIsLink(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsLink: Invalid path");
     struct stat path_stat;
@@ -589,14 +587,14 @@ SC::Result SC::FileSystemOperations::existsAndIsLink(StringViewData path)
     return Result(S_ISLNK(path_stat.st_mode));
 }
 
-SC::Result SC::FileSystemOperations::removeEmptyDirectory(StringViewData path)
+SC::Result SC::FileSystemOperations::removeEmptyDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeEmptyDirectory: Invalid path");
     SC_TRY_POSIX(::rmdir(path.getNullTerminatedNative()), "removeEmptyDirectory: Failed to remove directory");
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::moveDirectory(StringViewData source, StringViewData destination)
+SC::Result SC::FileSystemOperations::moveDirectory(StringSpan source, StringSpan destination)
 {
     SC_TRY_MSG(Internal::validatePath(source), "moveDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destination), "moveDirectory: Invalid destination path");
@@ -605,14 +603,14 @@ SC::Result SC::FileSystemOperations::moveDirectory(StringViewData source, String
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::removeFile(StringViewData path)
+SC::Result SC::FileSystemOperations::removeFile(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeFile: Invalid path");
     SC_TRY_POSIX(::remove(path.getNullTerminatedNative()), "removeFile: Failed to remove file");
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::getFileStat(StringViewData path, FileSystemStat& fileStat)
+SC::Result SC::FileSystemOperations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
     SC_TRY_MSG(Internal::validatePath(path), "getFileStat: Invalid path");
     struct stat path_stat;
@@ -627,7 +625,7 @@ SC::Result SC::FileSystemOperations::getFileStat(StringViewData path, FileSystem
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::setLastModifiedTime(StringViewData path, Time::Realtime time)
+SC::Result SC::FileSystemOperations::setLastModifiedTime(StringSpan path, Time::Realtime time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
     struct timespec times[2];
@@ -640,7 +638,7 @@ SC::Result SC::FileSystemOperations::setLastModifiedTime(StringViewData path, Ti
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::rename(StringViewData path, StringViewData newPath)
+SC::Result SC::FileSystemOperations::rename(StringSpan path, StringSpan newPath)
 {
     SC_TRY_MSG(Internal::validatePath(path), "rename: Invalid path");
     SC_TRY_MSG(Internal::validatePath(newPath), "rename: Invalid new path");
@@ -649,8 +647,7 @@ SC::Result SC::FileSystemOperations::rename(StringViewData path, StringViewData 
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::copyFile(StringViewData srcPath, StringViewData destPath,
-                                              FileSystemCopyFlags flags)
+SC::Result SC::FileSystemOperations::copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(srcPath), "copyFile: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destPath), "copyFile: Invalid destination path");
@@ -658,8 +655,7 @@ SC::Result SC::FileSystemOperations::copyFile(StringViewData srcPath, StringView
     return Result(Internal::copyFile(srcPath, destPath, flags, false));
 }
 
-SC::Result SC::FileSystemOperations::copyDirectory(StringViewData srcPath, StringViewData destPath,
-                                                   FileSystemCopyFlags flags)
+SC::Result SC::FileSystemOperations::copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags)
 {
     SC_TRY_MSG(Internal::validatePath(srcPath), "copyDirectory: Invalid source path");
     SC_TRY_MSG(Internal::validatePath(destPath), "copyDirectory: Invalid destination path");
@@ -667,7 +663,7 @@ SC::Result SC::FileSystemOperations::copyDirectory(StringViewData srcPath, Strin
 }
 
 #if __APPLE__
-SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, StringViewData destination,
+SC::Result SC::FileSystemOperations::Internal::copyFile(StringSpan source, StringSpan destination,
                                                         FileSystemCopyFlags options, bool isDirectory)
 {
     const char* sourceFile      = source.getNullTerminatedNative();
@@ -725,7 +721,7 @@ SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, S
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData path)
+SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
     auto state     = ::removefile_state_alloc();
@@ -735,7 +731,7 @@ SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData pat
     return Result(true);
 }
 
-SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+SC::StringSpan SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
 {
     uint32_t executableLength = static_cast<uint32_t>(StringPath::MaxPath);
     if (::_NSGetExecutablePath(executablePath.path, &executableLength) == 0)
@@ -746,7 +742,7 @@ SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& execu
     return {};
 }
 
-SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+SC::StringSpan SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
     CFBundleRef mainBundle = CFBundleGetMainBundle();
     if (mainBundle != nullptr)
@@ -768,7 +764,7 @@ SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringP
 }
 
 #else
-SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, StringViewData destination,
+SC::Result SC::FileSystemOperations::Internal::copyFile(StringSpan source, StringSpan destination,
                                                         FileSystemCopyFlags options, bool isDirectory)
 {
     if (isDirectory)
@@ -823,8 +819,7 @@ SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, S
             }
 
             // Recursively copy subdirectories and files
-            SC_TRY(copyFile(StringViewData(fullSourcePath), StringViewData(fullDestPath), options,
-                            S_ISDIR(statbuf.st_mode)));
+            SC_TRY(copyFile(StringSpan(fullSourcePath), StringSpan(fullDestPath), options, S_ISDIR(statbuf.st_mode)));
         }
 
         return Result(true);
@@ -879,7 +874,7 @@ SC::Result SC::FileSystemOperations::Internal::copyFile(StringViewData source, S
     return Result(true);
 }
 
-SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData path)
+SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "removeDirectoryRecursive: Invalid path");
 
@@ -940,7 +935,7 @@ SC::Result SC::FileSystemOperations::removeDirectoryRecursive(StringViewData pat
     return Result(true);
 }
 
-SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
+SC::StringSpan SC::FileSystemOperations::getExecutablePath(StringPath& executablePath)
 {
     const int pathLength = ::readlink("/proc/self/exe", executablePath.path, StringPath::MaxPath);
     if (pathLength > 0)
@@ -951,9 +946,9 @@ SC::StringViewData SC::FileSystemOperations::getExecutablePath(StringPath& execu
     return {};
 }
 
-SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
+SC::StringSpan SC::FileSystemOperations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
-    StringViewData executablePath = getExecutablePath(applicationRootDirectory);
+    StringSpan executablePath = getExecutablePath(applicationRootDirectory);
     if (!executablePath.isEmpty())
     {
         // Get the directory part of the executable path

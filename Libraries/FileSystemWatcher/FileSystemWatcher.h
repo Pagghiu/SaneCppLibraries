@@ -98,9 +98,9 @@ struct FileSystemWatcher
     /// @brief Notification holding type and path
     struct Notification
     {
-        StringViewData basePath;                        ///< Reference to the watched directory
-        StringViewData relativePath;                    ///< Relative path of the file being notified from `basePath`
-        Operation      operation = Operation::Modified; ///< Notification type
+        StringSpan basePath;                        ///< Reference to the watched directory
+        StringSpan relativePath;                    ///< Relative path of the file being notified from `basePath`
+        Operation  operation = Operation::Modified; ///< Notification type
 
         /// @brief Get the full path of the file being watched.
         /// @param path StringPath that will hold full (absolute) path
@@ -110,7 +110,7 @@ struct FileSystemWatcher
       private:
         friend struct Internal;
 #if SC_PLATFORM_APPLE
-        StringViewData fullPath;
+        StringSpan fullPath;
 #endif
     };
 
@@ -178,7 +178,7 @@ struct FileSystemWatcher
     /// Its address must not change until FolderWatcher::stopWatching or FileSystemWatcher::close
     /// @param path The directory being monitored
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
-    Result watch(FolderWatcher& watcher, StringViewData path);
+    Result watch(FolderWatcher& watcher, StringSpan path);
 
   private:
     friend decltype(internal);

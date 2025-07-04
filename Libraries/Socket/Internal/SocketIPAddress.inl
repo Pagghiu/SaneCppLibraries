@@ -18,7 +18,7 @@ struct SocketIPAddressInternal;
 }
 struct SC::SocketIPAddressInternal
 {
-    [[nodiscard]] static Result parseIPV4(StringViewData ipAddress, uint16_t port, struct sockaddr_in& inaddr)
+    [[nodiscard]] static Result parseIPV4(StringSpan ipAddress, uint16_t port, struct sockaddr_in& inaddr)
     {
         char buffer[64] = {0};
         SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
@@ -33,7 +33,7 @@ struct SC::SocketIPAddressInternal
         return Result(true);
     }
 
-    [[nodiscard]] static Result parseIPV6(StringViewData ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
+    [[nodiscard]] static Result parseIPV6(StringSpan ipAddress, uint16_t port, struct sockaddr_in6& inaddr)
     {
         char buffer[64] = {0};
         SC_TRY_MSG(detail::writeNullTerminatedToBuffer(ipAddress.toCharSpan(), buffer), "ipAddress too long");
@@ -114,7 +114,7 @@ bool SC::SocketIPAddress::isValid() const
     return not toString(ipstr).isEmpty();
 }
 
-SC::StringViewData SC::SocketIPAddress::formatAddress(Span<char> inOutString) const
+SC::StringSpan SC::SocketIPAddress::formatAddress(Span<char> inOutString) const
 {
     const sockaddr* sa = &handle.reinterpret_as<struct sockaddr const>();
 
@@ -127,7 +127,7 @@ SC::StringViewData SC::SocketIPAddress::formatAddress(Span<char> inOutString) co
         {
             return {};
         }
-        return StringViewData({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        return StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
     }
     else if (sa->sa_family == AF_INET6)
     {
@@ -136,12 +136,12 @@ SC::StringViewData SC::SocketIPAddress::formatAddress(Span<char> inOutString) co
         {
             return {};
         }
-        return StringViewData({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        return StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
     }
     return {};
 }
 
-SC::Result SC::SocketIPAddress::fromAddressPort(StringViewData interfaceAddress, uint16_t port)
+SC::Result SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uint16_t port)
 {
     static_assert(sizeof(sockaddr_in6) >= sizeof(sockaddr_in), "size");
     static_assert(alignof(sockaddr_in6) >= alignof(sockaddr_in), "size");

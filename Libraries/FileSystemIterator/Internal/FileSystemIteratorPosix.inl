@@ -61,7 +61,7 @@ struct SC::FileSystemIterator::Internal
     }
 };
 
-SC::Result SC::FileSystemIterator::init(StringViewData directory, Span<FolderState> recursiveEntries)
+SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> recursiveEntries)
 {
     Internal::destroy(recurseStack);
     recurseStack.recursiveEntries = recursiveEntries;
@@ -130,9 +130,9 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
         break;
     }
 #if SC_PLATFORM_APPLE
-    entry.name = StringViewData({item->d_name, item->d_namlen}, true, StringEncoding::Utf8);
+    entry.name = StringSpan({item->d_name, item->d_namlen}, true, StringEncoding::Utf8);
 #else
-    entry.name = StringViewData({item->d_name, strlen(item->d_name)}, true, StringEncoding::Utf8);
+    entry.name = StringSpan({item->d_name, strlen(item->d_name)}, true, StringEncoding::Utf8);
 #endif
     currentPathStringLength = recurseStack.back().textLengthInBytes;
 
@@ -147,7 +147,7 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
     currentPathStringLength += entry.name.sizeInBytes() + 1;
     currentPathString[currentPathStringLength] = '\0'; // Ensure null termination
 
-    entry.path  = StringViewData({currentPathString, currentPathStringLength}, true, StringEncoding::Utf8);
+    entry.path  = StringSpan({currentPathString, currentPathStringLength}, true, StringEncoding::Utf8);
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
 
     entry.parentFileDescriptor = parent.fileDescriptor;

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringSpan.h"
 
 namespace SC
 {
@@ -19,16 +19,16 @@ struct StringPath
     size_t length = 0; ///< Length of the path in bytes (excluding null terminator)
 #if SC_PLATFORM_WINDOWS
     wchar_t path[MaxPath]; ///< Native path on Windows (UTF16-LE)
-    operator StringViewData() const { return StringViewData({path, length}, true); }
+    operator StringSpan() const { return StringSpan({path, length}, true); }
 #else
     char path[MaxPath]; ///< Native path on Posix (UTF-8)
-    operator StringViewData() const { return StringViewData({path, length}, true, StringEncoding::Utf8); }
+    operator StringSpan() const { return StringSpan({path, length}, true, StringEncoding::Utf8); }
 #endif
 
-    /// @brief Obtain a StringViewData from the current StringPath
-    [[nodiscard]] StringViewData view() const { return *this; }
+    /// @brief Obtain a StringSpan from the current StringPath
+    [[nodiscard]] StringSpan view() const { return *this; }
 
     /// @brief Assigns a StringView to current StringPath, converting the encoding from UTF16 to UTF8 if needed
-    [[nodiscard]] bool assign(StringViewData pathToConvert);
+    [[nodiscard]] bool assign(StringSpan pathToConvert);
 };
 } // namespace SC

@@ -4,7 +4,7 @@
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringSpan.h"
 #include "../Foundation/UniqueHandle.h"
 
 //! @defgroup group_file File
@@ -84,7 +84,7 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @param path The absolute path to file. It MUST be encoded in ASCII,UTF-8/16 on Windows, ASCII,UTF-8 on POSIX.
     /// @param mode The mode used to open file (read-only, write-append etc.)
     /// @return Valid Result if file is opened successfully
-    Result open(StringViewData path, FileOpen mode);
+    Result open(StringSpan path, FileOpen mode);
 
     /// @brief Set blocking mode (read / write waiting for I/O). Can be set also during open with OpenOptions.
     /// @param blocking `true` to set file to blocking mode

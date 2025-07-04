@@ -53,95 +53,95 @@ struct SC_COMPILER_EXPORT FileSystemOperations
     /// @param sourceFileOrDirectory The source file or directory to link to
     /// @param linkFile The link file to create
     /// @return Result::Error if the symbolic link could not be created
-    static Result createSymbolicLink(StringViewData sourceFileOrDirectory, StringViewData linkFile);
+    static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
 
     /// @brief Create a directory
     /// @param dir The directory to create
     /// @return Result::Error if the directory could not be created
-    static Result makeDirectory(StringViewData dir);
+    static Result makeDirectory(StringSpan dir);
 
     /// @brief Check if a path exists
     /// @param path The path to check
     /// @return Result::Error if the path could not be checked
-    static Result exists(StringViewData path);
+    static Result exists(StringSpan path);
 
     /// @brief Check if a path exists and is a directory
     /// @param path The path to check
     /// @return Result::Error if the path could not be checked
-    static Result existsAndIsDirectory(StringViewData path);
+    static Result existsAndIsDirectory(StringSpan path);
 
     /// @brief Check if a path exists and is a file
     /// @param path The path to check
     /// @return Result::Error if the path could not be checked
-    static Result existsAndIsFile(StringViewData path);
+    static Result existsAndIsFile(StringSpan path);
 
     /// @brief Check if a path exists and is a link
     /// @param path The path to check
     /// @return Result::Error if the path could not be checked
-    static Result existsAndIsLink(StringViewData path);
+    static Result existsAndIsLink(StringSpan path);
 
     /// @brief Create a directory and all parent directories as needed (like `mkdir -p`)
     /// @param path The directory to create
     /// @return Result::Error if the directory could not be created
-    static Result makeDirectoryRecursive(StringViewData path);
+    static Result makeDirectoryRecursive(StringSpan path);
 
     /// @brief Remove an empty directory
     /// @param path The path to the empty directory to remove
     /// @return Result::Error if the directory could not be removed
-    static Result removeEmptyDirectory(StringViewData path);
+    static Result removeEmptyDirectory(StringSpan path);
 
     /// @brief Move a directory
     /// @param source The source directory to move
     /// @param destination The destination directory to move to
-    static Result moveDirectory(StringViewData source, StringViewData destination);
+    static Result moveDirectory(StringSpan source, StringSpan destination);
 
     /// @brief Remove a file
     /// @param path The path to the file to remove
     /// @return Result::Error if the file could not be removed
-    static Result removeFile(StringViewData path);
+    static Result removeFile(StringSpan path);
 
     /// @brief Copy a file
     /// @param srcPath The source file to copy
     /// @param destPath The destination file to copy to
     /// @param flags The copy flags
     /// @return Result::Error if the file could not be copied
-    static Result copyFile(StringViewData srcPath, StringViewData destPath, FileSystemCopyFlags flags);
+    static Result copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
 
     /// @brief Rename a file or directory
     /// @param path The path to the file or directory to rename
     /// @param newPath The new path to the file or directory
     /// @return Result::Error if the file or directory could not be renamed
-    static Result rename(StringViewData path, StringViewData newPath);
+    static Result rename(StringSpan path, StringSpan newPath);
 
     /// @brief Copy a directory
     /// @param srcPath The source directory to copy
     /// @param destPath The destination directory to copy to
     /// @param flags The copy flags
     /// @return Result::Error if the directory could not be copied
-    static Result copyDirectory(StringViewData srcPath, StringViewData destPath, FileSystemCopyFlags flags);
+    static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
 
     /// @brief Remove a directory recursively
     /// @param directory The directory to remove
     /// @return Result::Error if the directory could not be removed
-    static Result removeDirectoryRecursive(StringViewData directory);
+    static Result removeDirectoryRecursive(StringSpan directory);
 
     /// @brief Get the file stat
     /// @param path The path to the file to get the stat of
     /// @param fileStat The file stat to fill
-    static Result getFileStat(StringViewData path, FileSystemStat& fileStat);
+    static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
 
     /// @brief Set the last modified time of a file
     /// @param path The path to the file to set the last modified time of
     /// @param time The last modified time to set
     /// @return Result::Error if the last modified time could not be set
-    static Result setLastModifiedTime(StringViewData path, Time::Realtime time);
+    static Result setLastModifiedTime(StringSpan path, Time::Realtime time);
 
     /// @brief Absolute executable path with extension (UTF16 on Windows, UTF8 elsewhere)
-    static StringViewData getExecutablePath(StringPath& executablePath);
+    static StringSpan getExecutablePath(StringPath& executablePath);
 
     /// @brief Absolute Application path with extension (UTF16 on Windows, UTF8 elsewhere)
     /// @note on macOS this is different from FileSystemDirectories::getExecutablePath
-    static StringViewData getApplicationRootDirectory(StringPath& applicationRootDirectory);
+    static StringSpan getApplicationRootDirectory(StringPath& applicationRootDirectory);
 
   private:
     struct Internal;

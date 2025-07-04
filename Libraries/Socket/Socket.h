@@ -4,7 +4,7 @@
 #include "SocketDescriptor.h"
 
 #include "../Foundation/Span.h"
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringSpan.h"
 #include "../Time/Time.h" // Milliseconds
 
 namespace SC
@@ -74,7 +74,7 @@ struct SC::SocketClient
     /// @param port Port to start listening to
     /// @return Valid Result if this client successfully connected to the specified address and port
     /// @note Socket descriptor MUST have already been created with SocketDescriptor::create
-    [[nodiscard]] Result connect(StringViewData address, uint16_t port);
+    [[nodiscard]] Result connect(StringSpan address, uint16_t port);
 
     /// @brief Connect to a given address and port combination
     /// @param ipAddress Address and port to connect to
@@ -116,7 +116,7 @@ struct SC::SocketDNS
     ///
     /// Example:
     /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
-    [[nodiscard]] static Result resolveDNS(StringViewData host, Span<char>& ipAddress);
+    [[nodiscard]] static Result resolveDNS(StringSpan host, Span<char>& ipAddress);
 };
 
 /// @brief Networking globals initialization (Winsock2 WSAStartup)

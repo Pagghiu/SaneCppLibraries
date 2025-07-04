@@ -27,34 +27,34 @@ enum class StringEncoding : uint8_t
 /// @brief An read-only view over a string (to avoid including @ref group_strings library when parsing is not needed).
 /// The most common use case is to pass it in and out of OS API as is for file system paths.
 /// Some libraries check the encoding and eventually convert the string to a different one when using specific OS api.
-struct SC_COMPILER_EXPORT StringViewData
+struct SC_COMPILER_EXPORT StringSpan
 {
     // clang-format off
     
     /// @brief Construct an empty StringView
-    constexpr StringViewData(StringEncoding encoding = StringEncoding::Ascii) : text(nullptr), textSizeInBytes(0), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(0) {}
+    constexpr StringSpan(StringEncoding encoding = StringEncoding::Ascii) : text(nullptr), textSizeInBytes(0), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(0) {}
 
     /// @brief Construct a StringView from a Span of bytes.
     /// @param text The span containing the text _EXCLUDING_ eventual null terminator
     /// @param nullTerm `true` if a null terminator code point is expected to be found after Span. On ASCII and UTF8 this is 1 byte, on UTF16 it must be 2 bytes.
     /// @param encoding The encoding of the text contained in this StringView
-    constexpr StringViewData(Span<const char> text, bool nullTerm, StringEncoding encoding) : text(text.data()), textSizeInBytes(text.sizeInBytes()), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(nullTerm ? 1 : 0) {}
+    constexpr StringSpan(Span<const char> text, bool nullTerm, StringEncoding encoding) : text(text.data()), textSizeInBytes(text.sizeInBytes()), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(nullTerm ? 1 : 0) {}
 
     /// @brief Constructs a StringView with a null terminated string terminal
     template <size_t N>
-    constexpr StringViewData(const char (&str)[N]) : text(str), textSizeInBytes(N - 1), encoding(static_cast<uint8_t>(StringEncoding::Ascii)), hasNullTerm(true) {}
+    constexpr StringSpan(const char (&str)[N]) : text(str), textSizeInBytes(N - 1), encoding(static_cast<uint8_t>(StringEncoding::Ascii)), hasNullTerm(true) {}
 
     /// @brief Constructs a StringView from a null terminated string
-    static constexpr StringViewData fromNullTerminated(const char* text, StringEncoding encoding) { return text == nullptr ? StringViewData(encoding) : StringViewData({text, ::strlen(text)}, true, encoding); }
+    static constexpr StringSpan fromNullTerminated(const char* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::strlen(text)}, true, encoding); }
 
 #if SC_PLATFORM_WINDOWS
-    constexpr StringViewData(Span<const wchar_t> textSpan, bool nullTerm) : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(nullTerm ? 1 : 0) {}
+    constexpr StringSpan(Span<const wchar_t> textSpan, bool nullTerm) : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(nullTerm ? 1 : 0) {}
 
     template <size_t N>
-    constexpr StringViewData(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}
-    static constexpr StringViewData fromNullTerminated(const wchar_t* text, StringEncoding encoding) { return text == nullptr ? StringViewData(encoding) : StringViewData({text, ::wcslen(text)}, true); }
+    constexpr StringSpan(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}
+    static constexpr StringSpan fromNullTerminated(const wchar_t* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::wcslen(text)}, true); }
 #endif
-    constexpr bool operator ==(const StringViewData other) const { return textSizeInBytes == other.textSizeInBytes and ::memcmp(text, other.text, textSizeInBytes) == 0; }
+    constexpr bool operator ==(const StringSpan other) const { return textSizeInBytes == other.textSizeInBytes and ::memcmp(text, other.text, textSizeInBytes) == 0; }
     // clang-format on
 
     /// @brief Obtain a `const char` Span from this StringView

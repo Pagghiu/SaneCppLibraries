@@ -1025,7 +1025,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param path The path to the file to open (encoded in UTF-8 on Posix and UTF-16 on Windows)
     /// @param mode The mode to open the file in (read, write, read-write, etc.)
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationOpenSnippet
-    SC::Result open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode);
+    SC::Result open(AsyncEventLoop& eventLoop, StringSpan path, FileOpen mode);
 
     /// @brief Closes a file descriptor asynchronously
     /// @param eventLoop The event loop to use
@@ -1056,7 +1056,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param destinationPath The path to the destination file
     /// @param copyFlags Flags to control the copy operation
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopySnippet
-    SC::Result copyFile(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
+    SC::Result copyFile(AsyncEventLoop& eventLoop, StringSpan path, StringSpan destinationPath,
                         FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
 
     /// @brief Copies a directory from one location to another
@@ -1065,7 +1065,7 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param destinationPath The path to the destination directory
     /// @param copyFlags Flags to control the copy operation
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationCopyDirectorySnippet
-    SC::Result copyDirectory(AsyncEventLoop& eventLoop, StringViewData path, StringViewData destinationPath,
+    SC::Result copyDirectory(AsyncEventLoop& eventLoop, StringSpan path, StringSpan destinationPath,
                              FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
 
     /// @brief Renames a file
@@ -1073,20 +1073,20 @@ struct AsyncFileSystemOperation : public AsyncRequest
     /// @param path The path to the source file
     /// @param newPath The new path to the file
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRenameSnippet
-    SC::Result rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath);
+    SC::Result rename(AsyncEventLoop& eventLoop, StringSpan path, StringSpan newPath);
 
     /// @brief Removes a directory asynchronously
     /// @param eventLoop The event loop to use
     /// @param path The path to the directory to remove
     /// @note The directory must be empty for this operation to succeed
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveEmptyFolderSnippet
-    SC::Result removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path);
+    SC::Result removeEmptyDirectory(AsyncEventLoop& eventLoop, StringSpan path);
 
     /// @brief Removes a file asynchronously
     /// @param eventLoop The event loop to use
     /// @param path The path to the file to remove
     /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveFileSnippet
-    SC::Result removeFile(AsyncEventLoop& eventLoop, StringViewData path);
+    SC::Result removeFile(AsyncEventLoop& eventLoop, StringSpan path);
 
   private:
     friend struct AsyncEventLoop;
@@ -1103,8 +1103,8 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     struct OpenData
     {
-        StringViewData path;
-        FileOpen       mode;
+        StringSpan path;
+        FileOpen   mode;
     };
 
     struct ReadData
@@ -1123,8 +1123,8 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     struct CopyFileData
     {
-        StringViewData      path;
-        StringViewData      destinationPath;
+        StringSpan          path;
+        StringSpan          destinationPath;
         FileSystemCopyFlags copyFlags;
     };
 
@@ -1134,13 +1134,13 @@ struct AsyncFileSystemOperation : public AsyncRequest
 
     struct RenameData
     {
-        StringViewData path;
-        StringViewData newPath;
+        StringSpan path;
+        StringSpan newPath;
     };
 
     struct RemoveData
     {
-        StringViewData path;
+        StringSpan path;
     };
 
     union

@@ -10,7 +10,7 @@
 #include <sys/select.h> // select
 #endif
 
-SC::Result SC::SocketClient::connect(StringViewData address, uint16_t port)
+SC::Result SC::SocketClient::connect(StringSpan address, uint16_t port)
 {
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));

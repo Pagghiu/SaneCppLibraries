@@ -36,7 +36,7 @@ struct SC::FileSystemIterator::Internal
     }
 };
 
-SC::Result SC::FileSystemIterator::init(StringViewData directory, Span<FolderState> recursiveEntries)
+SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> recursiveEntries)
 {
     Internal::destroy(recurseStack);
     recurseStack.recursiveEntries = recursiveEntries;
@@ -131,7 +131,7 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
     // Set entry name
     const size_t nameLen = ::wcsnlen(dirEnumerator.cFileName, MAX_PATH);
 
-    entry.name = StringViewData({dirEnumerator.cFileName, nameLen}, true);
+    entry.name = StringSpan({dirEnumerator.cFileName, nameLen}, true);
 
     // Build full path in currentItemString
     if (dirLen + 1 + nameLen + 1 > MaxPath)
@@ -152,7 +152,7 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
                 currentPathString[i] = L'/';
         }
     }
-    entry.path  = StringViewData({currentPathString, subDirLen}, true);
+    entry.path  = StringSpan({currentPathString, subDirLen}, true);
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
 
     entry.parentFileDescriptor = parent.fileDescriptor;

@@ -192,7 +192,7 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
     return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
 }
 
-SC::Result SC::FileDescriptor::open(StringViewData filePath, FileOpen mode)
+SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     wchar_t nullTerminatedPath[StringPath::MaxPath + 1];
     SC_TRY_MSG(filePath.sizeInBytes() <= StringPath::MaxPath, "FileDescriptor::open path length > MaxPath");
@@ -458,7 +458,7 @@ int SC::FileOpen::toPosixFlags() const
 
 int SC::FileOpen::toPosixAccess() const { return S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH; }
 
-SC::Result SC::FileDescriptor::open(StringViewData filePath, FileOpen mode)
+SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     if (filePath.getEncoding() == StringEncoding::Utf16)
     {

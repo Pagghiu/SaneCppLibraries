@@ -369,8 +369,7 @@ struct SC::FileSystemWatcher::Internal
         if (foundIndex == 0)
         {
             // Something changed in the original root folder being watched
-            notification.relativePath =
-                StringViewData({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
+            notification.relativePath = StringSpan({event->name, ::strlen(event->name)}, true, StringEncoding::Utf8);
         }
         else
         {
@@ -378,8 +377,8 @@ struct SC::FileSystemWatcher::Internal
             const FolderWatcherInternal& internal = entry->internal.get();
             const char* dirStart = internal.relativePaths.data() + internal.notifyHandles[foundIndex].nameOffset;
 
-            const StringViewData relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
-            const StringViewData relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
+            const StringSpan relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
+            const StringSpan relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
             if (relativeDirectory.sizeInBytes() + relativeName.sizeInBytes() + 2 > StringPath::MaxPath)
             {
                 return Result::Error("Relative path too long");

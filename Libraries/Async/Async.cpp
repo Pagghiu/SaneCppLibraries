@@ -499,7 +499,7 @@ SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool)
     return loopWork.setThreadPool(threadPool);
 }
 
-SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringViewData path, FileOpen mode)
+SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringSpan path, FileOpen mode)
 {
     SC_TRY(checkState());
     operation = Operation::Open;
@@ -586,8 +586,8 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
     return eventLoop.start(loopWork);
 }
 
-SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, StringViewData path,
-                                                  StringViewData destinationPath, FileSystemCopyFlags copyFlags)
+SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, StringSpan path,
+                                                  StringSpan destinationPath, FileSystemCopyFlags copyFlags)
 {
     SC_TRY(checkState());
     operation = Operation::CopyFile;
@@ -602,7 +602,7 @@ SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, Str
     return eventLoop.start(loopWork);
 }
 
-SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, StringViewData path, StringViewData newPath)
+SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, StringSpan path, StringSpan newPath)
 {
     SC_TRY(checkState());
     operation = Operation::Rename;
@@ -621,7 +621,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
     return eventLoop.start(loopWork);
 }
 
-SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& eventLoop, StringViewData path)
+SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& eventLoop, StringSpan path)
 {
     SC_TRY(checkState());
     operation = Operation::RemoveDirectory;
@@ -640,7 +640,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
     return eventLoop.start(loopWork);
 }
 
-SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, StringViewData path)
+SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, StringSpan path)
 {
     SC_TRY(checkState());
     operation = Operation::RemoveFile;
@@ -659,8 +659,8 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
     return eventLoop.start(loopWork);
 }
 
-SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop, StringViewData path,
-                                                       StringViewData destinationPath, FileSystemCopyFlags copyFlags)
+SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop, StringSpan path,
+                                                       StringSpan destinationPath, FileSystemCopyFlags copyFlags)
 {
     SC_TRY(checkState());
     operation = Operation::CopyDirectory;

@@ -44,23 +44,23 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
     StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
     @endcode
 */
-struct SC::StringView : public StringViewData
+struct SC::StringView : public StringSpan
 {
-    StringView() : StringViewData() {}
+    StringView() : StringSpan() {}
 
-    using StringViewData::StringViewData;
+    using StringSpan::StringSpan;
 
-    constexpr StringView(StringViewData ssv) : StringViewData(ssv) {}
+    constexpr StringView(StringSpan ssv) : StringSpan(ssv) {}
 
     static constexpr StringView fromNullTerminated(const char* text, StringEncoding encoding)
     {
-        return StringViewData::fromNullTerminated(text, encoding);
+        return StringSpan::fromNullTerminated(text, encoding);
     }
 
 #if SC_PLATFORM_WINDOWS
     static constexpr StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding)
     {
-        return StringViewData::fromNullTerminated(text, encoding);
+        return StringSpan::fromNullTerminated(text, encoding);
     }
 #endif
     /// @brief Directly access the memory of this null terminated-StringView.
@@ -165,7 +165,7 @@ struct SC::StringView : public StringViewData
     /// @brief Compare this StringView with another StringView for equality
     /// @param other StringView to be compared with current one
     /// @return 'true' if the two StringView are the same
-    [[nodiscard]] constexpr bool operator==(StringViewData other) const;
+    [[nodiscard]] constexpr bool operator==(StringSpan other) const;
 
     /// @brief Check if this StringView is equal to other StringView (operates on code points, not on utf graphemes).
     /// Returns the number of code points that are the same in both StringView-s.
@@ -711,7 +711,7 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
 #endif
 }
 
-[[nodiscard]] constexpr bool SC::StringView::operator==(StringViewData other) const
+[[nodiscard]] constexpr bool SC::StringView::operator==(StringSpan other) const
 {
 #if defined(__clang__)
 #pragma clang diagnostic push

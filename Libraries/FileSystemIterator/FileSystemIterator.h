@@ -56,10 +56,10 @@ struct FileSystemIterator
     /// @brief Contains information on a file or directory
     struct Entry
     {
-        StringViewData name;               ///< Name of current entry (file with extension or directory)
-        StringViewData path;               ///< Absolute path of the current entry
-        uint32_t       level = 0;          ///< Current level of nesting from start of iteration
-        Type           type  = Type::File; ///< Tells if it's a file or a directory
+        StringSpan name;               ///< Name of current entry (file with extension or directory)
+        StringSpan path;               ///< Absolute path of the current entry
+        uint32_t   level = 0;          ///< Current level of nesting from start of iteration
+        Type       type  = Type::File; ///< Tells if it's a file or a directory
 
         /// @brief Check if current entry is a directory
         bool isDirectory() const { return type == Type::Directory; }
@@ -99,7 +99,7 @@ struct FileSystemIterator
     /// @param directory Directory to iterate
     /// @param recursiveEntries User supplied buffer for the stack used during folder recursion (must be >= 1 elements)
     /// @return Valid result if directory exists and is accessible
-    Result init(StringViewData directory, Span<FolderState> recursiveEntries);
+    Result init(StringSpan directory, Span<FolderState> recursiveEntries);
 
     /// Returned string is only valid until next enumerateNext call and/or another init call
 

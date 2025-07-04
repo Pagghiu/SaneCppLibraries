@@ -20,7 +20,7 @@ SC::Result SC::FileSystemWatcher::init(ThreadRunner& runner) { return internal.g
 
 SC::Result SC::FileSystemWatcher::close() { return internal.get().close(); }
 
-SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringViewData path)
+SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringSpan path)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent = this;

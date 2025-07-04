@@ -264,13 +264,12 @@ struct SC::FileSystemWatcher::Internal
             if (flags & EVENT_SYSTEM)
                 continue;
 
-            const StringViewData path = StringViewData::fromNullTerminated(paths[idx], StringEncoding::Utf8);
+            const StringSpan path = StringSpan::fromNullTerminated(paths[idx], StringEncoding::Utf8);
 
             bool sendNotification = true;
             for (size_t prevIdx = 0; prevIdx < idx; ++prevIdx)
             {
-                const StringViewData otherPath =
-                    StringViewData::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
+                const StringSpan otherPath = StringSpan::fromNullTerminated(paths[prevIdx], StringEncoding::Utf8);
                 if (path == otherPath)
                 {
                     // Filter out multiple events for the same file in this batch
@@ -289,7 +288,7 @@ struct SC::FileSystemWatcher::Internal
         }
     }
 
-    static void notify(const StringViewData path, Internal& internal, const FSEventStreamEventFlags flags)
+    static void notify(const StringSpan path, Internal& internal, const FSEventStreamEventFlags flags)
     {
         internal.notification.fullPath = path;
 

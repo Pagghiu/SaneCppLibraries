@@ -177,8 +177,7 @@ bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringVi
     return StringFormatterFor<StringView>::format(data, specifier, value.view());
 }
 
-bool StringFormatterFor<StringViewData>::format(StringFormatOutput& data, const StringView specifier,
-                                                StringViewData value)
+bool StringFormatterFor<StringSpan>::format(StringFormatOutput& data, const StringView specifier, StringSpan value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(value);

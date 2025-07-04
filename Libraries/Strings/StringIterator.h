@@ -3,7 +3,7 @@
 #pragma once
 #include "../Foundation/Assert.h" //Assert::unreachable
 #include "../Foundation/Span.h"
-#include "../Foundation/StringViewData.h"
+#include "../Foundation/StringSpan.h"
 
 namespace SC
 {

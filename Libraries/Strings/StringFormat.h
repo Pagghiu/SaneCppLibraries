@@ -244,7 +244,7 @@ template <> struct SC_COMPILER_EXPORT StringFormatterFor<const void*>  {static b
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringView, const wchar_t);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringView, const wchar_t*);};
 #endif
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringViewData> {static bool format(StringFormatOutput&, const StringView, const StringViewData);};
+template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> {static bool format(StringFormatOutput&, const StringView, const StringSpan);};
 
 template <int N> struct StringFormatterFor<SmallString<N>> {static bool format(StringFormatOutput& sfo, const StringView sv, const SmallString<N>& s){return StringFormatterFor<StringView>::format(sfo,sv,s.view());}};
 // clang-format on
