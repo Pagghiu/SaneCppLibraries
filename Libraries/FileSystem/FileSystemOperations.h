@@ -80,6 +80,11 @@ struct SC_COMPILER_EXPORT FileSystemOperations
     /// @return Result::Error if the path could not be checked
     static Result existsAndIsLink(StringViewData path);
 
+    /// @brief Create a directory and all parent directories as needed (like `mkdir -p`)
+    /// @param path The directory to create
+    /// @return Result::Error if the directory could not be created
+    static Result makeDirectoryRecursive(StringViewData path);
+
     /// @brief Remove an empty directory
     /// @param path The path to the empty directory to remove
     /// @return Result::Error if the directory could not be removed

@@ -56,6 +56,70 @@ SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
     return Result(true);
 }
 
+SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
+    const size_t pathLength = path.sizeInBytes() / sizeof(wchar_t);
+    if (pathLength < 2)
+        return Result::Error("makeDirectoryRecursive: Path is empty");
+    wchar_t temp[MAX_PATH];
+    // Copy path to temp, ensure null-terminated
+    if (pathLength >= MAX_PATH)
+        return Result::Error("makeDirectoryRecursive: Path too long");
+    ::memcpy(temp, path.bytesWithoutTerminator(), pathLength * sizeof(wchar_t));
+    temp[pathLength] = 0; // Ensure null-termination
+    // Skip \\\\ or drive letter if present
+    size_t idx = 0;
+    if (pathLength >= 3)
+    {
+        if (temp[0] == L'\\' and temp[1] == L'\\')
+        {
+            // Skip until next backslash or forward slash
+            for (idx = 3; idx < pathLength; ++idx)
+            {
+                if (temp[idx] == L'\\' or temp[idx] == L'/')
+                {
+                    idx += 1; // Skip the backslash or forward slash
+                    break;
+                }
+            }
+        }
+        else if (temp[1] == L':' and (temp[2] == L'\\' or temp[2] == L'/'))
+        {
+            idx = 3; // Skip drive letter and colon and backslash
+        }
+    }
+    // Iterate and create directories
+    for (; idx < pathLength; ++idx)
+    {
+        if (temp[idx] == L'\\' or temp[idx] == L'/')
+        {
+            if (idx == 0)
+                continue; // Skip root
+            wchar_t old = temp[idx];
+            temp[idx]   = 0;
+            if (temp[0] != 0) // skip empty
+            {
+                if (!::CreateDirectoryW(temp, nullptr))
+                {
+                    DWORD err = ::GetLastError();
+                    if (err != ERROR_ALREADY_EXISTS)
+                        return Result::Error("makeDirectoryRecursive: Failed to create parent directory");
+                }
+            }
+            temp[idx] = old;
+        }
+    }
+    // Create the final directory
+    if (!::CreateDirectoryW(temp, nullptr))
+    {
+        DWORD err = ::GetLastError();
+        if (err != ERROR_ALREADY_EXISTS)
+            return Result::Error("makeDirectoryRecursive: Failed to create directory");
+    }
+    return Result(true);
+}
+
 SC::Result SC::FileSystemOperations::exists(StringViewData path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "exists: Invalid path");
@@ -396,6 +460,7 @@ SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringP
 #else
 
 #include <dirent.h>   // DIR, opendir, readdir, closedir
+#include <errno.h>    // errno
 #include <fcntl.h>    // AT_FDCWD
 #include <limits.h>   // PATH_MAX
 #include <math.h>     // round
@@ -406,7 +471,6 @@ SC::StringViewData SC::FileSystemOperations::getApplicationRootDirectory(StringP
 #if __APPLE__
 #include <CoreFoundation/CoreFoundation.h>
 #include <copyfile.h>
-#include <errno.h>       // errno
 #include <mach-o/dyld.h> // NSGetExecutablePath
 #include <removefile.h>
 #include <sys/attr.h>
@@ -452,6 +516,44 @@ SC::Result SC::FileSystemOperations::makeDirectory(StringViewData path)
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
     SC_TRY_POSIX(::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH),
                  "makeDirectory: Failed to create directory");
+    return Result(true);
+}
+
+SC::Result SC::FileSystemOperations::makeDirectoryRecursive(StringViewData path)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "makeDirectoryRecursive: Invalid path");
+    const size_t pathLength = path.sizeInBytes();
+    char         temp[PATH_MAX];
+    // Copy path to temp, ensure null-terminated
+    if (pathLength >= PATH_MAX)
+        return Result::Error("makeDirectoryRecursive: Path too long");
+    ::memcpy(temp, path.bytesWithoutTerminator(), pathLength);
+    // Iterate and create directories
+    for (size_t idx = 0; idx < pathLength; ++idx)
+    {
+        if (temp[idx] == '/' or temp[idx] == '\\')
+        {
+            if (idx == 0)
+                continue; // Skip root
+            char old  = temp[idx];
+            temp[idx] = 0;
+            if (temp[0] != 0) // skip empty
+            {
+                if (::mkdir(temp, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
+                {
+                    if (errno != EEXIST)
+                        return Result::Error("makeDirectoryRecursive: Failed to create parent directory");
+                }
+            }
+            temp[idx] = old;
+        }
+    }
+    // Create the final directory
+    if (::mkdir(path.getNullTerminatedNative(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0)
+    {
+        if (errno != EEXIST)
+            return Result::Error("makeDirectoryRecursive: Failed to create directory");
+    }
     return Result(true);
 }
 

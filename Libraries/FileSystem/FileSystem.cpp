@@ -397,30 +397,11 @@ SC::Result SC::FileSystem::makeDirectories(Span<const StringView> directories)
 
 SC::Result SC::FileSystem::makeDirectoriesRecursive(Span<const StringView> directories)
 {
-    StringView encodedPath;
-    for (auto& path : directories)
+    for (const auto& path : directories)
     {
-        SC_TRY(convert(path, fileFormatBuffer2, &encodedPath));
-        StringView dirnameDirectory = encodedPath;
-        int        levelsToCreate   = 0;
-        while (not existsAndIsDirectory(dirnameDirectory) or dirnameDirectory.isEmpty())
-        {
-            dirnameDirectory = Path::dirname(dirnameDirectory, Path::AsNative);
-            levelsToCreate++;
-        }
-        for (int idx = 0; idx < levelsToCreate; ++idx)
-        {
-            if (levelsToCreate - idx - 2 >= 0)
-            {
-                StringView partialPath = Path::dirname(encodedPath, Path::AsNative, levelsToCreate - idx - 2);
-                SC_TRY(convert(partialPath, fileFormatBuffer1, &dirnameDirectory));
-            }
-            else
-            {
-                dirnameDirectory = encodedPath;
-            }
-            SC_TRY_FORMAT_ERRNO(path, FileSystemOperations::makeDirectory(dirnameDirectory));
-        }
+        StringView encodedPath;
+        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(FileSystemOperations::makeDirectoryRecursive(encodedPath));
     }
     return Result(true);
 }
