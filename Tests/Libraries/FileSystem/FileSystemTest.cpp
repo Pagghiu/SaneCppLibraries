@@ -22,9 +22,9 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             makeRemoveIsDirectory();
         }
-        if (test_section("makeDirectoryRecursive / removeEmptyDirectoryRecursive"))
+        if (test_section("makeDirectoryRecursive"))
         {
-            makeRemoveDirectoryRecursive();
+            makeDirectoryRecursive();
         }
         if (test_section("write / read / removeFile"))
         {
@@ -62,7 +62,7 @@ struct SC::FileSystemTest : public SC::TestCase
 
     void formatError();
     void makeRemoveIsDirectory();
-    void makeRemoveDirectoryRecursive();
+    void makeDirectoryRecursive();
     void writeReadRemoveFile();
     void copyExistsFile();
     void copyDirectoryRecursive();
@@ -116,9 +116,9 @@ void SC::FileSystemTest::makeRemoveIsDirectory()
     SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test2"));
 }
 
-void SC::FileSystemTest::makeRemoveDirectoryRecursive()
+void SC::FileSystemTest::makeDirectoryRecursive()
 {
-    //! [makeRemoveDirectoryRecursive]
+    //! [makeDirectoryRecursive]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
     SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
@@ -131,11 +131,9 @@ void SC::FileSystemTest::makeRemoveDirectoryRecursive()
     SC_TEST_EXPECT(fs.existsAndIsDirectory("Test3/Subdir"));
 
     // Remove both levels of directory
-    SC_TEST_EXPECT(fs.removeEmptyDirectoryRecursive("Test3/Subdir"));
-
-    // Check that directory has been removed
-    SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test3"));
-    //! [makeRemoveDirectoryRecursive]
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("Test3/Subdir"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("Test3"));
+    //! [makeDirectoryRecursive]
 }
 
 void SC::FileSystemTest::writeReadRemoveFile()

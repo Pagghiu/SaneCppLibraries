@@ -14,7 +14,6 @@
 #include <Windows.h>
 
 namespace SC
-
 {
 
 static constexpr const SC::Result getErrorCode(int errorCode)
@@ -363,23 +362,6 @@ SC::Result SC::FileSystem::removeEmptyDirectories(Span<const StringView> directo
     {
         SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, FileSystemOperations::removeEmptyDirectory(encodedPath));
-    }
-    return Result(true);
-}
-
-SC::Result SC::FileSystem::removeEmptyDirectoriesRecursive(Span<const StringView> directories)
-{
-    StringView encodedPath;
-    for (StringView path : directories)
-    {
-        SC_TRY(convert(path, fileFormatBuffer2, &encodedPath));
-        int dirnameLevels = 0;
-        while (FileSystemOperations::removeEmptyDirectory(encodedPath))
-        {
-            encodedPath = Path::dirname(encodedPath, Path::AsNative, dirnameLevels);
-            dirnameLevels += 1;
-            SC_TRY(convert(encodedPath, fileFormatBuffer1, &encodedPath));
-        }
     }
     return Result(true);
 }

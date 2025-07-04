@@ -147,21 +147,6 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @see makeDirectoryRecursive (for an usage example)
     [[nodiscard]] Result removeEmptyDirectory(StringView directory) { return removeEmptyDirectories({directory}); }
 
-    /// @brief Removes multiple empty directories that only contains other empty directories (but no files)
-    /// @param directories List of empty directories to remove
-    /// @return Invalid Result if one of the directories doesn't exist or if it contains files somewhere inside of it
-    /// @see makeDirectoryRecursive (for an usage example)
-    [[nodiscard]] Result removeEmptyDirectoriesRecursive(Span<const StringView> directories);
-
-    /// @brief Removes an empty directory that only contains other empty directories (but no files)
-    /// @param directory List of empty directories to remove
-    /// @return Invalid Result if the directory doesn't exist or if it contains files somewhere inside of it
-    /// @see makeDirectoryRecursive (for an usage example)
-    [[nodiscard]] Result removeEmptyDirectoryRecursive(StringView directory)
-    {
-        return removeEmptyDirectoriesRecursive({directory});
-    }
-
     /// @brief  Creates new directories that do not already exist
     /// @param directories List of paths where to create such directories
     /// @return Invalid Results if directories already exist
@@ -196,7 +181,7 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @brief Create a new directory, creating also intermediate non existing directories (like posix `mkdir -p`)
     /// @param directory Path where to create such directory
     /// @return Invalid Result in case of I/O or access error
-    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp makeRemoveDirectoryRecursive
+    /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp makeDirectoryRecursive
     [[nodiscard]] Result makeDirectoryRecursive(StringView directory) { return makeDirectoriesRecursive({directory}); }
 
     /// @brief Creates a symbolic link at location linkFile pointing at sourceFileOrDirectory

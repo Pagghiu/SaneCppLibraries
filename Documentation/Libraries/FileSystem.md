@@ -38,7 +38,6 @@ Path is able to parse and manipulate windows and posix paths.
 | SC::FileSystem::copyDirectory                 | @copybrief SC::FileSystem::copyDirectory                  |
 | **Delete Directories**                        |                                                           |
 | SC::FileSystem::removeEmptyDirectory          | @copybrief SC::FileSystem::removeEmptyDirectory           |
-| SC::FileSystem::removeEmptyDirectoryRecursive | @copybrief SC::FileSystem::removeEmptyDirectoryRecursive  |
 | SC::FileSystem::removeDirectoryRecursive      | @copybrief SC::FileSystem::removeDirectoryRecursive       |
 | **Create Directories**                        |                                                           |
 | SC::FileSystem::makeDirectory                 | @copybrief SC::FileSystem::makeDirectory                  |
