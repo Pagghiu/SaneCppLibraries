@@ -16,7 +16,7 @@ struct String;
 /// @brief Converts String to a different encoding (UTF8, UTF16).
 ///
 /// SC::StringConverter converts strings between different UTF encodings and can add null-terminator if requested.
-/// When the SC::StringView is already null-terminated, the class just forwards the original SC::StringView.
+/// When the SC::StringSpan is already null-terminated, the class just forwards the original SC::StringSpan.
 ///
 /// Example:
 /// \snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
@@ -30,32 +30,32 @@ struct SC::StringConverter
     };
 
     /// @brief Converts text to (eventually null terminated) UTF8 encoding. Uses the passed in buffer if necessary.
-    /// @param text The StringView to be converted
+    /// @param text The StringSpan to be converted
     /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringView containing the encoded text will be returned
-    /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
+    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
+    /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF8(StringView text, Buffer& buffer, StringView* encodedText = nullptr,
+    [[nodiscard]] static bool convertEncodingToUTF8(StringSpan text, Buffer& buffer, StringSpan* encodedText = nullptr,
                                                     NullTermination nullTerminate = AddZeroTerminator);
 
     /// @brief Converts text to (eventually null terminated) UTF16 encoding. Uses the passed in buffer if necessary.
-    /// @param text The StringView to be converted
+    /// @param text The StringSpan to be converted
     /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringView containing the encoded text will be returned
-    /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
+    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
+    /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF16(StringView text, Buffer& buffer, StringView* encodedText = nullptr,
+    [[nodiscard]] static bool convertEncodingToUTF16(StringSpan text, Buffer& buffer, StringSpan* encodedText = nullptr,
                                                      NullTermination nullTerminate = AddZeroTerminator);
 
     /// @brief Converts text to (eventually null terminated) requested encoding. Uses the passed in buffer if necessary.
     /// @param encoding The requested destination encoding to convert to
-    /// @param text The StringView to be converted
+    /// @param text The StringSpan to be converted
     /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringView containing the encoded text will be returned
-    /// @param nullTerminate Specifies if the StringView will need to be null terminated or not
+    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
+    /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringView text, Buffer& buffer,
-                                                StringView*     encodedText   = nullptr,
+    [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringSpan text, Buffer& buffer,
+                                                StringSpan*     encodedText   = nullptr,
                                                 NullTermination nullTerminate = AddZeroTerminator);
 
     /// @brief Clearing flags used when initializing destination buffer
@@ -75,19 +75,19 @@ struct SC::StringConverter
     /// @param encoding The encoding to be used
     StringConverter(Buffer& text, StringEncoding encoding);
 
-    /// @brief Converts a given input StringView to null-terminated version.
+    /// @brief Converts a given input StringSpan to null-terminated version.
     /// Uses supplied buffer in constructor if an actual conversion is needed.
-    /// @param input The StringView to be converted
-    /// @param encodedText The converted output StringView
+    /// @param input The StringSpan to be converted
+    /// @param encodedText The converted output StringSpan
     /// @return `true` if the conversion succeeded
-    [[nodiscard]] bool convertNullTerminateFastPath(StringView input, StringView& encodedText);
+    [[nodiscard]] bool convertNullTerminateFastPath(StringSpan input, StringSpan& encodedText);
 
-    /// @brief Appends the given StringView and adds null-terminator.
+    /// @brief Appends the given StringSpan and adds null-terminator.
     /// If existing null-terminator was already last inserted code point, it will be removed before appending input.
-    /// @param input The StringView to be appended
+    /// @param input The StringSpan to be appended
     /// @param popExistingNullTerminator If true, removes existing null terminator before adding the new one
-    /// @return `true` if the StringView has been successfully appended
-    [[nodiscard]] bool appendNullTerminated(StringView input, bool popExistingNullTerminator = true);
+    /// @return `true` if the StringSpan has been successfully appended
+    [[nodiscard]] bool appendNullTerminated(StringSpan input, bool popExistingNullTerminator = true);
 
   private:
     /// @brief Removes ending null-terminator from stringData if stringData is not empty
@@ -117,20 +117,20 @@ struct SC::StringConverter
     friend struct File;
 
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
-    [[nodiscard]] static bool convertSameEncoding(StringView text, Buffer& buffer, StringView* encodedText,
+    [[nodiscard]] static bool convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
                                                   NullTermination terminate);
-    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringView* encodedText,
+    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringSpan* encodedText,
                                         NullTermination terminate);
 
     StringEncoding encoding;
     Buffer&        data;
     // Appends the input string null terminated
-    [[nodiscard]] bool internalAppend(StringView input, StringView* encodedText);
+    [[nodiscard]] bool internalAppend(StringSpan input, StringSpan* encodedText);
 
     // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
-    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringView sourceUtf16, Buffer& destination,
+    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, Buffer& destination,
                                                      int& writtenCodeUnits);
-    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringView sourceUtf8, Buffer& destination,
+    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, Buffer& destination,
                                                      int& writtenCodeUnits);
 };
 //! @}

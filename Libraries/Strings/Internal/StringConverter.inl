@@ -24,7 +24,7 @@ SC::StringConverter::StringConverter(String& text, Flags flags) : encoding(text.
 
 SC::StringConverter::StringConverter(Buffer& data, StringEncoding encoding) : encoding(encoding), data(data) {}
 
-bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, StringView* encodedText,
+bool SC::StringConverter::convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
                                               NullTermination terminate)
 {
     const bool nullTerminate = terminate == AddZeroTerminator;
@@ -33,8 +33,10 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, S
         const bool forceCopy = encodedText == nullptr;
         if (forceCopy)
         {
-            SC_TRY(buffer.append({text.bytesIncludingTerminator(),
-                                  nullTerminate ? text.sizeInBytesIncludingTerminator() : text.sizeInBytes()}));
+            const size_t sizeWithNull =
+                text.sizeInBytes() > 0 ? text.sizeInBytes() + StringEncodingGetSize(text.getEncoding()) : 0;
+
+            SC_TRY(buffer.append({text.bytesWithoutTerminator(), nullTerminate ? sizeWithNull : text.sizeInBytes()}));
         }
         else
         {
@@ -45,7 +47,7 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, S
             else
             {
                 *encodedText =
-                    StringView({text.bytesWithoutTerminator(), text.sizeInBytes()}, false, text.getEncoding());
+                    StringSpan({text.bytesWithoutTerminator(), text.sizeInBytes()}, false, text.getEncoding());
             }
         }
     }
@@ -58,7 +60,7 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, S
             SC_TRY(buffer.append(text.toCharSpan()));
             if (encodedText)
             {
-                *encodedText = StringView(buffer.toSpanConst(), true, text.getEncoding());
+                *encodedText = StringSpan(buffer.toSpanConst(), true, text.getEncoding());
             }
             SC_TRY(buffer.resize(buffer.size() + numZeros, 0)); // null terminator
         }
@@ -71,7 +73,7 @@ bool SC::StringConverter::convertSameEncoding(StringView text, Buffer& buffer, S
 }
 
 void SC::StringConverter::eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding,
-                                                  StringView* encodedText, StringConverter::NullTermination terminate)
+                                                  StringSpan* encodedText, StringConverter::NullTermination terminate)
 {
     const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
     if (terminate == StringConverter::AddZeroTerminator)
@@ -84,16 +86,16 @@ void SC::StringConverter::eventuallyNullTerminate(Buffer& buffer, StringEncoding
         }
         if (encodedText)
         {
-            *encodedText = StringView({buffer.data(), buffer.size() - destinationCharSize}, true, destinationEncoding);
+            *encodedText = StringSpan({buffer.data(), buffer.size() - destinationCharSize}, true, destinationEncoding);
         }
     }
     else if (encodedText)
     {
-        *encodedText = StringView(buffer.toSpanConst(), false, destinationEncoding);
+        *encodedText = StringSpan(buffer.toSpanConst(), false, destinationEncoding);
     }
 }
 
-bool SC::StringConverter::convertEncodingToUTF8(StringView text, Buffer& buffer, StringView* encodedText,
+bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer, StringSpan* encodedText,
                                                 NullTermination terminate)
 {
     if (text.isEmpty())
@@ -145,7 +147,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringView text, Buffer& buffer,
     return false;
 }
 
-bool SC::StringConverter::convertEncodingToUTF16(StringView text, Buffer& buffer, StringView* encodedText,
+bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer, StringSpan* encodedText,
                                                  NullTermination terminate)
 {
     if (text.isEmpty())
@@ -202,8 +204,8 @@ bool SC::StringConverter::convertEncodingToUTF16(StringView text, Buffer& buffer
     return false;
 }
 
-bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView text, Buffer& buffer,
-                                            StringView* encodedText, NullTermination terminate)
+bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringSpan text, Buffer& buffer,
+                                            StringSpan* encodedText, NullTermination terminate)
 {
     switch (encoding)
     {
@@ -216,14 +218,14 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringView 
 
 void SC::StringConverter::internalClear() { data.clear(); }
 
-bool SC::StringConverter::convertNullTerminateFastPath(StringView input, StringView& encodedText)
+bool SC::StringConverter::convertNullTerminateFastPath(StringSpan input, StringSpan& encodedText)
 {
     data.clear();
     SC_TRY(internalAppend(input, &encodedText));
     return true;
 }
 
-bool SC::StringConverter::appendNullTerminated(StringView input, bool popExistingNullTerminator)
+bool SC::StringConverter::appendNullTerminated(StringSpan input, bool popExistingNullTerminator)
 {
     if (popExistingNullTerminator)
     {
@@ -243,7 +245,7 @@ bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newData
     return true;
 }
 
-bool SC::StringConverter::internalAppend(StringView input, StringView* encodedText)
+bool SC::StringConverter::internalAppend(StringSpan input, StringSpan* encodedText)
 {
     return StringConverter::convertEncodingTo(encoding, input, data, encodedText);
 }
@@ -285,7 +287,7 @@ bool SC::StringConverter::pushNullTerm(Buffer& stringData, StringEncoding encodi
 
 // Fallbacks for platforms without a supported fast conversion function (Linux for now)
 
-bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringView sourceUtf8, SC::Buffer& destination,
+bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringSpan sourceUtf8, SC::Buffer& destination,
                                                  int& writtenCodeUnits)
 {
     const char*  utf8    = sourceUtf8.bytesWithoutTerminator();
@@ -357,7 +359,7 @@ bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringView sourceUtf8
     return true;
 }
 
-bool SC::StringConverter::convertUTF16LE_to_UTF8(const SC::StringView sourceUtf16, SC::Buffer& destination,
+bool SC::StringConverter::convertUTF16LE_to_UTF8(const SC::StringSpan sourceUtf16, SC::Buffer& destination,
                                                  int& writtenCodeUnits)
 {
     const uint16_t* utf16    = reinterpret_cast<const uint16_t*>(sourceUtf16.bytesWithoutTerminator());
