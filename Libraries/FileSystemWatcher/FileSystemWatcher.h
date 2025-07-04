@@ -103,10 +103,9 @@ struct FileSystemWatcher
         Operation      operation = Operation::Modified; ///< Notification type
 
         /// @brief Get the full path of the file being watched.
-        /// @param[in] bufferSpan Space holding full path
-        /// @param[out] outFullPath The full path
+        /// @param path StringPath that will hold full (absolute) path
         /// @return Invalid result if it's not possible building the full path
-        SC::Result getFullPath(Span<native_char_t> bufferSpan, StringViewData& outFullPath) const;
+        SC::Result getFullPath(StringPath& path) const;
 
       private:
         friend struct Internal;
@@ -136,8 +135,7 @@ struct FileSystemWatcher
         FolderWatcher*     next   = nullptr;
         FolderWatcher*     prev   = nullptr;
 
-        native_char_t  pathBuffer[StringPath::MaxPath];
-        StringViewData path;
+        StringPath path;
 
         OpaqueObject<FolderWatcherSizes> internal;
     };

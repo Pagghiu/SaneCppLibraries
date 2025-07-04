@@ -131,7 +131,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
                        "startWatching exceeded MaxWatchablePaths");
         }
-        HANDLE newHandle = ::CreateFileW(entry->path.getNullTerminatedNative(),                            //
+        HANDLE newHandle = ::CreateFileW(entry->path.path,                                                 //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
                                          nullptr,                                                          //
@@ -264,13 +264,13 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<wchar_t> buffer, StringViewData& outStringView) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
     // Calculate sizes in terms of wchar_t count rather than bytes
     const size_t basePathChars     = basePath.sizeInBytes() / sizeof(wchar_t);
     const size_t relativePathChars = relativePath.sizeInBytes() / sizeof(wchar_t);
 
-    if (buffer.sizeInBytes() / sizeof(wchar_t) < basePathChars + relativePathChars + 2)
+    if (StringPath::MaxPath < (basePathChars + relativePathChars + 2))
     {
         return Result::Error("Buffer too small to hold full path");
     }
@@ -278,11 +278,10 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<wchar_t> buffer
     const wchar_t* basePathStr     = basePath.getNullTerminatedNative();
     const wchar_t* relativePathStr = relativePath.getNullTerminatedNative();
 
-    ::memcpy(buffer.data(), basePathStr, basePathChars * sizeof(wchar_t));
-    buffer.data()[basePathChars] = L'\\'; // Add the separator
-    ::memcpy(buffer.data() + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
-    buffer.data()[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
-
-    outStringView = {{buffer.data(), (basePathChars + 1 + relativePathChars)}, true};
+    ::memcpy(buffer.path, basePathStr, basePathChars * sizeof(wchar_t));
+    buffer.path[basePathChars] = L'\\'; // Add the separator
+    ::memcpy(buffer.path + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
+    buffer.path[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
+    buffer.length                                      = basePathChars + 1 + relativePathChars;
     return Result(true);
 }

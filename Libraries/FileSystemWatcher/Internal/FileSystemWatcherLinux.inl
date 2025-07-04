@@ -125,13 +125,13 @@ struct SC::FileSystemWatcher::Internal
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
 
-        SC_TRY_MSG(entry->path.getEncoding() != StringEncoding::Utf16,
+        SC_TRY_MSG(entry->path.view().getEncoding() != StringEncoding::Utf16,
                    "FolderWatcher on Linux does not support UTF16 encoded paths. Use UTF8 or ASCII encoding instead.");
         FolderWatcherInternal& opaque = entry->internal.get();
 
         char currentPath[PATH_MAX];
-        ::memcpy(currentPath, entry->path.getNullTerminatedNative(), entry->path.sizeInBytes());
-        currentPath[entry->path.sizeInBytes()] = '\0'; // Ensure null termination
+        ::memcpy(currentPath, entry->path.view().getNullTerminatedNative(), entry->path.view().sizeInBytes());
+        currentPath[entry->path.view().sizeInBytes()] = '\0'; // Ensure null termination
 
         int rootNotifyFd;
         SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
@@ -170,9 +170,9 @@ struct SC::FileSystemWatcher::Internal
 
         auto closeRootDir = MakeDeferred([rootDir] { ::closedir(rootDir); });
 
-        stack[stackSize++] = {rootFd, static_cast<int>(entry->path.sizeInBytes())};
+        stack[stackSize++] = {rootFd, static_cast<int>(entry->path.view().sizeInBytes())};
 
-        const size_t rootPathLength = entry->path.sizeInBytes();
+        const size_t rootPathLength = entry->path.view().sizeInBytes();
         // Clean the stack of fd in case any of the return Result::Error below is hit.
         auto deferredCleanStack = MakeDeferred(
             [&]
@@ -415,19 +415,17 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<char> buffer, StringViewData& outStringView) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    if (buffer.sizeInBytes() < basePath.sizeInBytes() + relativePath.sizeInBytes() + 2)
+    if (StringPath::MaxPath < (basePath.sizeInBytes() + relativePath.sizeInBytes() + 2))
     {
         return Result::Error("Buffer too small to hold full path");
     }
-    ::memcpy(buffer.data(), basePath.getNullTerminatedNative(), basePath.sizeInBytes());
-    buffer.data()[basePath.sizeInBytes()] = '/'; // Add the separator
-    ::memcpy(buffer.data() + basePath.sizeInBytes() + 1, relativePath.getNullTerminatedNative(),
+    ::memcpy(buffer.path, basePath.getNullTerminatedNative(), basePath.sizeInBytes());
+    buffer.path[basePath.sizeInBytes()] = '/'; // Add the separator
+    ::memcpy(buffer.path + basePath.sizeInBytes() + 1, relativePath.getNullTerminatedNative(),
              relativePath.sizeInBytes());
-    buffer.data()[basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()] = '\0'; // Null terminate the string
-
-    outStringView = {
-        {buffer.data(), basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()}, true, StringEncoding::Utf8};
+    buffer.path[basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()] = '\0'; // Null terminate the string
+    buffer.length = basePath.sizeInBytes() + 1 + relativePath.sizeInBytes();
     return Result(true);
 }

@@ -58,10 +58,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
-                constexpr native_char_t nativeSep = Path::Separator;
-
-                native_char_t fullPathBuffer[StringPath::MaxPath];
-
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
 
                 params.callbackThreadID = Thread::CurrentThreadID();
@@ -77,12 +73,13 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 SC_TEST_EXPECT(params.appDirectory == notification.basePath);
                 // Comparisons must use the same encoding
                 SC_TEST_EXPECT("test.txt"_a8 == notification.relativePath);
-                StringView fullPath;
-                SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
+                StringPath fullPath;
+                SC_TEST_EXPECT(notification.getFullPath(fullPath));
 
-                StringBuilder expected(expectedBuffer);
+                StringBuilder           expected(expectedBuffer);
+                constexpr native_char_t nativeSep = Path::Separator;
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, "test.txt"));
-                SC_TEST_EXPECT(fullPath == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
                 params.eventObject.signal();
             };
 
@@ -139,8 +136,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 StringNative<255>  dirBuffer      = StringEncoding::Native;
                 StringNative<1024> expectedBuffer = StringEncoding::Native;
 
-                native_char_t fullPathBuffer[StringPath::MaxPath];
-
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
                 SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
@@ -149,12 +144,12 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     StringBuilder(dirBuffer).format("{}{}{}{}{}", "dir", nativeSep, "subdir2", nativeSep, "test.txt"));
                 SC_TEST_EXPECT(dirBuffer.view() == notification.relativePath);
 
-                StringView fullPath;
-                SC_TEST_EXPECT(notification.getFullPath(fullPathBuffer, fullPath));
+                StringPath fullPath;
+                SC_TEST_EXPECT(notification.getFullPath(fullPath));
 
                 StringBuilder expected(expectedBuffer);
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
-                SC_TEST_EXPECT(fullPath == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
             };
 
             FileSystem fs;
@@ -359,18 +354,16 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
     auto onFileModified = [&](const FileSystemWatcher::Notification& notification)
     {
         // This callback will be called from the thread calling AsyncEventLoop::run
-        native_char_t buffer[StringPath::MaxPath];
-
-        StringView fullPath;
-        if (notification.getFullPath(buffer, fullPath))
+        StringPath fullPath;
+        if (notification.getFullPath(fullPath))
         {
             switch (notification.operation)
             {
             case FileSystemWatcher::Operation::Modified: // File has been modified
-                console.print("Modified {} {}\n", notification.relativePath, fullPath);
+                console.print("Modified {} {}\n", notification.relativePath, fullPath.view());
                 break;
             case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
-                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath);
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.view());
                 break;
             }
         }
@@ -406,18 +399,16 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
     {
         // Warning! This callback is called from a background thread!
         // Make sure to do proper synchronization!
-        native_char_t buffer[StringPath::MaxPath];
-
-        StringView fullPath;
-        if (notification.getFullPath(buffer, fullPath))
+        StringPath fullPath;
+        if (notification.getFullPath(fullPath))
         {
             switch (notification.operation)
             {
             case FileSystemWatcher::Operation::Modified: // File has been modified
-                console.print("Modified {} {}\n", notification.relativePath, fullPath);
+                console.print("Modified {} {}\n", notification.relativePath, fullPath.view());
                 break;
             case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
-                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath);
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.view());
                 break;
             }
         }

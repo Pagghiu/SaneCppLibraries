@@ -24,28 +24,7 @@ SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringViewData p
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent = this;
-    // If on windows convert path to UTF16
-    // anywhere else return error on the path being UTF16
-    SC_TRY_MSG(path.sizeInBytes() / sizeof(native_char_t) < StringPath::MaxPath, "Path too long");
-#if SC_PLATFORM_WINDOWS
-    if (path.getEncoding() != StringEncoding::Utf16)
-    {
-        const int stringLen =
-            ::MultiByteToWideChar(CP_UTF8, 0, path.bytesWithoutTerminator(), static_cast<int>(path.sizeInBytes()),
-                                  watcher.pathBuffer, StringPath::MaxPath / sizeof(wchar_t));
-        SC_TRY_MSG(stringLen > 0, "Failed to convert path to UTF16");
-        watcher.pathBuffer[stringLen] = L'\0'; // Ensure null termination
-        watcher.path                  = StringViewData({watcher.pathBuffer, static_cast<size_t>(stringLen)}, true);
-    }
-    else
-#endif
-    {
-        ::memcpy(watcher.pathBuffer, path.bytesWithoutTerminator(), path.sizeInBytes());
-        watcher.pathBuffer[path.sizeInBytes() / sizeof(native_char_t)] = '\0'; // Ensure null termination
-        watcher.path = StringViewData({reinterpret_cast<const char*>(watcher.pathBuffer), path.sizeInBytes()}, true,
-                                      path.getEncoding());
-    }
-
+    SC_TRY_MSG(watcher.path.assign(path), "FileSystemWatcher::watch - Error assigning path");
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }

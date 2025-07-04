@@ -148,7 +148,7 @@ struct SC::FileSystemWatcher::Internal
             });
         for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
         {
-            watchedPaths[numAllocatedPaths] = CFStringCreateWithFileSystemRepresentation(nullptr, it->pathBuffer);
+            watchedPaths[numAllocatedPaths] = CFStringCreateWithFileSystemRepresentation(nullptr, it->path.path);
             if (not watchedPaths[numAllocatedPaths])
                 return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
@@ -322,14 +322,14 @@ struct SC::FileSystemWatcher::Internal
         {
             Span<const char> rootSpan;
 
-            const bool sliceStart = path.toCharSpan().sliceStartLength(0, watcher->path.sizeInBytes(), rootSpan);
+            const bool sliceStart = path.toCharSpan().sliceStartLength(0, watcher->path.view().sizeInBytes(), rootSpan);
             internal.notification.basePath = {rootSpan, false, StringEncoding::Utf8};
-            if (sliceStart and watcher->path == internal.notification.basePath)
+            if (sliceStart and watcher->path.view() == internal.notification.basePath)
             {
                 Span<const char> relativeSpan;
-                (void)path.toCharSpan().sliceStartLength(watcher->path.sizeInBytes(),
-                                                         path.toCharSpan().sizeInBytes() - watcher->path.sizeInBytes(),
-                                                         relativeSpan);
+                (void)path.toCharSpan().sliceStartLength(
+                    watcher->path.view().sizeInBytes(),
+                    path.toCharSpan().sizeInBytes() - watcher->path.view().sizeInBytes(), relativeSpan);
                 if (relativeSpan.data()[0] == '/')
                 {
                     (void)relativeSpan.sliceStart(1, relativeSpan);
@@ -391,8 +391,7 @@ struct SC::FileSystemWatcher::Internal
     }
 };
 
-SC::Result SC::FileSystemWatcher::Notification::getFullPath(Span<char>, StringViewData& view) const
+SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) const
 {
-    view = fullPath;
-    return Result(true);
+    return Result(path.assign(fullPath));
 }
