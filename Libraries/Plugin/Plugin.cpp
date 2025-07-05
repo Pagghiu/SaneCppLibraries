@@ -191,7 +191,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
     // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
     // Both no plugin definition (identity.identifier.isEmpty()) and multiple
     // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin PluginDefinition
-    String file;
+    String file = StringEncoding::Ascii;
     while (fsIterator.enumerateNext())
     {
         const auto& item = fsIterator.get();
@@ -219,7 +219,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
                 SC_TRY(pluginFile.absolutePath.assign(item.path));
                 SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
             }
-            SC_TRY(fs.read(item.path, file, StringEncoding::Ascii));
+            SC_TRY(fs.read(item.path, file));
             StringView extracted;
             if (PluginDefinition::find(file.view(), extracted))
             {

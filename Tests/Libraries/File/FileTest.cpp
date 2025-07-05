@@ -3,6 +3,7 @@
 #include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
+#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

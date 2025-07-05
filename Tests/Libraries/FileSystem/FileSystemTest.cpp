@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
+#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -150,8 +151,8 @@ void SC::FileSystemTest::writeReadRemoveFile()
     SC_TEST_EXPECT(fs.existsAndIsFile("file.txt"));
 
     // Read the file and check its content
-    String newString;
-    SC_TEST_EXPECT(fs.read("file.txt", newString, StringEncoding::Ascii));
+    String newString = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("file.txt", newString));
     SC_TEST_EXPECT(newString.view() == content);
 
     // Remove all files created by the test
@@ -181,8 +182,8 @@ void SC::FileSystemTest::copyExistsFile()
                                FileSystem::CopyFlags().setOverwrite(true).setUseCloneIfSupported(false)));
 
     // Now read the destinationFile.txt content and check if it's the same as source
-    String content;
-    SC_TEST_EXPECT(fs.read("destinationFile.txt", content, StringEncoding::Ascii));
+    String content = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("destinationFile.txt", content));
     SC_TEST_EXPECT(content.view() == contentSource);
 
     // Copy again sourceFile.txt to destinationFile.txt but using clone this time
@@ -191,7 +192,7 @@ void SC::FileSystemTest::copyExistsFile()
 
     // Check again if file exists and its content
     SC_TEST_EXPECT(fs.existsAndIsFile("destinationFile.txt"));
-    SC_TEST_EXPECT(fs.read("destinationFile.txt", content, StringEncoding::Ascii));
+    SC_TEST_EXPECT(fs.read("destinationFile.txt", content));
     SC_TEST_EXPECT(content.view() == contentSource);
 
     // Remove all files created by the test

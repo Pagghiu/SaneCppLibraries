@@ -45,5 +45,4 @@ If you really need you can:
 - `Ws2_32.lib`
 - `ntdll.lib`
 - `Rstrtmgr.lib`
-- `shlwapi.lib`
 

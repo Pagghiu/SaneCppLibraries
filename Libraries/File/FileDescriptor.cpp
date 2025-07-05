@@ -612,6 +612,7 @@ SC::Result SC::FileDescriptor::readUntilEOFGrowable(IGrowableBuffer&& adapter)
     char buffer[1024];
     SC_TRY_MSG(isValid(), "FileDescriptor::readUntilEOFGrowable - Invalid handle");
     bool isEOF = false;
+    SC_TRY_MSG(adapter.tryGrowTo(0), "FileDescriptor::readUntilEOFGrowable - Cannot reset string");
     while (not isEOF)
     {
         SC_TRY(Internal::readAppend(handle, adapter, {buffer, sizeof(buffer)}, isEOF));

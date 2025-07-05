@@ -11,6 +11,7 @@
 #include "Libraries/FileSystem/Path.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

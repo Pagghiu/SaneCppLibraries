@@ -406,8 +406,8 @@ void SC::ProcessTest::processFork()
         // Check creation of "save file" by fork and verify its content too
         FileSystem fs;
         SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
-        String savedData;
-        SC_TEST_EXPECT(fs.read(saveFile, savedData, StringEncoding::Ascii));
+        String savedData = StringEncoding::Ascii;
+        SC_TEST_EXPECT(fs.read(saveFile, savedData));
         SC_TEST_EXPECT(savedData == sharedTag);
         SC_TEST_EXPECT(fs.removeFile(saveFile));
 

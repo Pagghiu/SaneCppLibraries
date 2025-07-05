@@ -453,10 +453,10 @@ void SC::AsyncTest::fileSystemOperationCopyDirectory()
     // Verify the content was copied correctly
     SC_TEST_EXPECT(fs.existsAndIsFile("AsyncCopyDirCopy/file1.txt"));
     SC_TEST_EXPECT(fs.existsAndIsFile("AsyncCopyDirCopy/subdir/file2.txt"));
-    String text;
-    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/file1.txt", text, StringEncoding::Ascii));
+    String text = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/file1.txt", text));
     SC_TEST_EXPECT(text.view() == "data1");
-    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/subdir/file2.txt", text, StringEncoding::Ascii));
+    SC_TEST_EXPECT(fs.read("AsyncCopyDirCopy/subdir/file2.txt", text));
     SC_TEST_EXPECT(text.view() == "data2");
 
     // Cleanup

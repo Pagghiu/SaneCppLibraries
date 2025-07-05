@@ -223,7 +223,15 @@ struct GrowableBuffer<String> : public IGrowableBuffer
     }
     virtual bool tryGrowTo(size_t newSize) override final
     {
-        return string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
+        if (newSize > 0)
+        {
+            return string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
+        }
+        else
+        {
+            string.data.clear();
+            return true;
+        }
     }
 };
 

@@ -4,6 +4,7 @@
 #include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystem/Path.h"
+#include "Libraries/Strings/String.h"
 
 void SC::AsyncTest::fileReadWrite(bool useThreadPool)
 {
@@ -309,8 +310,8 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SC_TEST_EXPECT(fd.close());
 
     // 6. Verify file contents
-    String contents;
-    SC_TEST_EXPECT(fs.read(filePath.view(), contents, StringEncoding::Ascii));
+    String contents = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read(filePath.view(), contents));
     StringView sv = contents.view();
     SC_TEST_EXPECT(sv == "PINGPONGPENGPANG");
 

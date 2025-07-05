@@ -104,9 +104,9 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(isPluginOriginal());
 
             // Modify child plugin to change return value of the exported function
-            String     sourceContent;
+            String     sourceContent = StringEncoding::Ascii;
             FileSystem fs;
-            SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent, StringEncoding::Ascii));
+            SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent));
             FileSystem::FileStat scriptFileStat;
             SC_TEST_EXPECT(fs.getFileStat(pluginScriptPath.view(), scriptFileStat));
             String sourceMod1;

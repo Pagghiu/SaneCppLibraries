@@ -182,8 +182,8 @@ struct SC::SerializationExampleModel
 
     Result loadFromJSONFile(StringView jsonPath)
     {
-        String buffer;
-        SC_TRY(FileSystem().read(jsonPath, buffer, StringEncoding::Ascii));
+        String buffer = StringEncoding::Ascii;
+        SC_TRY(FileSystem().read(jsonPath, buffer));
         return Result(SC::SerializationJson::loadVersioned(modelState, buffer.view()));
     }
 };
