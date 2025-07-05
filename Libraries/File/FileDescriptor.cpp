@@ -194,21 +194,9 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 
 SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
-    wchar_t nullTerminatedPath[StringPath::MaxPath + 1];
-    SC_TRY_MSG(filePath.sizeInBytes() <= StringPath::MaxPath, "FileDescriptor::open path length > MaxPath");
-    if (filePath.getEncoding() == StringEncoding::Utf16)
-    {
-        ::memcpy(nullTerminatedPath, filePath.bytesWithoutTerminator(), filePath.sizeInBytes());
-        nullTerminatedPath[filePath.sizeInBytes() / sizeof(wchar_t)] = 0;
-    }
-    else
-    {
-        const int stringLen = ::MultiByteToWideChar(CP_UTF8, 0, filePath.bytesWithoutTerminator(),
-                                                    static_cast<int>(filePath.sizeInBytes()), nullTerminatedPath,
-                                                    StringPath::MaxPath / sizeof(wchar_t));
-        SC_TRY_MSG(stringLen > 0, "Failed to convert path to UTF16");
-        nullTerminatedPath[stringLen] = L'\0'; // Ensure null termination
-    }
+    StringPath nullTerminated;
+    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
+    auto& nullTerminatedPath = nullTerminated.path;
 
     const bool isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(wchar_t);
     if (not isThreeChars or
@@ -467,10 +455,9 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     const int flags  = mode.toPosixFlags();
     const int access = mode.toPosixAccess();
 
-    char nullTerminatedPath[StringPath::MaxPath + 1];
-    SC_TRY_MSG(filePath.sizeInBytes() <= StringPath::MaxPath, "FileDescriptor::open path length > MaxPath");
-    ::memcpy(nullTerminatedPath, filePath.bytesWithoutTerminator(), filePath.sizeInBytes());
-    nullTerminatedPath[filePath.sizeInBytes()] = 0;
+    StringPath nullTerminated;
+    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
+    auto& nullTerminatedPath = nullTerminated.path;
     if (nullTerminatedPath[0] != '/')
         return Result::Error("FileDescriptor::open - Path must be absolute");
     const int fileDescriptor = ::open(nullTerminatedPath, flags, access);
