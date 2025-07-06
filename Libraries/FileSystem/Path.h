@@ -1,23 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-//
-// Path - Parse filesystem paths for windows and posix
 #pragma once
 #include "../Strings/StringView.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT Path;
 struct String;
-template <typename T>
-struct Vector;
-} // namespace SC
 
 //! @addtogroup group_file_system
 //! @{
 
-/// @brief Represents a posix or windows file system path
-struct SC::Path
+/// @brief Parse filesystem paths for windows and posix
+struct SC_COMPILER_EXPORT Path
 {
     /// @brief Path type (windows or posix)
     enum Type
@@ -194,15 +188,22 @@ struct SC::Path
     /// For example:
     ///
     /// @code{.cpp}
-    /// Path::normalize("/Users/SC/../Documents/", cmp, &path, Path::AsPosix);
+    /// Path::normalize("/Users/SC/../Documents/", &path, Path::AsPosix);
     /// SC_RELEASE_ASSERT(path == "/Users/Documents");
     /// @endcode
+    /// @param[out] output Reference to String that will receive the normalized Path
     /// @param view The path to be normalized (but it should not be a view() of the output String)
-    /// @param components The parsed components that once joined will provide the normalized string
-    /// @param[out] output (Optional) pointer to String that will receive the normalized Path (if `nullptr`)
-    /// @param[in] type Specify to parse as Windows or Posix path
+    /// @param type Specify to parse as Windows or Posix path
     /// @return `true` if the Path was successfully parsed and normalized
-    [[nodiscard]] static bool normalize(StringView view, Vector<StringView>& components, String* output, Type type);
+    template <int numComponents = 64>
+    [[nodiscard]] static bool normalize(String& output, StringView view, Type type)
+    {
+        StringView components[numComponents];
+        return normalize(output, view, type, components);
+    }
+
+    /// @brief Resolves all `..` to output a normalized path String (allows custom span of components)
+    [[nodiscard]] static bool normalize(String& output, StringView view, Type type, Span<StringView> components);
 
     /// @brief Get relative path that appended to `source` resolves to `destination`.
     ///
@@ -238,8 +239,10 @@ struct SC::Path
     /// @return A StringView without its initial separator
     [[nodiscard]] static StringView removeStartingSeparator(StringView path);
 
-    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringView>& components,
-                                                        String& outputPath, Type type);
+    /// @brief An extended Path::normalize handling a bug with incorrect __FILE__ backslash escape on Windows when
+    /// using UNC Paths, and also removing quote characters '"' added when passing such paths to compiler command line.
+    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(String& outputPath, StringView fileLocation, Type type,
+                                                        Span<StringView> components);
 
   private:
     [[nodiscard]] static bool appendTrailingSeparator(String& path, Type type);
@@ -249,3 +252,4 @@ struct SC::Path
 };
 
 //! @}
+} // namespace SC

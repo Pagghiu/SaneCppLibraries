@@ -130,8 +130,8 @@ int main(int argc, const char* argv[])
 
     SC::SmallString<255> correctedPath;
     {
-        SmallVector<StringView, 50> components;
-        (void)Path::normalizeUNCAndTrimQuotes(SC_COMPILER_LIBRARY_PATH, components, correctedPath, Path::AsNative);
+        StringView components[64];
+        (void)Path::normalizeUNCAndTrimQuotes(correctedPath, SC_COMPILER_LIBRARY_PATH, Path::AsNative, components);
         // If you hit this assertion you must figure out a way to derive location of Libraries
         SC_ASSERT_RELEASE(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
     }

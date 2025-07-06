@@ -256,22 +256,21 @@ void SC::PathTest::testParse(TestReport&)
 
 void SC::PathTest::testNormalize(TestReport&)
 {
-    String                       path;
-    SmallVector<StringView, 256> cmp;
+    String path;
     //! [normalizeSnippet]
-    SC_TEST_EXPECT(Path::normalize("///", cmp, &path, Path::AsPosix) and path == "/");
-    SC_TEST_EXPECT(Path::normalize("\\\\", cmp, &path, Path::AsWindows) and path == "\\\\");
-    SC_TEST_EXPECT(Path::normalize("/a/b/c/../d/e//", cmp, &path, Path::AsPosix) and path == "/a/b/d/e");
-    SC_TEST_EXPECT(Path::normalize("a\\b\\..\\c\\d\\..\\e", cmp, &path, Path::AsPosix) and path == "a/c/e");
-    SC_TEST_EXPECT(Path::normalize("..\\a\\b\\c", cmp, &path, Path::AsWindows) and path == "..\\a\\b\\c");
-    SC_TEST_EXPECT(Path::normalize("C:\\Users\\SC\\..\\Documents\\", cmp, &path, Path::AsWindows) and
+    SC_TEST_EXPECT(Path::normalize(path, "///", Path::AsPosix) and path == "/");
+    SC_TEST_EXPECT(Path::normalize(path, "\\\\", Path::AsWindows) and path == "\\\\");
+    SC_TEST_EXPECT(Path::normalize(path, "/a/b/c/../d/e//", Path::AsPosix) and path == "/a/b/d/e");
+    SC_TEST_EXPECT(Path::normalize(path, "a\\b\\..\\c\\d\\..\\e", Path::AsPosix) and path == "a/c/e");
+    SC_TEST_EXPECT(Path::normalize(path, "..\\a\\b\\c", Path::AsWindows) and path == "..\\a\\b\\c");
+    SC_TEST_EXPECT(Path::normalize(path, "C:\\Users\\SC\\..\\Documents\\", Path::AsWindows) and
                    path == "C:\\Users\\Documents");
-    SC_TEST_EXPECT(Path::normalize("\\\\Users\\SC\\..\\Documents", cmp, &path, Path::AsWindows) and
+    SC_TEST_EXPECT(Path::normalize(path, "\\\\Users\\SC\\..\\Documents", Path::AsWindows) and
                    path == "\\\\Users\\Documents");
-    SC_TEST_EXPECT(Path::normalize("/a/b/../c/./d/", cmp, &path, Path::AsPosix) and path == "/a/c/d");
-    SC_TEST_EXPECT(Path::normalize("..\\../../../Libraries/Plugin/PluginTest.h", cmp, &path, Path::AsPosix) and
+    SC_TEST_EXPECT(Path::normalize(path, "/a/b/../c/./d/", Path::AsPosix) and path == "/a/c/d");
+    SC_TEST_EXPECT(Path::normalize(path, "..\\../../../Libraries/Plugin/PluginTest.h", Path::AsPosix) and
                    path == "../../../../Libraries/Plugin/PluginTest.h");
-    SC_TEST_EXPECT(Path::normalize("\\\\Mac\\Some\\Dir", cmp, &path, Path::AsPosix) and path == "\\\\Mac/Some/Dir");
+    SC_TEST_EXPECT(Path::normalize(path, "\\\\Mac\\Some\\Dir", Path::AsPosix) and path == "\\\\Mac/Some/Dir");
     //! [normalizeSnippet]
 }
 

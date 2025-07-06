@@ -34,11 +34,11 @@ struct HotReloadSystem
         eventLoop = &loop;
         // Setup Paths
         FileSystemOperations::getExecutablePath(state.executablePath);
-        SmallVector<StringView, 50> components;
-        SC_TRY(Path::normalizeUNCAndTrimQuotes(SC_COMPILER_LIBRARY_PATH, components, state.libraryRootDirectory,
-                                               Path::AsNative));
+        StringView components[64];
+        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.libraryRootDirectory, SC_COMPILER_LIBRARY_PATH, Path::AsNative,
+                                               components));
         constexpr const StringView imguiPath = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
-        SC_TRY(Path::normalizeUNCAndTrimQuotes(imguiPath, components, state.imguiPath, Path::AsNative));
+        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.imguiPath, imguiPath, Path::AsNative, components));
         SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Examples"}));
         StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
         if (FileSystem().existsAndIsDirectory(iosSysroot))

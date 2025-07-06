@@ -15,11 +15,10 @@ struct SC::BuildTest : public SC::TestCase
     {
         String buildDir;
         {
-            String             targetDirectory = report.applicationRootDirectory;
-            Vector<StringView> components;
+            String targetDirectory = report.applicationRootDirectory;
             SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
             // Normalizing is not strictly necessary but it helps when debugging the test
-            SC_TRUST_RESULT(Path::normalize(targetDirectory.view(), components, &buildDir, Path::AsNative));
+            SC_TRUST_RESULT(Path::normalize(buildDir, targetDirectory.view(), Path::AsNative));
         }
         Build::Action action;
         action.action = Build::Action::Configure;

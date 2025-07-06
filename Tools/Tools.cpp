@@ -62,10 +62,9 @@ int main(int argc, const char* argv[])
     const StringView toolDestination  = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
 
     {
-        SmallVector<StringView, 64> components;
-        (void)Path::normalize(libraryDirectory, components, &arguments.libraryDirectory, Path::Type::AsNative);
-        (void)Path::normalize(toolSource, components, &arguments.toolSource, Path::Type::AsNative);
-        (void)Path::normalize(toolDestination, components, &arguments.toolDestination, Path::Type::AsNative);
+        (void)Path::normalize(arguments.libraryDirectory, libraryDirectory, Path::Type::AsNative);
+        (void)Path::normalize(arguments.toolSource, toolSource, Path::Type::AsNative);
+        (void)Path::normalize(arguments.toolDestination, toolDestination, Path::Type::AsNative);
     }
 
     arguments.tool = Tool::getToolName();

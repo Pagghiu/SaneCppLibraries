@@ -146,8 +146,7 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
 
 bool SC::Build::Project::setRootDirectory(StringView file)
 {
-    SmallVector<StringView, 256> components;
-    return Path::normalize(file, components, &rootDirectory, Path::AsPosix);
+    return Path::normalize(rootDirectory, file, Path::AsPosix);
 }
 
 bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, const Parameters& parameters,
@@ -280,7 +279,7 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
     String projectGeneratorSubFolder = StringEncoding::Utf8;
     {
         Vector<StringView> components;
-        SC_TRY(Path::normalize(parameters.directories.projectsDirectory.view(), components, &projectGeneratorSubFolder,
+        SC_TRY(Path::normalize(projectGeneratorSubFolder, parameters.directories.projectsDirectory.view(),
                                Path::Type::AsPosix));
         SC_TRY(
             Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator)}, Path::Type::AsPosix));
@@ -378,13 +377,13 @@ SC::Result SC::Build::FilePathsResolver::resolve(const Build::Definition& defini
         {
             for (const FilesSelection& file : project.files.selection)
             {
-                SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, components, uniquePaths));
+                SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, uniquePaths));
             }
             for (const SourceFiles& sourceFiles : project.filesWithSpecificFlags)
             {
                 for (const FilesSelection& file : sourceFiles.selection)
                 {
-                    SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, components, uniquePaths));
+                    SC_TRY(mergePathsFor(file, project.rootDirectory.view(), buffer, uniquePaths));
                 }
             }
         }
@@ -398,7 +397,7 @@ SC::Result SC::Build::FilePathsResolver::resolve(const Build::Definition& defini
 }
 
 SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& file, const StringView rootDirectory,
-                                                       String& buffer, Vector<StringView>& components,
+                                                       String&                                       buffer,
                                                        VectorMap<String, VectorSet<FilesSelection>>& paths)
 {
     SC_TRY(buffer.assign(rootDirectory));
@@ -406,7 +405,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     {
         FilesSelection absFile;
         absFile.action = file.action;
-        SC_TRY(Path::normalize(file.base.view(), components, &absFile.base, Path::Type::AsPosix));
+        SC_TRY(Path::normalize(absFile.base, file.base.view(), Path::Type::AsPosix));
         SC_TRY(absFile.mask.assign(file.mask.view()));
         SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
         return Result(true);

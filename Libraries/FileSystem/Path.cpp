@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Path.h"
-#include "../Containers/Vector.h"
 #include "../Foundation/Result.h"
 #include "../Strings/String.h"
 #include "../Strings/StringBuilder.h"
@@ -368,8 +367,8 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, StringView se
     return true;
 }
 
-bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringView>& components, String& outputPath,
-                                         Type type)
+bool SC::Path::normalizeUNCAndTrimQuotes(String& outputPath, StringView fileLocation, Type type,
+                                         Span<StringView> components)
 {
     // The macro escaping Library Path from defines adds escaped double quotes
     fileLocation = fileLocation.trimAnyOf({'"'});
@@ -382,16 +381,15 @@ bool SC::Path::normalizeUNCAndTrimQuotes(StringView fileLocation, Vector<StringV
         fileLocation = fixUncPathsOnMSVC.view();
     }
 #endif
-    SC_TRY(Path::normalize(fileLocation, components, &outputPath, type));
+    SC_TRY(Path::normalize(outputPath, fileLocation, type, components));
     return true;
 }
 
-bool SC::Path::normalize(StringView view, Vector<StringView>& components, String* output, Type type)
+bool SC::Path::normalize(String& output, StringView view, Type type, Span<StringView> components)
 {
-    components.clear();
     if (view.isEmpty())
         return false;
-    if (output->owns(view))
+    if (output.owns(view))
         return false;
     auto newView = removeTrailingSeparator(view);
     if (not newView.isEmpty())
@@ -409,7 +407,8 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
     bool normalizationHappened = false;
 
     StringViewTokenizer tokenizer(view);
-    auto                isDoubleDot = [](StringView it) -> bool
+
+    auto isDoubleDot = [](StringView it) -> bool
     {
         constexpr StringView utf8dot = "..";
 #if SC_PLATFORM_WINDOWS
@@ -430,6 +429,7 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
 #endif
     };
     // Need to IncludeEmpty in order to preserve starting /
+    size_t numComponents = 0;
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
     {
         const auto component = tokenizer.component;
@@ -444,13 +444,18 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
         }
         if (isDoubleDot(component))
         {
-            if (components.isEmpty() or isDoubleDot(components.back()))
+            if (numComponents == 0 or isDoubleDot(components[numComponents - 1]))
             {
-                SC_TRY(components.push_back(component));
+                if (numComponents >= components.sizeInElements())
+                {
+                    return false;
+                }
+                components[numComponents] = component;
+                numComponents += 1;
             }
             else
             {
-                (void)components.pop_back();
+                numComponents -= 1;
             }
             normalizationHappened = true;
         }
@@ -460,34 +465,35 @@ bool SC::Path::normalize(StringView view, Vector<StringView>& components, String
         }
         else
         {
-            SC_TRY(components.push_back(component));
+            if (numComponents >= components.sizeInElements())
+            {
+                return false;
+            }
+            components[numComponents] = component;
+            numComponents += 1;
         }
     }
 
-    if (output != nullptr)
+    if (normalizationHappened)
     {
-        if (normalizationHappened)
+        bool res = join(output, {components.data(), numComponents},
+                        type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
+        SC_TRY(res);
+        if (view.startsWith("\\\\"))
         {
-            bool res = join(*output, components.toSpanConst(),
-                            type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
-            SC_TRY(res);
-            if (view.startsWith("\\\\"))
-            {
-                // TODO: This is not very good, find a better way
-                SmallString<256> other = output->getEncoding();
-                StringBuilder    sb(other);
-                SC_TRY(sb.append("\\\\"))
-                SC_TRY(sb.append(output->view().sliceStart(2)));
-                SC_TRY(output->assign(other.view()));
-            }
-            return res;
+            // TODO: This is not very good, find a better way
+            SmallString<256> other = output.getEncoding();
+            StringBuilder    sb(other);
+            SC_TRY(sb.append("\\\\"))
+            SC_TRY(sb.append(output.view().sliceStart(2)));
+            SC_TRY(output.assign(other.view()));
         }
-        else
-        {
-            return output->assign(view);
-        }
+        return res;
     }
-    return true;
+    else
+    {
+        return output.assign(view);
+    }
 }
 
 bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type inputType,

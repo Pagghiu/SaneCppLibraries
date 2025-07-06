@@ -45,7 +45,7 @@ struct FilePathsResolver
     static Result enumerateFileSystemFor(StringView path, const VectorSet<FilesSelection>& filters,
                                          VectorMap<String, Vector<String>>& filtersToFiles);
     static Result mergePathsFor(const FilesSelection& selection, const StringView rootDirectory, String& buffer,
-                                Vector<StringView>& components, VectorMap<String, VectorSet<FilesSelection>>& paths);
+                                VectorMap<String, VectorSet<FilesSelection>>& paths);
 };
 
 struct RelativeDirectories
@@ -177,7 +177,7 @@ struct SC::Build::WriterInternal
         {
             if (Path::isAbsolute(file.base.view(), Path::AsNative))
             {
-                SC_TRY(Path::normalize(file.base.view(), components, &renderedFile, Path::AsPosix));
+                SC_TRY(Path::normalize(renderedFile, file.base.view(), Path::AsPosix));
                 SC_TRY(Path::append(renderedFile, {file.mask.view()}, Path::AsPosix));
             }
             else
