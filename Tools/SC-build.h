@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Libraries/Build/Build.h"
-#include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Process/Process.h"
 #include "../Libraries/Strings/Console.h"
+#include "../Libraries/Strings/Path.h"
 #include "../Libraries/Strings/StringBuilder.h"
 #include "Tools.h"
 

@@ -5,6 +5,7 @@
 [TOC]
 
 Strings library allow read-only and write string operations and UTF Conversions.
+Path is able to parse and manipulate windows and posix paths.
 
 # Features
 
@@ -21,6 +22,7 @@ Strings library allow read-only and write string operations and UTF Conversions.
 | SC::StringAlgorithms      | @copybrief SC::StringAlgorithms       |
 | SC::StringViewTokenizer   | @copybrief SC::StringViewTokenizer    |
 | SC::StringFormat          | @copybrief SC::StringFormat           |
+| SC::Path                  | @copybrief SC::Path                   |
 | SC::Console               | @copybrief SC::Console                |
 
 # Status
@@ -121,6 +123,27 @@ Library is usable and can be successfully used to mix operations with strings ma
 
 ## Console
 @copydoc SC::Console
+
+## Path
+@copydoc SC::Path
+
+### Path::isAbsolute
+@copydoc SC::Path::isAbsolute
+
+### Path::dirname
+@copydoc SC::Path::dirname
+
+### Path::basename
+@copydoc SC::Path::basename
+
+### Path::parseNameExtension
+@copydoc SC::Path::parseNameExtension
+
+### Path::normalize
+@copydoc SC::Path::normalize
+
+### Path::relativeFromTo
+@copydoc SC::Path::relativeFromTo
 
 # Implementation
 A design choice of the library is that strings cannot be modified.

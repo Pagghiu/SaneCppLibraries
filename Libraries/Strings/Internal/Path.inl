@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Path.h"
-#include "../Foundation/Result.h"
-#include "../Strings/String.h"
-#include "../Strings/StringBuilder.h"
+#include "../../Foundation/Result.h"
+#include "../../Strings/Path.h"
+#include "../../Strings/String.h"
+#include "../../Strings/StringBuilder.h"
 
 struct SC::Path::Internal
 {

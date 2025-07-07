@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/FileSystem/Path.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"

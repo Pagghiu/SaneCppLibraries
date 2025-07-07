@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/FileSystem/Path.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Plugin/Plugin.h"
+#include "Libraries/Strings/Path.h"
 
 #include "Examples/ISCExample.h"
 

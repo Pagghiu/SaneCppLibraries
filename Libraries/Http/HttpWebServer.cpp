@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpWebServer.h"
 #include "../FileSystem/FileSystem.h"
-#include "../FileSystem/Path.h"
+#include "../Strings/Path.h"
 #include "../Strings/StringBuilder.h"
 
 struct SC::HttpWebServer::Internal

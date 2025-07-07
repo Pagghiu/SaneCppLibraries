@@ -5,11 +5,11 @@
 
 #include "../Libraries/File/FileDescriptor.h"
 #include "../Libraries/FileSystem/FileSystem.h"
-#include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Foundation/Function.h"
 #include "../Libraries/Hashing/Hashing.h"
 #include "../Libraries/Process/Process.h"
 #include "../Libraries/Strings/Console.h"
+#include "../Libraries/Strings/Path.h"
 #include "../Libraries/Strings/StringBuilder.h"
 
 namespace SC

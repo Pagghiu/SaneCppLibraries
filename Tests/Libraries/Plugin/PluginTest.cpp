@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/FileSystem/Path.h"
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"

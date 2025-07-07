@@ -3,7 +3,7 @@
 #include "AsyncTest.h"
 #include "Libraries/File/FileDescriptor.h"
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/FileSystem/Path.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/String.h"
 
 void SC::AsyncTest::fileReadWrite(bool useThreadPool)

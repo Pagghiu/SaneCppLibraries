@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 #include "../Libraries/Containers/Vector.h"
-#include "../Libraries/FileSystem/Path.h"
 #include "../Libraries/Foundation/Deferred.h"
 #include "../Libraries/Strings/Console.h"
+#include "../Libraries/Strings/Path.h"
 #include "../Libraries/Strings/String.h"
 #include "../Libraries/Time/Time.h"
 

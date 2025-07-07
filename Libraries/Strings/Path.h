@@ -10,7 +10,7 @@ struct String;
 //! @addtogroup group_file_system
 //! @{
 
-/// @brief Parse filesystem paths for windows and posix
+/// @brief Parse and compose filesystem paths for windows and posix
 struct SC_COMPILER_EXPORT Path
 {
     /// @brief Path type (windows or posix)

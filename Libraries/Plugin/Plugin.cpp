@@ -4,10 +4,10 @@
 
 #include "../Algorithms/AlgorithmBubbleSort.h"
 #include "../FileSystem/FileSystem.h"
-#include "../FileSystem/Path.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
+#include "../Strings/Path.h"
 #include "../Strings/StringBuilder.h"
 
 #if SC_PLATFORM_WINDOWS

@@ -106,9 +106,9 @@ void runSupportToolsTest(TestReport& report);
 
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/FileSystem/FileSystemOperations.h"
-#include "Libraries/FileSystem/Path.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 

@@ -6,7 +6,7 @@
 #include "../../Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/VectorMap.h"
 #include "../../Containers/VectorSet.h"
-#include "../../FileSystem/Path.h"
+#include "../../Strings/Path.h"
 #include "../../Strings/StringBuilder.h"
 
 namespace SC

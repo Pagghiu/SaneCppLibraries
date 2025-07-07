@@ -5,27 +5,12 @@
 [TOC]
 
 FileSystem executed executing operations on files and directories.  
-Path is able to parse and manipulate windows and posix paths.
 
 # Quick Sheet
 
 \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
 
 # Features
-
-| SC::Path                          | @copybrief SC::Path                           |
-|:----------------------------------|:----------------------------------------------|
-| SC::Path::join                    | @copybrief SC::Path::join                     |
-| SC::Path::parseNameExtension      | @copybrief SC::Path::parseNameExtension       |
-| SC::Path::parse                   | @copybrief SC::Path::parse                    |
-| SC::Path::dirname                 | @copybrief SC::Path::dirname                  |
-| SC::Path::basename                | @copybrief SC::Path::basename                 |
-| SC::Path::isAbsolute              | @copybrief SC::Path::isAbsolute               |
-| SC::Path::normalize               | @copybrief SC::Path::normalize                |
-| SC::Path::relativeFromTo          | @copybrief SC::Path::relativeFromTo           |
-| SC::Path::append                  | @copybrief SC::Path::append                   |
-| SC::Path::endsWithSeparator       | @copybrief SC::Path::endsWithSeparator        |
-| SC::Path::removeStartingSeparator | @copybrief SC::Path::removeStartingSeparator  |
 
 | SC::FileSystem                                | @copybrief SC::FileSystem                                 |
 |:----------------------------------------------|:----------------------------------------------------------|
@@ -63,10 +48,9 @@ Path is able to parse and manipulate windows and posix paths.
 # Status
 🟩 Usable  
 The library contains commonly used function but it's missing some notable ones like `stat`.
- SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
+SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
 # Description 
-SC::Path class allows parsing and manipulating windows and posix paths.
 
 SC::FileSystem allows all typical file operations ( exists | copy | delete | make files or directory).
 Some less used functions are  SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime .
@@ -77,24 +61,7 @@ If they are relative, they will be interpreted as relative to the base directory
 The class wants explicitly to make sure its behavior doesn't implicitly depend on current directory of process 
 (unless it's passed explicitly to SC::FileSystem::init of course).
 
-# Path
-## Path::isAbsolute
-@copydoc SC::Path::isAbsolute
-
-## Path::dirname
-@copydoc SC::Path::dirname
-
-## Path::basename
-@copydoc SC::Path::basename
-
-## Path::parseNameExtension
-@copydoc SC::Path::parseNameExtension
-
-## Path::normalize
-@copydoc SC::Path::normalize
-
-## Path::relativeFromTo
-@copydoc SC::Path::relativeFromTo
+Use SC::Path from [Strings](@ref library_strings) library to parse and compose paths.
 
 # FileSystem
 ## copyFile
