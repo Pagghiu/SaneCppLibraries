@@ -7,7 +7,6 @@
 #include "Libraries/Build/Build.cpp"
 #include "Libraries/File/FileDescriptor.cpp"
 #include "Libraries/FileSystem/FileSystem.cpp"
-#include "Libraries/FileSystem/FileSystemOperations.cpp"
 #include "Libraries/FileSystemIterator/FileSystemIterator.cpp"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.cpp"
 #include "Libraries/Foundation/Foundation.cpp"

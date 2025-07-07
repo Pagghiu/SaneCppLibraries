@@ -105,7 +105,7 @@ void runSupportToolsTest(TestReport& report);
 #endif
 
 #include "Libraries/Containers/Vector.h"
-#include "Libraries/FileSystem/FileSystemOperations.h"
+#include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
@@ -125,8 +125,9 @@ int main(int argc, const char* argv[])
     Console    console(globalConsoleConversionBuffer);
     TestReport report(console, argc, argv);
 
-    report.executableFile           = FileSystemOperations::getExecutablePath(report.executableFileStorage);
-    report.applicationRootDirectory = FileSystemOperations::getApplicationRootDirectory(report.applicationRootStorage);
+    report.executableFile = FileSystem::Operations::getExecutablePath(report.executableFileStorage);
+    report.applicationRootDirectory =
+        FileSystem::Operations::getApplicationRootDirectory(report.applicationRootStorage);
 
     SC::SmallString<255> correctedPath;
     {

@@ -196,7 +196,7 @@ struct SC::SerializationExampleView
 
     Result init()
     {
-        FileSystemOperations::getApplicationRootDirectory(applicationPath);
+        FileSystem::Operations::getApplicationRootDirectory(applicationPath);
         const StringView appPath = SC::Path::dirname(applicationPath.view(), SC::Path::Type::AsNative);
         SC_TRY(SC::Path::join(viewState.jsonSerializationPath, {appPath, "state.json"}));
         SC_TRY(SC::Path::join(viewState.binarySerializationPath, {appPath, "state.binary"}));

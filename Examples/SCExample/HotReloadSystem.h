@@ -33,7 +33,7 @@ struct HotReloadSystem
     {
         eventLoop = &loop;
         // Setup Paths
-        FileSystemOperations::getExecutablePath(state.executablePath);
+        FileSystem::Operations::getExecutablePath(state.executablePath);
         StringView components[64];
         SC_TRY(Path::normalizeUNCAndTrimQuotes(state.libraryRootDirectory, SC_COMPILER_LIBRARY_PATH, Path::AsNative,
                                                components));

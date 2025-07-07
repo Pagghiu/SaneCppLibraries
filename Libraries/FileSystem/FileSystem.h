@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../File/FileDescriptor.h"
-#include "../FileSystem/FileSystemOperations.h"
+#include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
+#include "../Time/Time.h"
 
 namespace SC
 {
@@ -12,6 +13,44 @@ namespace SC
 
 //! @addtogroup group_file_system
 //! @{
+
+/// @brief A structure to describe file stats
+struct FileSystemStat
+{
+    size_t         fileSize     = 0; ///< Size of the file in bytes
+    Time::Realtime modifiedTime = 0; ///< Time when file was last modified
+};
+
+/// @brief A structure to describe copy flags
+struct FileSystemCopyFlags
+{
+    FileSystemCopyFlags()
+    {
+        overwrite           = false;
+        useCloneIfSupported = true;
+    }
+
+    /// @brief If `true` copy will overwrite existing files in the destination
+    /// @param value `true` if to overwrite
+    /// @return itself
+    FileSystemCopyFlags& setOverwrite(bool value)
+    {
+        overwrite = value;
+        return *this;
+    }
+
+    /// @brief If `true` copy will use native filesystem clone os api
+    /// @param value `true` if using clone is wanted
+    /// @return itself
+    FileSystemCopyFlags& setUseCloneIfSupported(bool value)
+    {
+        useCloneIfSupported = value;
+        return *this;
+    }
+
+    bool overwrite;           ///< If `true` copy will overwrite existing files in the destination
+    bool useCloneIfSupported; ///< If `true` copy will use native filesystem clone os api
+};
 
 /// @brief Execute fs operations { exists, copy, delete } for { files and directories }.
 /// It will scope all operations on relative paths to the `initialWorkingDirectory` passed in SC::FileSystem::init.
@@ -263,6 +302,34 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
     /// @return Valid Result if file time for the given file was successfully set
     Result setLastModifiedTime(StringSpan file, Time::Realtime time);
+
+    /// @brief Low level filesystem API, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
+    /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
+    struct Operations
+    {
+        static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
+        static Result makeDirectory(StringSpan dir);
+        static Result exists(StringSpan path);
+        static Result existsAndIsDirectory(StringSpan path);
+        static Result existsAndIsFile(StringSpan path);
+        static Result existsAndIsLink(StringSpan path);
+        static Result makeDirectoryRecursive(StringSpan path);
+        static Result removeEmptyDirectory(StringSpan path);
+        static Result moveDirectory(StringSpan source, StringSpan destination);
+        static Result removeFile(StringSpan path);
+        static Result copyFile(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
+        static Result rename(StringSpan path, StringSpan newPath);
+        static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
+        static Result removeDirectoryRecursive(StringSpan directory);
+        static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
+        static Result setLastModifiedTime(StringSpan path, Time::Realtime time);
+
+        static StringSpan getExecutablePath(StringPath& executablePath);
+        static StringSpan getApplicationRootDirectory(StringPath& applicationRootDirectory);
+
+      private:
+        struct Internal;
+    };
 
   private:
     [[nodiscard]] bool convert(const StringSpan file, StringPath& destination, StringSpan* encodedPath = nullptr);

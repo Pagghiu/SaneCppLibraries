@@ -595,7 +595,8 @@ SC::Result SC::AsyncFileSystemOperation::copyFile(AsyncEventLoop& eventLoop, Str
     // TODO: Implement this on io_uring using two splice submissions with IOSQE_IO_LINK
     loopWork.work = [&]()
     {
-        SC_TRY(FileSystemOperations::copyFile(copyFileData.path, copyFileData.destinationPath, copyFileData.copyFlags));
+        SC_TRY(
+            FileSystem::Operations::copyFile(copyFileData.path, copyFileData.destinationPath, copyFileData.copyFlags));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
@@ -614,7 +615,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
 
     loopWork.work = [&]()
     {
-        SC_TRY(FileSystemOperations::rename(renameData.path, renameData.newPath));
+        SC_TRY(FileSystem::Operations::rename(renameData.path, renameData.newPath));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
@@ -633,7 +634,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
 
     loopWork.work = [&]()
     {
-        SC_TRY(FileSystemOperations::removeEmptyDirectory(removeData.path));
+        SC_TRY(FileSystem::Operations::removeEmptyDirectory(removeData.path));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
@@ -652,7 +653,7 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
 
     loopWork.work = [&]()
     {
-        SC_TRY(FileSystemOperations::removeFile(removeData.path));
+        SC_TRY(FileSystem::Operations::removeFile(removeData.path));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);
@@ -667,8 +668,8 @@ SC::Result SC::AsyncFileSystemOperation::copyDirectory(AsyncEventLoop& eventLoop
     new (&copyDirectoryData, PlacementNew()) CopyDirectoryData({path, destinationPath, copyFlags});
     loopWork.work = [&]()
     {
-        SC_TRY(FileSystemOperations::copyDirectory(copyDirectoryData.path, copyDirectoryData.destinationPath,
-                                                   copyDirectoryData.copyFlags));
+        SC_TRY(FileSystem::Operations::copyDirectory(copyDirectoryData.path, copyDirectoryData.destinationPath,
+                                                     copyDirectoryData.copyFlags));
         return SC::Result(true);
     };
     loopWork.callback.bind<AsyncFileSystemOperation, &AsyncFileSystemOperation::onOperationCompleted>(*this);

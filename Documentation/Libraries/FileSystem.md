@@ -38,12 +38,12 @@ FileSystem executed executing operations on files and directories.
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
 
-| Miscellaneous Classes                                 |                                                                   |
-|:------------------------------------------------------|:------------------------------------------------------------------|
-| SC::FileSystemOperations                              | @copybrief SC::FileSystemOperations                               |
-| **Get Executable / Application Path**                 |                                                                   |
-| SC::FileSystemOperations::getExecutablePath           | @copybrief SC::FileSystemOperations::getExecutablePath            |
-| SC::FileSystemOperations::getApplicationRootDirectory | @copybrief SC::FileSystemOperations::getApplicationRootDirectory  |
+| Miscellaneous Classes                                     |                                                                       |
+|:----------------------------------------------------------|:----------------------------------------------------------------------|
+| SC::FileSystem::Operations                                | @copybrief SC::FileSystem::Operations                                 |
+| **Get Executable / Application Path**                     |                                                                       |
+| SC::FileSystem::Operations::getExecutablePath             | @copybrief SC::FileSystem::Operations::getExecutablePath              |
+| SC::FileSystem::Operations::getApplicationRootDirectory   | @copybrief SC::FileSystem::Operations::getApplicationRootDirectory    |
 
 # Status
 🟩 Usable  

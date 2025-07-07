@@ -54,9 +54,9 @@ struct SC::FileSystemTest : public SC::TestCase
         if (test_section("executableFile / applicationRootDirectory"))
         {
             StringPath stringPath;
-            report.console.print("executableFile=\"{}\"\n", FileSystemOperations::getExecutablePath(stringPath));
+            report.console.print("executableFile=\"{}\"\n", FileSystem::Operations::getExecutablePath(stringPath));
             report.console.print("applicationRootDirectory=\"{}\"\n",
-                                 FileSystemOperations::getApplicationRootDirectory(stringPath));
+                                 FileSystem::Operations::getApplicationRootDirectory(stringPath));
         }
         // TODO: Add tests for createSymbolicLink, existsAndIsLink, removeLinkIfExists and moveDirectory
     }

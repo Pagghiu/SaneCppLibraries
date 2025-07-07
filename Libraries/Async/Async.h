@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../FileSystem/FileSystemOperations.h" // FileSystemCopyFlags
+#include "../FileSystem/FileSystem.h" // FileSystemCopyFlags
 #include "../Foundation/Function.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/OpaqueObject.h"
