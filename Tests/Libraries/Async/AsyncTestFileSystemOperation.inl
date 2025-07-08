@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
-#include "Libraries/File/FileDescriptor.h"
+#include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
@@ -71,7 +71,7 @@ void SC::AsyncTest::fileSystemOperationOpen()
         SC_TEST_EXPECT(res.completionData.code == 0);
         SC_TEST_EXPECT(res.completionData.handle != FileDescriptor::Invalid);
         // Read the file content from the file descriptor handle (that is already opened)
-        // and check that the content is correct. Descriptor is closed automatically by FileDescriptor.
+        // and check that the content is correct. Descriptor is closed automatically by File.
         FileDescriptor fd(res.completionData.handle);
 
         String text;

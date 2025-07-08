@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../File/FileDescriptor.h"
+#include "../File/File.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
 #include "../Time/Time.h"

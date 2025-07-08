@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
-#include "Libraries/File/FileDescriptor.h"
+#include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/String.h"

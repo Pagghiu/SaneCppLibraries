@@ -3,7 +3,7 @@
 #pragma once
 #include "Tools.h"
 
-#include "../Libraries/File/FileDescriptor.h"
+#include "../Libraries/File/File.h"
 #include "../Libraries/FileSystem/FileSystem.h"
 #include "../Libraries/Foundation/Function.h"
 #include "../Libraries/Hashing/Hashing.h"

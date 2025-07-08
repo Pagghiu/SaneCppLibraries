@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../File/FileDescriptor.h"
+#include "../File/File.h"
 #include "../Foundation/StringPath.h"
 
 #if SC_PLATFORM_WINDOWS

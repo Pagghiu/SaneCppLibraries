@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
-#include "../File/FileDescriptor.h"
+#include "../File/File.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Strings/StringConverter.h"
 

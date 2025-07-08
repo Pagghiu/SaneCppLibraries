@@ -6,7 +6,7 @@
 #include "Libraries/AsyncStreams/AsyncStreams.h"
 #include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/Containers/Vector.h"
-#include "Libraries/File/FileDescriptor.h"
+#include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"

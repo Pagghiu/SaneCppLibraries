@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../../Socket/Socket.h"
 
-#include "../../File/FileDescriptor.h" // TODO: Remove dependency of File library
+#include "../../File/File.h" // TODO: Remove dependency of File library
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
 

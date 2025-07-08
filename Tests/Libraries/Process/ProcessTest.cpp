@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Process/Process.h"
 #include "Libraries/Async/Async.h"
-#include "Libraries/File/FileDescriptor.h"
+#include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Testing/Testing.h"
 

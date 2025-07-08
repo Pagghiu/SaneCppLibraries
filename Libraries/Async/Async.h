@@ -12,7 +12,7 @@
 #include "../Time/Time.h"
 
 // Descriptors
-#include "../File/FileDescriptor.h"
+#include "../File/File.h"
 #include "../Socket/SocketDescriptor.h"
 
 namespace SC
