@@ -2,18 +2,15 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../FileSystem/FileSystem.h" // FileSystemCopyFlags
+#include "../File/File.h"
+#include "../FileSystem/FileSystem.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/OpaqueObject.h"
-#include "../Foundation/Span.h"
+#include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/ThreadPool.h"
 #include "../Time/Time.h"
-
-// Descriptors
-#include "../File/File.h"
-#include "../Socket/SocketDescriptor.h"
 
 namespace SC
 {

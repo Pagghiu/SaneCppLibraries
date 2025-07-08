@@ -4,7 +4,7 @@
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Result.h"
 #include "../../Foundation/Span.h"
-#include "../../Socket/SocketDescriptor.h"
+#include "../../Socket/Socket.h"
 #include "SocketInternal.h"
 
 #if !SC_PLATFORM_WINDOWS

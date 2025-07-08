@@ -10,7 +10,7 @@ using socklen_t = int;
 #pragma comment(lib, "Ws2_32.lib")
 
 #include "../../Foundation/Assert.h"
-#include "../../Socket/SocketDescriptor.h"
+#include "../../Socket/Socket.h"
 #include "../../Threading/Atomic.h"
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
