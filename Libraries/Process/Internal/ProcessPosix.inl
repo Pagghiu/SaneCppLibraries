@@ -20,11 +20,6 @@
 extern char** environ;
 #endif
 
-SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(pid_t& handle)
-{
-    handle = Invalid;
-    return Result(true);
-}
 //-----------------------------------------------------------------------------------------------------------------------
 // ProcessEnvironment
 //-----------------------------------------------------------------------------------------------------------------------

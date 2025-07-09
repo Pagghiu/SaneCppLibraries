@@ -305,7 +305,7 @@ struct SC_COMPILER_EXPORT FileSystem
 
     /// @brief Low level filesystem API, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
-    struct Operations
+    struct SC_COMPILER_EXPORT Operations
     {
         static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
         static Result makeDirectory(StringSpan dir);

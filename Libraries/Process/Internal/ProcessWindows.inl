@@ -10,12 +10,6 @@
 #include <stdlib.h> // _exit
 #endif
 
-SC::Result SC::detail::ProcessDescriptorDefinition::releaseHandle(HANDLE& handle)
-{
-    if (::CloseHandle(handle) == FALSE)
-        return Result::Error("ProcessNativeHandleClose - CloseHandle failed");
-    return Result(true);
-}
 //-----------------------------------------------------------------------------------------------------------------------
 // Process
 //-----------------------------------------------------------------------------------------------------------------------
@@ -373,7 +367,7 @@ SC::Result SC::ProcessFork::waitForChild()
     }
     ::NtClose(processHandle);
     ::NtClose(threadHandle);
-    threadHandle = detail::ProcessDescriptorDefinition::Invalid;
+    threadHandle = ProcessDescriptor::Invalid;
     return Result(true);
 }
 

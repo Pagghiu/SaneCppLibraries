@@ -5,16 +5,18 @@
 #include "../File/File.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Strings/String.h"
-#include "ProcessDescriptor.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT Process;
 struct SC_COMPILER_EXPORT ProcessChain;
-struct SC_COMPILER_EXPORT ProcessFork;
-struct ProcessID;
-struct ProcessEnvironment;
-} // namespace SC
+
+using ProcessDescriptor = FileDescriptor;
+
+/// @brief Wraps the code returned by a process that has exited
+struct ProcessExitStatus
+{
+    int32_t status = -1;
+};
 
 //! @defgroup group_process Process
 //! @copybrief library_process (see @ref library_process for more details)
@@ -23,7 +25,7 @@ struct ProcessEnvironment;
 //! @{
 
 /// @brief Native os handle to a process identifier
-struct SC::ProcessID
+struct ProcessID
 {
     int32_t pid = 0;
 };
@@ -61,7 +63,7 @@ struct SC::ProcessID
 /// Example: Disable environment variable inheritance
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentDisableInheritance
 
-struct SC::Process
+struct SC_COMPILER_EXPORT Process
 {
     struct SC_COMPILER_EXPORT Options
     {
@@ -74,7 +76,7 @@ struct SC::Process
         // clang-format off
         /// @brief Read the process standard output/error into the given String
         StdStream(String& externalString) { operation = Operation::String; string = &externalString;}
-
+        
         /// @brief Read the process standard output/error into the given Vector
         StdStream(Buffer& externalBuffer) { operation = Operation::Vector; buffer = &externalBuffer; }
         // clang-format on
@@ -132,16 +134,16 @@ struct SC::Process
         // clang-format off
         struct Ignore{};
         struct Inherit{};
-
+        
         /// @brief Ignores child process standard output/error (child process output will be silenced)
         StdOut(Ignore) { operation = Operation::Ignore; }
-
+        
         /// @brief Inherits child process standard output/error (child process will print into parent process console)
         StdOut(Inherit) { operation = Operation::Inherit; }
-
+        
         /// @brief Read the process standard output/error into the given Span
         StdOut(Span<char> span) { operation = Operation::WritableSpan; writableSpan = span; }
-
+        
         using StdStream::StdStream;
         friend struct ProcessChain;
         // clang-format on
@@ -153,19 +155,19 @@ struct SC::Process
     {
         // clang-format off
         struct Inherit{};
-
+        
         /// @brief Inherits child process Input from parent process
         StdIn(Inherit) { operation = Operation::Inherit; }
-
+        
         /// @brief Fills standard input with content of a C-String
         template <int N> StdIn(const char (&item)[N]) : StdIn(StringView({item, N - 1}, true, StringEncoding::Ascii)) {}
-
+        
         /// @brief Fills standard input with content of a StringView
         StdIn(StringView string) : StdIn(string.toCharSpan()) {}
-
+        
         /// @brief Fills standard input with content of a Span
         StdIn(Span<const char> span) { operation = Operation::ReadableSpan; readableSpan = span;}
-
+        
         using StdStream::StdStream;
         friend struct ProcessChain;
         // clang-format on
@@ -232,7 +234,7 @@ struct SC::Process
     [[nodiscard]] static bool isWindowsEmulatedProcess();
 
   private:
-    ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after process is finished
+    ProcessExitStatus exitStatus; ///< Exit status code returned after process is finished
 
     FileDescriptor stdInFd;  ///< Descriptor of process stdin
     FileDescriptor stdOutFd; ///< Descriptor of process stdout
@@ -291,7 +293,7 @@ struct SC::Process
 ///
 /// Example: Read standard output into a string using a Pipe
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp processChainPipeDualSnippet
-struct SC::ProcessChain
+struct SC_COMPILER_EXPORT ProcessChain
 {
     Process::Options options;
     /// @brief Add a process to the chain, with given arguments
@@ -329,7 +331,7 @@ struct SC::ProcessChain
 ///
 /// Example: Print all environment variables to stdout
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentPrint
-struct SC::ProcessEnvironment
+struct ProcessEnvironment
 {
     ProcessEnvironment();
     ~ProcessEnvironment();
@@ -391,7 +393,7 @@ struct SC::ProcessEnvironment
 ///
 /// Example: Fork current process modifying memory in forked process leaving parent's one unmodified.
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessFork
-struct SC::ProcessFork
+struct SC_COMPILER_EXPORT ProcessFork
 {
     ProcessFork();
     ~ProcessFork();
@@ -434,14 +436,16 @@ struct SC::ProcessFork
   private:
     Side side = ForkParent;
 #if SC_PLATFORM_WINDOWS
-    detail::ProcessDescriptorDefinition::Handle processHandle = detail::ProcessDescriptorDefinition::Invalid;
-    detail::ProcessDescriptorDefinition::Handle threadHandle  = detail::ProcessDescriptorDefinition::Invalid;
+    ProcessDescriptor::Handle processHandle = ProcessDescriptor::Invalid;
+    ProcessDescriptor::Handle threadHandle  = ProcessDescriptor::Invalid;
 #else
     ProcessID processID;
 #endif
-    ProcessDescriptor::ExitStatus exitStatus; ///< Exit status code returned after child fork exits
+    ProcessExitStatus exitStatus; ///< Exit status code returned after child fork exits
 
     PipeDescriptor parentToFork; ///< Pipe to write from parent and read in fork
     PipeDescriptor forkToParent; ///< Pipe to write from fork and read in parent
 };
 //! @}
+
+} // namespace SC
