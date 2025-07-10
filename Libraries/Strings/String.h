@@ -209,7 +209,7 @@ struct GrowableBuffer<String> : public IGrowableBuffer
     size_t  numZeroes;
     GrowableBuffer(String& string) : string(string) { numZeroes = StringEncodingGetSize(string.getEncoding()); }
 
-    virtual ~GrowableBuffer() override final
+    virtual ~GrowableBuffer() override
     {
         if (string.data.size() + numZeroes <= string.data.capacity())
         {
