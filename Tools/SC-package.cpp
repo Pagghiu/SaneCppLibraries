@@ -121,11 +121,11 @@ namespace Tools
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "7zip";
-    download.packageVersion = "24.09";
+    download.packageVersion = "25.00";
 
     download.packagePlatform = "windows";
     download.url             = "https://www.7-zip.org/a/7zr.exe";
-    download.fileMD5         = "9f018e5feb96aae0e893a739c83a8b1f";
+    download.fileMD5         = "972b9c23a3c76b7b762ed26bfe62d755";
     download.createLink      = false;
 
     CustomFunctions functions;
