@@ -607,7 +607,7 @@ SC::Result SC::FileDescriptor::write(Span<const uint8_t> data)
     return write({reinterpret_cast<const char*>(data.data()), data.sizeInBytes()});
 }
 
-SC::Result SC::FileDescriptor::readUntilEOFGrowable(IGrowableBuffer&& adapter)
+SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 {
     char buffer[1024];
     SC_TRY_MSG(isValid(), "FileDescriptor::readUntilEOFGrowable - Invalid handle");

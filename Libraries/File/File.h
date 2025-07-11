@@ -135,8 +135,14 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     template <typename T>
     Result readUntilEOF(T& destination)
     {
-        return readUntilEOFGrowable(GrowableBuffer<T>{destination});
+        return readUntilEOF(GrowableBuffer<T>{destination});
     }
+
+    /// @brief Reads into a given dynamic buffer until End of File (EOF) is signaled.
+    ///        It works also for non-seekable file descriptors (stdout / in / err).
+    /// @param buffer A destination buffer to write to (it will be resized as needed)
+    /// @return Valid result if read succeeded until EOF
+    Result readUntilEOF(IGrowableBuffer&& buffer);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write
@@ -187,7 +193,6 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
   private:
     friend struct File;
     struct Internal;
-    Result readUntilEOFGrowable(IGrowableBuffer&& buffer);
 };
 
 /// @brief Read / Write pipe (Process stdin/stdout and IPC communication)

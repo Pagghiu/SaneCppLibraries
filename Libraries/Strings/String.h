@@ -235,4 +235,9 @@ struct GrowableBuffer<String> : public IGrowableBuffer
     }
 };
 
+template <int N>
+struct GrowableBuffer<SmallString<N>> : GrowableBuffer<String>
+{
+    using GrowableBuffer<String>::GrowableBuffer;
+};
 } // namespace SC

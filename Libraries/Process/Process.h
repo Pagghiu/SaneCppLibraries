@@ -3,7 +3,11 @@
 #pragma once
 
 #include "../File/File.h"
+#include "../Foundation/AlignedStorage.h"
+#include "../Foundation/Function.h"
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
+#include "../Foundation/StringPath.h"
 #include "../Strings/String.h"
 
 namespace SC
@@ -73,13 +77,22 @@ struct SC_COMPILER_EXPORT Process
 
     struct StdStream
     {
-        // clang-format off
-        /// @brief Read the process standard output/error into the given String
-        StdStream(String& externalString) { operation = Operation::String; string = &externalString;}
-        
-        /// @brief Read the process standard output/error into the given Vector
-        StdStream(Buffer& externalBuffer) { operation = Operation::Vector; buffer = &externalBuffer; }
-        // clang-format on
+        /// @brief Read the process standard output/error into the given String / Buffer
+        template <typename T>
+        StdStream(T& destination)
+        {
+            GrowableBuffer<T>& gbuf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
+            placementNew(gbuf, destination);
+            growableBuffer = &gbuf;
+            operation      = Operation::GrowableBuffer;
+        }
+        ~StdStream()
+        {
+            if (growableBuffer)
+            {
+                growableBuffer->~IGrowableBuffer();
+            }
+        }
 
         /// @brief Redirects child process standard output/error to a given file descriptor
         StdStream(FileDescriptor&& file)
@@ -94,6 +107,11 @@ struct SC_COMPILER_EXPORT Process
             operation      = Operation::ExternalPipe;
             pipeDescriptor = &pipe;
         }
+
+        StdStream(const StdStream&)            = delete;
+        StdStream(StdStream&&)                 = delete;
+        StdStream& operator=(const StdStream&) = delete;
+        StdStream& operator=(StdStream&&)      = delete;
 
       protected:
         struct AlreadySetup
@@ -111,8 +129,7 @@ struct SC_COMPILER_EXPORT Process
             Ignore,
             ExternalPipe,
             FileDescriptor,
-            Vector,
-            String,
+            GrowableBuffer,
             WritableSpan,
             ReadableSpan
         };
@@ -121,8 +138,8 @@ struct SC_COMPILER_EXPORT Process
         Span<const char> readableSpan;
         Span<char>       writableSpan;
 
-        String* string;
-        Buffer* buffer;
+        IGrowableBuffer*                  growableBuffer = nullptr;
+        AlignedStorage<3 * sizeof(void*)> growableBufferStorage;
 
         FileDescriptor::Handle fileDescriptor;
 
@@ -178,7 +195,7 @@ struct SC_COMPILER_EXPORT Process
     Options           options;   ///< Options for the child process (hide console window etc.)
 
     /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
-    [[nodiscard]] Result waitForExitSync();
+    Result waitForExitSync();
 
     /// @brief Launch child process with the given arguments
     /// @param cmd Process executable path and its arguments (if any)
@@ -187,10 +204,10 @@ struct SC_COMPILER_EXPORT Process
     /// StringView/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    [[nodiscard]] Result launch(Span<const StringView> cmd,                        //
-                                const StdOut&          stdOut = StdOut::Inherit{}, //
-                                const StdIn&           stdIn  = StdIn::Inherit{},  //
-                                const StdErr&          stdErr = StdErr::Inherit{})
+    Result launch(Span<const StringView> cmd,                        //
+                  const StdOut&          stdOut = StdOut::Inherit{}, //
+                  const StdIn&           stdIn  = StdIn::Inherit{},  //
+                  const StdErr&          stdErr = StdErr::Inherit{})
     {
         SC_TRY(formatArguments(cmd));
         return launch(stdOut, stdIn, stdErr);
@@ -203,10 +220,10 @@ struct SC_COMPILER_EXPORT Process
     /// StringView/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    [[nodiscard]] Result exec(Span<const StringView> cmd,                        //
-                              const StdOut&          stdOut = StdOut::Inherit{}, //
-                              const StdIn&           stdIn  = StdIn::Inherit{},  //
-                              const StdErr&          stdErr = StdErr::Inherit{})
+    Result exec(Span<const StringView> cmd,                        //
+                const StdOut&          stdOut = StdOut::Inherit{}, //
+                const StdIn&           stdIn  = StdIn::Inherit{},  //
+                const StdErr&          stdErr = StdErr::Inherit{})
     {
         SC_TRY(launch(cmd, stdOut, stdIn, stdErr));
         return waitForExitSync();
@@ -216,13 +233,13 @@ struct SC_COMPILER_EXPORT Process
     int32_t getExitStatus() const { return exitStatus.status; }
 
     /// @brief Sets the starting working directory of the process that will be launched / executed
-    [[nodiscard]] Result setWorkingDirectory(StringView processWorkingDirectory);
+    Result setWorkingDirectory(StringSpan processWorkingDirectory);
 
     /// @brief Controls if the newly spawned child process will inherit parent process environment variables
     void inheritParentEnvironmentVariables(bool inherit) { inheritEnv = inherit; }
 
     /// @brief Sets the environment variable for the newly spawned child process
-    [[nodiscard]] Result setEnvironment(StringView environmentVariable, StringView value);
+    Result setEnvironment(StringView environmentVariable, StringView value);
 
     /// @brief Returns number of (virtual) processors available
     [[nodiscard]] static size_t getNumberOfProcessors();
@@ -240,11 +257,11 @@ struct SC_COMPILER_EXPORT Process
     FileDescriptor stdOutFd; ///< Descriptor of process stdout
     FileDescriptor stdErrFd; ///< Descriptor of process stderr
 
-    [[nodiscard]] Result launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
+    Result launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
 
-    [[nodiscard]] Result formatArguments(Span<const StringView> cmd);
+    Result formatArguments(Span<const StringView> cmd);
 
-    StringNative<255> currentDirectory = StringEncoding::Native;
+    StringPath currentDirectory;
 
     // On Windows command holds the concatenation of executable and arguments.
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
@@ -300,24 +317,24 @@ struct SC_COMPILER_EXPORT ProcessChain
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
     /// @return Invalid result if given process failed to create pipes for I/O redirection
-    [[nodiscard]] Result pipe(Process& process, const Span<const StringView> cmd);
+    Result pipe(Process& process, const Span<const StringView> cmd);
 
     /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.
     /// You can then call ProcessChain::waitForExitSync to block until the child process is fully finished.
     /// @return Valid result if given process chain has been launched successfully
-    [[nodiscard]] Result launch(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
-                                const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
-                                const Process::StdErr& stdErr = Process::StdErr::Inherit{});
+    Result launch(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
+                  const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
+                  const Process::StdErr& stdErr = Process::StdErr::Inherit{});
 
     /// @brief Waits (blocking) for entire process chain to exit. Can be called only after ProcessChain::launch.
     /// @return Valid result if the given process chain exited normally without aborting
-    [[nodiscard]] Result waitForExitSync();
+    Result waitForExitSync();
 
     /// @brief Launch the entire chain of processes and waits for the results (calling ProcessChain::waitForExitSync)
     /// @return Valid result if given process chain has been launched and waited for exit successfully
-    [[nodiscard]] Result exec(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
-                              const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
-                              const Process::StdErr& stdErr = Process::StdErr::Inherit{})
+    Result exec(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
+                const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
+                const Process::StdErr& stdErr = Process::StdErr::Inherit{})
     {
         SC_TRY(launch(stdOut, stdIn, stdErr));
         return waitForExitSync();

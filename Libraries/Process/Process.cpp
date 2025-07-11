@@ -100,8 +100,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         break;
         case StdStream::Operation::ExternalPipe:
-        case StdStream::Operation::Vector:
-        case StdStream::Operation::String:
+        case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::ReadableSpan: {
             SC_TRY(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
             SC_TRY(fileDescriptor.assign(move(pipe.readPipe)));
@@ -129,8 +128,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         break;
         case StdStream::Operation::ExternalPipe:
-        case StdStream::Operation::Vector:
-        case StdStream::Operation::String:
+        case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::WritableSpan: {
             SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
             SC_TRY(fileDescriptor.assign(move(pipe.writePipe)));
@@ -165,13 +163,9 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
     case StdStream::Operation::Ignore: break;
     case StdStream::Operation::ExternalPipe: break;
     case StdStream::Operation::FileDescriptor: break;
-    case StdStream::Operation::Vector: {
-        SC_TRY(stdinPipe.writePipe.write(stdInput.buffer->toSpan()));
-        SC_TRY(stdinPipe.writePipe.close());
-    }
-    break;
-    case StdStream::Operation::String: {
-        SC_TRY(stdinPipe.writePipe.write(stdInput.string->view().toCharSpan()));
+    case StdStream::Operation::GrowableBuffer: {
+        IGrowableBuffer::DirectAccess da = stdInput.growableBuffer->getDirectAccess();
+        SC_TRY(stdinPipe.writePipe.write({static_cast<const char*>(da.data), da.sizeInBytes}));
         SC_TRY(stdinPipe.writePipe.close());
     }
     break;
@@ -194,13 +188,8 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::Ignore: break;
         case StdStream::Operation::ExternalPipe: break;
         case StdStream::Operation::FileDescriptor: break;
-        case StdStream::Operation::Vector: {
-            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.buffer));
-            return pipe.close();
-        }
-        break;
-        case StdStream::Operation::String: {
-            SC_TRY(pipe.readPipe.readUntilEOF(*outputObject.string));
+        case StdStream::Operation::GrowableBuffer: {
+            SC_TRY(pipe.readPipe.readUntilEOFGrowable(move(*outputObject.growableBuffer)));
             return pipe.close();
         }
         case StdStream::Operation::WritableSpan: {
@@ -222,9 +211,9 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
     return Result(true);
 }
 
-SC::Result SC::Process::setWorkingDirectory(StringView processWorkingDirectory)
+SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
 {
-    return Result(StringConverter(currentDirectory).appendNullTerminated(processWorkingDirectory));
+    return Result(currentDirectory.assign(processWorkingDirectory));
 }
 
 SC::Result SC::Process::setEnvironment(StringView name, StringView value)
