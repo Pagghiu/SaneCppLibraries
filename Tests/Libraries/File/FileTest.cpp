@@ -27,8 +27,8 @@ struct SC::FileTest : public SC::TestCase
 void SC::FileTest::testOpen()
 {
     //! [FileSnippet]
-    StringNative<255> filePath = StringEncoding::Native;
-    StringNative<255> dirPath  = StringEncoding::Native;
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
     // Setup the test
     FileSystem fs;
 

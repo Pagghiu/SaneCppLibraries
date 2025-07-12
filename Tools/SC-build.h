@@ -27,9 +27,9 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 
 [[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& directories)
 {
-    Console&          console = arguments.console;
-    StringNative<256> buffer;
-    StringBuilder     builder(buffer);
+    Console&               console = arguments.console;
+    SmallStringNative<256> buffer;
+    StringBuilder          builder(buffer);
     SC_TRY(Path::join(directories.projectsDirectory, {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
     SC_TRY(Path::join(directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
     SC_TRY(Path::join(directories.intermediatesDirectory, {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));

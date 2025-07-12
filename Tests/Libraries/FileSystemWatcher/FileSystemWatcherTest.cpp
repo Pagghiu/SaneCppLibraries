@@ -59,7 +59,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
-                StringNative<1024> expectedBuffer = StringEncoding::Native;
+                SmallStringNative<1024> expectedBuffer = StringEncoding::Native;
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
@@ -92,7 +92,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 Thread::Sleep(200);
             }
 
-            StringNative<1024> path;
+            SmallStringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
@@ -134,8 +134,8 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             {
                 constexpr native_char_t nativeSep = Path::Separator;
 
-                StringNative<255>  dirBuffer      = StringEncoding::Native;
-                StringNative<1024> expectedBuffer = StringEncoding::Native;
+                SmallStringNative<255>  dirBuffer      = StringEncoding::Native;
+                SmallStringNative<1024> expectedBuffer = StringEncoding::Native;
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
@@ -164,7 +164,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 SC_TEST_EXPECT(fs.removeFile("dir/subdir2/test.txt"));
             }
 
-            StringNative<1024> path;
+            SmallStringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
@@ -199,7 +199,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             FileSystemWatcher::EventLoopRunner runner;
             SC_TEST_EXPECT(fileEventsWatcher.init(runner, eventLoop));
-            StringNative<1024> path;
+            SmallStringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
             FileSystemWatcher::FolderWatcher watcher;
             struct Params
@@ -231,7 +231,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             FileSystemWatcher                  fileEventsWatcher;
             FileSystemWatcher::EventLoopRunner runner;
             SC_TEST_EXPECT(fileEventsWatcher.init(runner, eventLoop));
-            StringNative<1024> path1, path2;
+            SmallStringNative<1024> path1, path2;
             SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__test1"}));
             SC_TEST_EXPECT(Path::join(path2, {appDirectory, "__test2"}));
             FileSystem fs;

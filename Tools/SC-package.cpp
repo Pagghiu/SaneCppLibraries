@@ -474,10 +474,10 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
 
-    StringNative<256> packagesCacheDirectory;
-    StringNative<256> packagesInstallDirectory;
-    StringNative<256> buffer;
-    StringBuilder     builder(buffer);
+    SmallStringNative<256> packagesCacheDirectory;
+    SmallStringNative<256> packagesInstallDirectory;
+    SmallStringNative<256> buffer;
+    StringBuilder          builder(buffer);
     SC_TRY(Path::join(packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
     SC_TRY(Path::join(packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));

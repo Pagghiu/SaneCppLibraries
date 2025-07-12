@@ -247,7 +247,7 @@ SC::Result SC::Process::launchImplementation()
             StringViewTokenizer tokenizer = pathEnv;
             while (tokenizer.tokenizeNext({':'}))
             {
-                StringNative<1024> finalCommand = pathEnv.getEncoding();
+                SmallStringNative<1024> finalCommand = pathEnv.getEncoding();
 
                 StringConverter converter(finalCommand);
                 SC_TRY(converter.appendNullTerminated(tokenizer.component));

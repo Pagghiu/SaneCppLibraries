@@ -50,10 +50,10 @@ struct FilePathsResolver
 
 struct RelativeDirectories
 {
-    StringNative<256> relativeProjectsToOutputs;       // _Projects ->_Outputs
-    StringNative<256> relativeProjectsToIntermediates; // _Projects ->_Intermediate
-    StringNative<256> relativeProjectsToProjectRoot;   // _Projects -> Project::setRootDirectory
-    StringNative<256> projectRootRelativeToProjects;   // Project root (expressed relative to $(PROJECT_DIR)
+    SmallStringNative<256> relativeProjectsToOutputs;       // _Projects ->_Outputs
+    SmallStringNative<256> relativeProjectsToIntermediates; // _Projects ->_Intermediate
+    SmallStringNative<256> relativeProjectsToProjectRoot;   // _Projects -> Project::setRootDirectory
+    SmallStringNative<256> projectRootRelativeToProjects;   // Project root (expressed relative to $(PROJECT_DIR)
 
     Result computeRelativeDirectories(Directories directories, Path::Type outputType, const Project& project,
                                       const StringView projectDirFormatString)

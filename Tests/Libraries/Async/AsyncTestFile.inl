@@ -20,10 +20,10 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SC_TEST_EXPECT(eventLoop.create(options));
 
     // 3. Create some files on disk
-    StringNative<255> filePath = StringEncoding::Native;
-    StringNative<255> dirPath  = StringEncoding::Native;
-    const StringView  name     = "AsyncTest";
-    const StringView  fileName = "test.txt";
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
+    const StringView       name     = "AsyncTest";
+    const StringView       fileName = "test.txt";
     SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 
@@ -147,10 +147,10 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     SC_TEST_EXPECT(eventLoop.create(options));
 
     // 3. Create some files on disk
-    StringNative<255> filePath = StringEncoding::Native;
-    StringNative<255> dirPath  = StringEncoding::Native;
-    const StringView  name     = "AsyncTest";
-    const StringView  fileName = "test.txt";
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
+    const StringView       name     = "AsyncTest";
+    const StringView       fileName = "test.txt";
     SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 
@@ -246,10 +246,10 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SC_TEST_EXPECT(eventLoop.create(options));
 
     // 2. Create Some file paths
-    StringNative<255> filePath = StringEncoding::Native;
-    StringNative<255> dirPath  = StringEncoding::Native;
-    const StringView  name     = "AsyncTest";
-    const StringView  fileName = "test.txt";
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
+    const StringView       name     = "AsyncTest";
+    const StringView       fileName = "test.txt";
     SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 

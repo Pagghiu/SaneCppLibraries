@@ -137,14 +137,14 @@ struct SC::PluginCompiler
         GnuCompiler,
         MicrosoftCompiler
     };
-    Type              type         = Type::ClangCompiler;    ///< Compile Type
-    StringNative<256> compilerPath = StringEncoding::Native; ///< Path to the compiler
-    StringNative<256> linkerPath   = StringEncoding::Native; ///< Path to the linker
+    Type                   type         = Type::ClangCompiler;    ///< Compile Type
+    SmallStringNative<256> compilerPath = StringEncoding::Native; ///< Path to the compiler
+    SmallStringNative<256> linkerPath   = StringEncoding::Native; ///< Path to the linker
 
-    SmallVector<StringNative<256>, 8> includePaths; ///< Path to include directories used to compile plugin
+    SmallVector<SmallStringNative<256>, 8> includePaths; ///< Path to include directories used to compile plugin
 
-    SmallVector<StringNative<256>, 8> compilerIncludePaths; ///< Path to compiler include directories
-    SmallVector<StringNative<256>, 8> compilerLibraryPaths; ///< Path to compiler library directories
+    SmallVector<SmallStringNative<256>, 8> compilerIncludePaths; ///< Path to compiler include directories
+    SmallVector<SmallStringNative<256>, 8> compilerLibraryPaths; ///< Path to compiler library directories
 
     /// @brief Look for best compiler on current system
     /// @param[out] compiler Best compiler found
@@ -161,10 +161,10 @@ struct SC::PluginCompiler
 /// @brief Holds include and library paths for a system toolchain, used to let plugins link to libc and libc++
 struct SC::PluginSysroot
 {
-    SmallVector<StringNative<256>, 8> includePaths; ///< Path to system include directories
-    SmallVector<StringNative<256>, 8> libraryPaths; ///< Path to system library directories
+    SmallVector<SmallStringNative<256>, 8> includePaths; ///< Path to system include directories
+    SmallVector<SmallStringNative<256>, 8> libraryPaths; ///< Path to system library directories
 
-    StringNative<256> isysroot; ///< Path to sysroot include (optional)
+    SmallStringNative<256> isysroot; ///< Path to sysroot include (optional)
 
     /// @brief Finds a reasonable sysroot for the given compiler
     /// @param compiler The PluginCompiler::Type to constrain the compatible PluginSysroot to look for

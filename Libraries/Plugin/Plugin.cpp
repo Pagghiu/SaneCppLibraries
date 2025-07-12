@@ -271,10 +271,11 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     for (String& base : rootPaths)
         (void)Path::join(base, {base.view(), "VC", "Tools", "MSVC"});
 
-    compiler.type           = Type::MicrosoftCompiler;
-    bool              found = false;
-    Version           version, bestVersion;
-    StringNative<256> bestCompiler, bestLinker;
+    compiler.type = Type::MicrosoftCompiler;
+    bool    found = false;
+    Version version, bestVersion;
+
+    SmallStringNative<256> bestCompiler, bestLinker;
     for (const String& basePath : rootPaths)
     {
         FileSystemIterator::FolderState recurseStack[16];
@@ -373,10 +374,10 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
-    size_t            argumentsLengths[MAX_PROCESS_ARGUMENTS];
-    StringNative<512> argumentsBuffer   = StringEncoding::Native;
-    size_t            numberOfArguments = 0;
-    StringsArena      argumentsArena{argumentsBuffer, numberOfArguments, {argumentsLengths}};
+    size_t                 argumentsLengths[MAX_PROCESS_ARGUMENTS];
+    SmallStringNative<512> argumentsBuffer   = StringEncoding::Native;
+    size_t                 numberOfArguments = 0;
+    StringsArena           argumentsArena{argumentsBuffer, numberOfArguments, {argumentsLengths}};
     SC_TRY(argumentsArena.appendAsSingleString(compilerPath.view()));
 #if SC_PLATFORM_WINDOWS
     for (size_t idx = 0; idx < includePaths.size(); ++idx)
@@ -465,7 +466,7 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
                                        String&                          standardOutput) const
 {
     // TODO: Spawn parallel tasks
-    StringNative<256> destFile = StringEncoding::Native;
+    SmallStringNative<256> destFile = StringEncoding::Native;
     for (auto& file : plugin.files)
     {
         StringView dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
@@ -686,7 +687,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
 #endif
     SC_TRY(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLog));
 
-    StringNative<256> buffer;
+    SmallStringNative<256> buffer;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
     SC_TRY(dynamicLibrary.load(buffer.view()));
 
@@ -828,8 +829,8 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
     PluginDynamicLibrary& lib = *res;
     FileSystem            fs;
     SC_TRY(fs.init(lib.definition.directory.view()));
-    StringNative<255> buffer;
-    StringBuilder     fmt(buffer);
+    SmallStringNative<255> buffer;
+    StringBuilder          fmt(buffer);
 #if SC_PLATFORM_WINDOWS
     SC_TRY(fmt.format("{}.lib", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
@@ -854,9 +855,9 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
 #endif
     for (auto& file : lib.definition.files)
     {
-        StringView        dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView        outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        StringNative<256> destFile   = StringEncoding::Native;
+        StringView             dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
+        StringView             outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
+        SmallStringNative<256> destFile   = StringEncoding::Native;
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
         SC_TRY(builder.append(".o"));

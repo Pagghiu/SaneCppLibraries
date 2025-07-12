@@ -267,14 +267,14 @@ struct SC_COMPILER_EXPORT Process
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
     // This is done so that in this single buffer with no allocation (under 255) or a single allocation (above 255)
     // we can track all arguments to be passed to execve.
-    StringNative<255> command = StringEncoding::Native;
+    SmallStringNative<255> command = StringEncoding::Native;
 #if !SC_PLATFORM_WINDOWS // On Posix we need to track the "sub-strings" hidden in command
     static constexpr size_t MAX_NUM_ARGUMENTS = 64;
     size_t commandArgumentsByteOffset[MAX_NUM_ARGUMENTS]; // Tracking length of each argument in the command string
     size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
 #endif
 
-    StringNative<1024> environment = StringEncoding::Native;
+    SmallStringNative<1024> environment = StringEncoding::Native;
 
     static constexpr size_t MAX_NUM_ENVIRONMENT = 256;
 
