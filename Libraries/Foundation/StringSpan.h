@@ -24,6 +24,11 @@ enum class StringEncoding : uint8_t
 #endif
 };
 
+/// @brief Returns the number of bytes to represent an utf unit in the given encoding
+/// @param encoding The encoding
+/// @return number of bytes of the given encoding
+constexpr uint32_t StringEncodingGetSize(StringEncoding encoding) { return encoding == StringEncoding::Utf16 ? 2 : 1; }
+
 /// @brief An read-only view over a string (to avoid including @ref group_strings library when parsing is not needed).
 /// The most common use case is to pass it in and out of OS API as is for file system paths.
 /// Some libraries check the encoding and eventually convert the string to a different one when using specific OS api.
@@ -69,11 +74,19 @@ struct SC_COMPILER_EXPORT StringSpan
     /// @brief Get size of the StringView in bytes
     [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
 
+    /// @brief Get size of the StringView in bytes, including null terminator (2 bytes on UTF16)
+    /// @warning This method will Assert if this isNullTerminated returns `false`
+    [[nodiscard]] size_t sizeInBytesIncludingTerminator() const;
+
     /// @brief Get encoding of this StringView
     [[nodiscard]] constexpr StringEncoding getEncoding() const { return static_cast<StringEncoding>(encoding); }
 
     /// @brief Directly access the memory of this StringView
     [[nodiscard]] constexpr const char* bytesWithoutTerminator() const { return text; }
+
+    /// @brief Directly access the memory of this null terminated-StringView.
+    /// @warning This method will assert if string is not null terminated.
+    [[nodiscard]] const char* bytesIncludingTerminator() const;
 
     /// @brief Directly access the memory of this null terminated-StringView.
     /// @return Pointer to start of StringView memory.
@@ -87,6 +100,23 @@ struct SC_COMPILER_EXPORT StringSpan
         return text;
 #endif
     }
+
+    struct NativeWritable
+    {
+        Span<native_char_t> writableSpan;
+        size_t              length = 0;
+
+        StringSpan view() const { return {{writableSpan.data(), length}, true, StringEncoding::Native}; }
+    };
+
+    /// @brief Writes this Span to a destination Span, using native encoding and null-terminating it
+    /// @param string The destination writable string to write to
+    [[nodiscard]] bool writeNullTerminatedTo(NativeWritable& string) const;
+
+    /// @brief Appends this Span to a destination Span, using native encoding and null-terminating it
+    /// @param string The destination writable string to write to
+    /// @param removePreviousNullTerminator If true, the previous null terminator is removed
+    [[nodiscard]] bool appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator = true) const;
 
   protected:
     friend struct StringView;

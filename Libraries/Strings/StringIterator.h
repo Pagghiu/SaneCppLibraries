@@ -23,20 +23,6 @@ constexpr bool StringEncodingAreBinaryCompatible(StringEncoding encoding1, Strin
            (encoding2 == StringEncoding::Utf8 and encoding1 == StringEncoding::Ascii);
 }
 
-/// @brief Returns the number of bytes to represent an utf unit in the given encoding
-/// @param encoding The encoding
-/// @return number of bytes of the given encoding
-constexpr uint32_t StringEncodingGetSize(StringEncoding encoding)
-{
-    switch (encoding)
-    {
-    case StringEncoding::Utf16: return 2;
-    case StringEncoding::Ascii: return 1;
-    case StringEncoding::Utf8: return 1;
-    }
-    Assert::unreachable();
-}
-
 /// @brief A position inside a fixed range `[start, end)` of UTF code points.
 ///
 /// It's a range of bytes (start and end pointers) with a *current* pointer pointing at a specific code point of the

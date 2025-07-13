@@ -63,10 +63,6 @@ struct SC::StringView : public StringSpan
         return StringSpan::fromNullTerminated(text, encoding);
     }
 #endif
-    /// @brief Directly access the memory of this null terminated-StringView.
-    /// @return Pointer to start of StringView memory
-    /// @warning This method will assert if string is not null terminated.
-    [[nodiscard]] constexpr const char* bytesIncludingTerminator() const;
 
     /// @brief Directly access the memory of this null terminated-StringView.
     /// @return Pointer to start of StringView memory.
@@ -192,12 +188,6 @@ struct SC::StringView : public StringSpan
     /// @brief Get size of the StringView in bytes
     /// @return Size in bytes of StringView
     [[nodiscard]] constexpr size_t sizeInBytes() const { return textSizeInBytes; }
-
-    /// @brief Get size of the StringView in bytes, including null terminator
-    /// @return Size in bytes of StringView including null terminator (2 bytes on UTF16)
-    /// @warning This method can be called only on StringView that are null terminated.
-    ///         This means that it will Assert if this StringView::isNullTerminated returns `false`
-    [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const;
 
     /// @brief Check if StringView ends with any utf code point in the given span
     /// @param codePoints The utf code points to check against
@@ -644,12 +634,6 @@ constexpr StringView operator""_u16(const char* txt, size_t sz)
 }
 } // namespace SC
 
-[[nodiscard]] constexpr const char* SC::StringView::bytesIncludingTerminator() const
-{
-    SC_ASSERT_RELEASE(hasNullTerm);
-    return text;
-}
-
 template <typename StringIterator>
 constexpr StringIterator SC::StringView::getIterator() const
 {
@@ -760,12 +744,6 @@ constexpr bool SC::StringView::fullyOverlaps(StringView other, size_t& commonOve
     case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other, commonOverlappingPoints);
     }
     Assert::unreachable();
-}
-
-constexpr SC::size_t SC::StringView::sizeInBytesIncludingTerminator() const
-{
-    SC_ASSERT_RELEASE(hasNullTerm);
-    return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(getEncoding()) : 0;
 }
 
 template <typename Func>
