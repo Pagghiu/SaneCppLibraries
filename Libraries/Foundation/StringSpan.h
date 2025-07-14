@@ -53,7 +53,7 @@ struct SC_COMPILER_EXPORT StringSpan
     static constexpr StringSpan fromNullTerminated(const char* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::strlen(text)}, true, encoding); }
 
 #if SC_PLATFORM_WINDOWS
-    constexpr StringSpan(Span<const wchar_t> textSpan, bool nullTerm) : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(nullTerm ? 1 : 0) {}
+    constexpr StringSpan(Span<const wchar_t> textSpan, bool nullTerm, StringEncoding encoding = StringEncoding::Native) : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(nullTerm ? 1 : 0) {}
 
     template <size_t N>
     constexpr StringSpan(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}

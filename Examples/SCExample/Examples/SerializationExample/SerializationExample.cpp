@@ -197,7 +197,7 @@ struct SC::SerializationExampleView
     Result init()
     {
         FileSystem::Operations::getApplicationRootDirectory(applicationPath);
-        const StringView appPath = SC::Path::dirname(applicationPath.view(), SC::Path::Type::AsNative);
+        const StringView appPath = SC::Path::dirname(applicationPath.path.view(), SC::Path::Type::AsNative);
         SC_TRY(SC::Path::join(viewState.jsonSerializationPath, {appPath, "state.json"}));
         SC_TRY(SC::Path::join(viewState.binarySerializationPath, {appPath, "state.binary"}));
         return Result(true);
@@ -365,7 +365,7 @@ struct SC::SerializationExampleView
         switch (SC::HostPlatform)
         {
         case SC::Platform::Windows: {
-            StringNative<128> command;
+            SmallStringNative<128> command;
             SC_TRY(StringBuilder(command).format("/select,\"{}\"", jsonPath));
             return process.exec({"explorer", command.view()});
         }

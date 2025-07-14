@@ -131,7 +131,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
                        "startWatching exceeded MaxWatchablePaths");
         }
-        HANDLE newHandle = ::CreateFileW(entry->path.path,                                                 //
+        HANDLE newHandle = ::CreateFileW(entry->path.path.buffer,                                          //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
                                          nullptr,                                                          //
@@ -223,7 +223,7 @@ struct SC::FileSystemWatcher::Internal
         FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
 
         Notification notification;
-        notification.basePath = entry.path;
+        notification.basePath = entry.path.path;
 
         do
         {
@@ -278,10 +278,11 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
     const wchar_t* basePathStr     = basePath.getNullTerminatedNative();
     const wchar_t* relativePathStr = relativePath.getNullTerminatedNative();
 
-    ::memcpy(buffer.path, basePathStr, basePathChars * sizeof(wchar_t));
-    buffer.path[basePathChars] = L'\\'; // Add the separator
-    ::memcpy(buffer.path + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
-    buffer.path[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
-    buffer.length                                      = basePathChars + 1 + relativePathChars;
+    ::memcpy(buffer.path.buffer, basePathStr, basePathChars * sizeof(wchar_t));
+    buffer.path.buffer[basePathChars] = L'\\'; // Add the separator
+    ::memcpy(buffer.path.buffer + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
+    buffer.path.buffer[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
+
+    buffer.path.length = basePathChars + 1 + relativePathChars;
     return Result(true);
 }

@@ -110,8 +110,9 @@ SC::Result SC::Process::launchImplementation()
 
     // In documentation it's explicitly stated that this buffer will be modified (!?)
     LPWSTR  wideCmd = const_cast<LPWSTR>(command.view().getNullTerminatedNative());
-    LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
-    LPWSTR  wideEnv = nullptr; // by default inherit parent environment
+    LPCWSTR wideDir =
+        currentDirectory.path.view().isEmpty() ? nullptr : currentDirectory.path.view().getNullTerminatedNative();
+    LPWSTR wideEnv = nullptr; // by default inherit parent environment
 
     EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
 

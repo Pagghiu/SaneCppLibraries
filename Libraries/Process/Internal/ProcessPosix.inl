@@ -187,9 +187,9 @@ SC::Result SC::Process::launchImplementation()
         SC_TRY(stdErrFd.close());
 
         // Switch to wanted current directory (if provided)
-        if (not currentDirectory.view().isEmpty())
+        if (not currentDirectory.path.view().isEmpty())
         {
-            int res = ::chdir(currentDirectory.view().getNullTerminatedNative());
+            int res = ::chdir(currentDirectory.path.view().getNullTerminatedNative());
             if (res < 0)
             {
                 return Result::Error("chdir failed");

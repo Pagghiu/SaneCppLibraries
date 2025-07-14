@@ -195,8 +195,8 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
     StringPath nullTerminated;
-    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
-    auto& nullTerminatedPath = nullTerminated.path;
+    SC_TRY_MSG(nullTerminated.path.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
+    auto& nullTerminatedPath = nullTerminated.path.buffer;
 
     const bool isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(wchar_t);
     if (not isThreeChars or
@@ -456,8 +456,8 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     const int access = mode.toPosixAccess();
 
     StringPath nullTerminated;
-    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
-    auto& nullTerminatedPath = nullTerminated.path;
+    SC_TRY_MSG(nullTerminated.path.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
+    auto& nullTerminatedPath = nullTerminated.path.buffer;
     if (nullTerminatedPath[0] != '/')
         return Result::Error("FileDescriptor::open - Path must be absolute");
     const int fileDescriptor = ::open(nullTerminatedPath, flags, access);

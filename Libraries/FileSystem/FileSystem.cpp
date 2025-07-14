@@ -109,7 +109,7 @@ SC::Result SC::FileSystem::init(StringSpan currentWorkingDirectory) { return cha
 
 SC::Result SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 {
-    SC_TRY_MSG(currentDirectory.assign(currentWorkingDirectory),
+    SC_TRY_MSG(currentDirectory.path.assign(currentWorkingDirectory),
                "FileSystem::changeDirectory - Cannot assign working directory");
     // TODO: Assert if path is not absolute
     return Result(existsAndIsDirectory("."));
@@ -117,43 +117,45 @@ SC::Result SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 
 bool SC::FileSystem::convert(const StringSpan file, StringPath& destination, StringSpan* encodedPath)
 {
-    SC_TRY(destination.assign(file));
+    SC_TRY(destination.path.assign(file));
     if (encodedPath)
     {
-        *encodedPath = destination.view();
+        *encodedPath = destination.path.view();
     }
 
 #if SC_PLATFORM_WINDOWS
-    const bool absolute = (destination.length >= 2 and destination.path[0] == L'\\' and destination.path[1] == L'\\') or
-                          (destination.length >= 2 and destination.path[1] == L':');
+    const bool absolute = (destination.path.length >= 2 and destination.path.buffer[0] == L'\\' and
+                           destination.path.buffer[1] == L'\\') or
+                          (destination.path.length >= 2 and destination.path.buffer[1] == L':');
 #else
-    const bool absolute = destination.length >= 1 and destination.path[0] == '/';
+    const bool absolute = destination.path.length >= 1 and destination.path.buffer[0] == '/';
 #endif
     if (absolute)
     {
         if (encodedPath != nullptr)
         {
-            *encodedPath = destination;
+            *encodedPath = destination.path;
         }
         return true;
     }
-    if (currentDirectory.length == 0)
+    if (currentDirectory.path.length == 0)
         return false;
 
     StringPath relative = destination;
     destination         = currentDirectory;
 #if SC_PLATFORM_WINDOWS
-    destination.path[destination.length] = L'\\';
-    ::memcpy(destination.path + destination.length + 1, relative.path, relative.length * sizeof(wchar_t));
+    destination.path.buffer[destination.path.length] = L'\\';
+    ::memcpy(destination.path.buffer + destination.path.length + 1, relative.path.buffer,
+             relative.path.length * sizeof(wchar_t));
 #else
-    destination.path[destination.length] = '/';
-    ::memcpy(destination.path + destination.length + 1, relative.path, relative.length);
+    destination.path.buffer[destination.path.length] = '/';
+    ::memcpy(destination.path.buffer + destination.path.length + 1, relative.path.buffer, relative.path.length);
 #endif
-    destination.path[destination.length + relative.length + 1] = 0;
-    destination.length += relative.length + 1;
+    destination.path.buffer[destination.path.length + relative.path.length + 1] = 0;
+    destination.path.length += relative.path.length + 1;
     if (encodedPath != nullptr)
     {
-        *encodedPath = destination.view();
+        *encodedPath = destination.path.view();
     }
     return true;
 }
@@ -293,14 +295,14 @@ SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringSpan> dir
     for (auto& path : directories)
     {
         SC_TRY(convert(path, fileFormatBuffer1)); // force write
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeDirectoryRecursive(fileFormatBuffer1.view()));
+        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeDirectoryRecursive(fileFormatBuffer1.path.view()));
     }
     return Result(true);
 }
 
 SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination)
 {
-    if (currentDirectory.length == 0)
+    if (currentDirectory.path.length == 0)
         return Result(false);
     StringSpan encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
@@ -314,14 +316,15 @@ SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination
 
 SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDestination)
 {
-    if (currentDirectory.length == 0)
+    if (currentDirectory.path.length == 0)
         return Result(false);
     for (const CopyOperation& op : sourceDestination)
     {
         SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
         SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
-        SC_TRY_FORMAT_NATIVE(op.source, FileSystem::Operations::copyDirectory(fileFormatBuffer1.view(),
-                                                                              fileFormatBuffer2.view(), op.copyFlags));
+        SC_TRY_FORMAT_NATIVE(op.source,
+                             FileSystem::Operations::copyDirectory(fileFormatBuffer1.path.view(),
+                                                                   fileFormatBuffer2.path.view(), op.copyFlags));
     }
     return Result(true);
 }
@@ -847,14 +850,14 @@ SC::Result SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInterna
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
     // Use GetModuleFileNameW to get the executable path in UTF-16
-    DWORD length = ::GetModuleFileNameW(nullptr, executablePath.path, static_cast<DWORD>(StringPath::MaxPath));
+    DWORD length = ::GetModuleFileNameW(nullptr, executablePath.path.buffer, static_cast<DWORD>(StringPath::MaxPath));
     if (length == 0 || length >= StringPath::MaxPath)
     {
-        executablePath.length = 0;
+        executablePath.path.length = 0;
         return {};
     }
-    executablePath.length = length; // length does not include null terminator
-    return executablePath;
+    executablePath.path.length = length; // length does not include null terminator
+    return executablePath.path;
 }
 
 SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
@@ -864,25 +867,26 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
         return {};
     // Find the last path separator (either '\\' or '/')
     ssize_t lastSeparator = -1;
-    for (size_t i = 0; i < applicationRootDirectory.length; ++i)
+    for (size_t i = 0; i < applicationRootDirectory.path.length; ++i)
     {
-        if (applicationRootDirectory.path[i] == L'\\' || applicationRootDirectory.path[i] == L'/')
+        if (applicationRootDirectory.path.buffer[i] == L'\\' || applicationRootDirectory.path.buffer[i] == L'/')
             lastSeparator = static_cast<ssize_t>(i);
     }
     if (lastSeparator < 0)
     {
         // No separator found, return empty
-        applicationRootDirectory.length = 0;
-        ::memset(applicationRootDirectory.path, 0, StringPath::MaxPath * sizeof(wchar_t));
+        applicationRootDirectory.path.length = 0;
+        ::memset(applicationRootDirectory.path.buffer, 0, StringPath::MaxPath * sizeof(wchar_t));
         return {};
     }
     const size_t copyLen = static_cast<size_t>(lastSeparator);
 
-    applicationRootDirectory.path[copyLen] = 0;
-    applicationRootDirectory.length        = copyLen;
+    applicationRootDirectory.path.buffer[copyLen] = 0;
+    applicationRootDirectory.path.length          = copyLen;
     // null terminate the path
-    ::memset(applicationRootDirectory.path + copyLen + 1, 0, (StringPath::MaxPath - copyLen - 1) * sizeof(wchar_t));
-    return applicationRootDirectory;
+    ::memset(applicationRootDirectory.path.buffer + copyLen + 1, 0,
+             (StringPath::MaxPath - copyLen - 1) * sizeof(wchar_t));
+    return applicationRootDirectory.path;
 }
 #else
 
@@ -1163,10 +1167,10 @@ SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
     uint32_t executableLength = static_cast<uint32_t>(StringPath::MaxPath);
-    if (::_NSGetExecutablePath(executablePath.path, &executableLength) == 0)
+    if (::_NSGetExecutablePath(executablePath.path.buffer, &executableLength) == 0)
     {
-        executablePath.length = ::strlen(executablePath.path);
-        return executablePath;
+        executablePath.path.length = ::strlen(executablePath.path.buffer);
+        return executablePath.path;
     }
     return {};
 }
@@ -1179,12 +1183,13 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
         CFURLRef bundleURL = CFBundleCopyBundleURL(mainBundle);
         if (bundleURL != nullptr)
         {
-            if (CFURLGetFileSystemRepresentation(
-                    bundleURL, true, reinterpret_cast<uint8_t*>(applicationRootDirectory.path), StringPath::MaxPath))
+            if (CFURLGetFileSystemRepresentation(bundleURL, true,
+                                                 reinterpret_cast<uint8_t*>(applicationRootDirectory.path.buffer),
+                                                 StringPath::MaxPath))
             {
-                applicationRootDirectory.length = ::strlen(applicationRootDirectory.path);
+                applicationRootDirectory.path.length = ::strlen(applicationRootDirectory.path.buffer);
                 CFRelease(bundleURL);
-                return applicationRootDirectory;
+                return applicationRootDirectory.path;
             }
             CFRelease(bundleURL);
         }
@@ -1366,11 +1371,11 @@ SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
 
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
-    const int pathLength = ::readlink("/proc/self/exe", executablePath.path, StringPath::MaxPath);
+    const int pathLength = ::readlink("/proc/self/exe", executablePath.path.buffer, StringPath::MaxPath);
     if (pathLength > 0)
     {
-        executablePath.length = static_cast<size_t>(pathLength);
-        return executablePath;
+        executablePath.path.length = static_cast<size_t>(pathLength);
+        return executablePath.path;
     }
     return {};
 }
@@ -1381,14 +1386,15 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
     if (!executablePath.isEmpty())
     {
         // Get the directory part of the executable path
-        const char* lastSlash = ::strrchr(applicationRootDirectory.path, '/');
+        const char* lastSlash = ::strrchr(applicationRootDirectory.path.buffer, '/');
         if (lastSlash != nullptr)
         {
-            applicationRootDirectory.length = static_cast<size_t>(lastSlash - applicationRootDirectory.path);
+            applicationRootDirectory.path.length =
+                static_cast<size_t>(lastSlash - applicationRootDirectory.path.buffer);
             // Null-terminate the path
-            ::memset(applicationRootDirectory.path + applicationRootDirectory.length, 0,
-                     StringPath::MaxPath - applicationRootDirectory.length);
-            return applicationRootDirectory;
+            ::memset(applicationRootDirectory.path.buffer + applicationRootDirectory.path.length, 0,
+                     StringPath::MaxPath - applicationRootDirectory.path.length);
+            return applicationRootDirectory.path;
         }
     }
     return {};

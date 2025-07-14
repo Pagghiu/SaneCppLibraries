@@ -47,19 +47,6 @@ struct StringPath
 #else
     static constexpr size_t MaxPath = 4096; // Equal to 'PATH_MAX' on Linux
 #endif
-    size_t length = 0; ///< Length of the path in bytes (excluding null terminator)
-#if SC_PLATFORM_WINDOWS
-    wchar_t path[MaxPath]; ///< Native path on Windows (UTF16-LE)
-    operator StringSpan() const { return StringSpan({path, length}, true); }
-#else
-    char path[MaxPath]; ///< Native path on Posix (UTF-8)
-    operator StringSpan() const { return StringSpan({path, length}, true, StringEncoding::Utf8); }
-#endif
-
-    /// @brief Obtain a StringSpan from the current StringPath
-    [[nodiscard]] StringSpan view() const { return *this; }
-
-    /// @brief Assigns a StringView to current StringPath, converting the encoding from UTF16 to UTF8 if needed
-    [[nodiscard]] bool assign(StringSpan str) { return str.writeNullTerminatedTo({path, MaxPath}, length); }
+    detail::StringNativeFixed<MaxPath> path;
 };
 } // namespace SC

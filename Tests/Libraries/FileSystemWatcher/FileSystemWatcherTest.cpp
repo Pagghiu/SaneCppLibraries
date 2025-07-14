@@ -80,7 +80,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 StringBuilder           expected(expectedBuffer);
                 constexpr native_char_t nativeSep = Path::Separator;
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, "test.txt"));
-                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.path.view() == expectedBuffer.view());
                 params.eventObject.signal();
             };
 
@@ -150,7 +150,7 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
                 StringBuilder expected(expectedBuffer);
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
-                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.path.view() == expectedBuffer.view());
             };
 
             FileSystem fs;
@@ -361,10 +361,10 @@ Result fileSystemWatcherEventLoopRunnerSnippet(AsyncEventLoop& eventLoop, Consol
             switch (notification.operation)
             {
             case FileSystemWatcher::Operation::Modified: // File has been modified
-                console.print("Modified {} {}\n", notification.relativePath, fullPath.view());
+                console.print("Modified {} {}\n", notification.relativePath, fullPath.path.view());
                 break;
             case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
-                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.view());
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.path.view());
                 break;
             }
         }
@@ -406,10 +406,10 @@ Result fileSystemWatcherThreadRunnerSnippet(Console& console)
             switch (notification.operation)
             {
             case FileSystemWatcher::Operation::Modified: // File has been modified
-                console.print("Modified {} {}\n", notification.relativePath, fullPath.view());
+                console.print("Modified {} {}\n", notification.relativePath, fullPath.path.view());
                 break;
             case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
-                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.view());
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.path.view());
                 break;
             }
         }
