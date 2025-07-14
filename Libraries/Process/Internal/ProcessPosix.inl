@@ -1,14 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
-#include "../Process.h"
-#include "EnvironmentTable.h"
+#include "../../Process/Internal/EnvironmentTable.h"
+#include "../../Process/Process.h"
 
 #include <errno.h>
-#include <signal.h>   // sigfillset / sigdelset / sigaction
-#include <stdio.h>    // stdout, stdin
-#include <stdlib.h>   // abort
+#include <signal.h> // sigfillset / sigdelset / sigaction
+#include <stdio.h>  // stdout, stdin
+#include <stdlib.h> // abort
+#include <string.h>
 #include <sys/wait.h> // waitpid
 #include <unistd.h>   // pipe fork execl _exit
 
@@ -215,7 +217,8 @@ SC::Result SC::Process::launchImplementation()
         StringsArena       table = {environment, environmentNumber, environmentByteOffset};
 
         EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
-        SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv));
+        SC_TRY_MSG(environmentTable.writeTo(environmentArray, inheritEnv, table, parentEnv),
+                   "Process::launchImplementation - environmentTable.writeTo failed");
         // If execvp succeeds, this fork morphs into the new executable on the next line, and the parent communication
         // pipe, that has the CLOEXEC flags set (as it has been created as Non-inheritable) will see both sides closed,
         // allowing the pipe.readPipe.read to receive an EOF. This works also because the parent is closing the write
@@ -225,8 +228,8 @@ SC::Result SC::Process::launchImplementation()
         int childErrno;
 
         const size_t cmdLen = commandArgumentsNumber > 1 ? commandArgumentsByteOffset[1] : command.view().sizeInBytes();
-        const StringView cmd({command.view().getNullTerminatedNative(), cmdLen}, true, StringEncoding::Ascii);
-        if (cmd.containsCodePoint('/'))
+        const StringSpan cmd({command.view().getNullTerminatedNative(), cmdLen}, true, StringEncoding::Ascii);
+        if (cmd.getNullTerminatedNative()[0] == '/')
         {
             // cmd holds an absolute path, let's call execve directly
             childErrno = ::execve(cmd.getNullTerminatedNative(),               // command
@@ -236,26 +239,43 @@ SC::Result SC::Process::launchImplementation()
         else
         {
             // cmd holds a relative path, let's parse PATH variable to try execve prepending PATH entries (one by one)
-            StringView pathEnv = StringView::fromNullTerminated(::getenv("PATH"), StringEncoding::Ascii);
-            char       pathBuffer[1024 + 1];
-            if (pathEnv.isEmpty())
+            char        pathBuffer[1024 + 1];
+            const char* cPath = ::getenv("PATH");
+            if (cPath == nullptr or ::strlen(cPath) == 0)
             {
                 // This is prescribed by Posix
                 ::confstr(_CS_PATH, pathBuffer, 1024);
-                pathEnv = StringView::fromNullTerminated(pathBuffer, StringEncoding::Ascii);
+                cPath = pathBuffer;
             }
-            StringViewTokenizer tokenizer = pathEnv;
-            while (tokenizer.tokenizeNext({':'}))
+            // Split the PATH variable by ':' and try to execve with each entry using just C stdlib
+            const char* pathStart = cPath;
+            while (pathStart && *pathStart)
             {
-                SmallStringNative<1024> finalCommand = pathEnv.getEncoding();
+                // Find the next ':' or end of string
+                // UTF-8 SAFETY NOTE: The ':' character (ASCII 0x3A) is not a valid UTF-8 continuation byte, and cannot
+                // appear as part of any multi-byte UTF-8 sequence. Therefore, using strchr to split PATH on ':' is safe
+                // even if PATH contains UTF-8 encoded directory names.
+                const char*  pathEnd = ::strchr(pathStart, ':');
+                const size_t pathLen = pathEnd ? static_cast<size_t>(pathEnd - pathStart) : ::strlen(pathStart);
 
-                StringConverter converter(finalCommand);
-                SC_TRY(converter.appendNullTerminated(tokenizer.component));
-                SC_TRY(converter.appendNullTerminated("/"));
-                SC_TRY(converter.appendNullTerminated(cmd));
-                childErrno = ::execve(finalCommand.view().getNullTerminatedNative(), // command
-                                      const_cast<char* const*>(argv),                // arguments
-                                      const_cast<char* const*>(environmentArray));   // environment
+                // Skip empty path components (which mean current directory)
+                if (pathLen > 0)
+                {
+                    StringSpan pathComponent({pathStart, pathLen}, false, StringEncoding::Utf8);
+                    StringPath finalCommand;
+                    SC_TRY_MSG(finalCommand.path.append(pathComponent), "Process::launchImplementation - finalCommand");
+                    SC_TRY_MSG(finalCommand.path.append("/"), "Process::launchImplementation - finalCommand");
+                    SC_TRY_MSG(finalCommand.path.append(cmd), "Process::launchImplementation - finalCommand");
+                    childErrno = ::execve(finalCommand.path.view().getNullTerminatedNative(), // command
+                                          const_cast<char* const*>(argv),                     // arguments
+                                          const_cast<char* const*>(environmentArray));        // environment
+                }
+
+                // Move to next component
+                if (pathEnd)
+                    pathStart = pathEnd + 1;
+                else
+                    break;
             }
         }
 
@@ -283,9 +303,9 @@ SC::Result SC::Process::launchImplementation()
         if (actuallyRead.sizeInBytes() != 0)
         {
             // Error received inside childErrno
-            return Result::Error("execve failed");
+            return Result::Error("Process::launchImplementation - execve failed");
         }
-        SC_TRY(handle.assign(processID.pid));
+        SC_TRY_MSG(handle.assign(processID.pid), "Process::launchImplementation - handle not assigned");
         SC_TRY(stdInFd.close());
         SC_TRY(stdOutFd.close());
         SC_TRY(stdErrFd.close());
@@ -295,7 +315,7 @@ SC::Result SC::Process::launchImplementation()
     Assert::unreachable();
 }
 
-SC::Result SC::Process::formatArguments(Span<const StringView> params)
+SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
 {
     StringsArena table = {command, commandArgumentsNumber, commandArgumentsByteOffset};
     for (size_t idx = 0; idx < params.sizeInElements(); ++idx)
@@ -321,19 +341,21 @@ SC::ProcessEnvironment::ProcessEnvironment()
 
 SC::ProcessEnvironment::~ProcessEnvironment() {}
 
-bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& value) const
+bool SC::ProcessEnvironment::get(size_t index, StringSpan& name, StringSpan& value) const
 {
     if (index >= numberOfEnvironment)
     {
         return false;
     }
-    StringView          nameValue = StringView::fromNullTerminated(environment[index], StringEncoding::Ascii);
-    StringViewTokenizer tokenizer(nameValue);
-    SC_TRY(tokenizer.tokenizeNext({'='}));
-    name = tokenizer.component;
-    if (not tokenizer.isFinished())
+    // UTF-8 SAFETY NOTE: The '=' character (ASCII 0x3D) is not a valid UTF-8 continuation byte, and cannot appear as
+    // part of any multi-byte UTF-8 sequence. Therefore, using strchr to split environment variables on '=' is safe even
+    // if names/values contain UTF-8 encoded text.
+    const char* currentEnv = environment[index];
+    const char* equalSign  = ::strchr(currentEnv, '=');
+    if (equalSign != nullptr)
     {
-        value = tokenizer.remaining;
+        name  = StringSpan({currentEnv, static_cast<size_t>(equalSign - currentEnv)}, false, StringEncoding::Ascii);
+        value = StringSpan::fromNullTerminated(equalSign + 1, StringEncoding::Ascii);
     }
     return true;
 }

@@ -374,10 +374,12 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
-    size_t                 argumentsLengths[MAX_PROCESS_ARGUMENTS];
-    SmallStringNative<512> argumentsBuffer   = StringEncoding::Native;
-    size_t                 numberOfArguments = 0;
-    StringsArena           argumentsArena{argumentsBuffer, numberOfArguments, {argumentsLengths}};
+    size_t argumentsLengths[MAX_PROCESS_ARGUMENTS];
+    size_t numberOfArguments = 0;
+
+    StringSpan::NativeWritable bufferWritable = {buffer};
+
+    StringsArena argumentsArena{bufferWritable, numberOfArguments, {argumentsLengths}};
     SC_TRY(argumentsArena.appendAsSingleString(compilerPath.view()));
 #if SC_PLATFORM_WINDOWS
     for (size_t idx = 0; idx < includePaths.size(); ++idx)
@@ -437,18 +439,20 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     {
         SC_TRY(argumentsArena.appendMultipleStrings({"-isysroot", sysroot.isysroot.view()}));
     }
-    SC_TRY(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena));
-    StringView arguments[MAX_PROCESS_ARGUMENTS];
-    SC_TRY(argumentsArena.writeTo(arguments));
+    SC_TRY_MSG(PluginCompilerEnvironment::Internal::writeFlags(compilerEnvironment.cFlags, argumentsArena),
+               "writeFlags");
+    StringSpan arguments[MAX_PROCESS_ARGUMENTS];
+    SC_TRY_MSG(argumentsArena.writeTo(arguments), "arguments MAX_PROCESS_ARGUMENTS exceeded");
     Process process;
     if (type == Type::ClangCompiler)
     {
-        SC_TRY(process.exec({arguments, numberOfArguments}, Process::StdOut::Inherit(), Process::StdIn::Inherit(),
-                            standardOutput));
+        SC_TRY_MSG(process.exec({arguments, numberOfArguments}, Process::StdOut::Inherit(), Process::StdIn::Inherit(),
+                                standardOutput),
+                   "Process exec failed (clang)");
     }
     else
     {
-        SC_TRY(process.exec({arguments, numberOfArguments}, standardOutput));
+        SC_TRY_MSG(process.exec({arguments, numberOfArguments}, standardOutput), "Process exec failed");
     }
     if (process.getExitStatus() == 0)
     {
@@ -486,12 +490,13 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
-    String buffer;
     size_t numberOfStrings = 0;
     size_t stringLengths[MAX_PROCESS_ARGUMENTS];
 
-    StringsArena arena = {buffer, numberOfStrings, {stringLengths}};
-    SC_TRY(arena.appendAsSingleString({linkerPath.view()}));
+    StringSpan::NativeWritable bufferWritable = {buffer};
+
+    StringsArena arena = {bufferWritable, numberOfStrings, {stringLengths}};
+    SC_TRY_MSG(arena.appendAsSingleString({linkerPath.view()}), "link buffer full");
 
 #if SC_PLATFORM_WINDOWS
     SC_COMPILER_UNUSED(compilerEnvironment);
@@ -561,17 +566,19 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_TRY(arena.appendMultipleStrings({"-o", destFile.view()}));
 #endif
 
-    StringView       args[MAX_PROCESS_ARGUMENTS];
-    Span<StringView> argsSpan = {args};
+    StringSpan       args[MAX_PROCESS_ARGUMENTS];
+    Span<StringSpan> argsSpan = {args};
     SC_TRY_MSG(arena.writeTo(argsSpan), "Excessive number of arguments");
     Process process;
     if (type == Type::ClangCompiler)
     {
-        SC_TRY(process.exec({args, numberOfStrings}, Process::StdOut::Inherit(), Process::StdIn::Inherit(), linkerLog));
+        SC_TRY_MSG(
+            process.exec({args, numberOfStrings}, Process::StdOut::Inherit(), Process::StdIn::Inherit(), linkerLog),
+            "Process link exec failed (clang)");
     }
     else
     {
-        SC_TRY(process.exec({args, numberOfStrings}, linkerLog));
+        SC_TRY_MSG(process.exec({args, numberOfStrings}, linkerLog), "Process lin exec failed");
     }
     if (process.getExitStatus() == 0)
     {
@@ -681,11 +688,11 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
         SC_TRY(environment.get(index, name, compilerEnvironment.ldFlags));
     }
     StringBuilder(lastErrorLog, StringBuilder::Clear);
-    SC_TRY(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLog));
+    SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLog), "Compile failed");
 #if SC_PLATFORM_WINDOWS
     Thread::Sleep(400); // Sometimes file is locked...
 #endif
-    SC_TRY(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLog));
+    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLog), "Link failes");
 
     SmallStringNative<256> buffer;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
@@ -780,7 +787,7 @@ SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const Plu
                                           const PluginSysroot& sysroot, StringView executablePath, LoadMode loadMode)
 {
     PluginDynamicLibrary* res = libraries.get(identifier);
-    SC_TRY(res != nullptr);
+    SC_TRY_MSG(res != nullptr, "loadplugin res == nullptr");
     PluginDynamicLibrary& lib = *res;
     if (loadMode == LoadMode::Reload or not lib.dynamicLibrary.isValid())
     {
@@ -791,7 +798,7 @@ SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const Plu
         }
         if (lib.dynamicLibrary.isValid())
         {
-            SC_TRY(unloadPlugin(identifier));
+            SC_TRY_MSG(unloadPlugin(identifier), "unload plugin");
         }
         SC_TRY(lib.load(compiler, sysroot, executablePath));
         SC_TRY_MSG(lib.pluginInit(lib.instance), "PluginInit failed"); // TODO: Return actual failure strings

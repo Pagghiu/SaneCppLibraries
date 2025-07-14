@@ -83,7 +83,7 @@ struct ProcessLimiter
     }
 
     /// @brief Launches a new background process eventually blocking until one slot becomes available
-    [[nodiscard]] Result launch(Span<const StringView> arguments)
+    [[nodiscard]] Result launch(Span<const StringSpan> arguments)
     {
         while (availableProcessMonitors.isEmpty())
         {

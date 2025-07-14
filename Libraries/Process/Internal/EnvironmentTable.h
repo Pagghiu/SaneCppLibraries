@@ -1,7 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Assert.h"
+#include "../../Process/Process.h"
 #include "StringsArena.h"
+
+#include <string.h>
 namespace SC
 {
 template <int MAX_NUM_ENVIRONMENT>
@@ -17,7 +21,7 @@ struct SC::EnvironmentTable
     Result writeTo(environment_ptr& environmentArray, bool inheritEnvironment, const StringsArena& table,
                    const ProcessEnvironment& parentEnv)
     {
-        if (table.bufferString.view().isEmpty())
+        if (table.view().isEmpty())
         {
             if (!inheritEnvironment)
             {
@@ -31,7 +35,8 @@ struct SC::EnvironmentTable
             // We have some custom user environment variables to add, and we push them to the childEnvironmentArray
             // array. If we also have to inherit paren environment variables, we will need to skip the ones that have
             // been redefined by the user.
-            const char* envsView = table.bufferString.view().bytesIncludingTerminator();
+            SC_ASSERT_RELEASE(table.view().isNullTerminated());
+            const char* envsView = table.view().bytesWithoutTerminator();
             for (size_t idx = 0; idx < table.numberOfStrings; ++idx)
             {
                 // Make argv point at the beginning of the idx-th arg
@@ -42,19 +47,25 @@ struct SC::EnvironmentTable
             if (inheritEnvironment)
             {
                 // Parse names of the custom / redefined environment variables
-                StringView names[MAX_NUM_ENVIRONMENT];
+                StringSpan names[MAX_NUM_ENVIRONMENT];
                 (void)table.writeTo({names, MAX_NUM_ENVIRONMENT});
                 for (size_t idx = 0; idx < table.numberOfStrings; ++idx)
                 {
-                    StringViewTokenizer tokenizer(names[idx]);
-                    (void)tokenizer.tokenizeNext({'='});
-                    names[idx] = tokenizer.component;
+                    const native_char_t* keyValue = names[idx].getNullTerminatedNative();
+#if SC_PLATFORM_WINDOWS
+                    const native_char_t* equalSign = ::wcschr(keyValue, '=');
+#else
+                    const native_char_t* equalSign = ::strchr(keyValue, '=');
+#endif
+                    SC_ASSERT_RELEASE(equalSign != nullptr);
+                    names[idx] = StringSpan({keyValue, static_cast<size_t>(equalSign - keyValue)}, false,
+                                            StringEncoding::Native);
                 }
 
                 for (size_t parentIdx = 0; parentIdx < parentEnv.size(); ++parentIdx)
                 {
                     bool       envHasBeenRedefined = false;
-                    StringView name, value;
+                    StringSpan name, value;
                     (void)parentEnv.get(parentIdx, name, value);
                     for (size_t idx = 0; idx < table.numberOfStrings; ++idx)
                     {
@@ -68,7 +79,7 @@ struct SC::EnvironmentTable
                     {
                         if (childEnvCount + table.numberOfStrings >= MAX_NUM_ENVIRONMENT)
                         {
-                            return Result(false);
+                            return Result::Error("EnvironmentTable::writeTo - MAX_NUM_ENVIRONMENT exceeded");
                         }
                         childEnvs[childEnvCount + table.numberOfStrings] =
                             reinterpret_cast<const native_char_t*>(name.bytesWithoutTerminator());

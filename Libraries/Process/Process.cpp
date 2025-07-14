@@ -3,7 +3,6 @@
 #include "Process.h"
 #include "../File/File.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
-#include "../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"
@@ -52,7 +51,7 @@ SC::Result SC::ProcessChain::launch(const Process::StdOut& stdOut, const Process
     return Result(true);
 }
 
-SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringView> cmd)
+SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringSpan> cmd)
 {
     // TODO: Expose options to decide if to pipe also stderr
     SC_TRY_MSG(process.parent == nullptr, "Process::pipe - already in use");
@@ -64,7 +63,7 @@ SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringView>
         SC_TRY(processes.back->stdOutFd.assign(move(chainPipe.writePipe)));
         SC_TRY(process.stdInFd.assign(move(chainPipe.readPipe)));
     }
-    SC_TRY(process.formatArguments(Span<const StringView>(cmd)));
+    SC_TRY(process.formatArguments(Span<const StringSpan>(cmd)));
     process.parent = this;
     processes.queueBack(process);
     return Result(true);
@@ -189,7 +188,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe: break;
         case StdStream::Operation::FileDescriptor: break;
         case StdStream::Operation::GrowableBuffer: {
-            SC_TRY(pipe.readPipe.readUntilEOFGrowable(move(*outputObject.growableBuffer)));
+            SC_TRY(pipe.readPipe.readUntilEOF(move(*outputObject.growableBuffer)));
             return pipe.close();
         }
         case StdStream::Operation::WritableSpan: {
@@ -216,7 +215,7 @@ SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
     return Result(currentDirectory.path.assign(processWorkingDirectory));
 }
 
-SC::Result SC::Process::setEnvironment(StringView name, StringView value)
+SC::Result SC::Process::setEnvironment(StringSpan name, StringSpan value)
 {
     StringsArena table = {environment, environmentNumber, environmentByteOffset};
     return table.appendAsSingleString({name, SC_NATIVE_STR("="), value});
@@ -226,11 +225,11 @@ SC::Result SC::Process::setEnvironment(StringView name, StringView value)
 // ProcessEnvironment
 //-------------------------------------------------------------------------------------------------------
 
-bool SC::ProcessEnvironment::contains(StringView variableName, size_t* index)
+bool SC::ProcessEnvironment::contains(StringSpan variableName, size_t* index)
 {
     for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
     {
-        StringView name, value;
+        StringSpan name, value;
         SC_TRY(get(idx, name, value));
         if (name == variableName)
         {

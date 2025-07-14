@@ -152,6 +152,8 @@ struct SC::PluginCompiler
     [[nodiscard]] static Result findBestCompiler(PluginCompiler& compiler);
 
   private:
+    mutable native_char_t buffer[4096];
+
     [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
                                      const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
                                      StringView objectFile, String& compilerLog) const;

@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Process/Process.h"
 #include "Libraries/Async/Async.h"
+#include "Libraries/Containers/Vector.h"
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -13,8 +15,13 @@ struct ProcessTest;
 
 struct SC::ProcessTest : public SC::TestCase
 {
+    Vector<native_char_t> commandArena;
+    Vector<native_char_t> environmentArena;
     ProcessTest(SC::TestReport& report) : TestCase(report, "ProcessTest")
     {
+        // There are some crazy large environment variables on github CI runners...
+        SC_ASSERT_RELEASE(commandArena.resize(16 * 1024));
+        SC_ASSERT_RELEASE(environmentArena.resize(64 * 1024));
         using namespace SC;
         if (test_section("Process error"))
         {
@@ -108,7 +115,7 @@ struct SC::ProcessTest : public SC::TestCase
 void SC::ProcessTest::processError()
 {
     // Tries to launch a process that doesn't exist (and gets an error)
-    Process process;
+    Process process(commandArena.toSpan(), environmentArena.toSpan());
     SC_TEST_EXPECT(not process.launch({"DOCTORI", "ASDF"}));
 }
 
@@ -313,7 +320,7 @@ SC::Result SC::ProcessTest::spawnChildAndPrintEnvironmentVars(Process& process, 
 void SC::ProcessTest::processEnvironmentNewVar()
 {
     //! [ProcessEnvironmentNewVar]
-    Process process;
+    Process process(commandArena.toSpan(), environmentArena.toSpan());
     // This child process will inherit parent environment variables plus NewEnvVar
     SC_TEST_EXPECT(process.setEnvironment("NewEnvVar", "SomeValue"));
     String output;
@@ -329,7 +336,7 @@ void SC::ProcessTest::processEnvironmentNewVar()
 void SC::ProcessTest::processEnvironmentRedefineParentVar()
 {
     //! [ProcessEnvironmentRedefine]
-    Process process;
+    Process process(commandArena.toSpan(), environmentArena.toSpan());
     // This child process will inherit parent environment variables but we re-define PATH
     SC_TEST_EXPECT(process.setEnvironment("PATH", "/usr/sane_cpp_binaries"));
     String output;
@@ -343,7 +350,7 @@ void SC::ProcessTest::processEnvironmentRedefineParentVar()
 void SC::ProcessTest::processEnvironmentDisableInheritance()
 {
     //! [ProcessEnvironmentDisableInheritance]
-    Process process;
+    Process process(commandArena.toSpan(), environmentArena.toSpan());
     process.inheritParentEnvironmentVariables(false);
     String output;
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
@@ -501,7 +508,7 @@ SC::Result SC::ProcessTest::processSnippet3()
 {
     //! [ProcessSnippet3]
     // Example: launch a child process and explicitly wait for it to finish execution
-    Process process;
+    Process process(commandArena.toSpan(), environmentArena.toSpan());
     SC_TRY(process.launch({"ls", "-l"}));
     // ...
     // Here you can do I/O to and from the spawned process

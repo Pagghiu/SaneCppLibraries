@@ -8,7 +8,6 @@
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/StringPath.h"
-#include "../Strings/String.h"
 
 namespace SC
 {
@@ -52,7 +51,7 @@ struct ProcessID
 /// Example: launch a child process and wait for it to finish execution
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet3
 ///
-/// Example: execute child process, filling its stdin with a StringView
+/// Example: execute child process, filling its stdin with a StringSpan
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessSnippet4
 ///
 /// Example: read process output using a pipe, using launch + waitForExitSync
@@ -177,10 +176,10 @@ struct SC_COMPILER_EXPORT Process
         StdIn(Inherit) { operation = Operation::Inherit; }
         
         /// @brief Fills standard input with content of a C-String
-        template <int N> StdIn(const char (&item)[N]) : StdIn(StringView({item, N - 1}, true, StringEncoding::Ascii)) {}
+        template <int N> StdIn(const char (&item)[N]) : StdIn(StringSpan({item, N - 1}, true, StringEncoding::Ascii)) {}
         
-        /// @brief Fills standard input with content of a StringView
-        StdIn(StringView string) : StdIn(string.toCharSpan()) {}
+        /// @brief Fills standard input with content of a StringSpan
+        StdIn(StringSpan string) : StdIn(string.toCharSpan()) {}
         
         /// @brief Fills standard input with content of a Span
         StdIn(Span<const char> span) { operation = Operation::ReadableSpan; readableSpan = span;}
@@ -201,10 +200,10 @@ struct SC_COMPILER_EXPORT Process
     /// @param cmd Process executable path and its arguments (if any)
     /// @param stdOut Process::StdOut::Ignore{}, Process::StdOut::Inherit{} or redirect stdout to String/Vector/Span
     /// @param stdIn Process::StdIn::Ignore{}, Process::StdIn::Inherit{} or feed stdin from
-    /// StringView/String/Vector/Span
+    /// StringSpan/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    Result launch(Span<const StringView> cmd,                        //
+    Result launch(Span<const StringSpan> cmd,                        //
                   const StdOut&          stdOut = StdOut::Inherit{}, //
                   const StdIn&           stdIn  = StdIn::Inherit{},  //
                   const StdErr&          stdErr = StdErr::Inherit{})
@@ -217,10 +216,10 @@ struct SC_COMPILER_EXPORT Process
     /// @param cmd Process executable path and its arguments (if any)
     /// @param stdOut Process::StdOut::Ignore{}, Process::StdOut::Inherit{} or redirect stdout to String/Vector/Span
     /// @param stdIn Process::StdIn::Ignore{}, Process::StdIn::Inherit{} or feed stdin from
-    /// StringView/String/Vector/Span
+    /// StringSpan/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    Result exec(Span<const StringView> cmd,                        //
+    Result exec(Span<const StringSpan> cmd,                        //
                 const StdOut&          stdOut = StdOut::Inherit{}, //
                 const StdIn&           stdIn  = StdIn::Inherit{},  //
                 const StdErr&          stdErr = StdErr::Inherit{})
@@ -239,7 +238,7 @@ struct SC_COMPILER_EXPORT Process
     void inheritParentEnvironmentVariables(bool inherit) { inheritEnv = inherit; }
 
     /// @brief Sets the environment variable for the newly spawned child process
-    Result setEnvironment(StringView environmentVariable, StringView value);
+    Result setEnvironment(StringSpan environmentVariable, StringSpan value);
 
     /// @brief Returns number of (virtual) processors available
     [[nodiscard]] static size_t getNumberOfProcessors();
@@ -250,6 +249,18 @@ struct SC_COMPILER_EXPORT Process
     /// @brief Returns true if we're emulating x64 on ARM64 or the inverse on Windows
     [[nodiscard]] static bool isWindowsEmulatedProcess();
 
+    /// @brief Constructs a Process object passing (optional) memory storage for command and environment variables.
+    /// @param commandMemory Memory storage for command and arguments. If empty, a default storage will be used.
+    /// @param environmentMemory Memory storage for environment variables. If empty, a default storage will be used.
+    Process(Span<native_char_t> commandMemory = {}, Span<native_char_t> environmentMemory = {})
+        : command({commandMemory}), environment({environmentMemory})
+    {
+        if (commandMemory.empty())
+            command = {commandStorage};
+        if (commandMemory.empty())
+            environment = {environmentStorage};
+    }
+
   private:
     ProcessExitStatus exitStatus; ///< Exit status code returned after process is finished
 
@@ -259,7 +270,7 @@ struct SC_COMPILER_EXPORT Process
 
     Result launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError);
 
-    Result formatArguments(Span<const StringView> cmd);
+    Result formatArguments(Span<const StringSpan> cmd);
 
     StringPath currentDirectory;
 
@@ -267,14 +278,16 @@ struct SC_COMPILER_EXPORT Process
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
     // This is done so that in this single buffer with no allocation (under 255) or a single allocation (above 255)
     // we can track all arguments to be passed to execve.
-    SmallStringNative<255> command = StringEncoding::Native;
+    native_char_t              commandStorage[StringPath::MaxPath + 1024];
+    StringSpan::NativeWritable command;
 #if !SC_PLATFORM_WINDOWS // On Posix we need to track the "sub-strings" hidden in command
     static constexpr size_t MAX_NUM_ARGUMENTS = 64;
     size_t commandArgumentsByteOffset[MAX_NUM_ARGUMENTS]; // Tracking length of each argument in the command string
     size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
 #endif
 
-    SmallStringNative<1024> environment = StringEncoding::Native;
+    native_char_t              environmentStorage[4096];
+    StringSpan::NativeWritable environment;
 
     static constexpr size_t MAX_NUM_ENVIRONMENT = 256;
 
@@ -317,7 +330,7 @@ struct SC_COMPILER_EXPORT ProcessChain
     /// @param process A non-launched Process object (allocated by caller, must be alive until waitForExitSync)
     /// @param cmd Path to executable and eventual args for this process
     /// @return Invalid result if given process failed to create pipes for I/O redirection
-    Result pipe(Process& process, const Span<const StringView> cmd);
+    Result pipe(Process& process, const Span<const StringSpan> cmd);
 
     /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.
     /// You can then call ProcessChain::waitForExitSync to block until the child process is fully finished.
@@ -365,20 +378,20 @@ struct ProcessEnvironment
     /// @param index The index of the variable to retrieve (must be less than ProcessEnvironment::size())
     /// @param name The parsed name of the environment variable at requested index
     /// @param value The parsed value of the environment variable at requested index
-    [[nodiscard]] bool get(size_t index, StringView& name, StringView& value) const;
+    [[nodiscard]] bool get(size_t index, StringSpan& name, StringSpan& value) const;
 
     /// @brief Checks if an environment variable exists in current process
     /// @param variableName Name of the variable to check
     /// @param index Optional pointer to a variable that will receive the index of the variable (only if found)
     /// @returns true if variableName has been found in list of the variable
-    [[nodiscard]] bool contains(StringView variableName, size_t* index = nullptr);
+    [[nodiscard]] bool contains(StringSpan variableName, size_t* index = nullptr);
 
   private:
     size_t numberOfEnvironment = 0;
 #if SC_PLATFORM_WINDOWS
     static constexpr size_t MAX_ENVIRONMENTS = 256;
 
-    StringView envStrings[MAX_ENVIRONMENTS];
+    StringSpan envStrings[MAX_ENVIRONMENTS];
     wchar_t*   environment = nullptr;
 #else
     char** environment = nullptr;

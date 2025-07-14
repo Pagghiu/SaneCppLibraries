@@ -1,13 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Process.h"
-#include "EnvironmentTable.h"
+#include "../../Process/Internal/EnvironmentTable.h"
+#include "../../Process/Process.h"
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <stdlib.h> // _exit
+#include <wchar.h>  // wcschr
 #endif
 
 //-----------------------------------------------------------------------------------------------------------------------
@@ -121,16 +122,19 @@ SC::Result SC::Process::launchImplementation()
     StringsArena arena = {environment, environmentNumber, environmentByteOffset};
 
     ProcessEnvironment parentEnv;
-    SC_TRY(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv));
+    SC_TRY_MSG(environmentTable.writeTo(environmentArray, inheritEnv, arena, parentEnv),
+               "Process::launchImplementation - environmentTable.writeTo failed");
 
     if (environmentArray != nullptr)
     {
         for (size_t idx = environmentNumber; environmentArray[idx] != nullptr; ++idx)
         {
-            const StringView environmentString({environmentArray[idx], ::wcslen(environmentArray[idx])}, true);
-            SC_TRY(arena.appendAsSingleString(environmentString));
+            const StringSpan environmentString({environmentArray[idx], ::wcslen(environmentArray[idx])}, true);
+            SC_TRY_MSG(arena.appendAsSingleString(environmentString),
+                       "Process::launchImplementation - environment arena exceeded");
         }
-        SC_TRY(arena.appendAsSingleString({"\0"})); // add final \0 (CreateProcessW requires it to signal end of array)
+        // add final \0 (CreateProcessW requires it to signal end of array)
+        SC_TRY_MSG(arena.appendAsSingleString({"\0"}), "Process::launchImplementation - environment arena exceeded");
 
         // const_cast is required by CreateProcessW signature unfortunately
         wideEnv = const_cast<LPWSTR>(environment.view().getNullTerminatedNative());
@@ -151,7 +155,7 @@ SC::Result SC::Process::launchImplementation()
 
     if (not success)
     {
-        return Result::Error("CreateProcessW failed");
+        return Result::Error("Process::launchImplementation - CreateProcessW failed");
     }
     ::CloseHandle(processInfo.hThread);
 
@@ -163,27 +167,29 @@ SC::Result SC::Process::launchImplementation()
     return Result(true);
 }
 
-SC::Result SC::Process::formatArguments(Span<const StringView> params)
+SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
 {
     bool first = true;
 
-    StringConverter formattedCmd(command, StringConverter::Clear);
-    for (const StringView& param : params)
+    for (const StringSpan param : params)
     {
         if (not first)
         {
-            SC_TRY(formattedCmd.appendNullTerminated(" "));
+            SC_TRY(StringSpan(" ").appendNullTerminatedTo(command));
         }
         first = false;
-        if (param.containsCodePoint(' ') and not param.containsCodePoint('"'))
+
+        const bool containsSpace = ::wcschr(param.getNullTerminatedNative(), L' ') != nullptr;
+        const bool containsQuote = ::wcschr(param.getNullTerminatedNative(), L'"') != nullptr;
+        if (containsSpace and not containsQuote)
         {
-            SC_TRY(formattedCmd.appendNullTerminated("\""));
-            SC_TRY(formattedCmd.appendNullTerminated(param));
-            SC_TRY(formattedCmd.appendNullTerminated("\""));
+            SC_TRY(StringSpan("\"").appendNullTerminatedTo(command));
+            SC_TRY(param.appendNullTerminatedTo(command));
+            SC_TRY(StringSpan("\"").appendNullTerminatedTo(command));
         }
         else
         {
-            SC_TRY(formattedCmd.appendNullTerminated(param));
+            SC_TRY(param.appendNullTerminatedTo(command));
         }
     }
 
@@ -200,7 +206,7 @@ SC::ProcessEnvironment::ProcessEnvironment()
     while (*env != L'\0')
     {
         size_t length                   = ::wcslen(env);
-        envStrings[numberOfEnvironment] = StringView({env, length}, true);
+        envStrings[numberOfEnvironment] = StringSpan({env, length}, true);
         env += length + 1;
         numberOfEnvironment++;
     }
@@ -208,21 +214,24 @@ SC::ProcessEnvironment::ProcessEnvironment()
 
 SC::ProcessEnvironment::~ProcessEnvironment() { ::FreeEnvironmentStringsW(environment); }
 
-bool SC::ProcessEnvironment::get(size_t index, StringView& name, StringView& value) const
+bool SC::ProcessEnvironment::get(size_t index, StringSpan& name, StringSpan& value) const
 {
     if (index >= numberOfEnvironment)
     {
         return false;
     }
-    StringView          nameValue = envStrings[index];
-    StringViewTokenizer tokenizer(nameValue);
-    SC_TRY(tokenizer.tokenizeNext({'='}));
-    name = tokenizer.component;
-    if (not tokenizer.isFinished())
+    const wchar_t* currentEnv = envStrings[index].getNullTerminatedNative();
+    // UTF-16 SAFETY NOTE: The '=' character (U+003D) is a single UTF-16 code unit and cannot appear as part of a
+    // surrogate pair or multi-unit sequence. Therefore, using wcschr to split environment variables on '=' is safe even
+    // if names/values contain UTF-16 encoded text.
+    const wchar_t* equalSign = ::wcschr(currentEnv, L'=');
+    if (equalSign != nullptr)
     {
-        value = tokenizer.remaining;
+        name  = StringSpan({currentEnv, static_cast<size_t>(equalSign - currentEnv)}, false);
+        value = StringSpan::fromNullTerminated(equalSign + 1, StringEncoding::Utf16);
+        return true;
     }
-    return true;
+    return false;
 }
 
 //-----------------------------------------------------------------------------------------------------------------------
