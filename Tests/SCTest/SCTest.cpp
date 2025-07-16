@@ -104,8 +104,8 @@ void runSupportToolsTest(TestReport& report);
 #error "SC_SPACES_SPECIFIC_DEFINE should NOT be defined on this file"
 #endif
 
-#include "Libraries/Containers/Vector.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Memory/Globals.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"

@@ -189,7 +189,10 @@ def string_SummaryProvider(valobj, dict):
     try:
         encoding = valobj.GetChildMemberWithName("encoding")
         encoding_value = encoding.GetValueAsUnsigned()
-        if valobj.GetType().GetName() == "SC::StringView":
+        valname = valobj.GetType().GetName()
+        if valname in ("SC::StringSpan", "SC::StringView"):
+            if valname == "SC::StringView":
+                valobj = valobj.GetChildAtIndex(0)
             data_size = valobj.GetChildMemberWithName("textSizeInBytes").GetValueAsUnsigned()
             if data_size == 0:
                 return '""'
@@ -282,3 +285,4 @@ def __lldb_init_module(debugger, internal_dict):
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)SmallString<.+>$"')
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)String$"')
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringView$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringSpan$"')

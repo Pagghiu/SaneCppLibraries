@@ -5,7 +5,6 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Containers/VectorMap.h"
 #include "Libraries/Containers/VectorSet.h"
-#include "Libraries/Memory/Memory.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -24,7 +23,7 @@ struct SC::DebugVisualizersTest : public SC::TestCase
     SmallString<32> smallString = "SMALL STRING\xf0\x9f\x98\x82\xf0\x9f\x98\x8e";
 
     StringView twoFaces;
-    StringView threeKanji;
+    StringSpan threeKanji;
 
     Vector<int>    ints    = {1, 2, 3, 4};
     Vector<double> doubles = {1.2, 2.3, 3.4};

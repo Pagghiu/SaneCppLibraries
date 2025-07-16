@@ -63,10 +63,16 @@
     <StringView Condition="encoding==StringEncoding::Utf16">((char*)amp;amp;data)+data.offset,su</StringView>
     <StringView>((char*)&amp;data)+data.offset,s8</StringView>
   </Type>
-  <Type Name="SC::StringView">
+  <Type Name="SC::StringSpan">
     <DisplayString Condition="encoding==StringEncoding::Utf16">{text,[textSizeInBytes/2]su}</DisplayString>
     <DisplayString>{text,[textSizeInBytes]s8}</DisplayString>
     <StringView Condition="encoding==StringEncoding::Utf16">text,[textSizeInBytes/2]su</StringView>
     <StringView>text,[textSizeInBytes]s8</StringView>
+  </Type>
+  <Type Name="SC::StringView">
+    <DisplayString>{*(SC::StringSpan*)this}</DisplayString>
+    <Expand>
+      <ExpandedItem>*(SC::StringSpan*)this</ExpandedItem>
+    </Expand>
   </Type>
 </AutoVisualizer>
