@@ -63,7 +63,7 @@ struct FileSystemWatcher
         static constexpr int Windows =
             MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = 1056;
+        static constexpr int Linux   = 1056 + 1024 + 8;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -119,6 +119,12 @@ struct FileSystemWatcher
     /// @note You can create an SC::ArenaMap to create a buffer of these objects, that can be easily reused.
     struct FolderWatcher
     {
+        /// @brief Constructs a folder watcher
+        /// @param subFolderRelativePathsBuffer User provided buffer used to sub-folders relative paths.
+        /// When an empty span is passed, the internal 1Kb buffer is used.
+        /// This buffer is used on Linux only when watching folders recursively, it's unused on Windows / macOS.
+        FolderWatcher(Span<char> subFolderRelativePathsBuffer = {});
+
         Function<void(const Notification&)> notifyCallback; ///< Function that will be called on a notification
 
         /// @brief Stop watching this directory. After calling it the FolderWatcher can be reused or released.
@@ -138,6 +144,9 @@ struct FileSystemWatcher
         StringPath path;
 
         OpaqueObject<FolderWatcherSizes> internal;
+#if SC_PLATFORM_LINUX
+        Span<char> subFolderRelativePathsBuffer;
+#endif
     };
 
     /// @brief Delivers notifications using @ref library_async (SC::AsyncEventLoop).

@@ -10,6 +10,15 @@
 #include "Internal/FileSystemWatcherLinux.inl"
 #endif
 
+SC::FileSystemWatcher::FolderWatcher::FolderWatcher(Span<char> buffer)
+{
+#if SC_PLATFORM_LINUX
+    subFolderRelativePathsBuffer = buffer;
+#else
+    (void)buffer;
+#endif
+}
+
 SC::Result SC::FileSystemWatcher::init(EventLoopRunner& runner, AsyncEventLoop& eventLoop)
 {
     runner.eventLoop = &eventLoop;

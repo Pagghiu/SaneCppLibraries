@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 
+#include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
-#include "../../Memory/Buffer.h"
 #include "../../Threading/Threading.h"
 
 #include <dirent.h> // opendir, readdir, closedir
@@ -29,9 +29,12 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
     Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
     size_t notifyHandlesCount = 0;
 
-    Buffer relativePaths;
+    char                       relativePathsStorage[1024];
+    StringSpan::NativeWritable relativePaths;
 
     FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
+
+    FolderWatcherInternal() { relativePaths.writableSpan = {relativePathsStorage}; }
 };
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
@@ -116,8 +119,8 @@ struct SC::FileSystemWatcher::Internal
             const int res = ::inotify_rm_watch(rootNotifyFd, folderInternal.notifyHandles[idx].notifyID);
             SC_TRY_MSG(res != -1, "inotify_rm_watch");
         }
-        folderInternal.notifyHandlesCount = 0; // Reset the count to zero
-        folderInternal.relativePaths.clear();
+        folderInternal.notifyHandlesCount   = 0; // Reset the count to zero
+        folderInternal.relativePaths.length = 0;
         return Result(true);
     }
 
@@ -128,6 +131,11 @@ struct SC::FileSystemWatcher::Internal
         SC_TRY_MSG(entry->path.path.view().getEncoding() != StringEncoding::Utf16,
                    "FolderWatcher on Linux does not support UTF16 encoded paths. Use UTF8 or ASCII encoding instead.");
         FolderWatcherInternal& opaque = entry->internal.get();
+        if (not entry->subFolderRelativePathsBuffer.empty())
+        {
+            opaque.relativePaths.writableSpan = entry->subFolderRelativePathsBuffer;
+        }
+        opaque.relativePaths.length = 0;
 
         char currentPath[PATH_MAX];
         ::memcpy(currentPath, entry->path.path.view().getNullTerminatedNative(), entry->path.path.view().sizeInBytes());
@@ -247,8 +255,10 @@ struct SC::FileSystemWatcher::Internal
                         relativePath++;
                     }
                     pair.notifyID   = newHandle;
-                    pair.nameOffset = opaque.relativePaths.size();
-                    SC_TRY(opaque.relativePaths.append({relativePath, ::strlen(relativePath) + 1}));
+                    pair.nameOffset = opaque.relativePaths.length == 0 ? 0 : opaque.relativePaths.length + 1;
+                    StringSpan relativePathSpan = StringSpan::fromNullTerminated(relativePath, StringEncoding::Utf8);
+                    SC_TRY_MSG(relativePathSpan.appendNullTerminatedTo(opaque.relativePaths, false),
+                               "Not enough buffer space to hold sub-folders relative paths");
 
                     SC_TRY_MSG(opaque.notifyHandlesCount < FolderWatcherSizes::MaxNumberOfSubdirs,
                                "Too many subdirectories being watched");
@@ -375,7 +385,9 @@ struct SC::FileSystemWatcher::Internal
         {
             // Something changed in any of the sub folders of the original root folder being watched
             const FolderWatcherInternal& internal = entry->internal.get();
-            const char* dirStart = internal.relativePaths.data() + internal.notifyHandles[foundIndex].nameOffset;
+
+            const char* dirStart =
+                internal.relativePaths.writableSpan.data() + internal.notifyHandles[foundIndex].nameOffset;
 
             const StringSpan relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
             const StringSpan relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
