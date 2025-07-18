@@ -70,21 +70,15 @@ SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> 
     FolderState entry;
     if (directory.getEncoding() == StringEncoding::Utf16)
     {
-
         return Result::Error("FileSystemIterator on Posix does not support UTF16 encoded paths");
     }
-    if (directory.sizeInBytes() + 1 > sizeof(currentPathString))
-    {
-        return Result::Error("Directory path is too long");
-    }
 
-    ::memcpy(currentPathString, directory.bytesWithoutTerminator(), directory.sizeInBytes());
-    currentPathString[directory.sizeInBytes()] = '\0'; // Ensure null termination
+    SC_TRY_MSG(currentPath.path.assign(directory), "Directory path is too long");
 
     entry.textLengthInBytes = directory.sizeInBytes();
 
     SC_TRY_MSG(recurseStack.push_back(entry), "Exceeding maximum number of recursive entries");
-    const int fd = ::open(currentPathString, O_DIRECTORY);
+    const int fd = ::open(currentPath.path.buffer, O_DIRECTORY);
     SC_TRY(Internal::initFolderState(recurseStack.back(), fd));
     return Result(true);
 }
@@ -93,8 +87,6 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
 {
     if (recurseStack.isEmpty())
         return Result::Error("Forgot to call init");
-
-    size_t currentPathStringLength = 0; // Length of currentPathString excluding null terminator
 
     FolderState&   parent = recurseStack.back();
     struct dirent* item;
@@ -111,7 +103,7 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
             }
             parent = recurseStack.back();
 
-            currentPathStringLength = parent.textLengthInBytes;
+            currentPath.path.length = parent.textLengthInBytes;
             continue;
         }
         if (not(parent.gotDot1 and parent.gotDot2))
@@ -134,20 +126,12 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
 #else
     entry.name = StringSpan({item->d_name, strlen(item->d_name)}, true, StringEncoding::Utf8);
 #endif
-    currentPathStringLength = recurseStack.back().textLengthInBytes;
+    currentPath.path.length = recurseStack.back().textLengthInBytes;
 
-    if (currentPathStringLength + entry.name.sizeInBytes() + 1 > sizeof(currentPathString) - 1)
-    {
-        return Result::Error("Insufficient space on current path string");
-    }
+    SC_TRY_MSG(currentPath.path.append("/"), "Insufficient space on current path string");
+    SC_TRY_MSG(currentPath.path.append(entry.name), "Insufficient space on current path string");
 
-    currentPathString[currentPathStringLength] = '/';
-    ::memcpy(currentPathString + currentPathStringLength + 1, entry.name.bytesWithoutTerminator(),
-             entry.name.sizeInBytes());
-    currentPathStringLength += entry.name.sizeInBytes() + 1;
-    currentPathString[currentPathStringLength] = '\0'; // Ensure null termination
-
-    entry.path  = StringSpan({currentPathString, currentPathStringLength}, true, StringEncoding::Utf8);
+    entry.path  = currentPath.path.view();
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
 
     entry.parentFileDescriptor = parent.fileDescriptor;
@@ -169,19 +153,10 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
 SC::Result SC::FileSystemIterator::recurseSubdirectoryInternal(Entry& entry)
 {
     FolderState newParent;
-    size_t      currentPathStringLength; // Length of currentPathString excluding null terminator
-    currentPathStringLength = recurseStack.back().textLengthInBytes;
-    if (currentPathStringLength + entry.name.sizeInBytes() + 1 > sizeof(currentPathString) - 1)
-    {
-        return Result::Error("Directory path is too long");
-    }
-    currentPathString[currentPathStringLength] = '/';
-    ::memcpy(currentPathString + currentPathStringLength + 1, entry.name.bytesWithoutTerminator(),
-             entry.name.sizeInBytes());
-    currentPathStringLength += entry.name.sizeInBytes() + 1;
-    currentPathString[currentPathStringLength] = '\0'; // Ensure null termination
-
-    newParent.textLengthInBytes = currentPathStringLength;
+    currentPath.path.length = recurseStack.back().textLengthInBytes;
+    SC_TRY_MSG(currentPath.path.append("/"), "Directory path is too long");
+    SC_TRY_MSG(currentPath.path.append(entry.name), "Directory path is too long");
+    newParent.textLengthInBytes = currentPath.path.length;
     SC_TRY(entry.name.isNullTerminated());
     SC_TRY_MSG(recurseStack.push_back(newParent), "Exceeding maximum number of recursive entries");
     const int fd = ::openat(entry.parentFileDescriptor, entry.name.getNullTerminatedNative(), O_DIRECTORY);

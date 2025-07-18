@@ -134,12 +134,13 @@ struct FileSystemIterator
     bool   errorsChecked = false;
 
 #if SC_PLATFORM_WINDOWS
-    bool     expectDotDirectories = true;
-    wchar_t  currentPathString[MaxPath];
-    uint64_t dirEnumeratorBuffer[592 / sizeof(uint64_t)];
+    bool       expectDotDirectories = true;
+    StringPath currentPath;
+    uint64_t   dirEnumeratorBuffer[592 / sizeof(uint64_t)];
 #else
-    char currentPathString[MaxPath];
+    StringPath currentPath;
 #endif
+
     Result enumerateNextInternal(Entry& entry);
     Result recurseSubdirectoryInternal(Entry& entry);
 };
