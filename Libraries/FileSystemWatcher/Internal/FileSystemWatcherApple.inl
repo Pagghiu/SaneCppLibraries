@@ -61,7 +61,7 @@ struct SC::FileSystemWatcher::Internal
         closing.exchange(false);
         // Create Signal to go from Loop --> CFRunLoop
         CFRunLoopSourceContext signalContext;
-        memset(&signalContext, 0, sizeof(signalContext));
+        ::memset(&signalContext, 0, sizeof(signalContext));
 
         signalContext.info    = this;
         signalContext.perform = &Internal::threadExecuteRefresh;
@@ -173,7 +173,7 @@ struct SC::FileSystemWatcher::Internal
         constexpr FSEventStreamCreateFlags watchFlags =
             kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagNoDefer;
         FSEventStreamContext fsEventContext;
-        memset(&fsEventContext, 0, sizeof(fsEventContext));
+        ::memset(&fsEventContext, 0, sizeof(fsEventContext));
         fsEventContext.info = this;
         fsEventStream       = FSEventStreamCreate(nullptr,                       //
                                                   &Internal::threadOnNewFSEvent, //

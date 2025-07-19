@@ -244,7 +244,7 @@ struct SC::FileSystemWatcher::Internal
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (true);
 
-        memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
+        ::memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
         HANDLE handle;
         if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
         {
@@ -266,23 +266,8 @@ struct SC::FileSystemWatcher::Internal
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    // Calculate sizes in terms of wchar_t count rather than bytes
-    const size_t basePathChars     = basePath.sizeInBytes() / sizeof(wchar_t);
-    const size_t relativePathChars = relativePath.sizeInBytes() / sizeof(wchar_t);
-
-    if (StringPath::MaxPath < (basePathChars + relativePathChars + 2))
-    {
-        return Result::Error("Buffer too small to hold full path");
-    }
-
-    const wchar_t* basePathStr     = basePath.getNullTerminatedNative();
-    const wchar_t* relativePathStr = relativePath.getNullTerminatedNative();
-
-    ::memcpy(buffer.path.buffer, basePathStr, basePathChars * sizeof(wchar_t));
-    buffer.path.buffer[basePathChars] = L'\\'; // Add the separator
-    ::memcpy(buffer.path.buffer + basePathChars + 1, relativePathStr, relativePathChars * sizeof(wchar_t));
-    buffer.path.buffer[basePathChars + 1 + relativePathChars] = L'\0'; // Null terminate the string
-
-    buffer.path.length = basePathChars + 1 + relativePathChars;
+    SC_TRY_MSG(buffer.path.assign(basePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.path.append(L"\\"), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
 }

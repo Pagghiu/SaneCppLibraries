@@ -6,8 +6,8 @@
 #include "../../Foundation/Deferred.h"
 #include "../../Threading/Threading.h"
 
-#include <dirent.h> // opendir, readdir, closedir
-#include <errno.h>
+#include <dirent.h>      // opendir, readdir, closedir
+#include <errno.h>       // errno
 #include <fcntl.h>       // open, O_RDONLY, O_DIRECTORY
 #include <limits.h>      // PATH_MAX
 #include <string.h>      // strlen
@@ -124,6 +124,29 @@ struct SC::FileSystemWatcher::Internal
         return Result(true);
     }
 
+    static Result getSubFolderPath(StringPath& path, const StringPath& entryPath, const char* name,
+                                   FolderWatcherInternal& opaque, int notifyHandleId)
+    {
+        // Append '/' and the subdirectory name
+        path = entryPath;
+        const char* dirStart =
+            opaque.notifyHandles[notifyHandleId].nameOffset >= 0
+                ? opaque.relativePaths.writableSpan.data() + opaque.notifyHandles[notifyHandleId].nameOffset
+                : "";
+
+        const StringSpan relativeDirectory = StringSpan::fromNullTerminated(dirStart, StringEncoding::Utf8);
+        const StringSpan relativeName      = StringSpan::fromNullTerminated(name, StringEncoding::Utf8);
+
+        if (not relativeDirectory.isEmpty())
+        {
+            SC_TRY_MSG(path.path.append("/"), "Relative path too long");
+            SC_TRY_MSG(path.path.append(relativeDirectory), "Relative path too long");
+        }
+        SC_TRY_MSG(path.path.append("/"), "Relative path too long");
+        SC_TRY_MSG(path.path.append(relativeName), "Relative path too long");
+        return Result(true);
+    }
+
     Result startWatching(FolderWatcher* entry)
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
@@ -137,22 +160,20 @@ struct SC::FileSystemWatcher::Internal
         }
         opaque.relativePaths.length = 0;
 
-        char currentPath[PATH_MAX];
-        ::memcpy(currentPath, entry->path.path.view().getNullTerminatedNative(), entry->path.path.view().sizeInBytes());
-        currentPath[entry->path.path.view().sizeInBytes()] = '\0'; // Ensure null termination
+        StringPath currentPath = entry->path;
 
         int rootNotifyFd;
         SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
         constexpr int mask =
             IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
-        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath, mask);
+        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.path.buffer, mask);
         if (newHandle == -1)
         {
             return Result::Error("inotify_add_watch");
         }
         FolderWatcherInternal::Pair pair;
         pair.notifyID   = newHandle;
-        pair.nameOffset = 0;
+        pair.nameOffset = -1;
         SC_TRY_MSG(opaque.notifyHandlesCount < FolderWatcherSizes::MaxNumberOfSubdirs,
                    "Too many subdirectories being watched");
         opaque.notifyHandles[opaque.notifyHandlesCount++] = pair;
@@ -162,14 +183,14 @@ struct SC::FileSystemWatcher::Internal
         struct DirStackEntry
         {
             int fd;
-            int pathLength;
+            int notifyHandleId;
         };
         DirStackEntry stack[MaxStackDepth];
 
         int stackSize = 0;
 
         // Push the root directory onto the stack
-        DIR* rootDir = ::opendir(currentPath);
+        DIR* rootDir = ::opendir(currentPath.path.buffer);
         if (!rootDir)
         {
             return Result::Error("Failed to open root directory");
@@ -178,7 +199,7 @@ struct SC::FileSystemWatcher::Internal
 
         auto closeRootDir = MakeDeferred([rootDir] { ::closedir(rootDir); });
 
-        stack[stackSize++] = {rootFd, static_cast<int>(entry->path.path.view().sizeInBytes())};
+        stack[stackSize++] = {rootFd, static_cast<int>(opaque.notifyHandlesCount - 1)};
 
         const size_t rootPathLength = entry->path.path.view().sizeInBytes();
         // Clean the stack of fd in case any of the return Result::Error below is hit.
@@ -193,11 +214,7 @@ struct SC::FileSystemWatcher::Internal
         while (stackSize > 0)
         {
             DirStackEntry entryStack = stack[--stackSize];
-            // Build the current path
-            if (entryStack.pathLength < PATH_MAX)
-            {
-                currentPath[entryStack.pathLength] = '\0';
-            }
+
             DIR* dir = ::fdopendir(entryStack.fd);
             if (!dir)
             {
@@ -213,23 +230,17 @@ struct SC::FileSystemWatcher::Internal
                 {
                     continue;
                 }
-                size_t nameLen = ::strlen(subDirectory->d_name);
-                if (entryStack.pathLength + 1 + nameLen >= PATH_MAX)
-                {
-                    continue; // Skip if path is too long
-                }
-                // Append '/' and the subdirectory name
-                currentPath[entryStack.pathLength] = '/';
-                ::memcpy(currentPath + entryStack.pathLength + 1, subDirectory->d_name, nameLen);
-                currentPath[entryStack.pathLength + 1 + nameLen] = '\0';
+                SC_TRY(getSubFolderPath(currentPath, entry->path, subDirectory->d_name, opaque,
+                                        entryStack.notifyHandleId));
+
                 struct stat st;
-                if (::stat(currentPath, &st) != 0)
+                if (::stat(currentPath.path.buffer, &st) != 0)
                 {
                     continue;
                 }
                 if (S_ISDIR(st.st_mode))
                 {
-                    const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath, mask);
+                    const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.path.buffer, mask);
                     if (newHandle == -1)
                     {
                         (void)stopWatching(*entry);
@@ -238,10 +249,12 @@ struct SC::FileSystemWatcher::Internal
                     if (stackSize < MaxStackDepth)
                     {
                         // Open the subdirectory and push onto the stack
-                        const int subFd = ::open(currentPath, O_RDONLY | O_DIRECTORY);
+                        const int subFd = ::open(currentPath.path.buffer, O_RDONLY | O_DIRECTORY);
                         if (subFd != -1)
                         {
-                            stack[stackSize++] = {subFd, static_cast<int>(entryStack.pathLength + 1 + nameLen)};
+                            stack[stackSize].fd             = subFd;
+                            stack[stackSize].notifyHandleId = opaque.notifyHandlesCount;
+                            stackSize++;
                         }
                     }
                     else
@@ -249,7 +262,7 @@ struct SC::FileSystemWatcher::Internal
                         (void)stopWatching(*entry);
                         return Result::Error("Exceeded maximum stack depth for nested directories");
                     }
-                    const char* relativePath = currentPath + rootPathLength;
+                    const char* relativePath = currentPath.path.buffer + rootPathLength;
                     if (relativePath[0] == '/')
                     {
                         relativePath++;
@@ -370,7 +383,7 @@ struct SC::FileSystemWatcher::Internal
                                                   const struct inotify_event* prevEvent, const FolderWatcher* entry,
                                                   size_t foundIndex)
     {
-        char         bufferString[StringPath::MaxPath];
+        StringPath   eventPath;
         Notification notification;
 
         notification.basePath = entry->path.path;
@@ -387,21 +400,18 @@ struct SC::FileSystemWatcher::Internal
             const FolderWatcherInternal& internal = entry->internal.get();
 
             const char* dirStart =
-                internal.relativePaths.writableSpan.data() + internal.notifyHandles[foundIndex].nameOffset;
+                internal.notifyHandles[foundIndex].nameOffset >= 0
+                    ? internal.relativePaths.writableSpan.data() + internal.notifyHandles[foundIndex].nameOffset
+                    : "";
 
-            const StringSpan relativeDirectory({dirStart, ::strlen(dirStart)}, true, StringEncoding::Utf8);
-            const StringSpan relativeName({event->name, event->len - 1}, true, StringEncoding::Utf8);
-            if (relativeDirectory.sizeInBytes() + relativeName.sizeInBytes() + 2 > StringPath::MaxPath)
-            {
-                return Result::Error("Relative path too long");
-            }
-            ::memcpy(bufferString, relativeDirectory.getNullTerminatedNative(), relativeDirectory.sizeInBytes());
-            bufferString[relativeDirectory.sizeInBytes()] = '/'; // Add the separator
-            ::memcpy(bufferString + relativeDirectory.sizeInBytes() + 1, relativeName.getNullTerminatedNative(),
-                     relativeName.sizeInBytes());
-            bufferString[relativeDirectory.sizeInBytes() + 1 + relativeName.sizeInBytes()] = '\0';
+            const StringSpan relativeDirectory = StringSpan::fromNullTerminated(dirStart, StringEncoding::Utf8);
+            const StringSpan relativeName      = StringSpan::fromNullTerminated(event->name, StringEncoding::Utf8);
 
-            notification.relativePath = {{bufferString, strlen(bufferString)}, true, StringEncoding::Utf8};
+            SC_TRY_MSG(eventPath.path.assign(relativeDirectory), "Relative path too long");
+            SC_TRY_MSG(eventPath.path.append("/"), "Relative path too long");
+            SC_TRY_MSG(eventPath.path.append(relativeName), "Relative path too long");
+
+            notification.relativePath = eventPath.path.view();
         }
 
         // 2. Compute event Type
@@ -428,15 +438,8 @@ struct SC::FileSystemWatcher::Internal
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    if (StringPath::MaxPath < (basePath.sizeInBytes() + relativePath.sizeInBytes() + 2))
-    {
-        return Result::Error("Buffer too small to hold full path");
-    }
-    ::memcpy(buffer.path.buffer, basePath.getNullTerminatedNative(), basePath.sizeInBytes());
-    buffer.path.buffer[basePath.sizeInBytes()] = '/'; // Add the separator
-    ::memcpy(buffer.path.buffer + basePath.sizeInBytes() + 1, relativePath.getNullTerminatedNative(),
-             relativePath.sizeInBytes());
-    buffer.path.buffer[basePath.sizeInBytes() + 1 + relativePath.sizeInBytes()] = '\0'; // Null terminate the string
-    buffer.path.length = basePath.sizeInBytes() + 1 + relativePath.sizeInBytes();
+    SC_TRY_MSG(buffer.path.assign(basePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.path.append("/"), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
 }
