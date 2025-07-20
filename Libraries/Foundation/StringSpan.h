@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 
 namespace SC
@@ -111,12 +112,12 @@ struct SC_COMPILER_EXPORT StringSpan
 
     /// @brief Writes this Span to a destination Span, using native encoding and null-terminating it
     /// @param string The destination writable string to write to
-    [[nodiscard]] bool writeNullTerminatedTo(NativeWritable& string) const;
+    Result writeNullTerminatedTo(NativeWritable& string) const;
 
     /// @brief Appends this Span to a destination Span, using native encoding and null-terminating it
     /// @param string The destination writable string to write to
     /// @param removePreviousNullTerminator If true, the previous null terminator is removed
-    [[nodiscard]] bool appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator = true) const;
+    Result appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator = true) const;
 
   protected:
     friend struct StringView;

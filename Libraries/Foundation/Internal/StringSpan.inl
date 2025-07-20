@@ -19,19 +19,19 @@ const char* SC::StringSpan::bytesIncludingTerminator() const
     return text;
 }
 
-bool SC::StringSpan::writeNullTerminatedTo(NativeWritable& string) const
+SC::Result SC::StringSpan::writeNullTerminatedTo(NativeWritable& string) const
 {
     string.length = 0;
     return appendNullTerminatedTo(string, false);
 }
 
-bool SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator) const
+SC::Result SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator) const
 {
     const size_t lenToSlice =
         removePreviousNullTerminator ? string.length : (string.length > 0 ? string.length + 1 : 0);
     Span<native_char_t> remaining;
     if (not string.writableSpan.sliceStart(lenToSlice, remaining))
-        return false;
+        return Result::Error("StringSpan::append - sliceStart failed");
     size_t         numWritten = 0;
     native_char_t* buffer     = remaining.data();
 #if SC_PLATFORM_WINDOWS
@@ -39,7 +39,7 @@ bool SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removeP
     {
         if (sizeInBytes() >= remaining.sizeInBytes())
         {
-            return false;
+            return Result::Error("StringSpan::append - exceeded buffer size");
         }
         ::memcpy(buffer, bytesWithoutTerminator(), sizeInBytes());
         buffer[sizeInBytes() / sizeof(wchar_t)] = 0;
@@ -53,7 +53,7 @@ bool SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removeP
                                   static_cast<int>(remaining.sizeInElements()));
         if (stringLen <= 0)
         {
-            return false; // Error while converting the string
+            return Result::Error("StringSpan::append - MultiByteToWideChar failed");
         }
         buffer[stringLen] = L'\0'; // Ensure null termination
 
@@ -62,11 +62,11 @@ bool SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removeP
 #else
     if (getEncoding() == StringEncoding::Utf16)
     {
-        return false;
+        return Result::Error("StringSpan::append - UTF16 not supported");
     }
     if (sizeInBytes() >= remaining.sizeInBytes())
     {
-        return false;
+        return Result::Error("StringSpan::append - exceeded buffer size");
     }
     ::memcpy(buffer, bytesWithoutTerminator(), sizeInBytes());
     buffer[sizeInBytes()] = 0; // Ensure null termination
@@ -74,5 +74,5 @@ bool SC::StringSpan::appendNullTerminatedTo(NativeWritable& string, bool removeP
     numWritten = sizeInBytes();
 #endif
     string.length = lenToSlice + numWritten;
-    return true;
+    return Result(true);
 }
