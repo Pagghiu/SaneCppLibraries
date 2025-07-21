@@ -10,6 +10,10 @@ If a library doesn't directly or indirectly depend on the Memory library, you ca
 
 Most classes have been originally part of the [Foundation](@ref library_foundation) library.
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
 # Features
 
 ## Classes

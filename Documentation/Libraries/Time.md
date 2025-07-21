@@ -6,6 +6,10 @@
 
 Library contains classes to measure time and compute or measure time intervals.
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
 # Features
 
 | Class                             | Description                                   |

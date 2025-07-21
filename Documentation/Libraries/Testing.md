@@ -6,6 +6,10 @@
 
 Testing is a very simple test framework that allows splitting tests in sections and record successful/failed expectations.
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
+- All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
+
 # Features
 | Class             | Description               |
 |:------------------|:--------------------------|

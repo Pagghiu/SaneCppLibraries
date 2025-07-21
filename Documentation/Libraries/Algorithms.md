@@ -6,7 +6,11 @@
 
 Algorithms is a placeholder where templated algorithms will be added as needed over time.  
 
-## Features
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
+# Features
 
 | Algorithm                                                     | Description                           |
 |---------------------------------------------------------------|---------------------------------------|
@@ -16,17 +20,17 @@ Algorithms is a placeholder where templated algorithms will be added as needed o
 
 @note `min` and `max` are in `Compiler.h` as they're widely used everywhere
 
-## Status
+# Status
 🟥 Draft  
 We need _MOAR_ algorithms.
 
-## Description
+# Description
 
 Currently the list of algorithms is very short because it only contains only what's needed by other libraries.
 They're probably not enough to deserve their own library but hopefully additional algorithms will be added
 in the future and it's better grouping them here rather than keeping them around inside other libraries.
 
-## Roadmap
+# Roadmap
 
 🟨 MVP Features:
 - Unique

@@ -10,6 +10,10 @@ FileSystem executed executing operations on files and directories.
 
 \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
 
+# Dependencies
+- Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
+- All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
+
 # Features
 
 | SC::FileSystem                                | @copybrief SC::FileSystem                                 |

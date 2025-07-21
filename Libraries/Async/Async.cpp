@@ -18,7 +18,7 @@
 #include "../Threading/Threading.h" // EventObject
 
 #if SC_ASYNC_ENABLE_LOG
-#include "../Strings/Console.h"
+#include "../Strings/Console.h" // OPTIONAL DEPENDENCY
 #else
 #if defined(SC_LOG_MESSAGE)
 #undef SC_LOG_MESSAGE

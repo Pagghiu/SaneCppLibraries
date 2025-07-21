@@ -6,6 +6,10 @@
 
 @copydetails group_socket
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading), [Time](@ref library_time)
+- All dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading), [Time](@ref library_time)
+
 # Features
 | Class                     | Description
 |:--------------------------|:----------------------------------|

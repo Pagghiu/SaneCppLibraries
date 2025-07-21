@@ -8,6 +8,10 @@ Foundation library provides many fundamental type definitions and types widely u
 As this is included and needed by almost every other library, it tries to keep bloat to the bare minimum.  
 Detailed documentation is in the @ref group_foundation topic.
 
+# Dependencies
+- Direct dependencies: *(none)*
+- All dependencies: *(none)*
+
 # Features
 
 ## Classes

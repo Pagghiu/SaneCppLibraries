@@ -6,6 +6,10 @@
 
 Http library contains a hand-written http 1.1 parser, client and server.
 
+# Dependencies
+- Direct dependencies: [Async](@ref library_async), [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Socket](@ref library_socket), [Strings](@ref library_strings)
+- All dependencies: [Algorithms](@ref library_algorithms), [Async](@ref library_async), [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Socket](@ref library_socket), [Strings](@ref library_strings), [Threading](@ref library_threading), [Time](@ref library_time)
+
 # Features
 - HTTP 1.1 Parser
 - HTTP 1.1 Client

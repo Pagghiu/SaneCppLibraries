@@ -7,6 +7,10 @@
 Strings library allow read-only and write string operations and UTF Conversions.
 Path is able to parse and manipulate windows and posix paths.
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+
 # Features
 
 | Class                     | Description

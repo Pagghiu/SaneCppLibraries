@@ -6,6 +6,10 @@
 
 Threading is a library defining basic primitives for user-space threading and synchronization.
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
 # Features
 | Class                 | Description                       |
 |:----------------------|:----------------------------------|

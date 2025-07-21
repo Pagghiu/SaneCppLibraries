@@ -28,6 +28,8 @@ Take a look also at [DeepWiki/SaneCppLibraries](https://deepwiki.com/Pagghiu/San
 
 # Libraries
 
+Each library only depends on the smallest possible subset of the others libraries (see [Dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html)).
+
 Library                                                                                                 | Description
 :-------------------------------------------------------------------------------------------------------|:------------------------------------------------------------------------------------
 [Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                        | 🟥 Placeholder library where templated algorithms will be placed

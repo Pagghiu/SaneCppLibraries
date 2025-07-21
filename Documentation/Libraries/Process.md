@@ -10,6 +10,10 @@ Process allows launching, chaining input and output, setting working directory a
 
 \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessQuickSheetSnippet
 
+# Dependencies
+- Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
+- All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
+
 # Features
 | Class                     | Description
 |:--------------------------|:----------------------------------|

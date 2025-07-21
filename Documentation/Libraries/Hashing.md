@@ -6,6 +6,10 @@
 
 The Hashing library abstracts OS API to compute MD5, SHA1 and SHA256 hashes.  
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
 # Features
 | Hashing Algorithm         | Description                           |
 |:--------------------------|:--------------------------------------|

@@ -6,6 +6,10 @@ File library allows synchronous I/O operations on files and pipes.
 
 [TOC]
 
+# Dependencies
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
 # Features
 | SC::FileDescriptor                | @copybrief SC::FileDescriptor                 |
 |:----------------------------------|:----------------------------------------------|
