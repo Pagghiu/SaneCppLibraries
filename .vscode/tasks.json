@@ -367,6 +367,31 @@
             ]
         },
         {
+            "label": "Update Documentation Statistics",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "Support/Scripts/update_documentation.py"
+            ],
+            "problemMatcher": [
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
+            ],
+        },
+        {
             "label": "Build Coverage",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",

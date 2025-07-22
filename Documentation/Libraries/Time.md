@@ -10,6 +10,10 @@ Library contains classes to measure time and compute or measure time intervals.
 - Direct dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
 
+# Statistics
+- Lines of code (excluding comments): 359
+- Lines of code (including comments): 524
+
 # Features
 
 | Class                             | Description                                   |

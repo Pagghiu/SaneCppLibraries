@@ -14,6 +14,10 @@ FileSystem executed executing operations on files and directories.
 - Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
 
+# Statistics
+- Lines of code (excluding comments): 1323
+- Lines of code (including comments): 1752
+
 # Features
 
 | SC::FileSystem                                | @copybrief SC::FileSystem                                 |

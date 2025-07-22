@@ -10,6 +10,10 @@
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
+# Statistics
+- Lines of code (excluding comments): 625
+- Lines of code (including comments): 860
+
 # Features
 - No heap allocations
 - Serialize primitive types (Little Endian)

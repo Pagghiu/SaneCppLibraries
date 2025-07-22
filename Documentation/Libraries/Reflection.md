@@ -10,6 +10,10 @@
 - Direct dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
 
+# Statistics
+- Lines of code (excluding comments): 701
+- Lines of code (including comments): 995
+
 # Features
 - Reflection info is built at compile time
 - Free of heap allocations

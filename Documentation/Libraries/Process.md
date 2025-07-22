@@ -14,6 +14,10 @@ Process allows launching, chaining input and output, setting working directory a
 - Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
 
+# Statistics
+- Lines of code (excluding comments): 1291
+- Lines of code (including comments): 1789
+
 # Features
 | Class                     | Description
 |:--------------------------|:----------------------------------|

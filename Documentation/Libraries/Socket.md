@@ -10,6 +10,10 @@
 - Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading), [Time](@ref library_time)
 - All dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading), [Time](@ref library_time)
 
+# Statistics
+- Lines of code (excluding comments): 858
+- Lines of code (including comments): 1147
+
 # Features
 | Class                     | Description
 |:--------------------------|:----------------------------------|

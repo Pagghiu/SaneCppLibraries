@@ -10,6 +10,10 @@ Threading is a library defining basic primitives for user-space threading and sy
 - Direct dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
 
+# Statistics
+- Lines of code (excluding comments): 888
+- Lines of code (including comments): 1166
+
 # Features
 | Class                 | Description                       |
 |:----------------------|:----------------------------------|

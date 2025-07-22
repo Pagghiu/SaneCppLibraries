@@ -12,6 +12,10 @@ Detailed documentation is in the @ref group_foundation topic.
 - Direct dependencies: *(none)*
 - All dependencies: *(none)*
 
+# Statistics
+- Lines of code (excluding comments): 1616
+- Lines of code (including comments): 2414
+
 # Features
 
 ## Classes

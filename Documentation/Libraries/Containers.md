@@ -10,6 +10,10 @@ Containers is a library holding some commonly used generic data structures.
 - Direct dependencies: [Algorithms](@ref library_algorithms), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 - All dependencies: [Algorithms](@ref library_algorithms), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 
+# Statistics
+- Lines of code (excluding comments): 773
+- Lines of code (including comments): 1061
+
 # Features
 | Class                             | Description                               |
 |:----------------------------------|:------------------------------------------|

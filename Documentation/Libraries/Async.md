@@ -15,6 +15,10 @@ Check @ref library_async_streams for an higher level construct when streaming da
 - Direct dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 - All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 
+# Statistics
+- Lines of code (excluding comments): 5533
+- Lines of code (including comments): 7336
+
 # Features
 
 This is the list of supported async operations:

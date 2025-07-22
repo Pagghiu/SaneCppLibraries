@@ -10,6 +10,10 @@ File library allows synchronous I/O operations on files and pipes.
 - Direct dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
 
+# Statistics
+- Lines of code (excluding comments): 700
+- Lines of code (including comments): 925
+
 # Features
 | SC::FileDescriptor                | @copybrief SC::FileDescriptor                 |
 |:----------------------------------|:----------------------------------------------|
