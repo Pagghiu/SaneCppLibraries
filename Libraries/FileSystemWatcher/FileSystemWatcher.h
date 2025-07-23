@@ -36,10 +36,34 @@ namespace SC
 ///
 /// Example using SC::FileSystemWatcher::ThreadRunner:
 /// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
+
+//! [OpaqueDeclarationSnippet]
 struct FileSystemWatcher
 {
   private:
     struct Internal;
+
+    struct InternalDefinition
+    {
+        static constexpr int Windows = 3 * sizeof(void*);
+        static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
+        static constexpr int Linux   = sizeof(void*) * 4;
+        static constexpr int Default = Linux;
+
+        static constexpr size_t Alignment = alignof(void*);
+
+        using Object = Internal;
+    };
+
+  public:
+    // Must be public to avoid GCC complaining
+    using InternalOpaque = OpaqueObject<InternalDefinition>;
+
+  private:
+    InternalOpaque internal;
+
+    //...
+    //! [OpaqueDeclarationSnippet]
     struct ThreadRunnerInternal;
     struct ThreadRunnerDefinition
     {
@@ -70,21 +94,6 @@ struct FileSystemWatcher
 
         using Object = FolderWatcherInternal;
     };
-    struct InternalDefinition
-    {
-        static constexpr int Windows = 3 * sizeof(void*);
-        static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
-        static constexpr int Linux   = sizeof(void*) * 4;
-        static constexpr int Default = Linux;
-
-        static constexpr size_t Alignment = alignof(void*);
-
-        using Object = Internal;
-    };
-
-    using InternalOpaque = OpaqueObject<InternalDefinition>;
-
-    InternalOpaque internal;
 
   public:
     /// @brief Specifies the event classes. Some events are grouped in a single one because

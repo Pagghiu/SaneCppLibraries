@@ -264,7 +264,7 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 }
 
 #else
-
+//! [UniqueHandleDefinitionSnippet]
 #include <errno.h>    // errno
 #include <fcntl.h>    // fcntl
 #include <sys/stat.h> // fstat
@@ -281,6 +281,7 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
     }
     return Result(true);
 }
+//! [UniqueHandleDefinitionSnippet]
 
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptor

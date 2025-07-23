@@ -15,7 +15,6 @@ namespace SC
 namespace detail
 {
 #if SC_PLATFORM_WINDOWS
-
 struct SC_COMPILER_EXPORT FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
@@ -28,6 +27,8 @@ struct SC_COMPILER_EXPORT FileDescriptorDefinition
 };
 
 #else
+//! [UniqueHandleDeclaration1Snippet]
+
 /// @brief Definition used to declare FileDescriptor (as argument to UniqueHandle)
 struct SC_COMPILER_EXPORT FileDescriptorDefinition
 {
@@ -36,7 +37,7 @@ struct SC_COMPILER_EXPORT FileDescriptorDefinition
 
     static constexpr Handle Invalid = -1; // invalid fd
 };
-
+//! [UniqueHandleDeclaration1Snippet]
 #endif
 } // namespace detail
 
@@ -70,11 +71,15 @@ struct SC_COMPILER_EXPORT FileOpen
     int toPosixAccess() const;
 #endif
 };
+//! [UniqueHandleDeclaration2Snippet]
 
 /// @brief Open, read and write to/from a file descriptor (like a file or pipe).
 struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
+
+    ///...
+    //! [UniqueHandleDeclaration2Snippet]
 
     /// @brief Opens a file descriptor handle for writing to /dev/null or equivalent on current OS.
     /// @return `true` if file has been opened successfully

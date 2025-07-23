@@ -18,60 +18,14 @@ namespace SC
 /// @tparam Definition Pass in a custom Definition declaring Sizes and alignment on different platforms
 ///
 /// Example:
-/**
- * @code{.cpp}
- // ... in the header file
- struct TestObject
- {
-    private:
-    struct Internal;
-
-    // Define maximum sizes and alignment in bytes of Internal object on each platform
-    struct InternalDefinition
-    {
-        static constexpr int Windows = 224;
-        static constexpr int Apple   = 144;
-        static constexpr int Linux   = sizeof(void*);
-        static constexpr int Default = Linux;
-
-        static constexpr size_t Alignment = alignof(void*);
-
-        using Object = Internal;
-    };
-
-  public:
-    // Must be public to avoid GCC complaining
-    using InternalOpaque = OpaqueObject<InternalDefinition>;
-
-  private:
-    InternalOpaque internal;
-};
-
-// ... In .cpp file
-
-// Declare Internal struct with all platform specific details
-struct SC::TestObject::Internal
-{
-    SC_NtSetInformationFile    pNtSetInformationFile = nullptr;
-    LPFN_CONNECTEX             pConnectEx            = nullptr;
-    LPFN_ACCEPTEX              pAcceptEx             = nullptr;
-    LPFN_DISCONNECTEX          pDisconnectEx         = nullptr;
-    // ... additional stuff
-};
-
-// Declare only two of the four functions to avoid linker errors.
-template <>
-void SC::TestObject::InternalOpaque::construct(Handle& buffer)
-{
-    placementNew(buffer.reinterpret_as<Object>());
-}
-template <>
-void SC::TestObject::InternalOpaque::destruct(Object& obj)
-{
-    obj.~Object();
-}
- @endcode
-*/
+///
+/// ... in the header file
+/// @snippet Libraries/FileSystemWatcher/FileSystemWatcher.h OpaqueDeclarationSnippet
+/// ... in .cpp file
+/// Declare Internal struct with all platform specific details (requiring OS specific headers).
+/// @snippet Libraries/FileSystemWatcher/Internal/FileSystemWatcherApple.inl OpaqueDefinition1Snippet
+/// Declare only two of the four functions to avoid linker errors.
+/// @snippet Libraries/FileSystemWatcher/FileSystemWatcher.cpp OpaqueDefinition2Snippet
 template <typename Definition>
 struct OpaqueObject
 {

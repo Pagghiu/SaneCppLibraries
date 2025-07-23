@@ -37,14 +37,12 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @param args arguments to format
     /// @return `true` if format succeeded
     /// @n
-    /**
-        @code{.cpp}
-        String        buffer(StringEncoding::Ascii); // Or SmallString<N>
-        StringBuilder builder(buffer);
-        SC_TRY(builder.format("[{1}-{0}]", "Storia", "Bella"));
-        SC_ASSERT_RELEASE(builder.view() == "[Bella-Storia]");
-        @endcode
-    */
+    /// @code{.cpp}
+    /// String        buffer(StringEncoding::Ascii); // Or SmallString<N>
+    /// StringBuilder builder(buffer);
+    /// SC_TRY(builder.format("[{1}-{0}]", "Storia", "Bella"));
+    /// SC_ASSERT_RELEASE(builder.view() == "[Bella-Storia]");
+    /// @endcode
     template <typename... Types>
     [[nodiscard]] bool format(StringView fmt, Types&&... args);
 
@@ -54,16 +52,14 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @param args arguments to format
     /// @return `true` if format succeeded
     /// @n
-    /**
-     * Example:
-        @code{.cpp}
-        String        buffer(StringEncoding::Ascii); // Or SmallString<N>
-        StringBuilder builder(buffer);
-        SC_TRY(builder.append("Salve"));
-        SC_TRY(builder.append(" {1} {0}!!!", "tutti", "a"));
-        SC_ASSERT_RELEASE(builder.view() == "Salve a tutti!!!");
-        @endcode
-    */
+    /// Example:
+    /// @code{.cpp}
+    /// String        buffer(StringEncoding::Ascii); // Or SmallString<N>
+    /// StringBuilder builder(buffer);
+    /// SC_TRY(builder.append("Salve"));
+    /// SC_TRY(builder.append(" {1} {0}!!!", "tutti", "a"));
+    /// SC_ASSERT_RELEASE(builder.view() == "Salve a tutti!!!");
+    /// @endcode
     template <typename... Types>
     [[nodiscard]] bool append(StringView fmt, Types&&... args);
 

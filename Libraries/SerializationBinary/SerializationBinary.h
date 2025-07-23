@@ -38,14 +38,14 @@ struct SerializationBinary
     ///
     /// Assuming the following struct:
     /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryWriteSnippet1
-    /**
-     * `PrimitiveStruct` can be written to a binary buffer with the following code:
-     * @code{.cpp}
-        PrimitiveStruct objectToSerialize;
-        Vector buffer;
-        SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
-     * @endcode
-    */
+
+    /// `PrimitiveStruct` can be written to a binary buffer with the following code:
+    /// @code{.cpp}
+    /// PrimitiveStruct objectToSerialize;
+    /// Vector buffer;
+    /// SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
+    /// @endcode
+
     template <typename T>
     [[nodiscard]] static bool write(T& value, Buffer& buffer, size_t* numberOfWrites = nullptr)
     {
@@ -73,25 +73,23 @@ struct SerializationBinary
     ///
     /// Assuming the following structs:
     /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryExactSnippet1
-    /**
-     * `TopLevelStruct` can be serialized and de-serialized with the following code:
-     * @code{.cpp}
-
-    TopLevelStruct objectToSerialize;
-    TopLevelStruct deserializedObject;
-
-    // Change a field just as a test
-    objectToSerialize.nestedStruct.doubleVal = 44.4;
-
-    // Serialization
-    Vector buffer;
-    SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
-
-    // Deserialization
-    SC_TRY(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst()));
-    SC_ASSERT_RELEASE(objectToSerialize.nestedStruct.doubleVal == deserializedObject.nestedStruct.doubleVal);
-     * @endcode
-    */
+    /// `TopLevelStruct` can be serialized and de-serialized with the following code:
+    /// @code{.cpp}
+    ///
+    /// TopLevelStruct objectToSerialize;
+    /// TopLevelStruct deserializedObject;
+    ///
+    /// // Change a field just as a test
+    /// objectToSerialize.nestedStruct.doubleVal = 44.4;
+    ///
+    /// // Serialization
+    /// Vector buffer;
+    /// SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
+    ///
+    /// // Deserialization
+    /// SC_TRY(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst()));
+    /// SC_ASSERT_RELEASE(objectToSerialize.nestedStruct.doubleVal == deserializedObject.nestedStruct.doubleVal);
+    /// @endcode
     template <typename T>
     [[nodiscard]] static bool loadExact(T& value, Span<const char> buffer, size_t* numberOfReads = nullptr)
     {
@@ -124,21 +122,19 @@ struct SerializationBinary
     /// @n
     /// Assuming the following structs:
     /// \snippet Tests/Libraries/SerializationBinary/SerializationSuiteTest.h serializationBinaryVersionedSnippet1
-    /**
-     * `VersionedStruct2` can be deserialized from `VersionedStruct1` in the following way
-     * @code{.cpp}
-        constexpr auto   schema = SerializerSchemaCompiler::template compile<VersionedStruct1>();
-        VersionedStruct1 objectToSerialize;
-        VersionedStruct2 deserializedObject;
-
-        // Serialization
-        Vector buffer;
-        SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
-
-        // Deserialization
-        SC_TRY(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos));
-     * @endcode
-    */
+    /// `VersionedStruct2` can be deserialized from `VersionedStruct1` in the following way
+    /// @code{.cpp}
+    ///  constexpr auto   schema = SerializerSchemaCompiler::template compile<VersionedStruct1>();
+    ///  VersionedStruct1 objectToSerialize;
+    ///  VersionedStruct2 deserializedObject;
+    ///
+    ///  // Serialization
+    ///  Vector buffer;
+    ///  SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
+    ///
+    ///  // Deserialization
+    ///  SC_TRY(SerializerReader::loadVersioned(deserializedObject, buffer.toSpanConst(), schema.typeInfos));
+    /// @endcode
     template <typename T>
     [[nodiscard]] static bool loadVersioned(T& value, Span<const char> buffer, Span<const Reflection::TypeInfo> schema,
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)

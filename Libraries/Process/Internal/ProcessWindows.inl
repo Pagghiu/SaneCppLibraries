@@ -316,14 +316,13 @@ extern "C"
                                                 _In_opt_ PSECURITY_DESCRIPTOR       ThreadSecurityDescriptor,
                                                 _In_opt_ HANDLE                     DebugPort,
                                                 _Out_ PRTL_USER_PROCESS_INFORMATION ProcessInformation);
-    /**
-     * Terminates the specified process.
-     *
-     * @param ProcessHandle Optional. A handle to the process to be terminated. If this parameter is NULL, the calling
-     * process is terminated.
-     * @param ExitStatus The exit status to be used by the process and the process's termination status.
-     * @return NTSTATUS Successful or errant status.
-     */
+
+    // Terminates the specified process.
+    //
+    // @param ProcessHandle Optional. A handle to the process to be terminated. If this parameter is NULL, the calling
+    // process is terminated.
+    // @param ExitStatus The exit status to be used by the process and the process's termination status.
+    // @return NTSTATUS Successful or errant status.
     NTSYSCALLAPI NTSTATUS NTAPI NtTerminateProcess(_In_opt_ HANDLE ProcessHandle, _In_ NTSTATUS ExitStatus);
 }
 

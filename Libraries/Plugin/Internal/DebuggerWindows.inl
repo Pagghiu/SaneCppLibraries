@@ -84,17 +84,25 @@ struct SC::Debugger::Internal
         {
             theFile = theFile.sliceStart(1); // Eat one slash
         }
+        //! [DeferredSnippet]
         HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, processId);
         if (processHandle == nullptr)
         {
             return false;
         }
         auto deferDeleteProcessHandle = SC::MakeDeferred(
+            // Function (or lambda) that will be invoked at the end of scope
             [&]
             {
                 CloseHandle(processHandle);
                 processHandle = nullptr;
             });
+        // Use processHandle that will be disposed at end of scope by the Deferred
+
+        // ...
+        // Deferred can be disarmed, meaning that the dispose function will not be executed
+        // deferDeleteProcessHandle.disarm();
+        //! [DeferredSnippet]
 
         DWORD handleCount;
         BOOL  error = GetProcessHandleCount(processHandle, &handleCount);

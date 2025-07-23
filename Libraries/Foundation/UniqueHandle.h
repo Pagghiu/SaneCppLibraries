@@ -13,55 +13,15 @@ namespace SC
 /// @tparam Definition A struct declaring handle type, release function and invalid handle value.
 ///
 /// Example:
-/**
- * @code{.cpp}
-    // ... definition in header
-    struct PosixFileDescriptorDefinition
-    {
-        using Handle = int; // fd
-        static Result releaseHandle(Handle& handle);
-
-        static constexpr Handle Invalid = -1; // invalid fd
-    };
-
-    using PosixFileDescriptor = UniqueHandle<PosixFileDescriptorDefinition>;
-
-    // ...declaration in .cpp file
-
-    Result PosixFileDescriptorDefinition::releaseHandle(Handle& handle)
-    {
-        if (::close(handle) != 0)
-        {
-            return Result::Error("releaseHandle - close failed");
-        }
-        return Result(true);
-    }
-
-    // ... usage
-    PosixFileDescriptor myDescriptor;
-
-    const int nativeFd = ::open(filePath.getNullTerminatedNative(), flags, access);
-
-    // Assign the native handle to UniqueHandle (will release the existing one, if any)
-    myDescriptor.assign(nativeFd);
-
-    // UniqueHandle can only be moved, but not copied
-    PosixFileDescriptor otherDescriptor = move(myDescriptor);
-    // PosixFileDescriptor otherDescriptor = myDescriptor; // <- Doesn't compile
-
-    // Explicitly close (or it will be automatically released on scope close / destructor)
-    otherDescriptor.close()
-
-    // If detach() is called, the handle will be made invalid without releasing it
-    otherDescriptor.detach()
-
-    // Check handle for validity
-    if(otherDescriptor.isValid())
-    {
-        // ... do something
-    }
- @endcode
-*/
+///
+/// ... definition in header
+/// @snippet Libraries/File/File.h UniqueHandleDeclaration1Snippet
+/// ... derive from it
+/// @snippet Libraries/File/File.h UniqueHandleDeclaration2Snippet
+/// ...declaration in .cpp file
+/// @snippet Libraries/File/File.cpp UniqueHandleDefinitionSnippet
+/// ...usage
+/// @snippet Tests/Libraries/File/FileTest.cpp UniqueHandleExampleSnippet
 template <typename Definition>
 struct UniqueHandle
 {

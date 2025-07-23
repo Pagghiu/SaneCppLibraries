@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+//! [OpaqueDefinition1Snippet]
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 
 #include "../../Async/Async.h"
@@ -14,13 +15,6 @@
 // TODO: Figure out another API for ios as this is a private API and it will not be accepted on app store.
 #include "FSEventsIOS.h"
 #endif
-
-struct SC::FileSystemWatcher::ThreadRunnerInternal
-{
-};
-struct SC::FileSystemWatcher::FolderWatcherInternal
-{
-};
 
 struct SC::FileSystemWatcher::Internal
 {
@@ -38,6 +32,9 @@ struct SC::FileSystemWatcher::Internal
     Notification   notification;
     FolderWatcher* watcher;
     Atomic<bool>   closing = false;
+
+    //...
+    //! [OpaqueDefinition1Snippet]
 
     Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
@@ -395,3 +392,9 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) co
 {
     return Result(path.path.assign(fullPath));
 }
+struct SC::FileSystemWatcher::ThreadRunnerInternal
+{
+};
+struct SC::FileSystemWatcher::FolderWatcherInternal
+{
+};

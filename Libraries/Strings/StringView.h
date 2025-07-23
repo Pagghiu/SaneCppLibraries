@@ -24,26 +24,24 @@ struct SC_COMPILER_EXPORT StringAlgorithms;
 /// During construction the encoding information and the null-termination state must be specified.
 /// All methods are const because it's not possible to modify a string with it.
 /// @n
-/**
-    Example (Construct)
-    @code{.cpp}
-    StringView s("asd");
-    SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
-    SC_ASSERT_RELEASE(s.isNullTerminated());
-    @endcode
+/// Example (Construct)
+/// @code{.cpp}
+/// StringView s("asd");
+/// SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
+/// SC_ASSERT_RELEASE(s.isNullTerminated());
+/// @endcode
+/// Example (Construct from null terminated string)
+/// @code{.cpp}
+/// const char* someString = "asdf";
+/// // construct only "asd", not null terminated (as there is 'f' after 'd')
+/// StringView s({someString, strlen(asd) - 1}, false, StringEncoding::Ascii);
+/// SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
+/// SC_ASSERT_RELEASE(not s.isNullTerminated());
+/// //
+/// // ... or
+/// StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
+/// @endcode
 
-    Example (Construct from null terminated string)
-    @code{.cpp}
-    const char* someString = "asdf";
-    // construct only "asd", not null terminated (as there is 'f' after 'd')
-    StringView s({someString, strlen(asd) - 1}, false, StringEncoding::Ascii);
-    SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
-    SC_ASSERT_RELEASE(not s.isNullTerminated());
-    //
-    // ... or
-    StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
-    @endcode
-*/
 struct SC::StringView : public StringSpan
 {
     StringView() : StringSpan() {}
@@ -532,35 +530,31 @@ struct SC::StringViewTokenizer
     /// @param options If to skip empty tokens or not
     /// @return `true` if there are additional tokens to parse
     /// @n
-    /**
-     * Example:
-        @code{.cpp}
-        StringViewTokenizer tokenizer("bring,me,the,horizon");
-        while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
-        {
-            console.printLine(tokenizer.component);
-        }
-        @endcode
-    */
+    /// Example:
+    /// @code{.cpp}
+    /// StringViewTokenizer tokenizer("bring,me,the,horizon");
+    /// while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
+    /// {
+    ///     console.printLine(tokenizer.component);
+    /// }
+    /// @endcode
     [[nodiscard]] bool tokenizeNext(Span<const StringCodePoint> separators, Options options = Options::SkipEmpty);
 
     /// @brief Tokenizes from current position to first newline.
     ///
     /// @return `true` if a new line has been found
     /// @n
-    /**
-     * Example:
-        @code{.cpp}
-         StringViewTokenizer lines("Line1\nLine2\nLine3\n");
-         SC_TEST_EXPECT(lines.tokenizeNextLine());
-         SC_TEST_EXPECT(lines.component == "Line1");
-         SC_TEST_EXPECT(lines.tokenizeNextLine());
-         SC_TEST_EXPECT(lines.component == "Line2");
-         SC_TEST_EXPECT(lines.tokenizeNextLine());
-         SC_TEST_EXPECT(lines.component == "Line3");
-         SC_TEST_EXPECT(not lines.tokenizeNextLine());
-         @endcode
-     */
+    /// Example:
+    /// @code{.cpp}
+    /// StringViewTokenizer lines("Line1\nLine2\nLine3\n");
+    /// SC_TEST_EXPECT(lines.tokenizeNextLine());
+    /// SC_TEST_EXPECT(lines.component == "Line1");
+    /// SC_TEST_EXPECT(lines.tokenizeNextLine());
+    /// SC_TEST_EXPECT(lines.component == "Line2");
+    /// SC_TEST_EXPECT(lines.tokenizeNextLine());
+    /// SC_TEST_EXPECT(lines.component == "Line3");
+    /// SC_TEST_EXPECT(not lines.tokenizeNextLine());
+    /// @endcode
     [[nodiscard]] bool tokenizeNextLine() { return tokenizeNext({'\n'}); }
 
     /// @brief Count the number of tokens that exist in the string view passed in constructor, when splitted along the
@@ -569,13 +563,11 @@ struct SC::StringViewTokenizer
     /// @return Current StringViewTokenizer to inspect SC::StringViewTokenizer::numSplitsNonEmpty or
     /// SC::StringViewTokenizer::numSplitsTotal.
     /// @n
-    /**
-     * Example:
-        @code{.cpp}
-        SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsNonEmpty == 0);
-        SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsTotal == 3);
-        @endcode
-    */
+    /// Example:
+    /// @code{.cpp}
+    /// SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsNonEmpty == 0);
+    /// SC_TEST_EXPECT(StringViewTokenizer("___").countTokens('_').numSplitsTotal == 3);
+    /// @endcode
     StringViewTokenizer& countTokens(Span<const StringCodePoint> separators);
 
     /// @brief Check if the tokenizer has processed the entire the string view passed in the constructor

@@ -52,6 +52,7 @@ void SC::FileSystemWatcher::FolderWatcher::setDebugName(const char* debugName)
 #endif
 }
 
+//! [OpaqueDefinition2Snippet]
 template <>
 void SC::FileSystemWatcher::InternalOpaque::construct(Handle& buffer)
 {
@@ -62,7 +63,7 @@ void SC::FileSystemWatcher::InternalOpaque::destruct(Object& obj)
 {
     obj.~Object();
 }
-
+//! [OpaqueDefinition2Snippet]
 template <>
 void SC::FileSystemWatcher::ThreadRunner::construct(Handle& buffer)
 {
