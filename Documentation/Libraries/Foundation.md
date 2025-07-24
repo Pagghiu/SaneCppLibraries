@@ -13,8 +13,8 @@ Detailed documentation is in the @ref group_foundation topic.
 - All dependencies: *(none)*
 
 # Statistics
-- Lines of code (excluding comments): 1616
-- Lines of code (including comments): 2414
+- Lines of code (excluding comments): 1532
+- Lines of code (including comments): 2307
 
 # Features
 

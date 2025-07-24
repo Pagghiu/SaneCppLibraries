@@ -35,7 +35,7 @@ This file describes what each library depends on. It also lists the number of li
 - Direct dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
 - Lines of code (excluding comments): 700
-- Lines of code (including comments): 925
+- Lines of code (including comments): 931
 
 # [FileSystem](@ref library_file_system)
 - Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
@@ -52,14 +52,14 @@ This file describes what each library depends on. It also lists the number of li
 # [FileSystemWatcher](@ref library_file_system_watcher)
 - Direct dependencies: [Async](@ref library_async), [Foundation](@ref library_foundation), [Threading](@ref library_threading)
 - All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
-- Lines of code (excluding comments): 1225
-- Lines of code (including comments): 1557
+- Lines of code (excluding comments): 1227
+- Lines of code (including comments): 1570
 
 # [Foundation](@ref library_foundation)
 - Direct dependencies: *(none)*
 - All dependencies: *(none)*
-- Lines of code (excluding comments): 1616
-- Lines of code (including comments): 2414
+- Lines of code (excluding comments): 1532
+- Lines of code (including comments): 2307
 
 # [Hashing](@ref library_hashing)
 - Direct dependencies: [Foundation](@ref library_foundation)
@@ -83,13 +83,13 @@ This file describes what each library depends on. It also lists the number of li
 - Direct dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Threading](@ref library_threading), [Time](@ref library_time)
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Threading](@ref library_threading), [Time](@ref library_time)
 - Lines of code (excluding comments): 1464
-- Lines of code (including comments): 1844
+- Lines of code (including comments): 1852
 
 # [Process](@ref library_process)
 - Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
-- Lines of code (excluding comments): 1291
-- Lines of code (including comments): 1789
+- Lines of code (excluding comments): 1283
+- Lines of code (including comments): 1788
 
 # [Reflection](@ref library_reflection)
 - Direct dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
@@ -100,8 +100,8 @@ This file describes what each library depends on. It also lists the number of li
 # [SerializationBinary](@ref library_serialization_binary)
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
-- Lines of code (excluding comments): 625
-- Lines of code (including comments): 860
+- Lines of code (excluding comments): 594
+- Lines of code (including comments): 856
 
 # [SerializationText](@ref library_serialization_text)
 - Direct dependencies: [Foundation](@ref library_foundation), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
@@ -118,8 +118,8 @@ This file describes what each library depends on. It also lists the number of li
 # [Strings](@ref library_strings)
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 - All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
-- Lines of code (excluding comments): 3452
-- Lines of code (including comments): 4963
+- Lines of code (excluding comments): 3388
+- Lines of code (including comments): 4951
 
 # [Testing](@ref library_testing)
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
@@ -141,7 +141,6 @@ This file describes what each library depends on. It also lists the number of li
 
 ---
 # Project Total
-- Total lines of code (excluding comments): 31292
-- Total lines of code (including comments): 41364
+- Total lines of code (excluding comments): 31107
+- Total lines of code (including comments): 41267
 
-![Dependencies](Dependencies.svg)

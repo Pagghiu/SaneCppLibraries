@@ -29,7 +29,6 @@ Features and workflow (step by step):
    - Both sections are inserted before the '# Features' section if present, or at the end otherwise.
    - Any existing '# Dependencies' or '# Statistics' section is replaced.
    - Naming conventions are consistent between library name, file name, and link references.
-9. Generates an SVG pie chart (Dependencies.svg) in the documentation directory, visualizing the relative size (LOC) of each library, with a legend.
 
 Usage:
     python3 update_documentation.py [<SANE_CPP_LIBRARIES_ROOT>]
@@ -178,6 +177,55 @@ def update_library_md(lib, direct_deps, all_deps, line_counts):
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
+def update_libraries_md_table(lib_line_counts):
+    """
+    Updates the 'Lines of code' column in the Libraries.md table with the correct values (excluding comments).
+    """
+    libraries_md_path = os.path.join(PROJECT_ROOT, 'Documentation', 'Pages', 'Libraries.md')
+    if not os.path.isfile(libraries_md_path):
+        return
+    with open(libraries_md_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # Find the table start and end
+    table_start = None
+    table_end = None
+    for i, line in enumerate(lines):
+        if line.strip().startswith('Library') and 'Lines of code' in line:
+            table_start = i + 2  # skip header and separator
+        elif table_start is not None and line.strip() == '':
+            table_end = i
+            break
+    if table_start is None:
+        return  # Table not found
+    if table_end is None:
+        table_end = table_start + 1
+        while table_end < len(lines) and lines[table_end].strip():
+            table_end += 1
+
+    # Prepare a mapping from subpage name to library name
+    subpage_to_lib = {}
+    for lib in lib_line_counts:
+        subpage = f'@subpage library_{camel_to_snake(lib)}'
+        subpage_to_lib[subpage] = lib
+
+    # Update the table lines
+    for i in range(table_start, table_end):
+        line = lines[i]
+        parts = line.split('|')
+        if len(parts) < 3:
+            continue
+        subpage = parts[0].strip()
+        if subpage in subpage_to_lib:
+            lib = subpage_to_lib[subpage]
+            loc = lib_line_counts[lib][1]  # non-comment lines
+            # Replace the last column with the correct LOC
+            parts[-1] = f'   {loc}\n'
+            lines[i] = '|'.join(parts)
+
+    with open(libraries_md_path, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+
 def main():
     # Step 5: Write Markdown output
     with open(OUTPUT_MD, 'w', encoding='utf-8') as out:
@@ -207,86 +255,10 @@ def main():
         out.write('# Project Total\n')
         out.write(f'- Total lines of code (excluding comments): {total_all_non_comment}\n')
         out.write(f'- Total lines of code (including comments): {total_all_lines}\n\n')
-        out.write(f'![Dependencies](Dependencies.svg)\n')
 
-    # Generate SVG pie chart using only the Python standard library
-    svg_path = os.path.join(os.path.dirname(OUTPUT_MD), 'Dependencies.svg')
-    lib_names = []
-    lib_values = []
-    for lib in sorted(libraries):
-        lib_names.append(lib)
-        lib_values.append(lib_line_counts[lib][1])
-    total = sum(lib_values)
-    if total == 0:
-        print("No data to plot in SVG pie chart.")
-        return
-    # Pie chart parameters
-    cx, cy, r = 200, 200, 180
-    colors = [
-        '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4', '#46f0f0', '#f032e6',
-        '#bcf60c', '#fabebe', '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000', '#aaffc3',
-        '#808000', '#ffd8b1', '#000075', '#808080', '#ffffff', '#000000'
-    ]
-    svg = [
-        f'<svg width="700" height="530" viewBox="0 0 700 530" xmlns="http://www.w3.org/2000/svg">',
-        '<style> .legend { font: 14px sans-serif; } .label { font: 12px sans-serif; } </style>',
-        '<rect width="700" height="530" fill="white"/>'
-    ]
-    # Draw pie slices
-    angle = 0
-    for i, (name, value) in enumerate(zip(lib_names, lib_values)):
-        if value == 0:
-            continue
-        frac = value / total
-        theta1 = angle
-        theta2 = angle + frac * 360
-        x1 = cx + r * math.cos(math.radians(theta1 - 90))
-        y1 = cy + r * math.sin(math.radians(theta1 - 90))
-        x2 = cx + r * math.cos(math.radians(theta2 - 90))
-        y2 = cy + r * math.sin(math.radians(theta2 - 90))
-        large_arc = 1 if theta2 - theta1 > 180 else 0
-        color = colors[i % len(colors)]
-        path = (
-            f'M {cx},{cy} '  # Move to center
-            f'L {x1},{y1} '  # Line to start of arc
-            f'A {r},{r} 0 {large_arc},1 {x2},{y2} '  # Arc
-            f'Z'  # Close path
-        )
-        svg.append(f'<path d="{path}" fill="{color}" stroke="#222" stroke-width="1"/>')
-        # Add label
-        mid_angle = (theta1 + theta2) / 2
-        label_r = r * 0.65
-        lx = cx + label_r * math.cos(math.radians(mid_angle - 90))
-        ly = cy + label_r * math.sin(math.radians(mid_angle - 90))
-        percent = f"{frac*100:.1f}%"
-        # Determine rotation for label
-        text_angle = mid_angle
-        # Normalize angle to [-180, 180) for flipping logic
-        norm_angle = ((mid_angle + 90) % 360) - 180
-        flip = abs(norm_angle) <= 90  # Inverted logic
-        rotate_angle = text_angle + 90
-        if flip:
-            rotate_angle += 180
-        # Determine text color based on background brightness
-        def hex_to_rgb(hex_color):
-            hex_color = hex_color.lstrip('#')
-            return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        r_bg, g_bg, b_bg = hex_to_rgb(color)
-        brightness = 0.299 * r_bg + 0.587 * g_bg + 0.114 * b_bg
-        text_color = '#fff' if brightness < 128 else '#000'
-        svg.append(f'<text x="{lx}" y="{ly}" class="label" text-anchor="middle" alignment-baseline="middle" transform="rotate({rotate_angle} {lx} {ly})" fill="{text_color}">{name}</text>')
-        angle = theta2
-    # Draw legend
-    legend_x = 420
-    legend_y = 20
-    for i, (name, value) in enumerate(zip(lib_names, lib_values)):
-        color = colors[i % len(colors)]
-        svg.append(f'<rect x="{legend_x}" y="{legend_y + i*22}" width="18" height="18" fill="{color}" stroke="#222"/>')
-        svg.append(f'<text x="{legend_x + 24}" y="{legend_y + 14 + i*22}" class="legend">{name} ({value})</text>')
-    svg.append('</svg>')
-    with open(svg_path, 'w', encoding='utf-8') as svg_file:
-        svg_file.write('\n'.join(svg))
-    print(f"SVG pie chart written to {svg_path}")
+    # Update Libraries.md table with LOC
+    update_libraries_md_table(lib_line_counts)
+
 
     print(f"Dependency file written to {OUTPUT_MD}") 
 

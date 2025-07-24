@@ -18,7 +18,7 @@ Plugin library allows extending application compiling C++ source to executable c
 
 # Statistics
 - Lines of code (excluding comments): 1464
-- Lines of code (including comments): 1844
+- Lines of code (including comments): 1852
 
 # Features
 - Compile and link cpp files to dynamic library

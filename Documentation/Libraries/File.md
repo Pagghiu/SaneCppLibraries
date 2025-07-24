@@ -12,7 +12,7 @@ File library allows synchronous I/O operations on files and pipes.
 
 # Statistics
 - Lines of code (excluding comments): 700
-- Lines of code (including comments): 925
+- Lines of code (including comments): 931
 
 # Features
 | SC::FileDescriptor                | @copybrief SC::FileDescriptor                 |
