@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Containers/StrongID.h"
 #include "../Containers/Vector.h"
-#include "../Foundation/StrongID.h"
 
 namespace SC
 {

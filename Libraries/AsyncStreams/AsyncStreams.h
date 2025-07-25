@@ -5,7 +5,6 @@
 #include "../Foundation/Function.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
-#include "../Foundation/StrongID.h"
 #include "Internal/CircularQueue.h"
 #include "Internal/Event.h"
 
@@ -43,14 +42,22 @@
 //! @{
 namespace SC
 {
-
 /// @brief A Span of bytes memory to be read or written by async streams
 struct AsyncBufferView
 {
-    struct Tag
+    struct ID
     {
+        using NumericType = int32_t;
+        NumericType                  identifier;
+        static constexpr NumericType InvalidValue = -1;
+
+        constexpr ID() : identifier(InvalidValue) {}
+        explicit constexpr ID(int32_t value) : identifier(value) {}
+
+        [[nodiscard]] constexpr bool operator==(ID other) const { return identifier == other.identifier; }
+        [[nodiscard]] constexpr bool isValid() const { return identifier != InvalidValue; }
     };
-    using ID = StrongID<Tag>;
+
     Span<char> data;
 
   private:
