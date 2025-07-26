@@ -82,7 +82,7 @@ Shortly:
 - Include any public header (`Libraries/[Library]/*.h`)
 
 ## Windows
-- Nothing else to link (in addition to default libs)
+- If using MSVC required libraries are already implicitly linked through `#pragma comment(lib, ...)`
 
 ## macOS / iOS
 - Link `CoreFoundation.framework`

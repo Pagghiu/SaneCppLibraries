@@ -22,26 +22,9 @@ struct SC::BaseTest : public SC::TestCase
             int* b = new int[2];
             delete[] b;
         }
-        if (test_section("Assert::print"))
-        {
-            Assert::print("a!=b", "FileName.cpp", "Function", 12);
-        }
         if (test_section("Assert::printBacktrace"))
         {
-            SC_TEST_EXPECT(Assert::printBacktrace());
-            size_t frames = Assert::printBacktrace(0, static_cast<size_t>(MaxValue()));
-            SC_TEST_EXPECT(frames == 0);
-        }
-        if (test_section("Assert::captureBacktrace"))
-        {
-            void*    traceBuffer[10];
-            uint32_t hash   = 0;
-            size_t   frames = Assert::captureBacktrace(2, traceBuffer, sizeof(traceBuffer), &hash);
-            SC_TEST_EXPECT(hash != 0);
-            SC_TEST_EXPECT(frames != 0);
-            constexpr auto maxVal = static_cast<size_t>(static_cast<int>(MaxValue())) + 1;
-            frames                = Assert::captureBacktrace(2, nullptr, maxVal * sizeof(void*), &hash);
-            SC_TEST_EXPECT(frames == 0);
+            Assert::printBacktrace("a!=b", "FileName.cpp", "Function", 12);
         }
     }
 };

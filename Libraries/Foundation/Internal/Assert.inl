@@ -1,147 +1,105 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
-#if SC_PLATFORM_EMSCRIPTEN
-#include <emscripten.h>
-#elif SC_PLATFORM_WINDOWS
+
+#if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#pragma comment(lib, "Dbghelp.lib")
+#include <DbgHelp.h> // For stack trace symbol resolution
 #else
-
-#if SC_PLATFORM_APPLE
-#include <TargetConditionals.h>
-#endif
-
 #include <execinfo.h> // backtrace
+#include <string.h>   // strlen
 #include <unistd.h>   // _exit
 #endif
 
-#include <limits.h> // INT_MAX
-#include <stdio.h>  // fwrite
-#include <stdlib.h> // free
-#include <string.h> // strlen
+#include <stdio.h>  // fwrite (posix), snprintf (windows)
+#include <stdlib.h> // free (posix), _exit (windows)
 
-#if SC_PLATFORM_EMSCRIPTEN
-void SC::Assert::exit(int code) { ::emscripten_force_exit(code); }
-#else
 void SC::Assert::exit(int code) { ::_exit(code); }
-#endif
 
-void SC::Assert::printAscii(const char* str)
+struct SC::Assert::Internal
 {
-    if (str == nullptr)
-        return;
-
+    static void printAscii(const char* str)
+    {
 #if SC_PLATFORM_WINDOWS
-    ::WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str, static_cast<DWORD>(::strlen(str)), nullptr, nullptr);
-    // TODO: We should limit the string sent to OutputDebugStringA to numBytes
-    ::OutputDebugStringA(str);
+        ::WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str, static_cast<DWORD>(::strlen(str)), nullptr, nullptr);
+        ::OutputDebugStringA(str);
 #else
-    ::fwrite(str, sizeof(char), ::strlen(str), stdout);
+        ::fwrite(str, sizeof(char), ::strlen(str), stdout);
 #endif
-}
+    }
+    static bool printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
+    {
+#if SC_PLATFORM_WINDOWS
+        const size_t framesToSkip = 3; // Skip the current function and two internal functions
+        const USHORT maxFrames    = static_cast<USHORT>(backtraceBufferSizeInBytes / sizeof(void*));
+        const USHORT numFrames    = ::CaptureStackBackTrace(framesToSkip, maxFrames, backtraceBuffer, nullptr);
+        if (numFrames == 0)
+            return false;
 
-#if SC_PLATFORM_EMSCRIPTEN or SC_PLATFORM_WINDOWS
+        HANDLE process = ::GetCurrentProcess();
+        ::SymInitialize(process, nullptr, TRUE);
 
-bool SC::Assert::printBacktrace() { return true; }
+        char         symbolBuffer[sizeof(SYMBOL_INFO) + 256];
+        SYMBOL_INFO* symbol  = reinterpret_cast<SYMBOL_INFO*>(symbolBuffer);
+        symbol->MaxNameLen   = 255;
+        symbol->SizeOfStruct = sizeof(SYMBOL_INFO);
 
-bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
-{
-    SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
-    if (!backtraceBuffer)
-        return false;
-    return true;
-}
-
-SC::size_t SC::Assert::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
-                                        uint32_t* hash)
-{
-    SC_COMPILER_UNUSED(framesToSkip);
-    SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
-    if (hash)
-        *hash = 1;
-    if (backtraceBuffer == nullptr)
-        return 0;
-    return 1;
-}
-
+        for (USHORT i = 0; i < numFrames; ++i)
+        {
+            DWORD64 address = (DWORD64)(backtraceBuffer[i]);
+            if (::SymFromAddr(process, address, 0, symbol))
+            {
+                char buffer[512];
+                ::snprintf(buffer, sizeof(buffer), "[%u] %s - 0x%p\n", i, symbol->Name, (void*)address);
+                printAscii(buffer);
+            }
+            else
+            {
+                char buffer[128];
+                ::snprintf(buffer, sizeof(buffer), "[%u] ??? - 0x%p\n", i, (void*)address);
+                printAscii(buffer);
+            }
+        }
+        ::SymCleanup(process);
+        return true;
 #else
-
-bool SC::Assert::printBacktrace()
-{
-    void* backtraceBuffer[100];
-    return printBacktrace(backtraceBuffer, sizeof(backtraceBuffer));
-}
-
-bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
-{
-    const size_t numFrames = captureBacktrace(2, backtraceBuffer, backtraceBufferSizeInBytes, nullptr);
-    if (numFrames == 0)
-    {
-        return false;
-    }
-    char** strs = ::backtrace_symbols(backtraceBuffer, static_cast<int>(numFrames));
-    for (size_t i = 0; i < numFrames; ++i)
-    {
-        printAscii(strs[i]);
-        printAscii("\n");
-    }
-    // TODO: Fix Backtrace line numbers
-    // https://stackoverflow.com/questions/8278691/how-to-fix-backtrace-line-number-error-in-c
-    ::free(strs);
-    return true;
-}
-
-SC::size_t SC::Assert::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
-                                        uint32_t* hash)
-{
-    const size_t framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
-    if (framesToCapture > INT_MAX or (backtraceBuffer == nullptr))
-    {
-        return 0;
-    }
-    // This signature maps 1 to 1 with windows CaptureStackBackTrace, at some
-    // point we will allow framesToSkip > 0 and compute has
-    int numFrames = ::backtrace(backtraceBuffer, static_cast<int>(framesToCapture));
-    if (framesToSkip > static_cast<size_t>(numFrames))
-        return 0;
-    numFrames -= framesToSkip;
-    if (framesToSkip > 0)
-    {
-        for (int frame = 0; frame < numFrames; ++frame)
+        const size_t framesToSkip    = 2;
+        const size_t framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
+        int          numFrames       = ::backtrace(backtraceBuffer, static_cast<int>(framesToCapture));
+        if (framesToSkip > static_cast<size_t>(numFrames))
+            return 0;
+        numFrames -= framesToSkip;
+        if (framesToSkip > 0)
         {
-            backtraceBuffer[frame] = backtraceBuffer[static_cast<size_t>(frame) + framesToSkip];
+            for (int frame = 0; frame < numFrames; ++frame)
+            {
+                backtraceBuffer[frame] = backtraceBuffer[static_cast<size_t>(frame) + framesToSkip];
+            }
         }
-    }
-    if (hash)
-    {
-        uint32_t computedHash = 0;
-        // TODO: Compute a proper hash
-        for (int i = 0; i < numFrames; ++i)
+        if (numFrames == 0)
         {
-            uint32_t value;
-            ::memcpy(&value, backtraceBuffer[i], sizeof(uint32_t));
-            computedHash ^= value;
+            return false;
         }
-        *hash = computedHash;
-    }
-    return static_cast<size_t>(numFrames);
-}
-
+        char** strs = ::backtrace_symbols(backtraceBuffer, static_cast<int>(numFrames));
+        for (int idx = 0; idx < numFrames; ++idx)
+        {
+            printAscii(strs[idx]);
+            printAscii("\n");
+        }
+        ::free(strs);
+        return true;
 #endif
+    }
+};
 
-void SC::Assert::print(const char* expression, const char* filename, const char* functionName, int lineNumber)
+void SC::Assert::printBacktrace(const char* expression, const char* filename, const char* function, int line)
 {
-    // Here we're explicitly avoiding usage of StringFormat to avoid dynamic allocation
-    printAscii("Assertion failed: (");
-    printAscii(expression);
-    printAscii(")\nFile: ");
-    printAscii(filename);
-    printAscii("\nFunction: ");
-    printAscii(functionName);
-    printAscii("\nLine: ");
-    char buffer[50];
-    ::snprintf(buffer, sizeof(buffer), "%d", lineNumber);
-    printAscii(buffer);
-    printAscii("\n");
+    char buffer[2048];
+    ::snprintf(buffer, sizeof(buffer), "Assertion failed: (%s)\nFile: %s\nFunction: %s\nLine: %d\n", expression,
+               filename, function, line);
+    Internal::printAscii(buffer);
+    void* backtraceBuffer[256];
+    Internal::printBacktrace(backtraceBuffer, sizeof(backtraceBuffer));
 }
