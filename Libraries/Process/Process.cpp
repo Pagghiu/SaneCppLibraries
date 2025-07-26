@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "Process.h"
 #include "../File/File.h"
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"
@@ -78,6 +77,38 @@ SC::Result SC::ProcessChain::waitForExitSync()
     }
     processes.clear();
     return Result(true);
+}
+
+void SC::ProcessChain::ProcessLinkedList::clear()
+{
+    Process* current = front;
+    while (current != nullptr)
+    {
+        Process* next = current->next;
+        current->next = nullptr;
+        current->prev = nullptr;
+        current       = next;
+    }
+    back  = nullptr;
+    front = nullptr;
+}
+
+void SC::ProcessChain::ProcessLinkedList::queueBack(Process& process)
+{
+    SC_ASSERT_DEBUG(process.next == nullptr and process.prev == nullptr);
+    if (back)
+    {
+        back->next   = &process;
+        process.prev = back;
+    }
+    else
+    {
+        SC_ASSERT_DEBUG(front == nullptr);
+        front = &process;
+    }
+    back = &process;
+    SC_ASSERT_DEBUG(back->next == nullptr);
+    SC_ASSERT_DEBUG(front->prev == nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------------

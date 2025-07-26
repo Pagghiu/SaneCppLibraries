@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../File/File.h"
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 #include "../Foundation/Platform.h"
+#include "Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #include <string.h> // strncpy
 

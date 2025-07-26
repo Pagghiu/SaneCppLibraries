@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/Internal/IntrusiveDoubleLinkedList.h"
-#include "Libraries/Foundation/Internal/IntrusiveDoubleLinkedList.inl"
+#include "Libraries/Async/Internal/IntrusiveDoubleLinkedList.h"
+#include "Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

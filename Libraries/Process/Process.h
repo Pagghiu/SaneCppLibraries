@@ -6,7 +6,6 @@
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/StringPath.h"
 
 namespace SC
@@ -296,7 +295,6 @@ struct SC_COMPILER_EXPORT Process
 
     bool inheritEnv = true;
 
-    friend struct IntrusiveDoubleLinkedList<Process>;
     friend struct ProcessChain;
     ProcessChain* parent = nullptr;
 
@@ -354,7 +352,18 @@ struct SC_COMPILER_EXPORT ProcessChain
     }
 
   private:
-    IntrusiveDoubleLinkedList<Process> processes;
+    // Trimmed duplicate of IntrusiveDoubleLinkedList<T>
+    struct ProcessLinkedList
+    {
+        Process* back  = nullptr; // has no next
+        Process* front = nullptr; // has no prev
+
+        [[nodiscard]] bool isEmpty() const { return front == nullptr; }
+
+        void clear();
+        void queueBack(Process& process);
+    };
+    ProcessLinkedList processes;
 };
 
 /// @brief Reads current process environment variables

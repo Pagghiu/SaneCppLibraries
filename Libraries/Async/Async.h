@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Async/Internal/IntrusiveDoubleLinkedList.h"
 #include "../File/File.h"
 #include "../FileSystem/FileSystem.h"
 #include "../Foundation/Function.h"
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"

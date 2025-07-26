@@ -10,7 +10,6 @@ void runBuildTest(TestReport& report);
 // Foundation
 void runBaseTest(TestReport& report);
 void runBufferTest(TestReport& report);
-void runIntrusiveDoubleLinkedListTest(TestReport& report);
 void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
@@ -92,6 +91,7 @@ void runAsyncTest(SC::TestReport& report);
 void runAsyncStreamTest(SC::TestReport& report);
 void runAsyncRequestStreamTest(SC::TestReport& report);
 void runZLibStreamTest(TestReport& report);
+void runIntrusiveDoubleLinkedListTest(TestReport& report);
 
 // Support
 void runDebugVisualizersTest(TestReport& report);
@@ -145,7 +145,6 @@ int main(int argc, const char* argv[])
     runBaseTest(report);
     runBufferTest(report);
     runFunctionTest(report);
-    runIntrusiveDoubleLinkedListTest(report);
     runVirtualMemoryTest(report);
     runUniqueHandleTest(report);
     runGlobalsTest(report);
@@ -226,6 +225,7 @@ int main(int argc, const char* argv[])
     runAsyncStreamTest(report);
     runAsyncRequestStreamTest(report);
     runZLibStreamTest(report);
+    runIntrusiveDoubleLinkedListTest(report);
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);

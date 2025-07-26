@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Foundation/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
+#include "../Async/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"
