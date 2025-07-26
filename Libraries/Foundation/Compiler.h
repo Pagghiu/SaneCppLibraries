@@ -73,25 +73,21 @@
 
 #define SC_COMPILER_EXTERN
 #if defined(SC_PLUGIN_LIBRARY)
-#define SC_COMPILER_EXPORT ///< Macro for handling symbol visibility for plugin library.
+#define SC_COMPILER_EXPORT
 #else
-#define SC_COMPILER_EXPORT                                                                                             \
-    __attribute__((visibility("default"))) ///< Macro for symbol visibility in non-MSVC compilers.
+#define SC_COMPILER_EXPORT __attribute__((visibility("default")))
 #endif
 
 #endif
 
 #if !DOXYGEN && defined(SC_LIBRARY_PATH)
-#define SC_COMPILER_MACRO_ESCAPE(input)          __SC_COMPILER_MACRO_ESCAPE_HELPER(input) ///< Macro to escape input.
-#define __SC_COMPILER_MACRO_ESCAPE_HELPER(input) #input  ///< Macro helper for escaping input.
-#define __SC_COMPILER_MACRO_TO_LITERAL(string)   #string ///< Macro for string to literal conversion.
-#define SC_COMPILER_MACRO_TO_LITERAL(string)                                                                           \
-    __SC_COMPILER_MACRO_TO_LITERAL(string) ///< Macro for string to literal conversion.
-#define SC_COMPILER_LIBRARY_PATH                                                                                       \
-    SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_LIBRARY_PATH)) ///< Macro to get literal library path.
+#define SC_COMPILER_MACRO_ESCAPE(input)          __SC_COMPILER_MACRO_ESCAPE_HELPER(input)
+#define __SC_COMPILER_MACRO_ESCAPE_HELPER(input) #input
+#define __SC_COMPILER_MACRO_TO_LITERAL(string)   #string
+#define SC_COMPILER_MACRO_TO_LITERAL(string)     __SC_COMPILER_MACRO_TO_LITERAL(string)
+#define SC_COMPILER_LIBRARY_PATH                 SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_LIBRARY_PATH))
 #endif
 
-/// Evaluates to true (1) if ASAN is active
 #if defined(__SANITIZE_ADDRESS__)
 #define SC_COMPILER_ASAN 1 ///< Flag indicating the availability of Address Sanitizer (ASAN).
 #else
@@ -110,17 +106,13 @@
 /// Returns offset of Class::Field in bytes
 #define SC_COMPILER_OFFSETOF(Class, Field) __builtin_offsetof(Class, Field)
 
+// clang-format off
 namespace SC
 {
-template <int offset, typename T, typename R>
-T& fieldOffset(R& object)
-{
-    return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset);
-}
+template <int offset, typename T, typename R> T& fieldOffset(R& object) { return *reinterpret_cast<T*>(reinterpret_cast<char*>(&object) - offset); }
 } // namespace SC
-
-#define SC_COMPILER_FIELD_OFFSET(Class, Field, Value)                                                                  \
-    SC::fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
+#define SC_COMPILER_FIELD_OFFSET(Class, Field, Value)  SC::fieldOffset<SC_COMPILER_OFFSETOF(Class, Field), Class, decltype(Class::Field)>(Value);
+// clang-format on
 
 /// Disables invalid-offsetof gcc and clang warning
 #if SC_COMPILER_CLANG
@@ -149,8 +141,7 @@ T& fieldOffset(R& object)
 #define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834 6031)")
 #endif
 
-/// `SC_LANGUAGE_FORCE_STANDARD_CPP` == `14`, `17` or `20` to force a specific C++ standard version (`202002L`,
-/// `201703L` or `201402L`)
+/// `SC_LANGUAGE_FORCE_STANDARD_CPP` == `14`, `17` or `20` to force a specific C++ standard version.
 #if defined(SC_LANGUAGE_FORCE_STANDARD_CPP)
 #if SC_LANGUAGE_FORCE_STANDARD_CPP == 14
 #define SC_LANGUAGE_CPP_VERSION 201402L
@@ -173,31 +164,28 @@ T& fieldOffset(R& object)
 #endif
 
 #if SC_LANGUAGE_CPP_VERSION >= 202002L
-#define SC_LANGUAGE_CPP_LESS_THAN_20 0
-#define SC_LANGUAGE_CPP_AT_LEAST_20  1
-#define SC_LANGUAGE_CPP_AT_LEAST_17  1
-#define SC_LANGUAGE_CPP_AT_LEAST_14  1
+
+#define SC_LANGUAGE_CPP_AT_LEAST_20 1
+#define SC_LANGUAGE_CPP_AT_LEAST_17 1
+#define SC_LANGUAGE_CPP_AT_LEAST_14 1
 
 #elif SC_LANGUAGE_CPP_VERSION >= 201703L
 
-#define SC_LANGUAGE_CPP_LESS_THAN_20 1
-#define SC_LANGUAGE_CPP_AT_LEAST_20  0
-#define SC_LANGUAGE_CPP_AT_LEAST_17  1
-#define SC_LANGUAGE_CPP_AT_LEAST_14  1
+#define SC_LANGUAGE_CPP_AT_LEAST_20 0
+#define SC_LANGUAGE_CPP_AT_LEAST_17 1
+#define SC_LANGUAGE_CPP_AT_LEAST_14 1
 
 #elif SC_LANGUAGE_CPP_VERSION >= 201402L
 
-#define SC_LANGUAGE_CPP_LESS_THAN_20 1
-#define SC_LANGUAGE_CPP_AT_LEAST_20  0
-#define SC_LANGUAGE_CPP_AT_LEAST_17  0
-#define SC_LANGUAGE_CPP_AT_LEAST_14  1
+#define SC_LANGUAGE_CPP_AT_LEAST_20 0
+#define SC_LANGUAGE_CPP_AT_LEAST_17 0
+#define SC_LANGUAGE_CPP_AT_LEAST_14 1
 
 #else
 
-#define SC_LANGUAGE_CPP_LESS_THAN_20 1 ///< True (1) if C++ standard is  < C++ 20
-#define SC_LANGUAGE_CPP_AT_LEAST_20  0 ///< True (1) if C++ standard is <= C++ 20
-#define SC_LANGUAGE_CPP_AT_LEAST_17  0 ///< True (1) if C++ standard is <= C++ 17
-#define SC_LANGUAGE_CPP_AT_LEAST_14  0 ///< True (1) if C++ standard is <= C++ 14
+#define SC_LANGUAGE_CPP_AT_LEAST_20 0 ///< True (1) if C++ standard is <= C++ 20
+#define SC_LANGUAGE_CPP_AT_LEAST_17 0 ///< True (1) if C++ standard is <= C++ 17
+#define SC_LANGUAGE_CPP_AT_LEAST_14 0 ///< True (1) if C++ standard is <= C++ 14
 
 #endif
 

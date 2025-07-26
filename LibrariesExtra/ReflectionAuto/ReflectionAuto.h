@@ -100,7 +100,7 @@ struct c_op
     template <typename U, int M, int = cloophole(tag<T, M>{})>
     static auto inserter(int) -> char;
 
-#if SC_LANGUAGE_CPP_LESS_THAN_20
+#if SC_LANGUAGE_CPP_VERSION < 202002L
     template <typename U, int = sizeof(fn_def<T, U, N, sizeof(inserter<U, N>(0)) == sizeof(char)>)>
     operator U();
 #else

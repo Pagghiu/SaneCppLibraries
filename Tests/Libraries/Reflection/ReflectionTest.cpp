@@ -8,7 +8,7 @@
 
 // TODO: Split the Auto reflection tests in ReflectionAuto
 #if SC_REFLECT_AUTOMATIC
-#if SC_LANGUAGE_CPP_LESS_THAN_20
+#if SC_LANGUAGE_CPP_VERSION < 202002L
 #include "LibrariesExtra/ReflectionAuto/ReflectionAutoAggregates.h"
 #else
 #include "LibrariesExtra/ReflectionAuto/ReflectionAutoStructured.h"
