@@ -1,10 +1,19 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/TypeTraits.h" // RemovePointer
+#include "../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {
+namespace TypeTraits
+{
+// clang-format off
+/// RemovePointer removes the pointer qualification from a type `T`.
+template <class T> struct RemovePointer       { using type = T; };
+template <class T> struct RemovePointer<T*>   { using type = T; };
+template <class T> struct RemovePointer<T**>  { using type = T; };
+// clang-format on
+} // namespace TypeTraits
 //! @defgroup group_algorithms Algorithms
 //! @copybrief library_algorithms (see @ref library_algorithms for more details)
 

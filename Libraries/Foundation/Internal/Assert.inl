@@ -18,7 +18,7 @@
 #endif
 
 #include <stdio.h>  // fwrite
-#include <stdlib.h> // malloc, free, *_MAX (integer)
+#include <stdlib.h> // free, *_MAX (integer)
 #include <string.h> // strlen
 
 #if SC_PLATFORM_EMSCRIPTEN

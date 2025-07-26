@@ -8,8 +8,13 @@ namespace SC
 {
 namespace TypeTraits
 {
+
 //! @addtogroup group_foundation_type_traits
 //! @{
+// clang-format off
+/// ConditionalT is an alias template that resolves to type `T` if a boolean value is `true`, otherwise to type `F`.
+template <bool B, class T, class F> using ConditionalT = typename Conditional<B,T,F>::type;
+// clang-format on
 
 /// @brief Represents a variadic template type list.
 ///

@@ -53,13 +53,11 @@ EXCLUDE_PATTERNS       = *Test.h \
 PREDEFINED             = DOXYGEN
 EXCLUDE_SYMBOLS        = \
 TypeTraits::IsSame<*> \
-TypeTraits::AddReference<*> \
 TypeTraits::Conditional<*> \
 TypeTraits::EnableIf<*> \
 TypeTraits::IsConst<*> \
 TypeTraits::RemoveConst<*> \
 TypeTraits::RemovePointer<*> \
-TypeTraits::ReturnType<*> \
 TypeTraits::RemoveReference<*> \
 TypeTraits::IsLValueReference<*> \
 TypeTraits::IsRValueReference<*> \

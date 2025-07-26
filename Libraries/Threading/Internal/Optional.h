@@ -23,6 +23,12 @@ struct ReferenceWrapper
     operator const T&() const { return *ptr; }
     operator T&() { return *ptr; }
 };
+
+// clang-format off
+/// IsReference evaluates to `true` if the type `T` is a reference, `false` otherwise.
+template <class T> struct IsReference { static constexpr bool value = IsLValueReference<T>::value || IsRValueReference<T>::value; };
+// clang-format on
+
 } // namespace TypeTraits
 } // namespace SC
 
@@ -57,6 +63,11 @@ struct [[nodiscard]] SC::Optional
 
     constexpr Optional() { valueExists = false; }
 
+#if SC_LANGUAGE_CPP_AT_LEAST_20
+#define SC_LANGUAGE_CONSTEXPR_DESTRUCTOR constexpr
+#else
+#define SC_LANGUAGE_CONSTEXPR_DESTRUCTOR
+#endif
     SC_LANGUAGE_CONSTEXPR_DESTRUCTOR ~Optional()
     {
         if (valueExists)
@@ -64,6 +75,7 @@ struct [[nodiscard]] SC::Optional
             value.~ValueType();
         }
     }
+#undef SC_LANGUAGE_CONSTEXPR_DESTRUCTOR
 
     constexpr Optional(Optional&& other) noexcept
     {

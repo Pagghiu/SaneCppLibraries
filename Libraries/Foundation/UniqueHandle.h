@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/TypeTraits.h" // ReturnType<T>
+#include "../Foundation/Result.h"
 
 namespace SC
 {
@@ -25,8 +25,7 @@ namespace SC
 template <typename Definition>
 struct UniqueHandle
 {
-    using Handle          = typename Definition::Handle;
-    using CloseReturnType = typename TypeTraits::ReturnType<decltype(Definition::releaseHandle)>::type;
+    using Handle = typename Definition::Handle;
 
     static constexpr Handle Invalid = Definition::Invalid;
 
@@ -40,32 +39,32 @@ struct UniqueHandle
     /// @brief Move assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param other The handle to be move-assigned
     /// @return Returns invalid result if close failed
-    [[nodiscard]] CloseReturnType assign(UniqueHandle&& other)
+    [[nodiscard]] Result assign(UniqueHandle&& other)
     {
         if (other.handle == handle)
-            return CloseReturnType(false);
+            return Result(false);
         if (close())
         {
             handle = other.handle;
             other.detach();
-            return CloseReturnType(true);
+            return Result(true);
         }
-        return CloseReturnType(false);
+        return Result(false);
     }
 
     /// @brief Copy assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param externalHandle The handle to be copy assigned
     /// @return Returns invalid result if close failed
-    [[nodiscard]] CloseReturnType assign(const Handle& externalHandle)
+    [[nodiscard]] Result assign(const Handle& externalHandle)
     {
         if (handle == externalHandle)
-            return CloseReturnType(false);
+            return Result(false);
         if (close())
         {
             handle = externalHandle;
-            return CloseReturnType(true);
+            return Result(true);
         }
-        return CloseReturnType(false);
+        return Result(false);
     }
 
     UniqueHandle& operator=(UniqueHandle&& other)
@@ -85,19 +84,19 @@ struct UniqueHandle
     /// @param outHandle Output native OS handle
     /// @param invalidReturnType the value to be returned if this function fails
     /// @return invalidReturnType if isValid() == `false`
-    [[nodiscard]] CloseReturnType get(Handle& outHandle, CloseReturnType invalidReturnType) const
+    [[nodiscard]] Result get(Handle& outHandle, Result invalidReturnType) const
     {
         if (isValid())
         {
             outHandle = handle;
-            return CloseReturnType(true);
+            return Result(true);
         }
         return invalidReturnType;
     }
 
     /// @brief Closes the handle by calling its OS specific close function
     /// @return `true` if the handle was closed correctly
-    [[nodiscard]] CloseReturnType close()
+    [[nodiscard]] Result close()
     {
         if (isValid())
         {
@@ -105,7 +104,7 @@ struct UniqueHandle
             detach();
             return Definition::releaseHandle(handleCopy);
         }
-        return CloseReturnType(true);
+        return Result(true);
     }
 
   protected:

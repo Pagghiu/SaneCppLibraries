@@ -21,10 +21,10 @@ struct SC::UniqueHandleTest : public SC::TestCase
             static bool deleteCalled = false;
             return deleteCalled;
         }
-        static bool releaseHandle(int&)
+        static Result releaseHandle(int&)
         {
             getDeleteCalled() = true;
-            return true;
+            return Result(true);
         }
     };
 
@@ -51,10 +51,10 @@ struct SC::UniqueHandleTest : public SC::TestCase
             SC_TEST_EXPECT(myInt2.isValid());
             SC_TEST_EXPECT(not HandleDefinition::getDeleteCalled());
             int handleValue;
-            SC_TEST_EXPECT(myInt2.get(handleValue, false));
+            SC_TEST_EXPECT(myInt2.get(handleValue, Result(false)));
             SC_TEST_EXPECT(handleValue == 12);
             SC_TEST_EXPECT(myInt2.close());
-            SC_TEST_EXPECT(not myInt2.get(handleValue, false));
+            SC_TEST_EXPECT(not myInt2.get(handleValue, Result(false)));
             SC_TEST_EXPECT(HandleDefinition::getDeleteCalled());
         }
     }
