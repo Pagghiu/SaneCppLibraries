@@ -89,18 +89,14 @@ struct SC_COMPILER_EXPORT StringSpan
     /// @warning This method will assert if string is not null terminated.
     [[nodiscard]] const char* bytesIncludingTerminator() const;
 
-    /// @brief Directly access the memory of this null terminated-StringView.
-    /// @return Pointer to start of StringView memory.
-    /// On Windows return type will be `const wchar_t*`.
-    /// On other platforms return type will be `const char*`.
-    [[nodiscard]] auto getNullTerminatedNative() const
-    {
+    /// @brief Directly access the memory of this null terminated-StringView:
+    /// - On Windows return type will be `const wchar_t*`.
+    /// - On other platforms return type will be `const char*`.
 #if SC_PLATFORM_WINDOWS
-        return textWide;
+    [[nodiscard]] const wchar_t* getNullTerminatedNative() const { return textWide; }
 #else
-        return text;
+    [[nodiscard]] const char* getNullTerminatedNative() const { return text; }
 #endif
-    }
 
     struct NativeWritable
     {

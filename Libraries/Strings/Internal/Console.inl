@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Foundation/Limits.h"
 #include "../../Foundation/Platform.h"
 #include "../../Strings/StringConverter.h"
 #include "../Console.h"

@@ -52,7 +52,7 @@ struct SchemaCompiler
             // Set number of children for parent type and update types array size
             const auto numberOfTypes    = builder.currentLinkID - baseLinkID;
             const auto numberOfChildren = numberOfTypes - 1;
-            if (numberOfChildren > static_cast<decltype(TypeInfo::numberOfChildren)>(MaxValue()))
+            if (numberOfChildren > static_cast<decltype(TypeInfo::numberOfChildren)>(~0ull))
                 return false;
             if (not types.values[baseLinkID].typeInfo.setNumberOfChildren(numberOfChildren))
                 return false;

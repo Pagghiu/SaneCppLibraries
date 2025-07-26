@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Algorithms/AlgorithmBubbleSort.h"
-#include "Libraries/Foundation/Limits.h"
 #include "Libraries/Strings/String.h"
+#include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

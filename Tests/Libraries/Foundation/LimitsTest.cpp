@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/Limits.h"
+#include "Libraries/Testing/Limits.h"
 
 #include <float.h>  // FLT_MAX / DBL_MAX
 #include <stdint.h> // Linux *_{MAX | MIN}

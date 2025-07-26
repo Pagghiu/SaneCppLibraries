@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include <time.h>
 
-#include "../Foundation/Limits.h"
 #include "Time.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -12,6 +11,7 @@
 #else
 #include <math.h> // round
 #endif
+#include <stdint.h> // INT64_MAX
 
 struct SC::Time::Absolute::Internal
 {
@@ -120,7 +120,7 @@ SC::Time::Milliseconds SC::Time::Absolute::subtractExact(Time::Absolute other) c
 
 SC::Time::Absolute SC::Time::Absolute::offsetBy(Milliseconds other) const
 {
-    constexpr auto maxValue = static_cast<decltype(milliseconds)>(MaxValue());
+    constexpr int64_t maxValue = INT64_MAX;
     if (milliseconds > maxValue - other.ms)
     {
         return Time::Absolute(maxValue);
@@ -135,9 +135,6 @@ SC::Time::HighResolutionCounter::HighResolutionCounter()
     LARGE_INTEGER queryPerformanceFrequency;
     // Since WinXP this is guaranteed to succeed
     QueryPerformanceFrequency(&queryPerformanceFrequency);
-    static_assert(static_cast<decltype(queryPerformanceFrequency.QuadPart)>(MaxValue()) ==
-                      static_cast<decltype(part2)>(MaxValue()),
-                  "Change part2");
     part2 = queryPerformanceFrequency.QuadPart;
 #else
     part2 = 0;
@@ -148,18 +145,11 @@ SC::Time::HighResolutionCounter& SC::Time::HighResolutionCounter::snap()
 {
 #if SC_PLATFORM_WINDOWS
     LARGE_INTEGER performanceCounter;
-    static_assert(static_cast<decltype(performanceCounter.QuadPart)>(MaxValue()) ==
-                      static_cast<decltype(part1)>(MaxValue()),
-                  "Change part1");
     QueryPerformanceCounter(&performanceCounter);
     part1 = performanceCounter.QuadPart;
 #else
     timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    static_assert(static_cast<decltype(ts.tv_sec)>(MaxValue()) <= static_cast<decltype(part1)>(MaxValue()),
-                  "Change part1");
-    static_assert(static_cast<decltype(ts.tv_nsec)>(MaxValue()) <= static_cast<decltype(part2)>(MaxValue()),
-                  "Change part2");
     part1 = ts.tv_sec;
     part2 = ts.tv_nsec;
 #endif

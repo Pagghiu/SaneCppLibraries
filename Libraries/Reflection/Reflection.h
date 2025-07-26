@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Foundation/Limits.h"     // MaxValue
 #include "../Foundation/TypeTraits.h" // EnableIf
 #include "ReflectionFoundation.h"
 
@@ -144,7 +143,7 @@ struct TypeInfo
     /// @return `true` if it has been changed successfully
     [[nodiscard]] constexpr bool setNumberOfChildren(size_t numChildren)
     {
-        if (numChildren > static_cast<decltype(numberOfChildren)>(MaxValue()))
+        if (numChildren > static_cast<decltype(numberOfChildren)>(~0ull)) // MaxValue<uint8_t>
             return false;
         numberOfChildren = static_cast<decltype(numberOfChildren)>(numChildren);
         return true;
@@ -165,7 +164,7 @@ struct TypeInfo
     /// @return `true` if the link index has been changed successfully
     [[nodiscard]] constexpr bool setLinkIndex(ssize_t newLinkIndex)
     {
-        if (newLinkIndex > static_cast<decltype(linkIndex)>(MaxValue()))
+        if (newLinkIndex > static_cast<decltype(linkIndex)>(~0ull))
             return false;
         linkIndex = static_cast<decltype(linkIndex)>(newLinkIndex);
         return true;

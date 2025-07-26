@@ -1,6 +1,6 @@
 @page library_foundation Foundation
 
-@brief 🟩 Primitive types, asserts, limits, Function, Span, Result
+@brief 🟩 Primitive types, asserts, compiler macros, Function, Span, Result
 
 [TOC]
 
@@ -41,7 +41,6 @@ Detailed documentation is in the @ref group_foundation topic.
 |:--------------------------|:--------------------------------|
 | SC::Assert                | @copybrief SC::Assert
 | SC::AlignedStorage        | @copybrief SC::AlignedStorage
-| SC::MaxValue              | @copybrief SC::MaxValue
 
 # Status
 🟩 Usable  

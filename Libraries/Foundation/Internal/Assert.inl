@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Limits.h"
 #if SC_PLATFORM_EMSCRIPTEN
 #include <emscripten.h>
 #elif SC_PLATFORM_WINDOWS
@@ -17,8 +16,9 @@
 #include <unistd.h>   // _exit
 #endif
 
+#include <limits.h> // INT_MAX
 #include <stdio.h>  // fwrite
-#include <stdlib.h> // free, *_MAX (integer)
+#include <stdlib.h> // free
 #include <string.h> // strlen
 
 #if SC_PLATFORM_EMSCRIPTEN
@@ -95,9 +95,8 @@ bool SC::Assert::printBacktrace(void** backtraceBuffer, size_t backtraceBufferSi
 SC::size_t SC::Assert::captureBacktrace(size_t framesToSkip, void** backtraceBuffer, size_t backtraceBufferSizeInBytes,
                                         uint32_t* hash)
 {
-    const size_t   framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
-    constexpr auto maxVal          = static_cast<size_t>(static_cast<int>(MaxValue()));
-    if (framesToCapture > maxVal || (backtraceBuffer == nullptr))
+    const size_t framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
+    if (framesToCapture > INT_MAX or (backtraceBuffer == nullptr))
     {
         return 0;
     }
