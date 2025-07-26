@@ -74,15 +74,9 @@ struct Span
     operator Span<void>() { return Span<void>(items, sizeElements * detail::SpanSizeOfType<Type>::size); }
 
     /// @brief Constructs a Span reinterpreting memory pointed by object of type `T` as a type `Type`
-    /// @tparam T Type of object to be reinterpreted
-    /// @param value The source object to be reinterpreted
-    /// @return The output converted Span object
     template <typename T> [[nodiscard]] static Span<Type> reinterpret_object(T& value) { return {reinterpret_cast<Type*>(&value), sizeof(T) / detail::SpanSizeOfType<Type>::size}; }
 
     /// @brief Construct a span reinterpreting raw memory (`void*` or `const void*`) to `Type` or `const Type`
-    /// @param rawMemory Pointer to raw buffer of memory
-    /// @param sizeInBytes Size of the raw buffer in Bytes
-    /// @return The reinterpreted Span object
     [[nodiscard]] static Span<Type> reinterpret_bytes(VoidType* rawMemory, SizeType sizeInBytes) { return Span(reinterpret_cast<Type*>(rawMemory), sizeInBytes / detail::SpanSizeOfType<Type>::size); }
 
     /// @brief Reinterprets the current span as an array of the specified type
@@ -90,32 +84,6 @@ struct Span
 
     /// @brief Reinterprets the current span as an array of the specified type
     template <typename T> [[nodiscard]] Span<T> reinterpret_as_span_of() { return Span<T>(reinterpret_cast<T*>(items), sizeInBytes() / sizeof(T)); }
-
-    template <typename T> [[nodiscard]] T* start_lifetime_as_array() const noexcept
-    {
-        // TODO: Not a fully compliant implementation, replace it with a proper one under C++23
-        // https://stackoverflow.com/questions/79164176/emulate-stdstart-lifetime-as-array-in-c20
-        void* p = const_cast<void*>(static_cast<const void*>(data()));
-        return sizeElements == 0 ? static_cast<const T*>(p) : launder(static_cast<const T*>(::memmove(p, p, sizeof(T) * sizeElements)));
-    }
-
-    template <typename T> [[nodiscard]] T* start_lifetime_as_array() noexcept
-    {
-        void* p = data();
-        return sizeElements == 0 ? static_cast<T*>(p) : launder(static_cast<T*>(::memmove(p, p, sizeof(T) * sizeElements)));
-    }
-
-    template <typename T> [[nodiscard]] const T* start_lifetime_as() const noexcept
-    {
-        void* p = const_cast<void*>(static_cast<const void*>(data()));
-        return launder(static_cast<const T*>(::memmove(p, p, sizeof(T))));
-    }
-
-    template <typename T> [[nodiscard]] T* start_lifetime_as() noexcept
-    {
-        void* p = data();
-        return launder(static_cast<T*>(::memmove(p, p, sizeof(T))));
-    }
 
     [[nodiscard]] constexpr const Type* begin() const { return items; }
     [[nodiscard]] constexpr const Type* end() const { return items + sizeElements; }
@@ -135,36 +103,26 @@ struct Span
 
     /// @brief Creates another Span, starting at an offset in elements from current Span, until end.
     /// @param offsetInElements Offset in current Span where destination Span will be starting
-    /// @param destination Reference to a Span that will hold the resulting computed span
-    /// @return
-    ///         - `true` if destination has been written.
-    ///         - `false` if offsetInElements is bigger to than Span::size().
+    /// @param destination Reference to a Span that will hold the resulting sliced span
+    /// @return `false` if offsetInElements is bigger to than Span::sizeInElements().
     [[nodiscard]] constexpr bool sliceStart(SizeType offsetInElements, Span& destination) const
     {
-        if (offsetInElements <= sizeInElements())
-        {
-            destination = Span(items + offsetInElements, (sizeInElements() - offsetInElements));
-            return true;
-        }
-        return false;
+        bool valid  = offsetInElements <= sizeElements;
+        destination = valid ? Span(items + offsetInElements, sizeElements - offsetInElements) : Span(nullptr, 0);
+        return valid;
     }
 
     /// @brief Creates another Span, starting at an offset in elements from current Span of specified length.
     /// @param offsetInElements Offset in current Span where destination Span will be starting
-    /// @param lengthInElements Number of elements wanted for destination Span
-    /// @param destination Reference to a Span that will hold the resulting computed span
-    /// @return
-    ///         - `true` if destination has been written.
-    ///         - `false` if (offsetInElements + lengthInElements) is bigger to than Span::size().
+    /// @param lengthInElements Number of elements to include in destination Span
+    /// @param destination Reference to a Span that will hold the resulting sliced span
+    /// @return false` if (offsetInElements + lengthInElements) is bigger to than Span::sizeInElements().
     [[nodiscard]] constexpr bool sliceStartLength(SizeType offsetInElements, SizeType lengthInElements,
                                                   Span& destination) const
     {
-        if (offsetInElements + lengthInElements <= sizeInElements())
-        {
-            destination = Span(items + offsetInElements, lengthInElements);
-            return true;
-        }
-        return false;
+        bool valid  = offsetInElements + lengthInElements <= sizeElements;
+        destination = valid ? Span(items + offsetInElements, lengthInElements) : Span(nullptr, 0);
+        return valid;
     }
 };
 //! @}

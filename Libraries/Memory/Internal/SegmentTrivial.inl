@@ -2,6 +2,21 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Segment.inl"
+namespace SC
+{
+// clang-format off
+#if SC_COMPILER_MSVC && !SC_LANGUAGE_CPP_AT_LEAST_17
+template <typename T> [[nodiscard]] constexpr T* launder(T* p) noexcept { return p; } // We're in UB-land
+#else
+template <typename T> [[nodiscard]] constexpr T* launder(T* p) noexcept { return __builtin_launder(p); }
+#endif
+// TODO: Not a fully compliant implementation, replace it with a proper one under C++23
+// https://stackoverflow.com/questions/79164176/emulate-stdstart-lifetime-as-array-in-c20
+template <typename T> [[nodiscard]] T* start_lifetime_as_array(Span<T> span) noexcept { return span.empty() ? static_cast<T*>(span.data()) : launder(static_cast<T*>(::memmove(span.data(), span.data(), sizeof(T) * span.sizeInElements()))); }
+
+template <typename T, typename U> [[nodiscard]] const T* start_lifetime_as(Span<const U> span) noexcept { void* p = const_cast<void*>(static_cast<const void*>(span.data())); return launder(static_cast<const T*>(::memmove(p, p, sizeof(T)))); }
+// clang-format on
+} // namespace SC
 template <typename T>
 inline void SC::detail::SegmentTrivial<T>::destruct(Span<T>) noexcept
 {}
@@ -11,7 +26,7 @@ template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<const U> value) noexcept
 {
     const size_t numElements = data.sizeInElements();
-    T*           destData    = data.template start_lifetime_as_array<T>();
+    T*           destData    = start_lifetime_as_array(data);
     if (value.sizeInBytes() == 1)
     {
         int intValue = 0;
@@ -33,7 +48,7 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstruct(Span<T> data, const U* src) noexcept
 {
-    ::memmove(data.template start_lifetime_as_array<T>(), src, data.sizeInBytes());
+    ::memmove(start_lifetime_as_array(data), src, data.sizeInBytes());
 }
 
 template <typename T>
@@ -56,14 +71,14 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveConstruct(Span<T> data, U* src) noexcept
 {
-    ::memcpy(data.template start_lifetime_as_array<T>(), src, data.sizeInBytes());
+    ::memcpy(start_lifetime_as_array(data), src, data.sizeInBytes());
 }
 
 template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveAssign(Span<T> data, U* src) noexcept
 {
-    ::memcpy(data.template start_lifetime_as_array<T>(), src, data.sizeInBytes());
+    ::memcpy(start_lifetime_as_array(data), src, data.sizeInBytes());
 }
 
 template <typename T>

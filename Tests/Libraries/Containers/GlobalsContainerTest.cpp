@@ -107,7 +107,7 @@ void SC::GlobalsContainerTest::virtualMemoryDump()
     // UB-free as ComplexStruct is not implicit-lifetime.
     // -----------------------------------------------------------------------------
     const Span<const void> span     = memoryDump.toSpanConst();
-    const ComplexStruct&   readonly = *span.start_lifetime_as<const ComplexStruct>();
+    const ComplexStruct&   readonly = *start_lifetime_as<const ComplexStruct>(span);
     SC_TEST_EXPECT(readonly.someField == 42);
     SC_TEST_EXPECT(readonly.singleString == "ASDF");
     SC_TEST_EXPECT(readonly.someStrings[0] == "First");
