@@ -11,8 +11,8 @@ Algorithms is a placeholder where templated algorithms will be added as needed o
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 96
-- Lines of code (including comments): 161
+- Lines of code (excluding comments): 102
+- Lines of code (including comments): 170
 
 # Features
 

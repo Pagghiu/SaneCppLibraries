@@ -29,6 +29,8 @@ Features and workflow (step by step):
    - Both sections are inserted before the '# Features' section if present, or at the end otherwise.
    - Any existing '# Dependencies' or '# Statistics' section is replaced.
    - Naming conventions are consistent between library name, file name, and link references.
+9. Updates the Libraries.md table in Documentation/Pages/Libraries.md and the README.md file:
+   - Updates the 'Lines of code' column with the correct values (excluding comments).
 
 Usage:
     python3 update_documentation.py [<SANE_CPP_LIBRARIES_ROOT>]
@@ -177,23 +179,25 @@ def update_library_md(lib, direct_deps, all_deps, line_counts):
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
-def update_libraries_md_table(lib_line_counts):
+
+def update_table_loc_in_file(file_path, lib_line_counts, is_readme=False):
     """
-    Updates the 'Lines of code' column in the Libraries.md table with the correct values (excluding comments).
+    Updates the 'LOC' column in the libraries table in the given file with the correct values (excluding comments).
+    If is_readme is True, expects the table format as in README.md.
     """
-    libraries_md_path = os.path.join(PROJECT_ROOT, 'Documentation', 'Pages', 'Libraries.md')
-    if not os.path.isfile(libraries_md_path):
+    if not os.path.isfile(file_path):
         return
-    with open(libraries_md_path, 'r', encoding='utf-8') as f:
+    with open(file_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
     # Find the table start and end
     table_start = None
     table_end = None
     for i, line in enumerate(lines):
-        if line.strip().startswith('Library') and 'Lines of code' in line:
+        if (is_readme and line.strip().startswith('Library') and 'Description' in line) or \
+           (not is_readme and line.strip().startswith('Library') and 'Description' in line):
             table_start = i + 2  # skip header and separator
-        elif table_start is not None and line.strip() == '':
+        elif table_start is not None and (line.strip() == '' or line.startswith('Each library is color-coded')):
             table_end = i
             break
     if table_start is None:
@@ -203,11 +207,12 @@ def update_libraries_md_table(lib_line_counts):
         while table_end < len(lines) and lines[table_end].strip():
             table_end += 1
 
-    # Prepare a mapping from subpage name to library name
-    subpage_to_lib = {}
-    for lib in lib_line_counts:
-        subpage = f'@subpage library_{camel_to_snake(lib)}'
-        subpage_to_lib[subpage] = lib
+
+    # Build a normalized name map for matching
+    def normalize(name):
+        return name.replace(' ', '').replace('_', '').lower()
+
+    lib_name_map = {normalize(lib): lib for lib in lib_line_counts}
 
     # Update the table lines
     for i in range(table_start, table_end):
@@ -215,16 +220,44 @@ def update_libraries_md_table(lib_line_counts):
         parts = line.split('|')
         if len(parts) < 3:
             continue
-        subpage = parts[0].strip()
-        if subpage in subpage_to_lib:
-            lib = subpage_to_lib[subpage]
-            loc = lib_line_counts[lib][1]  # non-comment lines
-            # Replace the last column with the correct LOC
+        lib_col = parts[0].strip()
+        if is_readme:
+            m = re.match(r'\[([A-Za-z0-9_ ]+)\]', lib_col)
+            if m:
+                lib_name_raw = m.group(1)
+                lib_name_norm = normalize(lib_name_raw)
+                lib_name = lib_name_map.get(lib_name_norm)
+                if not lib_name:
+                    continue
+            else:
+                continue
+        else:
+            # In Libraries.md, the first column is @subpage library_xxx
+            lib_name = None
+            for lib in lib_line_counts:
+                if f'@subpage library_{camel_to_snake(lib)}' == lib_col:
+                    lib_name = lib
+                    break
+            if not lib_name:
+                continue
+        if lib_name in lib_line_counts:
+            loc = lib_line_counts[lib_name][1]  # non-comment lines
             parts[-1] = f'   {loc}\n'
             lines[i] = '|'.join(parts)
 
-    with open(libraries_md_path, 'w', encoding='utf-8') as f:
+    with open(file_path, 'w', encoding='utf-8') as f:
         f.writelines(lines)
+
+def update_libraries_md_table(lib_line_counts):
+    """
+    Updates the 'Lines of code' column in the Libraries.md table with the correct values (excluding comments).
+    Also updates the table in README.md.
+    """
+    libraries_md_path = os.path.join(PROJECT_ROOT, 'Documentation', 'Pages', 'Libraries.md')
+    update_table_loc_in_file(libraries_md_path, lib_line_counts, is_readme=False)
+
+    readme_md_path = os.path.join(PROJECT_ROOT, 'README.md')
+    update_table_loc_in_file(readme_md_path, lib_line_counts, is_readme=True)
 
 def main():
     # Step 5: Write Markdown output

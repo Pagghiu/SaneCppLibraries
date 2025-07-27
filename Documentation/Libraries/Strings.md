@@ -12,8 +12,8 @@ Path is able to parse and manipulate windows and posix paths.
 - All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 
 # Statistics
-- Lines of code (excluding comments): 3388
-- Lines of code (including comments): 4951
+- Lines of code (excluding comments): 3387
+- Lines of code (including comments): 4950
 
 # Features
 
