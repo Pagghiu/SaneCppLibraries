@@ -29,6 +29,7 @@ INPUT                  = ../../Documentation/Pages \
                          ../../Libraries/FileSystem \
                          ../../Libraries/FileSystemIterator \
                          ../../Libraries/FileSystemWatcher \
+                         ../../Libraries/FileSystemWatcherAsync \
                          ../../Libraries/Foundation \
                          ../../Libraries/Hashing \
                          ../../Libraries/Http \

@@ -4,12 +4,12 @@
 
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
+#include "../../Threading/Atomic.h"
 #include "../../Threading/Threading.h"
 
 #include <dirent.h>      // opendir, readdir, closedir
 #include <errno.h>       // errno
 #include <fcntl.h>       // open, O_RDONLY, O_DIRECTORY
-#include <limits.h>      // PATH_MAX
 #include <string.h>      // strlen
 #include <sys/inotify.h> // inotify
 #include <sys/select.h>  // fd_set / FD_ZERO
@@ -42,7 +42,8 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
     Thread       thread;
     Atomic<bool> shouldStop = false;
 
-    PipeDescriptor shutdownPipe; // Allows unblocking the ::read() when stopping the watcher
+    // Allows unblocking the ::read() when stopping the watcher [0]=read end, [1]=write end
+    int shutdownPipe[2] = {-1, -1};
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -51,15 +52,19 @@ struct SC::FileSystemWatcher::Internal
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
 
-    FileDescriptor notifyFd;
+    int notifyFd = -1; // inotify file descriptor
 
     Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
         threadingRunner = &runner.get();
 
-        SC_TRY(threadingRunner->shutdownPipe.createPipe());
-        return notifyFd.assign(::inotify_init1(IN_CLOEXEC));
+        if (::pipe2(threadingRunner->shutdownPipe, O_CLOEXEC) == -1)
+        {
+            return Result::Error("pipe2 failed");
+        }
+        notifyFd = ::inotify_init1(IN_CLOEXEC);
+        return notifyFd != -1 ? Result(true) : Result::Error("inotify_init1 failed");
     }
 
     Result init(FileSystemWatcher& parent, EventLoopRunner& runner)
@@ -67,19 +72,21 @@ struct SC::FileSystemWatcher::Internal
         self            = &parent;
         eventLoopRunner = &runner;
 
-        int notifyHandle = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
-        SC_TRY(notifyFd.assign(notifyHandle));
+        notifyFd = ::inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
+        if (notifyFd == -1)
+        {
+            return Result::Error("inotify_init1 failed");
+        }
 
-        SC_TRY(eventLoopRunner->eventLoop->associateExternallyCreatedFileDescriptor(notifyFd));
-        runner.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
-        return runner.asyncPoll.start(*eventLoopRunner->eventLoop, notifyHandle);
+        eventLoopRunner->internalInit(parent, notifyFd);
+        return eventLoopRunner->linuxStartSharedFilePoll();
     }
 
     Result close()
     {
         if (eventLoopRunner)
         {
-            SC_TRY(eventLoopRunner->asyncPoll.stop(*eventLoopRunner->eventLoop));
+            SC_TRY(eventLoopRunner->linuxStopSharedFilePoll());
         }
 
         for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
@@ -94,12 +101,31 @@ struct SC::FileSystemWatcher::Internal
                 threadingRunner->shouldStop.exchange(true);
                 // Write to shutdownPipe to unblock the ::select() in the dedicated thread
                 char dummy = 1;
-                SC_TRY(threadingRunner->shutdownPipe.writePipe.write({&dummy, sizeof(dummy)}));
-                SC_TRY(threadingRunner->shutdownPipe.close());
+                while (::write(threadingRunner->shutdownPipe[1], &dummy, sizeof(dummy)) == -1)
+                {
+                    if (errno != EINTR)
+                    {
+                        return Result::Error("write to shutdown pipe failed");
+                    }
+                }
+                if (threadingRunner->shutdownPipe[0] != -1)
+                {
+                    ::close(threadingRunner->shutdownPipe[0]);
+                    threadingRunner->shutdownPipe[0] = -1;
+                }
+                if (threadingRunner->shutdownPipe[1] != -1)
+                {
+                    ::close(threadingRunner->shutdownPipe[1]);
+                    threadingRunner->shutdownPipe[1] = -1;
+                }
                 SC_TRY(threadingRunner->thread.join());
             }
         }
-        SC_TRY(notifyFd.close());
+        if (notifyFd != -1)
+        {
+            ::close(notifyFd);
+            notifyFd = -1;
+        }
         return Result(true);
     }
 
@@ -110,13 +136,14 @@ struct SC::FileSystemWatcher::Internal
 
         FolderWatcherInternal& folderInternal = folderWatcher.internal.get();
 
-        int rootNotifyFd;
-        SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
+        if (notifyFd == -1)
+        {
+            return Result::Error("invalid notifyFd");
+        }
 
-        // for (FolderWatcherInternal::Pair pair : folderInternal.notifyHandles)
         for (size_t idx = 0; idx < folderInternal.notifyHandlesCount; ++idx)
         {
-            const int res = ::inotify_rm_watch(rootNotifyFd, folderInternal.notifyHandles[idx].notifyID);
+            const int res = ::inotify_rm_watch(notifyFd, folderInternal.notifyHandles[idx].notifyID);
             SC_TRY_MSG(res != -1, "inotify_rm_watch");
         }
         folderInternal.notifyHandlesCount   = 0; // Reset the count to zero
@@ -163,7 +190,11 @@ struct SC::FileSystemWatcher::Internal
         StringPath currentPath = entry->path;
 
         int rootNotifyFd;
-        SC_TRY(notifyFd.get(rootNotifyFd, Result::Error("invalid notifyFd")));
+        if (notifyFd == -1)
+        {
+            return Result::Error("invalid notifyFd");
+        }
+        rootNotifyFd = notifyFd;
         constexpr int mask =
             IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
         const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.path.buffer, mask);
@@ -299,18 +330,12 @@ struct SC::FileSystemWatcher::Internal
         ThreadRunnerInternal& runner = *threadingRunner;
         while (not runner.shouldStop.load())
         {
-            int notifyHandle;
-            SC_ASSERT_RELEASE(notifyFd.get(notifyHandle, Result(false)));
-
-            int shutdownHandle;
-            SC_ASSERT_RELEASE(runner.shutdownPipe.readPipe.get(shutdownHandle, Result(false)));
-
-            // Setup a select fd_set to listen on both notifyHandle and shutdownHandle simultaneously
+            // Setup a select fd_set to listen on both notifyFd and shutdownPipe simultaneously
             fd_set fds;
             FD_ZERO(&fds);
-            FD_SET(notifyHandle, &fds);
-            FD_SET(shutdownHandle, &fds);
-            const int maxFd = notifyHandle > shutdownHandle ? notifyHandle : shutdownHandle;
+            FD_SET(notifyFd, &fds);
+            FD_SET(runner.shutdownPipe[0], &fds);
+            const int maxFd = notifyFd > runner.shutdownPipe[0] ? notifyFd : runner.shutdownPipe[0];
 
             int selectRes;
             do
@@ -319,9 +344,9 @@ struct SC::FileSystemWatcher::Internal
                 selectRes = ::select(maxFd + 1, &fds, nullptr, nullptr, nullptr);
             } while (selectRes == -1 and errno == EINTR);
 
-            if (FD_ISSET(shutdownHandle, &fds))
+            if (threadingRunner->shutdownPipe[0] == -1 or FD_ISSET(runner.shutdownPipe[0], &fds))
             {
-                return; // Interrupted by shutdownPipe.writePipe.write (from close())
+                return; // Interrupted by write to shutdown pipe (from close())
             }
             // Here select has received data on notifyHandle
             readAndNotify(notifyFd, self->watchers);
@@ -329,29 +354,21 @@ struct SC::FileSystemWatcher::Internal
         threadingRunner->shouldStop.exchange(false);
     }
 
-    void onEventLoopNotification(AsyncFilePoll::Result& result)
+    static void readAndNotify(const int notifyFd, WatcherLinkedList watchers)
     {
-        readAndNotify(notifyFd, self->watchers);
-        result.reactivateRequest(true);
-    }
-
-    static void readAndNotify(const FileDescriptor& notifyFd, IntrusiveDoubleLinkedList<FolderWatcher> watchers)
-    {
-        int notifyHandle;
-        SC_ASSERT_RELEASE(notifyFd.get(notifyHandle, Result(false)));
         int  numReadBytes;
         char inotifyBuffer[3 * 1024];
         // TODO: Handle the case where kernel is sending more than 3kb of events.
         do
         {
-            numReadBytes = ::read(notifyHandle, inotifyBuffer, sizeof(inotifyBuffer));
+            numReadBytes = ::read(notifyFd, inotifyBuffer, sizeof(inotifyBuffer));
         } while (numReadBytes == -1 and errno == EINTR);
 
         Span<char> actuallyRead = {inotifyBuffer, static_cast<size_t>(numReadBytes)};
         notifyWatchers(actuallyRead, watchers);
     }
 
-    static void notifyWatchers(Span<char> actuallyRead, IntrusiveDoubleLinkedList<FolderWatcher> watchers)
+    static void notifyWatchers(Span<char> actuallyRead, WatcherLinkedList watchers)
     {
         const struct inotify_event* event     = nullptr;
         const struct inotify_event* prevEvent = nullptr;
@@ -442,4 +459,9 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
     SC_TRY_MSG(buffer.path.append("/"), "Buffer too small to hold full path");
     SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
+}
+
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher*)
+{
+    internal.get().readAndNotify(internal.get().notifyFd, internal.get().self->watchers);
 }

@@ -41,6 +41,9 @@ void runFileSystemIteratorTest(TestReport& report);
 // FileSystemWatcher
 void runFileSystemWatcherTest(TestReport& report);
 
+// FileSystemWatcherAsync
+void runFileSystemWatcherAsyncTest(TestReport& report);
+
 // Hashing
 void runHashingTest(TestReport& report);
 
@@ -174,6 +177,7 @@ int main(int argc, const char* argv[])
 
     // FileSystemWatcher tests
     runFileSystemWatcherTest(report);
+    runFileSystemWatcherAsyncTest(report);
 
     // Hashing tests
     runHashingTest(report);

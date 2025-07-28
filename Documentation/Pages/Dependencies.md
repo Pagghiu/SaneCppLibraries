@@ -50,10 +50,16 @@ This file describes what each library depends on. It also lists the number of li
 - Lines of code (including comments): 541
 
 # [FileSystemWatcher](@ref library_file_system_watcher)
-- Direct dependencies: [Async](@ref library_async), [Foundation](@ref library_foundation), [Threading](@ref library_threading)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
-- Lines of code (excluding comments): 1227
-- Lines of code (including comments): 1570
+- Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
+- All dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
+- Lines of code (excluding comments): 1319
+- Lines of code (including comments): 1668
+
+# [FileSystemWatcherAsync](@ref library_file_system_watcher_async)
+- Direct dependencies: [Async](@ref library_async), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation)
+- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
+- Lines of code (excluding comments): 113
+- Lines of code (including comments): 166
 
 # [Foundation](@ref library_foundation)
 - Direct dependencies: *(none)*
@@ -141,6 +147,6 @@ This file describes what each library depends on. It also lists the number of li
 
 ---
 # Project Total
-- Total lines of code (excluding comments): 31037
-- Total lines of code (including comments): 41148
+- Total lines of code (excluding comments): 31242
+- Total lines of code (including comments): 41412
 

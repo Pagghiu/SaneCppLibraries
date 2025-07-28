@@ -3,6 +3,7 @@
 #pragma once
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
+#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Strings/Path.h"
 
@@ -54,7 +55,8 @@ struct HotReloadSystem
         SC_TRY(compiler.includePaths.push_back(state.imguiPath.view()));
 
         // Setup File System Watcher
-        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner, *eventLoop));
+        fileSystemWatcherRunner.init(*eventLoop);
+        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner));
         folderWatcher.notifyCallback.bind<HotReloadSystem, &HotReloadSystem::onFileChange>(*this);
         SC_TRY(fileSystemWatcher.watch(folderWatcher, state.pluginsPath.view()));
         return Result(true);
@@ -122,10 +124,10 @@ struct HotReloadSystem
     PluginCompiler compiler;
     PluginSysroot  sysroot;
 
-    FileSystemWatcher fileSystemWatcher;
+    FileSystemWatcher      fileSystemWatcher;
+    FileSystemWatcherAsync fileSystemWatcherRunner;
 
-    FileSystemWatcher::FolderWatcher   folderWatcher;
-    FileSystemWatcher::EventLoopRunner fileSystemWatcherRunner;
+    FileSystemWatcher::FolderWatcher folderWatcher;
 
     void onFileChange(const FileSystemWatcher::Notification& notification)
     {

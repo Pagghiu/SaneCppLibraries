@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Async/Async.h" // AsyncLoopWakeUp
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
-#include "../Threading/Threading.h" // EventObject
+#include "../Foundation/StringPath.h"
+#include "../Threading/Threading.h" // sizeof(Mutex)
 
 namespace SC
 {
@@ -31,11 +31,11 @@ namespace SC
 /// | SC::FileSystemWatcher::ThreadRunner   | @copybrief SC::FileSystemWatcher::ThreadRunner    |
 /// | SC::FileSystemWatcher::EventLoopRunner| @copybrief SC::FileSystemWatcher::EventLoopRunner |
 ///
-/// Example using SC::FileSystemWatcher::EventLoopRunner:
-/// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherEventLoopRunnerSnippet
-///
 /// Example using SC::FileSystemWatcher::ThreadRunner:
 /// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
+///
+/// Example using SC::FileSystemWatcherAsync (that implements SC::FileSystemWatcher::EventLoopRunner):
+/// \snippet Tests/Libraries/FileSystemWatcherAsync/FileSystemWatcherAsyncTest.cpp fileSystemWatcherAsyncSnippet
 
 //! [OpaqueDeclarationSnippet]
 struct FileSystemWatcher
@@ -84,11 +84,10 @@ struct FileSystemWatcher
     {
         static constexpr int MaxNumberOfSubdirs   = 128; // Max number of subfolders tracked in a watcher
         static constexpr int MaxChangesBufferSize = 1024;
-        static constexpr int Windows =
-            MaxChangesBufferSize + sizeof(void*) + sizeof(FileDescriptor) + sizeof(AsyncFilePoll);
-        static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = 1056 + 1024 + 8;
-        static constexpr int Default = Linux;
+        static constexpr int Windows              = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
+        static constexpr int Apple                = sizeof(void*);
+        static constexpr int Linux                = 1056 + 1024 + 8;
+        static constexpr int Default              = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
 
@@ -145,32 +144,49 @@ struct FileSystemWatcher
 
       private:
         friend struct FileSystemWatcher;
-        friend struct IntrusiveDoubleLinkedList<FolderWatcher>;
+        friend struct FileSystemWatcherAsync;
+#if SC_PLATFORM_WINDOWS
+        AlignedStorage<112> asyncStorage;
+#endif
+        OpaqueObject<FolderWatcherSizes> internal;
+
         FileSystemWatcher* parent = nullptr;
         FolderWatcher*     next   = nullptr;
         FolderWatcher*     prev   = nullptr;
 
         StringPath path;
 
-        OpaqueObject<FolderWatcherSizes> internal;
 #if SC_PLATFORM_LINUX
         Span<char> subFolderRelativePathsBuffer;
 #endif
     };
 
-    /// @brief Delivers notifications using @ref library_async (SC::AsyncEventLoop).
+    /// @brief Abstract class to use event loop notifications (see SC::FileSystemWatcherAsync).
     struct EventLoopRunner
     {
+        virtual ~EventLoopRunner() {}
 
-      private:
-        friend struct FileSystemWatcher;
-        AsyncEventLoop* eventLoop = nullptr;
+      protected:
 #if SC_PLATFORM_APPLE
-        AsyncLoopWakeUp asyncWakeUp = {};
-        EventObject     eventObject = {};
+        virtual Result appleStartWakeUp()       = 0;
+        virtual void   appleSignalEventObject() = 0;
+        virtual Result appleWakeUpAndWait()     = 0;
+
 #elif SC_PLATFORM_LINUX
-        AsyncFilePoll asyncPoll = {};
+        virtual Result linuxStartSharedFilePoll() = 0;
+        virtual Result linuxStopSharedFilePoll()  = 0;
+
+        int notifyFd = -1;
+
+#else
+        virtual Result windowsStartFolderFilePoll(FolderWatcher& watcher, void* handle) = 0;
+        virtual Result windowsStopFolderFilePoll(FolderWatcher& watcher)                = 0;
+        virtual void*  windowsGetOverlapped(FolderWatcher& watcher)                     = 0;
 #endif
+        friend struct Internal;
+        FileSystemWatcher* fileSystemWatcher = nullptr;
+
+        void internalInit(FileSystemWatcher& fsWatcher, int handle);
     };
 
     /// @brief Delivers notifications on a background thread.
@@ -181,11 +197,10 @@ struct FileSystemWatcher
     /// @return Valid Result if the watcher has been initialized correctly
     Result init(ThreadRunner& runner);
 
-    /// @brief Setup watcher to receive async notifications on SC::AsyncEventLoop
-    /// @param runner Address of a ThreadRunner object that must be valid until close()
-    /// @param eventLoop A valid AsyncEventLoop
+    /// @brief Setup watcher to receive async notifications on an event loop
+    /// @param runner Address of a EventLoopRunner object that must be valid until close()
     /// @return Valid Result if the watcher has been initialized correctly
-    Result init(EventLoopRunner& runner, AsyncEventLoop& eventLoop);
+    Result init(EventLoopRunner& runner);
 
     /// @brief Stops all watchers and frees the ThreadRunner or EventLoopRunner passed in init
     /// @return Valid Result if resources have been freed successfully
@@ -198,10 +213,24 @@ struct FileSystemWatcher
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
     Result watch(FolderWatcher& watcher, StringSpan path);
 
+    void asyncNotify(FolderWatcher* watcher);
+
   private:
     friend decltype(internal);
     friend decltype(FolderWatcher::internal);
-    IntrusiveDoubleLinkedList<FolderWatcher> watchers;
+    friend struct EventLoopRunner;
+    // Trimmed duplicate of IntrusiveDoubleLinkedList<T>
+    struct WatcherLinkedList
+    {
+        FolderWatcher* back  = nullptr; // has no next
+        FolderWatcher* front = nullptr; // has no prev
+
+        [[nodiscard]] bool isEmpty() const { return front == nullptr; }
+
+        void queueBack(FolderWatcher& watcher);
+        void remove(FolderWatcher& watcher);
+    };
+    WatcherLinkedList watchers;
 };
 
 //! @}

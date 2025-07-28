@@ -1,21 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
+#include "../../Threading/Atomic.h"
 #include "../../Threading/Threading.h"
-
-#include "../../Async/Internal/AsyncWindows.h" // AsyncWinOverlapped
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
-    AsyncFilePoll  asyncPoll;
     uint8_t        changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
     FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...
-    FileDescriptor fileHandle;
-
-    OVERLAPPED& getOverlapped() { return asyncPoll.getOverlappedOpaque().get().overlapped; }
+    HANDLE         fileHandle;
 };
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
@@ -36,6 +32,18 @@ struct SC::FileSystemWatcher::Internal
     EventLoopRunner*      eventLoopRunner = nullptr;
     ThreadRunnerInternal* threadingRunner = nullptr;
 
+    OVERLAPPED* getOverlapped(FolderWatcher& watcher)
+    {
+        if (eventLoopRunner)
+        {
+            return reinterpret_cast<OVERLAPPED*>(eventLoopRunner->windowsGetOverlapped(watcher));
+        }
+        else
+        {
+            return &watcher.asyncStorage.reinterpret_as<OVERLAPPED>();
+        }
+    }
+
     Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
         self            = &parent;
@@ -47,6 +55,7 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
+        eventLoopRunner->internalInit(parent, 0);
         return Result(true);
     }
 
@@ -76,21 +85,21 @@ struct SC::FileSystemWatcher::Internal
 
     void signalWatcherEvent(FolderWatcher& watcher)
     {
-        auto& opaque = watcher.internal.get();
-        ::SetEvent(opaque.getOverlapped().hEvent);
+        OVERLAPPED* overlapped = getOverlapped(watcher);
+        ::SetEvent(overlapped->hEvent);
     }
 
     void closeWatcherEvent(FolderWatcher& watcher)
     {
-        auto& opaque = watcher.internal.get();
-        ::CloseHandle(opaque.getOverlapped().hEvent);
-        opaque.getOverlapped().hEvent = INVALID_HANDLE_VALUE;
+        OVERLAPPED* overlapped = getOverlapped(watcher);
+        ::CloseHandle(overlapped->hEvent);
+        overlapped->hEvent = INVALID_HANDLE_VALUE;
     }
 
     void closeFileHandle(FolderWatcher& watcher)
     {
         auto& opaque = watcher.internal.get();
-        SC_TRUST_RESULT(opaque.fileHandle.close());
+        ::CloseHandle(opaque.fileHandle);
     }
 
     Result stopWatching(FolderWatcher& folderWatcher)
@@ -104,19 +113,10 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            // This is not strictly needed as file handle is being closed soon after anyway
-            // FolderWatcherInternal& opaque = folderWatcher.internal.get();
-            // SC_TRUST_RESULT(eventLoopRunner->eventLoop->removeAllAssociationsFor(opaque.fileHandle));
-            SC_TRUST_RESULT(folderWatcher.internal.get().asyncPoll.stop(*eventLoopRunner->eventLoop));
+            SC_TRUST_RESULT(eventLoopRunner->windowsStopFolderFilePoll(folderWatcher));
         }
         closeFileHandle(folderWatcher);
         return Result(true);
-    }
-
-    static void setDebugName(FolderWatcher& folderWatcher, const char* debugName)
-    {
-        FolderWatcherInternal& opaque = folderWatcher.internal.get();
-        opaque.asyncPoll.setDebugName(debugName);
     }
 
     Result startWatching(FolderWatcher* entry)
@@ -138,27 +138,24 @@ struct SC::FileSystemWatcher::Internal
                                          OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OVERLAPPED, //
                                          nullptr);
 
-        SC_TRY(newHandle != INVALID_HANDLE_VALUE);
+        SC_TRY_MSG(newHandle != INVALID_HANDLE_VALUE, "CreateFileW failed");
         FolderWatcherInternal& opaque = entry->internal.get();
-        SC_TRY(opaque.fileHandle.assign(newHandle));
+        opaque.fileHandle             = newHandle;
 
         opaque.parentEntry = entry;
 
+        OVERLAPPED* overlapped = getOverlapped(*entry);
         if (threadingRunner)
         {
-            opaque.getOverlapped().hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
+            overlapped->hEvent = ::CreateEventW(nullptr, FALSE, 0, nullptr);
 
-            threadingRunner->hEvents[threadingRunner->numEntries] = opaque.getOverlapped().hEvent;
+            threadingRunner->hEvents[threadingRunner->numEntries] = overlapped->hEvent;
             threadingRunner->entries[threadingRunner->numEntries] = entry;
             threadingRunner->numEntries++;
         }
         else
         {
-            // TODO: Consider associating / removing file handle with IOCP directly inside AsyncFilePoll
-            SC_TRY(eventLoopRunner->eventLoop->associateExternallyCreatedFileDescriptor(opaque.fileHandle));
-            opaque.asyncPoll.callback.bind<Internal, &Internal::onEventLoopNotification>(*this);
-            auto res = opaque.asyncPoll.start(*eventLoopRunner->eventLoop, newHandle);
-            SC_TRY(res);
+            SC_TRY(eventLoopRunner->windowsStartFolderFilePoll(*entry, newHandle));
         }
 
         BOOL success = ::ReadDirectoryChangesW(newHandle,                         //
@@ -169,7 +166,7 @@ struct SC::FileSystemWatcher::Internal
                                                    FILE_NOTIFY_CHANGE_DIR_NAME |  //
                                                    FILE_NOTIFY_CHANGE_LAST_WRITE, //
                                                nullptr,                           // lpBytesReturned
-                                               &opaque.getOverlapped(),           // lpOverlapped
+                                               overlapped,                        // lpOverlapped
                                                nullptr);                          // lpCompletionRoutine
         SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
 
@@ -195,26 +192,15 @@ struct SC::FileSystemWatcher::Internal
                 const DWORD            index  = result - WAIT_OBJECT_0;
                 FolderWatcher&         entry  = *runner.entries[index];
                 FolderWatcherInternal& opaque = entry.internal.get();
-                DWORD                  transferredBytes;
-                HANDLE                 handle;
-                if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
-                {
-                    ::GetOverlappedResult(handle, &opaque.getOverlapped(), &transferredBytes, FALSE);
-                    notifyEntry(entry);
-                }
+
+                DWORD transferredBytes;
+                SC_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
+                OVERLAPPED* overlapped = getOverlapped(entry);
+                ::GetOverlappedResult(opaque.fileHandle, overlapped, &transferredBytes, FALSE);
+                notifyEntry(entry);
             }
         }
         threadingRunner->shouldStop.exchange(false);
-    }
-
-    void onEventLoopNotification(AsyncFilePoll::Result& result)
-    {
-        SC_COMPILER_WARNING_PUSH_OFFSETOF;
-        FolderWatcherInternal& fwi = SC_COMPILER_FIELD_OFFSET(FolderWatcherInternal, asyncPoll, result.getAsync());
-        SC_ASSERT_DEBUG(fwi.fileHandle.isValid());
-        notifyEntry(*fwi.parentEntry);
-        result.reactivateRequest(true);
-        SC_COMPILER_WARNING_POP;
     }
 
     static void notifyEntry(FolderWatcher& entry)
@@ -244,23 +230,21 @@ struct SC::FileSystemWatcher::Internal
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (true);
 
-        ::memset(&opaque.getOverlapped(), 0, sizeof(opaque.getOverlapped()));
-        HANDLE handle;
-        if (opaque.fileHandle.get(handle, Result::Error("Invalid fs handle")))
-        {
-            BOOL success = ::ReadDirectoryChangesW(handle,                            //
-                                                   opaque.changesBuffer,              //
-                                                   sizeof(opaque.changesBuffer),      //
-                                                   TRUE,                              // watchSubtree
-                                                   FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                       FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                       FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                                   nullptr,                           // lpBytesReturned
-                                                   &opaque.getOverlapped(),           // lpOverlapped
-                                                   nullptr);                          // lpCompletionRoutine
-            // TODO: Handle ReadDirectoryChangesW error
-            (void)success;
-        }
+        OVERLAPPED* overlapped = entry.parent->internal.get().getOverlapped(entry);
+        ::memset(overlapped, 0, sizeof(OVERLAPPED));
+        SC_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
+        BOOL success = ::ReadDirectoryChangesW(opaque.fileHandle,                 //
+                                               opaque.changesBuffer,              //
+                                               sizeof(opaque.changesBuffer),      //
+                                               TRUE,                              // watchSubtree
+                                               FILE_NOTIFY_CHANGE_FILE_NAME |     //
+                                                   FILE_NOTIFY_CHANGE_DIR_NAME |  //
+                                                   FILE_NOTIFY_CHANGE_LAST_WRITE, //
+                                               nullptr,                           // lpBytesReturned
+                                               overlapped,                        // lpOverlapped
+                                               nullptr);                          // lpCompletionRoutine
+        // TODO: Handle ReadDirectoryChangesW error
+        (void)success;
     }
 };
 
@@ -270,4 +254,11 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
     SC_TRY_MSG(buffer.path.append(L"\\"), "Buffer too small to hold full path");
     SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
+}
+
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher)
+{
+    SC_ASSERT_DEBUG(watcher != nullptr);
+    SC_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
+    FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry);
 }

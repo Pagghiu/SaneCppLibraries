@@ -4,8 +4,8 @@
 //! [OpaqueDefinition1Snippet]
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 
-#include "../../Async/Async.h"
 #include "../../Foundation/Deferred.h"
+#include "../../Threading/Atomic.h"
 #include "../../Threading/Threading.h"
 #include <CoreServices/CoreServices.h> // FSEvents
 
@@ -47,10 +47,8 @@ struct SC::FileSystemWatcher::Internal
     {
         self            = &parent;
         eventLoopRunner = &runner;
-
-        AsyncLoopWakeUp& wakeUp = eventLoopRunner->asyncWakeUp;
-        wakeUp.callback.bind<Internal, &Internal::onMainLoop>(*this);
-        return wakeUp.start(*eventLoopRunner->eventLoop, eventLoopRunner->eventObject);
+        eventLoopRunner->internalInit(parent, 0);
+        return eventLoopRunner->appleStartWakeUp();
     }
 
     Result initThread()
@@ -85,7 +83,7 @@ struct SC::FileSystemWatcher::Internal
             closing.exchange(true);
             if (eventLoopRunner)
             {
-                eventLoopRunner->eventObject.signal();
+                eventLoopRunner->appleSignalEventObject();
             }
 
             // send close signal
@@ -339,8 +337,7 @@ struct SC::FileSystemWatcher::Internal
                     EventLoopRunner& eventLoopRunner = *internal.eventLoopRunner;
 
                     internal.watcher = watcher;
-                    const Result res = eventLoopRunner.asyncWakeUp.wakeUp(*eventLoopRunner.eventLoop);
-                    eventLoopRunner.eventObject.wait();
+                    const Result res = eventLoopRunner.appleWakeUpAndWait();
                     if (internal.closing.load())
                     {
                         break;
@@ -360,12 +357,6 @@ struct SC::FileSystemWatcher::Internal
             watcher = watcher->next;
             internal.mutex.unlock();
         }
-    }
-
-    void onMainLoop(AsyncLoopWakeUp::Result& result)
-    {
-        watcher->notifyCallback(notification);
-        result.reactivateRequest(true);
     }
 
     static void threadExecuteRefresh(void* arg)
@@ -398,3 +389,8 @@ struct SC::FileSystemWatcher::ThreadRunnerInternal
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
 };
+
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher*)
+{
+    internal.get().watcher->notifyCallback(internal.get().notification);
+}

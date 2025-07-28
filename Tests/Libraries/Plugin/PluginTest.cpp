@@ -3,6 +3,7 @@
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
+#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -219,7 +220,8 @@ struct PluginHost
         SC_TRY(compiler.includePaths.push_back(someLibraryDirectory.view()));
 
         // Setup File System Watcher
-        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner, *eventLoop));
+        fileSystemWatcherRunner.init(*eventLoop);
+        SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner));
         watcher.notifyCallback.bind<PluginHost, &PluginHost::onFileChanged>(*this);
         SC_TRY(fileSystemWatcher.watch(watcher, pluginsPath.view()));
         return Result(true);
@@ -270,8 +272,8 @@ struct PluginHost
 
     FileSystemWatcher fileSystemWatcher;
 
-    FileSystemWatcher::FolderWatcher   watcher;
-    FileSystemWatcher::EventLoopRunner fileSystemWatcherRunner;
+    FileSystemWatcher::FolderWatcher watcher;
+    FileSystemWatcherAsync           fileSystemWatcherRunner;
 
     void onFileChanged(const FileSystemWatcher::Notification& notification)
     {

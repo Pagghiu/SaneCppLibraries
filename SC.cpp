@@ -9,6 +9,7 @@
 #include "Libraries/FileSystem/FileSystem.cpp"
 #include "Libraries/FileSystemIterator/FileSystemIterator.cpp"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.cpp"
+#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.cpp"
 #include "Libraries/Foundation/Foundation.cpp"
 #include "Libraries/Hashing/Hashing.cpp"
 #include "Libraries/Http/HttpClient.cpp"

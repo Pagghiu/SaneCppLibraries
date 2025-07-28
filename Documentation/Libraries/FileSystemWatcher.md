@@ -7,12 +7,12 @@
 SC::FileSystemWatcher allows watching directories for changes that happen to them.  
 
 # Dependencies
-- Direct dependencies: [Async](@ref library_async), [Foundation](@ref library_foundation), [Threading](@ref library_threading)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
+- Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
+- All dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
 
 # Statistics
-- Lines of code (excluding comments): 1227
-- Lines of code (including comments): 1570
+- Lines of code (excluding comments): 1319
+- Lines of code (including comments): 1668
 
 # Features
 - Get notified about modified files or directories
