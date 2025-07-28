@@ -10,8 +10,8 @@ using socklen_t = int;
 #pragma comment(lib, "Ws2_32.lib")
 
 #include "../../Foundation/Assert.h"
+#include "../../Foundation/Compiler.h"
 #include "../../Socket/Socket.h"
-#include "../../Threading/Atomic.h"
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {
@@ -88,7 +88,18 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
 
 struct SC::SocketNetworking::Internal
 {
-    Atomic<bool> networkingInited = false;
+#if SC_COMPILER_MSVC
+    volatile long networkingInited = 0;
+#elif SC_COMPILER_CLANG
+    _Atomic bool networkingInited = false;
+#elif SC_COMPILER_GCC
+    volatile bool                              networkingInited = false;
+    __attribute__((always_inline)) inline bool load() { return __atomic_load_n(&networkingInited, __ATOMIC_SEQ_CST); }
+    __attribute__((always_inline)) inline void store(bool value)
+    {
+        __atomic_store_n(&networkingInited, value, __ATOMIC_SEQ_CST);
+    }
+#endif
 
     static Internal& get()
     {
@@ -97,7 +108,16 @@ struct SC::SocketNetworking::Internal
     }
 };
 
-bool SC::SocketNetworking::isNetworkingInited() { return Internal::get().networkingInited.load(); }
+bool SC::SocketNetworking::isNetworkingInited()
+{
+#if SC_COMPILER_MSVC
+    return InterlockedCompareExchange(&Internal::get().networkingInited, 0, 0) != 0;
+#elif SC_COMPILER_CLANG
+    return atomic_load(&Internal::get().networkingInited);
+#elif SC_COMPILER_GCC
+    return Internal::get().load();
+#endif
+}
 
 SC::Result SC::SocketNetworking::initNetworking()
 {
@@ -108,7 +128,13 @@ SC::Result SC::SocketNetworking::initNetworking()
         {
             return Result::Error("WSAStartup failed");
         }
-        Internal::get().networkingInited.exchange(true);
+#if SC_COMPILER_MSVC
+        InterlockedExchange(&Internal::get().networkingInited, 1);
+#elif SC_COMPILER_CLANG
+        atomic_store(&Internal::get().networkingInited, true);
+#elif SC_COMPILER_GCC
+        Internal::get().store(true);
+#endif
     }
     return Result(true);
 }
@@ -116,6 +142,12 @@ SC::Result SC::SocketNetworking::initNetworking()
 SC::Result SC::SocketNetworking::shutdownNetworking()
 {
     WSACleanup();
-    Internal::get().networkingInited.exchange(false);
+#if SC_COMPILER_MSVC
+    InterlockedExchange(&Internal::get().networkingInited, 0);
+#elif SC_COMPILER_CLANG
+    atomic_store(&Internal::get().networkingInited, false);
+#elif SC_COMPILER_GCC
+    Internal::get().store(false);
+#endif
     return Result(true);
 }
