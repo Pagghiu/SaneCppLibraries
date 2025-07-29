@@ -74,7 +74,7 @@ SC::Result SC::SocketClient::read(Span<char> data, Span<char>& readData)
     return Result(true);
 }
 
-SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout)
+SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout)
 {
     SocketDescriptor::Handle nativeSocket;
     SC_TRY(socket.get(nativeSocket, Result::Error("Invalid socket")));
@@ -83,8 +83,8 @@ SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readDa
     FD_SET(nativeSocket, &fds);
 
     struct timeval tv;
-    tv.tv_sec  = static_cast<int>(timeout.ms / 1000);
-    tv.tv_usec = (int)((timeout.ms % 1000) * 1000);
+    tv.tv_sec  = static_cast<int>(timeout / 1000);
+    tv.tv_usec = (int)((timeout % 1000) * 1000);
 #if SC_PLATFORM_WINDOWS
     int maxFd = -1;
 #else

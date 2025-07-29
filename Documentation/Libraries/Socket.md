@@ -7,11 +7,11 @@
 @copydetails group_socket
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation), [Time](@ref library_time)
-- All dependencies: [Foundation](@ref library_foundation), [Time](@ref library_time)
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 890
+- Lines of code (excluding comments): 889
 - Lines of code (including comments): 1179
 
 # Features

@@ -93,7 +93,8 @@ struct SC::SocketNetworking::Internal
 #elif SC_COMPILER_CLANG
     _Atomic bool networkingInited = false;
 #elif SC_COMPILER_GCC
-    volatile bool                              networkingInited = false;
+    volatile bool networkingInited = false;
+
     __attribute__((always_inline)) inline bool load() { return __atomic_load_n(&networkingInited, __ATOMIC_SEQ_CST); }
     __attribute__((always_inline)) inline void store(bool value)
     {

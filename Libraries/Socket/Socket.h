@@ -5,7 +5,6 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/StringSpan.h"
 #include "../Foundation/UniqueHandle.h"
-#include "../Time/Time.h"
 
 namespace SC
 {
@@ -280,7 +279,7 @@ struct SocketClient
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @param[in] timeout For how many milliseconds the read should wait before timing out
     /// @return Valid Result if bytes have been read successfully and timeout didn't occur
-    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, Time::Milliseconds timeout);
+    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout);
 
   private:
     const SocketDescriptor& socket;

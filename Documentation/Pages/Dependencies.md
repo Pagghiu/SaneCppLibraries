@@ -116,9 +116,9 @@ This file describes what each library depends on. It also lists the number of li
 - Lines of code (including comments): 853
 
 # [Socket](@ref library_socket)
-- Direct dependencies: [Foundation](@ref library_foundation), [Time](@ref library_time)
-- All dependencies: [Foundation](@ref library_foundation), [Time](@ref library_time)
-- Lines of code (excluding comments): 890
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+- Lines of code (excluding comments): 889
 - Lines of code (including comments): 1179
 
 # [Strings](@ref library_strings)
@@ -147,6 +147,6 @@ This file describes what each library depends on. It also lists the number of li
 
 ---
 # Project Total
-- Total lines of code (excluding comments): 31274
+- Total lines of code (excluding comments): 31273
 - Total lines of code (including comments): 41444
 
