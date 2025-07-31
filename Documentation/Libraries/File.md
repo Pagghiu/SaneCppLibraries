@@ -33,6 +33,12 @@ File library allows synchronous I/O operations on files and pipes.
 This library has a relatively limited scope and it should not need many additional features compared to now.   
 Will consider bumping to Complete in the future.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+
 # Description
 SC::FileDescriptor object can be created by SC::FileDescriptor::open-ing a path on file system and it can be SC::FileDescriptor::read or SC::FileDescriptor::write.  
 Also non-blocking mode can be controlled with SC::FileDescriptor::setBlocking.  

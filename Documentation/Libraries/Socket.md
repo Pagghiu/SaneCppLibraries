@@ -34,6 +34,7 @@ Simple synchronous TCP client / server workflow is supported, but it would need 
 Some relevant blog posts are:
 
 - [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
 
 # Description
 - SC::SocketDescriptor can create and destroy the OS level socket descriptor.

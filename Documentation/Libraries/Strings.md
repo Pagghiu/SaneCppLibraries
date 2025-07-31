@@ -37,6 +37,12 @@ Path is able to parse and manipulate windows and posix paths.
 🟩 Usable  
 Library is usable and can be successfully used to mix operations with strings made in different encodings.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+
 # Definition
 
 ## StringView

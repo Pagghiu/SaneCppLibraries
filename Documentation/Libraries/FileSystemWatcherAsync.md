@@ -21,6 +21,12 @@ SC::FileSystemWatcherAsync is an implementation of SC::FileSystemWatcher that us
 🟩 Usable  
 Library does have basic capabilities and it can be used just fine.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+
 # Roadmap
 
 🟦 Complete Features:

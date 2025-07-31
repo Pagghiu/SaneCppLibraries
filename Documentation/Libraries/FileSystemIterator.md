@@ -30,6 +30,7 @@ The library is simple but gets the job done.
 Some relevant blog posts are:
 
 - [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
 
 # Description
 @copydetails SC::FileSystemIterator

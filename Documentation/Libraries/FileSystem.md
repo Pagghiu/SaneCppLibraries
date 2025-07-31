@@ -58,6 +58,12 @@ FileSystem executed executing operations on files and directories.
 The library contains commonly used function but it's missing some notable ones like `stat`.
 SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+
 # Description 
 
 SC::FileSystem allows all typical file operations ( exists | copy | delete | make files or directory).
