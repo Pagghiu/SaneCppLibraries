@@ -21,7 +21,7 @@ template bool StringIterator<StringIteratorUTF8>::reverseAdvanceUntilMatches(Cod
 template bool StringIterator<StringIteratorUTF16>::reverseAdvanceUntilMatches(CodePoint c);
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::advanceAfterFinding(StringIterator other)
+bool StringIterator<CharIterator>::advanceAfterFindingSameIterator(StringIterator other)
 {
     const size_t thisLength  = static_cast<size_t>(end - it);
     const size_t otherLength = static_cast<size_t>(other.end - other.it);
@@ -58,22 +58,94 @@ bool StringIterator<CharIterator>::advanceAfterFinding(StringIterator other)
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::advanceAfterFinding(StringIterator other);
-template bool StringIterator<StringIteratorUTF8>::advanceAfterFinding(StringIterator other);
-template bool StringIterator<StringIteratorUTF16>::advanceAfterFinding(StringIterator other);
 
 template <typename CharIterator>
-bool StringIterator<CharIterator>::advanceBeforeFinding(StringIterator other)
+template <typename OtherIterator, bool after>
+bool StringIterator<CharIterator>::advanceBeforeOrAfterFinding(StringIterator<OtherIterator> other)
 {
-    if (advanceAfterFinding(other))
+    if (StringEncodingAreBinaryCompatible(StringIterator<CharIterator>::getEncoding(),
+                                          StringIterator<OtherIterator>::getEncoding()))
+    {
+        if (after)
+            return advanceAfterFindingSameIterator(reinterpret_cast<StringIterator<CharIterator>&>(other));
+        else
+            return advanceBeforeFindingSameIterator(reinterpret_cast<StringIterator<CharIterator>&>(other));
+    }
+    auto outerIterator = *this;
+    while (not outerIterator.isAtEnd())
+    {
+        auto innerIterator = outerIterator;
+        bool matchFound    = true;
+
+        CodePoint otherCodePoint;
+        CodePoint thisCodePoint;
+
+        auto otherIterator = other;
+        while (otherIterator.advanceRead(otherCodePoint))
+        {
+            if (not innerIterator.advanceRead(thisCodePoint))
+            {
+                matchFound = false;
+                break;
+            }
+            if (thisCodePoint != otherCodePoint)
+            {
+                matchFound = false;
+                break;
+            }
+        }
+
+        if (matchFound and otherIterator.isAtEnd())
+        {
+            if (after)
+            {
+                it = innerIterator.it;
+            }
+            else
+            {
+                it = outerIterator.it;
+            }
+            return true;
+        }
+        outerIterator.it = getNextOf(outerIterator.it);
+    }
+    return false;
+}
+
+// clang-format off
+template bool StringIterator<StringIteratorASCII>::advanceBeforeOrAfterFinding<StringIteratorUTF8, false>(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorASCII>::advanceBeforeOrAfterFinding<StringIteratorUTF8, true>(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorASCII>::advanceBeforeOrAfterFinding<StringIteratorUTF16, false>(StringIterator<StringIteratorUTF16>);
+template bool StringIterator<StringIteratorASCII>::advanceBeforeOrAfterFinding<StringIteratorUTF16, true>(StringIterator<StringIteratorUTF16>);
+template bool StringIterator<StringIteratorUTF8>::advanceBeforeOrAfterFinding<StringIteratorASCII, false>(StringIterator<StringIteratorASCII>);
+template bool StringIterator<StringIteratorUTF8>::advanceBeforeOrAfterFinding<StringIteratorASCII, true>(StringIterator<StringIteratorASCII>);
+template bool StringIterator<StringIteratorUTF8>::advanceBeforeOrAfterFinding<StringIteratorUTF16, true>(StringIterator<StringIteratorUTF16>);
+template bool StringIterator<StringIteratorUTF8>::advanceBeforeOrAfterFinding<StringIteratorUTF16, false>(StringIterator<StringIteratorUTF16>);
+template bool StringIterator<StringIteratorUTF16>::advanceBeforeOrAfterFinding<StringIteratorUTF8, true>(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorUTF16>::advanceBeforeOrAfterFinding<StringIteratorUTF8, false>(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorUTF16>::advanceBeforeOrAfterFinding<StringIteratorASCII, false>(StringIterator<StringIteratorASCII>);
+template bool StringIterator<StringIteratorUTF16>::advanceBeforeOrAfterFinding<StringIteratorASCII, true>(StringIterator<StringIteratorASCII>);
+
+// clang-format on
+
+template <typename CharIterator>
+bool StringIterator<CharIterator>::advanceBeforeFindingSameIterator(StringIterator other)
+{
+    if (advanceAfterFindingSameIterator(other))
     {
         return advanceOfBytes(other.it - other.end);
     }
     return false;
 }
-template bool StringIterator<StringIteratorASCII>::advanceBeforeFinding(StringIterator other);
-template bool StringIterator<StringIteratorUTF8>::advanceBeforeFinding(StringIterator other);
-template bool StringIterator<StringIteratorUTF16>::advanceBeforeFinding(StringIterator other);
+
+// clang-format off
+template bool StringIterator<StringIteratorASCII>::advanceBeforeFindingSameIterator(StringIterator<StringIteratorASCII>);
+template bool StringIterator<StringIteratorASCII>::advanceAfterFindingSameIterator(StringIterator<StringIteratorASCII>);
+template bool StringIterator<StringIteratorUTF8>::advanceBeforeFindingSameIterator(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorUTF8>::advanceAfterFindingSameIterator(StringIterator<StringIteratorUTF8>);
+template bool StringIterator<StringIteratorUTF16>::advanceBeforeFindingSameIterator(StringIterator<StringIteratorUTF16>);
+template bool StringIterator<StringIteratorUTF16>::advanceAfterFindingSameIterator(StringIterator<StringIteratorUTF16>);
+// clang-format on
 
 template <typename CharIterator>
 bool StringIterator<CharIterator>::advanceOfBytes(ssize_t bytesLength)
@@ -109,12 +181,11 @@ bool StringIterator<CharIterator>::advanceUntilMatchesAny(Span<const CodePoint> 
     return false;
 }
 
-template bool StringIterator<StringIteratorASCII>::advanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                          CodePoint&            matched);
-template bool StringIterator<StringIteratorUTF8>::advanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                         CodePoint&            matched);
-template bool StringIterator<StringIteratorUTF16>::advanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                          CodePoint&            matched);
+// clang-format off
+template bool StringIterator<StringIteratorASCII>::advanceUntilMatchesAny(Span<const CodePoint> items,CodePoint& matched);
+template bool StringIterator<StringIteratorUTF8>::advanceUntilMatchesAny(Span<const CodePoint> items,CodePoint& matched);
+template bool StringIterator<StringIteratorUTF16>::advanceUntilMatchesAny(Span<const CodePoint> items,CodePoint& matched);
+// clang-format on
 
 template <typename CharIterator>
 bool StringIterator<CharIterator>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched)
@@ -135,12 +206,11 @@ bool StringIterator<CharIterator>::reverseAdvanceUntilMatchesAny(Span<const Code
     return false;
 }
 
-template bool StringIterator<StringIteratorASCII>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                                 CodePoint&            matched);
-template bool StringIterator<StringIteratorUTF8>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                                CodePoint&            matched);
-template bool StringIterator<StringIteratorUTF16>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,
-                                                                                 CodePoint&            matched);
+// clang-format off
+template bool StringIterator<StringIteratorASCII>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
+template bool StringIterator<StringIteratorUTF8>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items, CodePoint& matched);
+template bool StringIterator<StringIteratorUTF16>::reverseAdvanceUntilMatchesAny(Span<const CodePoint> items,CodePoint& matched);
+// clang-format on
 
 template <typename CharIterator>
 bool StringIterator<CharIterator>::advanceUntilDifferentFrom(CodePoint c, CodePoint* optionalReadChar)

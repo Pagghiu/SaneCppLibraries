@@ -200,14 +200,19 @@ struct SC::StringViewTest : public SC::TestCase
                 SC_TEST_EXPECT(lines.component == "Line3");
                 SC_TEST_EXPECT(not lines.tokenizeNextLine());
             }
+            constexpr auto keyValue16 =
+                "\x4b\x00\x45\x00\x59\x00\x20\x00\x3d\x00\x20\x00\x56\x00\x41\x00\x4c\x00\x55\x00\x45\x00"_u16;
+            constexpr auto keyValue8 = "KEY = VALUE"_u8;
+            for (int idx = 0; idx < 2; ++idx)
             {
-                StringView str("KEY = VALUE");
+                StringView str(idx == 0 ? keyValue8 : keyValue16);
                 StringView split;
                 SC_TEST_EXPECT(str.splitAfter(" = ", split));
                 SC_TEST_EXPECT(split == "VALUE");
             }
+            for (int idx = 0; idx < 2; ++idx)
             {
-                StringView str("KEY = VALUE");
+                StringView str(idx == 0 ? keyValue8 : keyValue16);
                 StringView split;
                 SC_TEST_EXPECT(str.splitBefore(" = ", split));
                 SC_TEST_EXPECT(split == "KEY");

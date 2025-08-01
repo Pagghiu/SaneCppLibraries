@@ -227,11 +227,9 @@ struct SC::StringView : public StringSpan
     /// @endcode
     [[nodiscard]] bool endsWith(const StringView str) const;
 
-    /// @brief Check if StringView contains another StringView with compatible encoding.
+    /// @brief Check if StringView contains another StringView.
     /// @param str The other StringView to check with current
     /// @return  Returns `true` if this StringView contains str
-    /// @warning This method will assert if strings have non compatible encoding.
-    ///          It can be checked with StringView::hasCompatibleEncoding (str) == `true`
     ///
     /// Example:
     /// @code{.cpp}
@@ -281,8 +279,6 @@ struct SC::StringView : public StringSpan
     /// @param str The other StringView to check with current
     /// @return `true` if this StringView has compatible encoding with str
     [[nodiscard]] constexpr bool hasCompatibleEncoding(StringView str) const;
-
-    /// Returns a StringView from two iterators. The from iterator will be shortened until the start of to
 
     /// @brief  Returns a StringView starting at `from` and ending at `to`.
     /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16

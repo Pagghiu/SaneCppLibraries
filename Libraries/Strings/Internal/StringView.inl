@@ -195,38 +195,35 @@ bool SC::StringView::endsWith(const StringView str) const
 
 bool SC::StringView::containsString(const StringView str) const
 {
-    SC_ASSERT_RELEASE(hasCompatibleEncoding(str));
-    return withIterator([str](auto it) { return it.advanceAfterFinding(str.getIterator<decltype(it)>()); });
+    return withIterators(*this, str, [](auto it1, auto it2) { return it1.advanceAfterFinding(it2); });
 }
 
 bool SC::StringView::splitAfter(const StringView stringToMatch, StringView& remainingAfterSplit) const
 {
-    SC_ASSERT_RELEASE(hasCompatibleEncoding(stringToMatch));
-    return withIterator(
-        [&](auto it)
-        {
-            if (it.advanceAfterFinding(stringToMatch.getIterator<decltype(it)>()))
-            {
-                remainingAfterSplit = StringView::fromIteratorUntilEnd(it);
-                return true;
-            }
-            return false;
-        });
+    return withIterators(*this, stringToMatch,
+                         [&](auto it1, auto it2)
+                         {
+                             if (it1.advanceAfterFinding(it2))
+                             {
+                                 remainingAfterSplit = StringView::fromIteratorUntilEnd(it1);
+                                 return true;
+                             }
+                             return false;
+                         });
 }
 
 bool SC::StringView::splitBefore(const StringView stringToMatch, StringView& stringBeforeSplit) const
 {
-    SC_ASSERT_RELEASE(hasCompatibleEncoding(stringToMatch));
-    return withIterator(
-        [&](auto it)
-        {
-            if (it.advanceBeforeFinding(stringToMatch.getIterator<decltype(it)>()))
-            {
-                stringBeforeSplit = StringView::fromIteratorFromStart(it);
-                return true;
-            }
-            return false;
-        });
+    return withIterators(*this, stringToMatch,
+                         [&](auto it1, auto it2)
+                         {
+                             if (it1.advanceBeforeFinding(it2))
+                             {
+                                 stringBeforeSplit = StringView::fromIteratorFromStart(it1);
+                                 return true;
+                             }
+                             return false;
+                         });
 }
 
 bool SC::StringView::containsCodePoint(StringCodePoint c) const

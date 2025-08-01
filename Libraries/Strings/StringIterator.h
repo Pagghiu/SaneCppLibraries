@@ -67,13 +67,25 @@ struct SC_COMPILER_EXPORT StringIterator
     /// Position pointer is advanced additional after the matching range.
     /// @param other The range of character to be found `[it, end)`
     /// @return `true` if other was found, `false` if end was reached
-    [[nodiscard]] bool advanceAfterFinding(StringIterator other);
+    template <typename OtherIterator>
+    [[nodiscard]] bool advanceAfterFinding(StringIterator<OtherIterator> other)
+    {
+        return advanceBeforeOrAfterFinding<OtherIterator, true>(other);
+    }
+
+    [[nodiscard]] bool advanceAfterFinding(StringIterator other) { return advanceAfterFindingSameIterator(other); }
 
     /// @brief Advances position towards `end` until a matching range of character equal to `other[it, end)` is found.
     /// Position pointer is stopped before the first matching character of the range.
     /// @param other The range of character to be found `[it, end)`
     /// @return `true` if other was found, `false` if end was reached
-    [[nodiscard]] bool advanceBeforeFinding(StringIterator other);
+    template <typename OtherIterator>
+    [[nodiscard]] bool advanceBeforeFinding(StringIterator<OtherIterator> other)
+    {
+        return advanceBeforeOrAfterFinding<OtherIterator, false>(other);
+    }
+
+    [[nodiscard]] bool advanceBeforeFinding(StringIterator other) { return advanceBeforeFindingSameIterator(other); }
 
     /// @brief Advances position by the same number of code points as other
     /// @param other The other range of character
@@ -201,6 +213,10 @@ struct SC_COMPILER_EXPORT StringIterator
     [[nodiscard]] bool startsWith(IteratorType other) const;
 
   protected:
+    template <typename OtherIterator, bool after>
+    [[nodiscard]] bool advanceBeforeOrAfterFinding(StringIterator<OtherIterator> other);
+    [[nodiscard]] bool advanceAfterFindingSameIterator(StringIterator other);
+    [[nodiscard]] bool advanceBeforeFindingSameIterator(StringIterator other);
     [[nodiscard]] bool advanceOfBytes(ssize_t bytesLength);
 
     friend struct StringView;
