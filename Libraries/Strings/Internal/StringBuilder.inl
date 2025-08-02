@@ -39,11 +39,8 @@ bool StringBuilder::append(StringView str)
 
 bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf, StringView with)
 {
-    if (not source.hasCompatibleEncoding(occurrencesOf) or not source.hasCompatibleEncoding(with) or
-        not StringEncodingAreBinaryCompatible(source.getEncoding(), encoding))
-    {
-        return false;
-    }
+    SC_ASSERT_RELEASE(occurrencesOf.hasCompatibleEncoding(with));
+
     if (source.isEmpty())
     {
         return true;
@@ -52,25 +49,28 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     {
         return append(source);
     }
-    (void)StringConverter::popNullTermIfNotEmpty(stringData, encoding);
-    StringView current             = source;
-    const auto occurrencesIterator = occurrencesOf.getIterator<StringIteratorASCII>();
-    bool       res;
-    do
+    StringView current = source;
+
+    auto func = [&](auto sourceIt, auto occurrencesIt) -> bool
     {
-        auto sourceIt    = current.getIterator<StringIteratorASCII>();
-        res              = sourceIt.advanceBeforeFinding(occurrencesIterator);
-        StringView soFar = StringView::fromIteratorFromStart(sourceIt);
-        SC_TRY(stringData.append(soFar.toCharSpan()));
-        if (res)
+        bool matches;
+        do
         {
-            SC_TRY(stringData.append(with.toCharSpan()));
-            res     = sourceIt.advanceByLengthOf(occurrencesIterator);
-            current = StringView::fromIteratorUntilEnd(sourceIt);
-        }
-    } while (res);
-    SC_TRY(stringData.append(current.toCharSpan()));
-    return StringConverter::pushNullTerm(stringData, encoding);
+            sourceIt = current.getIterator<decltype(sourceIt)>();
+            matches  = sourceIt.advanceBeforeFinding(occurrencesIt);
+            SC_TRY(append(StringView::fromIteratorFromStart(sourceIt)));
+            if (matches)
+            {
+                SC_TRY(append(with));
+                sourceIt = current.getIterator<decltype(sourceIt)>();
+                matches  = sourceIt.advanceAfterFinding(occurrencesIt); // TODO: advanceBeforeAndAfterFinding?
+                current  = StringView::fromIteratorUntilEnd(sourceIt);
+            }
+        } while (matches);
+        return true;
+    };
+    SC_TRY(StringView::withIterators(current, occurrencesOf, func));
+    return append(current);
 }
 
 [[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions)
