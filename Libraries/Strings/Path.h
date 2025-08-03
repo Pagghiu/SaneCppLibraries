@@ -81,9 +81,9 @@ struct SC_COMPILER_EXPORT Path
                                    StringView separator = SeparatorStringView(), bool skipEmpty = false);
 
     /// @brief Splits a StringView of type "name.ext" into "name" and "ext"
-    /// @param[in] input        An input path coded as UTF8 sequence (ex. "name.ext")
-    /// @param[out] name         Output string holding name ("name" in "name.ext")
-    /// @param[out] extension    Output string holding extension ("ext" in "name.ext")
+    /// @param[in] input        An input filename (ex. "name.ext")
+    /// @param[out] name        Output string holding name ("name" in "name.ext")
+    /// @param[out] extension   Output string holding extension ("ext" in "name.ext")
     /// @returns `false` if both name and extension will be empty after trying to parse them
     ///
     /// Example:
