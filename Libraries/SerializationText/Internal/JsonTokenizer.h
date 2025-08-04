@@ -37,12 +37,11 @@ struct SC::JsonTokenizer
         constexpr Type getType() const { return type; }
 
         /// @brief Get current Token as StringView slice from the passed string
-        /// @param source The StringView that has been used (must be UTF8 or ASCII)
+        /// @param source The StringView that has been used when parsing
         /// @return StringView slice of `source` representing this token
         constexpr StringView getToken(StringView source) const
         {
-            SC_ASSERT_DEBUG(StringEncodingGetSize(source.getEncoding()) == 1);
-            return source.sliceStartLengthBytes(tokenStartBytes, tokenLengthBytes); // Assuming it's utf8 or ASCII
+            return {{source.bytesWithoutTerminator() + tokenStartBytes, tokenLengthBytes}, false, source.getEncoding()};
         }
 
       private:

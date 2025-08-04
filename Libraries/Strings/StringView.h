@@ -395,23 +395,6 @@ struct SC::StringView : public StringSpan
     /// @endcode
     [[nodiscard]] StringView trimWhiteSpaces() const;
 
-    /// @brief Returns a shortened StringView from current cutting the first `start` bytes.
-    /// @param start Offset in bytes where the slice starts.
-    /// @return A sliced StringView starting at `start` bytes offset
-    [[nodiscard]] constexpr StringView sliceStartBytes(size_t start) const;
-
-    /// @brief Returns a shortened StringView taking a slice from `start` to `end` expressed in bytes.
-    /// @param start Offset in bytes where the slice will start.
-    /// @param end Offset in bytes where the slice will end.
-    /// @return A sliced StringView starting at `start` bytes offset and ending at `end` bytes offset.
-    [[nodiscard]] constexpr StringView sliceStartEndBytes(size_t start, size_t end) const;
-
-    /// @brief Returns a shortened StringView taking a slice from `start` ending at `start`+`length` bytes.
-    /// @param start Offset in bytes where the slice will start.
-    /// @param length Length in bytes from `start` where the slice will end.
-    /// @return A sliced StringView starting at `start` bytes offset and ending at `start`+`length` bytes offset.
-    [[nodiscard]] constexpr StringView sliceStartLengthBytes(size_t start, size_t length) const;
-
     /// If the current view is an integer number, returns true
 
     /// @brief Check if StringView can be parsed as an integer number.
@@ -788,30 +771,4 @@ constexpr SC::StringView SC::StringView::fromIteratorFromStart(StringIterator it
     start.setToStart();
     const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
     return StringView({start.it, numBytes}, false, StringIterator::getEncoding());
-}
-
-constexpr SC::StringView SC::StringView::sliceStartBytes(size_t start) const
-{
-    if (start < sizeInBytes())
-        return sliceStartLengthBytes(start, sizeInBytes() - start);
-    SC_ASSERT_RELEASE(start < sizeInBytes());
-    return StringView({text, 0}, false, getEncoding());
-}
-
-constexpr SC::StringView SC::StringView::sliceStartEndBytes(size_t start, size_t end) const
-{
-    if (end >= start)
-        return sliceStartLengthBytes(start, end - start);
-    SC_ASSERT_RELEASE(end >= start);
-    return StringView({text, 0}, false, getEncoding());
-}
-
-constexpr SC::StringView SC::StringView::sliceStartLengthBytes(size_t start, size_t length) const
-{
-    if (start + length > sizeInBytes())
-    {
-        SC_ASSERT_RELEASE(start + length > sizeInBytes());
-        return StringView({text, 0}, false, getEncoding());
-    }
-    return StringView({text + start, length}, hasNullTerm and (start + length == sizeInBytes()), getEncoding());
 }

@@ -75,8 +75,8 @@ struct SC::Debugger::Internal
     {
         Path::ParsedView theFileParsed;
         (void)Path::parse(theFile, theFileParsed, Path::Type::AsWindows);
-        auto theFileDirectory = theFile.sliceStartBytes(theFileParsed.root.sizeInBytes());
-
+        StringView theFileDirectory;
+        (void)theFile.splitAfter(theFileParsed.root, theFileDirectory);
         SC::Vector<WCHAR> nameBuffer;
         SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
 

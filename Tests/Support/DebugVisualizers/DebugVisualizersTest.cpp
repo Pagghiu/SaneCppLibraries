@@ -43,8 +43,8 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         smallBuffer = buffer;
         (void)buffer.append({" salver"});
 
-        twoFaces   = stringUtf8.view().sliceStartLengthBytes(0, 8);
-        threeKanji = stringUtf16.view().sliceStartLengthBytes(0, 6);
+        twoFaces   = stringUtf8.view().sliceStartLength(0, 2);
+        threeKanji = stringUtf16.view().sliceStartLength(0, 3);
         (void)ints.resize(3);
 
         (void)strings.push_back(stringUtf8);

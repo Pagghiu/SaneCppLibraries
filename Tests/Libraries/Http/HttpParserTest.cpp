@@ -24,8 +24,10 @@ struct SC::HttpParserTest : public SC::TestCase
         Buffer currentField;
         while (true)
         {
-            length              = min(length, originalString.sizeInBytes());
-            const auto       sv = originalString.sliceStartLengthBytes(position, length);
+            length = min(length, originalString.sizeInBytes());
+
+            const StringView sv = {
+                {originalString.bytesWithoutTerminator() + position, length}, false, originalString.getEncoding()};
             Span<const char> parsedData;
             SC_TEST_EXPECT(parser.parse(sv.toCharSpan(), readBytes, parsedData));
             position += readBytes;
@@ -147,8 +149,10 @@ struct SC::HttpParserTest : public SC::TestCase
             Buffer currentField;
             while (true)
             {
-                length              = min(length, originalString.sizeInBytes());
-                const auto       sv = originalString.sliceStartLengthBytes(position, length);
+                length = min(length, originalString.sizeInBytes());
+
+                const StringView sv = {
+                    {originalString.bytesWithoutTerminator() + position, length}, false, originalString.getEncoding()};
                 Span<const char> parsedData;
                 SC_TEST_EXPECT(parser.parse(sv.toCharSpan(), readBytes, parsedData));
                 SC_TEST_EXPECT(currentField.append(parsedData));
