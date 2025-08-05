@@ -50,9 +50,11 @@ $(TOOL_OUTPUT_DIR)\_Intermediates\Makefile.$(TARGET_OS).$(CONFIG).touched: $(SCT
 !endif
 
 !if "$(CONFIG)"=="Debug"
-SCTool_CONFIG_FLAGS = /D_DEBUG /Zi /MTd
+SCTool_CONFIG_FLAGS = /D_DEBUG /Zi /MTd /GS /Od 
+SCTool_CONFIG_LFLAGS = /DEBUG
 !else
 SCTool_CONFIG_FLAGS = /DNDEBUG /O2 /MT
+SCTool_CONFIG_LFLAGS = /LTCG
 !endif
 
 SCTool_COMMON_FLAGS = /I"../../.." /I"."
@@ -105,4 +107,4 @@ SCTool_BUILD: $(SCTool_TARGET_DIR)\$(SCTool_TARGET_NAME)
 
 $(SCTool_TARGET_DIR)\$(SCTool_TARGET_NAME): $(SCTool_TARGET_DIR) $(SCTool_OBJECT_FILES) $(SCTool_DEPENDENCY_FILES)
     @echo Linking "$(SCTool_TARGET_NAME)"
-	@link /nologo /OUT:"$(SCTool_TARGET_DIR)\$(SCTool_TARGET_NAME)" $(SCTool_OBJECT_FILES) $(SCTool_LDFLAGS)
+	@link /nologo $(SCTool_CONFIG_LFLAGS) /OUT:"$(SCTool_TARGET_DIR)\$(SCTool_TARGET_NAME)" $(SCTool_OBJECT_FILES) /PDB:"$(SCTool_TARGET_DIR)\$(TOOL).pdb" $(SCTool_LDFLAGS)
