@@ -327,6 +327,7 @@ extern "C"
 }
 
 #define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#pragma comment(lib, "ntdll.lib")
 #if SC_COMPILER_MSVC
 #pragma warning(pop)
 #endif

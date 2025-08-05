@@ -3,6 +3,9 @@
 #include "Process.h"
 #include "../File/File.h"
 
+#include "Internal/EnvironmentTable.h"
+#include "Internal/StringsArena.h"
+
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"
 #else

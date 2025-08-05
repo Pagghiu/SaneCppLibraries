@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../FileSystemIterator.h"
+#include "../../FileSystemIterator/FileSystemIterator.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>

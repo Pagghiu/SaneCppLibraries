@@ -3,6 +3,7 @@
 #pragma once
 #include <WinSock2.h>
 #include <Ws2tcpip.h> // sockadd_in6
+
 using socklen_t = int;
 
 #define WIN32_LEAN_AND_MEAN
@@ -12,6 +13,10 @@ using socklen_t = int;
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Compiler.h"
 #include "../../Socket/Socket.h"
+
+#if SC_COMPILER_CLANG
+#include <stdatomic.h>
+#endif
 
 SC::Result SC::detail::SocketDescriptorDefinition::releaseHandle(Handle& handle)
 {

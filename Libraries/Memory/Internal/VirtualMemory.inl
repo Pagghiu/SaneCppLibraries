@@ -117,7 +117,7 @@ bool SC::VirtualMemory::shrink(size_t newCapacityBytes)
 // VirtualAllocator
 //------------------------------------------------------------------------------------------------------------------
 SC::VirtualAllocator::VirtualAllocator(VirtualMemory& virtualMemory)
-    : virtualMemory(virtualMemory), FixedAllocator(nullptr, 0)
+    : FixedAllocator(nullptr, 0), virtualMemory(virtualMemory)
 {}
 
 void* SC::VirtualAllocator::allocateImpl(const void* owner, size_t numBytes, size_t alignment)

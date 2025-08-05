@@ -53,7 +53,7 @@ struct StringsArena
     }
 
     StringsArena(StringSpan::NativeWritable& string, size_t& numberOfStrings, Span<size_t> stringsStart)
-        : string(string), numberOfStrings(numberOfStrings), stringsStart(stringsStart)
+        : numberOfStrings(numberOfStrings), stringsStart(stringsStart), string(string)
     {}
 
     StringSpan view() const { return string.view(); }

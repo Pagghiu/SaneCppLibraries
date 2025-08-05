@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../FileSystemIterator.h"
+#include "../../FileSystemIterator/FileSystemIterator.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -15,26 +15,46 @@
 #include <sys/syslimits.h> // For PATH_MAX on Apple and other POSIX systems
 #endif
 
-namespace SC
-{
-SC::Result getErrorCode(int errorCode); // defined in FileSystemInternalPosix.inl
-}
-
 struct SC::FileSystemIterator::Internal
 {
+
+    static Result translateErrorCode(int errorCode)
+    {
+        switch (errorCode)
+        {
+        case EACCES: return Result::Error("EACCES");
+        case EDQUOT: return Result::Error("EDQUOT");
+        case EEXIST: return Result::Error("EEXIST");
+        case EFAULT: return Result::Error("EFAULT");
+        case EIO: return Result::Error("EIO");
+        case ELOOP: return Result::Error("ELOOP");
+        case EMLINK: return Result::Error("EMLINK");
+        case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
+        case ENOENT: return Result::Error("ENOENT");
+        case ENOSPC: return Result::Error("ENOSPC");
+        case ENOTDIR: return Result::Error("ENOTDIR");
+        case EROFS: return Result::Error("EROFS");
+        case EBADF: return Result::Error("EBADF");
+        case EPERM: return Result::Error("EPERM");
+        case ENOMEM: return Result::Error("ENOMEM");
+        case ENOTSUP: return Result::Error("ENOTSUP");
+        case EINVAL: return Result::Error("EINVAL");
+        }
+        return Result::Error("Unknown");
+    }
     static Result initFolderState(FolderState& entry, int fd)
     {
         entry.fileDescriptor = fd;
         if (entry.fileDescriptor == -1)
         {
-            return getErrorCode(errno);
+            return translateErrorCode(errno);
         }
         entry.dirEnumerator = ::fdopendir(entry.fileDescriptor);
         if (entry.dirEnumerator == nullptr)
         {
             ::close(entry.fileDescriptor);
             entry.fileDescriptor = -1; // Reset file descriptor on error
-            return getErrorCode(errno);
+            return translateErrorCode(errno);
         }
         return Result(true);
     }

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Assert.h"
+#include "../../Process/Internal/StringsArena.h"
 #include "../../Process/Process.h"
-#include "StringsArena.h"
 
 #include <string.h>
 namespace SC

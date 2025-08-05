@@ -18,7 +18,10 @@ struct SC_FILE_COMPLETION_INFORMATION
     HANDLE Port;
     PVOID  Key;
 };
-
+#ifndef _NTDEF_
+typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
+typedef NTSTATUS* PNTSTATUS;
+#endif
 struct SC_IO_STATUS_BLOCK
 {
     union

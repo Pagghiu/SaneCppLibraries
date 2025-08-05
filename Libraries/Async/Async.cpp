@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../File/File.h"
 #include "../Foundation/Platform.h"
+#include "Internal/AsyncInternal.h"
 #include "Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #include <string.h> // strncpy
@@ -1591,7 +1592,6 @@ struct SC::AsyncEventLoop::Internal::CompleteAsyncPhase
     {
         using AsyncType       = T;
         using AsyncResultType = typename AsyncType::Result;
-        using AsyncCompletion = typename AsyncType::CompletionData;
         AsyncResultType result(eventLoop, async, returnCode, hasBeenReactivated);
         result.eventIndex = eventIndex;
         if (result.returnCode)

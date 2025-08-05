@@ -153,7 +153,7 @@ struct AsyncRequest
 
     /// @brief Constructs a free async request of given type
     /// @param type Type of this specific request
-    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), userFlags(0), unused(0) {}
+    AsyncRequest(Type type) : state(State::Free), type(type), flags(0), unused(0), userFlags(0) {}
 
     /// @brief Ask to stop current async operation
     /// @param eventLoop The event Loop associated with this request
@@ -258,7 +258,7 @@ struct AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
     AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request, SC::Result& res, bool* hasBeenReactivated = nullptr)
-        : eventLoop(eventLoop), async(request), returnCode(res), hasBeenReactivated(hasBeenReactivated)
+        : eventLoop(eventLoop), async(request), hasBeenReactivated(hasBeenReactivated), returnCode(res)
     {}
 
     /// @brief Ask the event loop to re-activate this request after it was already completed
@@ -802,9 +802,12 @@ struct AsyncFileWrite : public AsyncRequest
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
 
-    bool     isWatchable = false;
-    bool     useOffset   = false;
-    uint64_t offset      = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
+#if SC_PLATFORM_WINDOWS
+#else
+    bool isWatchable = false;
+#endif
+    bool     useOffset = false;
+    uint64_t offset    = 0xffffffffffffffff; /// Offset to start writing from. Not supported on pipes.
 
     size_t totalBytesWritten = 0;
 #if SC_PLATFORM_WINDOWS
@@ -994,7 +997,12 @@ struct AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
     ~AsyncFileSystemOperation() { destroy(); }
-
+#ifdef CopyFile
+#undef CopyFile
+#endif
+#ifdef RemoveDirectory
+#undef RemoveDirectory
+#endif
     enum class Operation
     {
         None = 0,

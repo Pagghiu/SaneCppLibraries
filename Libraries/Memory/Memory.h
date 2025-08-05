@@ -108,9 +108,10 @@ struct SC::FixedAllocator : public MemoryAllocator
 {
     FixedAllocator(void* memory, size_t capacityBytes);
 
-    const void*  data() const { return memory; }
-    const size_t size() const { return position; }
-    const size_t capacity() const { return capacityBytes; }
+    const void* data() const { return memory; }
+
+    size_t size() const { return position; }
+    size_t capacity() const { return capacityBytes; }
 
   protected:
     // Not using a span here to avoid depending on Span<T> in this header
