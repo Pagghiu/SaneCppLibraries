@@ -444,9 +444,9 @@ struct Definition
     Vector<Workspace> workspaces; ///< Workspaces to be generated
 
     /// @brief Generates projects for all workspaces, with specified parameters at given root path.
-    /// @param projectName Name of the workspace file / directory to generate
+    /// @param workspaceName Name of the workspace to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
-    Result configure(StringView projectName, const Parameters& parameters) const;
+    Result configure(StringView workspaceName, const Parameters& parameters) const;
 };
 
 //! @}
@@ -467,13 +467,14 @@ struct Action
     };
     using ConfigureFunction = Result (*)(Build::Definition& definition, const Build::Parameters& parameters);
 
-    static Result execute(const Action& action, ConfigureFunction configure, StringView projectName);
+    static Result execute(const Action& action, ConfigureFunction configure, StringView defaultWorkspaceName);
 
     Type action = Configure;
 
     Parameters parameters;
     StringView configuration;
     StringView target;
+    StringView workspaceName;
 
   private:
     struct Internal;

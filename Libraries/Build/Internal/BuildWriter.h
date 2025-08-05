@@ -28,7 +28,7 @@ struct ProjectWriter
     {}
 
     /// @brief Write the project file at given directories
-    [[nodiscard]] bool write(StringView filename);
+    Result write(StringView filename);
 
   private:
     struct WriterXCode;

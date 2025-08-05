@@ -232,10 +232,15 @@ endif
         return Result(true);
     }
 
-    [[nodiscard]] bool sanitizeName(StringView input, String& output)
+    [[nodiscard]] Result sanitizeName(StringView input, String& output)
     {
+        SC_TRY_MSG(not input.isEmpty(), "Project name is empty");
         // TODO: Actually implement name sanitization
-        return output.assign(input);
+        if (not StringBuilder(output, StringBuilder::Clear).appendReplaceAll(input, ".", "_"))
+        {
+            return Result::Error("sanitizeName");
+        }
+        return Result(true);
     }
 
     void writeTargetRule(StringBuilder& builder, StringView makeTarget)
@@ -270,7 +275,7 @@ else
 endif
 
 $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
-	@echo Generate compile_commands.json
+	@echo Writing {0} compile_commands.json
 ifeq ($(TARGET_OS),linux)    
 	$(VRBS)sed -e '1s/^/[\n/' -e '$$s/,$$/\n]/' $({0}_INTERMEDIATE_DIR)/*.o.json > $({0}_INTERMEDIATE_DIR)/compile_commands.json
 else

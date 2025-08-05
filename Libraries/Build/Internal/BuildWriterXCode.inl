@@ -1286,4 +1286,24 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
         return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
+
+    static Result writeWorkspace(StringBuilder& builder, Span<const Project> projects)
+    {
+        SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8"?>
+<Workspace version = "1.0">
+)delimiter");
+        SC_TRY(builder.append("\n"));
+        for (const Project& project : projects)
+        {
+            builder.append(R"delimiter(
+   <FileRef location = "group:{}.xcodeproj">
+   </FileRef>
+)delimiter",
+                           project.name.view());
+        }
+        builder.append("</Workspace>");
+        SC_COMPILER_WARNING_POP;
+        return Result(true);
+    }
 };

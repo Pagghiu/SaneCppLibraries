@@ -26,12 +26,12 @@ Under VSCode select `Tasks: Run Task` and choose:
 ## Command-line
 
 Intel Machines
-- **Windows**: `SC.bat build compile Debug default intel64`
-- **Posix**: `SC.sh build compile Debug default intel64`
+- **Windows**: `SC.bat build compile SCTest Debug default intel64`
+- **Posix**: `SC.sh build compile SCTest Debug default intel64`
 
 Arm Machines
-- **Windows**: `SC.bat build compile Debug default arm64`
-- **Posix**: `SC.sh build compile Debug default arm64`
+- **Windows**: `SC.bat build compile SCTest Debug default arm64`
+- **Posix**: `SC.sh build compile SCTest Debug default arm64`
 
 ## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 

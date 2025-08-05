@@ -201,9 +201,11 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     return Result(true);
 }
 
+static constexpr StringView DEFAULT_WORKSPACE_NAME = "SCWorkspace";
+
 Result configure(Definition& definition, const Parameters& parameters)
 {
-    Workspace workspace = {"SCTest"};
+    Workspace workspace = {DEFAULT_WORKSPACE_NAME};
     SC_TRY(workspace.projects.resize(2));
     SC_TRY(buildTestProject(parameters, workspace.projects[0]));
     SC_TRY(buildExampleProject(parameters, workspace.projects[1]));
@@ -212,6 +214,6 @@ Result configure(Definition& definition, const Parameters& parameters)
 }
 SC_COMPILER_WARNING_POP;
 
-Result executeAction(const Action& action) { return Build::Action::execute(action, configure, TEST_PROJECT_NAME); }
+Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE_NAME); }
 } // namespace Build
 } // namespace SC

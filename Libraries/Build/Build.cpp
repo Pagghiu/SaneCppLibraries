@@ -256,6 +256,15 @@ bool SC::Build::Project::removeFiles(StringView subdirectory, StringView filter)
 SC::Result SC::Build::Project::validate() const
 {
     SC_TRY_MSG(not name.isEmpty(), "Project needs name");
+    SC_TRY_MSG(not targetName.isEmpty(), "Project needs targetName");
+    SC_TRY_MSG(not rootDirectory.isEmpty(), "Project needs targetName");
+    SC_TRY_MSG(configurations.size() > 0, "Project needs at least one configuration");
+    for (const Configuration& config : configurations)
+    {
+        SC_TRY_MSG(not config.name.isEmpty(), "Configuration needs a name");
+        SC_TRY_MSG(not config.outputPath.isEmpty(), "Configuration needs an output path");
+        SC_TRY_MSG(not config.intermediatesPath.isEmpty(), "Configuration needs an intermediates path");
+    }
     return Result(true);
 }
 
@@ -268,7 +277,7 @@ SC::Result SC::Build::Workspace::validate() const
     return Result(true);
 }
 
-SC::Result SC::Build::Definition::configure(StringView projectFileName, const Build::Parameters& parameters) const
+SC::Result SC::Build::Definition::configure(StringView workspaceName, const Build::Parameters& parameters) const
 {
     for (const auto& workspace : workspaces)
     {
@@ -281,8 +290,8 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
         Vector<StringView> components;
         SC_TRY(Path::normalize(projectGeneratorSubFolder, parameters.directories.projectsDirectory.view(),
                                Path::Type::AsPosix));
-        SC_TRY(
-            Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator)}, Path::Type::AsPosix));
+        SC_TRY(Path::append(projectGeneratorSubFolder, {Generator::toString(parameters.generator), workspaceName},
+                            Path::Type::AsPosix));
         if (parameters.generator == Generator::Make)
         {
             if (parameters.platform == Platform::Linux)
@@ -298,7 +307,7 @@ SC::Result SC::Build::Definition::configure(StringView projectFileName, const Bu
     Build::Parameters newParameters             = parameters;
     newParameters.directories.projectsDirectory = move(projectGeneratorSubFolder);
     Build::ProjectWriter writer(*this, filePathsResolver, newParameters);
-    return Result(writer.write(projectFileName));
+    return Result(writer.write(workspaceName));
 }
 
 SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView                         path,
@@ -473,18 +482,21 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     return Result(true);
 }
 
-bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
+SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
 {
     const Directories& directories = parameters.directories;
-    (void)defaultProjectName;
-    FileSystem fs;
     SC_TRY(Path::isAbsolute(directories.projectsDirectory.view(), Path::AsNative));
+
+    FileSystem fs;
     SC_TRY(fs.init("."));
     SC_TRY(fs.makeDirectoryRecursive(directories.projectsDirectory.view()));
     SC_TRY(fs.init(directories.projectsDirectory.view()));
 
-    // TODO: Generate all projects for all workspaces
-    const Workspace& workspace = definition.workspaces[0];
+    size_t idx = 0;
+    SC_TRY_MSG(definition.workspaces.find([&](const Workspace& it) { return it.name == workspaceName; }, &idx),
+               "Workspace not found in definition");
+
+    const Workspace& workspace = definition.workspaces[idx];
 
     String buffer;
 
@@ -546,6 +558,17 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
             break;
             }
         }
+        // Write workspace
+        {
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(WriterXCode::writeWorkspace(builder, workspace.projects.toSpanConst()));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcworkspace", workspace.name));
+            SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
+            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
+                       .format("{}.xcworkspace/contents.xcworkspacedata", workspace.name));
+            SC_TRY(fs.removeFileIfExists(prjName.view()));
+            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+        }
         break;
     }
     case Generator::VisualStudio2019:
@@ -581,15 +604,16 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
                 SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
             }
             SC_TRY(projectsGuids.push_back(writer.projectGuid));
-            // Write solution
-            {
-                StringBuilder builder(buffer, StringBuilder::Clear);
-                SC_TRY(WriterVisualStudio::writeSolution(builder, {project}, projectsGuids.toSpanConst()));
-                String slnName;
-                SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", project.name));
-                SC_TRY(fs.removeFileIfExists(slnName.view()));
-                SC_TRY(fs.writeString(slnName.view(), buffer.view()));
-            }
+        }
+        // Write solution for all projects
+        {
+            StringBuilder builder(buffer, StringBuilder::Clear);
+            SC_TRY(WriterVisualStudio::writeSolution(builder, workspace.projects.toSpanConst(),
+                                                     projectsGuids.toSpanConst()));
+            String slnName;
+            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", workspace.name));
+            SC_TRY(fs.removeFileIfExists(slnName.view()));
+            SC_TRY(fs.writeString(slnName.view(), buffer.view()));
         }
         break;
     }
@@ -610,9 +634,9 @@ bool SC::Build::ProjectWriter::write(StringView defaultProjectName)
 
 struct SC::Build::Action::Internal
 {
-    static Result configure(ConfigureFunction configure, StringView projectFileName, const Action& action);
-    static Result coverage(StringView projectFileName, const Action& action);
-    static Result executeInternal(StringView projectFileName, const Action& action, Span<StringView> environment = {},
+    static Result configure(ConfigureFunction configure, StringView workspaceName, const Action& action);
+    static Result coverage(StringView workspaceName, const Action& action);
+    static Result executeInternal(StringView workspaceName, const Action& action, Span<StringView> environment = {},
                                   String* outputExecutable = nullptr);
 
     static Result toVisualStudioArchitecture(Architecture::Type architectureType, StringView& architecture)
@@ -659,29 +683,31 @@ struct SC::Build::Action::Internal
     }
 };
 
-SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure, StringView projectName)
+SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure,
+                                      StringView defaultWorkspaceName)
 {
+    StringView workspaceName = action.workspaceName.isEmpty() ? defaultWorkspaceName : action.workspaceName;
     switch (action.action)
     {
     case Print:
     case Run:
-    case Compile: return Internal::executeInternal(projectName, action);
-    case Coverage: return Internal::coverage(projectName, action);
-    case Configure: return Internal::configure(configure, projectName, action);
+    case Compile: return Internal::executeInternal(workspaceName, action);
+    case Coverage: return Internal::coverage(workspaceName, action);
+    case Configure: return Internal::configure(configure, workspaceName, action);
     }
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView projectFileName,
+SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView workspaceName,
                                                   const Action& action)
 {
     Build::Definition definition;
     SC_TRY(configure(definition, action.parameters));
-    SC_TRY(definition.configure(projectFileName, action.parameters));
+    SC_TRY(definition.configure(workspaceName, action.parameters));
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, const Action& action)
+SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const Action& action)
 {
     Action newAction = action;
     String executablePath;
@@ -689,11 +715,11 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     // Build the configuration with coverage information
     newAction.action         = Action::Compile;
     StringView environment[] = {"CC", "clang", "CXX", "clang++"};
-    SC_TRY(executeInternal(projectFileName, newAction, environment));
+    SC_TRY(executeInternal(workspaceName, newAction, environment));
 
     // Get coverage configuration executable path
     newAction.action = Action::Print;
-    SC_TRY(executeInternal(projectFileName, newAction, environment, &executablePath));
+    SC_TRY(executeInternal(workspaceName, newAction, environment, &executablePath));
     String coverageDirectory;
     SC_TRY(Path::join(coverageDirectory, {action.parameters.directories.projectsDirectory.view(), "..", "_Coverage"}));
 
@@ -854,11 +880,11 @@ SC::Result SC::Build::Action::Internal::coverage(StringView projectFileName, con
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileName, const Action& action,
+SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName, const Action& action,
                                                         Span<StringView> environment, String* outputExecutable)
 {
     const StringView configuration  = action.configuration.isEmpty() ? "Debug" : action.configuration;
-    const StringView selectedTarget = action.target.isEmpty() ? projectFileName : action.target;
+    const StringView selectedTarget = action.target.isEmpty() ? workspaceName : action.target;
 
     SmallString<256> solutionLocation;
 
@@ -866,9 +892,11 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     switch (action.parameters.generator)
     {
     case Generator::XCode: {
-        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator), selectedTarget}));
-        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".xcodeproj"));
+        SC_TRY(Path::join(solutionLocation,
+                          {action.parameters.directories.projectsDirectory.view(),
+                           Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
+        StringView extension = action.target.isEmpty() ? ".xcworkspace"_a8 : ".xcodeproj"_a8;
+        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(extension));
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
         SmallString<32> formattedPlatform;
@@ -887,12 +915,34 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
             break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
-        arguments[numArgs++] = "-configuration";         // 3
-        arguments[numArgs++] = configuration;            // 4
-        arguments[numArgs++] = "-project";               // 5
-        arguments[numArgs++] = solutionLocation.view();  // 6
-        arguments[numArgs++] = "ONLY_ACTIVE_ARCH=NO";    // 7
-        arguments[numArgs++] = formattedPlatform.view(); // 8
+        arguments[numArgs++] = "-configuration"; // 3
+        arguments[numArgs++] = configuration;    // 4
+        String defaultScheme;
+        if (action.target.isEmpty())
+        {
+            arguments[numArgs++] = "-workspace";            // 5
+            arguments[numArgs++] = solutionLocation.view(); // 6
+            StringView schemeName;
+            {
+                // TODO: Match behaviour of other backends where empty target means building all
+                // Invoke xcodebuild to list available schemes and pick the first scheme
+                arguments[numArgs++] = "-list"; // 7
+                Process defaultSchemeProcess;
+                SC_TRY(defaultSchemeProcess.exec({arguments, numArgs}, defaultScheme));
+                numArgs--;
+                SC_TRY(defaultScheme.view().splitAfter("Schemes:\n", schemeName));
+                SC_TRY(schemeName.splitBefore("\n", schemeName));
+            }
+            arguments[numArgs++] = "-scheme";                    // 7
+            arguments[numArgs++] = schemeName.trimWhiteSpaces(); // 8
+        }
+        else
+        {
+            arguments[numArgs++] = "-project";              // 7
+            arguments[numArgs++] = solutionLocation.view(); // 8
+        }
+        arguments[numArgs++] = "ONLY_ACTIVE_ARCH=NO";    // 9
+        arguments[numArgs++] = formattedPlatform.view(); // 10
         if (action.action == Action::Run or action.action == Action::Print)
         {
             String output = StringEncoding::Utf8;
@@ -946,9 +996,11 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     break;
     case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
-        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator), selectedTarget}));
-        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(".sln"));
+        SC_TRY(Path::join(solutionLocation,
+                          {action.parameters.directories.projectsDirectory.view(),
+                           Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
+        StringView extension = action.target.isEmpty() ? ".sln"_a8 : ".vcxproj"_a8;
+        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(extension));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
 
@@ -1009,7 +1061,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
     break;
     case Generator::Make: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator)}));
+                                             Generator::toString(action.parameters.generator), workspaceName}));
         if (action.parameters.generator == Generator::Make)
         {
             if (action.parameters.platform == Platform::Linux)
@@ -1034,7 +1086,14 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView projectFileNa
         switch (action.action)
         {
         case Action::Compile: {
-            SC_TRY(StringBuilder(targetName).format("{}_COMPILE_COMMANDS", selectedTarget));
+            if (action.target.isEmpty())
+            {
+                targetName = "all";
+            }
+            else
+            {
+                SC_TRY(StringBuilder(targetName).format("{}_COMPILE_COMMANDS", selectedTarget));
+            }
         }
         break;
         case Action::Run: {

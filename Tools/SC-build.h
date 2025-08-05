@@ -55,23 +55,39 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     action.action = Build::Action::Configure;
 
     action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
-
+    if (arguments.arguments.sizeInElements() >= 1)
+    {
+        StringView afterSplit;
+        if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
+        {
+            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.target));
+        }
+        else
+        {
+            action.target = arguments.arguments[0];
+        }
+    }
     // TODO: We should run a matrix of all generators / platforms / architectures
     action.parameters.generator = Build::Generator::VisualStudio2019;
     action.parameters.platform  = Build::Platform::Windows;
-    SC_TRY_MSG(Build::executeAction(action), "Build error Visual Studio 2019");
+    arguments.console.print("Executing \"{}\" for Visual Studio 2019 on Windows\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
     action.parameters.generator = Build::Generator::VisualStudio2022;
     action.parameters.platform  = Build::Platform::Windows;
-    SC_TRY_MSG(Build::executeAction(action), "Build error Visual Studio 2022");
+    arguments.console.print("Executing \"{}\" for Visual Studio 2022 on Windows\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
     action.parameters.generator = Build::Generator::XCode;
     action.parameters.platform  = Build::Platform::Apple;
-    SC_TRY_MSG(Build::executeAction(action), "Build error XCode");
+    arguments.console.print("Executing \"{}\" for XCode on Apple platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
     action.parameters.generator = Build::Generator::Make;
     action.parameters.platform  = Build::Platform::Linux;
-    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (Linux)");
+    arguments.console.print("Executing \"{}\" for Make on Linux platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
     action.parameters.generator = Build::Generator::Make;
     action.parameters.platform  = Build::Platform::Apple;
-    SC_TRY_MSG(Build::executeAction(action), "Build error Makefile (Apple)");
+    arguments.console.print("Executing \"{}\" for Make on Apple platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
     return Result(true);
 }
 
@@ -103,7 +119,15 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 
     if (arguments.arguments.sizeInElements() >= 1)
     {
-        action.target = arguments.arguments[0];
+        StringView afterSplit;
+        if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
+        {
+            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.target));
+        }
+        else
+        {
+            action.target = arguments.arguments[0];
+        }
     }
     if (arguments.arguments.sizeInElements() >= 2)
     {
