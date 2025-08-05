@@ -199,7 +199,31 @@ bool SC::Build::Project::addFiles(StringView subdirectory, StringView filter)
 {
     if (subdirectory.containsCodePoint('*') or subdirectory.containsCodePoint('?'))
         return false;
-    return files.selection.push_back({FilesSelection::Add, subdirectory, filter});
+    if (subdirectory.isEmpty() and filter.isEmpty())
+        return false;
+    FilesSelection selection;
+    selection.action = FilesSelection::Add;
+    SC_TRY(selection.base.assign(subdirectory));
+    SC_TRY(selection.mask.assign(filter));
+
+    // Relativize path if subdirectory or filter is absolute
+    StringView source = subdirectory.isEmpty() ? filter : subdirectory;
+    StringView other  = subdirectory.isEmpty() ? subdirectory : filter;
+    String&    dest   = subdirectory.isEmpty() ? selection.mask : selection.base;
+    if (Path::isAbsolute(source, Path::AsNative))
+    {
+        if (Path::isAbsolute(other, Path::AsNative))
+            return false; // cannot be both absolute
+        String relativePath;
+        SC_TRY(Path::relativeFromTo(rootDirectory.view(), source, relativePath, Path::AsNative));
+        SC_TRY(StringBuilder(dest, StringBuilder::Clear).appendReplaceAll(relativePath.view(), "\\", "/"));
+    }
+    else
+    {
+        SC_TRY(StringBuilder(dest, StringBuilder::Clear).appendReplaceAll(source, "\\", "/"));
+    }
+
+    return files.selection.push_back(move(selection));
 }
 
 bool SC::Build::Project::addIncludePaths(Span<const StringView> includePaths)
@@ -234,12 +258,7 @@ bool SC::Build::Project::addLinkFrameworksIOS(Span<const StringView> frameworks)
 
 bool SC::Build::Project::addDefines(Span<const StringView> defines) { return files.compile.defines.append(defines); }
 
-bool SC::Build::Project::addFile(StringView singleFile)
-{
-    if (singleFile.containsCodePoint('*') or singleFile.containsCodePoint('?'))
-        return false;
-    return files.selection.push_back({FilesSelection::Add, {}, singleFile});
-}
+bool SC::Build::Project::addFile(StringView singleFile) { return addFiles({}, singleFile); }
 
 bool SC::Build::Project::addSpecificFileFlags(SourceFiles selection)
 {
@@ -423,7 +442,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     {
         if (not file.mask.isEmpty())
         {
-            if (Path::isAbsolute(file.mask.view(), Path::AsPosix))
+            if (Path::isAbsolute(file.mask.view(), Path::AsNative))
             {
                 return Result::Error("Absolute path detected");
             }
