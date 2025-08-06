@@ -33,7 +33,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install
-      run: sudo apt install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev
     - name: clang-format
       run: ./SC.sh format check
     - name: build documentation

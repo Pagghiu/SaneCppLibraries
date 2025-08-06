@@ -22,7 +22,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: install
-      run: sudo apt install -y liburing-dev
+      run:  |
+        sudo apt-get update
+        sudo apt-get install -y liburing-dev
       if: matrix.params.os == 'ubuntu-latest'
     # Install 7zip just to check that links are still valid
     - name: package install 7zip
