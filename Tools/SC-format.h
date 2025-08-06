@@ -67,9 +67,11 @@ struct ProcessLimiter
         {
             availableProcessMonitors.queueBack(processMonitors[idx]);
         }
-        // TODO: Investigate why ProcessLimiter fails on uring backend
         AsyncEventLoop::Options options;
+#if SC_PLATFORM_LINUX
+        // TODO: Investigate why ProcessLimiter fails on uring backend
         options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+#endif
         return eventLoop.create(options);
     }
 
