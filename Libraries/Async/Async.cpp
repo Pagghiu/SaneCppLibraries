@@ -987,6 +987,7 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     eventObjectExitBlockingMode.signal();
     SC_TRY(eventLoop->wakeUpFromExternalThread());
     SC_TRY(eventLoopThread.join());
+    SC_TRY(eventLoop->dispatchCompletions(asyncKernelEvents));
     SC_TRY(eventLoopWakeUp.stop(*eventLoop));
     eventLoop = nullptr;
     return Result(true);

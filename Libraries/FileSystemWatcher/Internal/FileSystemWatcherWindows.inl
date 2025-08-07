@@ -100,6 +100,7 @@ struct SC::FileSystemWatcher::Internal
     {
         auto& opaque = watcher.internal.get();
         ::CloseHandle(opaque.fileHandle);
+        opaque.fileHandle = INVALID_HANDLE_VALUE;
     }
 
     Result stopWatching(FolderWatcher& folderWatcher)

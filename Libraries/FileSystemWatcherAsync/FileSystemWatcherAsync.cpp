@@ -60,6 +60,7 @@ SC::Result SC::FileSystemWatcherAsync::windowsStartFolderFilePoll(FolderWatcher&
     SC_TRY(res);
     AsyncFilePoll& asyncPoll = watcher.asyncStorage.reinterpret_as<AsyncFilePoll>();
     placementNew(asyncPoll);
+    asyncPoll.setDebugName("FileSystemWatcherAsync Poll");
     asyncPoll.callback.bind<FileSystemWatcherAsync, &FileSystemWatcherAsync::onEventLoopNotification>(*this);
     return asyncPoll.start(*eventLoop, handle);
 }

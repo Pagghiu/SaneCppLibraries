@@ -182,7 +182,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         {
             return Result::Error("createEventLoop only accepts ApiType::Automatic");
         }
-        HANDLE newQueue = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
+        HANDLE newQueue = ::CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 1);
         if (newQueue == INVALID_HANDLE_VALUE)
         {
             // TODO: Better CreateIoCompletionPort error handling
@@ -888,21 +888,51 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     [[nodiscard]] static bool cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& poll)
     {
-        // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it
-        // doesn't generate a cancellation on the IOCP, setting true here would block forever.
-        if (poll.handle)
+        // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it doesn't generate a
+        // cancellation on the IOCP, setting hasPendingKernelCancellations == true would block forever.
+        if (poll.handle == 0)
         {
-            eventLoop.internal.hasPendingKernelCancellations = true;
+            // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it doesn't generate a
+            // cancellation on the IOCP, setting hasPendingKernelCancellations == true would block forever.
+            return true;
         }
+        // If the handle is valid it will generate a cancellation packet on the IOCP.
+        // There is no easy way to check if the handle is valid so we try to duplicate it and check if the
+        // duplicated handle is valid.
+        HANDLE handle  = INVALID_HANDLE_VALUE;
+        HANDLE process = ::GetCurrentProcess();
+        if (::DuplicateHandle(process, poll.handle, process, &handle, 0, FALSE, DUPLICATE_SAME_ACCESS) == TRUE)
+        {
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                ::CloseHandle(handle);
+                handle = INVALID_HANDLE_VALUE;
+
+                eventLoop.internal.hasPendingKernelCancellations = true;
+            }
+        }
+
         return true;
     }
 
     [[nodiscard]] static bool teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
     {
-        // See comment regarding AsyncFilePoll in cancelAsync
-        if (teardown.fileHandle)
+        if (teardown.fileHandle == 0)
         {
-            teardown.eventLoop->internal.hasPendingKernelCancellations = true;
+            // See comment regarding AsyncFilePoll in cancelAsync
+            return true;
+        }
+        HANDLE handle  = INVALID_HANDLE_VALUE;
+        HANDLE process = ::GetCurrentProcess();
+        if (::DuplicateHandle(process, teardown.fileHandle, process, &handle, 0, FALSE, DUPLICATE_SAME_ACCESS) == TRUE)
+        {
+            if (handle != INVALID_HANDLE_VALUE)
+            {
+                ::CloseHandle(handle);
+                handle = INVALID_HANDLE_VALUE;
+
+                teardown.eventLoop->internal.hasPendingKernelCancellations = true;
+            }
         }
         return true;
     }
