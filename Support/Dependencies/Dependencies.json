@@ -1,0 +1,308 @@
+{
+    "Algorithms": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "Async": {
+        "direct_dependencies": [
+            "File",
+            "FileSystem",
+            "Foundation",
+            "Socket",
+            "Threading",
+            "Time"
+        ],
+        "all_dependencies": [
+            "File",
+            "FileSystem",
+            "Foundation",
+            "Socket",
+            "Threading",
+            "Time"
+        ]
+    },
+    "AsyncStreams": {
+        "direct_dependencies": [
+            "Async",
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Async",
+            "File",
+            "FileSystem",
+            "Foundation",
+            "Socket",
+            "Threading",
+            "Time"
+        ]
+    },
+    "Build": {
+        "direct_dependencies": [
+            "Algorithms",
+            "Containers",
+            "FileSystem",
+            "FileSystemIterator",
+            "Foundation",
+            "Hashing",
+            "Process",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Containers",
+            "File",
+            "FileSystem",
+            "FileSystemIterator",
+            "Foundation",
+            "Hashing",
+            "Memory",
+            "Process",
+            "Strings",
+            "Time"
+        ]
+    },
+    "Containers": {
+        "direct_dependencies": [
+            "Algorithms",
+            "Foundation",
+            "Memory"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Foundation",
+            "Memory"
+        ]
+    },
+    "File": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "FileSystem": {
+        "direct_dependencies": [
+            "File",
+            "Foundation",
+            "Time"
+        ],
+        "all_dependencies": [
+            "File",
+            "Foundation",
+            "Time"
+        ]
+    },
+    "FileSystemIterator": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "FileSystemWatcher": {
+        "direct_dependencies": [
+            "Foundation",
+            "Threading"
+        ],
+        "all_dependencies": [
+            "Foundation",
+            "Threading"
+        ]
+    },
+    "FileSystemWatcherAsync": {
+        "direct_dependencies": [
+            "Async",
+            "FileSystemWatcher",
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Async",
+            "File",
+            "FileSystem",
+            "FileSystemWatcher",
+            "Foundation",
+            "Socket",
+            "Threading",
+            "Time"
+        ]
+    },
+    "Foundation": {
+        "direct_dependencies": [],
+        "all_dependencies": []
+    },
+    "Hashing": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "Http": {
+        "direct_dependencies": [
+            "Async",
+            "Containers",
+            "FileSystem",
+            "Foundation",
+            "Memory",
+            "Socket",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Async",
+            "Containers",
+            "File",
+            "FileSystem",
+            "Foundation",
+            "Memory",
+            "Socket",
+            "Strings",
+            "Threading",
+            "Time"
+        ]
+    },
+    "Memory": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "Plugin": {
+        "direct_dependencies": [
+            "Algorithms",
+            "Containers",
+            "FileSystem",
+            "FileSystemIterator",
+            "Foundation",
+            "Memory",
+            "Process",
+            "Strings",
+            "Threading",
+            "Time"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Containers",
+            "File",
+            "FileSystem",
+            "FileSystemIterator",
+            "Foundation",
+            "Memory",
+            "Process",
+            "Strings",
+            "Threading",
+            "Time"
+        ]
+    },
+    "Process": {
+        "direct_dependencies": [
+            "File",
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "File",
+            "Foundation"
+        ]
+    },
+    "Reflection": {
+        "direct_dependencies": [
+            "Algorithms",
+            "Containers",
+            "Foundation",
+            "Memory",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Containers",
+            "Foundation",
+            "Memory",
+            "Strings"
+        ]
+    },
+    "SerializationBinary": {
+        "direct_dependencies": [
+            "Foundation",
+            "Memory",
+            "Reflection"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Containers",
+            "Foundation",
+            "Memory",
+            "Reflection",
+            "Strings"
+        ]
+    },
+    "SerializationText": {
+        "direct_dependencies": [
+            "Foundation",
+            "Reflection",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Algorithms",
+            "Containers",
+            "Foundation",
+            "Memory",
+            "Reflection",
+            "Strings"
+        ]
+    },
+    "Socket": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "Strings": {
+        "direct_dependencies": [
+            "Foundation",
+            "Memory"
+        ],
+        "all_dependencies": [
+            "Foundation",
+            "Memory"
+        ]
+    },
+    "Testing": {
+        "direct_dependencies": [
+            "Foundation",
+            "Memory",
+            "Strings"
+        ],
+        "all_dependencies": [
+            "Foundation",
+            "Memory",
+            "Strings"
+        ]
+    },
+    "Threading": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
+    "Time": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    }
+}

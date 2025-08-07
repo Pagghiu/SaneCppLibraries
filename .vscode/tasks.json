@@ -367,11 +367,14 @@
             ]
         },
         {
-            "label": "Update Documentation Statistics",
+            "label": "Update Dependencies",
             "type": "shell",
             "command": "python3",
+            "windows": {
+                "command": "python"
+            },
             "args": [
-                "Support/Scripts/update_documentation.py"
+                "Support/Dependencies/update_dependencies.py"
             ],
             "problemMatcher": [
                 "$msCompile",
