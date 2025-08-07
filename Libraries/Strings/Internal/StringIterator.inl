@@ -432,14 +432,15 @@ template bool StringIterator<StringIteratorUTF16>::startsWith(StringIteratorUTF8
 // StringIteratorASCII
 bool StringIteratorASCII::advanceUntilMatchesNonConstexpr(CodePoint c)
 {
-    if (c > 127)
-        SC_LANGUAGE_UNLIKELY
-        {
-            it = end;
-            return false;
-        }
+    // clang-format off
+    if (it == nullptr or c > 127) SC_LANGUAGE_UNLIKELY
+    {
+        it = end;
+        return false;
+    }
+    // clang-format on
     char charC = static_cast<char>(c);
-    auto res   = memchr(it, charC, static_cast<size_t>(end - it));
+    auto res   = ::memchr(it, charC, static_cast<size_t>(end - it));
     if (res != nullptr)
         it = static_cast<const char*>(res);
     else
