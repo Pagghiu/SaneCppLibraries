@@ -9,10 +9,14 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
-#elif SC_PLATFORM_APPLE
+#else
+#if SC_PLATFORM_LINUX
+#include "Internal/AsyncLinuxKernelEvents.h"
+#endif
 #include "Internal/AsyncPosix.inl"
-#elif SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX
 #include "Internal/AsyncLinux.inl"
+#endif
 #endif
 
 #include "../Threading/ThreadPool.h"
@@ -46,7 +50,6 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::SocketSendTo: return "SocketSendTo";
     case Type::SocketReceive: return "SocketReceive";
     case Type::SocketReceiveFrom: return "SocketReceiveFrom";
-    case Type::SocketClose: return "SocketClose";
     case Type::FileRead: return "FileRead";
     case Type::FileWrite: return "FileWrite";
     case Type::FilePoll: return "FilePoll";
@@ -911,6 +914,7 @@ SC::Result SC::AsyncEventLoopMonitor::create(AsyncEventLoop& loop)
     eventLoop = &loop;
 
     asyncKernelEvents.eventsMemory = eventsMemory;
+    eventLoopWakeUp.setDebugName("AsyncEventLoopMonitor WakeUp");
     SC_TRY(eventLoopWakeUp.start(*eventLoop));
     eventLoopWakeUp.callback = [this](AsyncLoopWakeUp::Result& result)
     {

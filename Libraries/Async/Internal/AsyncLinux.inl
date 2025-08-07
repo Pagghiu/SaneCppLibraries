@@ -1,57 +1,18 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "AsyncInternal.h"
-#include "Libraries/Foundation/Assert.h"
+#include "../../Async/Internal/AsyncInternal.h"
+#include "../../Async/Internal/AsyncLinuxAPI.h"
+#include "../../Async/Internal/AsyncLinuxKernelEvents.h"
+#include "../../Async/Internal/AsyncPosix.inl" // This is only to provide clangd completion (guarded by #pragma once)
+#include "../../Foundation/Assert.h"
 
 #include <arpa/inet.h>   // sockaddr_in
+#include <errno.h>       // errno
 #include <stdint.h>      // uint32_t
 #include <sys/eventfd.h> // eventfd
 #include <sys/poll.h>    // POLLIN
 #include <sys/syscall.h> // SYS_pidfd_open
 #include <sys/wait.h>    // waitpid
-
-struct SC::AsyncEventLoop::Internal::KernelEvents
-{
-    bool                  isEpoll = true;
-    AlignedStorage<16400> storage;
-
-    KernelEvents(KernelQueue& kernelQueue, AsyncKernelEvents& asyncKernelEvents);
-    ~KernelEvents();
-
-    KernelEventsIoURing&       getUring();
-    KernelEventsPosix&         getPosix();
-    const KernelEventsIoURing& getUring() const;
-    const KernelEventsPosix&   getPosix() const;
-
-    [[nodiscard]] uint32_t getNumEvents() const;
-
-    Result syncWithKernel(AsyncEventLoop&, Internal::SyncMode);
-    Result validateEvent(uint32_t&, bool&);
-
-    [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t);
-
-    // clang-format off
-    template <typename T> Result setupAsync(AsyncEventLoop&, T&);
-    template <typename T> Result activateAsync(AsyncEventLoop&, T&);
-    template <typename T> Result cancelAsync(AsyncEventLoop&, T&);
-    template <typename T> Result completeAsync(T&);
-
-    template <typename T> static Result teardownAsync(T*, AsyncTeardown&);
-
-    // If False, makes re-activation a no-op, that is a lightweight optimization.
-    // More importantly it prevents an assert about being Submitting state when async completes during re-activation run cycle.
-    template<typename T> static bool needsSubmissionWhenReactivating(T&)
-    {
-        return true;
-    }
-
-    template <typename T, typename P> static Result executeOperation(T&, P& p);
-    // clang-format on
-};
-
-#include "AsyncPosix.inl"
-
-#include "AsyncLinuxAPI.h"
 
 // TODO: Protect it with a mutex or force passing it during creation
 static AsyncLinuxLibURingLoader globalLibURing;

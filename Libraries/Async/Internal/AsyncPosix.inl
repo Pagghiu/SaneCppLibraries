@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "AsyncInternal.h"
+#pragma once
+#include "../../Async/Internal/AsyncInternal.h"
 
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"

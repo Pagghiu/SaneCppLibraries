@@ -830,7 +830,7 @@ struct AsyncFilePoll : public AsyncRequest
     SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
 
 #if SC_PLATFORM_WINDOWS
-    [[nodiscard]] auto& getOverlappedOpaque() { return overlapped; }
+    [[nodiscard]] void* getOverlappedPtr();
 #endif
 
     Function<void(Result&)> callback;

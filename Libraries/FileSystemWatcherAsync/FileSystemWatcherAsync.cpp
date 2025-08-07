@@ -3,10 +3,6 @@
 #include "../FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "../Foundation/Deferred.h"
 
-#if SC_PLATFORM_WINDOWS
-#include "../Async/Internal/AsyncWindows.h" // AsyncWinOverlapped
-#endif
-
 #if SC_PLATFORM_APPLE
 SC::Result SC::FileSystemWatcherAsync::appleStartWakeUp()
 {
@@ -85,7 +81,7 @@ SC::Result SC::FileSystemWatcherAsync::windowsStopFolderFilePoll(FolderWatcher& 
 void* SC::FileSystemWatcherAsync::windowsGetOverlapped(FolderWatcher& watcher)
 {
     AsyncFilePoll& asyncPoll = watcher.asyncStorage.reinterpret_as<AsyncFilePoll>();
-    return &asyncPoll.getOverlappedOpaque().get().overlapped;
+    return asyncPoll.getOverlappedPtr();
 }
 
 void SC::FileSystemWatcherAsync::onEventLoopNotification(AsyncFilePoll::Result& result)

@@ -6,17 +6,89 @@
 #include <MSWSock.h> // AcceptEx, LPFN_CONNECTEX
 //
 #include <Ws2tcpip.h> // sockadd_in6
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+
+#include <stddef.h> // offsetof
+
+struct SC_FILE_BASIC_INFORMATION
+{
+    LARGE_INTEGER CreationTime;
+    LARGE_INTEGER LastAccessTime;
+    LARGE_INTEGER LastWriteTime;
+    LARGE_INTEGER ChangeTime;
+    DWORD         FileAttributes;
+};
+
+struct SC_FILE_COMPLETION_INFORMATION
+{
+    HANDLE Port;
+    PVOID  Key;
+};
+
+#ifndef _NTDEF_
+typedef _Return_type_success_(return >= 0) LONG NTSTATUS;
+typedef NTSTATUS* PNTSTATUS;
+#endif
+
+struct SC_IO_STATUS_BLOCK
+{
+    union
+    {
+        NTSTATUS Status;
+        PVOID    Pointer;
+    };
+    ULONG_PTR Information;
+};
+
+enum SC_FILE_INFORMATION_CLASS
+{
+    FileReplaceCompletionInformation = 0x3D
+};
+
+typedef NTSTATUS(NTAPI* SC_NtSetInformationFile)(HANDLE fileHandle, struct SC_IO_STATUS_BLOCK* ioStatusBlock,
+                                                 void* fileInformation, ULONG length,
+                                                 enum SC_FILE_INFORMATION_CLASS fileInformationClass);
+
+static constexpr NTSTATUS STATUS_SUCCESS = 0;
+
+// Undefine Windows API functions that conflict with our AsyncFileSystemOperation enumeration...
+#ifdef CopyFile
+#undef CopyFile
+#endif
+#ifdef RemoveDirectory
+#undef RemoveDirectory
+#endif
 
 #include "../../Foundation/Deferred.h"
 #include "../../Socket/Socket.h"
 #include "AsyncInternal.h"
-#include "AsyncWindows.h"
-#include "AsyncWindowsAPI.h"
+
+// We store a user pointer at a fixed offset from overlapped to allow getting back source object
+// with results from GetQueuedCompletionStatusEx.
+// We must do it because there is no void* userData pointer in the OVERLAPPED struct
+struct SC::detail::AsyncWinOverlapped
+{
+    void*      userData = nullptr;
+    OVERLAPPED overlapped;
+
+    AsyncWinOverlapped() { memset(&overlapped, 0, sizeof(overlapped)); }
+
+    template <typename T>
+    [[nodiscard]] static T* getUserDataFromOverlapped(LPOVERLAPPED lpOverlapped)
+    {
+        constexpr size_t offsetOfOverlapped = offsetof(AsyncWinOverlapped, overlapped);
+        constexpr size_t offsetOfUserData   = offsetof(AsyncWinOverlapped, userData);
+        return *reinterpret_cast<T**>(reinterpret_cast<uint8_t*>(lpOverlapped) - offsetOfOverlapped + offsetOfUserData);
+    }
+};
 
 #if SC_COMPILER_MSVC
 // Not sure why on MSVC we don't get on Level 4 warnings for missing switch cases
 #pragma warning(default : 4062)
 #endif
+
+void* SC::AsyncFilePoll::getOverlappedPtr() { return &overlapped.get().overlapped; }
 
 SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 {
@@ -168,7 +240,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         FileDescriptor::Handle loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("watchInputs - Invalid Handle")));
 
-        if (PostQueuedCompletionStatus(loopHandle, 0, 0, &asyncWakeUp.getOverlappedOpaque().get().overlapped) == FALSE)
+        OVERLAPPED* overlapped = static_cast<OVERLAPPED*>(asyncWakeUp.getOverlappedPtr());
+        if (::PostQueuedCompletionStatus(loopHandle, 0, 0, overlapped) == FALSE)
         {
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
         }

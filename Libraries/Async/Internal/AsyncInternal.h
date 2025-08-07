@@ -1,8 +1,8 @@
 #pragma once
-#include "../Async.h"
+#include "../../Async/Async.h"
 
 #include "../../Async/Internal/IntrusiveDoubleLinkedList.h"
-#include "ThreadSafeLinkedList.h"
+#include "../../Async/Internal/ThreadSafeLinkedList.h"
 
 struct SC::AsyncEventLoop::Internal
 {
