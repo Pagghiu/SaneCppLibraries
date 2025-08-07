@@ -45,7 +45,12 @@ struct ApplicationSystem
         currentThreadID = Thread::CurrentThreadID();
         lastEventTime.snap();
         SC_TRY(SocketNetworking::initNetworking());
-        SC_TRY(eventLoop.create());
+        AsyncEventLoop::Options options;
+#if SC_PLATFORM_LINUX && 0
+        // Just for testing purposes, we can force using epoll instead of io_uring
+        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+#endif
+        SC_TRY(eventLoop.create(options));
         timeout.callback = [this](AsyncLoopTimeout::Result& result) { onTimeout(result); };
         SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
         eventLoopMonitor.onNewEventsAvailable = []() { sokol_wake_up(); };

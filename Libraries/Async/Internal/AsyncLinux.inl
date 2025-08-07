@@ -320,14 +320,27 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     Result validateEvent(uint32_t idx, bool& continueProcessing)
     {
         io_uring_cqe& completion = events[idx];
-        // Cancellation completions have nullptr user_data
+        // Most cancellation completions have nullptr user_data
         continueProcessing = completion.user_data != 0;
-        if (continueProcessing and completion.res < 0)
+        if (continueProcessing)
         {
-            continueProcessing = false; // Don't process cancellations
-            if (completion.res != -ECANCELED)
+            if (completion.res < 0)
             {
-                return Result::Error("Error in processing event (io uring)");
+                continueProcessing = false; // Don't process cancellations
+                if (completion.res != -ECANCELED)
+                {
+                    return Result::Error("Error in processing event (io uring)");
+                }
+            }
+            else
+            {
+                // One exception to the above: AsyncFilePoll is cancelled by matching its
+                // user_data that will generate a notification that must still be filtered.
+                AsyncRequest* async = getAsyncRequest(idx);
+                if (async->state == AsyncRequest::State::Cancelling)
+                {
+                    continueProcessing = false;
+                }
             }
         }
         return Result(true);
