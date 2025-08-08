@@ -179,18 +179,35 @@ endif
 
         writeTargetRule(builder, makeTarget.view());
 
+        SC_TRY_MSG(not project.configurations.isEmpty(), "Needs at least one configuration");
+        bool first = true;
         for (const Configuration& configuration : project.configurations)
         {
-
             SmallString<255> configName;
             SC_TRY(sanitizeName(configuration.name.view(), configName));
-            builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
+            if (first)
+            {
+                builder.append("\n\nifeq ($(CONFIG),{0})\n", configName.view());
+                first = false;
+            }
+            else
+            {
+                builder.append("\n\nelse ifeq ($(CONFIG),{0})\n", configName.view());
+            }
             SC_TRY(writeConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view(),
                                       configName.view()))
 
             writePerFileConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view());
-            builder.append("\nendif");
         }
+
+        builder.append(R"delimiter(
+
+else
+
+$(error "CONFIG = $(CONFIG) is unsupported")
+
+endif # $(CONFIG)
+)delimiter");
 
         writeMergedCompileFlags(builder, makeTarget.view());
         writeTargetFlags(builder, makeTarget.view());
