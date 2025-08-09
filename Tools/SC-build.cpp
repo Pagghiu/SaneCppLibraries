@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "SC-build.h"
+#include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 
 namespace SC
 {
@@ -201,6 +202,62 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     return Result(true);
 }
 
+Result buildSingleFileLibs(Definition& definition, const Parameters& parameters)
+{
+    Workspace workspace = {"SCSingleFileLibs"};
+
+    // Read all single file libraries from the _Build/_SingleFileLibrariesTest directory
+    FileSystemIterator fsi;
+
+    FileSystemIterator::FolderState entries[1];
+
+    String path;
+    SC_TRY(Path::join(path, {parameters.directories.libraryDirectory.view(), "_Build", "_SingleFileLibrariesTest"}));
+
+    SC_TRY_MSG(fsi.init(path.view(), entries), "Cannot access _Build/_SingleFileLibrariesTest");
+
+    // Create a project for each single file library
+    while (fsi.enumerateNext())
+    {
+        StringView name, extension;
+        SC_TRY(Path::parseNameExtension(fsi.get().name, name, extension));
+        if (extension != "cpp" or not name.startsWith("Test_"))
+            continue; // Only process .cpp files
+
+        Project project;
+        project.targetType = TargetType::ConsoleExecutable;
+        project.name       = name;
+        project.targetName = project.name;
+        // All relative paths are evaluated from this project root directory.
+        project.setRootDirectory(parameters.directories.libraryDirectory.view());
+        project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+        project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+        // Link C++ stdlib to avoid needing to link Memory library to define __cxa_guard_acquire etc.
+        project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
+        project.configurations[0].compile.enableStdCpp = true;
+        project.configurations[1].compile.enableStdCpp = true;
+
+        project.addIncludePaths({"_Build/_SingleFileLibraries"});
+
+        project.addFile(fsi.get().path);
+
+        // Libraries to link
+        if (parameters.platform == Platform::Apple)
+        {
+            project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
+        }
+
+        if (parameters.platform != Platform::Windows)
+        {
+            project.addLinkLibraries({"dl", "pthread"});
+        }
+
+        workspace.projects.push_back(move(project));
+    }
+    definition.workspaces.push_back(move(workspace));
+    return Result(true);
+}
 static constexpr StringView DEFAULT_WORKSPACE_NAME = "SCWorkspace";
 
 Result configure(Definition& definition, const Parameters& parameters)
@@ -210,6 +267,9 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(buildTestProject(parameters, workspace.projects[0]));
     SC_TRY(buildExampleProject(parameters, workspace.projects[1]));
     definition.workspaces.push_back(move(workspace));
+
+    // Ignore errors from building single file libraries
+    (void)buildSingleFileLibs(definition, parameters);
     return Result(true);
 }
 SC_COMPILER_WARNING_POP;

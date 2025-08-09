@@ -395,6 +395,64 @@
             ],
         },
         {
+            "label": "Amalgamate Single File Libraries Python",
+            "type": "shell",
+            "command": "python3",
+            "windows": {
+                "command": "python"
+            },
+            "args": [
+                "Support/SingleFileLibs/python/amalgamate_single_file_libs.py"
+            ],
+            "problemMatcher": [
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
+            ],
+        },
+
+        {
+            "label": "Update LOC",
+            "type": "shell",
+            "command": "python3",
+            "windows": {
+                "command": "python"
+            },
+            "args": [
+                "Support/SingleFileLibs/python/amalgamate_single_file_libs.py",
+                "--update_loc"
+            ],
+            "problemMatcher": [
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
+            ],
+        },
+        {
             "label": "Build Coverage",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",

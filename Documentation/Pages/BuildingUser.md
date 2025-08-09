@@ -47,3 +47,12 @@ If you really need you can:
 - `Rstrtmgr.lib`
 - `DbgHelp.lib`
 
+# Single Files Amalgamation
+
+Sane C++ Libraries can be consumed also as single-file amalgamated files.
+
+To generate them in `_Build/_SingleFileLibraries` run:
+
+```sh
+python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+```

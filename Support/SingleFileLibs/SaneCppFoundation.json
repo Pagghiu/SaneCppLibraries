@@ -1,0 +1,25 @@
+{
+    "name": "SaneCppFoundation",
+    "includeOrder": [
+        "Compiler.h",
+        "Platform.h",
+        "PrimitiveTypes.h",
+        "Assert.h",
+        "LibC.h",
+        "InitializerList.h",
+        "TypeTraits.h",
+        "AlignedStorage.h",
+        "Deferred.h",
+        "Function.h",
+        "OpaqueObject.h",
+        "Result.h",
+        "Span.h",
+        "StringSpan.h",
+        "StringPath.h",
+        "UniqueHandle.h",
+        "IGrowableBuffer.h"
+    ],
+    "implementationOrder": [
+        "Foundation.cpp"
+    ]
+}
