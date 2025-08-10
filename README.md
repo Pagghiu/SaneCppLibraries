@@ -28,7 +28,10 @@ Take a look also at [DeepWiki/SaneCppLibraries](https://deepwiki.com/Pagghiu/San
 
 # Libraries
 
-Each library only depends on the smallest possible subset of the others libraries (see [Dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html)).
+Each library:
+- Depends on the smallest possible subset of the others libraries (see [Dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html)).
+- Has minimal headers, preferring to keep as much code as possible code in the implementation files.
+- Is available as a [Single File Library](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) amalgamated locally / offline or directly in the browser!
 
 Library                                                                                                 | Description                                                                                                                                                                                       | LOC
 :-------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----

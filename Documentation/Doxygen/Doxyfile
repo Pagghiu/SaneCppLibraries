@@ -1,8 +1,3 @@
-# Compile using Doxyfile 1.9.2 because:
-# - Version 1.9.5 / 1.9.6 breaks the library recap table
-# - Version 1.9.7 has a bug that prevents showing TOC on subpages
-# - Version 1.9.8 has a bug that prevents showing modules and confuses with SC::Array, SC::Span, SC::SegmentItems, SC::forward
-
 PROJECT_NAME           = "Sane C++ Libraries"
 PROJECT_NUMBER         = 
 PROJECT_BRIEF          = "C++ Platform Abstraction Libraries"
@@ -109,6 +104,12 @@ HTML_EXTRA_FILES       = ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_P
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-custom/toggle-alternative-theme.js \
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-awesome-interactive-toc.js \
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-awesome-tabs.js\
+                         ../../Support/Dependencies/Dependencies.json \
+                         ../../Support/SingleFileLibs/SaneCppFoundation.json \
+                         ../../Support/SingleFileLibs/javascript/single_file_libs.html \
+                         ../../Support/SingleFileLibs/javascript/app.js \
+                         ../../Support/SingleFileLibs/javascript/styles.css \
+                         ../../Support/SingleFileLibs/javascript/amalgamationCore.js \
                          favicon.png
 GENERATE_TREEVIEW      = YES
 GENERATE_LATEX         = NO

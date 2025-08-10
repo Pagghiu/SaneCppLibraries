@@ -453,6 +453,52 @@
             ],
         },
         {
+            "label": "Amalgamate Single File Libraries Javascript",
+            "type": "shell",
+            "command": "node",
+            "args": [
+                "Support/SingleFileLibs/javascript/cli.js",
+                "--repo-root",
+                ".",
+                "--ref",
+                "HEAD",
+                "--all",
+                "--out",
+                "_Build/_SingleFileLibrariesJS"
+            ],
+            "problemMatcher": [
+                "$msCompile",
+                {
+                    "owner": "cpp",
+                    "fileLocation": [
+                        "absolute"
+                    ],
+                    "pattern": {
+                        "regexp": "^([^:]+):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+                        "file": 1,
+                        "line": 2,
+                        "column": 3,
+                        "severity": 4,
+                        "message": 5
+                    }
+                }
+            ],
+        },
+        {
+            "label": "Check If Single File Libs are equal",
+            "type": "shell",
+            "command": "python3",
+            "windows": {
+                "command": "python"
+            },
+            "args": [
+                "Support/SingleFileLibs/check_if_equal.py",
+                "_Build/_SingleFileLibraries",
+                "_Build/_SingleFileLibrariesJS"
+            ],
+            "problemMatcher": []
+        },
+        {
             "label": "Build Coverage",
             "type": "shell",
             "command": "${workspaceRoot}/SC.sh",

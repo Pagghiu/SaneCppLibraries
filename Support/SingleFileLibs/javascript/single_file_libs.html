@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sane C++ Libraries — Single File Builder</title>
+  <link rel="icon" type="image/png" href="https://pagghiu.github.io/SaneCppLibraries/favicon.png" />
+  <link rel="preconnect" href="https://api.github.com" crossorigin />
+  <link rel="preconnect" href="https://raw.githubusercontent.com" crossorigin />
+  <link rel="stylesheet" href="styles.css" />
+  <meta name="color-scheme" content="light dark">
+</head>
+
+<body>
+  <header class="app-header">
+    <div class="brand">
+      <img class="logo" src="https://pagghiu.github.io/SaneCppLibraries/SC.svg" alt="Sane C++" />
+      <div class="title-group">
+        <h1>Sane C++ Libraries</h1>
+        <h2>Amalgamation Tool</h2>
+      </div>
+    </div>
+    <div class="controls">
+      <button id="themeToggleBtn" class="ghost" title="Toggle theme" aria-label="Toggle theme">🌙</button>
+      <div class="select-group">
+        <label for="releaseSelect">Release</label>
+        <select id="releaseSelect"></select>
+        <a id="releaseLink" class="ghost-link" target="_blank" rel="noopener noreferrer">Open</a>
+      </div>
+      <div class="token-group">
+        <label for="ghToken">GitHub token</label>
+        <input id="ghToken" type="password" placeholder="optional" autocomplete="off" />
+      </div>
+      <button id="downloadAllBtn" class="primary">Download All</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="info-card">
+      Sane C++ Libraries can be consumed also as single-file amalgamated files, that must be generated with one of
+        the following methods:
+      <ul>
+        <li>Locally with a checked out copy of the repo (see <b>Generate Amalgamation Locally</b> below)</li>
+        <li>In-Browser using the javascript tool provided in this page</li>
+      </ul>
+      <!-- <a href="#" id="exampleModalOpen" class="ghost" role="button">View example</a> -->       
+      <details class="info-details">
+        <summary>How to GENERATE amalgamated libraries offline</summary>
+
+        If you have Sane C++ Libraries checked out locally / offline, to generate them in `_Build/_SingleFileLibraries`
+        run:
+
+        <pre class="code-block">
+python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+        </pre>
+
+        alternatively if you prefer to use node.js instead of python run:
+
+        <pre class="code-block">
+node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
+        </pre>
+      </details>
+
+      <details class="info-details">
+        <summary>How to GENERATE amalgamated libraries in-browser</summary>
+        <ul>
+          <li>Click <strong>Generate / Download</strong> button on a single library row</li>
+          <li>Click <strong>Show Dependencies</strong> to learn what other libraries are required for a given one</li>
+          <li>Click <strong>Download all</strong> (in the upper right corner of this page) to amalgamate all libraries
+            and obtain them in a ZIP file</li>
+          <li>Use a <strong>GitHub token</strong> to raise API limits (used to retrieve git metadata, stored locally
+            only)</li>
+        </ul>
+      </details>
+
+      <details class="info-details">
+        <summary>How to USE amalgamated libraries</summary>
+        <div class="cols">
+          <div>
+            <h4>In one (or more) of your headers</h4>
+            <pre class="code-block">#include "SaneCppAsync.h"</pre>
+          </div>
+          <div>
+            <h4>In one of your <code>.cpp</code> files</h4>
+            <pre class="code-block">#define SANE_CPP_IMPLEMENTATION
+#include "SaneCppAsync.h"</pre>
+          </div>
+        </div>
+        <div class="cols">
+          <div>
+            <h4>Link on macOS</h4>
+            <ul>
+              <li><code>CoreFoundation.framework</code></li>
+              <li><code>CoreServices.framework</code></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Link on Linux</h4>
+            <ul>
+              <li><code>libdl</code></li>
+              <li><code>libpthread</code></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Link on Windows</h4>
+            <ul>
+              <li><code>Ws2_32.lib</code></li>
+              <li><code>ntdll.lib</code></li>
+              <li><code>Rstrtmgr.lib</code></li>
+              <li><code>DbgHelp.lib</code></li>
+            </ul>
+          </div>
+        </div>
+        <b>Note</b>: On Windows <code>#pragma comment(lib, ...)</code> is automatically linking required libraries.
+      </details>
+
+    </section>
+
+    <section class="meta">
+      <div class="meta-row">
+        <div><strong>Repository</strong>: <a href="https://github.com/Pagghiu/SaneCppLibraries" target="_blank"
+            rel="noopener noreferrer">GitHub</a></div>
+        <div id="versionInfo">Version: loading…</div>
+      </div>
+    </section>
+
+    <section>
+      <div class="table-actions">
+        <input id="filterInput" type="search" placeholder="Filter libraries…" />
+      </div>
+      <div class="table-wrap">
+        <table id="libsTable">
+          <thead>
+            <tr>
+              <th>Library</th>
+              <th>Description</th>
+              <th class="fit">Action</th>
+            </tr>
+          </thead>
+          <tbody id="libsTbody">
+            <tr>
+              <td colspan="3" class="center">Loading…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <span>
+      Sane C++ Libraries amalgamation tool. Source and docs: <a href="https://pagghiu.github.io/SaneCppLibraries"
+        target="_blank" rel="noopener noreferrer">Documentation</a>
+    </span>
+  </footer>
+
+  <!-- Example Modal -->
+  <div id="exampleModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="exampleTitle">
+    <div class="modal-backdrop" data-close="1"></div>
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h3 id="exampleTitle" class="modal-title">Single-file structure example</h3>
+        <button class="hud-cancel" data-close="1">Close</button>
+      </div>
+      <div class="modal-body">
+        <pre class="example-pre"><code>TEST</code></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global HUD for long operations -->
+  <div id="hudOverlay" class="hud-overlay">
+    <div class="hud">
+      <div class="hud-header">
+        <div class="hud-title" id="hudTitle">Working…</div>
+        <button id="hudCancel" class="hud-cancel">Cancel</button>
+      </div>
+      <div id="hudStatus" class="hud-status">Preparing…</div>
+      <div class="progress">
+        <div id="hudBar" class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+
+</html>

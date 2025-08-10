@@ -56,3 +56,11 @@ To generate them in `_Build/_SingleFileLibraries` run:
 ```sh
 python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
 ```
+
+alternatively if you have node.js installed run:
+
+```sh
+node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
+```
+
+As a third alternative you can use [SingleFileLibs](@ref page_single_file_libs)
