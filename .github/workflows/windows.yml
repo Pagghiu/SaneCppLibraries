@@ -22,9 +22,17 @@ jobs:
     - name: package install 7zip
       shell: cmd
       run: SC.bat package install 7zip
-    - name: configure
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: configure SCTest
       shell: cmd
       run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: configure SCSingleFileLibs
+      shell: cmd
+      run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: compile single file libs
+      shell: cmd
+      run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
     - name: compile
       shell: cmd
       run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }}

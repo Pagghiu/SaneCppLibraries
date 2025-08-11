@@ -32,6 +32,12 @@ jobs:
     timeout-minutes: 40
     steps:
     - uses: actions/checkout@v4
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: Generate Single File Libs (Javascript)
+      run: node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
+    - name: Check if Single File Libs are equal
+      run: python3 Support/SingleFileLibs/check_if_equal.py _Build/_SingleFileLibraries _Build/_SingleFileLibrariesJS
     - name: install
       run: |
         sudo apt-get update

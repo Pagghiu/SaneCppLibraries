@@ -29,9 +29,15 @@ jobs:
     # Install 7zip just to check that links are still valid
     - name: package install 7zip
       run: ./SC.sh package install 7zip
-    - name: configure
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: configure SCTest
       run: ./SC.sh build configure SCTest ${{ matrix.config }}
-    - name: build
+    - name: configure SCSingleFileLibs
+      run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile single file libs
+      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile
       run: ./SC.sh build compile SCTest ${{ matrix.config }}
     - name: test
       run: ./SC.sh build run SCTest ${{ matrix.config }}
