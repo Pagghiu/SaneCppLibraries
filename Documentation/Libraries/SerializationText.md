@@ -11,8 +11,11 @@
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
 # Statistics
-- Lines of code (excluding comments): 661
-- Lines of code (including comments): 853
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 309			| 136		| 445	|
+| Sources   | 336			| 76		| 412	|
+| Sum       | 645			| 212		| 857	|
 
 # Features 
 ## JSON Serializer

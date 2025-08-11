@@ -16,8 +16,11 @@ Check @ref library_async_streams for an higher level construct when streaming da
 - All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 5661
-- Lines of code (including comments): 7502
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 752			| 723		| 1475	|
+| Sources   | 4921			| 1171		| 6092	|
+| Sum       | 5673			| 1894		| 7567	|
 
 # Features
 

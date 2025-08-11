@@ -11,8 +11,11 @@ Build uses C++ to imperatively describe a sequence of build operations.
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 4094
-- Lines of code (including comments): 4751
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 315			| 171		| 486	|
+| Sources   | 3844			| 539		| 4383	|
+| Sum       | 4159			| 710		| 4869	|
 
 # Features
 

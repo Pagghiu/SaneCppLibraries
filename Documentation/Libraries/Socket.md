@@ -11,8 +11,11 @@
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 889
-- Lines of code (including comments): 1179
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 133			| 190		| 323	|
+| Sources   | 722			| 142		| 864	|
+| Sum       | 855			| 332		| 1187	|
 
 # Features
 | Class                     | Description

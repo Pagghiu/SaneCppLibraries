@@ -11,8 +11,11 @@ Testing is a very simple test framework that allows splitting tests in sections 
 - All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
 
 # Statistics
-- Lines of code (excluding comments): 343
-- Lines of code (including comments): 440
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 96			| 88		| 184	|
+| Sources   | 235			| 21		| 256	|
+| Sum       | 331			| 109		| 440	|
 
 # Features
 | Class             | Description               |

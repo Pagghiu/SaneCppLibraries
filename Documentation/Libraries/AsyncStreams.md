@@ -15,8 +15,11 @@ Async Streams read and write data concurrently from async sources to destination
 - All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 2013
-- Lines of code (including comments): 2558
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 454			| 328		| 782	|
+| Sources   | 1521			| 265		| 1786	|
+| Sum       | 1975			| 593		| 2568	|
 
 # Features
 

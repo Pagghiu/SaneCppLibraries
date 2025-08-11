@@ -11,8 +11,11 @@ SC::FileSystemIterator enumerates files and directories at a given path.
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 417
-- Lines of code (including comments): 541
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 78			| 72		| 150	|
+| Sources   | 350			| 68		| 418	|
+| Sum       | 428			| 140		| 568	|
 
 # Features
 - Iterate files in directory

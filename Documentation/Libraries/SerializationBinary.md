@@ -11,8 +11,11 @@
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
 # Statistics
-- Lines of code (excluding comments): 594
-- Lines of code (including comments): 856
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 572			| 290		| 862	|
+| Sources   | 0			| 0		| 0	|
+| Sum       | 572			| 290		| 862	|
 
 # Features
 - No heap allocations

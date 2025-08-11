@@ -15,8 +15,11 @@ Most classes have been originally part of the [Foundation](@ref library_foundati
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 1257
-- Lines of code (including comments): 1679
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 304			| 284		| 588	|
+| Sources   | 915			| 195		| 1110	|
+| Sum       | 1219			| 479		| 1698	|
 
 # Features
 

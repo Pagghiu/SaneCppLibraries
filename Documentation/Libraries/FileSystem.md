@@ -15,8 +15,11 @@ FileSystem executed executing operations on files and directories.
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 1323
-- Lines of code (including comments): 1752
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 119			| 227		| 346	|
+| Sources   | 1196			| 210		| 1406	|
+| Sum       | 1315			| 437		| 1752	|
 
 # Features
 

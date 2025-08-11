@@ -11,8 +11,11 @@ Threading is a library defining basic primitives for user-space threading and sy
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 895
-- Lines of code (including comments): 1178
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 461			| 212		| 673	|
+| Sources   | 415			| 103		| 518	|
+| Sum       | 876			| 315		| 1191	|
 
 # Features
 | Class                 | Description                       |

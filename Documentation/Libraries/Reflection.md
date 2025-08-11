@@ -11,8 +11,11 @@
 - All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
 
 # Statistics
-- Lines of code (excluding comments): 700
-- Lines of code (including comments): 994
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 684			| 310		| 994	|
+| Sources   | 0			| 0		| 0	|
+| Sum       | 684			| 310		| 994	|
 
 # Features
 - Reflection info is built at compile time

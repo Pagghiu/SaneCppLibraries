@@ -11,8 +11,11 @@ The Hashing library abstracts OS API to compute MD5, SHA1 and SHA256 hashes.
 - All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
-- Lines of code (excluding comments): 359
-- Lines of code (including comments): 490
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 86			| 96		| 182	|
+| Sources   | 267			| 51		| 318	|
+| Sum       | 353			| 147		| 500	|
 
 # Features
 | Hashing Algorithm         | Description                           |

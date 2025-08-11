@@ -11,8 +11,11 @@ SC::FileSystemWatcherAsync is an implementation of SC::FileSystemWatcher that us
 - All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 113
-- Lines of code (including comments): 166
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 29			| 37		| 66	|
+| Sources   | 77			| 23		| 100	|
+| Sum       | 106			| 60		| 166	|
 
 # Features
 - Implement SC::FileSystemWatcher::EventLoopRunner for macOS, Windows and Linux

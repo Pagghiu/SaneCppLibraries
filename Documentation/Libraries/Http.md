@@ -11,8 +11,11 @@ Http library contains a hand-written http 1.1 parser, client and server.
 - All dependencies: [Algorithms](@ref library_algorithms), [Async](@ref library_async), [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Socket](@ref library_socket), [Strings](@ref library_strings), [Threading](@ref library_threading), [Time](@ref library_time)
 
 # Statistics
-- Lines of code (excluding comments): 1299
-- Lines of code (including comments): 1639
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 223			| 199		| 422	|
+| Sources   | 1037			| 181		| 1218	|
+| Sum       | 1260			| 380		| 1640	|
 
 # Features
 - HTTP 1.1 Parser
