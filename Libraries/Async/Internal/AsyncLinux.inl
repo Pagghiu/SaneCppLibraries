@@ -561,7 +561,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         {
             return Result::Error("pidfd_open failed");
         }
-        SC_TRY(async.pidFd.assign(pidFd));
+        SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         globalLibURing.io_uring_prep_poll_add(submission, pidFd, POLLIN);

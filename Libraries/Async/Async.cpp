@@ -1650,6 +1650,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     case AsyncRequest::Type::ProcessExit:
 #if SC_PLATFORM_LINUX
         (void)static_cast<AsyncProcessExit&>(async).pidFd.get(teardown.fileHandle, Result::Error("missing pidfd"));
+        static_cast<AsyncProcessExit&>(async).pidFd.detach();
 #endif
         teardown.processHandle = static_cast<AsyncProcessExit&>(async).handle;
         break;
