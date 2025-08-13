@@ -272,5 +272,37 @@
                 "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
+        {
+            "name": "Debug SC-format arm64 [apple] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Tools/Darwin/SC-format",
+            "args": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/Tools",
+                "${workspaceFolder}/_Build"
+            ],
+            "cwd": "${workspaceRoot}",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
+            ],
+        },
+        {
+            "name": "Debug SC-format arm64 [linux] (lldb)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Tools/Linux/SC-format",
+            "args": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/Tools",
+                "${workspaceFolder}/_Build"
+            ],
+            "cwd": "${workspaceRoot}",
+            "console": "integratedTerminal",
+            "preRunCommands": [
+                "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
+            ],
+        },
     ]
 }

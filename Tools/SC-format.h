@@ -67,12 +67,7 @@ struct ProcessLimiter
         {
             availableProcessMonitors.queueBack(processMonitors[idx]);
         }
-        AsyncEventLoop::Options options;
-#if SC_PLATFORM_LINUX
-        // TODO: Investigate why ProcessLimiter fails on uring backend
-        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
-#endif
-        return eventLoop.create(options);
+        return eventLoop.create();
     }
 
     /// @brief Waits for any process still running and free the resources created by event loop
@@ -100,8 +95,13 @@ struct ProcessLimiter
 
         Process process;
         SC_TRY(process.launch(arguments));
+        // Start monitoring process exit on the event loop
+        ProcessDescriptor::Handle processHandle = 0;
+        SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
+        SC_TRY(processExit.start(eventLoop, processHandle));
+
         // Launch does not wait for the child process to finish so we can monitor it with the event loop
-        processExit.callback = [this](AsyncProcessExit::Result& result)
+        processExit.callback = [this, processHandle](AsyncProcessExit::Result& result)
         {
             int exitStatus = -1;
             processResult  = result.get(exitStatus);
@@ -112,10 +112,6 @@ struct ProcessLimiter
             // This child process has exited, let's make its slot available again
             availableProcessMonitors.queueBack(result.getAsync());
         };
-        // Start monitoring process exit on the event loop
-        ProcessDescriptor::Handle processHandle = 0;
-        SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
-        SC_TRY(processExit.start(eventLoop, processHandle));
         process.handle.detach(); // we can't close it
         return Result(true);
     }

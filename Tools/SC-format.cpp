@@ -4,6 +4,7 @@
 // TODO: Figure out a way to avoid this macro
 
 #include "../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
+#include "../Libraries/Foundation/Deferred.h"
 #include "SC-package.h"
 
 #if !defined(SC_LIBRARY_PATH)
@@ -13,6 +14,7 @@
 #endif
 
 #include "SC-format.h"
+extern SC::Console* globalConsole; // Defined in Tools/SC-format.cpp
 
 namespace SC
 {
@@ -46,6 +48,7 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
 
     auto formatSourceFile = [&lambda](const StringView path)
     {
+        globalConsole->print("{}\n", path);
         switch (lambda.action)
         {
         case FormatSources::Execute: // Executes actual formatting
