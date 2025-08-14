@@ -427,6 +427,13 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
         SC_TRY(argumentsArena.appendMultipleStrings({"-fno-rtti"}));
     }
 
+#if SC_COMPILER_ASAN
+    SC_TRY(argumentsArena.appendMultipleStrings({"-fsanitize=address,undefined"}));
+#if SC_PLATFORM_APPLE
+    SC_TRY(argumentsArena.appendMultipleStrings({"-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"}));
+#endif
+#endif
+
     // This is really important on macOS because otherwise symbols exported on some plugin .dylib that
     // match the signature and assembly content, will be re-used by other plugin.dylib making the first
     // plugin .dylib not re-loadable until the other .dylibs having references to it are unloaded too...
@@ -548,6 +555,9 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 #else
     SC_COMPILER_UNUSED(executablePath);
     SC_TRY(arena.appendMultipleStrings({"-shared"}));
+#endif
+#if SC_COMPILER_ASAN
+    SC_TRY(arena.appendMultipleStrings({"-fsanitize=address,undefined"}));
 #endif
 #endif
 
