@@ -142,7 +142,7 @@ SC::Result SC::Process::launchImplementation()
 
     // Create a CLOSE_ON_EXEC pipe (non-inheritable) to communicate execvp failure
     PipeDescriptor pipe;
-    SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
+    SC_TRY(pipe.createPipe());
 
     // Fork child from parent here
     processID.pid = ::fork();
@@ -412,8 +412,8 @@ SC::Result SC::ProcessFork::resumeChildFork()
 SC::Result SC::ProcessFork::fork(State state)
 {
     // Create a CLOSE_ON_EXEC pipe (non-inheritable) to communicate with forked child
-    SC_TRY(parentToFork.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
-    SC_TRY(forkToParent.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
+    SC_TRY(parentToFork.createPipe());
+    SC_TRY(forkToParent.createPipe());
     int pid = ::fork();
     if (pid < 0)
     {

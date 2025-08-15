@@ -105,9 +105,9 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     Result createWakeup(AsyncEventLoop& eventLoop)
     {
         // Create
-        SC_TRY(wakeupPipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteNonInheritable));
-        SC_TRY(wakeupPipe.readPipe.setBlocking(false));
-        SC_TRY(wakeupPipe.writePipe.setBlocking(false));
+        PipeOptions options;
+        options.blocking = false;
+        SC_TRY(wakeupPipe.createPipe(options));
 
         // Register
         FileDescriptor::Handle wakeUpPipeDescriptor;

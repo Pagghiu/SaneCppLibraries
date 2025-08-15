@@ -91,21 +91,6 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @return Valid Result if file is opened successfully
     Result open(StringSpan path, FileOpen mode);
 
-    /// @brief Set blocking mode (read / write waiting for I/O). Can be set also during open with OpenOptions.
-    /// @param blocking `true` to set file to blocking mode
-    /// @return `true` if blocking mode has been changed successfully
-    Result setBlocking(bool blocking);
-
-    /// @brief Set inheritable flag (visibility to child processes). Can be set also during open with OpenOptions.
-    /// @param inheritable `true` to set file to blocking mode
-    /// @return `true` if blocking mode has been changed successfully
-    Result setInheritable(bool inheritable);
-
-    /// @brief Queries the inheritable state of this descriptor
-    /// @param hasValue will be set to true if the file descriptor has inheritable file set
-    /// @return Valid Result if the inheritable flag has been queried successfully
-    Result isInheritable(bool& hasValue) const;
-
     /// @brief Reads bytes at offset into user supplied span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
@@ -197,34 +182,26 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
 
   private:
     friend struct File;
+    friend struct PipeDescriptor;
     struct Internal;
+};
+
+struct SC_COMPILER_EXPORT PipeOptions
+{
+    bool readInheritable  = false; ///< Set to true to make the read side of the pipe visible to child processes
+    bool writeInheritable = false; ///< Set to true to make the write side of the pipe visible to child processes
+    bool blocking         = true;  ///< Set to false if pipe will be used for Async I/O (see @ref library_async)
 };
 
 /// @brief Read / Write pipe (Process stdin/stdout and IPC communication)
 struct SC_COMPILER_EXPORT PipeDescriptor
 {
-    /// @brief Specifies a flag for read side of the pipe
-    enum InheritableReadFlag
-    {
-        ReadInheritable,   ///< Requests read side of the pipe to be inheritable from child processes
-        ReadNonInheritable ///< Requests read side of the pipe not to be inheritable from child processes
-    };
-
-    /// @brief Specifies a flag for write side of the pipe
-    enum InheritableWriteFlag
-    {
-        WriteInheritable,   ///< Requests write side of the pipe to be inheritable from child processes
-        WriteNonInheritable ///< Requests write side of the pipe to be inheritable from child processes
-    };
     FileDescriptor readPipe;  ///< The read side of the pipe
     FileDescriptor writePipe; ///< The write side of the pipe
 
-    /// @brief Creates a Pipe. File descriptors are created with blocking mode enabled by default.
-    /// @param readFlag Specifies how the read side should be created
-    /// @param writeFlag Specifies how the write side should be created
+    /// @brief Creates a Pipe. File descriptors are created as blocking and non-inheritable
     /// @return Valid Result if pipe creation succeeded
-    Result createPipe(InheritableReadFlag  readFlag  = ReadNonInheritable,
-                      InheritableWriteFlag writeFlag = WriteNonInheritable);
+    Result createPipe(PipeOptions options = {});
 
     /// @brief Closes the pipe
     /// @return Valid Result if pipe destruction succeeded

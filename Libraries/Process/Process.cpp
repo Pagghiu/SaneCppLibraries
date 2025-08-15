@@ -61,7 +61,10 @@ SC::Result SC::ProcessChain::pipe(Process& process, const Span<const StringSpan>
     if (not processes.isEmpty())
     {
         PipeDescriptor chainPipe;
-        SC_TRY(chainPipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+        PipeOptions    chainOptions;
+        chainOptions.writeInheritable = true;
+        chainOptions.readInheritable  = true;
+        SC_TRY(chainPipe.createPipe(chainOptions));
         SC_TRY(processes.back->stdOutFd.assign(move(chainPipe.writePipe)));
         SC_TRY(process.stdInFd.assign(move(chainPipe.readPipe)));
     }
@@ -135,7 +138,10 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe:
         case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::ReadableSpan: {
-            SC_TRY(pipe.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteNonInheritable));
+            PipeOptions pipeReadOptions;
+            pipeReadOptions.readInheritable  = true;
+            pipeReadOptions.writeInheritable = false;
+            SC_TRY(pipe.createPipe(pipeReadOptions));
             SC_TRY(fileDescriptor.assign(move(pipe.readPipe)));
         }
         break;
@@ -163,7 +169,10 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::ExternalPipe:
         case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::WritableSpan: {
-            SC_TRY(pipe.createPipe(PipeDescriptor::ReadNonInheritable, PipeDescriptor::WriteInheritable));
+            PipeOptions pipeWriteOptions;
+            pipeWriteOptions.readInheritable  = false;
+            pipeWriteOptions.writeInheritable = true;
+            SC_TRY(pipe.createPipe(pipeWriteOptions));
             SC_TRY(fileDescriptor.assign(move(pipe.writePipe)));
         }
         break;

@@ -396,8 +396,11 @@ SC::Result SC::ProcessFork::resumeChildFork()
 SC::Result SC::ProcessFork::fork(State state)
 {
     // We want this to be inheritable
-    SC_TRY(parentToFork.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
-    SC_TRY(forkToParent.createPipe(PipeDescriptor::ReadInheritable, PipeDescriptor::WriteInheritable));
+    PipeOptions options;
+    options.readInheritable  = true;
+    options.writeInheritable = true;
+    SC_TRY(parentToFork.createPipe(options));
+    SC_TRY(forkToParent.createPipe(options));
 
     RTL_USER_PROCESS_INFORMATION processInfo;
     // RTL_CLONE_PROCESS_FLAGS_CREATE_SUSPENDED could be used instead of parentToFork.readPipe.read

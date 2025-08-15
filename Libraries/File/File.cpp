@@ -96,32 +96,6 @@ struct SC::FileDescriptor::Internal
         return success == FALSE;
     }
 };
-SC::Result SC::FileDescriptor::setBlocking(bool blocking)
-{
-    // TODO: IMPLEMENT
-    SC_COMPILER_UNUSED(blocking);
-    return Result(false);
-}
-
-SC::Result SC::FileDescriptor::setInheritable(bool inheritable)
-{
-    if (::SetHandleInformation(handle, HANDLE_FLAG_INHERIT, inheritable ? TRUE : FALSE) == FALSE)
-    {
-        return Result::Error("FileDescriptor::setInheritable - ::SetHandleInformation failed");
-    }
-    return Result(true);
-}
-
-SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
-{
-    DWORD dwFlags = 0;
-    if (::GetHandleInformation(handle, &dwFlags) == FALSE)
-    {
-        return Result::Error("FileDescriptor::getInheritable = ::GetHandleInformation failed");
-    }
-    hasValue = (dwFlags & HANDLE_FLAG_INHERIT) != 0;
-    return Result(true);
-}
 
 SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
 {
@@ -379,16 +353,6 @@ struct SC::FileDescriptor::Internal
     }
 
     template <int flag>
-    static Result hasFileDescriptorFlags(int fileDescriptor, bool& hasFlag)
-    {
-        static_assert(flag == FD_CLOEXEC, "hasFileDescriptorFlags invalid value");
-        int flags = 0;
-        SC_TRY(getFileFlags(F_GETFD, fileDescriptor, flags));
-        hasFlag = (flags & flag) != 0;
-        return Result(true);
-    }
-
-    template <int flag>
     static Result hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
     {
         static_assert(flag == O_NONBLOCK, "hasFileStatusFlags invalid value");
@@ -466,26 +430,9 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     SC_TRY(assign(fileDescriptor));
     if (not mode.blocking)
     {
-        SC_TRY(setBlocking(false));
+        SC_TRY(Internal::setFileStatusFlags<O_NONBLOCK>(handle, true));
     }
     return Result(true);
-}
-
-SC::Result SC::FileDescriptor::setBlocking(bool blocking)
-{
-    return Internal::setFileStatusFlags<O_NONBLOCK>(handle, not blocking);
-}
-
-SC::Result SC::FileDescriptor::setInheritable(bool inheritable)
-{
-    return Internal::setFileDescriptorFlags<FD_CLOEXEC>(handle, not inheritable);
-}
-
-SC::Result SC::FileDescriptor::isInheritable(bool& hasValue) const
-{
-    auto res = Internal::hasFileDescriptorFlags<FD_CLOEXEC>(handle, hasValue);
-    hasValue = not hasValue;
-    return res;
 }
 
 SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
@@ -625,42 +572,82 @@ SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 // PipeDescriptor
 //-------------------------------------------------------------------------------------------------------
 #if SC_PLATFORM_WINDOWS
-SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
+#include <stdio.h>
+SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 {
     // On Windows to inherit flags they must be flagged as inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
     SECURITY_ATTRIBUTES security;
-    memset(&security, 0, sizeof(security));
+    ::memset(&security, 0, sizeof(security));
     security.nLength              = sizeof(security);
-    security.bInheritHandle       = readFlag == ReadInheritable or writeFlag == WriteInheritable ? TRUE : FALSE;
+    security.bInheritHandle       = options.readInheritable or options.writeInheritable ? TRUE : FALSE;
     security.lpSecurityDescriptor = nullptr;
 
     HANDLE pipeRead  = INVALID_HANDLE_VALUE;
     HANDLE pipeWrite = INVALID_HANDLE_VALUE;
 
-    if (CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
+    if (options.blocking == false)
     {
-        return Result::Error("PipeDescriptor::createPipe - ::CreatePipe failed");
+        char pipeName[64];
+        snprintf(pipeName, sizeof(pipeName), "\\\\.\\pipe\\SC-%lu-%llu", ::GetCurrentProcessId(), (intptr_t)this);
+
+        DWORD pipeFlags = PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED;
+        DWORD pipeMode  = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;
+
+        pipeRead = ::CreateNamedPipeA(pipeName, pipeFlags, pipeMode, 1, 65536, 65536, 0, &security);
+        if (pipeRead == INVALID_HANDLE_VALUE)
+        {
+            return Result::Error("PipeDescriptor::createPipe - CreateNamedPipeW failed");
+        }
+        pipeWrite = ::CreateFileA(pipeName, GENERIC_WRITE | FILE_READ_ATTRIBUTES, 0, &security, OPEN_EXISTING,
+                                  FILE_FLAG_OVERLAPPED, nullptr);
+        if (pipeWrite == INVALID_HANDLE_VALUE)
+        {
+            ::CloseHandle(pipeRead);
+            return Result::Error("PipeDescriptor::createPipe - CreateFileW failed");
+        }
+        if (::ConnectNamedPipe(pipeRead, nullptr) == FALSE) // Connect the pipe immediately
+        {
+            if (GetLastError() != ERROR_PIPE_CONNECTED)
+            {
+                ::CloseHandle(pipeRead);
+                ::CloseHandle(pipeWrite);
+                return Result::Error("PipeDescriptor::createPipe - ConnectNamedPipe failed");
+            }
+        }
+    }
+    else
+    {
+        if (::CreatePipe(&pipeRead, &pipeWrite, &security, 0) == FALSE)
+        {
+            return Result::Error("PipeDescriptor::createPipe - ::CreatePipe failed");
+        }
     }
     SC_TRY(readPipe.assign(pipeRead));
     SC_TRY(writePipe.assign(pipeWrite));
 
     if (security.bInheritHandle)
     {
-        if (readFlag == ReadNonInheritable)
+        if (not options.readInheritable)
         {
-            SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set read pipe inheritable");
+            if (::SetHandleInformation(pipeRead, HANDLE_FLAG_INHERIT, FALSE) == FALSE)
+            {
+                return Result::Error("Cannot set read pipe inheritable");
+            }
         }
-        if (writeFlag == WriteNonInheritable)
+        if (not options.writeInheritable)
         {
-            SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set write pipe inheritable");
+            if (::SetHandleInformation(pipeWrite, HANDLE_FLAG_INHERIT, FALSE) == FALSE)
+            {
+                return Result::Error("Cannot set write pipe inheritable");
+            }
         }
     }
     return Result(true);
 }
 
 #else
-SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, InheritableWriteFlag writeFlag)
+SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 {
     int pipes[2];
     // TODO: Use pipe2 to set cloexec flags immediately
@@ -678,13 +665,22 @@ SC::Result SC::PipeDescriptor::createPipe(InheritableReadFlag readFlag, Inherita
     SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
     // On Posix by default descriptors are inheritable
     // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
-    if (readFlag == ReadNonInheritable)
+    if (options.readInheritable == false)
     {
-        SC_TRY_MSG(readPipe.setInheritable(false), "Cannot set close on exec on read pipe");
+        const Result pipeRes1 = FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[0], true);
+        SC_TRY_MSG(pipeRes1, "Cannot set close on exec on read pipe");
     }
-    if (writeFlag == WriteNonInheritable)
+    if (options.writeInheritable == false)
     {
-        SC_TRY_MSG(writePipe.setInheritable(false), "Cannot set close on exec on write pipe");
+        const Result pipeRes2 = FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[1], true);
+        SC_TRY_MSG(pipeRes2, "Cannot set close on exec on write pipe");
+    }
+    if (options.blocking == false)
+    {
+        const Result pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(pipes[0], true);
+        SC_TRY_MSG(pipeRes1, "Cannot set non-blocking flag on read");
+        const Result pipeRes2 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(pipes[1], true);
+        SC_TRY_MSG(pipeRes2, "Cannot set non-blocking flag on read");
     }
     return Result(true);
 }
