@@ -279,7 +279,10 @@ void SC::ProcessTest::processChainPipeDual()
     }
     break;
     }
+    PipeOptions pipeOptions;
+    pipeOptions.writeInheritable = true; // This is correct but not strictly necessary...
     PipeDescriptor outputPipe;
+    SC_TEST_EXPECT(outputPipe.createPipe(pipeOptions));
     SC_TEST_EXPECT(chain.launch(outputPipe));
     SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
     SC_TEST_EXPECT(chain.waitForExitSync());

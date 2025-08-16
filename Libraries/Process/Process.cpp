@@ -21,7 +21,7 @@ SC::Result SC::ProcessChain::launch(const Process::StdOut& stdOut, const Process
 {
     if (processes.isEmpty())
     {
-        return Result(false);
+        return Result::Error("ProcessChain::launch - No Processes");
     }
     for (Process* process = processes.front; process != nullptr; process = process->next)
     {
@@ -132,10 +132,14 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         case StdStream::Operation::Inherit: break;
         case StdStream::Operation::Ignore: break;
         case StdStream::Operation::FileDescriptor: {
-            SC_TRY(fileDescriptor.assign(inputObject.fileDescriptor));
+            SC_TRY_MSG(fileDescriptor.assign(inputObject.fileDescriptor), "Input file is not valid");
         }
         break;
-        case StdStream::Operation::ExternalPipe:
+        case StdStream::Operation::ExternalPipe: {
+            SC_TRY_MSG(fileDescriptor.assign(move(inputObject.pipeDescriptor->readPipe)),
+                       "Input pipe is not valid (forgot createPipe?)");
+        }
+        break;
         case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::ReadableSpan: {
             PipeOptions pipeReadOptions;
@@ -163,10 +167,14 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
             break;
         }
         case StdStream::Operation::FileDescriptor: {
-            SC_TRY(fileDescriptor.assign(outputObject.fileDescriptor));
+            SC_TRY_MSG(fileDescriptor.assign(outputObject.fileDescriptor), "Output file is not valid");
         }
         break;
-        case StdStream::Operation::ExternalPipe:
+        case StdStream::Operation::ExternalPipe: {
+            SC_TRY_MSG(fileDescriptor.assign(move(outputObject.pipeDescriptor->writePipe)),
+                       "Output pipe is not valid (forgot createPipe?)");
+        }
+        break;
         case StdStream::Operation::GrowableBuffer:
         case StdStream::Operation::WritableSpan: {
             PipeOptions pipeWriteOptions;
@@ -182,14 +190,10 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         return Result(true);
     };
-
     PipeDescriptor  pipes[3];
-    PipeDescriptor& stdoutPipe =
-        stdOutput.operation == StdOut::Operation::ExternalPipe ? *stdOutput.pipeDescriptor : pipes[0];
-    PipeDescriptor& stderrPipe =
-        stdError.operation == StdOut::Operation::ExternalPipe ? *stdError.pipeDescriptor : pipes[1];
-    PipeDescriptor& stdinPipe =
-        stdInput.operation == StdOut::Operation::ExternalPipe ? *stdInput.pipeDescriptor : pipes[2];
+    PipeDescriptor& stdoutPipe = pipes[0];
+    PipeDescriptor& stderrPipe = pipes[1];
+    PipeDescriptor& stdinPipe  = pipes[2];
 
     // Setup requested input / output / error redirection
     SC_TRY(setupInput(stdInput, stdinPipe, stdInFd));

@@ -4,7 +4,6 @@
 
 #include "../File/File.h"
 #include "../Foundation/AlignedStorage.h"
-#include "../Foundation/Function.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringPath.h"
 
