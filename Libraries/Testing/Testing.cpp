@@ -46,7 +46,8 @@ SC::TestReport::TestReport(Console& console, int argc, const char** argv) : cons
             }
         }
     }
-    if (not testToRun.isEmpty() || not sectionToRun.isEmpty())
+
+    if (not quietMode and (not testToRun.isEmpty() or not sectionToRun.isEmpty()))
     {
         console.print("\n"_a8);
     }
@@ -71,6 +72,8 @@ SC::TestReport::~TestReport()
 
 void SC::TestReport::runGlobalMemoryReport(bool reportFailure)
 {
+    if (quietMode)
+        return;
     MemoryAllocator::Statistics stats = Globals::get(Globals::Global).allocator.statistics;
     console.print("[[ Memory Report ]]\n");
     console.print("\t - Allocations   = {}\n", stats.numAllocate);
@@ -215,6 +218,10 @@ bool SC::TestCase::test_section(StringView sectionName, Execute execution)
 
 void SC::TestReport::printSectionResult(TestCase& testCase)
 {
+    if (quietMode)
+    {
+        return;
+    }
     console.print("\t- "_a8);
     if (testCase.numSectionTestsFailed > 0)
     {

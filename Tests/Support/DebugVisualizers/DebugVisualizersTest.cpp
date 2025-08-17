@@ -54,12 +54,18 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         (void)stringsView.push_back(twoFaces);
         (void)stringsView.push_back("SALVER");
         (void)stringsView.push_back(threeKanji);
-        report.console.printLine(twoFaces);
+        if (not report.quietMode)
+        {
+            report.console.printLine(twoFaces);
+        }
         (void)smallVector.push_back(1.1f);
         (void)smallVector.push_back(2.2f);
         (void)smallVector.push_back(3.3f);
         (void)smallVector.push_back(4.4f);
-        report.console.print("{}\n", smallVector[0]);
+        if (not report.quietMode)
+        {
+            report.console.print("{}\n", smallVector[0]);
+        }
 
         (void)map.insertIfNotExists({"one", 1});
         (void)map.insertIfNotExists({"two", 2});
