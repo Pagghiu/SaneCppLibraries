@@ -179,8 +179,13 @@ SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
         }
         first = false;
 
-        const bool containsSpace = ::wcschr(param.getNullTerminatedNative(), L' ') != nullptr;
-        const bool containsQuote = ::wcschr(param.getNullTerminatedNative(), L'"') != nullptr;
+        const bool isUtf16 = param.getEncoding() == StringEncoding::Utf16;
+        const bool containsSpace =
+            isUtf16 ? ::wmemchr(param.getNullTerminatedNative(), L' ', param.sizeInBytes() / sizeof(wchar_t)) != nullptr
+                    : ::memchr(param.bytesWithoutTerminator(), ' ', param.sizeInBytes()) != nullptr;
+        const bool containsQuote = isUtf16
+                                       ? ::wcschr(param.getNullTerminatedNative(), L'"') != nullptr
+                                       : ::memchr(param.bytesWithoutTerminator(), '"', param.sizeInBytes()) != nullptr;
         if (containsSpace and not containsQuote)
         {
             SC_TRY(StringSpan("\"").appendNullTerminatedTo(command));
