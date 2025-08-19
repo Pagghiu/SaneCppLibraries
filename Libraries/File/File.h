@@ -85,6 +85,18 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @return `true` if file has been opened successfully
     Result openForWriteToDevNull();
 
+    /// @brief Opens a duplicated file descriptor handle for reading from stdout.
+    /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
+    Result openStdOutDuplicate();
+
+    /// @brief Opens a duplicated file descriptor handle for reading from stderr.
+    /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
+    Result openStdErrDuplicate();
+
+    /// @brief Opens a duplicated file descriptor handle for reading from stdin.
+    /// @note The returned handle CAN be closed because it will be a duplicate of the original handle.
+    Result openStdInDuplicate();
+
     /// @brief Opens a file descriptor handle from a file system path.
     /// @param path The absolute path to file. It MUST be encoded in ASCII,UTF-8/16 on Windows, ASCII,UTF-8 on POSIX.
     /// @param mode The mode used to open file (read-only, write-append etc.)
@@ -133,6 +145,11 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @param buffer A destination buffer to write to (it will be resized as needed)
     /// @return Valid result if read succeeded until EOF
     Result readUntilEOF(IGrowableBuffer&& buffer);
+
+    /// @brief Writes a string to the file descriptor
+    /// @param data The string data to write
+    /// @return Valid result if write succeeded
+    Result writeString(StringSpan data);
 
     /// @brief Writes bytes at offset from start of the file descriptor
     /// @param data Span of bytes containing the data to write

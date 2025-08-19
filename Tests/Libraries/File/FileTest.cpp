@@ -20,8 +20,13 @@ struct SC::FileTest : public SC::TestCase
         {
             testOpen();
         }
+        if (test_section("open stdhandles"))
+        {
+            testOpenStdHandles();
+        }
     }
     inline void testOpen();
+    inline void testOpenStdHandles();
 
     Result snippetForUniqueHandle();
 };
@@ -67,6 +72,15 @@ void SC::FileTest::testOpen()
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
     //! [FileSnippet]
 }
+
+void SC::FileTest::testOpenStdHandles()
+{
+    FileDescriptor fd[3];
+    SC_TEST_EXPECT(fd[0].openStdInDuplicate());
+    SC_TEST_EXPECT(fd[1].openStdOutDuplicate());
+    SC_TEST_EXPECT(fd[2].openStdErrDuplicate());
+}
+
 #if !SC_PLATFORM_WINDOWS
 //! [UniqueHandleExampleSnippet]
 #include <fcntl.h> // for open

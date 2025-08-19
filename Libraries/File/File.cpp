@@ -529,6 +529,56 @@ SC::Result SC::FileDescriptor::openForWriteToDevNull()
 #endif
 }
 
+SC::Result SC::FileDescriptor::openStdOutDuplicate()
+{
+#if SC_PLATFORM_WINDOWS
+    handle   = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
+                                 DUPLICATE_SAME_ACCESS);
+    if (res == FALSE)
+    {
+        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+    }
+#else
+    handle = ::dup(STDOUT_FILENO);
+#endif
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::openStdErrDuplicate()
+{
+#if SC_PLATFORM_WINDOWS
+    handle   = ::GetStdHandle(STD_ERROR_HANDLE);
+    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
+                                 DUPLICATE_SAME_ACCESS);
+    if (res == FALSE)
+    {
+        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+    }
+#else
+    handle = ::dup(STDERR_FILENO); // Ensure that the file descriptor is valid
+#endif
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::openStdInDuplicate()
+{
+#if SC_PLATFORM_WINDOWS
+    handle   = ::GetStdHandle(STD_INPUT_HANDLE);
+    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
+                                 DUPLICATE_SAME_ACCESS);
+    if (res == FALSE)
+    {
+        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+    }
+#else
+    handle = ::dup(STDIN_FILENO);
+#endif
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::writeString(StringSpan data) { return write(data.toCharSpan()); }
+
 SC::Result SC::FileDescriptor::write(Span<const uint8_t> data, uint64_t offset)
 {
     return write({reinterpret_cast<const char*>(data.data()), data.sizeInBytes()}, offset);

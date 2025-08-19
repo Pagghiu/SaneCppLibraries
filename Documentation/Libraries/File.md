@@ -18,13 +18,16 @@ File library allows synchronous I/O operations on files and pipes.
 | Sum       | 692			| 239		| 931	|
 
 # Features
-| SC::FileDescriptor                | @copybrief SC::FileDescriptor                 |
-|:----------------------------------|:----------------------------------------------|
-| SC::FileDescriptor::read          | @copybrief SC::FileDescriptor::read           |
-| SC::FileDescriptor::write         | @copybrief SC::FileDescriptor::write          |
-| SC::FileDescriptor::seek          | @copybrief SC::FileDescriptor::seek           |
-| SC::FileDescriptor::open          | @copybrief SC::FileDescriptor::open           |
-| SC::FileDescriptor::readUntilEOF  | @copybrief SC::FileDescriptor::readUntilEOF   |
+| SC::FileDescriptor                        | @copybrief SC::FileDescriptor                         |
+|:------------------------------------------|:------------------------------------------------------|
+| SC::FileDescriptor::read                  | @copybrief SC::FileDescriptor::read                   |
+| SC::FileDescriptor::write                 | @copybrief SC::FileDescriptor::write                  |
+| SC::FileDescriptor::seek                  | @copybrief SC::FileDescriptor::seek                   |
+| SC::FileDescriptor::open                  | @copybrief SC::FileDescriptor::open                   |
+| SC::FileDescriptor::openStdInDuplicate    | @copybrief SC::FileDescriptor::openStdInDuplicate     |
+| SC::FileDescriptor::openStdOutDuplicate   | @copybrief SC::FileDescriptor::openStdOutDuplicate    |
+| SC::FileDescriptor::openStdErrDuplicate   | @copybrief SC::FileDescriptor::openStdErrDuplicate    |
+| SC::FileDescriptor::readUntilEOF          | @copybrief SC::FileDescriptor::readUntilEOF           |
 
 | SC::PipeDescriptor                | @copybrief SC::PipeDescriptor                 |
 |:----------------------------------|:----------------------------------------------|
