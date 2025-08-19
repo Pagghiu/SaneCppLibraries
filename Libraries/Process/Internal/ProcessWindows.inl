@@ -95,10 +95,20 @@ SC::Result SC::Process::launchImplementation()
     if (stdInFd.isValid())
     {
         SC_TRY(stdInFd.get(startupInfo.hStdInput, Result(false)));
+        // Some forgiveness here if the user forgot to set the inheritable flag
+        if (::SetHandleInformation(startupInfo.hStdInput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
+        {
+            return Result::Error("Process::launchImplementation() - ::SetHandleInformation stdInput failed");
+        }
     }
     if (stdOutFd.isValid())
     {
         SC_TRY(stdOutFd.get(startupInfo.hStdOutput, Result(false)));
+        // Some forgiveness here if the user forgot to set the inheritable flag
+        if (::SetHandleInformation(startupInfo.hStdOutput, HANDLE_FLAG_INHERIT, TRUE) == FALSE)
+        {
+            return Result::Error("Process::launchImplementation() - ::SetHandleInformation stdOut failed");
+        }
     }
     if (stdErrFd.isValid())
     {
