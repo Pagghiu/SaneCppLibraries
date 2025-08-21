@@ -385,8 +385,15 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         const epoll_event& event = events[idx];
         continueProcessing       = true;
 
-        if ((event.events & EPOLLERR) != 0 || (event.events & EPOLLHUP) != 0)
+        const bool epollHUP = (event.events & EPOLLHUP) != 0;
+        const bool epollERR = (event.events & EPOLLERR) != 0;
+        if (epollERR or epollHUP)
         {
+            const AsyncRequest* request = getAsyncRequest(idx);
+            if (request->type == AsyncRequest::Type::FileRead or request->type == AsyncRequest::Type::FileWrite)
+            {
+                return Result(true);
+            }
             continueProcessing = false;
             return Result::Error("Error in processing event (epoll EPOLLERR or EPOLLHUP)");
         }
@@ -987,6 +994,18 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result completeAsync(AsyncFileRead::Result& result)
     {
+#if SC_PLATFORM_LINUX
+        if (result.eventIndex > 0)
+        {
+            epoll_event& event    = events[result.eventIndex];
+            const bool   epollHUP = (event.events & EPOLLHUP) != 0;
+            const bool   epollERR = (event.events & EPOLLERR) != 0;
+            if (epollERR or epollHUP)
+            {
+                result.completionData.endOfFile = true; // epoll reports EOF on pipes
+            }
+        }
+#endif
         return executeOperation(result.getAsync(), result.completionData);
     }
 

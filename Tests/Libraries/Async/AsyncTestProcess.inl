@@ -52,3 +52,60 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(outParams2.numCallbackCalled == 1);
     SC_TEST_EXPECT(outParams2.exitStatus != 0); // Status == Not OK
 }
+
+void SC::AsyncTest::processInputOutput()
+{
+    StringSpan params[] = {report.executableFile, "--quiet",        "--test",
+                           "AsyncTest",           "--test-section", "process input output child"};
+
+    PipeDescriptor processStdOut;
+    PipeOptions    pipeOptions;
+
+    pipeOptions.blocking         = true;
+    pipeOptions.writeInheritable = true;
+    SC_TEST_EXPECT(processStdOut.createPipe(pipeOptions));
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    AsyncFileRead asyncRead;
+
+    int numCallbackCalled = 0;
+
+    asyncRead.callback = [&](AsyncFileRead::Result& res)
+    {
+        if (not res.completionData.endOfFile)
+        {
+            Span<char> data;
+            SC_TEST_EXPECT(res.get(data));
+            StringSpan span(data, false, StringEncoding::Ascii);
+            SC_TEST_EXPECT(span == "asdf");
+            numCallbackCalled++;
+            res.reactivateRequest(true);
+        }
+    };
+    AsyncTaskSequence asyncReadTask;
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(processStdOut.readPipe));
+
+    SC_TEST_EXPECT(processStdOut.readPipe.get(asyncRead.handle, Result::Error("handle")));
+    char myBuffer[4]; // just enough to hold "asdf";
+    asyncRead.buffer = myBuffer;
+    SC_TEST_EXPECT(asyncRead.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+
+    Process process;
+    SC_TEST_EXPECT(process.launch(params, processStdOut));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(numCallbackCalled == 4);
+}
+
+void SC::AsyncTest::processInputOutputChild()
+{
+    FileDescriptor stdOut;
+    SC_TEST_EXPECT(stdOut.openStdOutDuplicate());
+    for (int i = 0; i < 4; ++i)
+    {
+        SC_TEST_EXPECT(stdOut.writeString("asdf"));
+        Thread::Sleep(1); // just to simulate some delay
+    }
+    Thread::Sleep(10); // wait before closing
+}

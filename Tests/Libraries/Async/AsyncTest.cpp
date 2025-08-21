@@ -24,6 +24,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
         numTestsToRun   = 2;
     }
+    if (test_section("process input output child", TestCase::Execute::OnlyExplicit))
+    {
+        processInputOutputChild();
+    }
     for (int i = 0; i < numTestsToRun; ++i)
     {
         if (test_section("loop free submitting on close"))
@@ -61,6 +65,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         if (test_section("process exit"))
         {
             processExit();
+        }
+        if (test_section("process input output"))
+        {
+            processInputOutput();
         }
         if (test_section("socket TCP accept"))
         {

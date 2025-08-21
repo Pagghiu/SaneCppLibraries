@@ -35,6 +35,8 @@ struct SC::AsyncTest : public SC::TestCase
 
     // Processes
     void processExit();
+    void processInputOutput();
+    void processInputOutputChild();
 
     // Files
     void fileReadWrite(bool useThreadPool);

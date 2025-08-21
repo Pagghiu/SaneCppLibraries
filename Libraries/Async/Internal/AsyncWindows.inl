@@ -739,7 +739,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                     }
                 }
             }
-            else if (lastError == ERROR_HANDLE_EOF)
+            else if (lastError == ERROR_HANDLE_EOF or lastError == ERROR_BROKEN_PIPE)
             {
                 if (endOfFile)
                     *endOfFile = true;
@@ -770,7 +770,9 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD       transferred = 0;
         if (::GetOverlappedResult(result.getAsync().handle, &overlapped, &transferred, FALSE) == FALSE)
         {
-            if (::GetLastError() == ERROR_HANDLE_EOF)
+            DWORD lastError = ::GetLastError();
+            // Both ERROR_BROKEN_PIPE and ERROR_HANDLE_EOF indicate end of data
+            if (lastError == ERROR_HANDLE_EOF || lastError == ERROR_BROKEN_PIPE)
             {
                 if (endOfFile)
                     *endOfFile = true;
