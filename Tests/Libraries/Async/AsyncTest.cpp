@@ -68,7 +68,11 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         }
         if (test_section("process input output"))
         {
-            processInputOutput();
+            processInputOutput(false);
+        }
+        if (test_section("process input output threadpool"))
+        {
+            processInputOutput(true);
         }
         if (test_section("socket TCP accept"))
         {

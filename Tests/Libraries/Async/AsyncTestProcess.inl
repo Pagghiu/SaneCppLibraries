@@ -53,15 +53,19 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(outParams2.exitStatus != 0); // Status == Not OK
 }
 
-void SC::AsyncTest::processInputOutput()
+void SC::AsyncTest::processInputOutput(bool useThreadPool)
 {
     StringSpan params[] = {report.executableFile, "--quiet",        "--test",
                            "AsyncTest",           "--test-section", "process input output child"};
-
+    ThreadPool threadPool;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(threadPool.create(1));
+    }
     PipeDescriptor processStdOut;
     PipeOptions    pipeOptions;
 
-    pipeOptions.blocking         = true;
+    pipeOptions.blocking         = useThreadPool;
     pipeOptions.writeInheritable = true;
     SC_TEST_EXPECT(processStdOut.createPipe(pipeOptions));
     AsyncEventLoop eventLoop;
@@ -84,8 +88,14 @@ void SC::AsyncTest::processInputOutput()
         }
     };
     AsyncTaskSequence asyncReadTask;
-    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(processStdOut.readPipe));
-
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(asyncRead.executeOn(asyncReadTask, threadPool));
+    }
+    else
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(processStdOut.readPipe));
+    }
     SC_TEST_EXPECT(processStdOut.readPipe.get(asyncRead.handle, Result::Error("handle")));
     char myBuffer[4]; // just enough to hold "asdf";
     asyncRead.buffer = myBuffer;
