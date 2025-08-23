@@ -106,6 +106,7 @@ SC::AsyncZLibTransformStream::AsyncZLibTransformStream()
 
 SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input, Span<char> output)
 {
+    SC_ASSERT_RELEASE(not finalizing);
     savedInput  = input;
     savedOutput = output;
     finalizing  = false;
@@ -115,7 +116,7 @@ SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input,
 
 SC::Result SC::AsyncZLibTransformStream::compressFinalize(Span<char> output)
 {
-    savedInput  = {};
+    // Intentionally not resetting savedInput, that can contain leftover data to process
     savedOutput = output;
     finalizing  = true;
     SC_TRY_MSG(eventLoop != nullptr, "AsyncZLibTransformStream::setEventLoop not called");

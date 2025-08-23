@@ -102,8 +102,7 @@ struct SC::ZLibStream::Internal
 
     static Result decompressFinalize(ZLibAPI::Stream& stream, Span<char>& output, bool& streamEnded)
     {
-        stream.next_in   = nullptr;
-        stream.avail_in  = 0;
+        // Intentionally not resetting next_in / avail_in, that can contain leftover data to process
         stream.next_out  = reinterpret_cast<uint8_t*>(output.data());
         stream.avail_out = static_cast<unsigned int>(output.sizeInBytes());
 
