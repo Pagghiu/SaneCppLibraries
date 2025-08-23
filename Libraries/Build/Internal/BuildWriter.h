@@ -3,7 +3,7 @@
 #pragma once
 #include "../Build.h"
 
-#include "../../Algorithms/AlgorithmBubbleSort.h"
+#include "../../Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "../../Containers/VectorMap.h"
 #include "../../Containers/VectorSet.h"
 #include "../../Strings/Path.h"

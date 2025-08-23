@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Assert.h"
+#include "../../Foundation/Assert.h"
 
 namespace SC
 {

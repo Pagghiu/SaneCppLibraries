@@ -7,8 +7,8 @@ Build uses C++ to imperatively describe a sequence of build operations.
 [TOC]
 
 # Dependencies
-- Direct dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Process](@ref library_process), [Strings](@ref library_strings)
-- All dependencies: [Algorithms](@ref library_algorithms), [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
+- Direct dependencies: [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Process](@ref library_process), [Strings](@ref library_strings)
+- All dependencies: [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

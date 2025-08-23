@@ -15,7 +15,6 @@ WARN_AS_ERROR          = YES
 INPUT                  = ../../Documentation/Pages \
                          ../../Documentation/Libraries \
                          ../../Documentation/LibrariesExtra \
-                         ../../Libraries/Algorithms \
                          ../../Libraries/Async \
                          ../../Libraries/AsyncStreams \
                          ../../Libraries/Build \

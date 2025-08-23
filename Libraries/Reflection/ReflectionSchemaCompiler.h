@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Algorithms/AlgorithmBubbleSort.h"
+#include "../Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Reflection.h"
 
 namespace SC

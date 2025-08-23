@@ -35,7 +35,6 @@ Each library:
 
 Library                                                                                                         | Description                                                               | LOC
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|---------
-[Algorithms](https://pagghiu.github.io/SaneCppLibraries/library_algorithms.html)                                | 🟥 Placeholder library where templated algorithms will be placed          |   95
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      |   5673
 [Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟥 Concurrently read, write and transform byte streams                    |   1975
 [Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                          | 🟨 Minimal build system where builds are described in C++                 |   4159

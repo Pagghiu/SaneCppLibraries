@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/PrimitiveTypes.h"
+#include "../../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {

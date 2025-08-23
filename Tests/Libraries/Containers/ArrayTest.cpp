@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Containers/Array.h"
-#include "Libraries/Algorithms/AlgorithmBubbleSort.h"
+#include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"

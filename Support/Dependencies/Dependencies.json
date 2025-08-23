@@ -1,12 +1,4 @@
 {
-    "Algorithms": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
-    },
     "Async": {
         "direct_dependencies": [
             "File",
@@ -42,7 +34,6 @@
     },
     "Build": {
         "direct_dependencies": [
-            "Algorithms",
             "Containers",
             "FileSystem",
             "FileSystemIterator",
@@ -52,7 +43,6 @@
             "Strings"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Containers",
             "File",
             "FileSystem",
@@ -67,12 +57,10 @@
     },
     "Containers": {
         "direct_dependencies": [
-            "Algorithms",
             "Foundation",
             "Memory"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Foundation",
             "Memory"
         ]
@@ -155,7 +143,6 @@
             "Strings"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Async",
             "Containers",
             "File",
@@ -178,7 +165,6 @@
     },
     "Plugin": {
         "direct_dependencies": [
-            "Algorithms",
             "Containers",
             "FileSystem",
             "FileSystemIterator",
@@ -190,7 +176,6 @@
             "Time"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Containers",
             "File",
             "FileSystem",
@@ -215,14 +200,12 @@
     },
     "Reflection": {
         "direct_dependencies": [
-            "Algorithms",
             "Containers",
             "Foundation",
             "Memory",
             "Strings"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Containers",
             "Foundation",
             "Memory",
@@ -236,7 +219,6 @@
             "Reflection"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Containers",
             "Foundation",
             "Memory",
@@ -251,7 +233,6 @@
             "Strings"
         ],
         "all_dependencies": [
-            "Algorithms",
             "Containers",
             "Foundation",
             "Memory",

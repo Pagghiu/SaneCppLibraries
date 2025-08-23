@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Strings/StringView.h"
-#include "Libraries/Algorithms/AlgorithmBubbleSort.h"
+#include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

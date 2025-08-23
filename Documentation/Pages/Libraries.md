@@ -4,7 +4,6 @@ This is the list of all libraries, whose internal dependencies are documented at
 
 Library                                     | Description                                   | LOC
 :-------------------------------------------|:----------------------------------------------|---------------
-@subpage library_algorithms                 | @copybrief library_algorithms                 |   95
 @subpage library_async                      | @copybrief library_async                      |   5673
 @subpage library_async_streams              | @copybrief library_async_streams              |   1975
 @subpage library_build                      | @copybrief library_build                      |   4159

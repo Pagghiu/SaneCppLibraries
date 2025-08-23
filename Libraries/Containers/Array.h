@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Algorithms/AlgorithmFind.h" // contains
-#include "../Containers/Vector.h"        // ObjectVTable<T>
+#include "../Containers/Algorithms/AlgorithmFind.h" // contains
+#include "../Containers/Vector.h"                   // ObjectVTable<T>
 namespace SC
 {
 namespace detail

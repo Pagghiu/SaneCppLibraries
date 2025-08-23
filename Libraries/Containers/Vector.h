@@ -1,10 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Algorithms/AlgorithmRemove.h"       // removeIf
-#include "../Foundation/TypeTraits.h"            // IsTriviallyCopyable
-#include "../Memory/Internal/Segment.inl"        // IWYU pragma: keep
-#include "../Memory/Internal/SegmentTrivial.inl" // IWYU pragma: keep
+#include "../Containers/Algorithms/AlgorithmRemove.h" // removeIf
+#include "../Foundation/TypeTraits.h"                 // IsTriviallyCopyable
+#include "../Memory/Internal/Segment.inl"             // IWYU pragma: keep
+#include "../Memory/Internal/SegmentTrivial.inl"      // IWYU pragma: keep
 
 namespace SC
 {

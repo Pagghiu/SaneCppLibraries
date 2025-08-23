@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
-#include "../Algorithms/AlgorithmBubbleSort.h"
+#include "../Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "../FileSystem/FileSystem.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
 #include "../Process/Internal/StringsArena.h"

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h" // move
+#include "../../Foundation/Compiler.h" // move
 #include "AlgorithmFind.h"
 
 namespace SC
