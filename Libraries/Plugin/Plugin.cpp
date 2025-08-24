@@ -180,9 +180,10 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
 
 SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<PluginDefinition>& definitions)
 {
+    FileSystemIterator::FolderState recurseStack[16];
+
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = false; // Manually recurse only first level dirs
-    FileSystemIterator::FolderState recurseStack[16];
     SC_TRY(fsIterator.init(directory, recurseStack));
     FileSystem fs;
     SC_TRY(fs.init(directory));
@@ -280,7 +281,8 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     {
         FileSystemIterator::FolderState recurseStack[16];
         FileSystemIterator              fsIterator;
-        StringView                      base = basePath.view();
+
+        StringView base = basePath.view();
         if (not fsIterator.init(base, recurseStack))
             continue;
         while (fsIterator.enumerateNext())

@@ -207,9 +207,9 @@ Result buildSingleFileLibs(Definition& definition, const Parameters& parameters)
     Workspace workspace = {"SCSingleFileLibs"};
 
     // Read all single file libraries from the _Build/_SingleFileLibrariesTest directory
-    FileSystemIterator fsi;
-
     FileSystemIterator::FolderState entries[1];
+
+    FileSystemIterator fsi;
 
     String path;
     SC_TRY(Path::join(path, {parameters.directories.libraryDirectory.view(), "_Build", "_SingleFileLibrariesTest"}));
