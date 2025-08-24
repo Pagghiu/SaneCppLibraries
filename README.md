@@ -36,7 +36,7 @@ Each library:
 Library                                                                                                         | Description                                                               | LOC
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|---------
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      |   5673
-[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟥 Concurrently read, write and transform byte streams                    |   1975
+[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟨 Concurrently read, write and transform byte streams                    |   1975
 [Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                          | 🟨 Minimal build system where builds are described in C++                 |   4159
 [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)       |   779
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                            | 🟩 Synchronous Disk File I/O                                              |   692

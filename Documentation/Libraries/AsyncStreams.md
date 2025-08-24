@@ -1,6 +1,6 @@
 @page library_async_streams Async Streams
 
-@brief 🟥 Concurrently read, write and transform byte streams
+@brief 🟨 Concurrently read, write and transform byte streams
 
 [TOC]
 
@@ -39,10 +39,11 @@ This is the list of implemented objects stream types
 
 
 # Status
-🟥 Draft  
+🟨 MVP  
 
-Async Streams are for now in Draft state.
-It's also possible that its API will evolve a little bit to be less verbose and there is also lack of nice examples, aside from the tests.
+A basic set of stream to pipe Sockets and Files (Pipes included) has been implemented.  
+Also basic transform streams (ZLib based) have been implemented.  
+It's possible that its API will evolve a little bit to be less verbose and there is also lack of nice examples, aside from the tests.
 
 # Implementation
 
@@ -77,10 +78,6 @@ Some relevant blog posts are:
 - [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
 
 # Roadmap
-
-🟨 MVP features
-- Socket Stream
-- Pipe Stream
 
 🟩 Usable features:
 - Pipeline pause
