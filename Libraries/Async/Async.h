@@ -725,8 +725,11 @@ struct AsyncFileRead : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
-    bool       useOffset = false;
-    uint64_t   offset    = 0; /// Offset from file start where to start reading. Not supported on pipes.
+
+    bool useOffset = false;
+    bool endedSync = false;
+
+    uint64_t offset = 0; /// Offset from file start where to start reading. Not supported on pipes.
 #if SC_PLATFORM_WINDOWS
     uint64_t                    readCursor = 0;
     detail::WinOverlappedOpaque overlapped;
@@ -803,6 +806,7 @@ struct AsyncFileWrite : public AsyncRequest
     SC::Result validate(AsyncEventLoop&);
 
 #if SC_PLATFORM_WINDOWS
+    bool endedSync = false;
 #else
     bool isWatchable = false;
 #endif

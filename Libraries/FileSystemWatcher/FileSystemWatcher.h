@@ -146,7 +146,11 @@ struct FileSystemWatcher
         friend struct FileSystemWatcher;
         friend struct FileSystemWatcherAsync;
 #if SC_PLATFORM_WINDOWS
+#if SC_ASYNC_ENABLE_LOG
+        AlignedStorage<120> asyncStorage;
+#else
         AlignedStorage<112> asyncStorage;
+#endif
 #endif
         OpaqueObject<FolderWatcherSizes> internal;
 

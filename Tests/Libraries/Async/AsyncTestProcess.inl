@@ -100,8 +100,6 @@ void SC::AsyncTest::processInputOutput(bool useThreadPool)
     char myBuffer[4]; // just enough to hold "asdf";
     asyncRead.buffer = myBuffer;
     SC_TEST_EXPECT(asyncRead.start(eventLoop));
-    SC_TEST_EXPECT(eventLoop.runNoWait());
-
     Process process;
     SC_TEST_EXPECT(process.launch(params, processStdOut));
     SC_TEST_EXPECT(eventLoop.run());

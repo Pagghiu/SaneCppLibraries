@@ -705,8 +705,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // File READ / WRITE shared functions
     //-------------------------------------------------------------------------------------------------------
     template <typename Func, typename T>
-    static Result executeFileOperation(Func func, T& async, decltype(T::buffer) buffer, bool synchronous,
-                                       size_t& readBytes, bool* endOfFile)
+    static Result executeFileOperation(Func func, T& async, AsyncEventLoop* eventLoop, decltype(T::buffer) buffer,
+                                       bool synchronous, size_t& readBytes, bool* endOfFile)
     {
         OVERLAPPED& overlapped = async.overlapped.get().overlapped;
         overlapped.Offset      = static_cast<DWORD>(async.offset & 0xffffffff);
@@ -719,7 +719,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         DWORD numBytes;
         if (func(fileDescriptor, buffer.data(), bufSize, &numBytes, &overlapped) == FALSE)
         {
-            const DWORD lastError = ::GetLastError();
+            DWORD lastError = ::GetLastError();
             if (lastError == ERROR_IO_PENDING) // ERROR_IO_PENDING just indicates async operation is in progress
             {
                 if (synchronous)
@@ -727,7 +727,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                     // If we have been requested to do a synchronous operation on an async file, wait for completion
                     if (::GetOverlappedResult(fileDescriptor, &overlapped, &numBytes, TRUE) == FALSE) // bWait == TRUE
                     {
-                        if (::GetLastError() == ERROR_HANDLE_EOF)
+                        lastError = GetLastError();
+                        if (lastError == ERROR_HANDLE_EOF or lastError == ERROR_BROKEN_PIPE)
                         {
                             if (endOfFile)
                                 *endOfFile = true;
@@ -743,6 +744,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             {
                 if (endOfFile)
                     *endOfFile = true;
+
+                if (synchronous == false)
+                {
+                    // Async operation finished synchronously, must flag a manual completion to avoid waiting forever
+                    SC_ASSERT_RELEASE(eventLoop != nullptr);
+                    SC_ASSERT_RELEASE(numBytes == 0);
+                    async.flags |= Internal::Flag_ManualCompletion;
+                    async.endedSync = true; // GetOverlappedResult will fail, so we need to remember this is ended
+                }
             }
             else
             {
@@ -758,6 +768,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 }
             }
         }
+        else
+        {
+            if (synchronous == false)
+            {
+                // Async operation finished synchronously, must flag a manual completion to avoid waiting forever
+                SC_ASSERT_RELEASE(eventLoop != nullptr);
+                async.flags |= Internal::Flag_ManualCompletion;
+            }
+        }
 
         readBytes = static_cast<size_t>(numBytes);
         return Result(true);
@@ -766,13 +785,22 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     template <typename ResultType>
     static Result completeFileOperation(ResultType& result, bool* endOfFile)
     {
-        OVERLAPPED& overlapped  = result.getAsync().overlapped.get().overlapped;
+        auto& async = result.getAsync();
+        if (async.endedSync)
+        {
+            // The operation ended synchronously in activateAsync, GetOverlappedResult would fail
+            if (endOfFile)
+                *endOfFile = true;
+            result.completionData.numBytes = 0;
+            return Result(true);
+        }
+        OVERLAPPED& overlapped  = async.overlapped.get().overlapped;
         DWORD       transferred = 0;
-        if (::GetOverlappedResult(result.getAsync().handle, &overlapped, &transferred, FALSE) == FALSE)
+        if (::GetOverlappedResult(async.handle, &overlapped, &transferred, FALSE) == FALSE)
         {
             DWORD lastError = ::GetLastError();
             // Both ERROR_BROKEN_PIPE and ERROR_HANDLE_EOF indicate end of data
-            if (lastError == ERROR_HANDLE_EOF || lastError == ERROR_BROKEN_PIPE)
+            if (lastError == ERROR_HANDLE_EOF or lastError == ERROR_BROKEN_PIPE)
             {
                 if (endOfFile)
                     *endOfFile = true;
@@ -789,22 +817,26 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // File READ
     //-------------------------------------------------------------------------------------------------------
-    static Result activateAsync(AsyncEventLoop&, AsyncFileRead& async)
+    static Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileRead& async)
     {
         AsyncFileRead::CompletionData completionData;
-        return executeOperation(async, completionData, false); // synchronous == false
+        async.endedSync = false;
+        return executeOperation(async, completionData, false, &eventLoop); // synchronous == false
     }
 
     static Result executeOperation(AsyncFileRead& async, AsyncFileRead::CompletionData& completionData,
-                                   bool synchronous = true)
+                                   bool synchronous = true, AsyncEventLoop* eventLoop = nullptr)
     {
         if (not async.useOffset)
         {
             async.offset = async.readCursor;
         }
-        SC_TRY(executeFileOperation(&::ReadFile, async, async.buffer, synchronous, completionData.numBytes,
+        SC_TRY(executeFileOperation(&::ReadFile, async, eventLoop, async.buffer, synchronous, completionData.numBytes,
                                     &completionData.endOfFile));
-        async.readCursor = async.offset + async.buffer.sizeInBytes();
+        if (not completionData.endOfFile)
+        {
+            async.readCursor = async.offset + async.buffer.sizeInBytes();
+        }
         return Result(true);
     }
 
@@ -816,14 +848,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     //-------------------------------------------------------------------------------------------------------
     // File WRITE
     //-------------------------------------------------------------------------------------------------------
-    static Result activateAsync(AsyncEventLoop&, AsyncFileWrite& async)
+    static Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
     {
         AsyncFileWrite::CompletionData completionData;
-        return executeOperation(async, completionData, false); // synchronous == false
+        async.endedSync = false;
+        return executeOperation(async, completionData, false, &eventLoop); // synchronous == false
     }
 
     static Result executeOperation(AsyncFileWrite& async, AsyncFileWrite::CompletionData& completionData,
-                                   bool synchronous = true)
+                                   bool synchronous = true, AsyncEventLoop* eventLoop = nullptr)
     {
         // TODO: Do the same as AsyncFileRead
         // To write to the end of file, specify both the Offset and OffsetHigh members of the OVERLAPPED structure as
@@ -831,8 +864,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         // FILE_APPEND_DATA access.
         if (async.singleBuffer)
         {
-            return executeFileOperation(&::WriteFile, async, async.buffer, synchronous, completionData.numBytes,
-                                        nullptr);
+            return executeFileOperation(&::WriteFile, async, eventLoop, async.buffer, synchronous,
+                                        completionData.numBytes, nullptr);
         }
         else
         {
@@ -849,7 +882,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             {
                 size_t writtenBytes;
                 auto   buffer = async.buffers[currentBufferIndex];
-                SC_TRY(executeFileOperation(&::WriteFile, async, buffer, synchronous, writtenBytes, nullptr));
+                SC_TRY(
+                    executeFileOperation(&::WriteFile, async, eventLoop, buffer, synchronous, writtenBytes, nullptr));
                 currentBufferIndex += 1;
                 async.totalBytesWritten += buffer.sizeInBytes(); // writtenBytes could be == 0 in async case
                 if (synchronous == false)
