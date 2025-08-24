@@ -146,6 +146,11 @@ void SC::AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
         state = State::AsyncPushing;
     }
     break;
+    case State::Pausing: {
+        // Process buffers received while Pausing is being propagated upstream
+        emitOnData();
+    }
+    break;
     default: {
         emitError(Result::Error("AsyncReadableStream::push - called in wrong state"));
     }

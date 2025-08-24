@@ -24,11 +24,6 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
     AsyncEventLoop::Options options;
     AsyncRequestStreamsTest(SC::TestReport& report) : TestCase(report, "AsyncRequestStreamsTest")
     {
-        if (test_section("file to file"))
-        {
-            fileToFile();
-        }
-
         int numTestsToRun = 1;
         if (AsyncEventLoop::tryLoadingLiburing())
         {
@@ -47,11 +42,58 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
                 // Can't load the system installed x86_64 zlib dll from ARM64 executable
                 continue;
             }
+            if (test_section("file to file"))
+            {
+                fileToFile();
+            }
 
             if (test_section("file to socket to file"))
             {
-                fileToSocketToFile();
+                // Create Event Loop
+                AsyncEventLoop eventLoop;
+                SC_TEST_EXPECT(eventLoop.create(options));
+
+                // Create connected sockets pair
+                SocketDescriptor writable, readable;
+                createAsyncConnectedSockets(eventLoop, writable, readable);
+
+                // Use *SocketStream as readable and writable are two SocketDescriptor
+                // Sockets are duplex so the choice of who is writable and who is readable is just arbitrary
+                fileCompressRemote<ReadableSocketStream, WritableSocketStream>(eventLoop, writable, readable, false);
             }
+
+            if (test_section("file to pipe to file (async)"))
+            {
+                constexpr bool blocking = false;
+                // Create Event Loop
+                AsyncEventLoop eventLoop;
+                SC_TEST_EXPECT(eventLoop.create(options));
+
+                // Create an anonymous non-blocking pipe
+                FileDescriptor writable, readable;
+                createAsyncConnectedPipes(eventLoop, writable, readable, blocking);
+
+                // Use *FileStream as readPipe and writePipe are two FileDescriptor
+                // In Pipes there is a defined writeside and readside so the order of arguments here is important
+                fileCompressRemote<ReadableFileStream, WritableFileStream>(eventLoop, writable, readable, blocking);
+            }
+
+            if (test_section("file to pipe to file (sync)"))
+            {
+                constexpr bool blocking = true;
+                // Create Event Loop
+                AsyncEventLoop eventLoop;
+                SC_TEST_EXPECT(eventLoop.create(options));
+
+                // Create an anonymous blocking pipe
+                FileDescriptor writable, readable;
+                createAsyncConnectedPipes(eventLoop, writable, readable, blocking);
+
+                // Use *FileStream as readPipe and writePipe are two FileDescriptor
+                // In Pipes there is a defined writeside and readside so the order of arguments here is important
+                fileCompressRemote<ReadableFileStream, WritableFileStream>(eventLoop, writable, readable, blocking);
+            }
+
             if (numTestsToRun == 2)
             {
                 // If on Linux next run will test io_uring backend (if it's installed)
@@ -60,36 +102,58 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         }
     }
 
+    void createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,
+                                     SocketDescriptor& readSide);
+    void createAsyncConnectedPipes(AsyncEventLoop& eventLoop, FileDescriptor& writeSide, FileDescriptor& readSide,
+                                   bool blocking);
+
     void fileToFile();
 
-    void fileToSocketToFile();
-
-    void createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& client,
-                                     SocketDescriptor& serverSideClient)
-    {
-        SocketDescriptor serverSocket;
-        uint16_t         tcpPort        = 5050;
-        StringView       connectAddress = "::1";
-        SocketIPAddress  nativeAddress;
-        SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
-        SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
-
-        {
-            SocketServer server(serverSocket);
-            SC_TEST_EXPECT(server.bind(nativeAddress));
-            SC_TEST_EXPECT(server.listen(0));
-        }
-
-        SC_TEST_EXPECT(client.create(nativeAddress.getAddressFamily()));
-        SC_TEST_EXPECT(SocketClient(client).connect(connectAddress, tcpPort));
-        SC_TEST_EXPECT(SocketServer(serverSocket).accept(nativeAddress.getAddressFamily(), serverSideClient));
-        SC_TEST_EXPECT(client.setBlocking(false));
-        SC_TEST_EXPECT(serverSideClient.setBlocking(false));
-
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(client));
-        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(serverSideClient));
-    }
+    template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename DESCRIPTOR_TYPE>
+    void fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide, DESCRIPTOR_TYPE& readSide,
+                            bool useStreamThreadPool);
 };
+
+void SC::AsyncRequestStreamsTest::createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,
+                                                              SocketDescriptor& readSide)
+{
+    SocketDescriptor serverSocket;
+    uint16_t         tcpPort        = 5050;
+    StringView       connectAddress = "::1";
+    SocketIPAddress  nativeAddress;
+    SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
+    SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+
+    {
+        SocketServer server(serverSocket);
+        SC_TEST_EXPECT(server.bind(nativeAddress));
+        SC_TEST_EXPECT(server.listen(0));
+    }
+
+    SC_TEST_EXPECT(writeSide.create(nativeAddress.getAddressFamily()));
+    SC_TEST_EXPECT(SocketClient(writeSide).connect(connectAddress, tcpPort));
+    SC_TEST_EXPECT(SocketServer(serverSocket).accept(nativeAddress.getAddressFamily(), readSide));
+    SC_TEST_EXPECT(writeSide.setBlocking(false));
+    SC_TEST_EXPECT(readSide.setBlocking(false));
+
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(writeSide));
+    SC_TEST_EXPECT(eventLoop.associateExternallyCreatedSocket(readSide));
+}
+void SC::AsyncRequestStreamsTest::createAsyncConnectedPipes(AsyncEventLoop& eventLoop, FileDescriptor& writeSide,
+                                                            FileDescriptor& readSide, bool blocking)
+{
+    PipeDescriptor pipe;
+    PipeOptions    pipeOptions;
+    pipeOptions.blocking = blocking;
+    SC_TEST_EXPECT(pipe.createPipe(pipeOptions));
+    if (not pipeOptions.blocking)
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.writePipe));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(pipe.readPipe));
+    }
+    writeSide = move(pipe.writePipe);
+    readSide  = move(pipe.readPipe);
+}
 
 void SC::AsyncRequestStreamsTest::fileToFile()
 {
@@ -190,23 +254,26 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(fs.removeFiles({"readable.txt", "writeable.txt"}));
 }
 
-void SC::AsyncRequestStreamsTest::fileToSocketToFile()
+template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename DESCRIPTOR_TYPE>
+void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide,
+                                                     DESCRIPTOR_TYPE& readSide, bool useStreamThreadPool)
 {
-    // This test is:
-    // 1. Creates a "source.txt" file on disk filling it with some test data pattern
-    // 2. Creates a readable file stream from  "source.txt"
-    // 3. Creates a TCP socket pair (client server)
-    // 4. Pipes the readable file into one of the two sockets, through a compression transform stream
-    // 5. Pipe the receiving socket into a decompression transform stream, writing to a "destination.txt" file
-    // 6. Once the entire file is read, the first pipeline is forcefully ended by disconnecting the socket
+    // This test:
+    // 1. Accepts a connected pair of sockets or the two sides of a pipe (flowing data from writeSide to readSide)
+    // 2. Creates a "source.txt" file on disk filling it with some test data pattern
+    // 3. Creates a readable file stream for "source.txt" and a writable file stream for "destination.txt"
+    // 4. Pipes the readable file into the writeSide, through a compression transform stream
+    // 5. Pipes the readSide (receiving from writeSide) to a decompression transform stream piped to a writable file
+    // 6. Once the entire file is read, the first pipeline is forcefully ended by closing the two sides
     // 7. This action triggers also ending the second pipeline (as we listen to the disconnected event)
     // 8. Once both pipelines are finished, the event loop has no more active handles ::run() will return
     // 9. Finally the test checks that the written file matches the original one.
 
-    // First pipeline is: FileStream --> Compression --> WriteSocketStream
-    // Second pipeline is: ReadSocketStream --> Decompression --> WriteFileStream
+    // First pipeline is: FileStream --> Compression --> WRITABLE_TYPE
+    // Second pipeline is: READABLE_TYPE --> Decompression --> WriteFileStream
+    // Anything written to WRITABLE_TYPE will be available reading from READABLE_TYPE
 
-    // Generate data and write it to source.txt
+    // Generate test data and write it to source.txt
     Vector<uint64_t> source;
     constexpr auto   numElements = 1 * 1024 / sizeof(uint64_t);
     SC_TEST_EXPECT(source.resizeWithoutInitializing(numElements));
@@ -220,10 +287,6 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     SC_TEST_EXPECT(fs.removeFileIfExists("source.txt"));
     SC_TEST_EXPECT(fs.removeFileIfExists("destination.txt"));
     SC_TEST_EXPECT(fs.write("source.txt", source.toSpanConst().reinterpret_as_span_of<const char>()));
-
-    // Create Event Loop
-    AsyncEventLoop eventLoop;
-    SC_TEST_EXPECT(eventLoop.create(options));
 
     // Allocate transient buffers
     AsyncBuffersPool buffersPool1;
@@ -254,6 +317,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     openModeRead.blocking = true;
     SC_TEST_EXPECT(readFd.open(fileName.view(), openModeRead));
     AsyncTaskSequence readFileTask;
+    readFileStream.request.setDebugName("File Source");
     SC_TEST_EXPECT(readFileStream.request.executeOn(readFileTask, fileThreadPool));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(readFileStream.init(buffersPool1, readFileRequests, eventLoop, readFd));
@@ -267,6 +331,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     openModeWrite.blocking = true;
     SC_TEST_EXPECT(writeFd.open(fileName.view(), openModeWrite));
     AsyncTaskSequence writeFileTask;
+    writeFileStream.request.setDebugName("File Sink");
     SC_TEST_EXPECT(writeFileStream.request.executeOn(writeFileTask, fileThreadPool));
 
     // Allocate transient buffers
@@ -281,27 +346,40 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     {
         SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, buffers2[idx].data));
     }
-
-    // Create sockets pairs
-    SocketDescriptor client[2];
-    createAsyncConnectedSockets(eventLoop, client[0], client[1]);
+    ThreadPool streamPool;
+    if (useStreamThreadPool)
+    {
+        SC_TEST_EXPECT(streamPool.create(2));
+    }
 
     // Create Writable Socket Stream
-    WritableSocketStream         writeSocketStream;
-    AsyncWritableStream::Request writeSocketRequests[numberOfBuffers1 + 1];
-    SC_TEST_EXPECT(writeSocketStream.init(buffersPool1, writeSocketRequests, eventLoop, client[0]));
+    WRITABLE_TYPE                writeSideStream;
+    AsyncWritableStream::Request writeSideRequests[numberOfBuffers1 + 1];
+    SC_TEST_EXPECT(writeSideStream.init(buffersPool1, writeSideRequests, eventLoop, writeSide));
     // Autoclose socket after write stream receives an ::end()
-    SC_TEST_EXPECT(writeSocketStream.registerAutoCloseDescriptor(true));
-    client[0].detach(); // Taken care by registerAutoCloseDescriptor(true)
+    writeSideStream.request.setDebugName("Writable Side");
+    AsyncTaskSequence writeStreamTask;
+    if (useStreamThreadPool)
+    {
+        SC_TEST_EXPECT(writeSideStream.request.executeOn(writeStreamTask, streamPool));
+    }
+    SC_TEST_EXPECT(writeSideStream.registerAutoCloseDescriptor(true));
+    writeSide.detach(); // Taken care by registerAutoCloseDescriptor(true)
 
     // Create Readable Socket Stream
-    ReadableSocketStream         readSocketStream;
-    AsyncReadableStream::Request readSocketRequests[numberOfBuffers2 + 1];
-    SC_TEST_EXPECT(readSocketStream.init(buffersPool2, readSocketRequests, eventLoop, client[1]));
+    READABLE_TYPE                readSideStream;
+    AsyncReadableStream::Request readSideRequests[numberOfBuffers2 + 1];
+    SC_TEST_EXPECT(readSideStream.init(buffersPool2, readSideRequests, eventLoop, readSide));
     // Autoclose socket when socket stream receives an end event signaling socket disconnected
-    SC_TEST_EXPECT(readSocketStream.registerAutoCloseDescriptor(true));
-    client[1].detach(); // Taken care by registerAutoCloseDescriptor(true)
-    (void)readSocketStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    readSideStream.request.setDebugName("Readable Side");
+    AsyncTaskSequence readStreamTask;
+    if (useStreamThreadPool)
+    {
+        SC_TEST_EXPECT(readSideStream.request.executeOn(readStreamTask, streamPool));
+    }
+    SC_TEST_EXPECT(readSideStream.registerAutoCloseDescriptor(true));
+    readSide.detach(); // Taken care by registerAutoCloseDescriptor(true)
+    (void)readSideStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
 
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
@@ -318,7 +396,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
 
     // Create first Async Pipeline (file to socket)
     AsyncDuplexStream*   transforms1[1] = {&compressStream};
-    AsyncWritableStream* sinks1[1]      = {&writeSocketStream};
+    AsyncWritableStream* sinks1[1]      = {&writeSideStream};
     AsyncPipeline        pipeline0;
     (void)pipeline0.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
     SC_TEST_EXPECT(pipeline0.pipe(readFileStream, transforms1, {sinks1}));
@@ -338,7 +416,7 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     AsyncWritableStream* sinks2[1]      = {&writeFileStream};
     AsyncPipeline        pipeline1;
     (void)pipeline1.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    SC_TEST_EXPECT(pipeline1.pipe(readSocketStream, transforms2, {sinks2}));
+    SC_TEST_EXPECT(pipeline1.pipe(readSideStream, transforms2, {sinks2}));
 
     // Start both pipelines
     SC_TEST_EXPECT(pipeline0.start());
@@ -350,8 +428,8 @@ void SC::AsyncRequestStreamsTest::fileToSocketToFile()
     // Cleanup
     SC_TEST_EXPECT(readFd.close());
     SC_TEST_EXPECT(writeFd.close());
-    SC_TEST_EXPECT(not client[0].isValid());
-    SC_TEST_EXPECT(not client[1].isValid());
+    SC_TEST_EXPECT(not writeSide.isValid());
+    SC_TEST_EXPECT(not readSide.isValid());
 
     // Check written file content against source file
     Buffer destination;
