@@ -9,6 +9,9 @@
 #include "Internal/ThreadingPosix.inl"
 #endif
 
+//-------------------------------------------------------------------------------------------------------
+// Thread
+//-------------------------------------------------------------------------------------------------------
 SC::Thread::~Thread() { SC_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
 SC::Result SC::Thread::start(Function<void(Thread&)>&& func)
@@ -46,6 +49,62 @@ SC::Result SC::Thread::detach()
 
 bool SC::Thread::wasStarted() const { return thread.hasValue(); }
 
+//-------------------------------------------------------------------------------------------------------
+// RWLock
+//-------------------------------------------------------------------------------------------------------
+void SC::RWLock::lockRead()
+{
+    mutex.lock();
+    while (writerActive || waitingWriters > 0)
+    {
+        readersQ.wait(mutex);
+    }
+    activeReaders++;
+    mutex.unlock();
+}
+
+void SC::RWLock::unlockRead()
+{
+    mutex.lock();
+    activeReaders--;
+    if (activeReaders == 0 && waitingWriters > 0)
+    {
+        writersQ.signal();
+    }
+    mutex.unlock();
+}
+
+void SC::RWLock::lockWrite()
+{
+    mutex.lock();
+    waitingWriters++;
+    while (writerActive || activeReaders > 0)
+    {
+        writersQ.wait(mutex);
+    }
+    waitingWriters--;
+    writerActive = true;
+    mutex.unlock();
+}
+
+void SC::RWLock::unlockWrite()
+{
+    mutex.lock();
+    writerActive = false;
+    if (waitingWriters > 0)
+    {
+        writersQ.signal();
+    }
+    else
+    {
+        readersQ.broadcast();
+    }
+    mutex.unlock();
+}
+
+//-------------------------------------------------------------------------------------------------------
+// EventObject
+//-------------------------------------------------------------------------------------------------------
 void SC::EventObject::wait()
 {
     mutex.lock();

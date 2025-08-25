@@ -11,6 +11,7 @@ namespace SC
 struct Thread;
 struct ConditionVariable;
 struct Mutex;
+struct RWLock;
 struct EventObject;
 } // namespace SC
 
@@ -164,6 +165,43 @@ struct SC::Thread
     using OpaqueThread = AlignedStorage<sizeof(void*), alignof(void*)>;
     UniqueOptional<OpaqueThread> thread;
     Function<void(Thread&)>      userFunction;
+};
+
+/// @brief A Read-Write lock that allows multiple concurrent readers but only one writer
+///
+/// Example:
+/// @snippet Tests/Libraries/Threading/ThreadingTest.cpp rwlockSnippet
+struct SC::RWLock
+{
+    RWLock()  = default;
+    ~RWLock() = default;
+
+    RWLock(const RWLock&)            = delete;
+    RWLock(RWLock&&)                 = delete;
+    RWLock& operator=(const RWLock&) = delete;
+    RWLock& operator=(RWLock&&)      = delete;
+
+    /// @brief Acquire a read lock. Multiple readers can hold the lock concurrently.
+    void lockRead();
+
+    /// @brief Release a previously acquired read lock
+    void unlockRead();
+
+    /// @brief Acquire a write lock. Only one writer can hold the lock, and no readers can hold it simultaneously.
+    void lockWrite();
+
+    /// @brief Release a previously acquired write lock
+    void unlockWrite();
+
+  private:
+    Mutex mutex;
+
+    ConditionVariable readersQ;
+    ConditionVariable writersQ;
+
+    int  activeReaders  = 0;
+    int  waitingWriters = 0;
+    bool writerActive   = false;
 };
 
 /// @brief An automatically reset event object to synchronize two threads.

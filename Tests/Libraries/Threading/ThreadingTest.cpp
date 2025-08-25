@@ -13,6 +13,7 @@ struct SC::ThreadingTest : public SC::TestCase
     inline void testThread();
     inline void testEventObject();
     inline void testMutex();
+    inline void testRWLock();
 
     ThreadingTest(SC::TestReport& report) : TestCase(report, "ThreadingTest")
     {
@@ -27,6 +28,10 @@ struct SC::ThreadingTest : public SC::TestCase
         if (test_section("Mutex"))
         {
             testMutex();
+        }
+        if (test_section("RWLock"))
+        {
+            testRWLock();
         }
     }
 };
@@ -107,6 +112,59 @@ void SC::ThreadingTest::testMutex()
     SC_TEST_EXPECT(thread2.join());
     SC_TEST_EXPECT(globalVariable == 2);
     //! [mutexSnippet]
+}
+
+void SC::ThreadingTest::testRWLock()
+{
+    //! [rwlockSnippet]
+    constexpr int numReaders    = 3;
+    constexpr int numIterations = 100;
+
+    RWLock rwlock;
+    int    sharedData = 0;
+
+    // Start multiple reader threads
+    Thread readers[numReaders];
+    for (int i = 0; i < numReaders; i++)
+    {
+        auto readerFunc = [&](Thread& thread)
+        {
+            thread.setThreadName(SC_NATIVE_STR("Reader"));
+            for (int j = 0; j < numIterations; j++)
+            {
+                rwlock.lockRead();
+                volatile int value = sharedData; // Prevent optimization
+                (void)value;
+                rwlock.unlockRead();
+                Thread::Sleep(1); // Small delay to increase contention
+            }
+        };
+        SC_TEST_EXPECT(readers[i].start(readerFunc));
+    }
+
+    // Start a writer thread
+    Thread writer;
+    auto   writerFunc = [&](Thread& thread)
+    {
+        thread.setThreadName(SC_NATIVE_STR("Writer"));
+        for (int i = 0; i < numIterations; i++)
+        {
+            rwlock.lockWrite();
+            sharedData++;
+            rwlock.unlockWrite();
+            Thread::Sleep(1); // Small delay to increase contention
+        }
+    };
+    SC_TEST_EXPECT(writer.start(writerFunc));
+
+    // Wait for all threads to finish
+    for (int i = 0; i < numReaders; i++)
+    {
+        SC_TEST_EXPECT(readers[i].join());
+    }
+    SC_TEST_EXPECT(writer.join());
+    SC_TEST_EXPECT(sharedData == numIterations);
+    //! [rwlockSnippet]
 }
 
 namespace SC

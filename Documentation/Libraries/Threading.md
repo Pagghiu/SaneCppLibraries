@@ -23,6 +23,7 @@ Threading is a library defining basic primitives for user-space threading and sy
 | SC::Thread            | @copybrief SC::Thread             |
 | SC::ThreadPool        | @copybrief SC::ThreadPool         |
 | SC::Mutex             | @copybrief SC::Mutex              |
+| SC::RWLock            | @copybrief SC::RWLock             |
 | SC::ConditionVariable | @copybrief SC::ConditionVariable  |
 | SC::Atomic            | @copybrief SC::Atomic             |
 | SC::EventObject       | @copybrief SC::EventObject        |
@@ -62,5 +63,4 @@ This is the list of videos that have been recorded showing some of the internal 
 
 🟦 Complete Features:
 - Support more types in Atomic<T>
-- ReadWrite Lock
 - Barrier
