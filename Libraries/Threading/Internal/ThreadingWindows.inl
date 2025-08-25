@@ -6,7 +6,7 @@
 #include "../Threading.h"
 
 SC::Mutex::Mutex() { ::InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
-SC::Mutex::~Mutex() { ::InitializeCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
+SC::Mutex::~Mutex() { ::DeleteCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
 void SC::Mutex::lock() { ::EnterCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
 void SC::Mutex::unlock() { ::LeaveCriticalSection(&mutex.reinterpret_as<CRITICAL_SECTION>()); }
 

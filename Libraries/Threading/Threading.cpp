@@ -64,6 +64,6 @@ void SC::EventObject::signal()
 {
     mutex.lock();
     isSignaled = true;
-    mutex.unlock();
     cond.signal();
+    mutex.unlock();
 }
