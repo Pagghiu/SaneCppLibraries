@@ -12,6 +12,7 @@ struct Thread;
 struct ConditionVariable;
 struct Mutex;
 struct RWLock;
+struct Barrier;
 struct EventObject;
 } // namespace SC
 
@@ -202,6 +203,29 @@ struct SC::RWLock
     int  activeReaders  = 0;
     int  waitingWriters = 0;
     bool writerActive   = false;
+};
+
+/// @brief A synchronization point that blocks threads until the required number of threads have reached it
+///
+/// Example:
+/// @snippet Tests/Libraries/Threading/ThreadingTest.cpp barrierSnippet
+struct SC::Barrier
+{
+    /// @brief Creates a barrier that waits for the specified number of threads
+    /// @param count The number of threads that must reach the barrier before any can continue
+    Barrier(uint32_t count) : threadCount(count) {}
+
+    /// @brief Wait at the barrier until all threads have reached it
+    void wait();
+
+  private:
+    const uint32_t threadCount;
+
+    uint32_t waitCount  = 0;
+    uint32_t generation = 0;
+    Mutex    mutex;
+
+    ConditionVariable condition;
 };
 
 /// @brief An automatically reset event object to synchronize two threads.

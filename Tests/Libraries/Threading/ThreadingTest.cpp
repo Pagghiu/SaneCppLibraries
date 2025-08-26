@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Atomic.h"
 
 namespace SC
 {
@@ -14,6 +15,7 @@ struct SC::ThreadingTest : public SC::TestCase
     inline void testEventObject();
     inline void testMutex();
     inline void testRWLock();
+    inline void testBarrier();
 
     ThreadingTest(SC::TestReport& report) : TestCase(report, "ThreadingTest")
     {
@@ -32,6 +34,10 @@ struct SC::ThreadingTest : public SC::TestCase
         if (test_section("RWLock"))
         {
             testRWLock();
+        }
+        if (test_section("Barrier"))
+        {
+            testBarrier();
         }
     }
 };
@@ -165,6 +171,49 @@ void SC::ThreadingTest::testRWLock()
     SC_TEST_EXPECT(writer.join());
     SC_TEST_EXPECT(sharedData == numIterations);
     //! [rwlockSnippet]
+}
+
+void SC::ThreadingTest::testBarrier()
+{
+    //! [barrierSnippet]
+    constexpr uint32_t numThreads          = 8;
+    constexpr int      incrementsPerThread = 1000;
+
+    Thread threads[numThreads];
+
+    Barrier barrier(numThreads);
+    struct Context
+    {
+        Barrier&        barrier;
+        Atomic<int32_t> sharedCounter;
+    } ctx = {barrier, 0};
+
+    for (uint32_t i = 0; i < numThreads; i++)
+    {
+        auto threadFunc = [this, &ctx](Thread& thread)
+        {
+            thread.setThreadName(SC_NATIVE_STR("Barrier"));
+
+            // Phase 1: Each thread increments the counter
+            for (int j = 0; j < incrementsPerThread; ++j)
+            {
+                ctx.sharedCounter++;
+            }
+            ctx.barrier.wait();
+
+            // Phase 2: All threads should see the final value
+            SC_TEST_EXPECT(ctx.sharedCounter == numThreads * incrementsPerThread);
+            ctx.barrier.wait();
+        };
+        SC_TEST_EXPECT(threads[i].start(threadFunc));
+    }
+
+    // Wait for all threads to finish
+    for (uint32_t i = 0; i < numThreads; i++)
+    {
+        SC_TEST_EXPECT(threads[i].join());
+    }
+    //! [barrierSnippet]
 }
 
 namespace SC

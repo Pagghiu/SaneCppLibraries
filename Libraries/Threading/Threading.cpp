@@ -103,6 +103,31 @@ void SC::RWLock::unlockWrite()
 }
 
 //-------------------------------------------------------------------------------------------------------
+// Barrier
+//-------------------------------------------------------------------------------------------------------
+void SC::Barrier::wait()
+{
+    mutex.lock();
+    const uint32_t gen = generation;
+    waitCount++;
+
+    if (waitCount == threadCount)
+    {
+        waitCount = 0;
+        generation++;
+        condition.broadcast();
+    }
+    else
+    {
+        while (gen == generation)
+        {
+            condition.wait(mutex);
+        }
+    }
+    mutex.unlock();
+}
+
+//-------------------------------------------------------------------------------------------------------
 // EventObject
 //-------------------------------------------------------------------------------------------------------
 void SC::EventObject::wait()
