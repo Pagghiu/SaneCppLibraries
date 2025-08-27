@@ -24,6 +24,7 @@
 #include "Libraries/Socket/Socket.cpp"
 #include "Libraries/Strings/Strings.cpp"
 #include "Libraries/Testing/Testing.cpp"
+#include "Libraries/Threading/Atomic.cpp"
 #include "Libraries/Threading/ThreadPool.cpp"
 #include "Libraries/Threading/Threading.cpp"
 #include "Libraries/Time/Time.cpp"
