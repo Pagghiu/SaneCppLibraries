@@ -16,6 +16,7 @@ struct SC::ThreadingTest : public SC::TestCase
     inline void testMutex();
     inline void testRWLock();
     inline void testBarrier();
+    inline void testSemaphore();
 
     ThreadingTest(SC::TestReport& report) : TestCase(report, "ThreadingTest")
     {
@@ -38,6 +39,10 @@ struct SC::ThreadingTest : public SC::TestCase
         if (test_section("Barrier"))
         {
             testBarrier();
+        }
+        if (test_section("Semaphore"))
+        {
+            testSemaphore();
         }
     }
 };
@@ -214,6 +219,57 @@ void SC::ThreadingTest::testBarrier()
         SC_TEST_EXPECT(threads[i].join());
     }
     //! [barrierSnippet]
+}
+
+void SC::ThreadingTest::testSemaphore()
+{
+    //! [semaphoreSnippet]
+    constexpr int maxResources        = 2; // Only 2 threads can access resource at once
+    constexpr int numThreads          = 4; // Total number of threads trying to access
+    constexpr int operationsPerThread = 3; // Each thread will do 3 operations
+
+    Semaphore semaphore(maxResources); // Initialize with 2 available resources
+    struct Context
+    {
+        Semaphore& semaphore;
+        Mutex      counterMutex;       // To protect sharedResource counter
+        int        sharedResource = 0; // Counter to verify correct synchronization
+    } ctx{semaphore, {}};
+
+    Thread threads[numThreads];
+    for (int i = 0; i < numThreads; i++)
+    {
+        auto threadFunc = [this, &ctx](Thread& thread)
+        {
+            thread.setThreadName(SC_NATIVE_STR("Worker Thread"));
+            for (int j = 0; j < operationsPerThread; j++)
+            {
+                ctx.semaphore.acquire(); // Wait for resource to be available
+
+                // Critical section
+                ctx.counterMutex.lock();
+                ctx.sharedResource++;
+                SC_TEST_EXPECT(ctx.sharedResource <= maxResources); // Never more than maxResources threads
+                Thread::Sleep(1);                                   // Simulate some work
+                ctx.sharedResource--;
+                ctx.counterMutex.unlock();
+
+                ctx.semaphore.release(); // Release the resource
+                Thread::Sleep(1);        // Give other threads a chance
+            }
+        };
+        SC_TEST_EXPECT(threads[i].start(threadFunc));
+    }
+
+    // Wait for all threads to finish
+    for (int i = 0; i < numThreads; i++)
+    {
+        SC_TEST_EXPECT(threads[i].join());
+    }
+
+    // Verify final state
+    SC_TEST_EXPECT(ctx.sharedResource == 0);
+    //! [semaphoreSnippet]
 }
 
 namespace SC

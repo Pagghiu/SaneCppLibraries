@@ -128,6 +128,30 @@ void SC::Barrier::wait()
 }
 
 //-------------------------------------------------------------------------------------------------------
+// Semaphore
+//-------------------------------------------------------------------------------------------------------
+SC::Semaphore::Semaphore(int initialCount) : count(initialCount) {}
+
+void SC::Semaphore::acquire()
+{
+    mutex.lock();
+    while (count == 0)
+    {
+        condition.wait(mutex);
+    }
+    --count;
+    mutex.unlock();
+}
+
+void SC::Semaphore::release()
+{
+    mutex.lock();
+    ++count;
+    condition.signal();
+    mutex.unlock();
+}
+
+//-------------------------------------------------------------------------------------------------------
 // EventObject
 //-------------------------------------------------------------------------------------------------------
 void SC::EventObject::wait()

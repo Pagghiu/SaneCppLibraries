@@ -14,6 +14,7 @@ struct Mutex;
 struct RWLock;
 struct Barrier;
 struct EventObject;
+struct Semaphore;
 } // namespace SC
 
 //! @defgroup group_threading Threading
@@ -247,6 +248,29 @@ struct SC::EventObject
     Mutex mutex;
 
     ConditionVariable cond;
+};
+
+/// @brief A semaphore synchronization primitive that maintains a count for resource management.
+///
+/// Example:
+/// @snippet Tests/Libraries/Threading/ThreadingTest.cpp semaphoreSnippet
+struct SC::Semaphore
+{
+    /// @brief Creates a semaphore with an initial count
+    /// @param initialCount The initial number of resources available
+    Semaphore(int initialCount = 0);
+
+    /// @brief Wait for a resource to become available
+    void acquire();
+
+    /// @brief Make a resource available
+    void release();
+
+  private:
+    int   count;
+    Mutex mutex;
+
+    ConditionVariable condition;
 };
 
 //! @}
