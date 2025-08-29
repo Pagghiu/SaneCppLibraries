@@ -1,6 +1,6 @@
 @page library_threading Threading
 
-@brief 🟥 Atomic, thread, thread pool, mutex, condition variable
+@brief 🟩 Atomic, thread, thread pool, mutex, semaphore, barrier, rw-lock, condition variable
 
 [TOC]
 
@@ -25,13 +25,14 @@ Threading is a library defining basic primitives for user-space threading and sy
 | SC::Mutex             | @copybrief SC::Mutex              |
 | SC::RWLock            | @copybrief SC::RWLock             |
 | SC::Barrier           | @copybrief SC::Barrier            |
+| SC::Semaphore         | @copybrief SC::Semaphore          |
 | SC::ConditionVariable | @copybrief SC::ConditionVariable  |
 | SC::Atomic            | @copybrief SC::Atomic             |
 | SC::EventObject       | @copybrief SC::EventObject        |
 
 # Status
-🟥 Draft  
-Only the features needed for other libraries have been implemented so far.
+🟩 Usable  
+All the main threading primitives are there.  
 The Atomic header is really only being implemented for a few data types and needs some love to extend and improve it.
 
 # Videos
@@ -55,12 +56,19 @@ This is the list of videos that have been recorded showing some of the internal 
 ## SC::Atomic
 @copydoc SC::Atomic
 
-# Roadmap
-🟨 MVP
-- Scoped Lock / Unlock
+## SC::Semaphore
+@copydoc SC::Semaphore
 
-🟩 Usable
-- Semaphores
+## SC::RWLock
+@copydoc SC::RWLock
+
+## SC::Barrier
+@copydoc SC::Barrier
+
+## SC::ConditionVariable
+@copydoc SC::ConditionVariable
+
+# Roadmap
 
 🟦 Complete Features:
 - Support more types in Atomic<T>

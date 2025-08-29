@@ -56,7 +56,7 @@ Library                                                                         
 [Socket](https://pagghiu.github.io/SaneCppLibraries/library_socket.html)                                        | 🟨 Synchronous socket networking and DNS lookup                           |   855
 [Strings](https://pagghiu.github.io/SaneCppLibraries/library_strings.html)                                      | 🟩 String formatting / conversion / manipulation (UTF8 / UTF16)           |   3362
 [Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                                      | 🟨 Simple testing framework used by all of the other libraries            |   331
-[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟥 Atomic, thread, thread pool, mutex, condition variable                 |   876
+[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟩 Atomic, thread (+pool), mutex, semaphore, barrier, rw-lock, condition  |   876
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                            | 🟨 Time handling (relative, absolute, high resolution)                    |   346
 
 Each library is color-coded to signal its status:  
