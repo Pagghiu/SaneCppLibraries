@@ -30,7 +30,7 @@ namespace detail
 {
 struct SC_COMPILER_EXPORT HttpHeaderOffset
 {
-    HttpParser::Result result = HttpParser::Result::Method;
+    HttpParser::Token token = HttpParser::Token::Method;
 
     uint32_t start  = 0;
     uint32_t length = 0;
@@ -47,10 +47,10 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT ArenaMapKey<HttpServerClie
 struct SC::HttpRequest
 {
     /// @brief Finds a specific HttpParser::Result in the list of parsed header
-    /// @param result The result to look for (Method, Url etc.)
+    /// @param token The result to look for (Method, Url etc.)
     /// @param res A StringView, pointing at headerBuffer containing the found result
     /// @return `true` if the result has been found
-    [[nodiscard]] bool find(HttpParser::Result result, StringView& res) const;
+    [[nodiscard]] bool find(HttpParser::Token token, StringView& res) const;
 
     /// @brief Gets the associated HttpParser
     const HttpParser& getParser() const { return parser; }
@@ -78,17 +78,17 @@ struct SC::HttpResponse
     ArenaMapKey<HttpServerClient> getClientKey() const { return key; }
 
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
-    [[nodiscard]] Result startResponse(int httpCode);
+    Result startResponse(int httpCode);
 
     /// @brief Writes an http header to this response
-    [[nodiscard]] Result addHeader(StringView headerName, StringView headerValue);
+    Result addHeader(StringView headerName, StringView headerValue);
 
     /// @brief Appends some data to the response
-    [[nodiscard]] Result write(Span<const char> data);
+    Result write(Span<const char> data);
 
     /// @brief Finalizes response appending some data
     /// @warning The SC::HttpResponse / SC::HttpRequest pair will be invalidated on next SC::AsyncEventLoop run
-    [[nodiscard]] Result end(Span<const char> data);
+    Result end(Span<const char> data);
 
     HttpServer& getServer() { return *server; }
 
@@ -135,13 +135,13 @@ struct SC::HttpServer
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
     /// @return Valid Result if http listening has been started successfully
-    [[nodiscard]] Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringView address, uint16_t port);
+    Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringView address, uint16_t port);
 
     /// @brief Stops http server asynchronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
-    [[nodiscard]] Result stopAsync();
+    Result stopAsync();
 
     /// @brief Stops http server synchronously waiting for SC::AsyncEventLoop::runNoWait to cancel or close all requests
-    [[nodiscard]] Result stopSync();
+    Result stopSync();
 
     /// @brief Check if the server is started
     [[nodiscard]] bool isStarted() const;

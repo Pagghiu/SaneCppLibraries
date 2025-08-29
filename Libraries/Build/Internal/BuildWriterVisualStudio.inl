@@ -89,7 +89,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return Result(true);
     }
 
-    [[nodiscard]] Result writeConfigurations(StringBuilder& builder, const Project& project)
+    Result writeConfigurations(StringBuilder& builder, const Project& project)
     {
         return forArchitecture(
             builder, project,
@@ -97,7 +97,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             { return writeConfiguration(builder, configuration, platform); });
     }
 
-    [[nodiscard]] Result writeGlobals(StringBuilder& builder, const Project& project)
+    Result writeGlobals(StringBuilder& builder, const Project& project)
     {
         // TODO: Generate GUID
         // c701ae36-fa88-4674-a16f-298fa8444aa5
@@ -413,8 +413,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
-    [[nodiscard]] Result writeForAllArchitectures(StringView tag, StringBuilder& builder, const Project& project,
-                                                  StringView value)
+    Result writeForAllArchitectures(StringView tag, StringBuilder& builder, const Project& project, StringView value)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(
@@ -480,22 +479,21 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
-    [[nodiscard]] Result prepare(const Project& project, Renderer& renderer)
+    Result prepare(const Project& project, Renderer& renderer)
     {
         renderer.renderItems.clear();
         SC_TRY(fillVisualStudioFiles(directories.projectsDirectory.view(), project, renderer.renderItems));
         return Result(true);
     }
 
-    [[nodiscard]] Result fillVisualStudioFiles(StringView projectDirectory, const Project& project,
-                                               Vector<RenderItem>& outputFiles)
+    Result fillVisualStudioFiles(StringView projectDirectory, const Project& project, Vector<RenderItem>& outputFiles)
     {
         SC_TRY(WriterInternal::renderProject(projectDirectory, project, filePathsResolver, outputFiles));
         return Result(true);
     }
 
     // Project
-    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
+    Result writeProject(StringBuilder& builder, const Project& project, Renderer& renderer)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n");

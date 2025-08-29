@@ -55,7 +55,7 @@ struct FileSystemFinder
 struct ProcessLimiter
 {
     /// @brief Create the process limiter with an hint of maximum number of processes to allow
-    [[nodiscard]] Result create(size_t maxProcessesHint, Span<AsyncProcessExit> processExitPool)
+    Result create(size_t maxProcessesHint, Span<AsyncProcessExit> processExitPool)
     {
         processResult = Result(true);
         if (processExitPool.sizeInElements() < maxProcessesHint)
@@ -72,7 +72,7 @@ struct ProcessLimiter
 
     /// @brief Waits for any process still running and free the resources created by event loop
     /// @return Invalid result if any process returned non zero value
-    [[nodiscard]] Result close()
+    Result close()
     {
         SC_TRY(eventLoop.run()); // wait for outstanding tasks
         SC_TRY(eventLoop.close());
@@ -80,7 +80,7 @@ struct ProcessLimiter
     }
 
     /// @brief Launches a new background process eventually blocking until one slot becomes available
-    [[nodiscard]] Result launch(Span<const StringSpan> arguments)
+    Result launch(Span<const StringSpan> arguments)
     {
         while (availableProcessMonitors.isEmpty())
         {

@@ -32,7 +32,7 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     /// @brief Loads a dynamic library at given path
     /// @param fullPath Path where dynamic library exists
     /// @return Valid Result if dynamic library has been loaded successfully
-    [[nodiscard]] Result load(StringView fullPath);
+    Result load(StringView fullPath);
 
     /// @brief Obtains a function pointer exported from the dynamic library, casting to the wanted signature
     /// @tparam R Return type of the function exported from dynamic library
@@ -41,7 +41,7 @@ struct SC::SystemDynamicLibrary : public SC::UniqueHandle<SC::detail::SystemDyna
     /// @param[out] symbol The function pointer that has been read from the dynamic library
     /// @return `true` if a symbol with the given `symbolName` exists in the library
     template <typename R, typename... Args>
-    [[nodiscard]] Result getSymbol(StringView symbolName, R (*&symbol)(Args...)) const
+    Result getSymbol(StringView symbolName, R (*&symbol)(Args...)) const
     {
         return loadSymbol(symbolName, reinterpret_cast<void*&>(symbol));
     }

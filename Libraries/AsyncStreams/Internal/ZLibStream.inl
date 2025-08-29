@@ -3,7 +3,6 @@
 #pragma once
 
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Result.h"
 #include "ZLibStream.h"
 
 #include "ZLibAPI.h"

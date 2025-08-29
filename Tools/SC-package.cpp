@@ -7,8 +7,7 @@ namespace SC
 {
 namespace Tools
 {
-[[nodiscard]] Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                    Package& package)
+Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     // https://github.com/doxygen/doxygen/releases/download/Release_1_12_0/Doxygen-1.12.0.dmg
     static constexpr StringView packageVersion     = "1.12.0";
@@ -92,8 +91,8 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                              Package& package)
+Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                Package& package)
 {
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
@@ -113,8 +112,7 @@ namespace Tools
 }
 
 // 7zr.exe is needed to extract 7zip installer on windows
-[[nodiscard]] Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                  Package& package)
+Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
@@ -148,8 +146,7 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                 Package& package)
+Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     Package         sevenZipRPackage;
     CustomFunctions functions;
@@ -276,7 +273,7 @@ Result clangFormatMatchesVersion(StringView versionString, StringView wantedMajo
     return Result(true);
 }
 
-[[nodiscard]] Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
+Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath)
 {
     StringView       clangFormatExecutable;
     SmallString<255> version;
@@ -340,8 +337,7 @@ Result clangFormatMatchesVersion(StringView versionString, StringView wantedMajo
     return clangFormatMatchesVersion(version.view(), wantedMajorVersion);
 }
 
-[[nodiscard]] Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                          Package& package)
+Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     Package         sevenZipPackage;
     CustomFunctions functions;

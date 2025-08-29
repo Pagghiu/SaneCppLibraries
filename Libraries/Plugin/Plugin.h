@@ -84,12 +84,12 @@ struct SC::PluginDefinition
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled dynamic library from plugin
     /// @return Valid result if string can be allocated successfully
-    [[nodiscard]] Result getDynamicLibraryAbsolutePath(String& fullDynamicPath) const;
+    Result getDynamicLibraryAbsolutePath(String& fullDynamicPath) const;
 
     /// @brief Gets absolute path of where compiled Program Database File will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled Program Database File from plugin
     /// @return Valid result if string can be allocated successfully
-    [[nodiscard]] Result getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const;
+    Result getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const;
 
   private:
     [[nodiscard]] static bool parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value);
@@ -154,9 +154,9 @@ struct SC::PluginCompiler
   private:
     mutable native_char_t buffer[4096];
 
-    [[nodiscard]] Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                                     const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
-                                     StringView objectFile, String& compilerLog) const;
+    Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
+                       const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
+                       StringView objectFile, String& compilerLog) const;
     struct Internal;
 };
 
@@ -217,8 +217,8 @@ struct SC::PluginDynamicLibrary
     bool (*pluginQueryInterface)(void* instance, uint32_t hash, void** instanceInterface) = nullptr;
 
     friend struct PluginRegistry;
-    [[nodiscard]] Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
-    [[nodiscard]] Result unload();
+    Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
+    Result unload();
 };
 
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
@@ -246,19 +246,18 @@ struct SC::PluginRegistry
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
-    [[nodiscard]] Result loadPlugin(const StringView identifier, const PluginCompiler& compiler,
-                                    const PluginSysroot& sysroot, StringView executablePath,
-                                    LoadMode loadMode = LoadMode::Load);
+    Result loadPlugin(const StringView identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
+                      StringView executablePath, LoadMode loadMode = LoadMode::Load);
 
     /// @brief Unloads an already loaded plugin by its identifier
     /// @param identifier Identifier of a plugin that must be unloaded
     /// @return Valid Result if an already loaded plugin exists with the given identifier and it can be unloaded
-    [[nodiscard]] Result unloadPlugin(const StringView identifier);
+    Result unloadPlugin(const StringView identifier);
 
     /// @brief Removes all temporary build products of the Plugin with given identifier
     /// @param identifier Identifier of the plugin
     /// @return Valid Result if all build products for the given plugin can be successfully removed
-    [[nodiscard]] Result removeAllBuildProducts(const StringView identifier);
+    Result removeAllBuildProducts(const StringView identifier);
 
     /// @brief Find a PluginDynamicLibrary in the registry with a given identifier
     /// @param identifier Identifier of the Plugin to find

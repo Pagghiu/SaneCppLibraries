@@ -38,10 +38,10 @@ struct Tool
 };
 struct Package;
 // Tools
-[[nodiscard]] Result runFormatTool(Tool::Arguments& arguments);
-[[nodiscard]] Result runBuildTool(Tool::Arguments& arguments);
-[[nodiscard]] Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr);
-[[nodiscard]] Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath);
+Result runFormatTool(Tool::Arguments& arguments);
+Result runBuildTool(Tool::Arguments& arguments);
+Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package = nullptr);
+Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, String& foundPath);
 } // namespace Tools
 
 } // namespace SC

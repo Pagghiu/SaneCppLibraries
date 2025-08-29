@@ -61,7 +61,7 @@ static Result formatSourceFiles(FormatSources action, StringView clangFormatExec
     SC_TRY(FileSystemFinder::forEachFile(libraryDirectory, {".h", ".cpp", ".inl"}, {"_Build"}, formatSourceFile));
     return processLimiter.close();
 }
-[[nodiscard]] Result runFormatTool(Tool::Arguments& arguments)
+Result runFormatTool(Tool::Arguments& arguments)
 {
     SmallString<256> clangFormat;
     if (not Tools::findSystemClangFormat(arguments.console, "19", clangFormat))

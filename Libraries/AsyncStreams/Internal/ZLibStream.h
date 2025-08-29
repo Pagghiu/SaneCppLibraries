@@ -38,20 +38,20 @@ struct ZLibStream
     /// @brief Inits the compressor / decompressor with the required algorithm
     /// @param wantedAlgorithm Wanted algorithm (ZLIB, GZIP or DEFLATE with compression or decompression)
     /// @return Valid Result if the algorithm has been inited successfully
-    [[nodiscard]] Result init(Algorithm wantedAlgorithm);
+    Result init(Algorithm wantedAlgorithm);
 
     /// @brief Add data to be processed. Can be called multiple times before ZLibStream::finalize.
     /// @param input Span containing data to be processed, that will be modified pointing to data not (yet)
     /// processed due to insufficient output space.
     /// @param output Writable memory receiving processed data. It will then point to unused memory.
     /// @return Valid Result if data has been processed successfully
-    [[nodiscard]] Result process(Span<const char>& input, Span<char>& output);
+    Result process(Span<const char>& input, Span<char>& output);
 
     /// @brief Finalize stream by computing CRC or similar footers if needed (depending on the choosen Algorithm)
     /// @param output Writable memory receiving processed data. It will then point to unused memory.
     /// @param streamEnded Will be set to `true` if the stream has ended.
     /// @return Valid Result if no error has happened during finalization
-    [[nodiscard]] Result finalize(Span<char>& output, bool& streamEnded);
+    Result finalize(Span<char>& output, bool& streamEnded);
 
   private:
     struct Internal;

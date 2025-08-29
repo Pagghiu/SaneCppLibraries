@@ -209,8 +209,7 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
-    AsyncBuffersPool pool;
-    pool.buffers = {buffers, numberOfBuffers};
+    AsyncBuffersPool pool = {buffers};
 
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
@@ -300,8 +299,7 @@ void SC::AsyncStreamsTest::writableStream()
     {
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
     }
-    AsyncBuffersPool pool;
-    pool.buffers = {buffers, numberOfBuffers};
+    AsyncBuffersPool pool = {buffers};
 
     AsyncWritableStream          writable;
     AsyncWritableStream::Request writeRequestsQueue[numberOfBuffers + 1]; // Only N-1 slots will be used

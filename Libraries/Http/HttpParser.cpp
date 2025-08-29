@@ -40,7 +40,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
     readBytes = 0;
     if (type == Type::Request)
     {
-        if (result == Result::HeadersEnd)
+        if (token == Token::HeadersEnd)
         {
             if (state == State::Result)
             {
@@ -51,7 +51,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
     }
     else
     {
-        if (result == Result::Body)
+        if (token == Token::Body)
         {
             if (state == State::Result)
             {
@@ -78,7 +78,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         globalLength = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseMethod, Result::Method>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseMethod, Token::Method>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
         //------------------------
@@ -91,7 +91,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseUrl, Result::Url>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseUrl, Token::Url>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
         //------------------------
@@ -104,7 +104,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseVersion<false>, Result::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<false>, Token::Version>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
     }
@@ -117,7 +117,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseVersion<true>, Result::Version>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseVersion<true>, Token::Version>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
 
@@ -128,7 +128,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseStatusCode, Result::StatusCode>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseStatusCode, Token::StatusCode>(data, readBytes, parsedData)));
             statusCode = static_cast<uint32_t>(number);
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
@@ -142,7 +142,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
         matchIndex   = 0;
         do
         {
-            SC_TRY((process<&HttpParser::parseHeaderValue, Result::StatusString>(data, readBytes, parsedData)));
+            SC_TRY((process<&HttpParser::parseHeaderValue, Token::StatusString>(data, readBytes, parsedData)));
             SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
         } while (state == State::Parsing);
     }
@@ -163,7 +163,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
             matchIndex   = 0;
             do
             {
-                SC_TRY((process<&HttpParser::parseHeadersEnd, Result::HeadersEnd>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeadersEnd, Token::HeadersEnd>(data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
             } while (state == State::Parsing);
             if (type == Type::Request)
@@ -180,8 +180,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 //------------------------
                 // Parse Body
                 //------------------------
-                state  = State::Parsing;
-                result = Result::Body;
+                state = State::Parsing;
+                token = Token::Body;
                 do
                 {
                     {
@@ -219,7 +219,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
             matchIndex   = 0;
             do
             {
-                SC_TRY((process<&HttpParser::parseHeaderName, Result::HeaderName>(data, readBytes, parsedData)));
+                SC_TRY((process<&HttpParser::parseHeaderName, Token::HeaderName>(data, readBytes, parsedData)));
                 SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
             } while (state == State::Parsing);
 
@@ -235,7 +235,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY((process<&HttpParser::parseNumberValue, Result::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseNumberValue, Token::HeaderValue>(data, readBytes, parsedData)));
                     contentLength = static_cast<uint32_t>(number);
                     SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
                 } while (state == State::Parsing);
@@ -252,7 +252,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 matchIndex   = 0;
                 do
                 {
-                    SC_TRY((process<&HttpParser::parseHeaderValue, Result::HeaderValue>(data, readBytes, parsedData)));
+                    SC_TRY((process<&HttpParser::parseHeaderValue, Token::HeaderValue>(data, readBytes, parsedData)));
                     SC_CO_RETURN(topLevelCoroutine, SC::Result(true));
                 } while (state == State::Parsing);
             }
@@ -270,14 +270,15 @@ bool SC::HttpParser::matchesHeader(HeaderType headerName) const
     return matchingHeaderValid[headerIndex];
 }
 
-template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Result currentResult>
+template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Token currentResult>
 SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData)
 {
-    result                   = currentResult;
-    state                    = State::Parsing;
     const auto initialStart  = tokenStart;
     const auto initialLength = tokenLength;
-    readBytes                = 0;
+
+    token     = currentResult;
+    state     = State::Parsing;
+    readBytes = 0;
     for (auto c : data)
     {
         tokenLength++;

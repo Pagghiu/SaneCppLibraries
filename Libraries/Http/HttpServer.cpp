@@ -8,10 +8,10 @@
 #include "../Strings/StringBuilder.h"
 
 // HttpRequest
-bool SC::HttpRequest::find(HttpParser::Result result, StringView& res) const
+bool SC::HttpRequest::find(HttpParser::Token token, StringView& res) const
 {
     size_t found = 0;
-    if (headerOffsets.find([result](const auto& it) { return it.result == result; }, &found))
+    if (headerOffsets.find([token](const auto& it) { return it.token == token; }, &found))
     {
         const HttpHeaderOffset& header = headerOffsets[found];
         res = StringView({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
@@ -201,14 +201,14 @@ SC::Result SC::HttpServer::Internal::parse(HttpRequest& request, const uint32_t 
         if (parser.state == HttpParser::State::Result)
         {
             detail::HttpHeaderOffset header;
-            header.result = parser.result;
+            header.token  = parser.token;
             header.start  = static_cast<uint32_t>(parser.tokenStart);
             header.length = static_cast<uint32_t>(parser.tokenLength);
             parsedSuccessfully &= request.headerOffsets.push_back(header);
-            if (parser.result == HttpParser::Result::HeadersEnd)
+            if (parser.token == HttpParser::Token::HeadersEnd)
             {
                 request.headersEndReceived = true;
-                SC_TRY(request.find(HttpParser::Result::Url, request.url));
+                SC_TRY(request.find(HttpParser::Token::Url, request.url));
                 break;
             }
         }

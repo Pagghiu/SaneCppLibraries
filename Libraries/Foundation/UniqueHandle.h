@@ -39,7 +39,7 @@ struct UniqueHandle
     /// @brief Move assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param other The handle to be move-assigned
     /// @return Returns invalid result if close failed
-    [[nodiscard]] Result assign(UniqueHandle&& other)
+    Result assign(UniqueHandle&& other)
     {
         if (other.handle == handle)
             return Result(false);
@@ -55,7 +55,7 @@ struct UniqueHandle
     /// @brief Copy assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param externalHandle The handle to be copy assigned
     /// @return Returns invalid result if close failed
-    [[nodiscard]] Result assign(const Handle& externalHandle)
+    Result assign(const Handle& externalHandle)
     {
         if (handle == externalHandle)
             return Result(false);
@@ -84,7 +84,7 @@ struct UniqueHandle
     /// @param outHandle Output native OS handle
     /// @param invalidReturnType the value to be returned if this function fails
     /// @return invalidReturnType if isValid() == `false`
-    [[nodiscard]] Result get(Handle& outHandle, Result invalidReturnType) const
+    Result get(Handle& outHandle, Result invalidReturnType) const
     {
         if (isValid())
         {
@@ -96,7 +96,7 @@ struct UniqueHandle
 
     /// @brief Closes the handle by calling its OS specific close function
     /// @return `true` if the handle was closed correctly
-    [[nodiscard]] Result close()
+    Result close()
     {
         if (isValid())
         {

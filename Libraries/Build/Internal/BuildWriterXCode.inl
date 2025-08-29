@@ -1030,8 +1030,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] Result writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer,
-                                     StringView filename)
+    Result writeScheme(StringBuilder& builder, const Project& project, Renderer& renderer, StringView filename)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         String output;

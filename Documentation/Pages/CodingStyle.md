@@ -50,7 +50,7 @@ Example:
 struct MyClass
 {
     [[nodiscard]] bool canFail(){ ... }
-    [[nodiscard]] SC::Result alsoThisCanFail(){ ... }
+    SC::Result alsoThisCanFail(){ ... }
 }
 
 void myFunction(MyClass& stuff)

@@ -124,7 +124,7 @@ struct SocketIPAddress
     /// @param interfaceAddress A valid IPV4 or IPV6 address expressed as an ASCII string
     /// @param port The port to connect to
     /// @return A valid Result if the address has been parsed successfully
-    [[nodiscard]] Result fromAddressPort(StringSpan interfaceAddress, uint16_t port);
+    Result fromAddressPort(StringSpan interfaceAddress, uint16_t port);
 
     /// @brief Size of the native IP Address representation
     [[nodiscard]] uint32_t sizeOfHandle() const;
@@ -168,11 +168,11 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
     /// @param blocking If the socket should be created in blocking mode
     /// @param inheritable If the socket should be inheritable by child processes
     /// @return Valid Result if a socket with the requested options has been successfully created
-    [[nodiscard]] Result create(SocketFlags::AddressFamily   addressFamily,
-                                SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
-                                SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
-                                SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
-                                SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
+    Result create(SocketFlags::AddressFamily   addressFamily,
+                  SocketFlags::SocketType      socketType  = SocketFlags::SocketStream,
+                  SocketFlags::ProtocolType    protocol    = SocketFlags::ProtocolTcp,
+                  SocketFlags::BlockingType    blocking    = SocketFlags::Blocking,
+                  SocketFlags::InheritableType inheritable = SocketFlags::NonInheritable);
 
     /// @brief Check if socket is inheritable by child processes
     /// @param[out] value if set to `true` indicates that this socket is inheritable by child processes
@@ -212,24 +212,24 @@ struct SocketServer
 
     /// @brief Calls SocketDescriptor::close
     /// @return The Result of SocketDescriptor::close
-    [[nodiscard]] Result close();
+    Result close();
 
     /// @brief Binds this socket to a given address / port combination
     /// @param nativeAddress The interface ip address and port to start listening to
     /// @return Valid Result if this socket has successfully been bound
-    [[nodiscard]] Result bind(SocketIPAddress nativeAddress);
+    Result bind(SocketIPAddress nativeAddress);
 
     /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
     /// @return Valid Result if this socket has successfully been put in listening mode
     /// @note UDP socket cannot be listened. TCP socket need a successful SocketServer::bind before SocketServer::listen
-    [[nodiscard]] Result listen(uint32_t numberOfWaitingConnections);
+    Result listen(uint32_t numberOfWaitingConnections);
 
     /// @brief Accepts a new client, blocking while waiting for it
     /// @param[in] addressFamily The address family of the SocketDescriptor that will be created
     /// @param[out] newClient The SocketDescriptor that will be accepted
     /// @return Valid Result if the socket has been successfully accepted
-    [[nodiscard]] Result accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
+    Result accept(SocketFlags::AddressFamily addressFamily, SocketDescriptor& newClient);
 
   private:
     SocketDescriptor& socket;
@@ -256,30 +256,30 @@ struct SocketClient
     /// @param port Port to start listening to
     /// @return Valid Result if this client successfully connected to the specified address and port
     /// @note Socket descriptor MUST have already been created with SocketDescriptor::create
-    [[nodiscard]] Result connect(StringSpan address, uint16_t port);
+    Result connect(StringSpan address, uint16_t port);
 
     /// @brief Connect to a given address and port combination
     /// @param ipAddress Address and port to connect to
     /// @return Valid Result if this client successfully connected to the specified address and port
-    [[nodiscard]] Result connect(SocketIPAddress ipAddress);
+    Result connect(SocketIPAddress ipAddress);
 
     /// @brief Writes bytes to this socket
     /// @param data Bytes to write to this socket
     /// @return Valid Result if bytes have been written successfully
-    [[nodiscard]] Result write(Span<const char> data);
+    Result write(Span<const char> data);
 
     /// @brief Read bytes from this socket blocking until they're actually received
     /// @param[in] data Span of memory pointing at a buffer that will receive the read data
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @return Valid Result if bytes have been read successfully
-    [[nodiscard]] Result read(Span<char> data, Span<char>& readData);
+    Result read(Span<char> data, Span<char>& readData);
 
     /// @brief Read bytes from this socket blocking until they're actually received or timeout occurs
     /// @param[in] data Span of memory pointing at a buffer that will receive the read data
     /// @param[out] readData A sub-Span of `data` that has the length of actually read bytes
     /// @param[in] timeout For how many milliseconds the read should wait before timing out
     /// @return Valid Result if bytes have been read successfully and timeout didn't occur
-    [[nodiscard]] Result readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout);
+    Result readWithTimeout(Span<char> data, Span<char>& readData, int64_t timeout);
 
   private:
     const SocketDescriptor& socket;

@@ -7,7 +7,7 @@ namespace SC
 {
 namespace Tools
 {
-[[nodiscard]] Result installSokol(const Build::Directories& directories, Package& package)
+Result installSokol(const Build::Directories& directories, Package& package)
 {
     Download download;
     download.packagesCacheDirectory   = directories.packagesCacheDirectory;
@@ -28,7 +28,7 @@ namespace Tools
     return Result(true);
 }
 
-[[nodiscard]] Result installDearImGui(const Build::Directories& directories, Package& package)
+Result installDearImGui(const Build::Directories& directories, Package& package)
 {
     Download download;
     download.packagesCacheDirectory   = directories.packagesCacheDirectory;

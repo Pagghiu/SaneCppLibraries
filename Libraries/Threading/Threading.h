@@ -137,7 +137,7 @@ struct SC::Thread
 
     /// @brief Starts the new thread with given name and func
     /// @param func     Function running on thread. Must be a valid pointer to action for the entire duration of thread.
-    [[nodiscard]] Result start(Function<void(Thread&)>&& func);
+    Result start(Function<void(Thread&)>&& func);
 
     /// @brief Sets current thread name ONLY if called from inside the thread.
     /// @param name The name of the thread
@@ -146,12 +146,12 @@ struct SC::Thread
 
     /// @brief Waits for thread to finish and releases its resources
     /// @return Valid Result if thread has finished
-    [[nodiscard]] Result join();
+    Result join();
 
     /// @brief Detaches the thread so that its resources are automatically released back to the system without
     /// Thread::join
     /// @return Valid Result if thread has been detached
-    [[nodiscard]] Result detach();
+    Result detach();
 
     /// @brief Check if thread has been started
     /// @return `true` if thread has been started

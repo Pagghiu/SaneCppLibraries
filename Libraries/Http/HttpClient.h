@@ -24,17 +24,14 @@ struct SC::HttpClient
     /// @param loop The AsyncEventLoop to use for monitoring network packets
     /// @param url The url to `GET`
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
-    [[nodiscard]] Result get(AsyncEventLoop& loop, StringView url);
+    Result get(AsyncEventLoop& loop, StringView url);
 
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringView sent by the server
     [[nodiscard]] StringView getResponse() const;
 
-    [[nodiscard]] Result setCustomDebugName(const StringView debugName)
-    {
-        return Result(customDebugName.assign(debugName));
-    }
+    Result setCustomDebugName(const StringView debugName) { return Result(customDebugName.assign(debugName)); }
 
   private:
     void onConnected(AsyncSocketConnect::Result& result);

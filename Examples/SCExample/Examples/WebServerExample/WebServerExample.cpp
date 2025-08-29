@@ -176,13 +176,13 @@ struct WebServerExample : public SC::ISCExample
 
     [[nodiscard]] bool close() { return true; }
 
-    [[nodiscard]] SC::Result initAsync(SC::AsyncEventLoop& eventLoop)
+    SC::Result initAsync(SC::AsyncEventLoop& eventLoop)
     {
         model.eventLoop = &eventLoop;
         return SC::Result(true);
     }
 
-    [[nodiscard]] SC::Result closeAsync(SC::AsyncEventLoop&) { return model.stop(); }
+    SC::Result closeAsync(SC::AsyncEventLoop&) { return model.stop(); }
 
     void draw() { (void)view.draw(model); }
 

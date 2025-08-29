@@ -29,15 +29,15 @@ struct SC::HttpURLParser
     /// @brief Parse StringView representing an URL
     /// @param url The url to be parsed
     /// @return Valid Result if parse was successful
-    [[nodiscard]] Result parse(StringView url);
+    Result parse(StringView url);
 
   private:
-    [[nodiscard]] Result parsePath();
-    [[nodiscard]] Result parseHost();
-    [[nodiscard]] Result validateProtocol();
-    [[nodiscard]] Result validatePath();
-    [[nodiscard]] Result validateHost();
-    [[nodiscard]] Result parseUserPassword(StringView userPassword);
+    Result parsePath();
+    Result parseHost();
+    Result validateProtocol();
+    Result validatePath();
+    Result validateHost();
+    Result parseUserPassword(StringView userPassword);
 };
 
 //! @}

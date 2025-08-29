@@ -395,7 +395,7 @@ struct Project
     [[nodiscard]] bool removeFiles(StringView subdirectory, StringView filter);
 
     /// @brief Validates this project for it to contain a valid combination of flags
-    [[nodiscard]] Result validate() const;
+    Result validate() const;
 };
 
 /// @brief Groups multiple Project together with shared compile and link flags
@@ -408,7 +408,7 @@ struct Workspace
     Vector<Project> projects; ///< List of projects in this workspace
 
     /// @brief Validates all projects in this workspace
-    [[nodiscard]] Result validate() const;
+    Result validate() const;
 };
 
 /// @brief Collects all directories used during build generation

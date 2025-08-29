@@ -229,7 +229,7 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     return Result(true);
 }
 
-[[nodiscard]] Result runBuildTool(Tool::Arguments& arguments)
+Result runBuildTool(Tool::Arguments& arguments)
 {
     if (arguments.action == "configure")
     {

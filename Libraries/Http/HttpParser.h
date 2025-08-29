@@ -37,27 +37,27 @@ struct SC::HttpParser
         Finished, ///< Parser has finished
     };
 
-    /// @brief One possible Result reported by the parser
-    enum class Result
+    /// @brief One possible Token reported by the parser
+    enum class Token
     {
         Method,       ///< Http method has been found
         Url,          ///< Http url has been found
         Version,      ///< Http version number has been found
         HeaderName,   ///< Name of an http header has been found
         HeaderValue,  ///< Value of an http header has been found
-        HeadersEnd,   ///< Lash http header has been found
+        HeadersEnd,   ///< Last http header has been found
         StatusCode,   ///< Http status code has been found
         StatusString, ///< Http status string has been found
         Body          ///< Start of http body has been found
     };
 
-    Result result = Result::HeadersEnd; ///< Last found result
-    State  state  = State::Parsing;     ///< Current state of the parser
+    Token token = Token::HeadersEnd; ///< Last found result
+    State state = State::Parsing;    ///< Current state of the parser
 
     /// @brief Type of the stream to be parsed (Request or Response)
     enum class Type
     {
-        Request, ///< Stream to be parsed is an Http request from a client
+        Request, ///< Stream to be parsed is an http request from a client
         Response ///< Stream to be parsed is an http response from a server
     };
     Type type = Type::Request; ///< Type of http stream (request or response)
@@ -67,7 +67,7 @@ struct SC::HttpParser
     /// @param readBytes Number of bytes actually read
     /// @param parsedData A sub-span of `data` pointing at the actually parsed data
     /// @return Valid result if parse didn't encounter any error
-    [[nodiscard]] SC::Result parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
+    Result parse(Span<const char> data, size_t& readBytes, Span<const char>& parsedData);
 
     /// @brief Header types
     enum class HeaderType
@@ -103,8 +103,8 @@ struct SC::HttpParser
     template <bool spaces>
     [[nodiscard]] bool parseVersion(char currentChar);
 
-    template <bool (HttpParser::*Func)(char), Result currentResult>
-    [[nodiscard]] SC::Result process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
+    template <bool (HttpParser::*Func)(char), Token currentResult>
+    Result process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData);
 };
 
 //! @}

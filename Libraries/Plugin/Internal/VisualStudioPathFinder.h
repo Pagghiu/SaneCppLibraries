@@ -26,7 +26,7 @@ struct VisualStudioPathFinder
     /// @brief Finds newest version of the installed Visual Studio instance(s)
     /// @param[out] vsPath Path where Visual Studio is installed
     /// @return Valid Result if a Visual Studio path has been found successfully
-    [[nodiscard]] Result findLatest(String& vsPath)
+    Result findLatest(String& vsPath)
     {
         if (vswherePath.isEmpty())
             return Result::Error("Visual Studio Locator not found.");
@@ -42,7 +42,7 @@ struct VisualStudioPathFinder
     /// @brief Collects every Visual Studio version that installed on the current system
     /// @param[out] vsPaths List of installed Visual Studio path(s)
     /// @return Valid Result if VS paths has been collected successfully
-    [[nodiscard]] Result findAll(Vector<String>& vsPaths)
+    Result findAll(Vector<String>& vsPaths)
     {
         if (vswherePath.isEmpty())
             return Result::Error("Visual Studio Locator not found.");

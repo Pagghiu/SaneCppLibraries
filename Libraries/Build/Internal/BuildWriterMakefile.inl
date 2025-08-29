@@ -22,7 +22,7 @@ struct SC::Build::ProjectWriter::WriterMakefile
     using RenderGroup = WriterInternal::RenderGroup;
     using Renderer    = WriterInternal::Renderer;
 
-    [[nodiscard]] Result writeMakefile(StringBuilder& builder, const Workspace& workspace, Renderer& renderer)
+    Result writeMakefile(StringBuilder& builder, const Workspace& workspace, Renderer& renderer)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(ifeq ($(VERBOSE), 1)
@@ -170,8 +170,8 @@ endif
         return Result(true);
     }
 
-    [[nodiscard]] Result writeProject(StringBuilder& builder, const Project& project, const Renderer& renderer,
-                                      const RelativeDirectories& relativeDirectories)
+    Result writeProject(StringBuilder& builder, const Project& project, const Renderer& renderer,
+                        const RelativeDirectories& relativeDirectories)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         SmallString<255> makeTarget;
@@ -249,7 +249,7 @@ endif # $(CONFIG)
         return Result(true);
     }
 
-    [[nodiscard]] Result sanitizeName(StringView input, String& output)
+    Result sanitizeName(StringView input, String& output)
     {
         SC_TRY_MSG(not input.isEmpty(), "Project name is empty");
         // TODO: Actually implement name sanitization
@@ -750,10 +750,9 @@ $({0}_TARGET_DIR):
         SC_COMPILER_WARNING_POP;
     }
 
-    [[nodiscard]] Result writeConfiguration(StringBuilder& builder, const Project& project,
-                                            const Configuration&       configuration,
-                                            const RelativeDirectories& relativeDirectories, StringView makeTarget,
-                                            StringView configName)
+    Result writeConfiguration(StringBuilder& builder, const Project& project, const Configuration& configuration,
+                              const RelativeDirectories& relativeDirectories, StringView makeTarget,
+                              StringView configName)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         CompileFlags        compileFlags;

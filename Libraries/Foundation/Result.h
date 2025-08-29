@@ -8,7 +8,7 @@ namespace SC
 //! @{
 
 /// @brief An ascii string used as boolean result. #SC_TRY macro forwards errors to caller.
-struct [[nodiscard]] Result
+struct Result
 {
     /// @brief If == nullptr then Result is valid. If != nullptr it's the reason of the error
     const char* message;

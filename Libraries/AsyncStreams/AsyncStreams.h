@@ -230,7 +230,7 @@ struct AsyncWritableStream
     /// @brief Write a C-string literal in the stream
     /// @return Invalid Result if write queue is full or if there are no available buffers in the pool
     template <size_t N>
-    [[nodiscard]] Result write(const char (&str)[N])
+    Result write(const char (&str)[N])
     {
         return write(Span<const char>(str, N - 1));
     }
