@@ -329,8 +329,54 @@ def update_libraries_md_table(lib_line_counts, root_dir):
 
     readme_md_path = os.path.join(root_dir, 'README.md')
     update_table_loc_in_file(readme_md_path, lib_line_counts, is_readme=True)
+
+def add_total_loc_after_table(file_path, total_loc_str, is_readme=False):
+    if not os.path.isfile(file_path):
+        return
+    with open(file_path, 'r', encoding='utf-8') as f:
+        lines = f.readlines()
+
+    # Remove old total LOC table if it exists
+    new_lines = []
+    in_table = False
+    for line in lines:
+        stripped_line = line.strip()
+        if not in_table and stripped_line.startswith("LOC") and "| Count" in stripped_line:
+            in_table = True
+        
+        if not in_table:
+            new_lines.append(line)
+
+        if in_table and stripped_line.startswith("*Total*"):
+            in_table = False
+    lines = new_lines
+
+    # Find the table start and end
+    table_start = None
+    table_end = None
+    for i, line in enumerate(lines):
+        if (is_readme and line.strip().startswith('Library') and 'Description' in line) or \
+           (not is_readme and line.strip().startswith('Library') and 'Description' in line):
+            table_start = i + 2  # skip header and separator
+        elif table_start is not None and (line.strip() == '' or line.startswith('Each library is color-coded')):
+            table_end = i
+            break
+    if table_start is None:
+        return  # Table not found
+    if table_end is None:
+        table_end = table_start + 1
+        while table_end < len(lines) and lines[table_end].strip():
+            table_end += 1
+    
+    lines.insert(table_end, f'\n{total_loc_str}')
+
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.writelines(lines)
+
+
     
 def main():
+
     """Main function."""
     parser = argparse.ArgumentParser(description='Create single file libraries for Sane C++.')
     parser.add_argument('--update_loc', action='store_true', help='Update LOC statistics in documentation files.')
@@ -350,6 +396,9 @@ def main():
     git_version = get_git_version()
 
     lib_line_counts = {}
+    total_header_loc = 0
+    total_sources_loc = 0
+    total_comment_loc = 0
 
     for library_name, data in dependencies.items():
 
@@ -389,6 +438,9 @@ def main():
 
         header_code_loc, header_comment_loc = count_loc(headers)
         sources_code_loc, sources_comment_loc = count_loc(sources)
+        total_header_loc += header_code_loc
+        total_sources_loc += sources_code_loc
+        total_comment_loc += header_comment_loc + sources_comment_loc
         lib_line_counts[library_name] = (header_code_loc + sources_code_loc, header_code_loc + sources_code_loc)
         if args.update_loc:
             update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc, sources_code_loc, sources_comment_loc)
@@ -448,6 +500,23 @@ def main():
             f.write(f'}}\n')
     if args.update_loc:
         update_libraries_md_table(lib_line_counts, root_dir)
+        total_loc_str_sum = f"{total_header_loc + total_sources_loc + total_comment_loc}"
+
+        table = [
+            "LOC               | Count",
+            ":-----------------|:-----------------",
+            f"Header            | {total_header_loc}",
+            f"Implementation    | {total_sources_loc}",
+            f"Comments          | {total_comment_loc}",
+            f"*Total*           | {total_loc_str_sum}"
+        ]
+        total_loc_str = "\n".join(table)
+        
+        libraries_md_path = os.path.join(root_dir, 'Documentation', 'Pages', 'Libraries.md')
+        add_total_loc_after_table(libraries_md_path, total_loc_str, is_readme=False)
+
+        readme_md_path = os.path.join(root_dir, 'README.md')
+        add_total_loc_after_table(readme_md_path, total_loc_str, is_readme=True)
 
 if __name__ == '__main__':
     sys.exit(main())
