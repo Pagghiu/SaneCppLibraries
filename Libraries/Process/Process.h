@@ -255,7 +255,7 @@ struct SC_COMPILER_EXPORT Process
     {
         if (commandMemory.empty())
             command = {commandStorage};
-        if (commandMemory.empty())
+        if (environmentMemory.empty())
             environment = {environmentStorage};
     }
 
