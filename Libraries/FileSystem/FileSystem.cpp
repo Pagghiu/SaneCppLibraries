@@ -17,8 +17,25 @@ static constexpr const SC::Result getErrorCode(int errorCode)
 {
     switch (errorCode)
     {
+    case EACCES: return Result::Error("EACCES");
+#if !SC_PLATFORM_WINDOWS
+    case EDQUOT: return Result::Error("EDQUOT");
+#endif
     case EEXIST: return Result::Error("EEXIST");
+    case EFAULT: return Result::Error("EFAULT");
+    case EIO: return Result::Error("EIO");
+    case ELOOP: return Result::Error("ELOOP");
+    case EMLINK: return Result::Error("EMLINK");
+    case ENAMETOOLONG: return Result::Error("ENAMETOOLONG");
     case ENOENT: return Result::Error("ENOENT");
+    case ENOSPC: return Result::Error("ENOSPC");
+    case ENOTDIR: return Result::Error("ENOTDIR");
+    case EROFS: return Result::Error("EROFS");
+    case EBADF: return Result::Error("EBADF");
+    case EPERM: return Result::Error("EPERM");
+    case ENOMEM: return Result::Error("ENOMEM");
+    case ENOTSUP: return Result::Error("ENOTSUP");
+    case EINVAL: return Result::Error("EINVAL");
     }
     return Result::Error("Unknown");
 }
@@ -39,8 +56,8 @@ struct SC::FileSystem::Internal
         {
             return Result::Error("SC::FileSystem::Internal::formatWindowsError - Cannot format error");
         }
-        int res = ::MultiByteToWideChar(CP_UTF8, 0, buffer.data(), static_cast<int>(buffer.sizeInBytes()),
-                                        messageBuffer, static_cast<int>(size));
+        int res = ::WideCharToMultiByte(CP_UTF8, 0, messageBuffer, static_cast<int>(size), buffer.data(),
+                                        static_cast<int>(buffer.sizeInBytes()), nullptr, nullptr);
         return Result(res > 0);
     }
     static bool formatError(int errorNumber, Span<char> buffer)
@@ -50,8 +67,9 @@ struct SC::FileSystem::Internal
         if (err == 0)
         {
             const int messageLength = static_cast<int>(::wcsnlen_s(messageBuffer, 1024));
-            const int res = ::MultiByteToWideChar(CP_UTF8, 0, buffer.data(), static_cast<int>(buffer.sizeInBytes()),
-                                                  messageBuffer, messageLength);
+
+            const int res = ::WideCharToMultiByte(CP_UTF8, 0, messageBuffer, messageLength, buffer.data(),
+                                                  static_cast<int>(buffer.sizeInBytes()), nullptr, nullptr);
             return Result(res > 0);
         }
         return false;
