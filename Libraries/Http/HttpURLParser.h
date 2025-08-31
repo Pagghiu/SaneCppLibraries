@@ -38,6 +38,7 @@ struct SC::HttpURLParser
     Result validatePath();
     Result validateHost();
     Result parseUserPassword(StringView userPassword);
+    struct Internal;
 };
 
 //! @}
