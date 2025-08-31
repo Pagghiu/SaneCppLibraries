@@ -35,29 +35,36 @@ Each library:
 
 Library                                                                                                         | Description                                                               | LOC
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|---------
-[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      |   5673
-[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟨 Concurrently read, write and transform byte streams                    |   1975
-[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                          | 🟨 Minimal build system where builds are described in C++                 |   4159
-[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)       |   779
-[File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                            | 🟩 Synchronous Disk File I/O                                              |   692
-[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                              | 🟩 File System operations (like copy / delete) for files / directories    |   1315
+[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      |   5726
+[Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟨 Concurrently read, write and transform byte streams                    |   1977
+[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                          | 🟨 Minimal build system where builds are described in C++                 |   4155
+[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)       |   874
+[File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                            | 🟩 Synchronous Disk File I/O                                              |   736
+[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                              | 🟩 File System operations (like copy / delete) for files / directories    |   1332
 [File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)            | 🟩 Enumerates files and directories inside a given path                   |   428
-[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)              | 🟩 Notifications {add, remove, rename, modified} for files / directories  |   1295
+[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)              | 🟩 Notifications {add, remove, rename, modified} for files / directories  |   1299
 [File System Watcher Async](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher_async.html)  | 🟩 Async backend for FileSystemWatcher                                    |   106
 [Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                                | 🟩 Primitive types, asserts, compiler macros, Function, Span, Result      |   1173
 [Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                                      | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes         |   353
-[Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                            | 🟥 HTTP parser, client and server                                         |   1260
+[Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                            | 🟥 HTTP parser, client and server                                         |   1257
 [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html)                                        | 🟩 Custom allocators, Virtual Memory, Buffer, Segment                     |   1219
-[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                        | 🟨 Minimal dependency based plugin system with hot-reload                 |   1426
-[Process](https://pagghiu.github.io/SaneCppLibraries/library_process.html)                                      | 🟩 Create child processes and redirect their input / output               |   1294
+[Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                        | 🟨 Minimal dependency based plugin system with hot-reload                 |   1434
+[Process](https://pagghiu.github.io/SaneCppLibraries/library_process.html)                                      | 🟩 Create child processes and redirect their input / output               |   1324
 [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html)                                | 🟩 Describe C++ types at compile time for serialization                   |   684
 [Serialization Binary](https://pagghiu.github.io/SaneCppLibraries/library_serialization_binary.html)            | 🟨 Serialize to and from a binary format using Reflection                 |   572
 [Serialization Text](https://pagghiu.github.io/SaneCppLibraries/library_serialization_text.html)                | 🟨 Serialize to / from text formats (JSON) using Reflection               |   645
 [Socket](https://pagghiu.github.io/SaneCppLibraries/library_socket.html)                                        | 🟨 Synchronous socket networking and DNS lookup                           |   855
 [Strings](https://pagghiu.github.io/SaneCppLibraries/library_strings.html)                                      | 🟩 String formatting / conversion / manipulation (UTF8 / UTF16)           |   3362
-[Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                                      | 🟨 Simple testing framework used by all of the other libraries            |   331
-[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟩 Atomic, thread (+pool), mutex, semaphore, barrier, rw-lock, condition  |   876
+[Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                                      | 🟨 Simple testing framework used by all of the other libraries            |   337
+[Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟩 Atomic, thread (+pool), mutex, semaphore, barrier, rw-lock, condition  |   1324
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                            | 🟨 Time handling (relative, absolute, high resolution)                    |   346
+
+LOC               | Count
+:-----------------|:-----------------
+Header            | 8421
+Implementation    | 23097
+Comments          | 11009
+*Total*           | 42527
 
 Each library is color-coded to signal its status:  
 🟥 Draft (incomplete, WIP, works on basic case)  

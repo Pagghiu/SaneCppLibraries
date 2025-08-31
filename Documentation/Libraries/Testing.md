@@ -14,8 +14,8 @@ Testing is a very simple test framework that allows splitting tests in sections 
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 96			| 88		| 184	|
-| Sources   | 235			| 21		| 256	|
-| Sum       | 331			| 109		| 440	|
+| Sources   | 241			| 22		| 263	|
+| Sum       | 337			| 110		| 447	|
 
 # Features
 | Class             | Description               |

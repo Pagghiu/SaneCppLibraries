@@ -18,8 +18,8 @@ Process allows launching, chaining input and output, setting working directory a
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 246			| 242		| 488	|
-| Sources   | 1048			| 293		| 1341	|
-| Sum       | 1294			| 535		| 1829	|
+| Sources   | 1078			| 294		| 1372	|
+| Sum       | 1324			| 536		| 1860	|
 
 # Features
 | Class                     | Description
@@ -51,6 +51,7 @@ Some relevant blog posts are:
 - [April 2024 Update](https://pagghiu.github.io/site/blog/2024-04-27-SaneCppLibrariesUpdate.html)
 - [April 2025 Update](https://pagghiu.github.io/site/blog/2025-04-30-SaneCppLibrariesUpdate.html)
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 
 ## Process
 @copydoc SC::Process

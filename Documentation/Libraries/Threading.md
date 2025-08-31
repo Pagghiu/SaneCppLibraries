@@ -13,9 +13,9 @@ Threading is a library defining basic primitives for user-space threading and sy
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 461			| 212		| 673	|
-| Sources   | 415			| 103		| 518	|
-| Sum       | 876			| 315		| 1191	|
+| Headers   | 407			| 249		| 656	|
+| Sources   | 917			| 168		| 1085	|
+| Sum       | 1324			| 417		| 1741	|
 
 # Features
 | Class                 | Description                       |
@@ -34,6 +34,13 @@ Threading is a library defining basic primitives for user-space threading and sy
 🟩 Usable  
 All the main threading primitives are there.  
 The Atomic header is really only being implemented for a few data types and needs some love to extend and improve it.
+
+# Blog
+
+Some relevant blog posts are:
+
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
+
 
 # Videos
 

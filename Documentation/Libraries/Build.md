@@ -14,8 +14,8 @@ Build uses C++ to imperatively describe a sequence of build operations.
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 315			| 171		| 486	|
-| Sources   | 3844			| 539		| 4383	|
-| Sum       | 4159			| 710		| 4869	|
+| Sources   | 3840			| 539		| 4379	|
+| Sum       | 4155			| 710		| 4865	|
 
 # Features
 
@@ -86,6 +86,7 @@ Some relevant blog posts are:
 - [February 2025 Update](https://pagghiu.github.io/site/blog/2025-02-28-SaneCppLibrariesUpdate.html)
 - [March 2025 Update](https://pagghiu.github.io/site/blog/2025-03-31-SaneCppLibrariesUpdate.html)
 - [April 2025 Update](https://pagghiu.github.io/site/blog/2025-04-30-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 
 # Architecture
 

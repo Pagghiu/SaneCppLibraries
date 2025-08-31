@@ -13,9 +13,9 @@ File library allows synchronous I/O operations on files and pipes.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 100			| 132		| 232	|
-| Sources   | 592			| 107		| 699	|
-| Sum       | 692			| 239		| 931	|
+| Headers   | 97			| 129		| 226	|
+| Sources   | 639			| 106		| 745	|
+| Sum       | 736			| 235		| 971	|
 
 # Features
 | SC::FileDescriptor                        | @copybrief SC::FileDescriptor                         |
@@ -44,6 +44,7 @@ Will consider bumping to Complete in the future.
 Some relevant blog posts are:
 
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 
 # Description
 SC::FileDescriptor object can be created by SC::FileDescriptor::open-ing a path on file system and it can be SC::FileDescriptor::read or SC::FileDescriptor::write.  

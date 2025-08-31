@@ -13,9 +13,9 @@ Http library contains a hand-written http 1.1 parser, client and server.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 223			| 199		| 422	|
-| Sources   | 1037			| 181		| 1218	|
-| Sum       | 1260			| 380		| 1640	|
+| Headers   | 220			| 199		| 419	|
+| Sources   | 1037			| 182		| 1219	|
+| Sum       | 1257			| 381		| 1638	|
 
 # Features
 - HTTP 1.1 Parser

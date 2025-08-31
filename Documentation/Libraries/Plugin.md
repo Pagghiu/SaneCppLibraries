@@ -19,9 +19,9 @@ Plugin library allows extending application compiling C++ source to executable c
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 310			| 216		| 526	|
-| Sources   | 1116			| 203		| 1319	|
-| Sum       | 1426			| 419		| 1845	|
+| Headers   | 309			| 216		| 525	|
+| Sources   | 1125			| 206		| 1331	|
+| Sum       | 1434			| 422		| 1856	|
 
 # Features
 - Compile and link cpp files to dynamic library

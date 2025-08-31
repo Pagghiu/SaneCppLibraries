@@ -13,9 +13,9 @@ Containers is a library holding some commonly used generic data structures.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 779			| 338		| 1117	|
+| Headers   | 874			| 418		| 1292	|
 | Sources   | 0			| 0		| 0	|
-| Sum       | 779			| 338		| 1117	|
+| Sum       | 874			| 418		| 1292	|
 
 # Features
 | Class                             | Description                               |

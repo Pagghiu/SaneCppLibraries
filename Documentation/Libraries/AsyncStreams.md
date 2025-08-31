@@ -18,8 +18,8 @@ Async Streams read and write data concurrently from async sources to destination
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 454			| 328		| 782	|
-| Sources   | 1521			| 265		| 1786	|
-| Sum       | 1975			| 593		| 2568	|
+| Sources   | 1523			| 268		| 1791	|
+| Sum       | 1977			| 596		| 2573	|
 
 # Features
 
@@ -76,6 +76,7 @@ Some relevant blog posts are:
 - [November 2024 Update](https://pagghiu.github.io/site/blog/2024-11-30-SaneCppLibrariesUpdate.html)
 - [December 2024 Update](https://pagghiu.github.io/site/blog/2024-12-31-SaneCppLibrariesUpdate.html)
 - [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 

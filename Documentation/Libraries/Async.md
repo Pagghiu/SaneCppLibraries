@@ -18,9 +18,9 @@ Check @ref library_async_streams for an higher level construct when streaming da
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 752			| 723		| 1475	|
-| Sources   | 4921			| 1171		| 6092	|
-| Sum       | 5673			| 1894		| 7567	|
+| Headers   | 754			| 725		| 1479	|
+| Sources   | 4972			| 1176		| 6148	|
+| Sum       | 5726			| 1901		| 7627	|
 
 # Features
 
@@ -78,6 +78,7 @@ Some relevant blog posts are:
 - [May 2025 Update](https://pagghiu.github.io/site/blog/2025-05-31-SaneCppLibrariesUpdate.html)
 - [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 
 # Description
 @copydetails SC::AsyncRequest

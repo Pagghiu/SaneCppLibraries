@@ -45,6 +45,8 @@ Library is usable and can be successfully used to mix operations with strings ma
 Some relevant blog posts are:
 
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+- [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
+
 
 # Definition
 

@@ -18,8 +18,8 @@ FileSystem executed executing operations on files and directories.
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 119			| 227		| 346	|
-| Sources   | 1196			| 210		| 1406	|
-| Sum       | 1315			| 437		| 1752	|
+| Sources   | 1213			| 211		| 1424	|
+| Sum       | 1332			| 438		| 1770	|
 
 # Features
 

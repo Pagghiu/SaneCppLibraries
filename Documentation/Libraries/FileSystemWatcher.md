@@ -13,9 +13,9 @@ SC::FileSystemWatcher allows watching directories for changes that happen to the
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 124			| 111		| 235	|
+| Headers   | 128			| 111		| 239	|
 | Sources   | 1171			| 262		| 1433	|
-| Sum       | 1295			| 373		| 1668	|
+| Sum       | 1299			| 373		| 1672	|
 
 # Features
 - Get notified about modified files or directories
