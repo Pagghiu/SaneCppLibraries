@@ -285,24 +285,29 @@ struct SC::StringView : public StringSpan
     /// @param from Indicates where the StringView will start.
     ///             The from iterator will be shortened until the start of to.
     /// @param to   Indicates where the StringView will end.
+    /// @param encoding What encoding should be assigned to the resulting StringView
     /// @return A StringView  starting at `from` and ending at `to`.
     /// @note If from is `>` to an empty StringView will be returned
     template <typename StringIterator>
-    static StringView fromIterators(StringIterator from, StringIterator to);
+    static StringView fromIterators(StringIterator from, StringIterator to,
+                                    StringEncoding encoding = StringIterator::getEncoding());
 
     /// @brief Returns a section of a string, from `it` to end of StringView.
     /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16
     /// @param it The iterator pointing at the start of the specified portion of StringView.
+    /// @param encoding What encoding should be assigned to the resulting StringView
     /// @return Another StringView pointing at characters from `it` up to StringView end
     template <typename StringIterator>
-    static StringView fromIteratorUntilEnd(StringIterator it);
+    static StringView fromIteratorUntilEnd(StringIterator it, StringEncoding encoding = StringIterator::getEncoding());
 
     /// @brief Returns a section of a string, from start of StringView to `it`.
     /// @tparam StringIterator One among StringIteratorASCII, StringIteratorUTF8 and StringIteratorUTF16
     /// @param it The iterator pointing at the start of the specified portion of StringView.
+    /// @param encoding What encoding should be assigned to the resulting StringView
     /// @return Another StringView pointing at characters from start of StringView until `it`
     template <typename StringIterator>
-    static constexpr StringView fromIteratorFromStart(StringIterator it);
+    static constexpr StringView fromIteratorFromStart(StringIterator it,
+                                                      StringEncoding encoding = StringIterator::getEncoding());
 
     /// @brief Get slice `[start, end)` starting at offset `start` and ending at `end` (measured in utf code points)
     /// @param start The initial code point where the slice starts
@@ -742,7 +747,7 @@ constexpr bool SC::StringView::hasCompatibleEncoding(StringView str) const
 }
 
 template <typename StringIterator>
-inline SC::StringView SC::StringView::fromIterators(StringIterator from, StringIterator to)
+inline SC::StringView SC::StringView::fromIterators(StringIterator from, StringIterator to, StringEncoding encoding)
 {
     const ssize_t numBytes = to.bytesDistanceFrom(from);
     if (numBytes >= 0)
@@ -750,25 +755,25 @@ inline SC::StringView SC::StringView::fromIterators(StringIterator from, StringI
         StringIterator fromEnd = from;
         fromEnd.setToEnd();
         if (fromEnd.bytesDistanceFrom(to) >= 0) // If current iterator of to is inside from range
-            return StringView({from.it, static_cast<size_t>(numBytes)}, false, StringIterator::getEncoding());
+            return StringView({from.it, static_cast<size_t>(numBytes)}, false, encoding);
     }
-    return StringView(); // TODO: Make StringView::fromIterators return bool to make it fallible
+    return StringView(encoding); // TODO: Make StringView::fromIterators return bool to make it fallible
 }
 
 template <typename StringIterator>
-inline SC::StringView SC::StringView::fromIteratorUntilEnd(StringIterator it)
+inline SC::StringView SC::StringView::fromIteratorUntilEnd(StringIterator it, StringEncoding encoding)
 {
     StringIterator endIt = it;
     endIt.setToEnd();
     const size_t numBytes = static_cast<size_t>(endIt.bytesDistanceFrom(it));
-    return StringView({it.it, numBytes}, false, StringIterator::getEncoding());
+    return StringView({it.it, numBytes}, false, encoding);
 }
 
 template <typename StringIterator>
-constexpr SC::StringView SC::StringView::fromIteratorFromStart(StringIterator it)
+constexpr SC::StringView SC::StringView::fromIteratorFromStart(StringIterator it, StringEncoding encoding)
 {
     StringIterator start = it;
     start.setToStart();
     const size_t numBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
-    return StringView({start.it, numBytes}, false, StringIterator::getEncoding());
+    return StringView({start.it, numBytes}, false, encoding);
 }
