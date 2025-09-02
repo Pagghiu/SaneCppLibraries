@@ -17,33 +17,8 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "SCTest intel64 [apple] (gdb)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest",
-            "args": [],
-            "stopAtEntry": false,
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug intel64",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest intel64 [apple] (lldb)",
+            "name": "SCTest intel64 [apple]",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest",
@@ -77,6 +52,11 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Load SC GDB visualizers",
+                    "text": "source ${workspaceRoot}/Support/DebugVisualizers/GDB/.gdbinit",
+                    "ignoreFailures": true
                 }
             ]
         },
@@ -107,33 +87,8 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "SCTest arm64 [apple] (gdb)",
-            "type": "cppdbg",
-            "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCTest",
-            "args": [],
-            "stopAtEntry": false,
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "gdb",
-            "cwd": "${workspaceRoot}",
-            "preLaunchTask": "Build SCTest Debug arm64",
-            "setupCommands": [
-                {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
-                    "ignoreFailures": true
-                },
-                {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
-                    "ignoreFailures": true
-                }
-            ]
-        },
-        {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCTest arm64 [apple] (lldb)",
+            "name": "SCTest arm64 [apple]",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCTest",
@@ -164,8 +119,13 @@
                     "ignoreFailures": true
                 },
                 {
-                    "description": "Set Disassembly Flavor to Intel",
-                    "text": "-gdb-set disassembly-flavor intel",
+                    "description": "Set Disassembly Flavor to ARM for arm64",
+                    "text": "-gdb-set disassembly-flavor arm",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Load SC GDB visualizers",
+                    "text": "source ${workspaceRoot}/Support/DebugVisualizers/GDB/.gdbinit",
                     "ignoreFailures": true
                 }
             ]
@@ -198,7 +158,7 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCExample intel64 [apple] (lldb)",
+            "name": "SCExample intel64 [apple]",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/_Outputs/macOS-x86_64-make-clang-Debug/SCExample",
@@ -242,7 +202,7 @@
         },
         {
             // Install CodeLLDB extension or similar to use this one
-            "name": "SCExample arm64 [apple] (lldb)",
+            "name": "SCExample arm64 [apple]",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/_Outputs/macOS-arm64-make-clang-Debug/SCExample",
@@ -273,7 +233,7 @@
             ],
         },
         {
-            "name": "Debug SC-format arm64 [apple] (lldb)",
+            "name": "Debug SC-format arm64 [apple]",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/_Build/_Tools/Darwin/SC-format",

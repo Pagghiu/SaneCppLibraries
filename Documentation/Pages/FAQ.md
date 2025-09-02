@@ -21,9 +21,28 @@ Yes, if you disable the Standard C++ Library, you can also disable Exceptions an
 
 # Does the library have debug visualizers?
 
-Yes, this library contains debug visualizers for [Containers](@ref library_containers) and [Strings](@ref library_strings) for `clang` and `cl.exe` (Microsoft Compiler).
-Using them will make your life easier.  
-[Build](@ref library_build) is setting them up automatically for XCode and Visual Studio projects.
+Yes, this library contains debug visualizers for:
+- SC::Array
+- SC::Buffer
+- SC::SmallBuffer
+- SC::SmallString
+- SC::SmallVector
+- SC::String
+- SC::StringSpan
+- SC::StringView
+- SC::Vector
+
+Targeting:
+
+- `lldb` (`Support/DebugVisualizers/GDB/SCGDB.py`)
+- `gdb` (`Support/DebugVisualizers/LLDB/SCLLDB.py`)
+- `VS Debugger` (`Support/DebugVisualizers/MSVC/SCMSVC.natvis`). 
+
+Usage:
+
+- [Build](@ref library_build) is setting them up automatically for XCode and Visual Studio projects.
+- Starting the VSCode `launch.json` configurations for lldb and gdb should will load them in your debugger session.
+- You can manually `source` or add them to your project or build system
 
 # What plans for ABI / API stability?
 
