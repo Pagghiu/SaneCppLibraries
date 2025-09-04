@@ -207,7 +207,11 @@ struct GrowableBuffer<String> : public IGrowableBuffer
 {
     String& string;
     size_t  numZeroes;
-    GrowableBuffer(String& string) : string(string) { numZeroes = StringEncodingGetSize(string.getEncoding()); }
+    GrowableBuffer(String& string) : string(string)
+    {
+        numZeroes                     = StringEncodingGetSize(string.getEncoding());
+        IGrowableBuffer::directAccess = {string.data.size(), string.data.capacity(), string.data.data()};
+    }
 
     virtual ~GrowableBuffer() override
     {
@@ -217,21 +221,20 @@ struct GrowableBuffer<String> : public IGrowableBuffer
             (void)string.data.resize(string.data.size() + numZeroes, 0);
         }
     }
-    virtual DirectAccess getDirectAccess() override final
-    {
-        return {string.data.size(), string.data.capacity(), string.data.data()};
-    }
+
     virtual bool tryGrowTo(size_t newSize) override final
     {
+        bool res = true;
         if (newSize > 0)
         {
-            return string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
+            res = string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
         }
         else
         {
             string.data.clear();
-            return true;
         }
+        IGrowableBuffer::directAccess = {string.data.size(), string.data.capacity(), string.data.data()};
+        return res;
     }
 };
 

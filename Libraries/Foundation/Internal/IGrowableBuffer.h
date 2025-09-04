@@ -9,8 +9,6 @@ namespace SC
 /// This allows breaking the dependency between File and Strings / Memory libraries.
 struct IGrowableBuffer
 {
-    virtual ~IGrowableBuffer() {}
-
     struct DirectAccess
     {
         size_t sizeInBytes     = 0;
@@ -18,13 +16,18 @@ struct IGrowableBuffer
         void*  data            = nullptr;
     };
 
-    /// @brief Obtain direct access to buffer data
-    [[nodiscard]] virtual DirectAccess getDirectAccess() = 0;
+    virtual ~IGrowableBuffer() = default;
 
     /// @brief  Try to grow the buffer to a new size.
     /// @param newSize The desired new size for the buffer.
     /// @return `true` if the buffer was successfully grown, `false` otherwise.
     [[nodiscard]] virtual bool tryGrowTo(size_t newSize) = 0;
+
+    /// @brief Obtains direct access to the memory ownerd by the growable buffer
+    DirectAccess getDirectAccess() const { return directAccess; }
+
+  protected:
+    DirectAccess directAccess;
 };
 
 /// @brief Partial specialize GrowableBuffer deriving from IGrowableBuffer (see how String and Buffer do it)

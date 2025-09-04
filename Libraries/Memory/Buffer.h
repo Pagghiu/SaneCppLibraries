@@ -71,9 +71,17 @@ template <>
 struct GrowableBuffer<Buffer> : public IGrowableBuffer
 {
     Buffer& buffer;
-    GrowableBuffer(Buffer& buffer) : buffer(buffer) {}
-    virtual DirectAccess getDirectAccess() override final { return {buffer.size(), buffer.capacity(), buffer.data()}; }
-    virtual bool         tryGrowTo(size_t newSize) override final { return buffer.resizeWithoutInitializing(newSize); }
+    GrowableBuffer(Buffer& buffer) : buffer(buffer)
+    {
+        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
+    }
+
+    virtual bool tryGrowTo(size_t newSize) override final
+    {
+        const bool result             = buffer.resizeWithoutInitializing(newSize);
+        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
+        return result;
+    }
 };
 //! @}
 } // namespace SC

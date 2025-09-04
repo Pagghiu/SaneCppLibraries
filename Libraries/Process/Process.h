@@ -136,7 +136,7 @@ struct SC_COMPILER_EXPORT Process
         Span<char>       writableSpan;
 
         IGrowableBuffer*                  growableBuffer = nullptr;
-        AlignedStorage<3 * sizeof(void*)> growableBufferStorage;
+        AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
 
         FileDescriptor::Handle fileDescriptor;
 
