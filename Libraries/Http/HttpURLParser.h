@@ -32,6 +32,8 @@ struct SC::HttpURLParser
     Result parse(StringView url);
 
   private:
+    StringEncoding encoding;
+
     Result parsePath();
     Result parseHost();
     Result validateProtocol();

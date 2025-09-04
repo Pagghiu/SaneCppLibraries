@@ -3,6 +3,14 @@
 #include "HttpURLParser.h"
 #include <ctype.h>
 
+// Note: URL separators are always ASCII characters, allowing us to use StringIteratorASCII even with UTF8 strings
+// - `:` (colon) - code point 58
+// - `/` (slash) - code point 47
+// - `?` (question mark) - code point 63
+// - `#` (hash) - code point 35
+// - `@` (at sign) - code point 64
+// - `[` and `]` (IPv6 brackets) - code points 91, 93
+
 struct SC::HttpURLParser::Internal
 {
     static bool equalsIgnoreCase(SC::StringView a, SC::StringView b)
@@ -24,20 +32,24 @@ struct SC::HttpURLParser::Internal
 
 SC::Result SC::HttpURLParser::parse(StringView url)
 {
-    StringIteratorASCII it = url.getIterator<StringIteratorASCII>();
+    encoding = url.getEncoding();
 
+    auto it    = url.getIterator<StringIteratorASCII>();
     auto start = it;
+
     // Protocol
     SC_TRY(it.advanceUntilMatches(':'));
-    protocol = StringView::fromIterators(start, it);
+    protocol = StringView::fromIterators(start, it, encoding);
     SC_TRY(validateProtocol());
     SC_TRY(it.advanceIfMatches(':'));
     SC_TRY(it.advanceIfMatches('/'));
     SC_TRY(it.advanceIfMatches('/'));
     // hostname
-    start              = it;
+    start = it;
+
     const bool hasPath = it.advanceUntilMatches('/');
-    host               = StringView::fromIterators(start, it);
+
+    host = StringView::fromIterators(start, it, encoding);
     SC_TRY(parseHost());
     if (not hasPath)
     {
@@ -48,11 +60,11 @@ SC::Result SC::HttpURLParser::parse(StringView url)
     // path + hash
     start              = it;
     const bool hasHref = it.advanceUntilMatches('#');
-    path               = StringView::fromIterators(start, it);
+    path               = StringView::fromIterators(start, it, encoding);
     SC_TRY(parsePath());
     if (hasHref)
     {
-        hash = StringView::fromIteratorUntilEnd(it);
+        hash = StringView::fromIteratorUntilEnd(it, encoding);
     }
     return Result(true);
 }
@@ -62,8 +74,8 @@ SC::Result SC::HttpURLParser::parsePath()
     StringIteratorASCII it = path.getIterator<StringIteratorASCII>();
     if (it.advanceUntilMatches('?'))
     {
-        pathname = StringView::fromIteratorFromStart(it);
-        search   = StringView::fromIteratorUntilEnd(it);
+        pathname = StringView::fromIteratorFromStart(it, encoding);
+        search   = StringView::fromIteratorUntilEnd(it, encoding);
     }
     else
     {
@@ -80,7 +92,7 @@ SC::Result SC::HttpURLParser::parseHost()
     // Parse user@password if exists
     if (it.advanceUntilMatches('@'))
     {
-        StringView userAndPassword = StringView::fromIterators(start, it);
+        StringView userAndPassword = StringView::fromIterators(start, it, encoding);
         SC_TRY(parseUserPassword(userAndPassword));
         (void)it.stepForward();
     }
@@ -89,7 +101,7 @@ SC::Result SC::HttpURLParser::parseHost()
         it = start;
     }
     start = it;
-    host  = StringView::fromIteratorUntilEnd(it);
+    host  = StringView::fromIteratorUntilEnd(it, encoding);
 
     // Parse hostname and port from host
     StringIteratorASCII it2    = host.getIterator<StringIteratorASCII>();
@@ -102,11 +114,11 @@ SC::Result SC::HttpURLParser::parseHost()
         if (not it2.advanceUntilMatches(']'))
             return Result(false);
         (void)it2.stepForward(); // include ]
-        hostname = StringView::fromIterators(start2, it2);
+        hostname = StringView::fromIterators(start2, it2, encoding);
         if (it2.advanceRead(firstChar) && firstChar == ':')
         {
             (void)it2.stepForward();
-            StringView portString = StringView::fromIteratorUntilEnd(it2);
+            StringView portString = StringView::fromIteratorUntilEnd(it2, encoding);
             if (not portString.isEmpty())
             {
                 int32_t value;
@@ -123,9 +135,9 @@ SC::Result SC::HttpURLParser::parseHost()
         it2 = start2;
         if (it2.advanceUntilMatches(':'))
         {
-            hostname = StringView::fromIterators(start2, it2);
+            hostname = StringView::fromIterators(start2, it2, encoding);
             (void)it2.stepForward();
-            StringView portString = StringView::fromIteratorUntilEnd(it2);
+            StringView portString = StringView::fromIteratorUntilEnd(it2, encoding);
             if (not portString.isEmpty())
             {
                 int32_t value;
