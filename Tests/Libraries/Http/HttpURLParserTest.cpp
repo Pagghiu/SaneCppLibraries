@@ -39,6 +39,26 @@ struct SC::HttpURLParserTest : public SC::TestCase
         {
             testUTF8();
         }
+        if (test_section("edgeCases"))
+        {
+            testEdgeCases();
+        }
+        if (test_section("protocols"))
+        {
+            testProtocols();
+        }
+        if (test_section("queryParams"))
+        {
+            testQueryParams();
+        }
+        if (test_section("specialChars"))
+        {
+            testSpecialChars();
+        }
+        if (test_section("ipAddresses"))
+        {
+            testIPAddresses();
+        }
     }
 
     void testFull();
@@ -48,6 +68,11 @@ struct SC::HttpURLParserTest : public SC::TestCase
     void testIPv6();
     void testInvalidPort();
     void testUTF8();
+    void testEdgeCases();
+    void testProtocols();
+    void testQueryParams();
+    void testSpecialChars();
+    void testIPAddresses();
 };
 
 void SC::HttpURLParserTest::testFull()
@@ -170,6 +195,139 @@ void SC::HttpURLParserTest::testUTF8()
     SC_TEST_EXPECT(urlParser.pathname == "/pâth"_u8);
     SC_TEST_EXPECT(urlParser.search == "?q=âsk"_u8);
     SC_TEST_EXPECT(urlParser.hash == "#frâg"_u8);
+}
+
+void SC::HttpURLParserTest::testEdgeCases()
+{
+    HttpURLParser urlParser;
+
+    // Username only (no password)
+    SC_TEST_EXPECT(urlParser.parse("http://user@example.com/path"));
+    SC_TEST_EXPECT(urlParser.username == "user");
+    SC_TEST_EXPECT(urlParser.password.isEmpty());
+    SC_TEST_EXPECT(urlParser.hostname == "example.com");
+
+    // Root path only
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/"));
+    SC_TEST_EXPECT(urlParser.pathname == "/");
+    SC_TEST_EXPECT(urlParser.path == "/");
+
+    // No path at all
+    SC_TEST_EXPECT(urlParser.parse("http://example.com"));
+    SC_TEST_EXPECT(urlParser.pathname == "/");
+    SC_TEST_EXPECT(urlParser.path == "/");
+
+    // Port 0
+    SC_TEST_EXPECT(urlParser.parse("http://example.com:0/path"));
+    SC_TEST_EXPECT(urlParser.port == 0);
+
+    // Very long path
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/very/long/path/with/many/segments"));
+    SC_TEST_EXPECT(urlParser.pathname == "/very/long/path/with/many/segments");
+
+    // Path with dots
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path/./subpath/../other"));
+    SC_TEST_EXPECT(urlParser.pathname == "/path/./subpath/../other");
+}
+
+void SC::HttpURLParserTest::testProtocols()
+{
+    HttpURLParser urlParser;
+
+    // HTTPS protocol
+    SC_TEST_EXPECT(urlParser.parse("https://example.com"));
+    SC_TEST_EXPECT(urlParser.protocol == "https");
+    SC_TEST_EXPECT(urlParser.port == 443);
+
+    // Mixed case protocol
+    SC_TEST_EXPECT(urlParser.parse("Https://example.com"));
+    SC_TEST_EXPECT(urlParser.protocol == "Https");
+
+    // Invalid protocol
+    SC_TEST_EXPECT(not urlParser.parse("ftp://example.com"));
+    SC_TEST_EXPECT(not urlParser.parse("custom://example.com"));
+}
+
+void SC::HttpURLParserTest::testQueryParams()
+{
+    HttpURLParser urlParser;
+
+    // Multiple query parameters
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?key1=value1&key2=value2&key3=value3"));
+    SC_TEST_EXPECT(urlParser.search == "?key1=value1&key2=value2&key3=value3");
+
+    // Query parameter with empty value
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?empty=&key=value"));
+    SC_TEST_EXPECT(urlParser.search == "?empty=&key=value");
+
+    // Query parameter with no value
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?flag&key=value"));
+    SC_TEST_EXPECT(urlParser.search == "?flag&key=value");
+
+    // Only query parameters, no path
+    SC_TEST_EXPECT(urlParser.parse("http://example.com?query=value"));
+    SC_TEST_EXPECT(urlParser.pathname == "/");
+    SC_TEST_EXPECT(urlParser.search == "?query=value");
+
+    // Query parameters with special characters
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?q=hello%20world&special=%2B%2D"));
+    SC_TEST_EXPECT(urlParser.search == "?q=hello%20world&special=%2B%2D");
+}
+
+void SC::HttpURLParserTest::testSpecialChars()
+{
+    HttpURLParser urlParser;
+
+    // Path with allowed special characters
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path_with_underscores-and-dashes"));
+    SC_TEST_EXPECT(urlParser.pathname == "/path_with_underscores-and-dashes");
+
+    // Path with numbers
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path123/456"));
+    SC_TEST_EXPECT(urlParser.pathname == "/path123/456");
+
+    // Hostname with numbers
+    SC_TEST_EXPECT(urlParser.parse("http://site123.com/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "site123.com");
+
+    // Username with special characters
+    SC_TEST_EXPECT(urlParser.parse("http://user_name@example.com/path"));
+    SC_TEST_EXPECT(urlParser.username == "user_name");
+
+    // Invalid: space in path (should fail)
+    SC_TEST_EXPECT(not urlParser.parse("http://example.com/path with space"));
+}
+
+void SC::HttpURLParserTest::testIPAddresses()
+{
+    HttpURLParser urlParser;
+
+    // IPv4 address
+    SC_TEST_EXPECT(urlParser.parse("http://192.168.1.1/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "192.168.1.1");
+    SC_TEST_EXPECT(urlParser.port == 80);
+
+    // IPv4 with port
+    SC_TEST_EXPECT(urlParser.parse("http://192.168.1.1:8080/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "192.168.1.1");
+    SC_TEST_EXPECT(urlParser.port == 8080);
+
+    // IPv6 localhost
+    SC_TEST_EXPECT(urlParser.parse("http://[::1]/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "[::1]");
+
+    // IPv6 with port
+    SC_TEST_EXPECT(urlParser.parse("http://[::1]:8080/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "[::1]");
+    SC_TEST_EXPECT(urlParser.port == 8080);
+
+    // IPv6 full address
+    SC_TEST_EXPECT(urlParser.parse("http://[2001:db8::1]/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "[2001:db8::1]");
+
+    // IPv6 compressed
+    SC_TEST_EXPECT(urlParser.parse("http://[2001:db8::]/path"));
+    SC_TEST_EXPECT(urlParser.hostname == "[2001:db8::]");
 }
 
 namespace SC

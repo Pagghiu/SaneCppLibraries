@@ -50,11 +50,52 @@ SC::Result SC::HttpURLParser::parse(StringView url)
     const bool hasPath = it.advanceUntilMatches('/');
 
     host = StringView::fromIterators(start, it, encoding);
+
+    // Check for query parameters or fragments before parsing host
+    StringView      originalHost = host;
+    auto            hostIt       = originalHost.getIterator<StringIteratorASCII>();
+    StringCodePoint separator;
+    const bool      hasQueryOrFragment = hostIt.advanceUntilMatchesAny({'?', '#'}, separator);
+
+    // If there is no path but the host contains query/fragment (e.g. http://example.com?x=1)
+    // trim the `host` to exclude the query/fragment before parsing hostname/port.
+    if (not hasPath && hasQueryOrFragment)
+    {
+        // hostIt currently points at the separator ('?' or '#') within originalHost.
+        // Build a new host view that stops before the separator.
+        host = StringView::fromIteratorFromStart(hostIt, encoding);
+    }
+
     SC_TRY(parseHost());
     if (not hasPath)
     {
-        path     = "/";
-        pathname = "/";
+        if (hasQueryOrFragment)
+        {
+            // There are query params or fragments in the host string
+            if (separator == '?')
+            {
+                // Query parameters found
+                pathname = "/";
+                search   = StringView::fromIteratorUntilEnd(hostIt, encoding);
+                // Check for fragment after query
+                auto queryIt = hostIt;
+                if (queryIt.advanceUntilMatches('#'))
+                {
+                    hash = StringView::fromIteratorUntilEnd(queryIt, encoding);
+                }
+            }
+            else
+            {
+                // Fragment found
+                pathname = "/";
+                hash     = StringView::fromIteratorUntilEnd(hostIt, encoding);
+            }
+        }
+        else
+        {
+            path     = "/";
+            pathname = "/";
+        }
         return Result(true);
     }
     // path + hash
@@ -101,10 +142,11 @@ SC::Result SC::HttpURLParser::parseHost()
         it = start;
     }
     start = it;
-    host  = StringView::fromIteratorUntilEnd(it, encoding);
+    // Save the hostname part (before port) for parsing
+    StringView hostnamePart = StringView::fromIteratorUntilEnd(it, encoding);
 
-    // Parse hostname and port from host
-    StringIteratorASCII it2    = host.getIterator<StringIteratorASCII>();
+    // Parse hostname and port from hostnamePart
+    StringIteratorASCII it2    = hostnamePart.getIterator<StringIteratorASCII>();
     StringIteratorASCII start2 = it2;
 
     StringCodePoint firstChar;
@@ -115,7 +157,8 @@ SC::Result SC::HttpURLParser::parseHost()
             return Result(false);
         (void)it2.stepForward(); // include ]
         hostname = StringView::fromIterators(start2, it2, encoding);
-        if (it2.advanceRead(firstChar) && firstChar == ':')
+        // check if next char is ':' (port separator) without consuming it twice
+        if (it2.match(':'))
         {
             (void)it2.stepForward();
             StringView portString = StringView::fromIteratorUntilEnd(it2, encoding);
@@ -127,6 +170,13 @@ SC::Result SC::HttpURLParser::parseHost()
                     return Result(false);
                 port = static_cast<uint16_t>(value);
             }
+            // Update host to include hostname and port
+            host = StringView::fromIterators(start, it2, encoding);
+        }
+        else
+        {
+            // No port for IPv6
+            host = StringView::fromIterators(start, it2, encoding);
         }
     }
     else
@@ -136,6 +186,7 @@ SC::Result SC::HttpURLParser::parseHost()
         if (it2.advanceUntilMatches(':'))
         {
             hostname = StringView::fromIterators(start2, it2, encoding);
+            // stepForward moves past ':' so port iterator starts at first digit
             (void)it2.stepForward();
             StringView portString = StringView::fromIteratorUntilEnd(it2, encoding);
             if (not portString.isEmpty())
@@ -146,10 +197,17 @@ SC::Result SC::HttpURLParser::parseHost()
                     return Result(false);
                 port = static_cast<uint16_t>(value);
             }
+            // Advance it2 to end of port string for host calculation
+            while (not it2.isAtEnd())
+                (void)it2.stepForward();
+            // Update host to include hostname and port
+            host = StringView::fromIterators(start, it2, encoding);
         }
         else
         {
-            hostname = host;
+            // No port found
+            hostname = hostnamePart;
+            host     = hostnamePart;
         }
     }
 
@@ -188,10 +246,21 @@ SC::Result SC::HttpURLParser::validateHost()
 
 SC::Result SC::HttpURLParser::parseUserPassword(StringView userPassword)
 {
-    StringViewTokenizer tokenizer(userPassword);
-    SC_TRY(tokenizer.tokenizeNext({':'}, StringViewTokenizer::Options::SkipEmpty));
-    username = tokenizer.component;
-    SC_TRY(tokenizer.tokenizeNext({}, StringViewTokenizer::Options::SkipEmpty));
-    password = tokenizer.component;
-    return Result(true);
+    auto func = [this, userPassword](auto it) -> Result
+    {
+        auto start = it;
+        if (it.advanceUntilMatches(':'))
+        {
+            username = StringView::fromIterators(start, it, encoding);
+            (void)it.stepForward();
+            password = StringView::fromIteratorUntilEnd(it, encoding);
+        }
+        else
+        {
+            username = userPassword;
+            password = StringView();
+        }
+        return Result(true);
+    };
+    return userPassword.withIterator(func);
 }
