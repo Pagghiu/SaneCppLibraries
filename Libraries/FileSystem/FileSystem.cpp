@@ -878,6 +878,18 @@ SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executa
     return executablePath.path;
 }
 
+SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
+{
+    DWORD length = ::GetCurrentDirectoryW(static_cast<DWORD>(StringPath::MaxPath), currentWorkingDirectory.path.buffer);
+    if (length == 0 || length >= StringPath::MaxPath)
+    {
+        currentWorkingDirectory.path.length = 0;
+        return {};
+    }
+    currentWorkingDirectory.path.length = length; // length does not include null terminator
+    return currentWorkingDirectory.path;
+}
+
 SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
     StringSpan exeView = getExecutablePath(applicationRootDirectory);
@@ -925,6 +937,7 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <sys/attr.h>
 #include <sys/clonefile.h>
 #elif SC_PLATFORM_LINUX
+#include <sys/syscall.h> // SYS_getcwd
 #include <sys/sendfile.h>
 #endif
 struct SC::FileSystem::Operations::Internal
@@ -1193,6 +1206,16 @@ SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executa
     return {};
 }
 
+SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
+{
+    if (::getcwd(currentWorkingDirectory.path.buffer, StringPath::MaxPath) != nullptr)
+    {
+        currentWorkingDirectory.path.length = ::strlen(currentWorkingDirectory.path.buffer);
+        return currentWorkingDirectory.path;
+    }
+    return {};
+}
+
 SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
     CFBundleRef mainBundle = CFBundleGetMainBundle();
@@ -1394,6 +1417,17 @@ SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executa
     {
         executablePath.path.length = static_cast<size_t>(pathLength);
         return executablePath.path;
+    }
+    return {};
+}
+
+SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
+{
+    const int pathLength = syscall(SYS_getcwd, currentWorkingDirectory.path.buffer, StringPath::MaxPath);
+    if (pathLength > 0)
+    {
+        currentWorkingDirectory.path.length = static_cast<size_t>(pathLength);
+        return currentWorkingDirectory.path;
     }
     return {};
 }

@@ -325,6 +325,7 @@ struct SC_COMPILER_EXPORT FileSystem
         static Result setLastModifiedTime(StringSpan path, Time::Realtime time);
 
         static StringSpan getExecutablePath(StringPath& executablePath);
+        static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory);
         static StringSpan getApplicationRootDirectory(StringPath& applicationRootDirectory);
 
       private:
