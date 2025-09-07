@@ -42,9 +42,9 @@ SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> 
     recurseStack.recursiveEntries = recursiveEntries;
     recurseStack.currentEntry     = -1;
 
-    SC_TRY_MSG(currentPath.path.assign(directory), "Directory path is too long");
-    const size_t dirLen = currentPath.path.length;
-    SC_TRY_MSG(currentPath.path.append(L"\\*.*"), "Directory path is too long");
+    SC_TRY_MSG(currentPath.assign(directory), "Directory path is too long");
+    const size_t dirLen = currentPath.view().sizeInBytes() / sizeof(wchar_t);
+    SC_TRY_MSG(currentPath.append(L"\\*.*"), "Directory path is too long");
     {
         FolderState entry;
         entry.textLengthInBytes = dirLen * sizeof(wchar_t);
@@ -53,9 +53,9 @@ SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> 
 
     FolderState&      currentFolder = recurseStack.back();
     WIN32_FIND_DATAW& dirEnumerator = reinterpret_cast<WIN32_FIND_DATAW&>(dirEnumeratorBuffer);
-    currentFolder.fileDescriptor    = ::FindFirstFileW(currentPath.path.buffer, &dirEnumerator);
+    currentFolder.fileDescriptor    = ::FindFirstFileW(currentPath.view().getNullTerminatedNative(), &dirEnumerator);
     // Set currentPathString back to just the directory (no pattern)
-    currentPath.path.buffer[dirLen] = L'\0';
+    currentPath.writableSpan().data()[dirLen] = L'\0';
 
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
@@ -106,20 +106,22 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
 
     entry.name = StringSpan({dirEnumerator.cFileName, ::wcsnlen(dirEnumerator.cFileName, MAX_PATH)}, true);
 
-    currentPath.path.length = dirLen;
-    SC_TRY_MSG(currentPath.path.append(L"\\"), "Path too long");
-    SC_TRY_MSG(currentPath.path.append(entry.name), "Path too long");
+    (void)currentPath.resize(dirLen);
+    SC_TRY_MSG(currentPath.append(L"\\"), "Path too long");
+    SC_TRY_MSG(currentPath.append(entry.name), "Path too long");
 
     if (options.forwardSlashes)
     {
         // Convert backslashes to forward slashes
-        for (size_t i = dirLen; i < currentPath.path.length; ++i)
+        wchar_t*     pathData   = currentPath.writableSpan().data();
+        const size_t pathLength = currentPath.view().sizeInBytes() / sizeof(wchar_t);
+        for (size_t i = dirLen; i < pathLength; ++i)
         {
-            if (currentPath.path.buffer[i] == L'\\')
-                currentPath.path.buffer[i] = L'/';
+            if (pathData[i] == L'\\')
+                pathData[i] = L'/';
         }
     }
-    entry.path  = currentPath.path.view();
+    entry.path  = currentPath.view();
     entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
 
     entry.parentFileDescriptor = parent.fileDescriptor;
@@ -143,22 +145,22 @@ SC::Result SC::FileSystemIterator::recurseSubdirectoryInternal(Entry& entry)
     StringPath recursePath;
 
     // Build subdirectory path
-    recursePath.path        = currentPath.path;
-    recursePath.path.length = recurseStack.back().textLengthInBytes / sizeof(wchar_t);
-    SC_TRY_MSG(recursePath.path.append(L"\\"), "Directory path is too long");
-    SC_TRY_MSG(recursePath.path.append(entry.name), "Directory path is too long");
+    recursePath = currentPath;
+    (void)recursePath.resize(recurseStack.back().textLengthInBytes / sizeof(wchar_t));
+    SC_TRY_MSG(recursePath.append(L"\\"), "Directory path is too long");
+    SC_TRY_MSG(recursePath.append(entry.name), "Directory path is too long");
 
     {
         // Store the length of the sub directory without the trailing \*.* added later
         FolderState newParent;
-        newParent.textLengthInBytes = recursePath.path.length * sizeof(wchar_t);
+        newParent.textLengthInBytes = recursePath.view().sizeInBytes();
         SC_TRY(recurseStack.push_back(newParent));
     }
-    SC_TRY_MSG(recursePath.path.append(L"\\*.*"), "Directory path is too long");
+    SC_TRY_MSG(recursePath.append(L"\\*.*"), "Directory path is too long");
 
     FolderState&      currentFolder = recurseStack.back();
     WIN32_FIND_DATAW& dirEnumerator = reinterpret_cast<WIN32_FIND_DATAW&>(dirEnumeratorBuffer);
-    currentFolder.fileDescriptor    = ::FindFirstFileW(recursePath.path.buffer, &dirEnumerator);
+    currentFolder.fileDescriptor    = ::FindFirstFileW(recursePath.view().getNullTerminatedNative(), &dirEnumerator);
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
         return Result::Error("FindFirstFileW failed");

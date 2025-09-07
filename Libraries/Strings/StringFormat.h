@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/StringPath.h"
 #include "../Strings/StringView.h"
 
 namespace SC
@@ -258,4 +259,14 @@ struct StringFormatterFor<char[N]>
         return StringFormatterFor<StringView>::format(data, specifier, sv);
     }
 };
+
+template <>
+struct StringFormatterFor<StringPath>
+{
+    static bool format(StringFormatOutput& data, const StringView specifier, const StringPath& str)
+    {
+        return StringFormatterFor<StringSpan>::format(data, specifier, str.view());
+    }
+};
+
 } // namespace SC

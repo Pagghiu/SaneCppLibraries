@@ -64,7 +64,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
                 StringBuilder expected(expectedBuffer);
                 SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
-                SC_TEST_EXPECT(fullPath.path.view() == expectedBuffer.view());
+                SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
             };
 
             FileSystem fs;
@@ -278,10 +278,10 @@ Result fileSystemWatcherAsyncSnippet(AsyncEventLoop& eventLoop, Console& console
             switch (notification.operation)
             {
             case FileSystemWatcher::Operation::Modified: // File has been modified
-                console.print("Modified {} {}\n", notification.relativePath, fullPath.path.view());
+                console.print("Modified {} {}\n", notification.relativePath, fullPath.view());
                 break;
             case FileSystemWatcher::Operation::AddRemoveRename: // File was added / removed
-                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.path.view());
+                console.print("AddRemoveRename {} {}\n", notification.relativePath, fullPath.view());
                 break;
             }
         }

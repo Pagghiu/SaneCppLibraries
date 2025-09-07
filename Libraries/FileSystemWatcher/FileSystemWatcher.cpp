@@ -29,7 +29,7 @@ SC::Result SC::FileSystemWatcher::watch(FolderWatcher& watcher, StringSpan path)
 {
     SC_TRY_MSG(watcher.parent == nullptr, "Watcher belongs to other FileSystemWatcher");
     watcher.parent = this;
-    SC_TRY_MSG(watcher.path.path.assign(path), "FileSystemWatcher::watch - Error assigning path");
+    SC_TRY_MSG(watcher.path.assign(path), "FileSystemWatcher::watch - Error assigning path");
     watchers.queueBack(watcher);
     return internal.get().startWatching(&watcher);
 }

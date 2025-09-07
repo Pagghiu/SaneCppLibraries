@@ -259,7 +259,7 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
 
 SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
 {
-    return Result(currentDirectory.path.assign(processWorkingDirectory));
+    return Result(currentDirectory.assign(processWorkingDirectory));
 }
 
 SC::Result SC::Process::setEnvironment(StringSpan name, StringSpan value)

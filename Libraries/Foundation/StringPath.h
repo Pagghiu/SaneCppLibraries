@@ -15,9 +15,9 @@ struct StringNativeFixed
     size_t        length = 0;
     native_char_t buffer[N];
 
-    [[nodiscard]] operator StringSpan() const { return StringSpan({buffer, length}, true, StringEncoding::Native); }
-    [[nodiscard]] StringSpan          view() const { return *this; }
-    [[nodiscard]] Span<native_char_t> writableSpan() const { return {buffer, N}; }
+    [[nodiscard]] StringSpan view() const { return StringSpan({buffer, length}, true, StringEncoding::Native); }
+
+    [[nodiscard]] Span<native_char_t> writableSpan() { return {buffer, N}; }
 
     [[nodiscard]] bool assign(StringSpan str)
     {
@@ -37,7 +37,7 @@ struct StringNativeFixed
 } // namespace detail
 
 /// @brief Pre-sized char array holding enough space to represent a file system path
-struct StringPath
+struct SC_COMPILER_EXPORT StringPath
 {
     /// @brief Maximum size of paths on current native platform
 #if SC_PLATFORM_WINDOWS
@@ -47,6 +47,22 @@ struct StringPath
 #else
     static constexpr size_t MaxPath = 4096; // Equal to 'PATH_MAX' on Linux
 #endif
+    [[nodiscard]] StringSpan view() const { return path.view(); }
+
+    [[nodiscard]] bool append(StringSpan str) { return path.append(str); }
+    [[nodiscard]] bool assign(StringSpan str) { return path.assign(str); }
+    [[nodiscard]] bool resize(size_t newSize)
+    {
+        if (newSize < MaxPath)
+        {
+            path.length = newSize;
+        }
+        return newSize < MaxPath;
+    }
+
+    [[nodiscard]] Span<native_char_t> writableSpan() { return path.writableSpan(); }
+
+  private:
     detail::StringNativeFixed<MaxPath> path;
 };
 } // namespace SC

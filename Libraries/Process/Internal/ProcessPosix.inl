@@ -189,9 +189,9 @@ SC::Result SC::Process::launchImplementation()
         SC_TRY(stdErrFd.close());
 
         // Switch to wanted current directory (if provided)
-        if (not currentDirectory.path.view().isEmpty())
+        if (not currentDirectory.view().isEmpty())
         {
-            int res = ::chdir(currentDirectory.path.view().getNullTerminatedNative());
+            int res = ::chdir(currentDirectory.view().getNullTerminatedNative());
             if (res < 0)
             {
                 return Result::Error("chdir failed");
@@ -263,12 +263,12 @@ SC::Result SC::Process::launchImplementation()
                 {
                     StringSpan pathComponent({pathStart, pathLen}, false, StringEncoding::Utf8);
                     StringPath finalCommand;
-                    SC_TRY_MSG(finalCommand.path.append(pathComponent), "Process::launchImplementation - finalCommand");
-                    SC_TRY_MSG(finalCommand.path.append("/"), "Process::launchImplementation - finalCommand");
-                    SC_TRY_MSG(finalCommand.path.append(cmd), "Process::launchImplementation - finalCommand");
-                    childErrno = ::execve(finalCommand.path.view().getNullTerminatedNative(), // command
-                                          const_cast<char* const*>(argv),                     // arguments
-                                          const_cast<char* const*>(environmentArray));        // environment
+                    SC_TRY_MSG(finalCommand.append(pathComponent), "Process::launchImplementation - finalCommand");
+                    SC_TRY_MSG(finalCommand.append("/"), "Process::launchImplementation - finalCommand");
+                    SC_TRY_MSG(finalCommand.append(cmd), "Process::launchImplementation - finalCommand");
+                    childErrno = ::execve(finalCommand.view().getNullTerminatedNative(), // command
+                                          const_cast<char* const*>(argv),                // arguments
+                                          const_cast<char* const*>(environmentArray));   // environment
                 }
 
                 // Move to next component

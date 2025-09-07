@@ -87,14 +87,14 @@ void SC::FileTest::testOpenStdHandles()
 SC::Result SC::FileTest::snippetForUniqueHandle()
 {
     StringPath filePath;
-    SC_TRY(filePath.path.assign("someFile.txt"));
+    SC_TRY(filePath.assign("someFile.txt"));
 
     const int flags  = O_RDWR | O_CREAT | O_TRUNC; // Open for read/write, create if not exists, truncate if exists
     const int access = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; // Read/write for owner, read for group and others
 
     FileDescriptor myDescriptor;
 
-    const int nativeFd = ::open(filePath.path.buffer, flags, access);
+    const int nativeFd = ::open(filePath.view().bytesIncludingTerminator(), flags, access);
 
     // Assign the native handle to UniqueHandle (will release the existing one, if any)
     SC_TRY(myDescriptor.assign(nativeFd));

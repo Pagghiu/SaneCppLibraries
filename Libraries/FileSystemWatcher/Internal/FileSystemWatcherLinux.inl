@@ -166,11 +166,11 @@ struct SC::FileSystemWatcher::Internal
 
         if (not relativeDirectory.isEmpty())
         {
-            SC_TRY_MSG(path.path.append("/"), "Relative path too long");
-            SC_TRY_MSG(path.path.append(relativeDirectory), "Relative path too long");
+            SC_TRY_MSG(path.append("/"), "Relative path too long");
+            SC_TRY_MSG(path.append(relativeDirectory), "Relative path too long");
         }
-        SC_TRY_MSG(path.path.append("/"), "Relative path too long");
-        SC_TRY_MSG(path.path.append(relativeName), "Relative path too long");
+        SC_TRY_MSG(path.append("/"), "Relative path too long");
+        SC_TRY_MSG(path.append(relativeName), "Relative path too long");
         return Result(true);
     }
 
@@ -178,7 +178,7 @@ struct SC::FileSystemWatcher::Internal
     {
         // TODO: Add check for trying to watch folders already being watched or children of recursive watches
 
-        SC_TRY_MSG(entry->path.path.view().getEncoding() != StringEncoding::Utf16,
+        SC_TRY_MSG(entry->path.view().getEncoding() != StringEncoding::Utf16,
                    "FolderWatcher on Linux does not support UTF16 encoded paths. Use UTF8 or ASCII encoding instead.");
         FolderWatcherInternal& opaque = entry->internal.get();
         if (not entry->subFolderRelativePathsBuffer.empty())
@@ -197,7 +197,7 @@ struct SC::FileSystemWatcher::Internal
         rootNotifyFd = notifyFd;
         constexpr int mask =
             IN_ATTRIB | IN_CREATE | IN_MODIFY | IN_DELETE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_FROM | IN_MOVED_TO;
-        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.path.buffer, mask);
+        const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
         if (newHandle == -1)
         {
             return Result::Error("inotify_add_watch");
@@ -221,7 +221,7 @@ struct SC::FileSystemWatcher::Internal
         int stackSize = 0;
 
         // Push the root directory onto the stack
-        DIR* rootDir = ::opendir(currentPath.path.buffer);
+        DIR* rootDir = ::opendir(currentPath.view().bytesIncludingTerminator());
         if (!rootDir)
         {
             return Result::Error("Failed to open root directory");
@@ -232,7 +232,7 @@ struct SC::FileSystemWatcher::Internal
 
         stack[stackSize++] = {rootFd, static_cast<int>(opaque.notifyHandlesCount - 1)};
 
-        const size_t rootPathLength = entry->path.path.view().sizeInBytes();
+        const size_t rootPathLength = entry->path.view().sizeInBytes();
         // Clean the stack of fd in case any of the return Result::Error below is hit.
         auto deferredCleanStack = MakeDeferred(
             [&]
@@ -265,13 +265,14 @@ struct SC::FileSystemWatcher::Internal
                                         entryStack.notifyHandleId));
 
                 struct stat st;
-                if (::stat(currentPath.path.buffer, &st) != 0)
+                if (::stat(currentPath.view().bytesIncludingTerminator(), &st) != 0)
                 {
                     continue;
                 }
                 if (S_ISDIR(st.st_mode))
                 {
-                    const int newHandle = ::inotify_add_watch(rootNotifyFd, currentPath.path.buffer, mask);
+                    const int newHandle =
+                        ::inotify_add_watch(rootNotifyFd, currentPath.view().bytesIncludingTerminator(), mask);
                     if (newHandle == -1)
                     {
                         (void)stopWatching(*entry);
@@ -280,7 +281,7 @@ struct SC::FileSystemWatcher::Internal
                     if (stackSize < MaxStackDepth)
                     {
                         // Open the subdirectory and push onto the stack
-                        const int subFd = ::open(currentPath.path.buffer, O_RDONLY | O_DIRECTORY);
+                        const int subFd = ::open(currentPath.view().bytesIncludingTerminator(), O_RDONLY | O_DIRECTORY);
                         if (subFd != -1)
                         {
                             stack[stackSize].fd             = subFd;
@@ -293,7 +294,7 @@ struct SC::FileSystemWatcher::Internal
                         (void)stopWatching(*entry);
                         return Result::Error("Exceeded maximum stack depth for nested directories");
                     }
-                    const char* relativePath = currentPath.path.buffer + rootPathLength;
+                    const char* relativePath = currentPath.view().bytesIncludingTerminator() + rootPathLength;
                     if (relativePath[0] == '/')
                     {
                         relativePath++;
@@ -403,7 +404,7 @@ struct SC::FileSystemWatcher::Internal
         StringPath   eventPath;
         Notification notification;
 
-        notification.basePath = entry->path.path;
+        notification.basePath = entry->path.view();
 
         // 1. Compute relative Path
         if (foundIndex == 0)
@@ -424,11 +425,11 @@ struct SC::FileSystemWatcher::Internal
             const StringSpan relativeDirectory = StringSpan::fromNullTerminated(dirStart, StringEncoding::Utf8);
             const StringSpan relativeName      = StringSpan::fromNullTerminated(event->name, StringEncoding::Utf8);
 
-            SC_TRY_MSG(eventPath.path.assign(relativeDirectory), "Relative path too long");
-            SC_TRY_MSG(eventPath.path.append("/"), "Relative path too long");
-            SC_TRY_MSG(eventPath.path.append(relativeName), "Relative path too long");
+            SC_TRY_MSG(eventPath.assign(relativeDirectory), "Relative path too long");
+            SC_TRY_MSG(eventPath.append("/"), "Relative path too long");
+            SC_TRY_MSG(eventPath.append(relativeName), "Relative path too long");
 
-            notification.relativePath = eventPath.path.view();
+            notification.relativePath = eventPath.view();
         }
 
         // 2. Compute event Type
@@ -455,9 +456,9 @@ struct SC::FileSystemWatcher::Internal
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    SC_TRY_MSG(buffer.path.assign(basePath), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.path.append("/"), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.assign(basePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.append("/"), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
 }
 

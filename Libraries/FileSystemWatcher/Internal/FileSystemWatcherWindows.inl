@@ -132,7 +132,7 @@ struct SC::FileSystemWatcher::Internal
             SC_TRY_MSG(threadingRunner->numEntries < ThreadRunnerDefinition::MaxWatchablePaths,
                        "startWatching exceeded MaxWatchablePaths");
         }
-        HANDLE newHandle = ::CreateFileW(entry->path.path.buffer,                                          //
+        HANDLE newHandle = ::CreateFileW(entry->path.view().getNullTerminatedNative(),                     //
                                          FILE_LIST_DIRECTORY,                                              //
                                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,           //
                                          nullptr,                                                          //
@@ -210,7 +210,7 @@ struct SC::FileSystemWatcher::Internal
         FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
 
         Notification notification;
-        notification.basePath = entry.path.path;
+        notification.basePath = entry.path.view();
 
         do
         {
@@ -251,9 +251,9 @@ struct SC::FileSystemWatcher::Internal
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) const
 {
-    SC_TRY_MSG(buffer.path.assign(basePath), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.path.append(L"\\"), "Buffer too small to hold full path");
-    SC_TRY_MSG(buffer.path.append(relativePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.assign(basePath), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.append(L"\\"), "Buffer too small to hold full path");
+    SC_TRY_MSG(buffer.append(relativePath), "Buffer too small to hold full path");
     return Result(true);
 }
 

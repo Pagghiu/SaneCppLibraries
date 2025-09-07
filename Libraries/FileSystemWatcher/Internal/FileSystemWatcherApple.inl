@@ -143,7 +143,8 @@ struct SC::FileSystemWatcher::Internal
             });
         for (FolderWatcher* it = self->watchers.front; it != nullptr; it = it->next)
         {
-            watchedPaths[numAllocatedPaths] = CFStringCreateWithFileSystemRepresentation(nullptr, it->path.path.buffer);
+            watchedPaths[numAllocatedPaths] =
+                CFStringCreateWithFileSystemRepresentation(nullptr, it->path.view().bytesIncludingTerminator());
             if (not watchedPaths[numAllocatedPaths])
                 return Result::Error("CFStringCreateWithFileSystemRepresentation failed");
             numAllocatedPaths++;
@@ -316,21 +317,20 @@ struct SC::FileSystemWatcher::Internal
         {
             Span<const char> rootSpan;
 
-            const bool sliceStart =
-                path.toCharSpan().sliceStartLength(0, watcher->path.path.view().sizeInBytes(), rootSpan);
+            const bool sliceStart = path.toCharSpan().sliceStartLength(0, watcher->path.view().sizeInBytes(), rootSpan);
             internal.notification.basePath = {rootSpan, false, StringEncoding::Utf8};
-            if (sliceStart and watcher->path.path.view() == internal.notification.basePath)
+            if (sliceStart and watcher->path.view() == internal.notification.basePath)
             {
                 Span<const char> relativeSpan;
                 (void)path.toCharSpan().sliceStartLength(
-                    watcher->path.path.view().sizeInBytes(),
-                    path.toCharSpan().sizeInBytes() - watcher->path.path.view().sizeInBytes(), relativeSpan);
+                    watcher->path.view().sizeInBytes(),
+                    path.toCharSpan().sizeInBytes() - watcher->path.view().sizeInBytes(), relativeSpan);
                 if (relativeSpan.data()[0] == '/')
                 {
                     (void)relativeSpan.sliceStart(1, relativeSpan);
                 }
                 internal.notification.relativePath = {relativeSpan, true, path.getEncoding()};
-                internal.notification.basePath     = watcher->path.path;
+                internal.notification.basePath     = watcher->path.view();
 
                 if (internal.eventLoopRunner)
                 {
@@ -381,7 +381,7 @@ struct SC::FileSystemWatcher::Internal
 
 SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& path) const
 {
-    return Result(path.path.assign(fullPath));
+    return Result(path.assign(fullPath));
 }
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {

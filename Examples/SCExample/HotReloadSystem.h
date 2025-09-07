@@ -95,7 +95,7 @@ struct HotReloadSystem
             }
         }
 
-        SC_TRY(registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.path.view(),
+        SC_TRY(registry.loadPlugin(identifier, compiler, sysroot, state.executablePath.view(),
                                    PluginRegistry::LoadMode::Reload));
 
         ISCExample* example = nullptr;
