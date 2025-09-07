@@ -68,20 +68,11 @@ struct SC_COMPILER_EXPORT Buffer;
 
 // Enables File library from reading data from file descriptor into a Buffer
 template <>
-struct GrowableBuffer<Buffer> : public IGrowableBuffer
+struct GrowableBuffer<Buffer> final : public IGrowableBuffer
 {
     Buffer& buffer;
-    GrowableBuffer(Buffer& buffer) : buffer(buffer)
-    {
-        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
-    }
-
-    virtual bool tryGrowTo(size_t newSize) override final
-    {
-        const bool result             = buffer.resizeWithoutInitializing(newSize);
-        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
-        return result;
-    }
+    GrowableBuffer(Buffer& buffer);
+    virtual bool tryGrowTo(size_t newSize) override;
 };
 //! @}
 } // namespace SC
