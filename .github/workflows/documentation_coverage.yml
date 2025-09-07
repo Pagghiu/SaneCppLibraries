@@ -1,9 +1,10 @@
-# Simple workflow for deploying static content to GitHub Pages
 name: Documentation and Code Coverage
 
 on:
-  # Runs on pushes targeting main and development branch
+  # Runs on pushes and pull requests targeting the main branch
   push:
+    branches: [ "main" ]
+  pull_request:
     branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
