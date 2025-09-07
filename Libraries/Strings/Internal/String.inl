@@ -74,3 +74,35 @@ SC::native_char_t* SC::String::nativeWritableBytesIncludingTerminator()
     return data.data();
 #endif
 }
+
+SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da)
+    : string(string), da(da)
+{
+    da = {string.data.size(), string.data.capacity(), string.data.data()};
+}
+
+SC::String::GrowableImplementation::~GrowableImplementation()
+{
+    const size_t numZeroes = StringEncodingGetSize(string.getEncoding());
+    if (string.data.size() + numZeroes <= string.data.capacity())
+    {
+        // Add null-terminator
+        (void)string.data.resize(string.data.size() + numZeroes, 0);
+    }
+}
+
+bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
+{
+    bool res = true;
+    if (newSize > 0)
+    {
+        const size_t numZeroes = StringEncodingGetSize(string.getEncoding());
+        res = string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
+    }
+    else
+    {
+        string.data.clear();
+    }
+    da = {string.data.size(), string.data.capacity(), string.data.data()};
+    return res;
+}

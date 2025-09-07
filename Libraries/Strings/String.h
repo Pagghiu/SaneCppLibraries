@@ -154,8 +154,18 @@ struct SC::String
     friend struct FileSystem;
     template <typename T>
     friend struct Reflection::Reflect;
+
     template <typename T>
     friend struct GrowableBuffer;
+    struct GrowableImplementation
+    {
+        String&                        string;
+        IGrowableBuffer::DirectAccess& da;
+        GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da);
+        ~GrowableImplementation();
+        bool tryGrowTo(size_t newSize);
+    };
+
     StringEncoding encoding;
     Buffer         data;
 
@@ -203,44 +213,18 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(
 
 // Enables File library from reading data from file descriptor into a String
 template <>
-struct GrowableBuffer<String> : public IGrowableBuffer
+struct GrowableBuffer<String> final : public IGrowableBuffer
 {
-    String& string;
-    size_t  numZeroes;
-    GrowableBuffer(String& string) : string(string)
-    {
-        numZeroes                     = StringEncodingGetSize(string.getEncoding());
-        IGrowableBuffer::directAccess = {string.data.size(), string.data.capacity(), string.data.data()};
-    }
-
-    virtual ~GrowableBuffer() override
-    {
-        if (string.data.size() + numZeroes <= string.data.capacity())
-        {
-            // Add null-terminator
-            (void)string.data.resize(string.data.size() + numZeroes, 0);
-        }
-    }
-
-    virtual bool tryGrowTo(size_t newSize) override final
-    {
-        bool res = true;
-        if (newSize > 0)
-        {
-            res = string.data.reserve(newSize + numZeroes) and string.data.resizeWithoutInitializing(newSize);
-        }
-        else
-        {
-            string.data.clear();
-        }
-        IGrowableBuffer::directAccess = {string.data.size(), string.data.capacity(), string.data.data()};
-        return res;
-    }
+    String::GrowableImplementation gi;
+    GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
+    virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
 };
 
 template <int N>
-struct GrowableBuffer<SmallString<N>> : GrowableBuffer<String>
+struct GrowableBuffer<SmallString<N>> final : public IGrowableBuffer
 {
-    using GrowableBuffer<String>::GrowableBuffer;
+    String::GrowableImplementation gi;
+    GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
+    virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
 };
 } // namespace SC
