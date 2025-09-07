@@ -937,8 +937,8 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <sys/attr.h>
 #include <sys/clonefile.h>
 #elif SC_PLATFORM_LINUX
-#include <sys/syscall.h> // SYS_getcwd
 #include <sys/sendfile.h>
+#include <sys/syscall.h> // SYS_getcwd
 #endif
 struct SC::FileSystem::Operations::Internal
 {

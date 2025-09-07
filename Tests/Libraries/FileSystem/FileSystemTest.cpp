@@ -62,7 +62,7 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             StringPath stringPath;
             report.console.print("currentWorkingDirectory=\"{}\"\n",
-                FileSystem::Operations::getCurrentWorkingDirectory(stringPath));
+                                 FileSystem::Operations::getCurrentWorkingDirectory(stringPath));
         }
         // TODO: Add tests for createSymbolicLink, existsAndIsLink, removeLinkIfExists and moveDirectory
     }
