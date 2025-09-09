@@ -204,10 +204,12 @@ endif
 
 else
 
-$(error "CONFIG = $(CONFIG) is unsupported")
-
+ifneq ($(filter {0}_% all compile run print-executable-paths,$(MAKECMDGOALS)),)
+$(error "CONFIG = '$(CONFIG)' is unsupported on '$(MAKECMDGOALS)' because '{0}' does not have such configuration")
+endif
 endif # $(CONFIG)
-)delimiter");
+)delimiter",
+                       makeTarget.view());
 
         writeMergedCompileFlags(builder, makeTarget.view());
         writeTargetFlags(builder, makeTarget.view());
@@ -265,7 +267,6 @@ endif # $(CONFIG)
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
 # {0} Target
-
 {0}_TARGET_NAME := {0}
 
 {0}_PRINT_EXECUTABLE_PATH:
@@ -439,10 +440,14 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
+ifneq ($(and $({0}_TARGET_DIR),$({0}_INTERMEDIATE_DIR)),)
 {0}_CLEAN:
 	@echo Cleaning {0}
 	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
-
+else
+{0}_CLEAN:
+	@echo "Cleaning {0} (skipped for config '$(CONFIG)')"
+endif
 )delimiter",
                        makeTarget);
 
