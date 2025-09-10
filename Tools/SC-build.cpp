@@ -98,6 +98,12 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
+    if (parameters.platform == Platform::Linux)
+    {
+        project.addPresetConfiguration(Configuration::Preset::Debug, parameters, "DebugValgrind");
+        project.configurations.back().compile.enableASAN = false; // ASAN and Valgrind don't mix
+        project.configurations.back().link.enableASAN    = false; // ASAN and Valgrind don't mix
+    }
 
     // Defines
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
