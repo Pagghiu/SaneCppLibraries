@@ -516,7 +516,19 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             auto spec = nextTimer or syncMode == Internal::SyncMode::NoWait ? &specTimeout : nullptr;
 #if SC_ASYNC_USE_EPOLL
-            res = ::epoll_pwait2(loopFd, events, totalNumEvents, spec, 0);
+            int timeout_ms = -1; // infinite wait
+            if (spec)
+            {
+                if (spec->tv_sec == 0 && spec->tv_nsec == 0)
+                {
+                    timeout_ms = 0; // no wait
+                }
+                else
+                {
+                    timeout_ms = static_cast<int>((spec->tv_sec * 1000) + (spec->tv_nsec / 1000000));
+                }
+            }
+            res = ::epoll_pwait(loopFd, events, totalNumEvents, timeout_ms, 0);
 #else
             res = ::kevent(loopFd, events, newEvents, events, totalNumEvents, spec);
 #endif
