@@ -231,8 +231,6 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     HANDLE fileDescriptor =
         ::CreateFileW(nullTerminatedPath, accessMode, shareMode, &security, createDisposition, fileFlags, nullptr);
 
-    DWORD lastErr = ::GetLastError();
-    SC_COMPILER_UNUSED(lastErr);
     SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed");
     return assign(fileDescriptor);
 }
@@ -532,49 +530,79 @@ SC::Result SC::FileDescriptor::openForWriteToDevNull()
 SC::Result SC::FileDescriptor::openStdOutDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
-    handle   = ::GetStdHandle(STD_OUTPUT_HANDLE);
-    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
-                                 DUPLICATE_SAME_ACCESS);
+    HANDLE stdHandle = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    if (stdHandle == INVALID_HANDLE_VALUE)
+    {
+        return Result::Error("GetStdHandle failed");
+    }
+    HANDLE duplicated;
+    BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+        return Result::Error("DuplicateHandle failed");
     }
+    return assign(duplicated);
 #else
-    handle = ::dup(STDOUT_FILENO);
+    int duplicated = ::dup(STDOUT_FILENO);
+    if (duplicated == -1)
+    {
+        return Result::Error("dup failed");
+    }
+    return assign(duplicated);
 #endif
-    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::openStdErrDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
-    handle   = ::GetStdHandle(STD_ERROR_HANDLE);
-    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
-                                 DUPLICATE_SAME_ACCESS);
+    HANDLE stdHandle = ::GetStdHandle(STD_ERROR_HANDLE);
+    if (stdHandle == INVALID_HANDLE_VALUE)
+    {
+        return Result::Error("GetStdHandle failed");
+    }
+    HANDLE duplicated;
+    BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+        return Result::Error("DuplicateHandle failed");
     }
+    return assign(duplicated);
 #else
-    handle = ::dup(STDERR_FILENO); // Ensure that the file descriptor is valid
+    int duplicated = ::dup(STDERR_FILENO);
+    if (duplicated == -1)
+    {
+        return Result::Error("dup failed");
+    }
+    return assign(duplicated);
 #endif
-    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::openStdInDuplicate()
 {
 #if SC_PLATFORM_WINDOWS
-    handle   = ::GetStdHandle(STD_INPUT_HANDLE);
-    BOOL res = ::DuplicateHandle(::GetCurrentProcess(), handle, ::GetCurrentProcess(), &handle, 0, TRUE,
-                                 DUPLICATE_SAME_ACCESS);
+    HANDLE stdHandle = ::GetStdHandle(STD_INPUT_HANDLE);
+    if (stdHandle == INVALID_HANDLE_VALUE)
+    {
+        return Result::Error("GetStdHandle failed");
+    }
+    HANDLE duplicated;
+    BOOL   res = ::DuplicateHandle(::GetCurrentProcess(), stdHandle, ::GetCurrentProcess(), &duplicated, 0, TRUE,
+                                   DUPLICATE_SAME_ACCESS);
     if (res == FALSE)
     {
-        return Result::Error("FileDescriptor::openStdOutDuplicate - DuplicateHandle failed");
+        return Result::Error("DuplicateHandle failed");
     }
+    return assign(duplicated);
 #else
-    handle = ::dup(STDIN_FILENO);
+    int duplicated = ::dup(STDIN_FILENO);
+    if (duplicated == -1)
+    {
+        return Result::Error("dup failed");
+    }
+    return assign(duplicated);
 #endif
-    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::writeString(StringSpan data) { return write(data.toCharSpan()); }
