@@ -68,7 +68,7 @@ struct SC_COMPILER_EXPORT Buffer;
 
 // Enables File library from reading data from file descriptor into a Buffer
 template <>
-struct GrowableBuffer<Buffer> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> final : public IGrowableBuffer
 {
     Buffer& buffer;
     GrowableBuffer(Buffer& buffer);

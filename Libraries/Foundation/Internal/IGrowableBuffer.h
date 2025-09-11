@@ -7,7 +7,7 @@ namespace SC
 /// @brief Virtual interface to abstract a linear binary buffer.
 /// It's used by File library to read data into a Buffer or String object without need to know their types.
 /// This allows breaking the dependency between File and Strings / Memory libraries.
-struct IGrowableBuffer
+struct SC_COMPILER_EXPORT IGrowableBuffer
 {
     struct DirectAccess
     {

@@ -157,7 +157,7 @@ struct SC::String
 
     template <typename T>
     friend struct GrowableBuffer;
-    struct GrowableImplementation
+    struct SC_COMPILER_EXPORT GrowableImplementation
     {
         String&                        string;
         IGrowableBuffer::DirectAccess& da;
@@ -213,7 +213,7 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(
 
 // Enables File library from reading data from file descriptor into a String
 template <>
-struct GrowableBuffer<String> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<String> final : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
     GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
@@ -221,7 +221,7 @@ struct GrowableBuffer<String> final : public IGrowableBuffer
 };
 
 template <int N>
-struct GrowableBuffer<SmallString<N>> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<SmallString<N>> final : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
     GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
