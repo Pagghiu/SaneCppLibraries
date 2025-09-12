@@ -127,4 +127,6 @@ struct Span
 };
 //! @}
 
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Span<char>;
 } // namespace SC

@@ -3,6 +3,7 @@
 #include "Libraries/Containers/Array.h"
 #include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Containers/Vector.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -179,7 +180,7 @@ struct SC::ArrayTest : public SC::TestCase
 
 bool SC::ArrayTest::arraySnippet()
 {
-    Buffer  buffer;
+    char    buffer[256];
     Console console(buffer);
     //! [ArraySnippet]
     Array<int, 3> myVector;

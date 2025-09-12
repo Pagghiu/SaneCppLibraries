@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Memory/Globals.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/VirtualMemory.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"

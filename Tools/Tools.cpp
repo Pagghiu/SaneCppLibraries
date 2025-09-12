@@ -17,7 +17,7 @@
 #include <Windows.h>
 #endif
 
-static SC::SmallBuffer<512> gConsoleBuffer;
+static char                 gConsoleBuffer[256];
 static SC::SmallString<512> gFormatString;
 
 SC::Console* globalConsole;

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpParser.h"
 #include "Libraries/Containers/Vector.h"
+#include "Libraries/Memory/Buffer.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC

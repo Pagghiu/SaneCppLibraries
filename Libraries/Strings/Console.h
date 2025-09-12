@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Memory/Buffer.h"
+#include "../Foundation/Span.h"
 #include "../Strings/StringFormat.h"
 #include "../Strings/StringView.h"
 
@@ -17,8 +17,9 @@ struct String;
 /// Example:
 /// @code{.cpp}
 /// // Create a buffer used for UTF conversions (if necessary)
-/// SmallBuffer< 512 * sizeof(native_char_t)> consoleConversionBuffer;
+/// char consoleConversionBuffer[512];
 /// // Construct console with the buffer
+/// Console console(consoleConversionBuffer);
 /// String str = StringView("Test Test\n");
 /// // Have fun printing
 /// console.print(str.view());
@@ -26,8 +27,8 @@ struct String;
 struct SC_COMPILER_EXPORT Console
 {
     /// @brief Constructs a console with a conversion buffer used for string conversions (UTF8 / UTF16)
-    /// @param encodingConversionBuffer The buffer used for UTF conversions
-    Console(Buffer& encodingConversionBuffer);
+    /// @param conversionBuffer The buffer used for UTF conversions (must be at least 6 bytes or it will assert)
+    Console(Span<char> conversionBuffer);
 
     /// @brief Prints a formatted string using SC::StringFormat
     /// @tparam Types Types of `args`
@@ -63,7 +64,7 @@ struct SC_COMPILER_EXPORT Console
     static bool isAttachedToConsole();
 
   private:
-    Buffer& encodingConversionBuffer;
+    Span<char> conversionBuffer;
 #if SC_PLATFORM_WINDOWS
     void* handle;
     bool  isConsole  = true;
