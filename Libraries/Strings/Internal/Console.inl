@@ -1,22 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Foundation/Platform.h"
-#include "../../Strings/StringConverter.h"
 #include "../Console.h"
-
-#include <stdio.h>  // stdout
-#include <string.h> // strlen
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#else
+#include <stdio.h> // stdout
 #endif
 
 SC::Console::Console(Span<char> conversionBuffer) : conversionBuffer(conversionBuffer)
 {
-    // Minimum size for conversion buffer (two wide chars + null terminator)
-    SC_ASSERT_RELEASE(conversionBuffer.sizeInBytes() >= 6);
 #if SC_PLATFORM_WINDOWS
     handle     = ::GetStdHandle(STD_OUTPUT_HANDLE);
     isConsole  = ::GetFileType(handle) == FILE_TYPE_CHAR;
@@ -42,17 +37,22 @@ bool SC::Console::isAttachedToConsole()
 #endif
 }
 
-void SC::Console::printLine(const StringView str)
+void SC::Console::printLine(const StringSpan str)
 {
     print(str);
     print("\n"_a8);
 }
 
-void SC::Console::print(const StringView str)
+void SC::Console::print(const StringSpan str)
 {
     if (str.isEmpty())
         return;
 #if SC_PLATFORM_WINDOWS
+    char fallbackBuffer[256];
+    if (conversionBuffer.sizeInBytes() < 256)
+    {
+        conversionBuffer = fallbackBuffer;
+    }
     if (!isConsole)
     {
         if (str.getEncoding() == StringEncoding::Utf16)
@@ -170,10 +170,9 @@ void SC::Console::print(const StringView str)
         else if (str.getEncoding() == StringEncoding::Utf8)
         {
             // convert to wide char and use OutputDebugStringW / WriteConsoleW
-            wchar_t*     buffer       = reinterpret_cast<wchar_t*>(conversionBuffer.data());
-            const size_t bufferWChars = conversionBuffer.sizeInBytes() / sizeof(wchar_t);
-#if SC_CONFIGURATION_DEBUG
-            size_t numWrittenBytes = 0;
+            wchar_t*     buffer          = reinterpret_cast<wchar_t*>(conversionBuffer.data());
+            const size_t bufferWChars    = conversionBuffer.sizeInBytes() / sizeof(wchar_t);
+            size_t       numWrittenBytes = 0;
             while (numWrittenBytes < str.sizeInBytes())
             {
                 // convert just a chunk of bytes to wide char buffer, ensuring not to cut UTF8 characters, and null
@@ -197,10 +196,12 @@ void SC::Console::print(const StringView str)
                 if (numWideChars > 0)
                 {
                     buffer[numWideChars] = 0;
+#if SC_CONFIGURATION_DEBUG
                     if (isDebugger)
                     {
                         ::OutputDebugStringW(buffer);
                     }
+#endif
                     if (isConsole)
                     {
                         ::WriteConsoleW(handle, buffer, static_cast<DWORD>(numWideChars), nullptr, nullptr);
@@ -208,10 +209,12 @@ void SC::Console::print(const StringView str)
                 }
                 numWrittenBytes += numToWrite;
             }
-#endif
         }
     }
-
+    if (conversionBuffer.data() == fallbackBuffer)
+    {
+        conversionBuffer = {};
+    }
 #else
     fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif

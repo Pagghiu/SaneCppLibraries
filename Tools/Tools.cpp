@@ -17,7 +17,6 @@
 #include <Windows.h>
 #endif
 
-static char                 gConsoleBuffer[256];
 static SC::SmallString<512> gFormatString;
 
 SC::Console* globalConsole;
@@ -27,7 +26,8 @@ int main(int argc, const char* argv[])
     using namespace SC;
     using namespace SC::Tools;
     Console::tryAttachingToParentConsole();
-    Console         console(gConsoleBuffer);
+    Console console;
+
     Tool::Arguments arguments{console};
 
     globalConsole = &console;

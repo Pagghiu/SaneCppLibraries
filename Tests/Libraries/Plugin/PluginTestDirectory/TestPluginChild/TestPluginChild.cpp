@@ -9,11 +9,9 @@ SC::StringView externallyDefinedFunc();
 
 struct TestPluginChild : public ITestInterface1, public ITestInterface2
 {
-    char consoleBuffer[256];
-
     SC::Console console;
 
-    TestPluginChild() : console(consoleBuffer)
+    TestPluginChild()
     {
         // Setup Interfaces table
         ITestInterface1::multiplyInt.bind<TestPluginChild, &TestPluginChild::multiply>(*this);

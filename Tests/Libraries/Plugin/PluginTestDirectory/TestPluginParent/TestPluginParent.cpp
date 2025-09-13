@@ -7,11 +7,7 @@
 
 struct TestPluginParent
 {
-    char consoleBuffer[256];
-
     SC::Console console;
-
-    TestPluginParent() : console(consoleBuffer) {}
 
     [[nodiscard]] bool init()
     {

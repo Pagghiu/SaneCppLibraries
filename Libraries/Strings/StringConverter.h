@@ -108,13 +108,10 @@ struct SC::StringConverter
     static void ensureZeroTermination(Buffer& data, StringEncoding encoding);
 
     void internalClear();
-    // TODO: FileSystemIterator should just use a Buffer
-    friend struct FileSystemIterator;
     friend struct String;
     template <int N>
     friend struct SmallString;
     friend struct StringBuilder;
-    friend struct File;
 
     [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
     [[nodiscard]] static bool convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,

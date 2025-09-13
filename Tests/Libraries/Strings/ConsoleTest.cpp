@@ -17,9 +17,10 @@ struct SC::ConsoleTest : public SC::TestCase
     {
         using namespace SC;
 
-        char consoleConversionBuffer[256];
+        // Totally optional conversion buffer for UTF conversions on Windows (default is 256 bytes)
+        char optionalConversionBuffer[512];
 
-        Console console(consoleConversionBuffer);
+        Console console(optionalConversionBuffer);
 
         if (test_section("print"))
         {

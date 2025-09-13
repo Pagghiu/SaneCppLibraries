@@ -1,9 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Span.h"
 #include "../Strings/StringFormat.h"
-#include "../Strings/StringView.h"
 
 namespace SC
 {
@@ -16,19 +14,18 @@ struct String;
 ///
 /// Example:
 /// @code{.cpp}
-/// // Create a buffer used for UTF conversions (if necessary)
-/// char consoleConversionBuffer[512];
-/// // Construct console with the buffer
-/// Console console(consoleConversionBuffer);
+/// // Use a custom buffer UTF conversions on windows (optional)
+/// char optionalConversionBuffer[512];
+/// Console console(optionalConversionBuffer);
 /// String str = StringView("Test Test\n");
 /// // Have fun printing
 /// console.print(str.view());
 /// @endcode
 struct SC_COMPILER_EXPORT Console
 {
-    /// @brief Constructs a console with a conversion buffer used for string conversions (UTF8 / UTF16)
-    /// @param conversionBuffer The buffer used for UTF conversions (must be at least 6 bytes or it will assert)
-    Console(Span<char> conversionBuffer);
+    /// @brief Constructs a console with an OPTIONAL conversion buffer used for UTF encoding conversions on Windows
+    /// @param conversionBuffer The optional buffer used for UTF conversions
+    Console(Span<char> conversionBuffer = {});
 
     /// @brief Prints a formatted string using SC::StringFormat
     /// @tparam Types Types of `args`
@@ -36,7 +33,7 @@ struct SC_COMPILER_EXPORT Console
     /// @param args Arguments to be formatted in the string
     /// @return `true` if message has been printed successfully to Console
     template <typename... Types>
-    bool print(StringView fmt, Types&&... args)
+    bool print(StringSpan fmt, Types&&... args)
     {
         StringFormatOutput output(fmt.getEncoding(), *this);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
@@ -48,13 +45,13 @@ struct SC_COMPILER_EXPORT Console
         return false; // UTF16/32 format strings are not supported
     }
 
-    /// @brief Prints a StringView to console
-    /// @param str The StringView to print
-    void print(const StringView str);
+    /// @brief Prints a StringSpan to console
+    /// @param str The StringSpan to print
+    void print(const StringSpan str);
 
-    /// @brief Prints a StringView to console and adds a newline at the end of it
-    /// @param str The StringView to print
-    void printLine(const StringView str);
+    /// @brief Prints a StringSpan to console and adds a newline at the end of it
+    /// @param str The StringSpan to print
+    void printLine(const StringSpan str);
 
     /// @brief Tries attaching current process to parent console (Windows only, has no effect elsewhere)
     /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)

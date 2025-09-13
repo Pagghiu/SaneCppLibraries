@@ -121,11 +121,10 @@ int main(int argc, const char* argv[])
 {
     using namespace SC;
     Globals::init(Globals::Global, {1024 * 1024}); // 1MB for ownership tracking
-    char globalConsoleConversionBuffer[256];
     Console::tryAttachingToParentConsole();
     if (not SocketNetworking::initNetworking())
         return -2;
-    Console    console(globalConsoleConversionBuffer);
+    Console    console;
     TestReport report(console, argc, argv);
 
     report.executableFile = FileSystem::Operations::getExecutablePath(report.executableFileStorage);

@@ -792,8 +792,7 @@ void SC::VectorTest::testBasicType()
 
 bool SC::VectorTest::vectorSnippet()
 {
-    char    buffer[256];
-    Console console(buffer);
+    Console console;
     //! [VectorSnippet]
     Vector<int> myVector;
     SC_TRY(myVector.reserve(10));

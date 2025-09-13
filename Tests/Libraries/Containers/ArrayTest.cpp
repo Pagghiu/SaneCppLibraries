@@ -180,8 +180,7 @@ struct SC::ArrayTest : public SC::TestCase
 
 bool SC::ArrayTest::arraySnippet()
 {
-    char    buffer[256];
-    Console console(buffer);
+    Console console;
     //! [ArraySnippet]
     Array<int, 3> myVector;
     SC_TRY(myVector.push_back(1));
