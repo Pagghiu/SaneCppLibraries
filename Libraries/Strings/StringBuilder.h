@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Strings/StringConverter.h" // popNullTermIfNotEmpty
 #include "../Strings/StringFormat.h"
 namespace SC
 {
@@ -117,6 +116,9 @@ struct SC_COMPILER_EXPORT StringBuilder
   private:
     void clear();
 
+    [[nodiscard]] static bool popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding);
+    [[nodiscard]] static bool pushNullTerm(Buffer& stringData, StringEncoding encoding);
+
     Buffer&        stringData;
     StringEncoding encoding;
 };
@@ -141,7 +143,7 @@ inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
     {
         return false; // UTF16 format strings are not supported
     }
-    const bool hadNullTerminator = StringConverter::popNullTermIfNotEmpty(stringData, encoding);
+    const bool hadNullTerminator = popNullTermIfNotEmpty(stringData, encoding);
     // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
     // because on a valid UTF8 string, these chars are unambiguously recognizable
     StringFormatOutput sfo(encoding, stringData);
@@ -154,7 +156,7 @@ inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
         if (hadNullTerminator)
         {
             // Even if format failed, let's not leave a broken string without a null-terminator
-            (void)StringConverter::pushNullTerm(stringData, encoding);
+            (void)pushNullTerm(stringData, encoding);
         }
         return false;
     }

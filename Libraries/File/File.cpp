@@ -61,7 +61,7 @@ struct SC::FileDescriptor::Internal
         }
         else if (numReadBytes > 0)
         {
-            SC_TRY_MSG(buffer.tryGrowTo(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
+            SC_TRY_MSG(buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
                        "FileDescriptor::readAppend - resize failed");
             if (not useVector)
             {
@@ -286,7 +286,7 @@ struct SC::FileDescriptor::Internal
         }
         if (numReadBytes > 0)
         {
-            SC_TRY_MSG(buffer.tryGrowTo(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
+            SC_TRY_MSG(buffer.resizeWithoutInitializing(bufferData.sizeInBytes + static_cast<size_t>(numReadBytes)),
                        "FileDescriptor::readAppend - resize failed");
             if (not useVector)
             {
@@ -638,7 +638,7 @@ SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
     char buffer[1024];
     SC_TRY_MSG(isValid(), "FileDescriptor::readUntilEOFGrowable - Invalid handle");
     bool isEOF = false;
-    SC_TRY_MSG(adapter.tryGrowTo(0), "FileDescriptor::readUntilEOFGrowable - Cannot reset string");
+    SC_TRY_MSG(adapter.resizeWithoutInitializing(0), "FileDescriptor::readUntilEOFGrowable - Cannot reset string");
     while (not isEOF)
     {
         SC_TRY(Internal::readAppend(handle, adapter, {buffer, sizeof(buffer)}, isEOF));

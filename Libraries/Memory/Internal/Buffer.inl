@@ -16,10 +16,19 @@ GrowableBuffer<Buffer>::GrowableBuffer(Buffer& buffer) : buffer(buffer)
     IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
 }
 
+GrowableBuffer<Buffer>::~GrowableBuffer()
+{
+    if (buffer.size() != IGrowableBuffer::directAccess.sizeInBytes)
+    {
+        (void)buffer.resizeWithoutInitializing(IGrowableBuffer::directAccess.sizeInBytes);
+    }
+}
+
 bool GrowableBuffer<Buffer>::tryGrowTo(size_t newSize)
 {
     const bool result             = buffer.resizeWithoutInitializing(newSize);
     IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
     return result;
 }
+
 } // namespace SC

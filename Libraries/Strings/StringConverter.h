@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Strings/StringView.h"
+#include "../Foundation/StringSpan.h"
 
 namespace SC
 {
@@ -56,13 +56,6 @@ struct SC_COMPILER_EXPORT StringConverter
                                                 NullTermination nullTerminate = AddZeroTerminator);
 
   private:
-    static void ensureZeroTermination(Buffer& data, StringEncoding encoding);
-
-    [[nodiscard]] static bool popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding);
-    [[nodiscard]] static bool pushNullTerm(Buffer& stringData, StringEncoding encoding);
-
-    friend struct String;
-    friend struct StringBuilder;
     struct Internal;
 };
 //! @}

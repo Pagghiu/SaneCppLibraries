@@ -2,12 +2,27 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Strings/String.h"
-#include "../../Strings/StringConverter.h" // ensureZeroTermination
+
+struct SC::String::Internal
+{
+    static void ensureZeroTermination(Buffer& buffer, StringEncoding encoding)
+    {
+        const size_t numZeros = StringEncodingGetSize(encoding);
+        if (buffer.size() >= numZeros)
+        {
+            auto* data = buffer.data();
+            for (size_t idx = 0; idx < numZeros; ++idx)
+            {
+                data[buffer.size() - 1 - idx] = 0;
+            }
+        }
+    }
+};
 
 SC::String::String(Buffer&& otherData, StringEncoding encoding) : encoding(encoding)
 {
     SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
-    StringConverter::ensureZeroTermination(data, encoding);
+    Internal::ensureZeroTermination(data, encoding);
 }
 
 SC::String::String(StringEncoding encoding, uint32_t inlineCapacity) : encoding(encoding), data(inlineCapacity) {}
@@ -16,7 +31,7 @@ SC::String::String(Buffer&& otherData, StringEncoding encoding, uint32_t inlineC
     : String(encoding, inlineCapacity)
 {
     SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
-    StringConverter::ensureZeroTermination(data, encoding);
+    Internal::ensureZeroTermination(data, encoding);
 }
 
 bool SC::String::owns(StringSpan view) const
@@ -64,17 +79,6 @@ SC::StringView SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
     return StringView({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
 }
 
-SC::native_char_t* SC::String::nativeWritableBytesIncludingTerminator()
-{
-#if SC_PLATFORM_WINDOWS
-    SC_ASSERT_RELEASE(encoding == StringEncoding::Utf16);
-    return reinterpret_cast<wchar_t*>(data.data());
-#else
-    SC_ASSERT_RELEASE(encoding < StringEncoding::Utf16);
-    return data.data();
-#endif
-}
-
 SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da)
     : string(string), da(da)
 {
@@ -83,6 +87,10 @@ SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrow
 
 SC::String::GrowableImplementation::~GrowableImplementation()
 {
+    if (string.data.size() != da.sizeInBytes)
+    {
+        (void)string.data.resizeWithoutInitializing(da.sizeInBytes);
+    }
     const size_t numZeroes = StringEncodingGetSize(string.getEncoding());
     if (string.data.size() + numZeroes <= string.data.capacity())
     {

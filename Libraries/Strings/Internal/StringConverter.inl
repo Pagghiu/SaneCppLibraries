@@ -4,7 +4,6 @@
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
 #include "../../Memory/Buffer.h"
-#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -218,39 +217,6 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringSpan 
     case StringEncoding::Utf16: return convertEncodingToUTF16(text, buffer, encodedText, terminate);
     }
     return false;
-}
-
-void SC::StringConverter::ensureZeroTermination(Buffer& buffer, StringEncoding encoding)
-{
-    const size_t numZeros = StringEncodingGetSize(encoding);
-    if (buffer.size() >= numZeros)
-    {
-        auto* data = buffer.data();
-        for (size_t idx = 0; idx < numZeros; ++idx)
-        {
-            data[buffer.size() - 1 - idx] = 0;
-        }
-    }
-}
-
-bool SC::StringConverter::popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding)
-{
-    const auto sizeOfZero = StringEncodingGetSize(encoding);
-    const auto dataSize   = stringData.size();
-    if (dataSize >= sizeOfZero)
-    {
-        (void)stringData.resizeWithoutInitializing(dataSize - sizeOfZero);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool SC::StringConverter::pushNullTerm(Buffer& stringData, StringEncoding encoding)
-{
-    return stringData.resize(stringData.size() + StringEncodingGetSize(encoding), 0);
 }
 
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE

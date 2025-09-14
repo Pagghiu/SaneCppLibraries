@@ -16,17 +16,27 @@ struct SC_COMPILER_EXPORT IGrowableBuffer
         void*  data            = nullptr;
     };
 
+    /// Note: derived classes should set their size == to match directAccess.sizeInBytes during destructor
     virtual ~IGrowableBuffer() = default;
 
-    /// @brief  Try to grow the buffer to a new size.
+    [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
+    {
+        if (newSize < directAccess.capacityInBytes) // try to avoid a virtual call
+        {
+            directAccess.sizeInBytes = newSize; // size on type erased buffer will be set by virtual destructor
+            return true;
+        }
+        return tryGrowTo(newSize);
+    }
+
+    DirectAccess getDirectAccess() const { return directAccess; }
+
+  protected:
+    /// @brief  Try to grow the buffer to a new size, and update directAccess.
     /// @param newSize The desired new size for the buffer.
     /// @return `true` if the buffer was successfully grown, `false` otherwise.
     [[nodiscard]] virtual bool tryGrowTo(size_t newSize) = 0;
 
-    /// @brief Obtains direct access to the memory ownerd by the growable buffer
-    DirectAccess getDirectAccess() const { return directAccess; }
-
-  protected:
     DirectAccess directAccess;
 };
 

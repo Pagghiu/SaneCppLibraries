@@ -72,7 +72,25 @@ struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> final : public IGrowableBuffer
 {
     Buffer& buffer;
     GrowableBuffer(Buffer& buffer);
+    ~GrowableBuffer();
     virtual bool tryGrowTo(size_t newSize) override;
+};
+
+template <int N>
+struct SC_COMPILER_EXPORT GrowableBuffer<SmallBuffer<N>> final : public IGrowableBuffer
+{
+    Buffer& buffer;
+    GrowableBuffer(Buffer& buffer) : buffer(buffer)
+    {
+        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
+    }
+    ~GrowableBuffer() { (void)buffer.resizeWithoutInitializing(IGrowableBuffer::directAccess.sizeInBytes); }
+    virtual bool tryGrowTo(size_t newSize) override
+    {
+        const bool result             = buffer.resizeWithoutInitializing(newSize);
+        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
+        return result;
+    }
 };
 //! @}
 } // namespace SC

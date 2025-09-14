@@ -142,8 +142,7 @@ struct SC::String
     String& operator=(StringSpan view);
 
   protected:
-    // TODO: nativeWritableBytesIncludingTerminator should be removed
-    [[nodiscard]] native_char_t* nativeWritableBytesIncludingTerminator();
+    struct Internal;
 
     // All these friendships are made to leverage writing directly to the Buffer
     // but while still keeping it an implementation detail

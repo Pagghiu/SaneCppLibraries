@@ -33,7 +33,7 @@ bool StringBuilder::append(StringView str)
 {
     if (str.isEmpty())
         return true;
-    (void)StringConverter::popNullTermIfNotEmpty(stringData, encoding);
+    (void)popNullTermIfNotEmpty(stringData, encoding);
     return StringConverter::convertEncodingTo(encoding, str, stringData);
 }
 
@@ -113,9 +113,29 @@ bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
             break;
         }
     }
-    return StringConverter::pushNullTerm(stringData, encoding);
+    return pushNullTerm(stringData, encoding);
 }
 
 void StringBuilder::clear() { stringData.clear(); }
+
+bool StringBuilder::popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding)
+{
+    const auto sizeOfZero = StringEncodingGetSize(encoding);
+    const auto dataSize   = stringData.size();
+    if (dataSize >= sizeOfZero)
+    {
+        (void)stringData.resizeWithoutInitializing(dataSize - sizeOfZero);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+bool StringBuilder::pushNullTerm(Buffer& stringData, StringEncoding encoding)
+{
+    return stringData.resize(stringData.size() + StringEncodingGetSize(encoding), 0);
+}
 
 } // namespace SC
