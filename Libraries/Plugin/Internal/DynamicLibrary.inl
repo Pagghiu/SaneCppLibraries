@@ -25,11 +25,9 @@ SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& han
 SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 {
     SC_TRY(close());
-    SmallString<1024> string = StringEncoding::Native;
-    StringConverter   converter(string);
-    StringView        fullPathZeroTerminated;
-    SC_TRY(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
-    HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.getNullTerminatedNative());
+    StringPath fullPathZeroTerminated;
+    SC_TRY(fullPathZeroTerminated.assign(fullPath));
+    HMODULE module = ::LoadLibraryW(fullPathZeroTerminated.view().getNullTerminatedNative());
     if (module == nullptr)
     {
         return Result::Error("LoadLibraryW failed");
@@ -41,13 +39,31 @@ SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle");
-    SmallString<1024> string = StringEncoding::Ascii;
-    StringConverter   converter(string);
-    StringView        symbolZeroTerminated;
-    SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
+    char symbolNullTerminated[512];
+    if (symbolName.getEncoding() == StringEncoding::Utf16)
+    {
+        // use widechartomulti byte conversion
+        const int numChars =
+            WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<const wchar_t*>(symbolName.bytesWithoutTerminator()),
+                                static_cast<int>(symbolName.sizeInBytes()), symbolNullTerminated,
+                                static_cast<int>(sizeof(symbolNullTerminated) - 1), nullptr, nullptr);
+        if (numChars == 0)
+        {
+            return Result::Error("SystemDynamicLibrary::loadSymbol - WideCharToMultiByte failed");
+        }
+        symbolNullTerminated[numChars] = 0;
+    }
+    else
+    {
+        if (symbolName.sizeInBytes() + 1 > sizeof(symbolNullTerminated))
+            return Result::Error("SystemDynamicLibrary::loadSymbol - symbol name too long");
+        ::memcpy(symbolNullTerminated, symbolName.bytesWithoutTerminator(), symbolName.sizeInBytes());
+        symbolNullTerminated[symbolName.sizeInBytes()] = 0; // ensure null termination
+    }
+
     HMODULE module;
     memcpy(&module, &handle, sizeof(HMODULE));
-    symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolZeroTerminated.bytesIncludingTerminator()));
+    symbol = reinterpret_cast<void*>(::GetProcAddress(module, symbolNullTerminated));
     return Result(symbol != nullptr);
 }
 #elif SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
@@ -67,11 +83,9 @@ SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& han
 SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 {
     SC_TRY(close());
-    SmallString<1024> string = StringEncoding::Native;
-    StringConverter   converter(string);
-    StringView        fullPathZeroTerminated;
-    SC_TRY(converter.convertNullTerminateFastPath(fullPath, fullPathZeroTerminated));
-    handle = ::dlopen(fullPathZeroTerminated.getNullTerminatedNative(), RTLD_LAZY);
+    StringPath fullPathZeroTerminated;
+    SC_TRY(fullPathZeroTerminated.assign(fullPath));
+    handle = ::dlopen(fullPathZeroTerminated.view().getNullTerminatedNative(), RTLD_LAZY);
     if (handle == nullptr)
     {
         return Result::Error("dlopen failed");
@@ -82,11 +96,10 @@ SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
 SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid dlsym handle");
-    SmallString<1024> string = StringEncoding::Native;
-    StringConverter   converter(string);
-    StringView        symbolZeroTerminated;
-    SC_TRY(converter.convertNullTerminateFastPath(symbolName, symbolZeroTerminated));
-    symbol = ::dlsym(handle, symbolZeroTerminated.getNullTerminatedNative());
+    // Using StringPath just to null terminate the symbol name
+    StringPath symbolZeroTerminated;
+    SC_TRY(symbolZeroTerminated.assign(symbolName));
+    symbol = ::dlsym(handle, symbolZeroTerminated.view().getNullTerminatedNative());
     return Result(symbol != nullptr);
 }
 #else

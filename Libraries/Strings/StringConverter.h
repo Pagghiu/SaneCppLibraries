@@ -6,9 +6,6 @@
 namespace SC
 {
 struct Buffer;
-struct SC_COMPILER_EXPORT StringConverter;
-struct String;
-} // namespace SC
 
 //! @addtogroup group_strings
 //! @{
@@ -20,7 +17,7 @@ struct String;
 ///
 /// Example:
 /// \snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
-struct SC::StringConverter
+struct SC_COMPILER_EXPORT StringConverter
 {
     /// @brief Specifies if to add a null terminator
     enum NullTermination
@@ -58,76 +55,15 @@ struct SC::StringConverter
                                                 StringSpan*     encodedText   = nullptr,
                                                 NullTermination nullTerminate = AddZeroTerminator);
 
-    /// @brief Clearing flags used when initializing destination buffer
-    enum Flags
-    {
-        Clear,     ///< Destination buffer will be cleared before pushing to it
-        DoNotClear ///< Destination buffer will not be cleared before pushing to it
-    };
-
-    /// @brief Create a StringBuilder that will push to given String
-    /// @param text Destination buffer where code points will be pushed
-    /// @param flags Specifies if destination buffer must be emptied or not before pushing
-    StringConverter(String& text, Flags flags = DoNotClear);
-
-    /// @brief Create a StringBuilder that will push to given Vector, with specific encoding.
-    /// @param text Destination buffer where code points will be pushed
-    /// @param encoding The encoding to be used
-    StringConverter(Buffer& text, StringEncoding encoding);
-
-    /// @brief Converts a given input StringSpan to null-terminated version.
-    /// Uses supplied buffer in constructor if an actual conversion is needed.
-    /// @param input The StringSpan to be converted
-    /// @param encodedText The converted output StringSpan
-    /// @return `true` if the conversion succeeded
-    [[nodiscard]] bool convertNullTerminateFastPath(StringSpan input, StringSpan& encodedText);
-
-    /// @brief Appends the given StringSpan and adds null-terminator.
-    /// If existing null-terminator was already last inserted code point, it will be removed before appending input.
-    /// @param input The StringSpan to be appended
-    /// @param popExistingNullTerminator If true, removes existing null terminator before adding the new one
-    /// @return `true` if the StringSpan has been successfully appended
-    [[nodiscard]] bool appendNullTerminated(StringSpan input, bool popExistingNullTerminator = true);
-
   private:
-    /// @brief Removes ending null-terminator from stringData if stringData is not empty
-    /// @param stringData The buffer to be modified
-    /// @param encoding The requested encoding, that determines how many null-termination bytes exist
-    /// @return `false` if the stringData is empty or its size is insufficient considering the given encoding
-    [[nodiscard]] static bool popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding);
-
-    /// @brief Will unconditionally add a null-terminator to given buffer.
-    /// @param stringData The destination buffer
-    /// @param encoding The given encoding
-    /// @return `true` if null-terminator was successfully pushed
-    [[nodiscard]] static bool pushNullTerm(Buffer& stringData, StringEncoding encoding);
-
-    /// @brief Eventually add null-terminators if needed to end of given buffer
-    /// @param data The destination buffer
-    /// @param encoding The given encoding
     static void ensureZeroTermination(Buffer& data, StringEncoding encoding);
 
-    void internalClear();
+    [[nodiscard]] static bool popNullTermIfNotEmpty(Buffer& stringData, StringEncoding encoding);
+    [[nodiscard]] static bool pushNullTerm(Buffer& stringData, StringEncoding encoding);
+
     friend struct String;
-    template <int N>
-    friend struct SmallString;
     friend struct StringBuilder;
-
-    [[nodiscard]] bool        setTextLengthInBytesIncludingTerminator(size_t newDataSize);
-    [[nodiscard]] static bool convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                                  NullTermination terminate);
-    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringSpan* encodedText,
-                                        NullTermination terminate);
-
-    StringEncoding encoding;
-    Buffer&        data;
-    // Appends the input string null terminated
-    [[nodiscard]] bool internalAppend(StringSpan input, StringSpan* encodedText);
-
-    // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
-    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, Buffer& destination,
-                                                     int& writtenCodeUnits);
-    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, Buffer& destination,
-                                                     int& writtenCodeUnits);
+    struct Internal;
 };
 //! @}
+} // namespace SC

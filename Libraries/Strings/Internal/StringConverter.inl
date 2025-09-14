@@ -14,18 +14,21 @@
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
-SC::StringConverter::StringConverter(String& text, Flags flags) : encoding(text.getEncoding()), data(text.data)
+struct SC::StringConverter::Internal
 {
-    if (flags == Clear)
-    {
-        internalClear();
-    }
-}
+    // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
+    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, Buffer& destination,
+                                                     int& writtenCodeUnits);
+    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, Buffer& destination,
+                                                     int& writtenCodeUnits);
+    [[nodiscard]] static bool convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
+                                                  NullTermination terminate);
+    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringSpan* encodedText,
+                                        NullTermination terminate);
+};
 
-SC::StringConverter::StringConverter(Buffer& data, StringEncoding encoding) : encoding(encoding), data(data) {}
-
-bool SC::StringConverter::convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                              NullTermination terminate)
+bool SC::StringConverter::Internal::convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
+                                                        NullTermination terminate)
 {
     const bool nullTerminate = terminate == AddZeroTerminator;
     if (text.isNullTerminated())
@@ -72,8 +75,9 @@ bool SC::StringConverter::convertSameEncoding(StringSpan text, Buffer& buffer, S
     return true;
 }
 
-void SC::StringConverter::eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding,
-                                                  StringSpan* encodedText, StringConverter::NullTermination terminate)
+void SC::StringConverter::Internal::eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding,
+                                                            StringSpan*                      encodedText,
+                                                            StringConverter::NullTermination terminate)
 {
     const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
     if (terminate == StringConverter::AddZeroTerminator)
@@ -104,7 +108,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer,
     }
     if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
-        return convertSameEncoding(text, buffer, encodedText, terminate);
+        return Internal::convertSameEncoding(text, buffer, encodedText, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf16)
     {
@@ -126,7 +130,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer,
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF8, 0, false, NULL, 0, &numChars);
 #else
         int numChars = -1;
-        SC_TRY(convertUTF16LE_to_UTF8(text, buffer, numChars));
+        SC_TRY(Internal::convertUTF16LE_to_UTF8(text, buffer, numChars));
 #endif
 
         if (numChars <= 0)
@@ -141,7 +145,7 @@ bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer,
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF8, 0, false,
                          reinterpret_cast<UInt8*>(buffer.data() + oldSize), numChars, NULL);
 #endif
-        eventuallyNullTerminate(buffer, StringEncoding::Utf8, encodedText, terminate);
+        Internal::eventuallyNullTerminate(buffer, StringEncoding::Utf8, encodedText, terminate);
         return true;
     }
     return false;
@@ -156,7 +160,7 @@ bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer
     }
     if (text.getEncoding() == StringEncoding::Utf16)
     {
-        return convertSameEncoding(text, buffer, encodedText, terminate);
+        return Internal::convertSameEncoding(text, buffer, encodedText, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
@@ -183,7 +187,7 @@ bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer
         CFIndex writtenCodeUnits = numChars / static_cast<CFIndex>(destinationCharSize);
 #else
         int writtenCodeUnits = -1;
-        SC_TRY(convertUTF8_to_UTF16LE(text, buffer, writtenCodeUnits));
+        SC_TRY(Internal::convertUTF8_to_UTF16LE(text, buffer, writtenCodeUnits));
 #endif
         if (writtenCodeUnits <= 0)
         {
@@ -198,7 +202,7 @@ bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF16, 0, false,
                          reinterpret_cast<UInt8*>(buffer.data() + oldSize), numChars, NULL);
 #endif
-        eventuallyNullTerminate(buffer, destinationEncoding, encodedText, terminate);
+        Internal::eventuallyNullTerminate(buffer, destinationEncoding, encodedText, terminate);
         return true;
     }
     return false;
@@ -214,40 +218,6 @@ bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringSpan 
     case StringEncoding::Utf16: return convertEncodingToUTF16(text, buffer, encodedText, terminate);
     }
     return false;
-}
-
-void SC::StringConverter::internalClear() { data.clear(); }
-
-bool SC::StringConverter::convertNullTerminateFastPath(StringSpan input, StringSpan& encodedText)
-{
-    data.clear();
-    SC_TRY(internalAppend(input, &encodedText));
-    return true;
-}
-
-bool SC::StringConverter::appendNullTerminated(StringSpan input, bool popExistingNullTerminator)
-{
-    if (popExistingNullTerminator)
-    {
-        (void)StringConverter::popNullTermIfNotEmpty(data, encoding);
-    }
-    return internalAppend(input, nullptr);
-}
-
-bool SC::StringConverter::setTextLengthInBytesIncludingTerminator(size_t newDataSize)
-{
-    const auto zeroSize = StringEncodingGetSize(encoding);
-    if (newDataSize >= zeroSize)
-    {
-        const bool res = data.resizeWithoutInitializing(newDataSize - zeroSize);
-        return res && data.resize(newDataSize, 0); // Adds the null terminator
-    }
-    return true;
-}
-
-bool SC::StringConverter::internalAppend(StringSpan input, StringSpan* encodedText)
-{
-    return StringConverter::convertEncodingTo(encoding, input, data, encodedText);
 }
 
 void SC::StringConverter::ensureZeroTermination(Buffer& buffer, StringEncoding encoding)
@@ -285,10 +255,8 @@ bool SC::StringConverter::pushNullTerm(Buffer& stringData, StringEncoding encodi
 
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
 
-// Fallbacks for platforms without a supported fast conversion function (Linux for now)
-
-bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringSpan sourceUtf8, SC::Buffer& destination,
-                                                 int& writtenCodeUnits)
+bool SC::StringConverter::Internal::convertUTF8_to_UTF16LE(const SC::StringSpan sourceUtf8, SC::Buffer& destination,
+                                                           int& writtenCodeUnits)
 {
     const char*  utf8    = sourceUtf8.bytesWithoutTerminator();
     const size_t utf8Len = sourceUtf8.sizeInBytes();
@@ -359,8 +327,8 @@ bool SC::StringConverter::convertUTF8_to_UTF16LE(const SC::StringSpan sourceUtf8
     return true;
 }
 
-bool SC::StringConverter::convertUTF16LE_to_UTF8(const SC::StringSpan sourceUtf16, SC::Buffer& destination,
-                                                 int& writtenCodeUnits)
+bool SC::StringConverter::Internal::convertUTF16LE_to_UTF8(const SC::StringSpan sourceUtf16, SC::Buffer& destination,
+                                                           int& writtenCodeUnits)
 {
     const uint16_t* utf16    = reinterpret_cast<const uint16_t*>(sourceUtf16.bytesWithoutTerminator());
     const size_t    utf16Len = sourceUtf16.sizeInBytes() / sizeof(uint16_t);

@@ -229,7 +229,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Vector<P
                     if (pluginDefinition.identity.identifier.isEmpty())
                     {
                         const StringView identifier = Path::basename(pluginDefinition.directory.view(), Path::AsNative);
-                        SC_TRY(StringConverter(pluginDefinition.identity.identifier).appendNullTerminated(identifier));
+                        SC_TRY(pluginDefinition.identity.identifier.assign(identifier));
                         pluginDefinition.pluginFileIndex = pluginDefinition.files.size() - 1;
                     }
                     else
