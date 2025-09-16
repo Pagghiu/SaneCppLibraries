@@ -5,6 +5,7 @@
 namespace SC
 {
 struct String;
+struct Buffer;
 //! @addtogroup group_strings
 //! @{
 

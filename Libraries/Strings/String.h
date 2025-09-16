@@ -200,6 +200,15 @@ struct SC::SmallString : public String
 
 namespace SC
 {
+template <typename T>
+struct StringFormatterFor;
+struct StringFormatOutput;
+
+// clang-format off
+template <> struct SC_COMPILER_EXPORT StringFormatterFor<String> { static bool format(StringFormatOutput&, const StringView, const String&);};
+template <int N> struct StringFormatterFor<SmallString<N>>       { static bool format(StringFormatOutput& sfo, const StringView sv, const SmallString<N>& s){return StringFormatterFor<String>::format(sfo,sv,s);}};
+// clang-format on
+
 template <int N>
 using SmallStringNative = SmallString<N * sizeof(native_char_t)>;
 

@@ -1,14 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#include "../../Foundation/StringPath.h"
 #include "../../Strings/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
-#include "../../Strings/String.h"
 #include "../../Strings/StringConverter.h"
 #include "../../Strings/StringFormat.h"
 
 #include <inttypes.h> // PRIu64 / PRIi64
 #include <stdio.h>    // snprintf
-#include <string.h>   // strlen
 #include <wchar.h>    // wcslen
 
 namespace SC
@@ -172,16 +171,17 @@ bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const Stri
     return data.append(value);
 }
 
-bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringView specifier, const String& value)
-{
-    return StringFormatterFor<StringView>::format(data, specifier, value.view());
-}
-
 bool StringFormatterFor<StringSpan>::format(StringFormatOutput& data, const StringView specifier, StringSpan value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(value);
 }
+
+bool StringFormatterFor<StringPath>::format(StringFormatOutput& data, const StringView specifier, const StringPath& str)
+{
+    return StringFormatterFor<StringSpan>::format(data, specifier, str.view());
+}
+
 //-----------------------------------------------------------------------------------------------------------------------
 // StringFormatOutput
 //-----------------------------------------------------------------------------------------------------------------------
@@ -196,16 +196,9 @@ bool StringFormatOutput::append(StringView text)
         console->print(text);
         return true;
     }
-    else if (data != nullptr)
+    else if (growableBuffer != nullptr)
     {
-        if (StringEncodingAreBinaryCompatible(encoding, text.getEncoding()))
-        {
-            return data->append(text.toCharSpan());
-        }
-        else
-        {
-            return StringConverter::appendEncodingTo(encoding, text, *data, StringConverter::DoNotTerminate);
-        }
+        return StringConverter::appendEncodingTo(encoding, text, *growableBuffer, StringConverter::DoNotTerminate);
     }
     else
     {
@@ -214,44 +207,47 @@ bool StringFormatOutput::append(StringView text)
     }
 }
 
-StringFormatOutput::StringFormatOutput(StringEncoding encoding, Buffer& destination) : encoding(encoding)
-{
-    data    = &destination;
-    console = nullptr;
-}
-
 StringFormatOutput::StringFormatOutput(StringEncoding encoding, Console& newConsole) : encoding(encoding)
 {
-    data    = nullptr;
     console = &newConsole;
+}
+
+StringFormatOutput::~StringFormatOutput()
+{
+    if (growableBuffer != nullptr)
+    {
+        growableBuffer->~IGrowableBuffer();
+        growableBuffer = nullptr;
+    }
 }
 
 void StringFormatOutput::onFormatBegin()
 {
-    if (data != nullptr)
+    if (growableBuffer != nullptr)
     {
-        backupSize = data->size();
+        backupSize = growableBuffer->getDirectAccess().sizeInBytes;
     }
 }
 
 bool StringFormatOutput::onFormatSucceeded()
 {
-    if (data != nullptr)
+    if (growableBuffer != nullptr)
     {
-        if (backupSize < data->size())
-        {
-            // Add null terminator
-            return data->resize(data->size() + StringEncodingGetSize(encoding), 0);
-        }
+        SC_TRY(StringConverter::appendEncodingTo(encoding, {}, *growableBuffer, StringConverter::NullTerminate));
+        growableBuffer->~IGrowableBuffer();
+        growableBuffer = nullptr;
+        return true;
     }
     return true;
 }
 
 void StringFormatOutput::onFormatFailed()
 {
-    if (data != nullptr)
+    if (growableBuffer != nullptr)
     {
-        SC_ASSERT_RELEASE(data->resize(backupSize, 0));
+        SC_ASSERT_RELEASE(growableBuffer->resizeWithoutInitializing(backupSize));
+        growableBuffer->~IGrowableBuffer();
+        growableBuffer = nullptr;
     }
 }
 

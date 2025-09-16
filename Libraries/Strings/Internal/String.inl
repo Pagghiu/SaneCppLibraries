@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Strings/String.h"
+#include "../../Strings/StringFormat.h"
 
 struct SC::String::Internal
 {
@@ -114,3 +115,11 @@ bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
     da = {string.data.size(), string.data.capacity(), string.data.data()};
     return res;
 }
+
+namespace SC
+{
+bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringView specifier, const String& value)
+{
+    return StringFormatterFor<StringView>::format(data, specifier, value.view());
+}
+} // namespace SC

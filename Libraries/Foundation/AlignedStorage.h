@@ -62,6 +62,8 @@ struct AlignedStorage
   private:
     alignas(Alignment) char bytes[N] = {0};
 };
+// Allows using this type across Plugin boundaries
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT AlignedStorage<6 * sizeof(void*)>;
 
 //! @}
 #if SC_COMPILER_GCC

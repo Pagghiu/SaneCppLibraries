@@ -1,29 +1,34 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/StringPath.h"
+#include "../Foundation/AlignedStorage.h"
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Strings/StringView.h"
 
 namespace SC
 {
 struct Console;
-struct String;
-struct Buffer;
-template <int N>
-struct SmallString;
+
 template <typename T>
 struct StringFormatterFor;
 
 //! @addtogroup group_strings
 //! @{
-
 /// @brief Allows pushing results of StringFormat to a buffer or to the console
 struct SC_COMPILER_EXPORT StringFormatOutput
 {
     /// @brief Constructs a StringFormatOutput object pushing to a destination buffer
     /// @param encoding The given encoding
     /// @param destination The destination buffer
-    StringFormatOutput(StringEncoding encoding, Buffer& destination);
+    template <typename T>
+    StringFormatOutput(StringEncoding encoding, T& destination) : encoding(encoding)
+    {
+        GrowableBuffer<T>& gbuf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
+        placementNew(gbuf, destination);
+        growableBuffer = &gbuf;
+    }
+
+    ~StringFormatOutput();
 
     /// @brief Constructs a StringFormatOutput object pushing to a console
     /// @param encoding The given encoding
@@ -46,10 +51,13 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     [[nodiscard]] bool onFormatSucceeded();
 
   private:
-    Buffer*        data    = nullptr;
-    Console*       console = nullptr;
-    StringEncoding encoding;
-    size_t         backupSize = 0;
+    AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
+
+    IGrowableBuffer* growableBuffer = nullptr;
+    StringEncoding   encoding;
+
+    Console* console    = nullptr;
+    size_t   backupSize = 0;
 };
 
 /// @brief Formats String with a simple DSL embedded in the format string
@@ -238,7 +246,6 @@ template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::uint8_t>  {static b
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringView, const char);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringView, const bool);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringView, const StringView);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<String>       {static bool format(StringFormatOutput&, const StringView, const String&);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringView, const char*);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<const void*>  {static bool format(StringFormatOutput&, const StringView, const void*);};
 #if SC_PLATFORM_WINDOWS
@@ -247,7 +254,9 @@ template <> struct SC_COMPILER_EXPORT StringFormatterFor<const wchar_t*> {static
 #endif
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> {static bool format(StringFormatOutput&, const StringView, const StringSpan);};
 
-template <int N> struct StringFormatterFor<SmallString<N>> {static bool format(StringFormatOutput& sfo, const StringView sv, const SmallString<N>& s){return StringFormatterFor<StringView>::format(sfo,sv,s.view());}};
+struct StringPath;
+template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringPath> {static bool format(StringFormatOutput&, const StringView, const StringPath&);};
+
 // clang-format on
 
 template <int N>
@@ -257,15 +266,6 @@ struct StringFormatterFor<char[N]>
     {
         const StringView sv({str, N - 1}, true, StringEncoding::Ascii);
         return StringFormatterFor<StringView>::format(data, specifier, sv);
-    }
-};
-
-template <>
-struct StringFormatterFor<StringPath>
-{
-    static bool format(StringFormatOutput& data, const StringView specifier, const StringPath& str)
-    {
-        return StringFormatterFor<StringSpan>::format(data, specifier, str.view());
     }
 };
 
