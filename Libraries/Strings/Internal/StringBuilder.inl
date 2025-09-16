@@ -34,7 +34,7 @@ bool StringBuilder::append(StringView str)
     if (str.isEmpty())
         return true;
     (void)popNullTermIfNotEmpty(stringData, encoding);
-    return StringConverter::convertEncodingTo(encoding, str, stringData);
+    return StringConverter::appendEncodingTo(encoding, str, stringData, StringConverter::NullTerminate);
 }
 
 bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf, StringView with)

@@ -1,12 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringSpan.h"
 
 namespace SC
 {
-struct Buffer;
-
 //! @addtogroup group_strings
 //! @{
 
@@ -20,42 +19,28 @@ struct Buffer;
 struct SC_COMPILER_EXPORT StringConverter
 {
     /// @brief Specifies if to add a null terminator
-    enum NullTermination
+    enum StringTermination
     {
-        AddZeroTerminator,     ///< A null terminator will be added at the end of the String
-        DoNotAddZeroTerminator ///< A null terminator will NOT be added at the end of the String
+        NullTerminate, ///< A null terminator will be added at the end of the String
+        DoNotTerminate ///< A null terminator will NOT be added at the end of the String
     };
 
-    /// @brief Converts text to (eventually null terminated) UTF8 encoding. Uses the passed in buffer if necessary.
-    /// @param text The StringSpan to be converted
-    /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
-    /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
-    /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF8(StringSpan text, Buffer& buffer, StringSpan* encodedText = nullptr,
-                                                    NullTermination nullTerminate = AddZeroTerminator);
-
-    /// @brief Converts text to (eventually null terminated) UTF16 encoding. Uses the passed in buffer if necessary.
-    /// @param text The StringSpan to be converted
-    /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
-    /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
-    /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingToUTF16(StringSpan text, Buffer& buffer, StringSpan* encodedText = nullptr,
-                                                     NullTermination nullTerminate = AddZeroTerminator);
-
-    /// @brief Converts text to (eventually null terminated) requested encoding. Uses the passed in buffer if necessary.
+    /// @brief Appends to buffer text with requested encoding, optionally null-terminating it too.
     /// @param encoding The requested destination encoding to convert to
     /// @param text The StringSpan to be converted
-    /// @param buffer The destination buffer that will be eventually used
-    /// @param encodedText If specified, a StringSpan containing the encoded text will be returned
+    /// @param buffer Encoded text will be appended to buffer
     /// @param nullTerminate Specifies if the StringSpan will need to be null terminated or not
     /// @return `true` if the conversion succeeds
-    [[nodiscard]] static bool convertEncodingTo(StringEncoding encoding, StringSpan text, Buffer& buffer,
-                                                StringSpan*     encodedText   = nullptr,
-                                                NullTermination nullTerminate = AddZeroTerminator);
+    template <typename T>
+    [[nodiscard]] static bool appendEncodingTo(StringEncoding encoding, StringSpan text, T& buffer,
+                                               StringTermination nullTerminate)
+    {
+        GrowableBuffer<T> growableBuffer{buffer};
+        return appendEncodingTo(encoding, text, static_cast<IGrowableBuffer&>(growableBuffer), nullTerminate);
+    }
 
-  private:
+    [[nodiscard]] static bool appendEncodingTo(StringEncoding encoding, StringSpan text, IGrowableBuffer& buffer,
+                                               StringTermination nullTerminate);
     struct Internal;
 };
 //! @}

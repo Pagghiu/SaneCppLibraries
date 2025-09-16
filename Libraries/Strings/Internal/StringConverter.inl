@@ -3,7 +3,6 @@
 
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
-#include "../../Memory/Buffer.h"
 #include "../../Strings/StringConverter.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -16,70 +15,63 @@
 struct SC::StringConverter::Internal
 {
     // Fallbacks for platforms without an API to do the conversion out of the box (Linux)
-    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, Buffer& destination,
+    [[nodiscard]] static bool convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, IGrowableBuffer& destination,
                                                      int& writtenCodeUnits);
-    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, Buffer& destination,
+    [[nodiscard]] static bool convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, IGrowableBuffer& destination,
                                                      int& writtenCodeUnits);
-    [[nodiscard]] static bool convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                                  NullTermination terminate);
-    static void eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding, StringSpan* encodedText,
-                                        NullTermination terminate);
+    [[nodiscard]] static bool convertSameEncoding(StringSpan text, IGrowableBuffer& buffer,
+                                                  StringTermination terminate);
+    [[nodiscard]] static bool convertEncodingToUTF8(StringSpan text, IGrowableBuffer& ibuffer,
+                                                    StringTermination terminate);
+    [[nodiscard]] static bool convertEncodingToUTF16(StringSpan text, IGrowableBuffer& ibuffer,
+                                                     StringTermination terminate);
+
+    static void eventuallyNullTerminate(IGrowableBuffer& buffer, StringEncoding destinationEncoding,
+                                        StringTermination terminate);
+
+    struct ConverterBuffer : public IGrowableBuffer
+    {
+        size_t size() const { return directAccess.sizeInBytes; }
+        char*  data() const { return static_cast<char*>(directAccess.data); }
+
+        Span<const char> toSpanConst() const { return {data(), size()}; }
+
+        [[nodiscard]] bool append(Span<const char> span, size_t extraZeroes = 0)
+        {
+            const size_t oldSize = size();
+            const size_t newSize = oldSize + span.sizeInBytes() + extraZeroes;
+            SC_TRY(resizeWithoutInitializing(newSize));
+            if (not span.empty())
+            {
+                ::memcpy(data() + oldSize, span.data(), span.sizeInBytes());
+            }
+            if (extraZeroes > 0)
+            {
+                ::memset(data() + oldSize + span.sizeInBytes(), 0, extraZeroes);
+            }
+            return true;
+        }
+    };
 };
 
-bool SC::StringConverter::Internal::convertSameEncoding(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                                        NullTermination terminate)
+bool SC::StringConverter::Internal::convertSameEncoding(StringSpan text, IGrowableBuffer& ibuffer,
+                                                        StringTermination terminate)
 {
-    const bool nullTerminate = terminate == AddZeroTerminator;
-    if (text.isNullTerminated())
-    {
-        const bool forceCopy = encodedText == nullptr;
-        if (forceCopy)
-        {
-            const size_t sizeWithNull =
-                text.sizeInBytes() > 0 ? text.sizeInBytes() + StringEncodingGetSize(text.getEncoding()) : 0;
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
 
-            SC_TRY(buffer.append({text.bytesWithoutTerminator(), nullTerminate ? sizeWithNull : text.sizeInBytes()}));
-        }
-        else
-        {
-            if (nullTerminate)
-            {
-                *encodedText = text;
-            }
-            else
-            {
-                *encodedText =
-                    StringSpan({text.bytesWithoutTerminator(), text.sizeInBytes()}, false, text.getEncoding());
-            }
-        }
-    }
-    else
-    {
-        if (nullTerminate)
-        {
-            const auto numZeros = StringEncodingGetSize(text.getEncoding());
-            SC_TRY(buffer.reserve(buffer.size() + text.sizeInBytes() + numZeros));
-            SC_TRY(buffer.append(text.toCharSpan()));
-            if (encodedText)
-            {
-                *encodedText = StringSpan(buffer.toSpanConst(), true, text.getEncoding());
-            }
-            SC_TRY(buffer.resize(buffer.size() + numZeros, 0)); // null terminator
-        }
-        else if (encodedText)
-        {
-            *encodedText = text;
-        }
-    }
+    const size_t nullBytes = terminate == NullTerminate ? StringEncodingGetSize(text.getEncoding()) : 0;
+    SC_TRY(buffer.append(text.toCharSpan(), nullBytes));
     return true;
 }
 
-void SC::StringConverter::Internal::eventuallyNullTerminate(Buffer& buffer, StringEncoding destinationEncoding,
-                                                            StringSpan*                      encodedText,
-                                                            StringConverter::NullTermination terminate)
+void SC::StringConverter::Internal::eventuallyNullTerminate(IGrowableBuffer&                   ibuffer,
+                                                            StringEncoding                     destinationEncoding,
+                                                            StringConverter::StringTermination terminate)
 {
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
+
     const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
-    if (terminate == StringConverter::AddZeroTerminator)
+    if (terminate == StringConverter::NullTerminate)
     {
         char*  bufferData = buffer.data();
         size_t size       = buffer.size();
@@ -87,31 +79,20 @@ void SC::StringConverter::Internal::eventuallyNullTerminate(Buffer& buffer, Stri
         {
             bufferData[size - idx - 1] = 0; // null terminator
         }
-        if (encodedText)
-        {
-            *encodedText = StringSpan({buffer.data(), buffer.size() - destinationCharSize}, true, destinationEncoding);
-        }
-    }
-    else if (encodedText)
-    {
-        *encodedText = StringSpan(buffer.toSpanConst(), false, destinationEncoding);
     }
 }
 
-bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                                NullTermination terminate)
+bool SC::StringConverter::Internal::convertEncodingToUTF8(StringSpan text, IGrowableBuffer& ibuffer,
+                                                          StringTermination terminate)
 {
-    if (text.isEmpty())
-    {
-        return false;
-    }
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
     if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
-        return Internal::convertSameEncoding(text, buffer, encodedText, terminate);
+        return Internal::convertSameEncoding(text, buffer, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf16)
     {
-        const bool nullTerminate = terminate == AddZeroTerminator;
+        const bool nullTerminate = terminate == NullTerminate;
         const auto oldSize       = buffer.size();
 #if SC_PLATFORM_WINDOWS
         const int      sourceSizeInBytes = static_cast<int>(text.sizeInBytes());
@@ -136,7 +117,8 @@ bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer,
         {
             return false;
         }
-        SC_TRY(buffer.resizeWithoutInitializing(oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0))));
+        const size_t newSize = oldSize + (static_cast<size_t>(numChars) + (nullTerminate ? 1 : 0));
+        SC_TRY(buffer.resizeWithoutInitializing(newSize));
 #if SC_PLATFORM_WINDOWS
         WideCharToMultiByte(CP_UTF8, 0, source, sourceSizeInBytes / sizeof(uint16_t),
                             reinterpret_cast<char*>(buffer.data() + oldSize), numChars, nullptr, 0);
@@ -144,28 +126,25 @@ bool SC::StringConverter::convertEncodingToUTF8(StringSpan text, Buffer& buffer,
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF8, 0, false,
                          reinterpret_cast<UInt8*>(buffer.data() + oldSize), numChars, NULL);
 #endif
-        Internal::eventuallyNullTerminate(buffer, StringEncoding::Utf8, encodedText, terminate);
+        Internal::eventuallyNullTerminate(buffer, StringEncoding::Utf8, terminate);
         return true;
     }
     return false;
 }
 
-bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer, StringSpan* encodedText,
-                                                 NullTermination terminate)
+bool SC::StringConverter::Internal::convertEncodingToUTF16(StringSpan text, IGrowableBuffer& ibuffer,
+                                                           StringTermination terminate)
 {
-    if (text.isEmpty())
-    {
-        return false;
-    }
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
     if (text.getEncoding() == StringEncoding::Utf16)
     {
-        return Internal::convertSameEncoding(text, buffer, encodedText, terminate);
+        return Internal::convertSameEncoding(text, buffer, terminate);
     }
     else if (text.getEncoding() == StringEncoding::Utf8 || text.getEncoding() == StringEncoding::Ascii)
     {
         const StringEncoding destinationEncoding = StringEncoding::Utf16;
 
-        const bool nullTerminate       = terminate == AddZeroTerminator;
+        const bool nullTerminate       = terminate == NullTerminate;
         const auto destinationCharSize = StringEncodingGetSize(destinationEncoding);
 
         const auto oldSize = buffer.size();
@@ -192,8 +171,9 @@ bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer
         {
             return false;
         }
-        SC_TRY(buffer.resizeWithoutInitializing(
-            oldSize + (static_cast<size_t>(writtenCodeUnits) + (nullTerminate ? 1 : 0)) * destinationCharSize));
+        const size_t newSize =
+            oldSize + (static_cast<size_t>(writtenCodeUnits) + (nullTerminate ? 1 : 0)) * destinationCharSize;
+        SC_TRY(buffer.resizeWithoutInitializing(newSize));
 #if SC_PLATFORM_WINDOWS
         MultiByteToWideChar(CP_UTF8, 0, text.bytesWithoutTerminator(), static_cast<int>(text.sizeInBytes()),
                             reinterpret_cast<wchar_t*>(buffer.data() + oldSize), writtenCodeUnits);
@@ -201,37 +181,48 @@ bool SC::StringConverter::convertEncodingToUTF16(StringSpan text, Buffer& buffer
         CFStringGetBytes(tmpStr, charRange, kCFStringEncodingUTF16, 0, false,
                          reinterpret_cast<UInt8*>(buffer.data() + oldSize), numChars, NULL);
 #endif
-        Internal::eventuallyNullTerminate(buffer, destinationEncoding, encodedText, terminate);
+        Internal::eventuallyNullTerminate(buffer, destinationEncoding, terminate);
         return true;
     }
     return false;
 }
 
-bool SC::StringConverter::convertEncodingTo(StringEncoding encoding, StringSpan text, Buffer& buffer,
-                                            StringSpan* encodedText, NullTermination terminate)
+bool SC::StringConverter::appendEncodingTo(StringEncoding encoding, StringSpan text, IGrowableBuffer& buffer,
+                                           StringTermination terminate)
 {
+    if (text.isEmpty())
+    {
+        if (terminate == NullTerminate)
+        {
+            return static_cast<Internal::ConverterBuffer&>(buffer).append({}, StringEncodingGetSize(encoding));
+        }
+        return true;
+    }
+
     switch (encoding)
     {
-    case StringEncoding::Ascii: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
-    case StringEncoding::Utf8: return convertEncodingToUTF8(text, buffer, encodedText, terminate);
-    case StringEncoding::Utf16: return convertEncodingToUTF16(text, buffer, encodedText, terminate);
+    case StringEncoding::Ascii: return Internal::convertEncodingToUTF8(text, buffer, terminate);
+    case StringEncoding::Utf8: return Internal::convertEncodingToUTF8(text, buffer, terminate);
+    case StringEncoding::Utf16: return Internal::convertEncodingToUTF16(text, buffer, terminate);
     }
     return false;
 }
 
 #if !SC_PLATFORM_WINDOWS && !SC_PLATFORM_APPLE
 
-bool SC::StringConverter::Internal::convertUTF8_to_UTF16LE(const SC::StringSpan sourceUtf8, SC::Buffer& destination,
+bool SC::StringConverter::Internal::convertUTF8_to_UTF16LE(const StringSpan sourceUtf8, IGrowableBuffer& ibuffer,
                                                            int& writtenCodeUnits)
 {
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
+
     const char*  utf8    = sourceUtf8.bytesWithoutTerminator();
     const size_t utf8Len = sourceUtf8.sizeInBytes();
 
     // Calculate the maximum possible size for the UTF-16 string
     // Each UTF-8 character can be represented by at most one UTF-16 code unit
-    SC_TRY(destination.resizeWithoutInitializing(utf8Len + 1));
+    SC_TRY(buffer.resizeWithoutInitializing(utf8Len + 1));
 
-    uint16_t* utf16 = reinterpret_cast<uint16_t*>(destination.data());
+    uint16_t* utf16 = reinterpret_cast<uint16_t*>(buffer.data());
 
     size_t srcIndex = 0;
     size_t dstIndex = 0;
@@ -293,17 +284,19 @@ bool SC::StringConverter::Internal::convertUTF8_to_UTF16LE(const SC::StringSpan 
     return true;
 }
 
-bool SC::StringConverter::Internal::convertUTF16LE_to_UTF8(const SC::StringSpan sourceUtf16, SC::Buffer& destination,
+bool SC::StringConverter::Internal::convertUTF16LE_to_UTF8(const StringSpan sourceUtf16, IGrowableBuffer& ibuffer,
                                                            int& writtenCodeUnits)
 {
+    Internal::ConverterBuffer& buffer = static_cast<Internal::ConverterBuffer&>(ibuffer);
+
     const uint16_t* utf16    = reinterpret_cast<const uint16_t*>(sourceUtf16.bytesWithoutTerminator());
     const size_t    utf16Len = sourceUtf16.sizeInBytes() / sizeof(uint16_t);
 
     // Calculate the maximum possible size for the UTF-8 string
     // UTF-8 uses at most 4 bytes per character
-    SC_TRY(destination.resizeWithoutInitializing(4 * utf16Len + 1));
+    SC_TRY(buffer.resizeWithoutInitializing(4 * utf16Len + 1));
 
-    char*  utf8     = destination.data();
+    char*  utf8     = buffer.data();
     size_t srcIndex = 0;
     size_t dstIndex = 0;
 

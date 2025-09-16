@@ -204,8 +204,7 @@ bool StringFormatOutput::append(StringView text)
         }
         else
         {
-            return StringConverter::convertEncodingTo(encoding, text, *data, nullptr,
-                                                      StringConverter::DoNotAddZeroTerminator);
+            return StringConverter::appendEncodingTo(encoding, text, *data, StringConverter::DoNotTerminate);
         }
     }
     else
