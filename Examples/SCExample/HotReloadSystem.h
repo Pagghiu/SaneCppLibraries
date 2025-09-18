@@ -213,8 +213,8 @@ struct HotReloadView
                 SmallString<128>            formattedTime;
                 Time::Absolute::ParseResult local;
                 SC_TRY(library.lastLoadTime.parseLocal(local));
-                SC_TRY(
-                    StringBuilder(formattedTime).format("{:02}:{:02}:{:02}", local.hour, local.minutes, local.seconds));
+                SC_TRY(StringBuilder::format(formattedTime, "{:02}:{:02}:{:02}", local.hour, local.minutes,
+                                             local.seconds));
                 ImGui::Text("%s", formattedTime.view().bytesIncludingTerminator());
 
                 ImGui::TableNextColumn();

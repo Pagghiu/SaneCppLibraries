@@ -237,9 +237,8 @@ endif # $(CONFIG)
         int index = 0;
         for (const SourceFiles& sourceFiles : project.filesWithSpecificFlags)
         {
-            String        perFileTarget;
-            StringBuilder sb(perFileTarget, StringBuilder::DoNotClear);
-            SC_TRY(sb.format("{0}_GROUP_{1}", makeTarget, index));
+            String perFileTarget;
+            SC_TRY(StringBuilder::format(perFileTarget, "{0}_GROUP_{1}", makeTarget, index));
             index++;
             CompileFlags        compileFlags;
             const CompileFlags* compileSources[] = {&sourceFiles.compile, &configuration.compile,
@@ -351,7 +350,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                 if (filesWithSpecificFlags.find([&](const SourceFiles& it) { return &it.compile == item.compileFlags; },
                                                 &index))
                 {
-                    StringBuilder(buffer, StringBuilder::DoNotClear).format("_GROUP_{0}", index);
+                    StringBuilder::format(buffer, "_GROUP_{0}", index);
                     flagsGroup = buffer.view();
                 }
             }
@@ -686,7 +685,7 @@ endif
                                                     relativeDirectories.relativeProjectsToIntermediates.view());
 
         SC_TRY(appendVariable(intermediateBuilder, intermediatesPath, makeTarget, relativeDirectories));
-
+        intermediateBuilder.finalize();
         // Avoid Makefile warnings on intermediates and outputs directory creation.
         //
         // This happens when multiple projects define the same output or intermediates directory.
@@ -697,7 +696,7 @@ endif
         // the use of makefile variables but should handle most well written build files and common cases.
 
         String key;
-        StringBuilder(key).format("{}_{}", intermediate, configName);
+        StringBuilder::format(key, "{}_{}", intermediate, configName);
         if (intermediateDirectories.insertIfNotExists({key.view(), makeTarget}))
         {
             builder.append("\n{0}_INTERMEDIATE_DIR := ", makeTarget);
@@ -730,8 +729,9 @@ $({0}_INTERMEDIATE_DIR):
         WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", outputBuilder, outputPath,
                                                     relativeDirectories.relativeProjectsToOutputs.view());
         SC_TRY(appendVariable(outputBuilder, outputPath, makeTarget, relativeDirectories));
+        outputBuilder.finalize();
         String key;
-        StringBuilder(key).format("{}_{}", output, configName);
+        StringBuilder::format(key, "{}_{}", output, configName);
         if (outputDirectories.insertIfNotExists({key.view(), makeTarget}))
         {
             builder.append("\n{0}_TARGET_DIR := ", makeTarget);

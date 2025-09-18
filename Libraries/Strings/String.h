@@ -144,13 +144,7 @@ struct SC::String
   protected:
     struct Internal;
 
-    // All these friendships are made to leverage writing directly to the Buffer
-    // but while still keeping it an implementation detail
     friend struct StringTest;
-    friend struct StringBuilder;
-    friend struct StringConverter;
-    friend struct File;
-    friend struct FileSystem;
     template <typename T>
     friend struct Reflection::Reflect;
 
@@ -158,8 +152,10 @@ struct SC::String
     friend struct GrowableBuffer;
     struct SC_COMPILER_EXPORT GrowableImplementation
     {
-        String&                        string;
+        String& string;
+
         IGrowableBuffer::DirectAccess& da;
+
         GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da);
         ~GrowableImplementation();
         bool tryGrowTo(size_t newSize);

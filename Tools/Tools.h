@@ -16,7 +16,7 @@ template <typename... Types>
 inline String format(const StringView fmt, Types&&... types)
 {
     String result = StringEncoding::Utf8;
-    (void)StringBuilder(result).format(fmt, forward<Types>(types)...);
+    (void)StringBuilder::format(result, fmt, forward<Types>(types)...);
     return result;
 }
 struct Tool

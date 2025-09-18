@@ -65,8 +65,8 @@ struct RelativeDirectories
 
         SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), project.rootDirectory.view(),
                                     relativeProjectsToProjectRoot, Path::AsNative, outputType));
-        SC_TRY(StringBuilder(projectRootRelativeToProjects, StringBuilder::Clear)
-                   .format(projectDirFormatString, relativeProjectsToProjectRoot));
+        SC_TRY(StringBuilder::format(projectRootRelativeToProjects, projectDirFormatString,
+                                     relativeProjectsToProjectRoot));
 
         return Result(true);
     }
@@ -198,8 +198,9 @@ struct SC::Build::WriterInternal
             {
                 RenderItem renderItem;
                 renderItem.name = StringView(StringEncoding::Utf8); // To unify hashes
-                SC_TRY(StringBuilder(renderItem.name).append(Path::basename(it.view(), Path::AsPosix)));
-                auto nameView = renderItem.name.view();
+                StringBuilder sb(renderItem.name);
+                SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
+                auto nameView = sb.finalize();
                 if (nameView.endsWith(".h"))
                 {
                     renderItem.type = RenderItem::HeaderFile;

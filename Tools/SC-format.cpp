@@ -75,7 +75,7 @@ Result runFormatTool(Tool::Arguments& arguments)
         // If no system installed clang-format (matching version 19) has been found, we install a local copy
         Tools::Package clangPackage;
         SC_TRY(runPackageTool(args, &clangPackage));
-        SC_TRY(StringBuilder(clangFormat).format("{}/bin/clang-format", clangPackage.installDirectoryLink));
+        SC_TRY(StringBuilder::format(clangFormat, "{}/bin/clang-format", clangPackage.installDirectoryLink));
     }
     arguments.console.print("Using: {}\n", clangFormat);
 

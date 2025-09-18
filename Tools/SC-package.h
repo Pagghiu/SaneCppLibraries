@@ -154,7 +154,7 @@ struct CustomFunctions
 {
     Process          process;
     SmallString<255> stripString;
-    SC_TRY(StringBuilder(stripString).format("--strip-components={}", stripComponents));
+    SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
     SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view()}));
     return Result(process.getExitStatus() == 0);
 }
@@ -164,7 +164,7 @@ struct CustomFunctions
 {
     Process          process;
     SmallString<255> stripString;
-    SC_TRY(StringBuilder(stripString).format("--strip-components={}", stripComponents));
+    SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
     SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view(), singleFilePath}));
     return Result(process.getExitStatus() == 0);
 }

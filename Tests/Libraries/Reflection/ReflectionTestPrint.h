@@ -40,7 +40,7 @@ inline void printFlatSchema(Console& console, const Reflection::TypeInfo (&type)
     {
         StringBuilder builder(buffer, StringBuilder::Clear);
         typeIndex += printTypes(builder, typeIndex, type + typeIndex, names + typeIndex) + 1;
-        console.print(buffer.view());
+        console.print(builder.finalize());
     }
 }
 

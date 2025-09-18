@@ -28,6 +28,9 @@ struct SC_COMPILER_EXPORT IGrowableBuffer
         }
         return tryGrowTo(newSize);
     }
+    void   clear() { directAccess.sizeInBytes = 0; }
+    char*  data() const { return static_cast<char*>(directAccess.data); }
+    size_t size() const { return directAccess.sizeInBytes; }
 
     DirectAccess getDirectAccess() const { return directAccess; }
 

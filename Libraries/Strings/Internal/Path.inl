@@ -363,7 +363,7 @@ bool SC::Path::normalizeUNCAndTrimQuotes(String& outputPath, StringView fileLoca
     if (fileLocation.startsWithAnyOf({'\\'}) and not fileLocation.startsWith("\\\\"))
     {
         // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
-        SC_TRY(StringBuilder(fixUncPathsOnMSVC).format("\\{}", fileLocation));
+        SC_TRY(StringBuilder::format(fixUncPathsOnMSVC, "\\{}", fileLocation));
         fileLocation = fixUncPathsOnMSVC.view();
     }
 #endif
@@ -472,7 +472,7 @@ bool SC::Path::normalize(String& output, StringView view, Type type, Span<String
             StringBuilder    sb(other);
             SC_TRY(sb.append("\\\\"))
             SC_TRY(sb.append(output.view().sliceStart(2)));
-            SC_TRY(output.assign(other.view()));
+            SC_TRY(output.assign(sb.finalize()));
         }
         return res;
     }
@@ -586,7 +586,6 @@ bool SC::Path::appendTrailingSeparator(String& path, Type type)
 
 bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
 {
-    StringBuilder builder(output, StringBuilder::DoNotClear);
     for (auto& path : paths)
     {
         if (isAbsolute(path, type))
@@ -594,7 +593,9 @@ bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
             return false;
         }
         SC_TRY(appendTrailingSeparator(output, type));
+        StringBuilder builder(output, StringBuilder::DoNotClear);
         SC_TRY(builder.append(path));
+        builder.finalize();
     }
     return true;
 }

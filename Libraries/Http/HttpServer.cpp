@@ -24,7 +24,7 @@ bool SC::HttpRequest::find(HttpParser::Token token, StringView& res) const
 SC::Result SC::HttpResponse::startResponse(int code)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
-    SC_TRY(sb.format("HTTP/1.1 "));
+    SC_TRY(sb.append("HTTP/1.1 "));
     switch (code)
     {
     case 200: SC_TRY(sb.append("{} OK\r\n", code)); break;
@@ -49,6 +49,7 @@ SC::Result SC::HttpResponse::end(Span<const char> span)
 {
     StringBuilder sb(outputBuffer, StringEncoding::Ascii);
     SC_TRY(sb.append("Content-Length: {}\r\n\r\n", span.sizeInBytes()));
+    sb.finalize();
     SC_TRY(not outputBuffer.isEmpty());
     SC_TRY(outputBuffer.resizeWithoutInitializing(outputBuffer.size() - 1)); // pop null terminator
     SC_TRY(outputBuffer.append(span));

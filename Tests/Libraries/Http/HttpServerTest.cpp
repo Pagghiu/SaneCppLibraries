@@ -58,15 +58,14 @@ void SC::HttpServerTest::httpServerTest()
         SC_TEST_EXPECT(response.addHeader("Server", "SC"));
         SC_TEST_EXPECT(response.addHeader("Date", "Mon, 27 Aug 2023 16:37:00 GMT"));
         SC_TEST_EXPECT(response.addHeader("Last-Modified", "Wed, 27 Aug 2023 16:37:00 GMT"));
-        String        str;
-        StringBuilder sb(str);
-        const char    sampleHtml[] = "<html>\r\n"
-                                     "<body bgcolor=\"#000000\" text=\"#ffffff\">\r\n"
-                                     "<h1>This is a title {}!</h1>\r\n"
-                                     "We must start from somewhere\r\n"
-                                     "</body>\r\n"
-                                     "</html>\r\n";
-        SC_TEST_EXPECT(sb.format(sampleHtml, serverContext.numRequests));
+        const char sampleHtml[] = "<html>\r\n"
+                                  "<body bgcolor=\"#000000\" text=\"#ffffff\">\r\n"
+                                  "<h1>This is a title {}!</h1>\r\n"
+                                  "We must start from somewhere\r\n"
+                                  "</body>\r\n"
+                                  "</html>\r\n";
+        String     str;
+        SC_TEST_EXPECT(StringBuilder::format(str, sampleHtml, serverContext.numRequests));
         SC_TEST_EXPECT(response.end(str.view().toCharSpan()));
     };
 
@@ -82,8 +81,7 @@ void SC::HttpServerTest::httpServerTest()
     } clientContext = {0, server};
     for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
     {
-        StringBuilder sb(buffer, StringBuilder::Clear);
-        SC_TEST_EXPECT(sb.format("HttpClient [{}]", idx));
+        SC_TEST_EXPECT(StringBuilder::format(buffer, "HttpClient [{}]", idx));
         SC_TEST_EXPECT(client[idx].setCustomDebugName(buffer.view()));
         client[idx].callback = [this, &clientContext](HttpClient& result)
         {

@@ -102,7 +102,7 @@ SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlag
 SC::Build::Configuration::Configuration()
 {
     (void)outputPath.assign(getStandardBuildDirectory());
-    (void)StringBuilder(intermediatesPath).format("$(PROJECT_NAME)/{}", getStandardBuildDirectory());
+    (void)StringBuilder::format(intermediatesPath, "$(PROJECT_NAME)/{}", getStandardBuildDirectory());
 }
 
 bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPreset, const Parameters& parameters)
@@ -395,7 +395,8 @@ SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView      
 SC::Result SC::Build::FilePathsResolver::resolve(const Build::Definition& definition)
 {
     VectorMap<String, VectorSet<FilesSelection>> uniquePaths;
-    String                                       buffer;
+
+    String buffer;
 
     SmallVector<StringView, 16> components;
 
@@ -536,39 +537,41 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             {
                 StringBuilder builder(buffer, StringBuilder::Clear);
                 SC_TRY(writer.writeProject(builder, project, renderer));
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj", projectName));
+                builder.finalize();
+                SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj", projectName));
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-                SC_TRY(
-                    StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/project.pbxproj", projectName));
+
+                SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/project.pbxproj", projectName));
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
             }
             {
                 StringBuilder builder(buffer, StringBuilder::Clear);
                 SC_TRY(writer.writeScheme(builder, project, renderer, projectName));
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcodeproj/xcshareddata", projectName));
+                SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/xcshareddata", projectName));
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                           .format("{}.xcodeproj/xcshareddata/xcschemes", projectName));
+                SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/xcshareddata/xcschemes", projectName));
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                           .format("{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName, projectName));
+                SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName,
+                                             projectName));
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+                SC_TRY(fs.writeString(prjName.view(), builder.finalize()));
             }
             switch (project.targetType)
             {
             case TargetType::ConsoleExecutable: break;
             case TargetType::GUIApplication: {
                 StringBuilder builderEntitlements(buffer, StringBuilder::Clear);
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{0}.entitlements", projectName));
+                SC_TRY(StringBuilder::format(prjName, "{0}.entitlements", projectName));
                 SC_TRY(writer.writeEntitlements(builderEntitlements, project));
+                builderEntitlements.finalize();
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
 
                 StringBuilder builderStoryboard(buffer, StringBuilder::Clear);
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{0}.storyboard", projectName));
+                SC_TRY(StringBuilder::format(prjName, "{0}.storyboard", projectName));
                 SC_TRY(writer.writeStoryboard(builderStoryboard, project));
+                builderStoryboard.finalize();
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
 
@@ -581,10 +584,10 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
             SC_TRY(WriterXCode::writeWorkspace(builder, workspace.projects.toSpanConst()));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.xcworkspace", workspace.name));
+            builder.finalize();
+            SC_TRY(StringBuilder::format(prjName, "{}.xcworkspace", workspace.name));
             SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear)
-                       .format("{}.xcworkspace/contents.xcworkspacedata", workspace.name));
+            SC_TRY(StringBuilder::format(prjName, "{}.xcworkspace/contents.xcworkspacedata", workspace.name));
             SC_TRY(fs.removeFileIfExists(prjName.view()));
             SC_TRY(fs.writeString(prjName.view(), buffer.view()));
         }
@@ -610,17 +613,17 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 StringBuilder builder(buffer, StringBuilder::Clear);
                 SC_TRY(writer.writeProject(builder, project, renderer));
                 String prjName;
-                SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", project.name));
+                SC_TRY(StringBuilder::format(prjName, "{}.vcxproj", project.name));
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+                SC_TRY(fs.writeString(prjName.view(), builder.finalize()));
             }
             {
                 StringBuilder builder(buffer, StringBuilder::Clear);
                 SC_TRY(writer.writeFilters(builder, renderer));
                 String prjFilterName;
-                SC_TRY(StringBuilder(prjFilterName, StringBuilder::Clear).format("{}.vcxproj.filters", project.name));
+                SC_TRY(StringBuilder::format(prjFilterName, "{}.vcxproj.filters", project.name));
                 SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
-                SC_TRY(fs.writeString(prjFilterName.view(), buffer.view()));
+                SC_TRY(fs.writeString(prjFilterName.view(), builder.finalize()));
             }
             SC_TRY(projectsGuids.push_back(writer.projectGuid));
         }
@@ -630,9 +633,9 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             SC_TRY(WriterVisualStudio::writeSolution(builder, workspace.projects.toSpanConst(),
                                                      projectsGuids.toSpanConst()));
             String slnName;
-            SC_TRY(StringBuilder(slnName, StringBuilder::Clear).format("{}.sln", workspace.name));
+            SC_TRY(StringBuilder::format(slnName, "{}.sln", workspace.name));
             SC_TRY(fs.removeFileIfExists(slnName.view()));
-            SC_TRY(fs.writeString(slnName.view(), buffer.view()));
+            SC_TRY(fs.writeString(slnName.view(), builder.finalize()));
         }
         break;
     }
@@ -642,6 +645,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
         {
             StringBuilder builder(buffer, StringBuilder::Clear);
             SC_TRY(writer.writeMakefile(builder, workspace, renderer));
+            builder.finalize();
             SC_TRY(fs.removeFileIfExists("Makefile"));
             SC_TRY(fs.writeString("Makefile", buffer.view()));
         }
@@ -887,7 +891,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
 
             // Compile coverage badge SVG template with proper color and percentage
             String compiledCoverageBadge;
-            SC_TRY(StringBuilder(compiledCoverageBadge).format(coverageBadge, coverageString, coverageColor));
+            SC_TRY(StringBuilder::format(compiledCoverageBadge, coverageBadge, coverageString, coverageColor));
 
             // Write badge svg to disk
             FileSystem fs;
@@ -919,7 +923,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
         SmallString<32> formattedPlatform;
-        SC_TRY(StringBuilder(formattedPlatform).format("ARCHS={}", architecture));
+        SC_TRY(StringBuilder::format(formattedPlatform, "ARCHS={}", architecture));
 
         StringView arguments[16];
         size_t     numArgs   = 0;
@@ -1021,12 +1025,12 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         StringView extension = action.target.isEmpty() ? ".sln"_a8 : ".vcxproj"_a8;
         SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(extension));
         SmallString<32> platformConfiguration;
-        SC_TRY(StringBuilder(platformConfiguration).format("/p:Configuration={}", configuration));
+        SC_TRY(StringBuilder::format(platformConfiguration, "/p:Configuration={}", configuration));
 
         StringView architecture;
         SC_TRY(Internal::toVisualStudioArchitecture(action.parameters.architecture, architecture));
         SmallString<32> platform;
-        SC_TRY(StringBuilder(platform).format("/p:Platform={}", architecture));
+        SC_TRY(StringBuilder::format(platform, "/p:Platform={}", architecture));
 
         StringView arguments[16];
         size_t     numArgs   = 0;
@@ -1093,7 +1097,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             }
         }
         SmallString<32> platformConfiguration;
-        SC_TRY(StringBuilder(platformConfiguration).format("CONFIG={}", configuration));
+        SC_TRY(StringBuilder::format(platformConfiguration, "CONFIG={}", configuration));
 
         StringView architecture;
         SC_TRY(toMakefileArchitecture(action.parameters.architecture, architecture));
@@ -1111,16 +1115,16 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             }
             else
             {
-                SC_TRY(StringBuilder(targetName).format("{}_COMPILE_COMMANDS", selectedTarget));
+                SC_TRY(StringBuilder::format(targetName, "{}_COMPILE_COMMANDS", selectedTarget));
             }
         }
         break;
         case Action::Run: {
-            SC_TRY(StringBuilder(targetName).format("{}_RUN", selectedTarget));
+            SC_TRY(StringBuilder::format(targetName, "{}_RUN", selectedTarget));
         }
         break;
         case Action::Print: {
-            SC_TRY(StringBuilder(targetName).format("{}_PRINT_EXECUTABLE_PATH", selectedTarget));
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", selectedTarget));
         }
         break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");

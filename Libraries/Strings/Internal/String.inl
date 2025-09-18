@@ -93,7 +93,7 @@ SC::String::GrowableImplementation::~GrowableImplementation()
         (void)string.data.resizeWithoutInitializing(da.sizeInBytes);
     }
     const size_t numZeroes = StringEncodingGetSize(string.getEncoding());
-    if (string.data.size() + numZeroes <= string.data.capacity())
+    if (not string.data.isEmpty() and (string.data.size() + numZeroes <= string.data.capacity()))
     {
         // Add null-terminator
         (void)string.data.resize(string.data.size() + numZeroes, 0);

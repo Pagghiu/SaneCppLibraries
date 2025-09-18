@@ -74,9 +74,9 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 StringPath fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPath));
 
-                StringBuilder           expected(expectedBuffer);
                 constexpr native_char_t nativeSep = Path::Separator;
-                SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, "test.txt"));
+                SC_TEST_EXPECT(
+                    StringBuilder::format(expectedBuffer, "{}{}{}", params.appDirectory, nativeSep, "test.txt"));
                 SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
                 params.eventObject.signal();
             };

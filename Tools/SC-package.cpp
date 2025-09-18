@@ -22,15 +22,15 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     download.packageName    = "doxygen";
     download.packageVersion = packageVersion;
 
-    StringBuilder sb(download.url);
-    SC_TRY(sb.format("{0}/Release_{1}/", baseURL, packageVersionDash));
+    SC_TRY(StringBuilder::format(download.url, "{0}/Release_{1}/", baseURL, packageVersionDash));
 
     CustomFunctions functions;
-
     switch (HostPlatform)
     {
-    case Platform::Apple:
+    case Platform::Apple: {
+        StringBuilder sb(download.url, StringBuilder::DoNotClear);
         SC_TRY(sb.append("Doxygen-{0}.dmg", download.packageVersion));
+        sb.finalize();
         download.packagePlatform  = "macos";
         download.fileMD5          = "354ee835cf03e8a0187460a1456eb108";
         package.packageBaseName   = format("Doxygen-{0}.dmg", download.packageVersion);
@@ -46,27 +46,34 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
             SC_TRY(Process().exec({"hdiutil", "detach", mountPoint.view()}));
             return Result(true);
         };
+    }
+    break;
 
-        break;
-    case Platform::Linux:
+    case Platform::Linux: {
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
         default: break;
         }
+        StringBuilder sb(download.url, StringBuilder::DoNotClear);
         SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", download.packageVersion));
+        sb.finalize();
         download.packagePlatform  = "linux";
         download.fileMD5          = "fd96a5defa535dfe2e987b46540844a4";
         package.packageBaseName   = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
         functions.extractFunction = [](StringView fileName, StringView directory) -> Result
         { return tarExpandSingleFileTo(fileName, directory, "doxygen-1.12.0/bin/doxygen", 2); };
-        break;
-    case Platform::Windows:
+    }
+    break;
+    case Platform::Windows: {
+        StringBuilder sb(download.url, StringBuilder::DoNotClear);
         SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", download.packageVersion));
+        sb.finalize();
         download.packagePlatform = "windows";
         download.fileMD5         = "d014a212331693ffcf72ad99b2087ea0";
         package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", download.packageVersion);
-        break;
+    }
+    break;
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
 
@@ -192,7 +199,7 @@ Result install7Zip(StringView packagesCacheDirectory, StringView packagesInstall
         {
             Process          process;
             SmallString<255> outputDirectory;
-            SC_TRY(StringBuilder(outputDirectory).format("-o\"{0}\"", directory));
+            SC_TRY(StringBuilder::format(outputDirectory, "-o\"{0}\"", directory));
             SC_TRY(process.exec({sevenZipRPackage.packageLocalFile.view(), "e", fileName, outputDirectory.view()}));
             SC_TRY_MSG(process.getExitStatus() == 0, "Extracting 7Zip with 7ZipR failed");
             return Result(true);
@@ -281,11 +288,14 @@ Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, St
     {
     case Platform::Apple: {
         SmallString<32> llvmVersion;
-        (void)StringBuilder(llvmVersion).format("llvm@{}", wantedMajorVersion);
+        (void)StringBuilder::format(llvmVersion, "llvm@{}", wantedMajorVersion);
         if (Process().exec({"brew", "--prefix", llvmVersion.view()}, foundPath))
         {
             (void)foundPath.assign(foundPath.view().trimEndAnyOf('\n'));
-            if (StringBuilder(foundPath, StringBuilder::DoNotClear).append("/bin/clang-format"))
+            StringBuilder sb(foundPath, StringBuilder::DoNotClear);
+            bool          res = sb.append("/bin/clang-format");
+            sb.finalize();
+            if (res)
             {
                 if (Process().exec({foundPath.view(), "--version"}, version))
                 {
@@ -301,7 +311,7 @@ Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, St
     if (clangFormatExecutable.isEmpty())
     {
         SmallString<32> clangFormatVersion;
-        SC_TRY(StringBuilder(clangFormatVersion).format("clang-format-{}", wantedMajorVersion));
+        SC_TRY(StringBuilder::format(clangFormatVersion, "clang-format-{}", wantedMajorVersion));
         if (Process().exec({clangFormatVersion.view(), "--version"}, version))
         {
             clangFormatExecutable = clangFormatVersion.view();
@@ -427,16 +437,16 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
         return Result::Error("Unsupported platform");
     }
     }
-    const bool isWindows = HostPlatform == Platform::Windows; // avoids MSVC 'conditial expression is constant'
+    const bool isWindows = HostPlatform == Platform::Windows; // avoids MSVC 'conditional expression is constant'
     if (isWindows)
     {
         functions.extractFunction = [&sevenZipPackage](StringView fileName, StringView directory) -> Result
         {
             Process          process;
             SmallString<255> outputDirectory;
-            SC_TRY(StringBuilder(outputDirectory).format("-o\"{}\"", directory));
+            SC_TRY(StringBuilder::format(outputDirectory, "-o\"{}\"", directory));
             SmallString<255> toolFile;
-            SC_TRY(StringBuilder(toolFile).format("{}/7z.exe", sevenZipPackage.installDirectoryLink));
+            SC_TRY(StringBuilder::format(toolFile, "{}/7z.exe", sevenZipPackage.installDirectoryLink));
             SC_TRY(process.exec({toolFile.view(), "x", fileName, outputDirectory.view(), "bin/clang-format.exe"}));
             return Result(process.getExitStatus() == 0);
         };
@@ -478,6 +488,7 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     SC_TRY(Path::join(packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));
     SC_TRY(builder.append("packages         = \"{}\"", packagesInstallDirectory.view()));
+    builder.finalize();
     console.printLine(buffer.view());
 
     Tools::Package clangPackage;
@@ -513,7 +524,7 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     }
     else
     {
-        SC_TRY(builder.format("SC-format no action named \"{}\" exists", arguments.action));
+        SC_TRY(StringBuilder::format(buffer, "SC-format no action named \"{}\" exists", arguments.action));
         console.printLine(buffer.view());
         return Result::Error("SC-format error executing action");
     }

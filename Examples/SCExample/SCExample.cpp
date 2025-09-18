@@ -123,7 +123,7 @@ struct ApplicationSystem
     {
         // The entire point of runStep is to run this callback in the main thread, so let's assert that
         SC_ASSERT_RELEASE(currentThreadID == Thread::CurrentThreadID());
-        (void)StringBuilder(state.loopMessage).format("I/O WakeUp {}", state.loopTimeouts);
+        (void)StringBuilder::format(state.loopMessage, "I/O WakeUp {}", state.loopTimeouts);
         state.loopTimeouts++;
         result.getAsync().relativeTimeout = Time::Milliseconds(state.timeoutOccursEveryMs);
         result.reactivateRequest(true);

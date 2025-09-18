@@ -29,6 +29,7 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
                      "User-agent: {}\r\n"
                      "Host: {}\r\n\r\n",
                      parser.path, "SC", "127.0.0.1"));
+    sb.finalize();
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);

@@ -28,6 +28,12 @@ struct SC_COMPILER_EXPORT StringFormatOutput
         growableBuffer = &gbuf;
     }
 
+    StringFormatOutput(StringEncoding encoding, IGrowableBuffer& buffer) : encoding(encoding)
+    {
+        growableBuffer = &buffer;
+        destroyBuffer  = false;
+    }
+
     ~StringFormatOutput();
 
     /// @brief Constructs a StringFormatOutput object pushing to a console
@@ -53,6 +59,7 @@ struct SC_COMPILER_EXPORT StringFormatOutput
   private:
     AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
 
+    bool             destroyBuffer  = true;
     IGrowableBuffer* growableBuffer = nullptr;
     StringEncoding   encoding;
 
@@ -73,11 +80,10 @@ struct SC_COMPILER_EXPORT StringFormatOutput
 ///
 /// Example:
 /// @code{.cpp}
-/// String        buffer(StringEncoding::Ascii);
-/// StringBuilder builder(buffer);
-/// SC_TEST_EXPECT(builder.format("{1}_{0}_{1}", 1, 0));
+/// String buffer(StringEncoding::Ascii);
+/// SC_TEST_EXPECT(StringBuilder::format(buffer, "{1}_{0}_{1}", 1, 0));
 /// SC_TEST_EXPECT(buffer == "0_1_0");
-/// SC_TEST_EXPECT(builder.format("{0:.2}_{1}_{0:.4}", 1.2222, "salve"));
+/// SC_TEST_EXPECT(StringBuilder::format(buffer, "{0:.2}_{1}_{0:.4}", 1.2222, "salve"));
 /// SC_TEST_EXPECT(buffer == "1.22_salve_1.2222");
 /// @endcode
 /// @note It's not convenient to use SC::StringFormat directly, as you should probably use SC::StringBuilder

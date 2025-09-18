@@ -71,8 +71,8 @@ SC::Result SC::HttpWebServer::Internal::writeGMTHeaderTime(StringView headerName
                                                            const Time::Absolute::ParseResult& local)
 {
     SmallString<512> buffer;
-    SC_TRY(StringBuilder(buffer).format("{}, {:02} {} {} {:02}:{:02}:{:02} GMT", local.getDay(), local.dayOfMonth,
-                                        local.getMonth(), local.year, local.hour, local.minutes, local.seconds));
+    SC_TRY(StringBuilder::format(buffer, "{}, {:02} {} {} {:02}:{:02}:{:02} GMT", local.getDay(), local.dayOfMonth,
+                                 local.getMonth(), local.year, local.hour, local.minutes, local.seconds));
 
     SC_TRY(response.addHeader(headerName, buffer.view()));
     return Result(true);

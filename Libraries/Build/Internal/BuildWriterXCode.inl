@@ -135,26 +135,26 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         RenderGroup* entitlement = resourcesGroup->children.getOrCreate("7B5A4A5A2C20D35E00EB8229");
         SC_TRY(entitlement != nullptr);
-        SC_TRY(StringBuilder(entitlement->name).format("{0}.entitlements", project.name.view()));
+        SC_TRY(StringBuilder::format(entitlement->name, "{0}.entitlements", project.name.view()));
         SC_TRY(entitlement->referenceHash.assign("7B5A4A5A2C20D35E00EB8229"));
 
         RenderGroup* storyboard = resourcesGroup->children.getOrCreate("7B375FE92C2F16B1007D27E7");
         SC_TRY(storyboard != nullptr);
-        SC_TRY(StringBuilder(storyboard->name).format("{0}.storyboard", project.name.view()));
+        SC_TRY(StringBuilder::format(storyboard->name, "{0}.storyboard", project.name.view()));
         SC_TRY(storyboard->referenceHash.assign("7B375FE92C2F16B1007D27E7"));
 
         RenderGroup* xcasset = resourcesGroup->children.getOrCreate("7A4F78E229662D25000D7EE4");
         SC_TRY(xcasset != nullptr);
-        SC_TRY(StringBuilder(xcasset->name).format("{0}.xcassets", project.name.view()));
+        SC_TRY(StringBuilder::format(xcasset->name, "{0}.xcassets", project.name.view()));
         SC_TRY(xcasset->referenceHash.assign("7A4F78E229662D25000D7EE4"));
 
         RenderItem xcodeFile;
-        SC_TRY(StringBuilder(xcodeFile.name).format("{0}.xcassets", project.name.view()));
+        SC_TRY(StringBuilder::format(xcodeFile.name, "{0}.xcassets", project.name.view()));
         xcodeFile.type          = RenderItem::XCAsset;
         xcodeFile.buildHash     = "7BEC30AF2C31BCF000961B17";
         xcodeFile.referenceHash = "7A4F78E229662D25000D7EE4";
         xcodeFile.referencePath = "Resources";
-        SC_TRY(StringBuilder(xcodeFile.path).format("{0}.xcassets", project.name.view()));
+        SC_TRY(StringBuilder::format(xcodeFile.path, "{0}.xcassets", project.name.view()));
         return xcodeFiles.push_back(xcodeFile);
     }
 
@@ -1198,8 +1198,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     Result writeAssets(FileSystem& fs, const Project& project)
     {
         SmallString<255> buffer;
-        StringBuilder    sb(buffer);
-        SC_TRY(sb.format("{0}.xcassets", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets", project.name));
         if (fs.existsAndIsDirectory(buffer.view()))
         {
             SC_TRY(fs.removeDirectoryRecursive(buffer.view()));
@@ -1208,9 +1207,9 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             SC_TRY(fs.makeDirectory(buffer.view()));
         }
-        SC_TRY(sb.format("{0}.xcassets/AccentColor.colorset", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/AccentColor.colorset", project.name));
         SC_TRY(fs.makeDirectoryRecursive(buffer.view()));
-        SC_TRY(sb.format("{0}.xcassets/AccentColor.colorset/Contents.json", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/AccentColor.colorset/Contents.json", project.name));
         SC_TRY(fs.writeString(buffer.view(), R"delimiter(
 {
   "colors" : [
@@ -1224,9 +1223,9 @@ struct SC::Build::ProjectWriter::WriterXCode
   }
 }
 )delimiter"));
-        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/AppIcon.appiconset", project.name));
         SC_TRY(fs.makeDirectoryRecursive(buffer.view()));
-        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset/Contents.json", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/AppIcon.appiconset/Contents.json", project.name));
         SC_TRY(fs.writeString(buffer.view(),
                               R"delimiter({
   "images" : [
@@ -1249,7 +1248,7 @@ struct SC::Build::ProjectWriter::WriterXCode
   }
 }
 )delimiter"));
-        SC_TRY(sb.format("{0}.xcassets/Contents.json", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/Contents.json", project.name));
         SC_TRY(fs.writeString(buffer.view(), R"delimiter(
 {
     "info" : {
@@ -1258,7 +1257,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     }
 })delimiter"));
 
-        SC_TRY(sb.format("{0}.xcassets/AppIcon.appiconset/AppIcon.svg", project.name));
+        SC_TRY(StringBuilder::format(buffer, "{0}.xcassets/AppIcon.appiconset/AppIcon.svg", project.name));
         String fullIconPath;
         SC_TRY(Path::join(fullIconPath, {project.rootDirectory.view(), project.iconPath.view()}));
         SC_TRY(fs.copyFile(fullIconPath.view(), buffer.view()));

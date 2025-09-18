@@ -544,7 +544,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             const Project&   project     = projects[idx];
             const StringView projectGuid = projectGuids[idx].view();
-            SC_TRY(StringBuilder(prjName, StringBuilder::Clear).format("{}.vcxproj", project.name));
+            SC_TRY(StringBuilder::format(prjName, "{}.vcxproj", project.name));
 
             builder.append("Project(\"{{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}}\") = \"{}\", \"{}\", \"{}\"\n"
                            "EndProject\n",

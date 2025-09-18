@@ -12,7 +12,7 @@ struct SupportToolsTest : public TestCase
     {
         using namespace SC::Tools;
         SmallString<256> outputDirectory;
-        (void)StringBuilder(outputDirectory).format("{0}/_Build", report.libraryRootDirectory);
+        (void)StringBuilder::format(outputDirectory, "{0}/_Build", report.libraryRootDirectory);
         Tool::Arguments arguments{report.console,
                                   report.libraryRootDirectory,
                                   report.libraryRootDirectory,

@@ -366,7 +366,7 @@ struct SC::SerializationExampleView
         {
         case SC::Platform::Windows: {
             SmallStringNative<128> command;
-            SC_TRY(StringBuilder(command).format("/select,\"{}\"", jsonPath));
+            SC_TRY(StringBuilder::format(command, "/select,\"{}\"", jsonPath));
             return process.exec({"explorer", command.view()});
         }
         default: {

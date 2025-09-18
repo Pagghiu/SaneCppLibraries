@@ -303,10 +303,15 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                 SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x86/"));
 #endif
 #endif
+                compilerBuilder.finalize();
+
                 SC_TRY(bestLinker.assign(bestCompiler.view()));
                 StringBuilder linkerBuilder(bestLinker);
                 SC_TRY(linkerBuilder.append(L"link.exe"));
-                SC_TRY(compilerBuilder.append(L"cl.exe"));
+                linkerBuilder.finalize();
+                StringBuilder compilerBuilder2(bestCompiler, StringBuilder::DoNotClear);
+                SC_TRY(compilerBuilder2.append(L"cl.exe"));
+                compilerBuilder2.finalize();
                 FileSystem fs;
                 if (fs.init(base))
                 {
@@ -330,7 +335,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                             SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
                             SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
                             String sysrootInclude;
-                            SC_TRY(StringBuilder(sysrootInclude).format("{0}/{1}/include", base, candidate));
+                            SC_TRY(StringBuilder::format(sysrootInclude, "{0}/{1}/include", base, candidate));
                             SC_TRY(compiler.compilerIncludePaths.push_back(sysrootInclude));
                             String     sysrootLib;
                             StringView instructionSet = "x86_64";
@@ -341,7 +346,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                             case InstructionSet::ARM64: instructionSet = "arm64"; break;
                             }
                             SC_TRY(
-                                StringBuilder(sysrootLib).format("{0}/{1}/lib/{2}", base, candidate, instructionSet));
+                                StringBuilder::format(sysrootLib, "{0}/{1}/lib/{2}", base, candidate, instructionSet));
                             SC_TRY(compiler.compilerLibraryPaths.push_back(sysrootLib));
                         }
                         found = true;
@@ -487,7 +492,7 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
         SC_TRY(builder.append(SC_NATIVE_STR(".o")));
-        SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), destFile.view(),
+        SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), builder.finalize(),
                            standardOutput));
     }
     return Result(true);
@@ -654,7 +659,7 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
                         SC_NATIVE_STR("cppwinrt")})
         {
             String str;
-            SC_TRY(StringBuilder(str).format("{0}\\include\\{1}\\{2}", baseDirectory, windowsSdkVersion, it));
+            SC_TRY(StringBuilder::format(str, "{0}\\include\\{1}\\{2}", baseDirectory, windowsSdkVersion, it));
             SC_TRY(sysroot.includePaths.push_back(move(str)));
         }
         StringView instructionSet = "x64";
@@ -668,8 +673,8 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
         for (auto it : {SC_NATIVE_STR("ucrt"), SC_NATIVE_STR("um")})
         {
             String str;
-            SC_TRY(StringBuilder(str).format("{0}\\lib\\{1}\\{2}\\{3}", baseDirectory, windowsSdkVersion, it,
-                                             instructionSet));
+            SC_TRY(StringBuilder::format(str, "{0}\\lib\\{1}\\{2}\\{3}", baseDirectory, windowsSdkVersion, it,
+                                         instructionSet));
             SC_TRY(sysroot.libraryPaths.push_back(move(str)));
         }
     }
@@ -688,9 +693,10 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
 {
     SC_TRY_MSG(not dynamicLibrary.isValid(), "Dynamic Library must be unloaded first");
     ProcessEnvironment        environment;
-    size_t                    index;
-    StringView                name;
     PluginCompilerEnvironment compilerEnvironment;
+
+    size_t     index;
+    StringView name;
     if (environment.contains("CFLAGS", &index))
     {
         SC_TRY(environment.get(index, name, compilerEnvironment.cFlags));
@@ -710,11 +716,11 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
     SC_TRY(dynamicLibrary.load(buffer.view()));
 
-    SC_TRY(StringBuilder(buffer).format("{}Init", definition.identity.identifier.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}Init", definition.identity.identifier.view()));
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginInit), "Missing #PluginName#Init");
-    SC_TRY(StringBuilder(buffer).format("{}Close", definition.identity.identifier.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}Close", definition.identity.identifier.view()));
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
-    SC_TRY(StringBuilder(buffer).format("{}QueryInterface", definition.identity.identifier.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}QueryInterface", definition.identity.identifier.view()));
     SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     numReloads += 1;
     lastLoadTime = Time::Realtime::now();
@@ -849,15 +855,15 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
     FileSystem            fs;
     SC_TRY(fs.init(lib.definition.directory.view()));
     SmallStringNative<255> buffer;
-    StringBuilder          fmt(buffer);
+
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(fmt.format("{}.lib", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.lib", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(fmt.format("{}.exp", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.exp", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(fmt.format("{}.ilk", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.ilk", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(fmt.format("{}.dll", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.dll", identifier));
     int numTries = 10;
     while (not fs.removeFile(buffer.view()))
     {
@@ -866,21 +872,22 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
         SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
     }
 #elif SC_PLATFORM_APPLE
-    SC_TRY(fmt.format("{}.dylib", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.dylib", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
 #else
-    SC_TRY(fmt.format("{}.so", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}.so", identifier));
     SC_TRY(fs.removeFile(buffer.view()));
 #endif
     for (auto& file : lib.definition.files)
     {
-        StringView             dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
-        StringView             outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        SmallStringNative<256> destFile   = StringEncoding::Native;
+        StringView dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
+        StringView outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
+
+        SmallStringNative<256> destFile = StringEncoding::Native;
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
         SC_TRY(builder.append(".o"));
-        SC_TRY(fs.removeFile(destFile.view()));
+        SC_TRY(fs.removeFile(builder.finalize()));
     }
     return Result(true);
 }

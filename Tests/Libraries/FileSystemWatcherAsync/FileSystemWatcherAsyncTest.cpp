@@ -56,14 +56,14 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
                 SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::AddRemoveRename);
                 SC_TEST_EXPECT(params.appDirectory == notification.basePath);
                 SC_TEST_EXPECT(
-                    StringBuilder(dirBuffer).format("{}{}{}{}{}", "dir", nativeSep, "subdir2", nativeSep, "test.txt"));
+                    StringBuilder::format(dirBuffer, "{}{}{}{}{}", "dir", nativeSep, "subdir2", nativeSep, "test.txt"));
                 SC_TEST_EXPECT(dirBuffer.view() == notification.relativePath);
 
                 StringPath fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPath));
 
-                StringBuilder expected(expectedBuffer);
-                SC_TEST_EXPECT(expected.format("{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
+                SC_TEST_EXPECT(
+                    StringBuilder::format(expectedBuffer, "{}{}{}", params.appDirectory, nativeSep, dirBuffer.view()));
                 SC_TEST_EXPECT(fullPath.view() == expectedBuffer.view());
             };
 

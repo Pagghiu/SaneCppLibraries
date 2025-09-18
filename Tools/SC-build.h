@@ -39,6 +39,7 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     SC_TRY(builder.append("projects         = \"{}\"\n", directories.projectsDirectory));
     SC_TRY(builder.append("outputs          = \"{}\"\n", directories.outputsDirectory));
     SC_TRY(builder.append("intermediates    = \"{}\"\n", directories.intermediatesDirectory));
+    builder.finalize();
     console.print(buffer.view());
     if (not Path::isAbsolute(directories.projectsDirectory.view(), SC::Path::AsNative) or
         not Path::isAbsolute(arguments.libraryDirectory.view(), SC::Path::AsNative))
@@ -263,7 +264,7 @@ Result runBuildTool(Tool::Arguments& arguments)
         additionalArgs[0] = "doxygen-awesome-css";
         SC_TRY(runPackageTool(args, &doxygenAwesomeCssPackage));
         String doxygenExecutable;
-        SC_TRY(StringBuilder(doxygenExecutable).format("{}/doxygen", doxygenPackage.installDirectoryLink));
+        SC_TRY(StringBuilder::format(doxygenExecutable, "{}/doxygen", doxygenPackage.installDirectoryLink));
         return runBuildDocumentation(doxygenExecutable.view(), arguments);
     }
 #endif

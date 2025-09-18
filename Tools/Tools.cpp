@@ -95,20 +95,21 @@ int main(int argc, const char* argv[])
         arguments.arguments = {additionalArguments, static_cast<size_t>(numArguments - 6)};
     }
 
-    StringBuilder builder(gFormatString);
-
     SC::Time::Realtime started = SC::Time::Realtime::now();
 
-    SC_TRY(builder.format("{} \"{}\" started\n", arguments.tool, arguments.action));
+    SC_TRY(StringBuilder::format(gFormatString, "{} \"{}\" started\n", arguments.tool, arguments.action));
+    StringBuilder builder(gFormatString, StringBuilder::DoNotClear);
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
     SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolSource));
     SC_TRY(builder.append("toolDestination  = \"{}\"\n", arguments.toolDestination));
+    builder.finalize();
     console.print(gFormatString.view());
 
     const Result   result  = Tool::runTool(arguments);
     const uint64_t elapsed = SC::Time::Realtime::now().subtractExact(started).ms;
 
-    SC_TRY(builder.format("{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action, elapsed));
+    SC_TRY(StringBuilder::format(gFormatString, "{} \"{}\" finished (took {} ms)\n", arguments.tool, arguments.action,
+                                 elapsed));
 
     console.print(gFormatString.view());
     if (not result)

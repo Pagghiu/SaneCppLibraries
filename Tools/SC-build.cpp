@@ -177,7 +177,8 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     String imguiRelative, imguiDefine;
     SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), imgui.packageLocalDirectory.view(), imguiRelative,
                                 Path::AsNative));
-    SC_TRY(StringBuilder(imguiDefine).format("SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
+
+    SC_TRY(StringBuilder::format(imguiDefine, "SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
     project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
 
     if (parameters.platform == Platform::Apple)

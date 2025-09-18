@@ -16,8 +16,7 @@ bool SC::SerializationJson::Writer::onSerializationEnd() { return output.onForma
 bool SC::SerializationJson::Writer::setOptions(Options opt)
 {
     options = opt;
-    StringBuilder builder(floatFormat);
-    return builder.format(".{}", options.floatDigits);
+    return StringBuilder::format(floatFormat, ".{}", options.floatDigits);
 }
 
 bool SC::SerializationJson::Writer::startObject(uint32_t index)
