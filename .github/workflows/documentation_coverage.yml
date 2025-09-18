@@ -1,11 +1,9 @@
 name: Documentation and Code Coverage
 
 on:
-  # Runs on pushes and pull requests targeting the main branch
+  # Runs on pushes and pull requests
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

@@ -2,9 +2,7 @@ name: Posix
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
 env:
   UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
