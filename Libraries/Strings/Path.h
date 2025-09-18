@@ -109,7 +109,7 @@ struct SC_COMPILER_EXPORT Path
     /// @endcode
     /// @param[in] input The StringView with path to be parsed. Trailing separators are ignored.
     /// @param[in] type Specify to parse as Windows or Posix path
-    /// @param repeat how many directory levels should be removed `dirname("/1/2/3/4", repeat=1) == "/1/2"`
+    /// @param[in] repeat how many directory levels should be removed `dirname("/1/2/3/4", Path::AsPosix, 1) == "/1/2"`
     /// @return Substring of `input` holding the directory name
     [[nodiscard]] static StringView dirname(StringView input, Type type, int repeat = 0);
 
@@ -188,12 +188,12 @@ struct SC_COMPILER_EXPORT Path
     /// For example:
     ///
     /// @code{.cpp}
-    /// Path::normalize("/Users/SC/../Documents/", &path, Path::AsPosix);
+    /// Path::normalize(path, "/Users/SC/../Documents/", Path::AsPosix);
     /// SC_RELEASE_ASSERT(path == "/Users/Documents");
     /// @endcode
     /// @param[out] output Reference to String that will receive the normalized Path
-    /// @param view The path to be normalized (but it should not be a view() of the output String)
-    /// @param type Specify to parse as Windows or Posix path
+    /// @param[in] view The path to be normalized (but it should not be a view() of the output String)
+    /// @param[in] type Specify to parse as Windows or Posix path
     /// @return `true` if the Path was successfully parsed and normalized
     template <int numComponents = 64>
     [[nodiscard]] static bool normalize(String& output, StringView view, Type type)
@@ -210,16 +210,16 @@ struct SC_COMPILER_EXPORT Path
     /// For example:
     ///
     /// @code{.cpp}
-    /// Path::relativeFromTo("/a/b/1/2/3", "/a/b/d/e", path, Path::AsPosix, Path::AsPosix);
+    /// Path::relativeFromTo(path, "/a/b/1/2/3", "/a/b/d/e", Path::AsPosix, Path::AsPosix);
     /// SC_TEST_ASSERT(path == "../../../d/e");
     /// @endcode
+    /// @param[out] output The output relative path computed that transforms source into destination
     /// @param[in] source The source Path
     /// @param[in] destination The destination Path
-    /// @param[out] output The output relative path computed that transforms source into destination
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @param[in] outputType Specify if the output relative path should be formatted as a Posix or Windows path
     /// @return `true` if source and destination paths can be properly parsed as absolute paths
-    [[nodiscard]] static bool relativeFromTo(StringView source, StringView destination, String& output, Type type,
+    [[nodiscard]] static bool relativeFromTo(String& output, StringView source, StringView destination, Type type,
                                              Type outputType = AsNative);
 
     /// @brief Append to an existing path a series of StringView with a separator
@@ -230,12 +230,12 @@ struct SC_COMPILER_EXPORT Path
     [[nodiscard]] static bool append(String& output, Span<const StringView> paths, Type inputType);
 
     /// @brief Check if the path ends with a Windows or Posix separator
-    /// @param path The path to check
+    /// @param[in] path The path to check
     /// @return `true` if path ends with a separator
     [[nodiscard]] static bool endsWithSeparator(StringView path);
 
     /// @brief Return a path without its (potential) starting separator
-    /// @param path The path to use
+    /// @param[in] path The path to use
     /// @return A StringView without its initial separator
     [[nodiscard]] static StringView removeStartingSeparator(StringView path);
 

@@ -215,7 +215,7 @@ bool SC::Build::Project::addFiles(StringView subdirectory, StringView filter)
         if (Path::isAbsolute(other, Path::AsNative))
             return false; // cannot be both absolute
         String relativePath;
-        SC_TRY(Path::relativeFromTo(rootDirectory.view(), source, relativePath, Path::AsNative));
+        SC_TRY(Path::relativeFromTo(relativePath, rootDirectory.view(), source, Path::AsNative));
         SC_TRY(StringBuilder(dest, StringBuilder::Clear).appendReplaceAll(relativePath.view(), "\\", "/"));
     }
     else

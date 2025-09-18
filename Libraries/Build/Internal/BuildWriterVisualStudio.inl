@@ -732,7 +732,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (Path::isAbsolute(text, Path::AsNative))
         {
             String relative;
-            SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), text, relative, Path::AsNative,
+            SC_TRY(Path::relativeFromTo(relative, directories.projectsDirectory.view(), text, Path::AsNative,
                                         Path::AsWindows));
             SC_TRY(builder.append("$(ProjectDir){}\\", relative));
             return true;

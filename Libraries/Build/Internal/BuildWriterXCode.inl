@@ -586,7 +586,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 if (Path::isAbsolute(it.view(), Path::AsNative))
                 {
                     String relative;
-                    SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), it.view(), relative,
+                    SC_TRY(Path::relativeFromTo(relative, directories.projectsDirectory.view(), it.view(),
                                                 Path::AsNative));
                     SC_TRY(builder.append("\n                       \"$(PROJECT_DIR)/{}\",", relative));
                 }

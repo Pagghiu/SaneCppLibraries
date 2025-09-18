@@ -58,13 +58,13 @@ struct RelativeDirectories
     Result computeRelativeDirectories(Directories directories, Path::Type outputType, const Project& project,
                                       const StringView projectDirFormatString)
     {
-        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), directories.outputsDirectory.view(),
-                                    relativeProjectsToOutputs, Path::AsNative, outputType));
-        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), directories.intermediatesDirectory.view(),
-                                    relativeProjectsToIntermediates, Path::AsNative, outputType));
+        SC_TRY(Path::relativeFromTo(relativeProjectsToOutputs, directories.projectsDirectory.view(),
+                                    directories.outputsDirectory.view(), Path::AsNative, outputType));
+        SC_TRY(Path::relativeFromTo(relativeProjectsToIntermediates, directories.projectsDirectory.view(),
+                                    directories.intermediatesDirectory.view(), Path::AsNative, outputType));
 
-        SC_TRY(Path::relativeFromTo(directories.projectsDirectory.view(), project.rootDirectory.view(),
-                                    relativeProjectsToProjectRoot, Path::AsNative, outputType));
+        SC_TRY(Path::relativeFromTo(relativeProjectsToProjectRoot, directories.projectsDirectory.view(),
+                                    project.rootDirectory.view(), Path::AsNative, outputType));
         SC_TRY(StringBuilder::format(projectRootRelativeToProjects, projectDirFormatString,
                                      relativeProjectsToProjectRoot));
 
@@ -230,10 +230,10 @@ struct SC::Build::WriterInternal
                     renderItem.type = RenderItem::DebugVisualizerFile;
                 }
                 renderItem.compileFlags = &files.compile;
-                SC_TRY(Path::relativeFromTo(referenceDirectory, it.view(), renderItem.path,
+                SC_TRY(Path::relativeFromTo(renderItem.path, referenceDirectory, it.view(),
                                             Path::Type::AsNative,  // input type
                                             Path::Type::AsPosix)); // output type
-                SC_TRY(Path::relativeFromTo(rootDirectory, it.view(), renderItem.referencePath,
+                SC_TRY(Path::relativeFromTo(renderItem.referencePath, rootDirectory, it.view(),
                                             Path::Type::AsNative,  // input type
                                             Path::Type::AsPosix)); // output type
                 if (file.action == FilesSelection::Add)

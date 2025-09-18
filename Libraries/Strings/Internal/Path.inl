@@ -482,7 +482,7 @@ bool SC::Path::normalize(String& output, StringView view, Type type, Span<String
     }
 }
 
-bool SC::Path::relativeFromTo(StringView source, StringView destination, String& output, Type inputType,
+bool SC::Path::relativeFromTo(String& output, StringView source, StringView destination, Type inputType,
                               Type outputType)
 {
     bool skipRelativeCheck = false;

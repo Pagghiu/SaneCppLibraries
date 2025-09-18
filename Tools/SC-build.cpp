@@ -175,7 +175,7 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addFiles(sokol.packageLocalDirectory.view(), "*.h");
     String imguiRelative, imguiDefine;
-    SC_TRY(Path::relativeFromTo(project.rootDirectory.view(), imgui.packageLocalDirectory.view(), imguiRelative,
+    SC_TRY(Path::relativeFromTo(imguiRelative, project.rootDirectory.view(), imgui.packageLocalDirectory.view(),
                                 Path::AsNative));
 
     SC_TRY(StringBuilder::format(imguiDefine, "SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
