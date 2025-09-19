@@ -38,7 +38,7 @@ static bool formatSprintf(StringFormatOutput& data, const char (&formatSpecifier
 }
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_PLATFORM_64_BIT == 0
-bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringView specifier, const long value)
+bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringSpan specifier, const long value)
 {
     constexpr char formatSpecifier[] = "d";
     return formatSprintf(data, formatSpecifier, specifier, value);
@@ -46,14 +46,14 @@ bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringV
 #endif
 #else
 #if !SC_PLATFORM_LINUX
-bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                             const SC::size_t value)
 {
     constexpr char formatSpecifier[] = "zu";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                              const SC::ssize_t value)
 {
     constexpr char formatSpecifier[] = "zd";
@@ -62,101 +62,101 @@ bool StringFormatterFor<SC::ssize_t>::format(StringFormatOutput& data, const Str
 #endif
 #endif
 
-bool StringFormatterFor<SC::int64_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::int64_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                              const SC::int64_t value)
 {
     constexpr char formatSpecifier[] = PRIi64;
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<SC::uint64_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::uint64_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                               const SC::uint64_t value)
 {
     constexpr char formatSpecifier[] = PRIu64;
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<SC::int32_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::int32_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                              const SC::int32_t value)
 {
     constexpr char formatSpecifier[] = "d";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<SC::uint32_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::uint32_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                               const SC::uint32_t value)
 {
     constexpr char formatSpecifier[] = "d";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<SC::int16_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::int16_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                              const SC::int16_t value)
 {
     return StringFormatterFor<SC::int32_t>::format(data, specifier, value);
 }
 
-bool StringFormatterFor<SC::uint16_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::uint16_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                               const SC::uint16_t value)
 {
     return StringFormatterFor<SC::uint32_t>::format(data, specifier, value);
 }
-bool StringFormatterFor<SC::int8_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::int8_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                             const SC::int8_t value)
 {
     return StringFormatterFor<SC::int32_t>::format(data, specifier, value);
 }
 
-bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                              const SC::uint8_t value)
 {
     return StringFormatterFor<SC::uint32_t>::format(data, specifier, value);
 }
 
-bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringView specifier, const bool value)
+bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringSpan specifier, const bool value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(value ? "true"_a8 : "false"_a8);
 }
 
-bool StringFormatterFor<float>::format(StringFormatOutput& data, StringView specifier, const float value)
+bool StringFormatterFor<float>::format(StringFormatOutput& data, const StringSpan specifier, const float value)
 {
     constexpr char formatSpecifier[] = "f";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringView specifier, const double value)
+bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringSpan specifier, const double value)
 {
     constexpr char formatSpecifier[] = "f";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
-bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringView specifier, const char value)
+bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringSpan specifier, const char value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(StringView({&value, sizeof(value)}, false, StringEncoding::Ascii));
 }
 
-bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringView specifier, const char* value)
+bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringSpan specifier, const char* value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(StringView::fromNullTerminated(value, StringEncoding::Ascii));
 }
 
-bool StringFormatterFor<const void*>::format(StringFormatOutput& data, const StringView specifier, const void* value)
+bool StringFormatterFor<const void*>::format(StringFormatOutput& data, const StringSpan specifier, const void* value)
 {
     constexpr char formatSpecifier[] = "p";
     return formatSprintf(data, formatSpecifier, specifier, value);
 }
 
 #if SC_PLATFORM_WINDOWS
-bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringView specifier, const wchar_t value)
+bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringSpan specifier, const wchar_t value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(StringView({&value, 1}, false));
 }
 
-bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringSpan specifier,
                                                 const wchar_t* value)
 {
     SC_COMPILER_UNUSED(specifier);
@@ -164,20 +164,20 @@ bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const 
 }
 #endif
 
-bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const StringView specifier,
+bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const StringSpan specifier,
                                             const StringView value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(value);
 }
 
-bool StringFormatterFor<StringSpan>::format(StringFormatOutput& data, const StringView specifier, StringSpan value)
+bool StringFormatterFor<StringSpan>::format(StringFormatOutput& data, const StringSpan specifier, StringSpan value)
 {
     SC_COMPILER_UNUSED(specifier);
     return data.append(value);
 }
 
-bool StringFormatterFor<StringPath>::format(StringFormatOutput& data, const StringView specifier, const StringPath& str)
+bool StringFormatterFor<StringPath>::format(StringFormatOutput& data, const StringSpan specifier, const StringPath& str)
 {
     return StringFormatterFor<StringSpan>::format(data, specifier, str.view());
 }

@@ -2,7 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Strings/String.h"
-#include "../../Strings/StringFormat.h"
+
+namespace SC
+{
+template <typename T>
+struct StringFormatterFor;
+}
 
 struct SC::String::Internal
 {
