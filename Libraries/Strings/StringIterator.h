@@ -135,7 +135,7 @@ struct SC_COMPILER_EXPORT StringIterator
     /// @param c code point to match
     /// @return `true` if code unit at current position matches `c`, `false` if there is no match or position is at
     /// `end`
-    [[nodiscard]] bool match(CodePoint c) { return it < end and CharIterator::decode(it) == c; }
+    [[nodiscard]] bool match(CodePoint c) { return it < end and CharIterator::decode(it, end) == c; }
 
     /// @brief Decode code unit at current position and advance
     /// @param c output code point read
@@ -220,8 +220,14 @@ struct SC_COMPILER_EXPORT StringIterator
     [[nodiscard]] bool advanceOfBytes(ssize_t bytesLength);
 
     friend struct StringView;
-    static constexpr const CodeUnit* getNextOf(const CodeUnit* src) { return CharIterator::getNextOf(src); }
-    static constexpr const CodeUnit* getPreviousOf(const CodeUnit* src) { return CharIterator::getPreviousOf(src); }
+    static constexpr const CodeUnit* getNextOf(const CodeUnit* src, const char* end)
+    {
+        return CharIterator::getNextOf(src, end);
+    }
+    static constexpr const CodeUnit* getPreviousOf(const CodeUnit* src, const char* start)
+    {
+        return CharIterator::getPreviousOf(src, start);
+    }
     constexpr StringIterator(const CodeUnit* it, const CodeUnit* end) : it(it), start(it), end(end) {}
     const CodeUnit* it;
     const CodeUnit* start;
@@ -243,9 +249,12 @@ struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIter
 
     [[nodiscard]] static constexpr StringEncoding getEncoding() { return StringEncoding::Ascii; }
 
-    [[nodiscard]] static constexpr const char* getNextOf(const char* src) { return src + 1; }
-    [[nodiscard]] static constexpr const char* getPreviousOf(const char* src) { return src - 1; }
-    [[nodiscard]] static constexpr CodePoint   decode(const char* src) { return static_cast<CodePoint>(*src); }
+    [[nodiscard]] static constexpr const char* getNextOf(const char* src, const char*) { return src + 1; }
+    [[nodiscard]] static constexpr const char* getPreviousOf(const char* src, const char*) { return src - 1; }
+    [[nodiscard]] static constexpr CodePoint   decode(const char* src, const char*)
+    {
+        return static_cast<CodePoint>(*src);
+    }
 };
 
 /// @brief A string iterator for UTF16 strings
@@ -260,11 +269,10 @@ struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIter
 
     [[nodiscard]] static StringEncoding getEncoding() { return StringEncoding::Utf16; }
 
-    [[nodiscard]] static const char* getNextOf(const char* bytes);
+    [[nodiscard]] static const char* getNextOf(const char* bytes, const char* end);
+    [[nodiscard]] static const char* getPreviousOf(const char* bytes, const char* start);
 
-    [[nodiscard]] static const char* getPreviousOf(const char* bytes);
-
-    [[nodiscard]] static uint32_t decode(const char* bytes);
+    [[nodiscard]] static uint32_t decode(const char* bytes, const char* end);
 };
 
 /// @brief A string iterator for UTF8 strings
@@ -279,11 +287,10 @@ struct SC_COMPILER_EXPORT StringIteratorUTF8 : public StringIterator<StringItera
 
     [[nodiscard]] static StringEncoding getEncoding() { return StringEncoding::Utf8; }
 
-    [[nodiscard]] static const char* getNextOf(const char* src);
+    [[nodiscard]] static const char* getNextOf(const char* src, const char* end);
+    [[nodiscard]] static const char* getPreviousOf(const char* src, const char* start);
 
-    [[nodiscard]] static const char* getPreviousOf(const char* src);
-
-    [[nodiscard]] static uint32_t decode(const char* src);
+    [[nodiscard]] static uint32_t decode(const char* src, const char* end);
 };
 
 /// @brief Builds a constexpr bool skip table of 256 entries used in some parsers
@@ -308,9 +315,9 @@ constexpr bool StringIterator<CharIterator>::advanceUntilMatches(CodePoint c)
 {
     while (it < end)
     {
-        if (CharIterator::decode(it) == c)
+        if (CharIterator::decode(it, end) == c)
             return true;
-        it = getNextOf(it);
+        it = getNextOf(it, end);
     }
     return false;
 }
@@ -318,9 +325,9 @@ constexpr bool StringIterator<CharIterator>::advanceUntilMatches(CodePoint c)
 template <typename CharIterator>
 constexpr bool StringIterator<CharIterator>::advanceIfMatches(CodePoint c)
 {
-    if (it < end and CharIterator::decode(it) == c)
+    if (it < end and CharIterator::decode(it, end) == c)
     {
-        it = getNextOf(it);
+        it = getNextOf(it, end);
         return true;
     }
     return false;
@@ -331,8 +338,8 @@ constexpr bool StringIterator<CharIterator>::advanceRead(CodePoint& c)
 {
     if (it < end)
     {
-        c  = CharIterator::decode(it);
-        it = getNextOf(it);
+        c  = CharIterator::decode(it, end);
+        it = getNextOf(it, end);
         return true;
     }
     return false;
@@ -343,7 +350,7 @@ constexpr bool StringIterator<CharIterator>::stepForward()
 {
     if (it < end)
     {
-        it = getNextOf(it);
+        it = getNextOf(it, end);
         return true;
     }
     return false;
@@ -354,7 +361,7 @@ constexpr bool StringIterator<CharIterator>::stepBackward()
 {
     if (it > start)
     {
-        it = getPreviousOf(it);
+        it = getPreviousOf(it, start);
         return true;
     }
     return false;
@@ -370,7 +377,7 @@ constexpr bool StringIterator<CharIterator>::advanceCodePoints(size_t numCodePoi
         {
             return false;
         }
-        it = getNextOf(it);
+        it = getNextOf(it, end);
     }
     return true;
 }
@@ -378,13 +385,13 @@ constexpr bool StringIterator<CharIterator>::advanceCodePoints(size_t numCodePoi
 template <typename CharIterator>
 constexpr bool StringIterator<CharIterator>::isFollowedBy(CodePoint c)
 {
-    return it < end ? CharIterator::decode(getNextOf(it)) == c : false;
+    return it < end ? CharIterator::decode(getNextOf(it, end), end) == c : false;
 }
 
 template <typename CharIterator>
 constexpr bool StringIterator<CharIterator>::isPrecededBy(CodePoint c)
 {
-    return it > start ? CharIterator::decode(getPreviousOf(it)) == c : false;
+    return it > start ? CharIterator::decode(getPreviousOf(it, start), it) == c : false;
 }
 
 template <typename CharIterator>

@@ -10,8 +10,9 @@ bool StringIterator<CharIterator>::reverseAdvanceUntilMatches(CodePoint c)
 {
     while (it > start)
     {
-        it = getPreviousOf(it);
-        if (CharIterator::decode(it) == c)
+        auto prevIt = it;
+        it          = getPreviousOf(it, start);
+        if (CharIterator::decode(it, prevIt) == c)
             return true;
     }
     return false;
@@ -107,7 +108,7 @@ bool StringIterator<CharIterator>::advanceBeforeOrAfterFinding(StringIterator<Ot
             }
             return true;
         }
-        outerIterator.it = getNextOf(outerIterator.it);
+        outerIterator.it = getNextOf(outerIterator.it, outerIterator.end);
     }
     return false;
 }
@@ -167,7 +168,7 @@ bool StringIterator<CharIterator>::advanceUntilMatchesAny(Span<const CodePoint> 
 {
     while (it < end)
     {
-        const auto decoded = CharIterator::decode(it);
+        const auto decoded = CharIterator::decode(it, end);
         for (auto c : items)
         {
             if (decoded == c)
@@ -176,7 +177,7 @@ bool StringIterator<CharIterator>::advanceUntilMatchesAny(Span<const CodePoint> 
                 return true;
             }
         }
-        it = getNextOf(it);
+        it = getNextOf(it, end);
     }
     return false;
 }
@@ -192,8 +193,10 @@ bool StringIterator<CharIterator>::reverseAdvanceUntilMatchesAny(Span<const Code
 {
     while (it > start)
     {
-        it                 = getPreviousOf(it);
-        const auto decoded = CharIterator::decode(it);
+        auto prevIt = it;
+        it          = getPreviousOf(it, start);
+
+        const auto decoded = CharIterator::decode(it, prevIt);
         for (auto c : items)
         {
             if (decoded == c)
@@ -217,7 +220,7 @@ bool StringIterator<CharIterator>::advanceUntilDifferentFrom(CodePoint c, CodePo
 {
     while (it < end)
     {
-        auto readChar = CharIterator::decode(it);
+        auto readChar = CharIterator::decode(it, end);
         if (readChar != c)
         {
             if (optionalReadChar)
@@ -226,7 +229,7 @@ bool StringIterator<CharIterator>::advanceUntilDifferentFrom(CodePoint c, CodePo
             }
             return true;
         }
-        it = getNextOf(it);
+        it = getNextOf(it, end);
     }
     return false;
 }
@@ -239,8 +242,8 @@ bool StringIterator<CharIterator>::advanceBackwardIfMatches(CodePoint c)
 {
     if (it > start)
     {
-        auto otherIt = getPreviousOf(it);
-        if (CharIterator::decode(otherIt) == c)
+        auto otherIt = getPreviousOf(it, start);
+        if (CharIterator::decode(otherIt, it) == c)
         {
             it = otherIt;
             return true;
@@ -257,12 +260,12 @@ bool StringIterator<CharIterator>::advanceIfMatchesAny(Span<const CodePoint> ite
 {
     if (it < end)
     {
-        const auto decoded = CharIterator::decode(it);
+        const auto decoded = CharIterator::decode(it, end);
         for (auto c : items)
         {
             if (decoded == c)
             {
-                it = getNextOf(it);
+                it = getNextOf(it, end);
                 return true;
             }
         }
@@ -279,10 +282,10 @@ bool StringIterator<CharIterator>::advanceIfMatchesRange(CodePoint first, CodePo
     SC_ASSERT_RELEASE(first <= last);
     if (it < end)
     {
-        const auto decoded = CharIterator::decode(it);
+        const auto decoded = CharIterator::decode(it, end);
         if (decoded >= first and decoded <= last)
         {
-            it = getNextOf(it);
+            it = getNextOf(it, end);
             return true;
         }
     }
@@ -297,7 +300,7 @@ bool StringIterator<CharIterator>::read(CodePoint& c)
 {
     if (it < end)
     {
-        c = CharIterator::decode(it);
+        c = CharIterator::decode(it, end);
         return true;
     }
     return false;
@@ -311,8 +314,10 @@ bool StringIterator<CharIterator>::advanceBackwardRead(CodePoint& c)
 {
     if (it > start)
     {
-        it = getPreviousOf(it);
-        c  = CharIterator::decode(it);
+        auto prevIt = it;
+
+        it = getPreviousOf(it, start);
+        c  = CharIterator::decode(it, prevIt);
         return true;
     }
     return false;
@@ -330,7 +335,7 @@ bool StringIterator<CharIterator>::reverseAdvanceCodePoints(size_t numCodePoints
         {
             return false;
         }
-        it = getPreviousOf(it);
+        it = getPreviousOf(it, start);
     }
     return true;
 }
@@ -343,8 +348,8 @@ bool StringIterator<CharIterator>::endsWithAnyOf(Span<const CodePoint> codePoint
 {
     if (start != end)
     {
-        auto pointerToLast    = CharIterator::getPreviousOf(end);
-        auto decodedCodePoint = CharIterator::decode(pointerToLast);
+        auto pointerToLast    = CharIterator::getPreviousOf(end, start);
+        auto decodedCodePoint = CharIterator::decode(pointerToLast, end);
         for (CodePoint codePoint : codePoints)
         {
             if (codePoint == decodedCodePoint)
@@ -364,7 +369,7 @@ bool StringIterator<CharIterator>::startsWithAnyOf(Span<const CodePoint> codePoi
 {
     if (start != end)
     {
-        auto decodedCodePoint = CharIterator::decode(start);
+        auto decodedCodePoint = CharIterator::decode(start, end);
         for (CodePoint codePoint : codePoints)
         {
             if (codePoint == decodedCodePoint)
@@ -449,27 +454,22 @@ bool StringIteratorASCII::advanceUntilMatchesNonConstexpr(CodePoint c)
 }
 
 // StringIteratorUTF16
-const char* StringIteratorUTF16::getNextOf(const char* bytes)
+const char* StringIteratorUTF16::getNextOf(const char* src, const char* end)
 {
-    uint16_t value;
-    ::memcpy(&value, bytes, sizeof(uint16_t)); // Avoid potential unaligned read
-    if (value >= 0xD800 and value <= 0xDFFF)   // TODO: This assumes Little endian
-    {
-        return bytes + 4; // Multi-byte character
-    }
-    else
-    {
-        return bytes + 2; // Single-byte character
-    }
+    const char* it = src;
+    StringSpan::advanceUTF16(it, end);
+    return it;
 }
 
-const char* StringIteratorUTF16::getPreviousOf(const char* bytes)
+const char* StringIteratorUTF16::getPreviousOf(const char* bytes, const char* start)
 {
+    if (bytes - 2 < start)
+        return nullptr;
     uint16_t value;
     ::memcpy(&value, bytes - 2, sizeof(uint16_t)); // Avoid potential unaligned read
     if (value >= 0xD800 and value <= 0xDFFF)       // TODO: This assumes Little endian
     {
-        return bytes - 4; // Multi-byte character
+        return bytes - 4 < start ? nullptr : bytes - 4; // Multi-byte character
     }
     else
     {
@@ -477,77 +477,32 @@ const char* StringIteratorUTF16::getPreviousOf(const char* bytes)
     }
 }
 
-SC::uint32_t StringIteratorUTF16::decode(const char* bytes)
+SC::uint32_t StringIteratorUTF16::decode(const char* bytes, const char* end)
 {
-    uint16_t src0;
-    ::memcpy(&src0, bytes, sizeof(uint16_t)); // Avoid potential unaligned read
-    const uint32_t character = static_cast<uint32_t>(src0);
-    if (character >= 0xD800 and character <= 0xDFFF) // TODO: This assumes Little endian
-    {
-        uint16_t src1;
-        ::memcpy(&src1, bytes + 2, sizeof(uint16_t)); // Avoid potential unaligned read
-        const uint32_t nextCharacter = static_cast<uint32_t>(src1);
-        if (nextCharacter >= 0xDC00) // TODO: This assumes Little endian
-        {
-            return 0x10000 + ((nextCharacter - 0xDC00) | ((character - 0xD800) << 10));
-        }
-    }
-    return character;
+    const char* srcCopy = bytes;
+    return StringSpan::advanceUTF16(srcCopy, end);
 }
 
 // StringIteratorUTF8
-const char* StringIteratorUTF8::getNextOf(const char* src)
+const char* StringIteratorUTF8::getNextOf(const char* src, const char* end)
 {
-    char character = src[0];
-    if ((character & 0x80) == 0)
-    {
-        return src + 1;
-    }
-    else if ((character & 0xE0) == 0xC0)
-    {
-        return src + 2;
-    }
-    else if ((character & 0xF0) == 0xE0)
-    {
-        return src + 3;
-    }
-    return src + 4;
+    const char* it = src;
+    StringSpan::advanceUTF8(it, end);
+    return it;
 }
 
-const char* StringIteratorUTF8::getPreviousOf(const char* src)
+const char* StringIteratorUTF8::getPreviousOf(const char* src, const char* start)
 {
     do
     {
         --src;
-    } while ((*src & 0xC0) == 0x80);
+    } while (src >= start and (*src & 0xC0) == 0x80);
     return src;
 }
 
-SC::uint32_t StringIteratorUTF8::decode(const char* src)
+SC::uint32_t StringIteratorUTF8::decode(const char* src, const char* end)
 {
-    uint32_t character = static_cast<uint32_t>(src[0]);
-    if ((character & 0x80) == 0)
-    {
-        return character;
-    }
-    else if ((character & 0xE0) == 0xC0)
-    {
-        character = src[0] & 0x1F;
-        character = (character << 6) | (src[1] & 0x3F);
-    }
-    else if ((character & 0xF0) == 0xE0)
-    {
-        character = src[0] & 0x0F;
-        character = (character << 6) | (src[1] & 0x3F);
-        character = (character << 6) | (src[2] & 0x3F);
-    }
-    else
-    {
-        character = src[0] & 0x07;
-        character = (character << 6) | (src[1] & 0x3F);
-        character = (character << 6) | (src[2] & 0x3F);
-        character = (character << 6) | (src[3] & 0x3F);
-    }
-    return character;
+    const char* srcCopy = src;
+    return StringSpan::advanceUTF8(srcCopy, end);
 }
 } // namespace SC
