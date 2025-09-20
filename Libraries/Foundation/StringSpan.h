@@ -60,8 +60,23 @@ struct SC_COMPILER_EXPORT StringSpan
     constexpr StringSpan(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}
     static constexpr StringSpan fromNullTerminated(const wchar_t* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::wcslen(text)}, true); }
 #endif
-    constexpr bool operator ==(const StringSpan other) const { return textSizeInBytes == other.textSizeInBytes and ::memcmp(text, other.text, textSizeInBytes) == 0; }
+
     // clang-format on
+
+    /// @brief Result of ordering comparison done by StringSpan::compare
+    enum class Comparison
+    {
+        Smaller = -1, ////< Current string is smaller than the other
+        Equals  = 0,  ////< Current string is equal to the other
+        Bigger  = 1   ////< Current string is bigger than the other
+    };
+
+    /// @brief Ordering comparison between non-normalized StringView (operates on code points, not on utf graphemes)
+    [[nodiscard]] Comparison compare(StringSpan other) const;
+
+    [[nodiscard]] bool operator==(const StringSpan other) const { return compare(other) == Comparison::Equals; }
+    [[nodiscard]] bool operator!=(const StringSpan other) const { return compare(other) != Comparison::Equals; }
+    [[nodiscard]] bool operator<(const StringSpan other) const { return compare(other) == Comparison::Smaller; }
 
     /// @brief Obtain a `const char` Span from this StringView
     [[nodiscard]] Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
@@ -114,6 +129,14 @@ struct SC_COMPILER_EXPORT StringSpan
     /// @param string The destination writable string to write to
     /// @param removePreviousNullTerminator If true, the previous null terminator is removed
     Result appendNullTerminatedTo(NativeWritable& string, bool removePreviousNullTerminator = true) const;
+
+    /// @brief Decode a single UTF8 code point and advance the iterator
+    /// @return The decoded code point, or 0 if the sequence is invalid (or end is reached)
+    static uint32_t advanceUTF8(const char*& it, const char* end);
+
+    /// @brief Decode a single UTF16 code point and advance the iterator
+    /// @return The decoded code point, or 0 if the sequence is invalid (or end is reached)
+    static uint32_t advanceUTF16(const char*& it, const char* end);
 
   protected:
     friend struct StringView;

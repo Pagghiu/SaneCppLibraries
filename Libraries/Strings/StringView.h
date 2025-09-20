@@ -78,53 +78,6 @@ struct SC::StringView : public StringSpan
         return Span<const uint8_t>::reinterpret_bytes(text, textSizeInBytes);
     }
 
-    /// @brief Result of ordering comparison done by StringView::compare
-    enum class Comparison
-    {
-        Smaller = -1, ////< Current string is smaller than the other
-        Equals  = 0,  ////< Current string is equal to the other
-        Bigger  = 1   ////< Current string is bigger than the other
-    };
-
-    /// @brief Ordering comparison between non-normalized StringView (operates on code points, not on utf graphemes)
-    /// @param other The string being compared to current one
-    /// @return Result of the comparison (smaller, equals or bigger)
-    ///
-    /// Example:
-    /// @code{.cpp}
-    /// // àèìòù (1 UTF16-LE sequence, 2 UTF8 sequence)
-    /// SC_ASSERT_RELEASE("\xc3\xa0\xc3\xa8\xc3\xac\xc3\xb2\xc3\xb9"_u8.compare(
-    ///                     "\xe0\x0\xe8\x0\xec\x0\xf2\x0\xf9\x0"_u16) == StringView::Comparison::Equals);
-    ///
-    /// // 日本語語語 (1 UTF16-LE sequence, 3 UTF8 sequence)
-    /// StringView stringUtf8  = StringView("\xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e\xe8\xaa\x9e\xe8\xaa\x9e"_u8);
-    /// StringView stringUtf16 = StringView("\xE5\x65\x2C\x67\x9E\x8a\x9E\x8a\x9E\x8a\x00"_u16); // LE
-    /// // Comparisons are on code points NOT grapheme clusters!!
-    /// SC_ASSERT_RELEASE(stringUtf8.compare(stringUtf16) == StringView::Comparison::Equals);
-    /// SC_ASSERT_RELEASE(stringUtf16.compare(stringUtf8) == StringView::Comparison::Equals);
-    /// SC_ASSERT_RELEASE(stringUtf8 == stringUtf16);
-    /// SC_ASSERT_RELEASE(stringUtf16 == stringUtf8);
-    /// @endcode
-    [[nodiscard]] Comparison compare(StringView other) const;
-
-    /// @brief Ordering operator for StringView using StringView::compare
-    /// @param other The string being compared to current one
-    /// @return `true` if current string is Comparison::Smaller than other
-    ///
-    /// Example:
-    /// @code{.cpp}
-    /// StringView sv[3] = {
-    ///     StringView("3"),
-    ///     StringView("1"),
-    ///     StringView("2"),
-    /// };
-    /// Algorithms::bubbleSort(sv, sv + 3, [](StringView a, StringView b) { return a < b; });
-    /// SC_TEST_EXPECT(sv[0] == "1");
-    /// SC_TEST_EXPECT(sv[1] == "2");
-    /// SC_TEST_EXPECT(sv[2] == "3");
-    /// @endcode
-    [[nodiscard]] bool operator<(StringView other) const { return compare(other) == Comparison::Smaller; }
-
     /// @brief Call given lambda with one of StringIteratorASCII, StringIteratorUTF8, StringIteratorUTF16 depending on
     /// encoding.
     /// @tparam Func A function/lambda with `auto operator()({StringIteratorASCII | StringIteratorUTF8 |
@@ -677,34 +630,22 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunreachable-code"
 #endif
-    if (hasCompatibleEncoding(other))
+    if (__builtin_is_constant_evaluated())
     {
-        if (textSizeInBytes != other.textSizeInBytes)
+        if (not hasCompatibleEncoding(other))
             return false;
-        if (__builtin_is_constant_evaluated())
-        {
-            auto it1 = text;
-            auto it2 = other.text;
-            auto sz  = textSizeInBytes;
-            for (size_t idx = 0; idx < sz; ++idx)
-                if (it1[idx] != it2[idx])
-                    return false;
-        }
-        else
-        {
-            if (text == nullptr)
-            {
-                return other.textSizeInBytes == 0;
-            }
-            if (other.text == nullptr)
-            {
-                return textSizeInBytes == 0;
-            }
-            return memcmp(text, other.text, textSizeInBytes) == 0;
-        }
+        auto it1 = text;
+        auto it2 = other.text;
+        auto sz  = textSizeInBytes;
+        for (size_t idx = 0; idx < sz; ++idx)
+            if (it1[idx] != it2[idx])
+                return false;
+        return true;
     }
-    size_t commonOverlappingPoints = 0;
-    return fullyOverlaps(other, commonOverlappingPoints);
+    else
+    {
+        return StringSpan::operator==(other);
+    }
 #if defined(__clang__)
 #pragma clang diagnostic pop
 #endif

@@ -9,6 +9,7 @@ void runBuildTest(TestReport& report);
 
 // Foundation
 void runBaseTest(TestReport& report);
+void runStringSpanTest(TestReport& report);
 void runBufferTest(TestReport& report);
 void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
@@ -145,6 +146,7 @@ int main(int argc, const char* argv[])
 
     // Foundation tests
     runBaseTest(report);
+    runStringSpanTest(report);
     runBufferTest(report);
     runFunctionTest(report);
     runVirtualMemoryTest(report);

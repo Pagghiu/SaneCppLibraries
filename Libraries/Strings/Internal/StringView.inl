@@ -118,52 +118,6 @@ bool SC::StringView::parseDouble(double& value) const
     return true;
 }
 
-SC::StringView::Comparison SC::StringView::compare(StringView other) const
-{
-    if (hasCompatibleEncoding(other))
-    {
-        const int res = memcmp(text, other.text, min(textSizeInBytes, other.textSizeInBytes));
-        if (res < 0)
-            return Comparison::Smaller;
-        else if (res == 0)
-            return Comparison::Equals;
-        else
-            return Comparison::Bigger;
-    }
-    else
-    {
-        return withIterator(
-            [other](auto it1)
-            {
-                return other.withIterator(
-                    [&it1](auto it2)
-                    {
-                        StringCodePoint c1 = 0, c2 = 0;
-                        while (it1.advanceRead(c1) and it2.advanceRead(c2))
-                        {
-                            if (c1 < c2)
-                            {
-                                return Comparison::Smaller;
-                            }
-                            else if (c1 > c2)
-                            {
-                                return Comparison::Bigger;
-                            }
-                        }
-                        if (it1.isAtEnd() and it2.isAtEnd())
-                        {
-                            return Comparison::Equals;
-                        }
-                        if (it1.isAtEnd())
-                        {
-                            return Comparison::Bigger;
-                        }
-                        return Comparison::Smaller;
-                    });
-            });
-    }
-}
-
 bool SC::StringView::startsWith(const StringView str) const
 {
     if (hasCompatibleEncoding(str))
