@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Result.h"
 #include "../../Strings/Path.h"
-#include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
+#if SC_COMPILER_MSVC
+#include "../../Foundation/StringPath.h"
+#endif
 
 struct SC::Path::Internal
 {
@@ -335,9 +337,10 @@ bool SC::Path::isAbsolute(StringView input, Type type)
     Assert::unreachable();
 }
 
-bool SC::Path::join(String& output, Span<const StringView> inputs, StringView separator, bool skipEmpty)
+bool SC::Path::join(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> inputs,
+                    StringView separator, bool skipEmpty)
 {
-    StringBuilder sb(output, StringBuilder::Clear);
+    StringBuilder sb(output, encoding, StringBuilder::Clear);
     const size_t  numElements = inputs.sizeInElements();
     for (size_t idx = 0; idx < numElements; ++idx)
     {
@@ -350,32 +353,33 @@ bool SC::Path::join(String& output, Span<const StringView> inputs, StringView se
             SC_TRY(sb.append(separator));
         }
     }
+    sb.finalize();
     return true;
 }
 
-bool SC::Path::normalizeUNCAndTrimQuotes(String& outputPath, StringView fileLocation, Type type,
-                                         Span<StringView> components)
+bool SC::Path::normalizeUNCAndTrimQuotes(IGrowableBuffer&& outputPath, StringEncoding encoding, StringView fileLocation,
+                                         Type type, Span<StringView> components)
 {
     // The macro escaping Library Path from defines adds escaped double quotes
     fileLocation = fileLocation.trimAnyOf({'"'});
 #if SC_COMPILER_MSVC
-    SmallString<256> fixUncPathsOnMSVC;
+    StringPath fixUncPathsOnMSVC;
     if (fileLocation.startsWithAnyOf({'\\'}) and not fileLocation.startsWith("\\\\"))
     {
         // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
-        SC_TRY(StringBuilder::format(fixUncPathsOnMSVC, "\\{}", fileLocation));
+        SC_TRY(fixUncPathsOnMSVC.append("\\"));
+        SC_TRY(fixUncPathsOnMSVC.append(fileLocation));
         fileLocation = fixUncPathsOnMSVC.view();
     }
 #endif
-    SC_TRY(Path::normalize(outputPath, fileLocation, type, components));
+    SC_TRY(Path::normalize(move(outputPath), encoding, fileLocation, type, components));
     return true;
 }
 
-bool SC::Path::normalize(String& output, StringView view, Type type, Span<StringView> components)
+bool SC::Path::normalize(IGrowableBuffer&& output, StringEncoding encoding, StringView view, Type type,
+                         Span<StringView> components)
 {
     if (view.isEmpty())
-        return false;
-    if (output.owns(view))
         return false;
     auto newView = removeTrailingSeparator(view);
     if (not newView.isEmpty())
@@ -462,7 +466,7 @@ bool SC::Path::normalize(String& output, StringView view, Type type, Span<String
 
     if (normalizationHappened)
     {
-        StringBuilder          sb(output, StringBuilder::Clear);
+        StringBuilder          sb(output, encoding, StringBuilder::Clear);
         Span<const StringSpan> inputs = {components.data(), numComponents};
         // Preserve UNC start '\\' even when normalizing as posix paths
         if (view.startsWith("\\\\"))
@@ -485,12 +489,12 @@ bool SC::Path::normalize(String& output, StringView view, Type type, Span<String
     }
     else
     {
-        return output.assign(view);
+        return StringBuilder(output, encoding, StringBuilder::Clear).append(view);
     }
 }
 
-bool SC::Path::relativeFromTo(String& output, StringView source, StringView destination, Type inputType,
-                              Type outputType)
+bool SC::Path::relativeFromTo(IGrowableBuffer&& output, StringEncoding encoding, StringView source,
+                              StringView destination, Type inputType, Type outputType)
 {
     bool skipRelativeCheck = false;
     if (inputType == AsPosix)
@@ -518,7 +522,7 @@ bool SC::Path::relativeFromTo(String& output, StringView source, StringView dest
 
     if (source == destination)
     {
-        return output.assign(".");
+        return StringBuilder(output, encoding, StringBuilder::Clear).append(".");
     }
 
     const StringView separator =
@@ -529,7 +533,7 @@ bool SC::Path::relativeFromTo(String& output, StringView source, StringView dest
     size_t numMatches    = 0;
     size_t numSeparators = 0;
 
-    StringBuilder builder(output, StringBuilder::Clear);
+    StringBuilder builder(output, encoding, StringBuilder::Clear);
     StringView    destRemaining = destination;
 
     while (srcTokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
@@ -568,6 +572,7 @@ bool SC::Path::relativeFromTo(String& output, StringView source, StringView dest
         }
         SC_TRY(builder.append(Path::removeTrailingSeparator(destRemaining)));
     }
+    builder.finalize();
     return true;
 }
 
@@ -577,9 +582,9 @@ SC::StringView SC::Path::removeStartingSeparator(StringView path) { return path.
 
 bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithAnyOf({'/', '\\'}); }
 
-bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
+bool SC::Path::append(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> paths, Type type)
 {
-    StringBuilder builder(output, StringBuilder::DoNotClear);
+    StringBuilder builder(output, encoding, StringBuilder::DoNotClear);
     for (auto& path : paths)
     {
         if (isAbsolute(path, type))

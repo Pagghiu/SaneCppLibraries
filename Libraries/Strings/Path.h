@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Strings/StringView.h"
 
 namespace SC
@@ -77,9 +78,15 @@ struct SC_COMPILER_EXPORT Path
     /// @param[in] separator The separator to use. By default `/` on Posix and `\` on Windows
     /// @param[in] skipEmpty If true will skip empty entries in `inputs` Span
     /// @return true if the Path was successfully joined
-    [[nodiscard]] static bool join(String& output, Span<const StringView> inputs,
-                                   StringView separator = SeparatorStringView(), bool skipEmpty = false);
+    template <typename T>
+    [[nodiscard]] static bool join(T& output, Span<const StringView> inputs,
+                                   StringView separator = SeparatorStringView(), bool skipEmpty = false)
+    {
+        return join(GrowableBuffer<T>{output}, output.getEncoding(), inputs, separator, skipEmpty);
+    }
 
+    [[nodiscard]] static bool join(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> inputs,
+                                   StringView separator = SeparatorStringView(), bool skipEmpty = false);
     /// @brief Splits a StringView of type "name.ext" into "name" and "ext"
     /// @param[in] input        An input filename (ex. "name.ext")
     /// @param[out] name        Output string holding name ("name" in "name.ext")
@@ -195,15 +202,15 @@ struct SC_COMPILER_EXPORT Path
     /// @param[in] view The path to be normalized (but it should not be a view() of the output String)
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @return `true` if the Path was successfully parsed and normalized
-    template <int numComponents = 64>
-    [[nodiscard]] static bool normalize(String& output, StringView view, Type type)
+    template <typename T, int numComponents = 64>
+    [[nodiscard]] static bool normalize(T& output, StringView view, Type type)
     {
         StringView components[numComponents];
-        return normalize(output, view, type, components);
+        return normalize(GrowableBuffer<T>{output}, output.getEncoding(), view, type, components);
     }
 
-    /// @brief Resolves all `..` to output a normalized path String (allows custom span of components)
-    [[nodiscard]] static bool normalize(String& output, StringView view, Type type, Span<StringView> components);
+    [[nodiscard]] static bool normalize(IGrowableBuffer&& output, StringEncoding encoding, StringView view, Type type,
+                                        Span<StringView> components);
 
     /// @brief Get relative path that appended to `source` resolves to `destination`.
     ///
@@ -219,15 +226,29 @@ struct SC_COMPILER_EXPORT Path
     /// @param[in] type Specify to parse as Windows or Posix path
     /// @param[in] outputType Specify if the output relative path should be formatted as a Posix or Windows path
     /// @return `true` if source and destination paths can be properly parsed as absolute paths
-    [[nodiscard]] static bool relativeFromTo(String& output, StringView source, StringView destination, Type type,
-                                             Type outputType = AsNative);
+    template <typename T>
+    [[nodiscard]] static bool relativeFromTo(T& output, StringView source, StringView destination, Type type,
+                                             Type outputType = AsNative)
+    {
+        return relativeFromTo(GrowableBuffer<T>{output}, output.getEncoding(), source, destination, type, outputType);
+    }
+
+    [[nodiscard]] static bool relativeFromTo(IGrowableBuffer&& output, StringEncoding encoding, StringView source,
+                                             StringView destination, Type type, Type outputType = AsNative);
 
     /// @brief Append to an existing path a series of StringView with a separator
     /// @param[out] output The destination string containing the existing path, that will be extended
     /// @param[in] paths The path components to join, appended to `output`
     /// @param[in] inputType Specify to append as Windows or Posix path components
     /// @return `true` if the `output` path can joined properly
-    [[nodiscard]] static bool append(String& output, Span<const StringView> paths, Type inputType);
+    template <typename T>
+    [[nodiscard]] static bool append(T& output, Span<const StringView> paths, Type inputType)
+    {
+        return append(GrowableBuffer<T>{output}, output.getEncoding(), paths, inputType);
+    }
+
+    [[nodiscard]] static bool append(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> paths,
+                                     Type inputType);
 
     /// @brief Check if the path ends with a Windows or Posix separator
     /// @param[in] path The path to check
@@ -241,7 +262,15 @@ struct SC_COMPILER_EXPORT Path
 
     /// @brief An extended Path::normalize handling a bug with incorrect __FILE__ backslash escape on Windows when
     /// using UNC Paths, and also removing quote characters '"' added when passing such paths to compiler command line.
-    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(String& outputPath, StringView fileLocation, Type type,
+    template <typename T>
+    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(T& outputPath, StringView fileLocation, Type type,
+                                                        Span<StringView> components)
+    {
+        return normalizeUNCAndTrimQuotes(GrowableBuffer<T>{outputPath}, outputPath.getEncoding(), fileLocation, type,
+                                         components);
+    }
+    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(IGrowableBuffer&& outputPath, StringEncoding encoding,
+                                                        StringView fileLocation, Type type,
                                                         Span<StringView> components);
 
   private:
