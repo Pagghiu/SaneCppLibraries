@@ -245,8 +245,6 @@ struct SC_COMPILER_EXPORT Path
                                                         Span<StringView> components);
 
   private:
-    [[nodiscard]] static bool appendTrailingSeparator(String& path, Type type);
-
     [[nodiscard]] static StringView removeTrailingSeparator(StringView path);
     struct Internal;
 };

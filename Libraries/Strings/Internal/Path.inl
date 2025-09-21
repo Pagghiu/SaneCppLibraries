@@ -462,19 +462,26 @@ bool SC::Path::normalize(String& output, StringView view, Type type, Span<String
 
     if (normalizationHappened)
     {
-        bool res = join(output, {components.data(), numComponents},
-                        type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView());
-        SC_TRY(res);
+        StringBuilder          sb(output, StringBuilder::Clear);
+        Span<const StringSpan> inputs = {components.data(), numComponents};
+        // Preserve UNC start '\\' even when normalizing as posix paths
         if (view.startsWith("\\\\"))
         {
-            // TODO: This is not very good, find a better way
-            SmallString<256> other = output.getEncoding();
-            StringBuilder    sb(other);
             SC_TRY(sb.append("\\\\"))
-            SC_TRY(sb.append(output.view().sliceStart(2)));
-            SC_TRY(output.assign(sb.finalize()));
+            inputs = {inputs.data() + 2, numComponents - 2}; // first two components are empty
         }
-        return res;
+        auto         separator   = type == AsPosix ? Posix::SeparatorStringView() : Windows::SeparatorStringView();
+        const size_t numElements = inputs.sizeInElements();
+        for (size_t idx = 0; idx < numElements; ++idx)
+        {
+            const StringView element = inputs.data()[idx];
+            SC_TRY(sb.append(element));
+            if (idx + 1 != numElements)
+            {
+                SC_TRY(sb.append(separator));
+            }
+        }
+        return true;
     }
     else
     {
@@ -570,32 +577,21 @@ SC::StringView SC::Path::removeStartingSeparator(StringView path) { return path.
 
 bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithAnyOf({'/', '\\'}); }
 
-bool SC::Path::appendTrailingSeparator(String& path, Type type)
-{
-    if (not endsWithSeparator(path.view()))
-    {
-        StringBuilder builder(path, StringBuilder::DoNotClear);
-        switch (type)
-        {
-        case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
-        case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;
-        }
-    }
-    return true;
-}
-
 bool SC::Path::append(String& output, Span<const StringView> paths, Type type)
 {
+    StringBuilder builder(output, StringBuilder::DoNotClear);
     for (auto& path : paths)
     {
         if (isAbsolute(path, type))
         {
             return false;
         }
-        SC_TRY(appendTrailingSeparator(output, type));
-        StringBuilder builder(output, StringBuilder::DoNotClear);
-        SC_TRY(builder.append(path));
-        builder.finalize();
+        switch (type)
+        {
+        case AsWindows: SC_TRY(builder.append(Windows::SeparatorStringView())); break;
+        case AsPosix: SC_TRY(builder.append(Posix::SeparatorStringView())); break;
+        }
+        SC_TRY(builder.append(removeTrailingSeparator(path)));
     }
     return true;
 }
