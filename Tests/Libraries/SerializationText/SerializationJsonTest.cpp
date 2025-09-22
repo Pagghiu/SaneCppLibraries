@@ -73,7 +73,8 @@ void SC::SerializationJsonTest::jsonWrite()
     StringFormatOutput   output(StringEncoding::Ascii, buffer);
 
     SC_TEST_EXPECT(SerializationJson::write(test, output));
-    const StringView serializedJSON({buffer.data(), buffer.size() - 1}, false, StringEncoding::Ascii);
+    // Note: StringFormatOutput will NOT null terminate the string
+    const StringView serializedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(serializedJSON == testJSON);
     //! [serializationJsonWriteSnippet]
 }

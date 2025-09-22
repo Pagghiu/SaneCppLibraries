@@ -53,7 +53,7 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     void onFormatFailed();
 
     /// @brief Method to be called when format succeeds
-    /// @return `true` if null terminator has been successfully added
+    /// @return `true` if IGrowableBuffer is still valid
     [[nodiscard]] bool onFormatSucceeded();
 
   private:

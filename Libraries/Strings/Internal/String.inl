@@ -88,20 +88,22 @@ SC::StringView SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
 SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da)
     : string(string), da(da)
 {
-    da = {string.data.size(), string.data.capacity(), string.data.data()};
+    const size_t numZeros = StringEncodingGetSize(string.getEncoding());
+    da                    = {string.data.isEmpty() ? 0 : string.data.size() - numZeros,
+          string.data.capacity() > numZeros ? string.data.capacity() - numZeros : 0, string.data.data()};
 }
 
 SC::String::GrowableImplementation::~GrowableImplementation()
 {
-    if (string.data.size() != da.sizeInBytes)
+    const size_t numZeros = StringEncodingGetSize(string.getEncoding());
+    if (da.sizeInBytes == 0)
     {
-        (void)string.data.resizeWithoutInitializing(da.sizeInBytes);
+        (void)string.data.resizeWithoutInitializing(0);
     }
-    const size_t numZeroes = StringEncodingGetSize(string.getEncoding());
-    if (not string.data.isEmpty() and (string.data.size() + numZeroes <= string.data.capacity()))
+    else if (string.data.size() != da.sizeInBytes + numZeros)
     {
-        // Add null-terminator
-        (void)string.data.resize(string.data.size() + numZeroes, 0);
+        (void)string.data.resizeWithoutInitializing(da.sizeInBytes + numZeros);
+        Internal::ensureZeroTermination(string.data, string.getEncoding());
     }
 }
 

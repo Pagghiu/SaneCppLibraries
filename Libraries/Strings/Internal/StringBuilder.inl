@@ -30,7 +30,6 @@ StringView StringBuilder::finalize()
 {
     if (buffer)
     {
-        (void)popNullTermIfNotEmpty(*buffer, encoding);
         if (destroyBuffer)
         {
             buffer->~IGrowableBuffer();
@@ -47,8 +46,7 @@ bool StringBuilder::append(StringView str)
         return false;
     if (str.isEmpty())
         return true;
-    (void)popNullTermIfNotEmpty(*buffer, encoding);
-    return StringConverter::appendEncodingTo(encoding, str, *buffer, StringConverter::NullTerminate);
+    return StringConverter::appendEncodingTo(encoding, str, *buffer, StringConverter::DoNotTerminate);
 }
 
 bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf, StringView with)
@@ -116,36 +114,13 @@ bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
             break;
         }
     }
-    return pushNullTerm(*buffer, encoding);
+    return true;
 }
 
 void StringBuilder::clear()
 {
     if (buffer)
         buffer->clear();
-}
-
-bool StringBuilder::popNullTermIfNotEmpty(IGrowableBuffer& buffer, StringEncoding encoding)
-{
-    const auto sizeOfZero = StringEncodingGetSize(encoding);
-    const auto dataSize   = buffer.size();
-    if (dataSize >= sizeOfZero)
-    {
-        (void)buffer.resizeWithoutInitializing(dataSize - sizeOfZero);
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-bool StringBuilder::pushNullTerm(IGrowableBuffer& buffer, StringEncoding encoding)
-{
-    const size_t oldSize = buffer.size();
-    SC_TRY(buffer.resizeWithoutInitializing(buffer.size() + StringEncodingGetSize(encoding)));
-    ::memset(buffer.data() + oldSize, 0, StringEncodingGetSize(encoding));
-    return true;
 }
 
 } // namespace SC

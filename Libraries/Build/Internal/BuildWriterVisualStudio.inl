@@ -406,7 +406,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         if (not allWarnings.isEmpty())
         {
             sb.append("%(DisableSpecificWarnings)");
-            writeForAllArchitectures("DisableSpecificWarnings", builder, project, allWarnings.view());
+            writeForAllArchitectures("DisableSpecificWarnings", builder, project, sb.finalize());
         }
         builder.append("    </ClCompile>\n");
         SC_COMPILER_WARNING_POP;

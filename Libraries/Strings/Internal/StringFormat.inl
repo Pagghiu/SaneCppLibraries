@@ -236,7 +236,7 @@ bool StringFormatOutput::onFormatSucceeded()
 {
     if (growableBuffer != nullptr)
     {
-        SC_TRY(StringConverter::appendEncodingTo(encoding, {}, *growableBuffer, StringConverter::NullTerminate));
+        SC_TRY(StringConverter::appendEncodingTo(encoding, {}, *growableBuffer, StringConverter::DoNotTerminate));
         if (destroyBuffer)
         {
             growableBuffer->~IGrowableBuffer();

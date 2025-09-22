@@ -133,9 +133,6 @@ struct SC_COMPILER_EXPORT StringBuilder
     void initWithEncoding(IGrowableBuffer& bufferT, StringEncoding stringEncoding, Flags flags);
     void clear();
 
-    [[nodiscard]] static bool popNullTermIfNotEmpty(IGrowableBuffer& buffer, StringEncoding encoding);
-    [[nodiscard]] static bool pushNullTerm(IGrowableBuffer& buffer, StringEncoding encoding);
-
     IGrowableBuffer* buffer        = nullptr;
     bool             destroyBuffer = true;
 
@@ -176,21 +173,8 @@ inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
     {
         return false; // UTF16 format strings are not supported
     }
-    const bool hadNullTerminator = popNullTermIfNotEmpty(*buffer, encoding);
     // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
     // because on a valid UTF8 string, these chars are unambiguously recognizable
     StringFormatOutput sfo(encoding, *buffer);
-    if (StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...))
-    {
-        return true;
-    }
-    else
-    {
-        if (hadNullTerminator)
-        {
-            // Even if format failed, let's not leave a broken string without a null-terminator
-            (void)pushNullTerm(*buffer, encoding);
-        }
-        return false;
-    }
+    return StringFormat<StringIteratorASCII>::format(sfo, fmt, forward<Types>(args)...);
 }
