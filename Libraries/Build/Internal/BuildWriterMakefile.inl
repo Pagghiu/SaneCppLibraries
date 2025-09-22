@@ -843,7 +843,7 @@ endif
     {
         const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
 
-        const StringBuilder::ReplacePair replacements[] = {
+        const ReplacePair replacements[] = {
             {"$(PROJECT_DIR)", "$(CURDIR)"},                       //
             {"$(PROJECT_ROOT)", relativeRoot},                     //
             {"$(CONFIGURATION)", "$(CONFIG)"},                     //
@@ -856,6 +856,6 @@ endif
             {"$(COMPILER_VERSION)", "$(COMPILER_VERSION)"},        //
             {"\"", "\\\""},                                        // Escape double quotes
         };
-        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
+        return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 };

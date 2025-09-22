@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Foundation/Result.h"
-#include "../../Strings/String.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringConverter.h"
 
@@ -88,24 +87,6 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
     };
     SC_TRY(StringView::withIterators(current, occurrencesOf, func));
     return append(current);
-}
-
-[[nodiscard]] bool StringBuilder::appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions)
-{
-    if (buffer == nullptr)
-        return false;
-    String tempBuffer, other;
-    SC_TRY(tempBuffer.assign(source));
-    for (auto it : substitutions)
-    {
-        if (it.searchFor == it.replaceWith)
-            continue;
-        StringBuilder sb(other, StringBuilder::Clear);
-        SC_TRY(sb.appendReplaceAll(tempBuffer.view(), it.searchFor, it.replaceWith));
-        sb.finalize();
-        swap(other, tempBuffer);
-    }
-    return append(tempBuffer.view());
 }
 
 bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)

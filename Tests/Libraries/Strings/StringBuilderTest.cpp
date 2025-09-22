@@ -23,10 +23,6 @@ struct SC::StringBuilderTest : public SC::TestCase
         {
             appendReplaceAllTest();
         }
-        if (test_section("appendReplaceMultiple"))
-        {
-            appendReplaceMultipleTest();
-        }
         if (test_section("appendHex"))
         {
             appendHexTest();
@@ -35,7 +31,6 @@ struct SC::StringBuilderTest : public SC::TestCase
 
     void appendTest();
     void appendReplaceAllTest();
-    void appendReplaceMultipleTest();
     void appendHexTest();
 };
 
@@ -67,16 +62,6 @@ void SC::StringBuilderTest::appendReplaceAllTest()
         SC_TEST_EXPECT(builder.finalize() == "0881");
     }
     //! [stringBuilderTestAppendReplaceAllSnippet]
-}
-
-void SC::StringBuilderTest::appendReplaceMultipleTest()
-{
-    //! [stringBuilderTestAppendReplaceMultipleSnippet]
-    String        buffer(StringEncoding::Utf8);
-    StringBuilder sb(buffer);
-    SC_TEST_EXPECT(sb.appendReplaceMultiple("asd\\salve\\bas"_u8, {{"asd", "un"}, {"bas", "a_tutti"}, {"\\", "/"}}));
-    SC_TEST_EXPECT(sb.finalize() == "un/salve/a_tutti");
-    //! [stringBuilderTestAppendReplaceMultipleSnippet]
 }
 
 void SC::StringBuilderTest::appendHexTest()

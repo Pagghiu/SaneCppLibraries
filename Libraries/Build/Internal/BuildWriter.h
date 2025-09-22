@@ -30,6 +30,37 @@ struct ProjectWriter
     /// @brief Write the project file at given directories
     Result write(StringView filename);
 
+    /// @brief Holds a search / replace pair for StringBuilder::appendReplaceMultiple
+    struct ReplacePair
+    {
+        StringView searchFor;   /// StringView to be searched for in source string
+        StringView replaceWith; /// StringView that will replace all instances of 'searchFor'
+    };
+
+    /// @brief Appends source to destination buffer, replacing multiple substitutions pairs
+    /// @param source The StringView to be appended
+    /// @param substitutions For each substitution in the span, the first is searched and replaced with the second.
+    /// @return `true` if append succeeded
+    ///
+    /// Example:
+    /// @snippet Tests/Libraries/Build/BuildTest.cpp stringBuilderTestAppendReplaceMultipleSnippet
+    [[nodiscard]] static bool appendReplaceMultiple(StringBuilder& builder, StringView source,
+                                                    Span<const ReplacePair> substitutions)
+    {
+        String tempBuffer, other;
+        SC_TRY(tempBuffer.assign(source));
+        for (auto it : substitutions)
+        {
+            if (it.searchFor == it.replaceWith)
+                continue;
+            StringBuilder sb(other, StringBuilder::Clear);
+            SC_TRY(sb.appendReplaceAll(tempBuffer.view(), it.searchFor, it.replaceWith));
+            sb.finalize();
+            swap(other, tempBuffer);
+        }
+        return builder.append(tempBuffer.view());
+    }
+
   private:
     struct WriterXCode;
     struct WriterVisualStudio;

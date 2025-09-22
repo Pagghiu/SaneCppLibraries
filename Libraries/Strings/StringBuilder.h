@@ -114,22 +114,6 @@ struct SC_COMPILER_EXPORT StringBuilder
     /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendReplaceAllSnippet
     [[nodiscard]] bool appendReplaceAll(StringView source, StringView occurrencesOf, StringView with);
 
-    /// @brief Holds a search / replace pair for StringBuilder::appendReplaceMultiple
-    struct ReplacePair
-    {
-        StringView searchFor;   /// StringView to be searched for in source string
-        StringView replaceWith; /// StringView that will replace all instances of 'searchFor'
-    };
-
-    /// @brief Appends source to destination buffer, replacing multiple substitutions pairs
-    /// @param source The StringView to be appended
-    /// @param substitutions For each substitution in the span, the first is searched and replaced with the second.
-    /// @return `true` if append succeeded
-    ///
-    /// Example:
-    /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendReplaceMultipleSnippet
-    [[nodiscard]] bool appendReplaceMultiple(StringView source, Span<const ReplacePair> substitutions);
-
     /// @brief Option for StringBuilder::appendHex
     enum class AppendHexCase
     {

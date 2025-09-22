@@ -748,7 +748,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     {
         const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
 
-        const StringBuilder::ReplacePair replacements[] = {
+        const ReplacePair replacements[] = {
             {"/", "\\"},                                                 //
             {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
             {"$(PROJECT_ROOT)", relativeRoot},                           //
@@ -761,6 +761,6 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {"$(COMPILER)", "msvc"},                                     //
             {"$(COMPILER_VERSION)", "17"},                               // TODO: Detect MSVC version
         };
-        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
+        return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 };

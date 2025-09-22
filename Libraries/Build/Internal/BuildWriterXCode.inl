@@ -1269,7 +1269,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     {
         const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
 
-        const StringBuilder::ReplacePair replacements[] = {
+        const ReplacePair replacements[] = {
             {"$(PROJECT_DIR)", "$(PROJECT_DIR)"},                    // Same
             {"$(PROJECT_ROOT)", relativeRoot},                       //
             {"$(CONFIGURATION)", "$(CONFIGURATION)"},                // Same
@@ -1282,7 +1282,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
             {"\"", "\\\\\\\""},                                      // Escape double quotes
         };
-        return builder.appendReplaceMultiple(text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
+        return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
     }
 
     static Result writeWorkspace(StringBuilder& builder, Span<const Project> projects)

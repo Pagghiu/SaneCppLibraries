@@ -119,9 +119,6 @@ Some relevant blog posts are:
 ### StringBuilder::appendReplaceAll
 @copydoc SC::StringBuilder::appendReplaceAll
 
-### StringBuilder::appendReplaceMultiple
-@copydoc SC::StringBuilder::appendReplaceMultiple
-
 ### StringBuilder::appendHex
 @copydoc SC::StringBuilder::appendHex
 
