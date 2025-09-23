@@ -11,7 +11,6 @@
 #include "../Strings/StringBuilder.h"
 
 #if SC_PLATFORM_WINDOWS
-#include "../Threading/Threading.h"
 #include "Internal/DebuggerWindows.inl"
 #include "Internal/VisualStudioPathFinder.h"
 #endif
@@ -708,7 +707,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     StringBuilder(lastErrorLog, StringBuilder::Clear);
     SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLog), "Compile failed");
 #if SC_PLATFORM_WINDOWS
-    Thread::Sleep(400); // Sometimes file is locked...
+    ::Sleep(400); // Sometimes file is locked...
 #endif
     SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLog), "Link failes");
 
@@ -867,7 +866,7 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
     int numTries = 10;
     while (not fs.removeFile(buffer.view()))
     {
-        Thread::Sleep(10); // It looks like FreeLibrary needs some time to avoid getting access denied
+        ::Sleep(10); // It looks like FreeLibrary needs some time to avoid getting access denied
         numTries--;
         SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
     }
