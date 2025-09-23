@@ -57,6 +57,12 @@ using size_t  = unsigned long;      ///< Platform independent unsigned size type
 using ssize_t = signed long;        ///< Platform independent signed size type
 #endif
 #endif
+
+/// @brief A vocabulary type representing a time interval in milliseconds since epoch
+struct TimeMs
+{
+    int64_t milliseconds = 0;
+};
 //! @}
 } // namespace SC
 

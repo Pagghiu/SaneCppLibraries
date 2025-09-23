@@ -601,7 +601,7 @@ SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat)
     return Result(true);
 }
 
-SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, Time::Realtime time)
+SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
 {
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
@@ -804,7 +804,7 @@ SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemSt
     fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
     fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
     fileTimeValue.QuadPart -= 116444736000000000ULL;
-    fileStat.modifiedTime = Time::Realtime(fileTimeValue.QuadPart / 10000ULL);
+    fileStat.modifiedTime = TimeMs{static_cast<int64_t>(fileTimeValue.QuadPart / 10000ULL)};
 
     LARGE_INTEGER fileSize;
     if (!::GetFileSizeEx(hFile, &fileSize))
@@ -815,7 +815,7 @@ SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemSt
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, Time::Realtime time)
+SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
 
@@ -835,7 +835,7 @@ SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, Time
 
     FILETIME       modifiedTime;
     ULARGE_INTEGER fileTimeValue;
-    fileTimeValue.QuadPart      = time.getMillisecondsSinceEpoch() * 10000ULL + 116444736000000000ULL;
+    fileTimeValue.QuadPart      = time.milliseconds * 10000ULL + 116444736000000000ULL;
     modifiedTime.dwLowDateTime  = fileTimeValue.LowPart;
     modifiedTime.dwHighDateTime = fileTimeValue.HighPart;
 
@@ -1242,16 +1242,16 @@ SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemSt
 #else
     auto ts = path_stat.st_mtim;
 #endif
-    fileStat.modifiedTime = Time::Realtime(static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000));
+    fileStat.modifiedTime = TimeMs{static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
     return Result(true);
 }
 
-SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, Time::Realtime time)
+SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
 {
     SC_TRY_MSG(Internal::validatePath(path), "setLastModifiedTime: Invalid path");
     struct timespec times[2];
-    times[0].tv_sec  = time.getMillisecondsSinceEpoch() / 1000;
-    times[0].tv_nsec = (time.getMillisecondsSinceEpoch() % 1000) * 1000 * 1000;
+    times[0].tv_sec  = time.milliseconds / 1000;
+    times[0].tv_nsec = (time.milliseconds % 1000) * 1000 * 1000;
     times[1]         = times[0];
 
     SC_TRY_POSIX(::utimensat(AT_FDCWD, path.getNullTerminatedNative(), times, 0),

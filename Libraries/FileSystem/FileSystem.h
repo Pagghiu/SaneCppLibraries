@@ -4,7 +4,6 @@
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
-#include "../Time/Time.h"
 
 namespace SC
 {
@@ -17,8 +16,8 @@ namespace SC
 /// @brief A structure to describe file stats
 struct FileSystemStat
 {
-    size_t         fileSize     = 0; ///< Size of the file in bytes
-    Time::Realtime modifiedTime = 0; ///< Time when file was last modified
+    size_t fileSize = 0; ///< Size of the file in bytes
+    TimeMs modifiedTime; ///< Time when file was last modified
 };
 
 /// @brief A structure to describe copy flags
@@ -303,7 +302,7 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
     /// @return Valid Result if file time for the given file was successfully set
-    Result setLastModifiedTime(StringSpan file, Time::Realtime time);
+    Result setLastModifiedTime(StringSpan file, TimeMs time);
 
     /// @brief Low level filesystem API, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
@@ -324,7 +323,7 @@ struct SC_COMPILER_EXPORT FileSystem
         static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
         static Result removeDirectoryRecursive(StringSpan directory);
         static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
-        static Result setLastModifiedTime(StringSpan path, Time::Realtime time);
+        static Result setLastModifiedTime(StringSpan path, TimeMs time);
 
         static StringSpan getExecutablePath(StringPath& executablePath);
         static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory);

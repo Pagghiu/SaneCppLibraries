@@ -4,6 +4,7 @@
 #include "../FileSystem/FileSystem.h"
 #include "../Strings/Path.h"
 #include "../Strings/StringBuilder.h"
+#include "../Time/Time.h"
 
 struct SC::HttpWebServer::Internal
 {
@@ -60,7 +61,7 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpReque
         Time::Absolute::ParseResult local;
         SC_TRY(Time::Realtime::now().parseUTC(local));
         SC_TRY(Internal::writeGMTHeaderTime("Date", response, local));
-        SC_TRY(fileStat.modifiedTime.parseUTC(local));
+        SC_TRY(Time::Realtime(fileStat.modifiedTime).parseUTC(local));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", response, local));
         SC_TRY(response.end(data.toSpanConst()));
     }

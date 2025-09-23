@@ -18,7 +18,6 @@ struct Milliseconds;
 struct Nanoseconds;
 struct Seconds;
 } // namespace Time
-} // namespace SC
 
 //! @defgroup group_time Time
 
@@ -28,7 +27,7 @@ struct Seconds;
 //! @{
 
 /// @brief Type-safe wrapper of uint64 used to represent nanoseconds
-struct SC::Time::Nanoseconds
+struct Time::Nanoseconds
 {
     constexpr Nanoseconds() : ns(0) {}
     constexpr explicit Nanoseconds(int64_t ns) : ns(ns) {};
@@ -40,7 +39,7 @@ struct SC::Time::Nanoseconds
 };
 
 /// @brief Type-safe wrapper of uint64 used to represent milliseconds
-struct SC::Time::Milliseconds
+struct Time::Milliseconds
 {
     constexpr Milliseconds() : ms(0) {}
     constexpr explicit Milliseconds(int64_t ms) : ms(ms) {};
@@ -52,7 +51,7 @@ struct SC::Time::Milliseconds
 };
 
 /// @brief Type-safe wrapper of uint64 used to represent seconds
-struct SC::Time::Seconds
+struct Time::Seconds
 {
     constexpr Seconds() : sec(0) {}
     constexpr explicit Seconds(int64_t sec) : sec(sec) {};
@@ -66,7 +65,7 @@ struct SC::Time::Seconds
 };
 
 /// @brief Interval of time represented with 64 bit double precision float
-struct SC::Time::Relative
+struct Time::Relative
 {
     /// @brief how many seconds have elapsed in
     Relative() : seconds(0.0) {}
@@ -97,32 +96,29 @@ struct SC::Time::Relative
 
 // User defined literals
 // Using "unsigned long long int" instead of int64_t because it's mandated by the standard.
-namespace SC
-{
 // clang-format off
 inline Time::Nanoseconds  operator""_ns(unsigned long long int ns) { return Time::Nanoseconds(static_cast<int64_t>(ns)); }
 inline Time::Milliseconds operator""_ms(unsigned long long int ms) { return Time::Milliseconds(static_cast<int64_t>(ms)); }
 inline Time::Seconds      operator""_sec(unsigned long long int sec) { return Time::Seconds(static_cast<int64_t>(sec)); }
 // clang-format on
 
-} // namespace SC
-
 /// @brief Absolute time as realtime or monotonically increasing clock
 /// @see Monotonic
 /// @see Realtime
-struct SC::Time::Absolute
+struct Time::Absolute : public TimeMs
 {
   protected:
     struct Internal;
-    int64_t milliseconds;
 
   public:
     /// @brief Construct an Absolute time equal to epoch
-    Absolute() : milliseconds(0) {}
+    Absolute() = default;
 
     /// @brief Construct an Absolute from milliseconds since epoch
     /// @param milliseconds Number of milliseconds since epoch
-    Absolute(int64_t milliseconds) : milliseconds(milliseconds) {}
+    Absolute(int64_t milliseconds) : TimeMs{milliseconds} {}
+
+    Absolute(TimeMs time) : TimeMs{time} {}
 
     /// @brief Holds information on a parsed absolute time from Absolute::parseLocal
     struct ParseResult
@@ -176,7 +172,7 @@ struct SC::Time::Absolute
 };
 
 /// @brief Represent monotonically increasing time (use Monotonic::now for current time)
-struct SC::Time::Monotonic : public Absolute
+struct Time::Monotonic : public Absolute
 {
     using Absolute::Absolute;
 
@@ -188,7 +184,7 @@ struct SC::Time::Monotonic : public Absolute
 };
 
 /// @brief Represents a realtime clock in milliseconds since epoch (use Realtime::now for current time)
-struct SC::Time::Realtime : public Absolute
+struct Time::Realtime : public Absolute
 {
     using Absolute::Absolute;
 
@@ -200,7 +196,7 @@ struct SC::Time::Realtime : public Absolute
 };
 
 /// @brief An high resolution time counter
-struct SC::Time::HighResolutionCounter
+struct Time::HighResolutionCounter
 {
     HighResolutionCounter();
 
@@ -259,3 +255,4 @@ struct SC::Time::HighResolutionCounter
 };
 
 //! @}
+} // namespace SC
