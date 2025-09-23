@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringSpan.h"
 
 namespace SC
@@ -47,22 +48,26 @@ struct SC_COMPILER_EXPORT StringPath
 #else
     static constexpr size_t MaxPath = 4096; // Equal to 'PATH_MAX' on Linux
 #endif
-    [[nodiscard]] StringSpan view() const { return path.view(); }
+    [[nodiscard]] StringSpan     view() const { return path.view(); }
+    [[nodiscard]] StringEncoding getEncoding() const { return StringEncoding::Native; }
 
+    [[nodiscard]] bool isEmpty() const { return path.view().isEmpty(); }
     [[nodiscard]] bool append(StringSpan str) { return path.append(str); }
     [[nodiscard]] bool assign(StringSpan str) { return path.assign(str); }
-    [[nodiscard]] bool resize(size_t newSize)
-    {
-        if (newSize < MaxPath)
-        {
-            path.length = newSize;
-        }
-        return newSize < MaxPath;
-    }
+    [[nodiscard]] bool resize(size_t newSize);
 
     [[nodiscard]] Span<native_char_t> writableSpan() { return path.writableSpan(); }
 
   private:
     detail::StringNativeFixed<MaxPath> path;
+};
+
+template <>
+struct SC_COMPILER_EXPORT GrowableBuffer<StringPath> final : public IGrowableBuffer
+{
+    StringPath& sp;
+    GrowableBuffer(StringPath& string);
+    virtual ~GrowableBuffer() override;
+    virtual bool tryGrowTo(size_t newSize) override;
 };
 } // namespace SC
