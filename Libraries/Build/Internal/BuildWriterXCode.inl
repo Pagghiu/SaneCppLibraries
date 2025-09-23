@@ -949,7 +949,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
                 SC_TRY(sb.append(".tbd"));
                 xcodeFile.type = RenderItem::SystemLibrary;
-                SC_TRY(Path::join(xcodeFile.path, {"usr/lib", xcodeFile.name.view()}, "/"));
+                SC_TRY(Path::join(xcodeFile.path, {"usr/lib", sb.finalize()}, "/"));
             }
             SC_TRY(computeBuildHash(xcodeFile.name.view(), xcodeFile.buildHash));
             SC_TRY(computeReferenceHash(xcodeFile.name.view(), xcodeFile.referenceHash));
