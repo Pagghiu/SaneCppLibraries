@@ -77,8 +77,11 @@ struct SC::FileSystem::Internal
 };
 
 #else
-#include <errno.h>  // errno
-#include <string.h> // strerror_r
+#include <errno.h>    // errno
+#include <fcntl.h>    // open, O_*
+#include <string.h>   // strerror_r
+#include <sys/stat.h> // stat, fstat
+#include <unistd.h>   // write, close, read
 namespace SC
 {
 // This is shared with FileSystemIterator
@@ -229,9 +232,44 @@ SC::Result SC::FileSystem::write(StringSpan path, Span<const char> data)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor fd;
-    SC_TRY(fd.open(encodedPath, FileOpen::Write));
-    return fd.write(data);
+#if SC_PLATFORM_WINDOWS
+    HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                                 FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return formatError(GetLastError(), path, true);
+    }
+    DWORD bytesWritten;
+    if (!::WriteFile(hFile, data.data(), static_cast<DWORD>(data.sizeInBytes()), &bytesWritten, nullptr))
+    {
+        ::CloseHandle(hFile);
+        return formatError(GetLastError(), path, true);
+    }
+    ::CloseHandle(hFile);
+    if (bytesWritten != data.sizeInBytes())
+    {
+        return Result::Error("Write incomplete");
+    }
+    return Result(true);
+#else
+    int fd = ::open(encodedPath.getNullTerminatedNative(), O_WRONLY | O_CREAT | O_TRUNC,
+                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd == -1)
+    {
+        return formatError(errno, path, false);
+    }
+    ssize_t bytesWritten = ::write(fd, data.data(), data.sizeInBytes());
+    ::close(fd);
+    if (bytesWritten == -1)
+    {
+        return formatError(errno, path, false);
+    }
+    if (static_cast<size_t>(bytesWritten) != data.sizeInBytes())
+    {
+        return Result::Error("Write incomplete");
+    }
+    return Result(true);
+#endif
 }
 
 SC::Result SC::FileSystem::write(StringSpan path, Span<const uint8_t> data)
@@ -245,9 +283,121 @@ SC::Result SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
 {
     StringSpan encodedPath;
     SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
-    FileDescriptor fd;
-    SC_TRY(fd.open(encodedPath, FileOpen::Append));
-    return fd.write(text.toCharSpan());
+#if SC_PLATFORM_WINDOWS
+    HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), FILE_APPEND_DATA, 0, nullptr, OPEN_ALWAYS,
+                                 FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return formatError(GetLastError(), path, true);
+    }
+    DWORD bytesWritten;
+    if (!::WriteFile(hFile, text.bytesWithoutTerminator(), static_cast<DWORD>(text.sizeInBytes()), &bytesWritten,
+                     nullptr))
+    {
+        ::CloseHandle(hFile);
+        return formatError(GetLastError(), path, true);
+    }
+    ::CloseHandle(hFile);
+    if (bytesWritten != text.sizeInBytes())
+    {
+        return Result::Error("Write incomplete");
+    }
+    return Result(true);
+#else
+    int fd = ::open(encodedPath.getNullTerminatedNative(), O_WRONLY | O_CREAT | O_APPEND,
+                    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd == -1)
+    {
+        return formatError(errno, path, false);
+    }
+    ssize_t bytesWritten = ::write(fd, text.bytesWithoutTerminator(), text.sizeInBytes());
+    ::close(fd);
+    if (bytesWritten == -1)
+    {
+        return formatError(errno, path, false);
+    }
+    if (static_cast<size_t>(bytesWritten) != text.sizeInBytes())
+    {
+        return Result::Error("Write incomplete");
+    }
+    return Result(true);
+#endif
+}
+
+SC::Result SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buffer)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+#if SC_PLATFORM_WINDOWS
+    HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return formatError(GetLastError(), path, true);
+    }
+    auto deferClose = MakeDeferred([&]() { ::CloseHandle(hFile); });
+
+    // Get file size
+    LARGE_INTEGER fileSize;
+    if (!::GetFileSizeEx(hFile, &fileSize))
+    {
+        return formatError(GetLastError(), path, true);
+    }
+
+    // Grow buffer to accommodate the file
+    if (!buffer.resizeWithoutInitializing(static_cast<size_t>(fileSize.QuadPart)))
+    {
+        return Result::Error("Failed to grow buffer");
+    }
+
+    // Read the file
+    DWORD bytesRead;
+    if (!::ReadFile(hFile, buffer.data(), static_cast<DWORD>(fileSize.QuadPart), &bytesRead, nullptr))
+    {
+        return formatError(GetLastError(), path, true);
+    }
+
+    if (bytesRead != static_cast<DWORD>(fileSize.QuadPart))
+    {
+        return Result::Error("Read incomplete");
+    }
+
+    return Result(true);
+#else
+    int fd = ::open(encodedPath.getNullTerminatedNative(), O_RDONLY);
+    if (fd == -1)
+    {
+        return formatError(errno, path, false);
+    }
+    auto deferClose = MakeDeferred([&]() { ::close(fd); });
+
+    // Get file size
+    struct stat fileStat;
+    if (::fstat(fd, &fileStat) == -1)
+    {
+        return formatError(errno, path, false);
+    }
+
+    // Grow buffer to accommodate the file
+    if (!buffer.resizeWithoutInitializing(static_cast<size_t>(fileStat.st_size)))
+    {
+        return Result::Error("Failed to grow buffer");
+    }
+
+    // Read the file
+    ssize_t bytesRead = ::read(fd, buffer.data(), static_cast<size_t>(fileStat.st_size));
+    if (bytesRead == -1)
+    {
+        return formatError(errno, path, false);
+    }
+
+    if (static_cast<size_t>(bytesRead) != static_cast<size_t>(fileStat.st_size))
+    {
+        return Result::Error("Read incomplete");
+    }
+
+    return Result(true);
+#endif
 }
 
 SC::Result SC::FileSystem::formatError(int errorNumber, StringSpan item, bool isWindowsNativeError)

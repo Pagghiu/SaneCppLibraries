@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../File/File.h"
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
 #include "../Time/Time.h"
@@ -281,12 +281,14 @@ struct SC_COMPILER_EXPORT FileSystem
     template <typename T>
     Result read(StringSpan file, T& data)
     {
-        FileDescriptor fd;
-        StringSpan     encodedPath;
-        SC_TRY(convert(file, fileFormatBuffer1, &encodedPath))
-        SC_TRY(fd.open(encodedPath, FileOpen::Read));
-        return fd.readUntilEOF(data);
+        return read(file, GrowableBuffer<T>{data});
     }
+
+    /// @brief Read contents of a file into an IGrowableBuffer
+    /// @param[in] file Path to the file to read
+    /// @param[out] buffer Destination IGrowableBuffer that will receive file contents
+    /// @return Valid Result if the entire file has been read successfully
+    Result read(StringSpan file, IGrowableBuffer&& buffer);
 
     /// @brief A structure to describe modified time
     using FileStat = FileSystemStat;
