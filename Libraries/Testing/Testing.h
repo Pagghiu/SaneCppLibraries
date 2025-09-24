@@ -69,10 +69,27 @@ struct TestReport
     /// @return `-1` if tests are failed, `0` if tests are successful
     [[nodiscard]] int getTestReturnCode() const;
 
-    /// @brief Runs a report for the Global Memory Allocator and prints its results
-    void runGlobalMemoryReport(bool reportFailure = true);
+    template <typename Statistics>
+    void runGlobalMemoryReport(Statistics stats, bool reportFailure = true)
+    {
+        TestReport::MemoryStatistics memStats;
+        memStats.numAllocate   = stats.numAllocate;
+        memStats.numReallocate = stats.numReallocate;
+        memStats.numRelease    = stats.numRelease;
+        internalRunGlobalMemoryReport(memStats, reportFailure);
+    }
 
   private:
+    struct MemoryStatistics
+    {
+        size_t numAllocate   = 0; ///< How many times MemoryAllocator::allocate has been called
+        size_t numReallocate = 0; ///< How many times MemoryAllocator::reallocate has been called
+        size_t numRelease    = 0; ///< How many times MemoryAllocator::release has been called
+    };
+
+    /// @brief Runs a report for the Global Memory Allocator and prints its results
+    void internalRunGlobalMemoryReport(MemoryStatistics stats, bool reportFailure);
+
     [[nodiscard]] bool isTestEnabled(StringSpan testName) const;
     [[nodiscard]] bool isSectionEnabled(StringSpan sectionName) const;
 

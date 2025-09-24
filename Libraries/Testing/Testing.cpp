@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
 #include "../Foundation/Assert.h"
-#include "../Memory/Globals.h"
-#include "../Memory/Memory.h"
 #include <stdlib.h> // exit
 #include <string.h> // strlen
 
@@ -70,11 +68,10 @@ SC::TestReport::~TestReport()
     console.print("\n---------------------------------------------------\n");
 }
 
-void SC::TestReport::runGlobalMemoryReport(bool reportFailure)
+void SC::TestReport::internalRunGlobalMemoryReport(MemoryStatistics stats, bool reportFailure)
 {
     if (quietMode)
         return;
-    MemoryAllocator::Statistics stats = Globals::get(Globals::Global).allocator.statistics;
     console.print("[[ Memory Report ]]\n");
     console.print("\t - Allocations   = {}\n", stats.numAllocate);
     console.print("\t - Deallocations = {}\n", stats.numRelease);

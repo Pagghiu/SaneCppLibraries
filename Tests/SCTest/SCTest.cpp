@@ -112,6 +112,7 @@ void runSupportToolsTest(TestReport& report);
 
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Globals.h"
+#include "Libraries/Memory/Memory.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
@@ -245,6 +246,6 @@ int main(int argc, const char* argv[])
     // Build tests
     runBuildTest(report);
 
-    report.runGlobalMemoryReport();
+    report.runGlobalMemoryReport(Globals::get(Globals::Global).allocator.statistics);
     return report.getTestReturnCode();
 }
