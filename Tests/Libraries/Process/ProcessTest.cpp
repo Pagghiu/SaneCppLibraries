@@ -6,6 +6,7 @@
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -389,7 +390,7 @@ void SC::ProcessTest::processFork()
     {
     case ProcessFork::ForkChild: {
         report.console.printLine("FORKED process");
-        report.console.print("FORKED Shared={0}\n", shared);
+        report.console.print("FORKED Shared={0}\n", shared.view());
 
         // Write the "shared" memory snapshot to the file system
         FileSystem fs;
@@ -403,7 +404,7 @@ void SC::ProcessTest::processFork()
     case ProcessFork::ForkParent: {
         report.console.printLine("PARENT process");
         // Check initial state to be "INITIAL" and modify shared = "PARENT"
-        report.console.print("PARENT Shared={0}\n", shared);
+        report.console.print("PARENT Shared={0}\n", shared.view());
         SC_TEST_EXPECT(shared == sharedTag and "PARENT");
         shared = parentTag;
 

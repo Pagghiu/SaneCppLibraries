@@ -4,6 +4,8 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+
+extern SC::Console* globalConsole;
 namespace SC
 {
 struct SupportToolsTest : public TestCase
@@ -13,7 +15,7 @@ struct SupportToolsTest : public TestCase
         using namespace SC::Tools;
         SmallString<256> outputDirectory;
         (void)StringBuilder::format(outputDirectory, "{0}/_Build", report.libraryRootDirectory);
-        Tool::Arguments arguments{report.console,
+        Tool::Arguments arguments{*globalConsole,
                                   report.libraryRootDirectory,
                                   report.libraryRootDirectory,
                                   outputDirectory.view(),

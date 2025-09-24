@@ -3,15 +3,11 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
-#include "../Strings/Console.h" // SC_COMPILER_DEBUG_BREAK
-#include "../Strings/StringView.h"
+#include "../Foundation/StringSpan.h"
 
 namespace SC
 {
 struct TestCase;
-struct TestReport;
-} // namespace SC
-
 //! @defgroup group_testing Testing
 //! @copybrief library_testing (see @ref library_testing for more details)
 
@@ -22,15 +18,41 @@ struct TestReport;
 ///
 /// This is passed as argument to SC::TestCase derived classes, and contains handle to _globals_ like a console,
 /// paths to the library and application root, path to executable etc.
-struct SC::TestReport
+struct TestReport
 {
-    Console&   console;                  ///< The passed in console object where to print results
-    StringView libraryRootDirectory;     ///< Path to sources directory for library
-    StringView executableFile;           ///< Path to current executable
-    StringView applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
+    struct IOutput
+    {
+        virtual ~IOutput() = default;
 
+        virtual void printLine(StringSpan text)                           = 0;
+        virtual void print(StringSpan text)                               = 0;
+        virtual void print(StringSpan text, StringSpan p0)                = 0;
+        virtual void print(StringSpan text, StringSpan p0, StringSpan p1) = 0;
+        virtual void print(StringSpan text, size_t p0)                    = 0;
+        virtual void print(StringSpan text, size_t p0, size_t p1)         = 0;
+    };
+
+    template <typename ConsoleType>
+    struct Output final : public TestReport::IOutput
+    {
+        ConsoleType& console;
+        Output(ConsoleType& console) : console(console) {}
+
+        virtual void printLine(StringSpan text) override { console.printLine(text); }
+        virtual void print(StringSpan text) override { console.print(text); }
+        virtual void print(StringSpan text, StringSpan p0) override { console.print(text, p0); }
+        virtual void print(StringSpan text, StringSpan p0, StringSpan p1) override { console.print(text, p0, p1); }
+        virtual void print(StringSpan text, size_t p0) override { console.print(text, p0); }
+        virtual void print(StringSpan text, size_t p0, size_t p1) override { console.print(text, p0, p1); }
+    };
+    IOutput& console;
+
+    StringSpan libraryRootDirectory;     ///< Path to sources directory for library
+    StringSpan executableFile;           ///< Path to current executable
+    StringSpan applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
     StringPath executableFileStorage;
     StringPath applicationRootStorage;
+
     // Options
     bool abortOnFirstFailedTest = true;  ///< If `true` will abort after first failed test
     bool debugBreakOnFailedTest = true;  ///< If `true` will issue a debugger halt when a test fails
@@ -40,7 +62,7 @@ struct SC::TestReport
     /// @param console A Console object where to print test results
     /// @param argc Number of command line arguments
     /// @param argv Command line arguments Arguments
-    TestReport(Console& console, int argc, const char** argv);
+    TestReport(IOutput& console, int argc, const char** argv);
     ~TestReport();
 
     /// @brief Gets return code for this process
@@ -51,8 +73,8 @@ struct SC::TestReport
     void runGlobalMemoryReport(bool reportFailure = true);
 
   private:
-    [[nodiscard]] bool isTestEnabled(StringView testName) const;
-    [[nodiscard]] bool isSectionEnabled(StringView sectionName) const;
+    [[nodiscard]] bool isTestEnabled(StringSpan testName) const;
+    [[nodiscard]] bool isSectionEnabled(StringSpan sectionName) const;
 
     void testCaseFinished(TestCase& testCase);
     void printSectionResult(TestCase& testCase);
@@ -60,10 +82,10 @@ struct SC::TestReport
     friend struct TestCase;
     uint32_t   numTestsSucceeded = 0;
     uint32_t   numTestsFailed    = 0;
-    StringView currentSection;
-    StringView firstFailedTest;
-    StringView testToRun;
-    StringView sectionToRun;
+    StringSpan currentSection;
+    StringSpan firstFailedTest;
+    StringSpan testToRun;
+    StringSpan sectionToRun;
 };
 
 /// @brief A test case that can be split into multiple sections.
@@ -71,12 +93,12 @@ struct SC::TestReport
 ///
 /// Example:
 /// @snippet Tests/Libraries/Strings/ConsoleTest.cpp testingSnippet
-struct SC::TestCase
+struct TestCase
 {
     /// @brief Adds this TestCase to a TestReport with a name
     /// @param report The current TestReport
     /// @param testName Name of this TestCase
-    TestCase(TestReport& report, StringView testName);
+    TestCase(TestReport& report, StringSpan testName);
     ~TestCase();
 
     /// @brief Records an expectation for a given expression
@@ -84,13 +106,13 @@ struct SC::TestCase
     /// @param status The boolean expectation of a test
     /// @param detailedError A detailed error message
     /// @return `status`
-    bool recordExpectation(StringView expression, bool status, StringView detailedError = StringView());
+    bool recordExpectation(StringSpan expression, bool status, StringSpan detailedError = StringSpan());
 
     /// @brief Records an expectation for a given expression
     /// @param expression Expression converted to string
     /// @param status A Result object, output from a test
     /// @return `false` if `status` Result is not valid
-    bool recordExpectation(StringView expression, Result status);
+    bool recordExpectation(StringSpan expression, Result status);
 
     enum class Execute
     {
@@ -102,12 +124,12 @@ struct SC::TestCase
     /// @param sectionName The name of the section
     /// @param execution Execution criteria
     /// @return `true` if the test is enabled, `false` otherwise
-    [[nodiscard]] bool test_section(StringView sectionName, Execute execution = Execute::Default);
+    [[nodiscard]] bool test_section(StringSpan sectionName, Execute execution = Execute::Default);
 
     TestReport& report; ///< The TestReport object passed in the constructor
   private:
     friend struct TestReport;
-    const StringView testName;
+    const StringSpan testName;
 
     uint32_t numTestsSucceeded;
     uint32_t numTestsFailed;
@@ -117,8 +139,9 @@ struct SC::TestCase
 
 /// Records a test expectation (eventually aborting or breaking o n failed test)
 #define SC_TEST_EXPECT(e)                                                                                              \
-    recordExpectation(StringView(#e##_a8), (e))                                                                        \
+    recordExpectation(StringSpan(#e), (e))                                                                             \
         ? (void)0                                                                                                      \
         : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)
 
 //! @}
+} // namespace SC

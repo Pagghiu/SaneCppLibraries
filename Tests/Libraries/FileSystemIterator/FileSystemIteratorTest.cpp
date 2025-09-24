@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC
 {

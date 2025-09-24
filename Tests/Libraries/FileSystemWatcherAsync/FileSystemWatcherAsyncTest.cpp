@@ -3,6 +3,7 @@
 #include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"

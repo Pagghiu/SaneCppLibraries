@@ -14,6 +14,7 @@
 
 #include "Libraries/Process/Process.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/Console.h"
 
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {

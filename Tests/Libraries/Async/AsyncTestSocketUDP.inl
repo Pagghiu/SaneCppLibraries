@@ -50,8 +50,6 @@ void SC::AsyncTest::socketUDPSendReceive()
         SC_TEST_EXPECT(memcmp(data.data(), "PING", 4) == 0);
         SocketIPAddress sourceAddress = res.getSourceAddress();
         SC_TEST_EXPECT(sourceAddress.isValid());
-        SocketIPAddress::AsciiBuffer buffer;
-        report.console.print("{}:{}\n", sourceAddress.toString(buffer), sourceAddress.getPort());
         context.recvCount++;
         res.reactivateRequest(false); // Only receive once for this test
     };

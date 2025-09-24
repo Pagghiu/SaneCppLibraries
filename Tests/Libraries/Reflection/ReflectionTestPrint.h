@@ -30,8 +30,8 @@ inline const StringView typeCategoryToStringView(Reflection::TypeCategory type)
     Assert::unreachable();
 }
 
-template <int NUM_TYPES>
-inline void printFlatSchema(Console& console, const Reflection::TypeInfo (&type)[NUM_TYPES],
+template <int NUM_TYPES, typename ConsoleType>
+inline void printFlatSchema(ConsoleType& console, const Reflection::TypeInfo (&type)[NUM_TYPES],
                             const Reflection::TypeStringView (&names)[NUM_TYPES])
 {
     String buffer(StringEncoding::Ascii);

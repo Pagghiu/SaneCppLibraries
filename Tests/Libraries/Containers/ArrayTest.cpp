@@ -5,6 +5,8 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/Console.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

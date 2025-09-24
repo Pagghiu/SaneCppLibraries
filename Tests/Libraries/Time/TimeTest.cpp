@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Time/Time.h"
+#include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 
@@ -42,10 +44,12 @@ void SC::TimeTest::testAbsoluteParseLocal()
     Time::Absolute::ParseResult local;
     SC_TEST_EXPECT(Time::Realtime::now().parseLocal(local));
     SC_TEST_EXPECT(local.year > 2022);
+    String result;
+    (void)StringBuilder::format(result, "{} {:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.getDay(), local.dayOfMonth,
+                                local.getMonth(), local.year, local.hour, local.minutes, local.seconds,
+                                local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
 
-    report.console.print("{} {:02}/{:02}/{} {:02}:{:02}:{:02} {}", local.getDay(), local.dayOfMonth, local.getMonth(),
-                         local.year, local.hour, local.minutes, local.seconds,
-                         local.isDaylightSaving ? "DAYLIGHT SAVING" : "NO DAYLIGHT SAVING");
+    report.console.print(result.view());
     //! [absoluteParseLocalSnippet]
 }
 

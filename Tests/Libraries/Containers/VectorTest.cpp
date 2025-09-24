@@ -4,6 +4,8 @@
 #include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/Console.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"
 

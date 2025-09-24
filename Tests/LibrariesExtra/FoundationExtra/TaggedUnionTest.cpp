@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "LibrariesExtra/FoundationExtra/TaggedUnion.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/Console.h"
 #include "Libraries/Testing/Testing.h"
 
 //! [TaggedUnionTestSnippet]

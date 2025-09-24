@@ -127,9 +127,12 @@ int main(int argc, const char* argv[])
     Console::tryAttachingToParentConsole();
     if (not SocketNetworking::initNetworking())
         return -2;
-    Console    console;
-    TestReport report(console, argc, argv);
+    Console console;
+    globalConsole = &console;
 
+    TestReport::Output<Console> trConsole = {console};
+
+    TestReport report(trConsole, argc, argv);
     report.executableFile = FileSystem::Operations::getExecutablePath(report.executableFileStorage);
     report.applicationRootDirectory =
         FileSystem::Operations::getApplicationRootDirectory(report.applicationRootStorage);
@@ -143,8 +146,6 @@ int main(int argc, const char* argv[])
     }
     report.libraryRootDirectory   = correctedPath.view();
     report.debugBreakOnFailedTest = true;
-
-    globalConsole = &console;
 
     // Foundation tests
     runBaseTest(report);

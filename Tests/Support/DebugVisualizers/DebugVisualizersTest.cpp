@@ -6,8 +6,8 @@
 #include "Libraries/Containers/VectorMap.h"
 #include "Libraries/Containers/VectorSet.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
-
 namespace SC
 {
 struct DebugVisualizersTest;
@@ -62,10 +62,6 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         (void)smallVector.push_back(2.2f);
         (void)smallVector.push_back(3.3f);
         (void)smallVector.push_back(4.4f);
-        if (not report.quietMode)
-        {
-            report.console.print("{}\n", smallVector[0]);
-        }
 
         (void)map.insertIfNotExists({"one", 1});
         (void)map.insertIfNotExists({"two", 2});
