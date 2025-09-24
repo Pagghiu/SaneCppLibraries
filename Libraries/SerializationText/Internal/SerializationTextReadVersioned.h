@@ -18,7 +18,7 @@ struct SerializationTextReadVersioned
     {
         if (not stream.startObject(index))
             return false;
-        StringView fieldToFind;
+        StringSpan fieldToFind;
         uint32_t   fieldIndex = 0;
         bool       hasMore    = false;
         if (not stream.getNextField(fieldIndex, fieldToFind, hasMore))
@@ -42,7 +42,7 @@ struct SerializationTextReadVersioned
         SerializerStream& stream;
         T&                object;
 
-        const StringView fieldToFind;
+        const StringSpan fieldToFind;
 
         bool consumed            = false;
         bool consumedWithSuccess = false;
@@ -50,7 +50,7 @@ struct SerializationTextReadVersioned
         template <typename R, int N>
         constexpr bool operator()(int, R T::* field, const char (&name)[N], size_t)
         {
-            const StringView fieldName = StringView({name, N - 1}, true, StringEncoding::Ascii);
+            const StringSpan fieldName = StringSpan({name, N - 1}, true, StringEncoding::Ascii);
             if (fieldName == fieldToFind)
             {
                 consumed = true;

@@ -126,7 +126,7 @@ bool SC::SerializationJson::Reader::startObjectField(uint32_t index, StringView 
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     return token.getType() == JsonTokenizer::Token::Colon;
 }
-bool SC::SerializationJson::Reader::getNextField(uint32_t index, StringView& text, bool& hasMore)
+bool SC::SerializationJson::Reader::getNextField(uint32_t index, StringSpan& text, bool& hasMore)
 {
     auto                 iteratorBackup = iterator;
     JsonTokenizer::Token token;

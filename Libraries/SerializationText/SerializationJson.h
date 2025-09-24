@@ -190,7 +190,7 @@ struct SC::SerializationJson
         }
 
         [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
-        [[nodiscard]] bool getNextField(uint32_t index, StringView& text, bool& hasMore);
+        [[nodiscard]] bool getNextField(uint32_t index, StringSpan& text, bool& hasMore);
 
         [[nodiscard]] bool serialize(uint32_t index, bool& value);
         [[nodiscard]] bool serialize(uint32_t index, float& value);
