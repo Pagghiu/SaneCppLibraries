@@ -6,7 +6,7 @@ Follow this guide if you're interested in building the library to contribute (ch
 
 # Generate projects
 
-The test suite and example projects uses the handmade / self-hosted [SC::Build](@ref library_build) system, that describes builds in C++
+The test suite and example projects uses the handmade / self-hosted [SC::Build](@ref page_build) system, that describes builds in C++
 
 ## Command-line
 - Generate projects

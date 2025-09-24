@@ -37,7 +37,6 @@ Library                                                                         
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|---------
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      |   5726
 [Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟨 Concurrently read, write and transform byte streams                    |   1977
-[Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html)                                          | 🟨 Minimal build system where builds are described in C++                 |   4155
 [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)       |   874
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                            | 🟩 Synchronous Disk File I/O                                              |   736
 [File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                              | 🟩 File System operations (like copy / delete) for files / directories    |   1332
@@ -114,7 +113,7 @@ https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad
 
 # Tests
 
-Tests are built with the self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/library_build.html) project generator, describing the builds in C++.    
+Tests are built with the self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/page_build.html) project generator, describing the builds in C++.    
 Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_building_contributor.html) to run the tests.
 
 # Getting in touch

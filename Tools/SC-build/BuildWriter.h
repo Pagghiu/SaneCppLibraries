@@ -1,13 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Build.h"
+#include "Build.h"
 
-#include "../../Containers/Algorithms/AlgorithmBubbleSort.h"
-#include "../../Containers/VectorMap.h"
-#include "../../Containers/VectorSet.h"
-#include "../../Strings/Path.h"
-#include "../../Strings/StringBuilder.h"
+#include "../../Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
+#include "../../Libraries/Containers/VectorMap.h"
+#include "../../Libraries/Containers/VectorSet.h"
+#include "../../Libraries/Strings/Path.h"
+#include "../../Libraries/Strings/StringBuilder.h"
 
 namespace SC
 {

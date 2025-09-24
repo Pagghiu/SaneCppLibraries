@@ -9,7 +9,7 @@ They leverage the growing shell, system and network programming capabilities of 
 Another way to look at them is just as small _C++ scripts_ for which you don't need to setup or maintain a build system, as long as you only use Sane C++ Libraries.
 
 @note Name is `SC::Tools` and not `SC::Scripts` because they're still just small programs.  
-If the system will be generalized even more, maybe acquiring more advanced capabilities from [SC::Plugin](@ref library_plugin) and [SC::Build](@ref library_build) or sandboxing capabilities, this naming will be re-evaluated and/or changed.
+If the system will be generalized even more, maybe acquiring more advanced capabilities from [SC::Plugin](@ref library_plugin) and [SC::Build](@ref page_build) or sandboxing capabilities, this naming will be re-evaluated and/or changed.
 
 # Blog
 
@@ -112,7 +112,7 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 # SC-build.cpp
 
-`SC-build` configures (generating projects) and compiles Sane C++ repository projects using [SC::Build](@ref library_build).
+`SC-build` configures (generating projects) and compiles Sane C++ repository projects using [SC::Build](@ref page_build).
 
 ## Actions
 
@@ -247,7 +247,7 @@ This is because all Sane C++ Libraries are compiled just once (the first time, i
 # Roadmap
 
 - Generate ready made .vscode configurations to debug the programs easily
-- When and if [SC::Build](@ref library_build) will be capable of launching build commands autonomously, get rid of the tool `Tools\Build\$(PLATFORM)` makefiles.
+- When and if [SC::Build](@ref page_build) will be capable of launching build commands autonomously, get rid of the tool `Tools\Build\$(PLATFORM)` makefiles.
 - Investigate better way of expressing the dependencies chain between scripts
 - Investigate if Tools (scripts) can be sandboxed using os facilities
 - Do not require to have a C++ toolchain already installed on the system [*]

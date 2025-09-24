@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "BuildWriter.h"
 
-#include "../../Hashing/Hashing.h"
+#include "../../Libraries/Hashing/Hashing.h"
 
 struct SC::Build::ProjectWriter::WriterVisualStudio
 {

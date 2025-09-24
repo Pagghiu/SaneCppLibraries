@@ -40,7 +40,7 @@ Targeting:
 
 Usage:
 
-- [Build](@ref library_build) is setting them up automatically for XCode and Visual Studio projects.
+- [Build](@ref page_build) is setting them up automatically for XCode and Visual Studio projects.
 - Starting the VSCode `launch.json` configurations for lldb and gdb should will load them in your debugger session.
 - You can manually `source` or add them to your project or build system
 

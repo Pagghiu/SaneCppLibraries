@@ -26,7 +26,7 @@ The Hashing library abstracts OS API to compute MD5, SHA1 and SHA256 hashes.
 
 # Status
 🟩 Usable  
-The library is very simple it it has what is needed so far (mainly by [Build](@ref library_build)). 
+The library is very simple it it has what is needed so far (mainly by [Build](@ref page_build)). 
 
 # Description
 

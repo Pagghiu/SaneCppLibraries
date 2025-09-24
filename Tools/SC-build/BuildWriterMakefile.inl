@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Build.h"
+#include "Build.h"
 
-#include "../../Strings/StringBuilder.h"
+#include "../../Libraries/Strings/StringBuilder.h"
 #include "BuildWriter.h"
 
 struct SC::Build::ProjectWriter::WriterMakefile

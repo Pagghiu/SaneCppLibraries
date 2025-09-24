@@ -6,7 +6,6 @@ Library                                     | Description                       
 :-------------------------------------------|:----------------------------------------------|---------------
 @subpage library_async                      | @copybrief library_async                      |   5726
 @subpage library_async_streams              | @copybrief library_async_streams              |   1977
-@subpage library_build                      | @copybrief library_build                      |   4155
 @subpage library_containers                 | @copybrief library_containers                 |   874
 @subpage library_file                       | @copybrief library_file                       |   736
 @subpage library_file_system                | @copybrief library_file_system                |   1332

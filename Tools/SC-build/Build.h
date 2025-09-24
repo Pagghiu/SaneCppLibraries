@@ -1,18 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Vector.h"
-#include "../Foundation/Result.h"
-#include "../Memory/String.h"
-#include "../Strings/StringView.h"
+#include "../../Libraries/Containers/Vector.h"
+#include "../../Libraries/Foundation/Result.h"
+#include "../../Libraries/Memory/String.h"
+#include "../../Libraries/Strings/StringView.h"
 
 namespace SC
 {
-/// @brief Minimal build system where builds are described in C++ (see @ref library_build)
+/// @brief Minimal build system where builds are described in C++ (see @ref page_build)
 namespace Build
 {
 //! @defgroup group_build Build
-//! @copybrief library_build (see @ref library_build for more details)
 
 //! @addtogroup group_build
 //! @{

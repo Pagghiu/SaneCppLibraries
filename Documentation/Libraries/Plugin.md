@@ -96,7 +96,7 @@ any system or compiler header.
 
 🟦 Complete Features:
 - Create minimal clang toolchain to compile scripts on non-developer machines
-- Integrate with [Build](@ref library_build) library (once it will gain capability to build standalone without needing Xcode or Visual Studio)
+- Integrate with [Build](@ref page_build) library (once it will gain capability to build standalone without needing Xcode or Visual Studio)
 - Evaluate possibility to achieve some minimal error recovery
 - Easily integration with some RPC mechanism
 

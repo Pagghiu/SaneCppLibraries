@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Libraries/Build/Build.h"
 #include "../Libraries/Process/Process.h"
 #include "../Libraries/Strings/Console.h"
 #include "../Libraries/Strings/Path.h"
 #include "../Libraries/Strings/StringBuilder.h"
+#include "SC-build/Build.h"
 #include "Tools.h"
 
 #include "SC-package.h"

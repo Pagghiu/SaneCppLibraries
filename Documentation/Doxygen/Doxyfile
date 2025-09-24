@@ -17,7 +17,6 @@ INPUT                  = ../../Documentation/Pages \
                          ../../Documentation/LibrariesExtra \
                          ../../Libraries/Async \
                          ../../Libraries/AsyncStreams \
-                         ../../Libraries/Build \
                          ../../Libraries/Containers \
                          ../../Libraries/File \
                          ../../Libraries/FileSystem \

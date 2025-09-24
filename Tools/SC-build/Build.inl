@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: MIT
 #include "Build.h"
 
-#include "Internal/BuildWriterMakefile.inl"
-#include "Internal/BuildWriterVisualStudio.inl"
-#include "Internal/BuildWriterXCode.inl"
+#include "BuildWriterMakefile.inl"
+#include "BuildWriterVisualStudio.inl"
+#include "BuildWriterXCode.inl"
 
-#include "../Containers/Vector.h"
-#include "../FileSystem/FileSystem.h"
-#include "../FileSystemIterator/FileSystemIterator.h"
-#include "../Process/Process.h" // for Actions::compile
+#include "../../Libraries/Containers/Vector.h"
+#include "../../Libraries/FileSystem/FileSystem.h"
+#include "../../Libraries/FileSystemIterator/FileSystemIterator.h"
+#include "../../Libraries/Process/Process.h" // for Actions::compile
 
 struct SC::Build::CompileFlags::Internal
 {

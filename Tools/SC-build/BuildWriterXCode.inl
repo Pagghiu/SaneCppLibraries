@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "BuildWriter.h"
 
-#include "../../FileSystem/FileSystem.h" // for FileSystem::existsAndIsFile
-#include "../../Hashing/Hashing.h"
+#include "../../Libraries/FileSystem/FileSystem.h" // for FileSystem::existsAndIsFile
+#include "../../Libraries/Hashing/Hashing.h"
 
 struct SC::Build::ProjectWriter::WriterXCode
 {
