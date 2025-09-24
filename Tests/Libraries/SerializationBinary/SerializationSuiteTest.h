@@ -3,9 +3,9 @@
 #pragma once
 #include "Libraries/Containers/Array.h"
 #include "Libraries/Containers/Vector.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Reflection/Reflection.h"
 #include "Libraries/Strings/Console.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"

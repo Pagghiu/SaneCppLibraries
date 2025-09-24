@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Strings/String.h"
+#include "../Memory/String.h"
 #include "../Strings/StringFormat.h" //StringFormatOutput
 #include "Internal/SerializationTextReadVersioned.h"
 #include "Internal/SerializationTextReadWriteExact.h"

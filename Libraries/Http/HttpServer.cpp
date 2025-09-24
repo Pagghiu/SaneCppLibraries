@@ -3,8 +3,8 @@
 #include "HttpServer.h"
 #include "../Async/Async.h"
 #include "../Containers/ArenaMap.h"
+#include "../Memory/String.h"
 #include "../Socket/Socket.h"
-#include "../Strings/String.h"
 #include "../Strings/StringBuilder.h"
 
 // HttpRequest

@@ -332,7 +332,7 @@ inline Result verifyGitCommitForDirectory(const Download& download, StringView s
                    },
                    result),
                "git not installed on current system");
-    return Result(result.view().startsWith(download.packageVersion.view()));
+    return Result(StringView(result.view()).startsWith(download.packageVersion.view()));
 }
 
 inline Result verifyGitCommitHashCache(const Download& download, const Package& package)

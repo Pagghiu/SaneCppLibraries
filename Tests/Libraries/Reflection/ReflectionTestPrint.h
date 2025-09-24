@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "Libraries/Memory/String.h"
 #include "Libraries/Reflection/Reflection.h"
 #include "Libraries/Strings/Console.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 
 namespace SC

@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/StringSpan.h"
 #include "../Memory/Buffer.h"
-#include "../Strings/StringView.h"
 
 namespace SC
 {
@@ -16,14 +16,14 @@ struct Reflect;
 }
 } // namespace SC
 
-//! @addtogroup group_strings
+//! @addtogroup group_memory
 //! @{
 
 /// @brief A non-modifiable owning string with associated encoding.
 ///
 /// SC::String is (currently) implemented as a SC::Vector with the associated string encoding.
-/// A SC::StringView can be obtained from it calling SC::String::view method but it's up to the user making sure that
-/// the usage of such SC::StringView doesn't exceed lifetime of the SC::String it originated from (but thankfully
+/// A SC::StringSpan can be obtained from it calling SC::String::view method but it's up to the user making sure that
+/// the usage of such SC::StringSpan doesn't exceed lifetime of the SC::String it originated from (but thankfully
 /// Address Sanitizer will catch the issue if it goes un-noticed).
 struct SC::String
 {
@@ -31,37 +31,37 @@ struct SC::String
     /// @param encoding The encoding of the String
     String(StringEncoding encoding = StringEncoding::Utf8) : encoding(encoding) {}
 
-    /// @brief Builds String from a StringView
-    /// @param sv StringView to be assigned to this String
-    /// @warning This function will assert if StringView::assign fails
+    /// @brief Builds String from a StringSpan
+    /// @param sv StringSpan to be assigned to this String
+    /// @warning This function will assert if StringSpan::assign fails
     String(StringSpan sv) { SC_ASSERT_RELEASE(assign(sv)); }
 
     /// @brief Builds a String from a buffer ensuring zero termination
-    /// @warning This function will assert if StringView::assign fails
+    /// @warning This function will assert if StringSpan::assign fails
     String(Buffer&& otherData, StringEncoding encoding);
 
     /// @brief Builds String with a null terminated char string literal
     /// @tparam N Length of the string literal (including null terminator)
     /// @param text Pointer to string literal
-    /// @warning This function will assert if StringView::assign fails
+    /// @warning This function will assert if StringSpan::assign fails
     template <size_t N>
     String(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringView({text, N - 1}, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
     }
 
-    /// @brief Checks if the memory pointed by the StringView is owned by this String
-    /// @param view StringView to be checked
-    /// @return `true` if StringView memory belongs to this String
+    /// @brief Checks if the memory pointed by the StringSpan is owned by this String
+    /// @param view StringSpan to be checked
+    /// @return `true` if StringSpan memory belongs to this String
     [[nodiscard]] bool owns(StringSpan view) const;
 
-    /// @brief Assigns a StringView to this String, replacing existing contents
-    /// @param sv StringView to be assigned to this string
-    /// @return `true` if StringView is assigned successfully
-    /// @note This method will invalidate any `StringView::view` previously obtained
+    /// @brief Assigns a StringSpan to this String, replacing existing contents
+    /// @param sv StringSpan to be assigned to this string
+    /// @return `true` if StringSpan is assigned successfully
+    /// @note This method will invalidate any `StringSpan::view` previously obtained
     [[nodiscard]] bool assign(StringSpan sv);
 
-    /// @brief Get StringView encoding
+    /// @brief Get StringSpan encoding
     /// @return Current encoding for this String
     [[nodiscard]] StringEncoding getEncoding() const { return encoding; }
 
@@ -77,9 +77,9 @@ struct SC::String
     /// @return `true` if String is empty
     [[nodiscard]] bool isEmpty() const { return data.isEmpty(); }
 
-    /// @brief Obtain a null-terminated StringView from current String
-    /// @return a null-terminated StringView from current String
-    [[nodiscard]] StringView view() const SC_LANGUAGE_LIFETIME_BOUND;
+    /// @brief Obtain a null-terminated StringSpan from current String
+    /// @return a null-terminated StringSpan from current String
+    [[nodiscard]] StringSpan view() const SC_LANGUAGE_LIFETIME_BOUND;
 
     /// @brief Check if current String is same as other String
     /// @param other String to be checked
@@ -91,20 +91,15 @@ struct SC::String
     /// @return `true` if the two strings are different
     [[nodiscard]] bool operator!=(const String& other) const { return not operator==(other); }
 
-    /// @brief Check if current String is same as other StringView
-    /// @param other StringView to be checked
-    /// @return `true` if the String and StringView are equal
+    /// @brief Check if current String is same as other StringSpan
+    /// @param other StringSpan to be checked
+    /// @return `true` if the String and StringSpan are equal
     [[nodiscard]] bool operator==(const StringSpan other) const { return view() == (other); }
 
-    /// @brief Check if current String is different from other StringView
-    /// @param other StringView to be checked
-    /// @return `true` if the String and StringView are different
+    /// @brief Check if current String is different from other StringSpan
+    /// @param other StringSpan to be checked
+    /// @return `true` if the String and StringSpan are different
     [[nodiscard]] bool operator!=(const StringSpan other) const { return not operator==(other); }
-
-    /// @brief Check if current String is smaller to another StringView (using StringView::compare)
-    /// @param other StringView to be checked
-    /// @return `true` if the String is smaller than StringView (using StringView::compare)
-    [[nodiscard]] bool operator<(const StringSpan other) const { return view() < other; }
 
     /// @brief Check if current String is equal to the ascii string literal
     /// @tparam N Length of string literal, including null terminator
@@ -125,6 +120,11 @@ struct SC::String
         return view() != other;
     }
 
+    /// @brief Check if current String is smaller to another StringView (using StringView::compare)
+    /// @param other StringView to be checked
+    /// @return `true` if the String is smaller than StringView (using StringView::compare)
+    [[nodiscard]] bool operator<(const StringSpan other) const { return view() < other; }
+
     /// @brief Assigns an ascii string literal to current String
     /// @tparam N Length of string literal, including null terminator
     /// @param text  The string literal
@@ -133,11 +133,11 @@ struct SC::String
     template <size_t N>
     String& operator=(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringView({text, N - 1}, true, StringEncoding::Ascii)));
+        SC_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
         return *this;
     }
 
-    /// @brief Assigns (copy) contents of given StringView in current String
+    /// @brief Assigns (copy) contents of given StringSpan in current String
     /// @warning Assignment operator will assert if String::assign fails
     String& operator=(StringSpan view);
 
@@ -185,7 +185,7 @@ struct SC::SmallString : public String
     SmallString(StringSpan other) : SmallString(other.getEncoding()) { String::operator=(move(other)); }
     SmallString(Buffer&& otherData, StringEncoding encoding) : String(move(otherData), encoding, N) {}
     template <size_t Q>
-    SmallString(const char (&text)[Q]) : SmallString(StringView({text, Q - 1}, true, StringEncoding::Ascii))
+    SmallString(const char (&text)[Q]) : SmallString(StringSpan({text, Q - 1}, true, StringEncoding::Ascii))
     {}
 
   private:
@@ -201,8 +201,12 @@ struct StringFormatterFor;
 struct StringFormatOutput;
 
 // clang-format off
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<String> { static bool format(StringFormatOutput&, const StringView, const String&);};
-template <int N> struct StringFormatterFor<SmallString<N>>       { static bool format(StringFormatOutput& sfo, const StringView sv, const SmallString<N>& s){return StringFormatterFor<String>::format(sfo,sv,s);}};
+template <> struct SC_COMPILER_EXPORT StringFormatterFor<String> { static bool format(StringFormatOutput&, const StringSpan, const String&);};
+#if !defined(SC_STRING_SPAN_FORMATTER_DEFINED)
+#define SC_STRING_SPAN_FORMATTER_DEFINED 1
+template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> { static bool format(StringFormatOutput&, const StringSpan, const StringSpan);};
+#endif
+template <int N> struct StringFormatterFor<SmallString<N>>       { static bool format(StringFormatOutput& sfo, const StringSpan sv, const SmallString<N>& s){return StringFormatterFor<String>::format(sfo,sv,s);}};
 // clang-format on
 
 template <int N>

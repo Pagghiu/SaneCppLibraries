@@ -4,7 +4,7 @@
 #include "Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Memory/Buffer.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

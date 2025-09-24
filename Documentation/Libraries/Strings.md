@@ -7,9 +7,12 @@
 Strings library allow read-only and write string operations and UTF Conversions.
 Path is able to parse and manipulate windows and posix paths.
 
+@note SC::String and SC::SmallString, the "classic C++ style" string containers are defined in [Memory](@ref library_memory) because they are based on SC::Buffer and they use dynamic memory allocation provided by the Memory library.
+
+
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
-- All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
@@ -22,7 +25,6 @@ Path is able to parse and manipulate windows and posix paths.
 
 | Class                     | Description
 |:--------------------------|:--------------------------------------|
-| SC::String                | @copybrief SC::String                 |
 | SC::StringBuilder         | @copybrief SC::StringBuilder          |
 | SC::StringConverter       | @copybrief SC::StringConverter        |
 | SC::StringIterator        | @copybrief SC::StringIterator         |
@@ -121,9 +123,6 @@ Some relevant blog posts are:
 
 ### StringBuilder::appendHex
 @copydoc SC::StringBuilder::appendHex
-
-## String
-@copydoc SC::String
 
 ## StringIterator
 @copydoc SC::StringIterator

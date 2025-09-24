@@ -10,11 +10,14 @@ void runBuildTest(TestReport& report);
 // Foundation
 void runBaseTest(TestReport& report);
 void runStringSpanTest(TestReport& report);
-void runBufferTest(TestReport& report);
-void runVirtualMemoryTest(TestReport& report);
 void runFunctionTest(TestReport& report);
 void runUniqueHandleTest(TestReport& report);
+
+// Memory
+void runBufferTest(TestReport& report);
+void runVirtualMemoryTest(TestReport& report);
 void runGlobalsTest(TestReport& report);
+void runStringTest(TestReport& report);
 
 // Foundation Extra
 void runTaggedUnionTest(TestReport& report);
@@ -75,7 +78,6 @@ void runSocketTest(TestReport& report);
 
 // Strings
 void runConsoleTest(TestReport& report);
-void runStringTest(TestReport& report);
 void runStringConverterTest(TestReport& report);
 void runStringBuilderTest(TestReport& report);
 void runStringFormatTest(TestReport& report);
@@ -110,10 +112,10 @@ void runSupportToolsTest(TestReport& report);
 
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Globals.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 SC::Console* globalConsole;
@@ -147,11 +149,14 @@ int main(int argc, const char* argv[])
     // Foundation tests
     runBaseTest(report);
     runStringSpanTest(report);
-    runBufferTest(report);
-    runFunctionTest(report);
-    runVirtualMemoryTest(report);
     runUniqueHandleTest(report);
+    runFunctionTest(report);
+
+    // Memory tests
     runGlobalsTest(report);
+    runBufferTest(report);
+    runVirtualMemoryTest(report);
+    runStringTest(report);
 
     // Containers tests
     runArenaMapTest(report);

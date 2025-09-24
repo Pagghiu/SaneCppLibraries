@@ -786,7 +786,8 @@ void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Ti
         const PluginDynamicLibrary& library = getPluginDynamicLibraryAt(idx);
         for (const PluginFile& file : library.definition.files)
         {
-            if (file.absolutePath.view().endsWith(relativePath))
+            StringView filePath = file.absolutePath.view();
+            if (filePath.endsWith(relativePath))
             {
                 const Time::Milliseconds elapsed = Time::Realtime::now().subtractExact(library.lastLoadTime);
                 if (elapsed > tolerance)

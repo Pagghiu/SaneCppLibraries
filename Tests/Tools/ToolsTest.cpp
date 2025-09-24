@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Tools/Tools.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC

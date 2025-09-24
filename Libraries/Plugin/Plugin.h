@@ -4,7 +4,7 @@
 #include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"
 #include "../Foundation/Function.h"
-#include "../Strings/String.h"
+#include "../Memory/String.h"
 #include "../Time/Time.h"
 #include "Internal/DynamicLibrary.h"
 

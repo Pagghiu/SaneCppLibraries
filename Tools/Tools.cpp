@@ -3,9 +3,9 @@
 
 #include "../Libraries/Containers/Vector.h"
 #include "../Libraries/Foundation/Deferred.h"
+#include "../Libraries/Memory/String.h"
 #include "../Libraries/Strings/Console.h"
 #include "../Libraries/Strings/Path.h"
-#include "../Libraries/Strings/String.h"
 #include "../Libraries/Time/Time.h"
 
 #include "../SC.cpp"

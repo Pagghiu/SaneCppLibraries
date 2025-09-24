@@ -3,8 +3,9 @@
 #pragma once
 #include "../Async/Async.h"
 #include "../Containers/Vector.h"
+#include "../Memory/String.h"
 #include "../Socket/Socket.h"
-#include "../Strings/String.h"
+#include "../Strings/StringView.h"
 namespace SC
 {
 /// @brief HTTP parser, client and server (see @ref library_http)

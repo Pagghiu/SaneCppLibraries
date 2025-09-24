@@ -9,9 +9,9 @@
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/Buffer.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

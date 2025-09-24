@@ -5,7 +5,7 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -286,7 +286,7 @@ void SC::ProcessTest::processChainPipeDual()
     SC_TEST_EXPECT(chain.launch(outputPipe));
     SC_TEST_EXPECT(outputPipe.readPipe.readUntilEOF(output));
     SC_TEST_EXPECT(chain.waitForExitSync());
-    SC_TEST_EXPECT(output.view().startsWith(expectedOutput));
+    SC_TEST_EXPECT(StringView(output.view()).startsWith(expectedOutput));
     //! [processChainPipeDualSnippet]
 }
 
@@ -330,9 +330,10 @@ void SC::ProcessTest::processEnvironmentNewVar()
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
     // We can check that the NewEnvVar has been set to SomeValue
-    SC_TEST_EXPECT(output.view().containsString("NewEnvVar=SomeValue"));
+    StringView out = output.view();
+    SC_TEST_EXPECT(out.containsString("NewEnvVar=SomeValue"));
     // PATH env var exists because we are inheriting environment
-    SC_TEST_EXPECT(output.view().containsString("PATH="));
+    SC_TEST_EXPECT(out.containsString("PATH="));
     //! [ProcessEnvironmentNewVar]
 }
 
@@ -346,7 +347,8 @@ void SC::ProcessTest::processEnvironmentRedefineParentVar()
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
     // PATH env var has been re-defined
-    SC_TEST_EXPECT(output.view().containsString("PATH=/usr/sane_cpp_binaries"));
+    StringView out = output.view();
+    SC_TEST_EXPECT(out.containsString("PATH=/usr/sane_cpp_binaries"));
     //! [ProcessEnvironmentRedefine]
 }
 
@@ -359,7 +361,8 @@ void SC::ProcessTest::processEnvironmentDisableInheritance()
     // Spawn the child process writing all env variables as KEY=VALUE\n to stdout, redirected to output
     SC_TEST_EXPECT(spawnChildAndPrintEnvironmentVars(process, output));
     // PATH env var doesn't exist because of Process::inheritParentEnvironmentVariables(false)
-    SC_TEST_EXPECT(not output.view().containsString("PATH="));
+    StringView out = output.view();
+    SC_TEST_EXPECT(not out.containsString("PATH="));
     //! [ProcessEnvironmentDisableInheritance]
 }
 

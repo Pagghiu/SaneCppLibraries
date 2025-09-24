@@ -5,7 +5,7 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/Containers/VectorMap.h"
 #include "Libraries/Containers/VectorSet.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -43,8 +43,8 @@ struct SC::DebugVisualizersTest : public SC::TestCase
         smallBuffer = buffer;
         (void)buffer.append({" salver"});
 
-        twoFaces   = stringUtf8.view().sliceStartLength(0, 2);
-        threeKanji = stringUtf16.view().sliceStartLength(0, 3);
+        twoFaces   = StringView(stringUtf8.view()).sliceStartLength(0, 2);
+        threeKanji = StringView(stringUtf16.view()).sliceStartLength(0, 3);
         (void)ints.resize(3);
 
         (void)strings.push_back(stringUtf8);

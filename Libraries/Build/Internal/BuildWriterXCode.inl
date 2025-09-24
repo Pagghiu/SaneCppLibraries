@@ -44,7 +44,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
         SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
-        return hash.assign(tmpHash.view().sliceStartLength(0, 24));
+        return hash.assign(StringView(tmpHash.view()).sliceStartLength(0, 24));
     }
 
     [[nodiscard]] bool computeBuildHash(StringView name, String& hash)
@@ -56,7 +56,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
         SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
-        return hash.assign(tmpHash.view().sliceStartLength(0, 24));
+        return hash.assign(StringView(tmpHash.view()).sliceStartLength(0, 24));
     }
 
     [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& xcodeFiles)

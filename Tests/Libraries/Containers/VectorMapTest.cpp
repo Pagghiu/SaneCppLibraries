@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Containers/VectorMap.h"
 #include "Libraries/Containers/Array.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

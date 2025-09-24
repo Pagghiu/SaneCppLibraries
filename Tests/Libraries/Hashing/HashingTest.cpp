@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Hashing/Hashing.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Console.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 

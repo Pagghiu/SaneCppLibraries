@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
-#include "Libraries/Strings/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

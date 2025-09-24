@@ -7,7 +7,7 @@
 @copydetails group_serialization_text
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
+- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 - All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
 # Statistics

@@ -3,8 +3,9 @@
 #include "HttpClient.h"
 #include "HttpURLParser.h"
 
-#include "../Strings/String.h"
+#include "../Memory/String.h"
 #include "../Strings/StringBuilder.h"
+#include "../Strings/StringView.h"
 
 SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
 {

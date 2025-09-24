@@ -8,7 +8,7 @@
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
+- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

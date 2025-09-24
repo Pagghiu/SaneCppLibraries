@@ -1,13 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Strings/String.h"
-
-namespace SC
-{
-template <typename T>
-struct StringFormatterFor;
-}
+#include "../../Memory/String.h"
 
 struct SC::String::Internal
 {
@@ -78,11 +72,11 @@ SC::String& SC::String::operator=(StringSpan view)
     return *this;
 }
 
-SC::StringView SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
+SC::StringSpan SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
 {
     const bool  isEmpty = data.isEmpty();
     const char* items   = isEmpty ? nullptr : data.data();
-    return StringView({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
+    return StringSpan({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
 }
 
 SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da)
@@ -125,8 +119,8 @@ bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
 
 namespace SC
 {
-bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringView specifier, const String& value)
+bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringSpan specifier, const String& value)
 {
-    return StringFormatterFor<StringView>::format(data, specifier, value.view());
+    return StringFormatterFor<StringSpan>::format(data, specifier, value.view());
 }
 } // namespace SC

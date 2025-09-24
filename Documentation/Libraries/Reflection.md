@@ -7,8 +7,8 @@
 @copydetails group_reflection
 
 # Dependencies
-- Direct dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
+- Direct dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

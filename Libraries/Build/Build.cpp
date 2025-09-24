@@ -336,12 +336,12 @@ SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView      
     bool doRecurse = false;
     for (const FilesSelection& it : filters)
     {
-        if (it.mask.view().containsCodePoint('/'))
+        if (StringView(it.mask.view()).containsCodePoint('/'))
         {
             doRecurse = true;
             break;
         }
-        if (it.mask.view().containsString("**"))
+        if (StringView(it.mask.view()).containsString("**"))
         {
             doRecurse = true;
             break;
@@ -447,13 +447,13 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
             {
                 return Result::Error("Absolute path detected");
             }
-            SC_TRY(Path::append(buffer, file.mask.view(), Path::AsPosix));
+            SC_TRY(Path::append(buffer, {file.mask.view()}, Path::AsPosix));
             auto* value = paths.getOrCreate(buffer);
             SC_TRY(value != nullptr and value->insert(file));
         }
         return Result(true);
     }
-    SC_TRY(Path::append(buffer, file.base.view(), Path::AsPosix));
+    SC_TRY(Path::append(buffer, {file.base.view()}, Path::AsPosix));
     // Some example cases:
     // 1. /SC/Tests/SCTest
     // 2. /SC/Libraries
@@ -465,7 +465,10 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     for (auto& it : paths)
     {
         size_t commonOverlap = 0;
-        if (it.key.view().fullyOverlaps(buffer.view(), commonOverlap))
+
+        StringView key = it.key.view();
+        StringView buf = buffer.view();
+        if (key.fullyOverlaps(buffer.view(), commonOverlap))
         {
             // they are the same (Case 4. after 2. has been inserted)
             SC_TRY(it.value.insert(file));
@@ -474,8 +477,8 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
         }
         else
         {
-            const StringView overlapNew      = buffer.view().sliceStart(commonOverlap);
-            const StringView overlapExisting = it.key.view().sliceStart(commonOverlap);
+            const StringView overlapNew      = buf.sliceStart(commonOverlap);
+            const StringView overlapExisting = key.sliceStart(commonOverlap);
             if (overlapExisting.isEmpty())
             {
                 // Case .5 and .3 after .2
@@ -863,7 +866,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
 
         // Parse coverage report
         StringView totals;
-        SC_TRY(output.view().splitAfter("\nTOTAL ", totals));
+        StringView out = output.view();
+        SC_TRY(out.splitAfter("\nTOTAL ", totals));
         StringViewTokenizer tokenizer(totals);
         for (int i = 0; i < 9; ++i)
             SC_TRY(tokenizer.tokenizeNext({' '}, StringViewTokenizer::SkipEmpty));
@@ -953,7 +957,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
                 Process defaultSchemeProcess;
                 SC_TRY(defaultSchemeProcess.exec({arguments, numArgs}, defaultScheme));
                 numArgs--;
-                SC_TRY(defaultScheme.view().splitAfter("Schemes:\n", schemeName));
+                SC_TRY(StringView(defaultScheme.view()).splitAfter("Schemes:\n", schemeName));
                 SC_TRY(schemeName.splitBefore("\n", schemeName));
             }
             arguments[numArgs++] = "-scheme";                    // 7
@@ -1150,7 +1154,8 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         if (action.action == Action::Print)
         {
             SC_TRY(process.exec({arguments, numArgs}, *outputExecutable));
-            *outputExecutable = outputExecutable->view().trimWhiteSpaces();
+            StringView out    = outputExecutable->view();
+            *outputExecutable = out.trimWhiteSpaces();
         }
         else
         {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
-#include "../Libraries/Strings/String.h"
+#include "../Libraries/Memory/String.h"
 namespace SC
 {
 namespace Tools
@@ -92,7 +92,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
         case Platform::Emscripten: return Result::Error("Unsupported platform");
         }
         SC_TRY_MSG(Process().exec({path.view(), "-v"}, result), "Cannot run doxygen executable");
-        return Result(result.view().startsWith(testVersion));
+        return Result(StringView(result.view()).startsWith(testVersion));
     };
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
@@ -291,7 +291,7 @@ Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, St
         (void)StringBuilder::format(llvmVersion, "llvm@{}", wantedMajorVersion);
         if (Process().exec({"brew", "--prefix", llvmVersion.view()}, foundPath))
         {
-            (void)foundPath.assign(foundPath.view().trimEndAnyOf('\n'));
+            (void)foundPath.assign(StringView(foundPath.view()).trimEndAnyOf('\n'));
             StringBuilder sb(foundPath, StringBuilder::DoNotClear);
             bool          res = sb.append("/bin/clang-format");
             sb.finalize();
@@ -338,7 +338,7 @@ Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, St
         }
         break;
         }
-        SC_TRY(foundPath.assign(foundPath.view().trimAnyOf({'\n', '\r'})));
+        SC_TRY(foundPath.assign(StringView(foundPath.view()).trimAnyOf({'\n', '\r'})));
     }
     console.print("Found \"");
     console.print(foundPath.view());

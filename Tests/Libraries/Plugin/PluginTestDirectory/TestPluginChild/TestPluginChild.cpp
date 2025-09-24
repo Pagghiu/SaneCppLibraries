@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "Interfaces.h"
 #include <Libraries/Containers/Vector.h>
+#include <Libraries/Memory/String.h>
 #include <Libraries/Plugin/PluginMacros.h>
 #include <Libraries/Strings/Console.h>
-#include <Libraries/Strings/String.h>
 SC::StringView externallyDefinedFunc();
 
 struct TestPluginChild : public ITestInterface1, public ITestInterface2

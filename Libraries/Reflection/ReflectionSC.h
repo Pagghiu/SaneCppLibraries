@@ -5,7 +5,7 @@
 #include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"
 #include "../Memory/Buffer.h"
-#include "../Strings/String.h"
+#include "../Memory/String.h"
 #include "Reflection.h"
 
 //-----------------------------------------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Containers/Vector.h"
-#include "Libraries/Strings/String.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 //! [testingSnippet]

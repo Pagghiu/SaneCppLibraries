@@ -10,7 +10,7 @@ This file describes what each library depends on.
 - All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
 
 # [Build](@ref library_build)
-- Direct dependencies: [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Process](@ref library_process), [Strings](@ref library_strings)
+- Direct dependencies: [Containers](@ref library_containers), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings)
 - All dependencies: [Containers](@ref library_containers), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Hashing](@ref library_hashing), [Memory](@ref library_memory), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
 
 # [Containers](@ref library_containers)
@@ -62,15 +62,15 @@ This file describes what each library depends on.
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
 
 # [Reflection](@ref library_reflection)
-- Direct dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)
+- Direct dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
 
 # [SerializationBinary](@ref library_serialization_binary)
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
+- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 
 # [SerializationText](@ref library_serialization_text)
-- Direct dependencies: [Foundation](@ref library_foundation), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
+- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 - All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
 # [Socket](@ref library_socket)
@@ -78,8 +78,8 @@ This file describes what each library depends on.
 - All dependencies: [Foundation](@ref library_foundation)
 
 # [Strings](@ref library_strings)
-- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
-- All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- Direct dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
 
 # [Testing](@ref library_testing)
 - Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Strings](@ref library_strings)

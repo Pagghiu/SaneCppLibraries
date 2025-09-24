@@ -3,7 +3,8 @@
 #pragma once
 #include "../Containers/Vector.h"
 #include "../Foundation/Result.h"
-#include "../Strings/String.h"
+#include "../Memory/String.h"
+#include "../Strings/StringView.h"
 
 namespace SC
 {

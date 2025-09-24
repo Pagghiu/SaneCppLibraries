@@ -35,7 +35,7 @@ struct VisualStudioPathFinder
         if (not Process().exec({vswherePath, "-prerelease", "-latest", "-property", "installationPath"}, output))
             return Result::Error("Visual Studio Locator cannot be executed.");
 
-        vsPath = output.view().trimEndAnyOf({'\r', '\n'});
+        vsPath = StringView(output.view()).trimEndAnyOf({'\r', '\n'});
         return Result(true);
     }
 

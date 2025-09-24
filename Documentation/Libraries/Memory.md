@@ -30,6 +30,8 @@ Most classes have been originally part of the [Foundation](@ref library_foundati
 | SC::Memory                | @copybrief SC::Memory
 | SC::VirtualMemory         | @copybrief SC::VirtualMemory
 | SC::Globals               | @copybrief SC::Globals
+| SC::String                | @copybrief SC::String
+| SC::SmallString           | @copybrief SC::SmallString
 
 # Status
 🟩 Usable  
@@ -45,6 +47,12 @@ Such allocators can be just fixed buffers, regular heap memory or reserved SC::V
 
 ## Buffer
 @copydoc SC::Buffer
+
+## String
+@copydoc SC::String
+
+## SmallString
+@copydoc SC::SmallString
 
 ## Memory
 @copydoc SC::Memory

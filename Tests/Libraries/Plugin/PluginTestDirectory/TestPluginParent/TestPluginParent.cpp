@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include <Libraries/Containers/Vector.h>
+#include <Libraries/Memory/String.h>
 #include <Libraries/Plugin/PluginMacros.h>
 #include <Libraries/Strings/Console.h>
-#include <Libraries/Strings/String.h>
 
 struct TestPluginParent
 {

@@ -39,6 +39,7 @@
             "FileSystemIterator",
             "Foundation",
             "Hashing",
+            "Memory",
             "Process",
             "Strings"
         ],
@@ -202,14 +203,12 @@
         "direct_dependencies": [
             "Containers",
             "Foundation",
-            "Memory",
-            "Strings"
+            "Memory"
         ],
         "all_dependencies": [
             "Containers",
             "Foundation",
-            "Memory",
-            "Strings"
+            "Memory"
         ]
     },
     "SerializationBinary": {
@@ -222,13 +221,13 @@
             "Containers",
             "Foundation",
             "Memory",
-            "Reflection",
-            "Strings"
+            "Reflection"
         ]
     },
     "SerializationText": {
         "direct_dependencies": [
             "Foundation",
+            "Memory",
             "Reflection",
             "Strings"
         ],
@@ -250,12 +249,10 @@
     },
     "Strings": {
         "direct_dependencies": [
-            "Foundation",
-            "Memory"
+            "Foundation"
         ],
         "all_dependencies": [
-            "Foundation",
-            "Memory"
+            "Foundation"
         ]
     },
     "Testing": {

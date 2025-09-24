@@ -33,16 +33,17 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         String hexString;
         SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         StringBuilder guidBuilder(projectGuid);
+        StringView    hexView = hexString.view();
         SC_TRY(guidBuilder.append("{"));
-        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(0, 8)));
+        SC_TRY(guidBuilder.append(hexView.sliceStartEnd(0, 8)));
         SC_TRY(guidBuilder.append("-"));
-        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(8, 12)));
+        SC_TRY(guidBuilder.append(hexView.sliceStartEnd(8, 12)));
         SC_TRY(guidBuilder.append("-"));
-        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(12, 16)));
+        SC_TRY(guidBuilder.append(hexView.sliceStartEnd(12, 16)));
         SC_TRY(guidBuilder.append("-"));
-        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(16, 20)));
+        SC_TRY(guidBuilder.append(hexView.sliceStartEnd(16, 20)));
         SC_TRY(guidBuilder.append("-"));
-        SC_TRY(guidBuilder.append(hexString.view().sliceStartEnd(20, 32)));
+        SC_TRY(guidBuilder.append(hexView.sliceStartEnd(20, 32)));
         SC_TRY(guidBuilder.append("}"));
         return true;
     }
@@ -218,7 +219,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             WriterInternal::appendPrefixIfRelativeMSVC("$(ProjectDir)", builder, configuration.outputPath.view(),
                                                        relativeDirectories.relativeProjectsToOutputs.view());
             appendVariable(builder, configuration.outputPath.view());
-            if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
+            StringView configurationOutputPath = configuration.outputPath.view();
+            if (not configurationOutputPath.endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
             }
@@ -230,7 +232,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             WriterInternal::appendPrefixIfRelativeMSVC("$(ProjectDir)", builder, configuration.intermediatesPath.view(),
                                                        relativeDirectories.relativeProjectsToIntermediates.view());
             appendVariable(builder, configuration.intermediatesPath.view());
-            if (not configuration.outputPath.view().endsWithAnyOf({'\\'}))
+            StringView out = configuration.outputPath.view();
+            if (not out.endsWithAnyOf({'\\'}))
             {
                 builder.append("\\");
             }
