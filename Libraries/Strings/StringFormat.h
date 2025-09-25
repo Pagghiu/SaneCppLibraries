@@ -9,8 +9,15 @@ namespace SC
 {
 struct Console;
 
+struct StringFormatOutput;
 template <typename T>
-struct StringFormatterFor;
+struct StringFormatterFor
+{
+    static bool format(StringFormatOutput& data, const StringSpan specifier, const T& value)
+    {
+        return StringFormatterFor<decltype(value.view())>::format(data, specifier, value.view());
+    };
+};
 
 //! @addtogroup group_strings
 //! @{
@@ -258,10 +265,7 @@ template <> struct SC_COMPILER_EXPORT StringFormatterFor<const void*>  {static b
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringSpan, const wchar_t);};
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringSpan, const wchar_t*);};
 #endif
-#if !defined(SC_STRING_SPAN_FORMATTER_DEFINED)
-#define SC_STRING_SPAN_FORMATTER_DEFINED 1
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> {static bool format(StringFormatOutput&, const StringSpan, const StringSpan);};
-#endif
 struct StringPath;
 template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringPath> {static bool format(StringFormatOutput&, const StringSpan, const StringPath&);};
 

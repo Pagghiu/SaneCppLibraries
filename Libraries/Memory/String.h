@@ -196,19 +196,6 @@ struct SC::SmallString : public String
 
 namespace SC
 {
-template <typename T>
-struct StringFormatterFor;
-struct StringFormatOutput;
-
-// clang-format off
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<String> { static bool format(StringFormatOutput&, const StringSpan, const String&);};
-#if !defined(SC_STRING_SPAN_FORMATTER_DEFINED)
-#define SC_STRING_SPAN_FORMATTER_DEFINED 1
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> { static bool format(StringFormatOutput&, const StringSpan, const StringSpan);};
-#endif
-template <int N> struct StringFormatterFor<SmallString<N>>       { static bool format(StringFormatOutput& sfo, const StringSpan sv, const SmallString<N>& s){return StringFormatterFor<String>::format(sfo,sv,s);}};
-// clang-format on
-
 template <int N>
 using SmallStringNative = SmallString<N * sizeof(native_char_t)>;
 

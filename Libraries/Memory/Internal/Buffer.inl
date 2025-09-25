@@ -26,6 +26,8 @@ GrowableBuffer<Buffer>::~GrowableBuffer()
 
 bool GrowableBuffer<Buffer>::tryGrowTo(size_t newSize)
 {
+    // ensure size is correct before trying to grow to avoid losing data
+    (void)buffer.resizeWithoutInitializing(IGrowableBuffer::directAccess.sizeInBytes);
     const bool result             = buffer.resizeWithoutInitializing(newSize);
     IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
     return result;

@@ -103,6 +103,8 @@ SC::String::GrowableImplementation::~GrowableImplementation()
 
 bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
 {
+    // ensure size is correct before trying to grow to avoid losing data
+    (void)string.data.resizeWithoutInitializing(da.sizeInBytes);
     bool res = true;
     if (newSize > 0)
     {
@@ -116,11 +118,3 @@ bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
     da = {string.data.size(), string.data.capacity(), string.data.data()};
     return res;
 }
-
-namespace SC
-{
-bool StringFormatterFor<String>::format(StringFormatOutput& data, const StringSpan specifier, const String& value)
-{
-    return StringFormatterFor<StringSpan>::format(data, specifier, value.view());
-}
-} // namespace SC
