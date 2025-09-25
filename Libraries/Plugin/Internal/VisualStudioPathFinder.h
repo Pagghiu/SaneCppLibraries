@@ -1,7 +1,6 @@
 // Copyright (c) Gabe Csendes
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Containers/Vector.h"
 #include "../../Foundation/Result.h"
 #include "../../Process/Process.h"
 #include "../../Strings/StringView.h"
@@ -42,7 +41,8 @@ struct VisualStudioPathFinder
     /// @brief Collects every Visual Studio version that installed on the current system
     /// @param[out] vsPaths List of installed Visual Studio path(s)
     /// @return Valid Result if VS paths has been collected successfully
-    Result findAll(Vector<String>& vsPaths)
+    template <typename Container>
+    Result findAll(Container& vsPaths)
     {
         if (vswherePath.isEmpty())
             return Result::Error("Visual Studio Locator not found.");

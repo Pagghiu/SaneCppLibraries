@@ -54,9 +54,16 @@ struct SC::PluginTest : public SC::TestCase
                                                         "Plugin", "PluginTestDirectory"}));
 
             // Scan for definitions
-            SmallVector<PluginDefinition, 5> definitions;
-            SC_TEST_EXPECT(PluginScanner::scanDirectory(testPluginsPath.view(), definitions));
-            SC_TEST_EXPECT(definitions.size() == 2);
+            {
+                // Test that it fails with insufficient span
+                PluginDefinition       definitions[1];
+                Span<PluginDefinition> definitionsSpan;
+                SC_TEST_EXPECT(not PluginScanner::scanDirectory(testPluginsPath.view(), definitions, definitionsSpan));
+            }
+            PluginDefinition       definitions[3];
+            Span<PluginDefinition> definitionsSpan;
+            SC_TEST_EXPECT(PluginScanner::scanDirectory(testPluginsPath.view(), definitions, definitionsSpan));
+            SC_TEST_EXPECT(definitionsSpan.sizeInElements() == 2);
 
             // Save parent and child plugin identifiers and paths
             const size_t parentIndex            = definitions[0].dependencies.isEmpty() ? 0 : 1;
@@ -75,11 +82,14 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
             PluginSysroot sysroot;
             SC_TEST_EXPECT(PluginSysroot::findBestSysroot(compiler.type, sysroot));
-            SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory.view()));
+            SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory));
 
             // Setup registry
+            PluginDynamicLibrary libraries[2]; // Provide storage space for Plugins
+
             PluginRegistry registry;
-            SC_TEST_EXPECT(registry.replaceDefinitions(move(definitions)));
+            registry.init(libraries);
+            SC_TEST_EXPECT(registry.replaceDefinitions(move(definitionsSpan)));
             SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view()));
 
             // Check that plugins have been compiled and are valid
@@ -200,10 +210,10 @@ SC_PLUGIN_EXPORT_INTERFACES(PluginClient, IPluginContract);
 struct PluginHost
 {
     // Fill directories before calling create
-    String executablePath;       // Where executable lives
-    String libraryRootDirectory; // Where Sane C++ Libraries live
-    String someLibraryDirectory; // Where 3rd party-lib headers live
-    String pluginsPath;          // Where Plugins live
+    StringPath executablePath;       // Where executable lives
+    StringPath libraryRootDirectory; // Where Sane C++ Libraries live
+    StringPath someLibraryDirectory; // Where 3rd party-lib headers live
+    StringPath pluginsPath;          // Where Plugins live
 
     PluginRegistry registry;
 
@@ -216,8 +226,8 @@ struct PluginHost
         SC_TRY(PluginSysroot::findBestSysroot(compiler.type, sysroot));
 
         // Add includes used by plugins...
-        SC_TRY(compiler.includePaths.push_back(libraryRootDirectory.view()));
-        SC_TRY(compiler.includePaths.push_back(someLibraryDirectory.view()));
+        SC_TRY(compiler.includePaths.push_back(libraryRootDirectory));
+        SC_TRY(compiler.includePaths.push_back(someLibraryDirectory));
 
         // Setup File System Watcher
         fileSystemWatcherRunner.init(*eventLoop);
@@ -236,9 +246,11 @@ struct PluginHost
 
     Result syncRegistry()
     {
-        Vector<PluginDefinition> definitions;
-        SC_TRY(PluginScanner::scanDirectory(pluginsPath.view(), definitions))
-        SC_TRY(registry.replaceDefinitions(move(definitions)));
+        // Max 16 definitions, but you can use heap allocation if you need an arbitrary limit
+        PluginDefinition       definitions[16];
+        Span<PluginDefinition> definitionsSpan;
+        SC_TRY(PluginScanner::scanDirectory(pluginsPath.view(), definitions, definitionsSpan))
+        SC_TRY(registry.replaceDefinitions(move(definitionsSpan)));
         return Result(true);
     }
 

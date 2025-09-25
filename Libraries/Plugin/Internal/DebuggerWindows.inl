@@ -3,6 +3,7 @@
 #pragma once
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
+#include "../../Memory/Memory.h"
 #include "../../Strings/StringView.h"
 
 namespace SC
@@ -77,8 +78,11 @@ struct SC::Debugger::Internal
         (void)Path::parse(theFile, theFileParsed, Path::Type::AsWindows);
         StringView theFileDirectory;
         (void)theFile.splitAfter(theFileParsed.root, theFileDirectory);
-        SC::Vector<WCHAR> nameBuffer;
-        SC_TRY(nameBuffer.resizeWithoutInitializing(USHRT_MAX));
+
+        void* nameMemory   = Memory::allocate(USHRT_MAX * sizeof(WCHAR), sizeof(WCHAR));
+        auto  deleteMemory = MakeDeferred([&] { Memory::release(nameMemory); });
+
+        Span<WCHAR> nameBuffer = {static_cast<WCHAR*>(nameMemory), USHRT_MAX};
 
         if (theFile.startsWithAnyOf({'\\'}))
         {
@@ -189,7 +193,7 @@ struct SC::Debugger::Internal
             const size_t nameLengthInBytes = pObjectNameInfo->Name.Length;
             if (nameLengthInBytes == 0)
                 continue;
-            wcsncpy_s(nameBuffer.data(), nameBuffer.size(), pObjectNameInfo->Name.Buffer,
+            wcsncpy_s(nameBuffer.data(), nameBuffer.sizeInElements(), pObjectNameInfo->Name.Buffer,
                       nameLengthInBytes / sizeof(WCHAR));
             nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
 

@@ -28,18 +28,21 @@ struct HotReloadState
 struct HotReloadSystem
 {
     HotReloadState state;
-    PluginRegistry registry;
+
+    PluginDynamicLibrary storage[16]; // Max 16 examples
+    PluginRegistry       registry;
 
     Result create(AsyncEventLoop& loop)
     {
+        registry.init(storage);
         eventLoop = &loop;
         // Setup Paths
         FileSystem::Operations::getExecutablePath(state.executablePath);
         StringView components[64];
         SC_TRY(Path::normalizeUNCAndTrimQuotes(state.libraryRootDirectory, SC_COMPILER_LIBRARY_PATH, Path::AsNative,
                                                components));
-        constexpr const StringView imguiPath = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
-        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.imguiPath, imguiPath, Path::AsNative, components));
+        constexpr const StringView escapedImgui = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
+        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.imguiPath, escapedImgui, Path::AsNative, components));
         SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Examples"}));
         StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
         if (FileSystem().existsAndIsDirectory(iosSysroot))
@@ -51,8 +54,12 @@ struct HotReloadSystem
         // Setup Compiler
         SC_TRY(PluginCompiler::findBestCompiler(compiler));
         SC_TRY(PluginSysroot::findBestSysroot(compiler.type, sysroot));
-        SC_TRY(compiler.includePaths.push_back(state.libraryRootDirectory.view()));
-        SC_TRY(compiler.includePaths.push_back(state.imguiPath.view()));
+        StringPath libraryRoot;
+        SC_TRY(libraryRoot.assign(state.libraryRootDirectory.view()));
+        SC_TRY(compiler.includePaths.push_back(libraryRoot));
+        StringPath imguiPath;
+        SC_TRY(imguiPath.assign(state.imguiPath.view()));
+        SC_TRY(compiler.includePaths.push_back(imguiPath));
 
         // Setup File System Watcher
         fileSystemWatcherRunner.init(*eventLoop);
@@ -71,9 +78,10 @@ struct HotReloadSystem
 
     Result syncRegistry()
     {
-        Vector<PluginDefinition> definitions;
-        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions))
-        SC_TRY(registry.replaceDefinitions(move(definitions)));
+        PluginDefinition       definitions[16];
+        Span<PluginDefinition> definitionSpan;
+        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions, definitionSpan))
+        SC_TRY(registry.replaceDefinitions(move(definitionSpan)));
         return Result(true);
     }
 
@@ -116,7 +124,7 @@ struct HotReloadSystem
 
     void unload(StringView identifier) { (void)registry.unloadPlugin(identifier); }
 
-    void setSysroot(StringView isysroot) { sysroot.isysroot = isysroot; }
+    void setSysroot(StringView isysroot) { (void)sysroot.isysroot.assign(isysroot); }
 
   private:
     AsyncEventLoop* eventLoop = nullptr;
