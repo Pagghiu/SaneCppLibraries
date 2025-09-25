@@ -134,9 +134,8 @@ int main(int argc, const char* argv[])
     TestReport::Output<Console> trConsole = {console};
 
     TestReport report(trConsole, argc, argv);
-    report.executableFile = FileSystem::Operations::getExecutablePath(report.executableFileStorage);
-    report.applicationRootDirectory =
-        FileSystem::Operations::getApplicationRootDirectory(report.applicationRootStorage);
+    FileSystem::Operations::getExecutablePath(report.executableFile);
+    FileSystem::Operations::getApplicationRootDirectory(report.applicationRootDirectory);
 
     SC::SmallString<255> correctedPath;
     {
@@ -145,7 +144,7 @@ int main(int argc, const char* argv[])
         // If you hit this assertion you must figure out a way to derive location of Libraries
         SC_ASSERT_RELEASE(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
     }
-    report.libraryRootDirectory   = correctedPath.view();
+    SC_ASSERT_RELEASE(report.libraryRootDirectory.assign(correctedPath.view()));
     report.debugBreakOnFailedTest = true;
 
     // Foundation tests

@@ -318,7 +318,8 @@ SC::Result SC::ProcessTest::spawnChildAndPrintEnvironmentVars(Process& process, 
 {
     // This calls the above ProcessTest::processEnvironmentPrint() in a child process
     return process.exec(
-        {report.executableFile, "--quiet", "--test", "ProcessTest", "--test-section", "ProcessEnvironment"}, output);
+        {report.executableFile.view(), "--quiet", "--test", "ProcessTest", "--test-section", "ProcessEnvironment"},
+        output);
 }
 
 void SC::ProcessTest::processEnvironmentNewVar()
@@ -394,7 +395,7 @@ void SC::ProcessTest::processFork()
 
         // Write the "shared" memory snapshot to the file system
         FileSystem fs;
-        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
         SC_TEST_EXPECT(fs.writeString(saveFile, shared.view()));
 
         // Send (as a signal) modified string contents back to Parent
@@ -419,7 +420,7 @@ void SC::ProcessTest::processFork()
 
         // Check creation of "save file" by fork and verify its content too
         FileSystem fs;
-        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
         String savedData = StringEncoding::Ascii;
         SC_TEST_EXPECT(fs.read(saveFile, savedData));
         SC_TEST_EXPECT(savedData == sharedTag);

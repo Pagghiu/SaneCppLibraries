@@ -41,9 +41,9 @@ void SC::FileTest::testOpen()
 
     const StringView name     = "FileTest";
     const StringView fileName = "test.txt";
-    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectory(name));
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
 
@@ -68,7 +68,7 @@ void SC::FileTest::testOpen()
 
     // Shutdown test
     SC_TEST_EXPECT(fs.removeFile(fileName));
-    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
     //! [FileSnippet]
 }

@@ -50,8 +50,8 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
-            SC_TEST_EXPECT(Path::join(
-                testPluginsPath, {report.libraryRootDirectory, "Tests", "Libraries", "Plugin", "PluginTestDirectory"}));
+            SC_TEST_EXPECT(Path::join(testPluginsPath, {report.libraryRootDirectory.view(), "Tests", "Libraries",
+                                                        "Plugin", "PluginTestDirectory"}));
 
             // Scan for definitions
             SmallVector<PluginDefinition, 5> definitions;
@@ -75,12 +75,12 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
             PluginSysroot sysroot;
             SC_TEST_EXPECT(PluginSysroot::findBestSysroot(compiler.type, sysroot));
-            SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory));
+            SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory.view()));
 
             // Setup registry
             PluginRegistry registry;
             SC_TEST_EXPECT(registry.replaceDefinitions(move(definitions)));
-            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile));
+            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view()));
 
             // Check that plugins have been compiled and are valid
             const PluginDynamicLibrary* pluginChild  = registry.findPlugin(identifierChild);
@@ -120,7 +120,7 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceMod2.view()));
 
             // Reload child plugin
-            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile,
+            SC_TEST_EXPECT(registry.loadPlugin(identifierChild, compiler, sysroot, report.executableFile.view(),
                                                PluginRegistry::LoadMode::Reload));
 
             // Check child return value of the exported function for the modified plugin

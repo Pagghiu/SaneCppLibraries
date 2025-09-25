@@ -25,7 +25,7 @@ void SC::HttpWebServerTest::httpWebServerTest()
 {
     // Create a test file in the application root directory
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.write("file.html", "<html><body>Response from file</body></html>"));
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
@@ -35,7 +35,7 @@ void SC::HttpWebServerTest::httpWebServerTest()
     HttpServer    server;
     HttpWebServer webServer;
     SC_TEST_EXPECT(server.start(eventLoop, 16, "127.0.0.1", 8090));
-    SC_TEST_EXPECT(webServer.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(webServer.init(report.applicationRootDirectory.view()));
 
     server.onRequest = [&](HttpRequest& req, HttpResponse& res) { webServer.serveFile(req, res); };
     //! [HttpWebServerSnippet]

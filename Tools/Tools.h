@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Libraries/Foundation/Result.h"
+#include "../Libraries/Foundation/StringPath.h"
 #include "../Libraries/Memory/String.h"
 #include "../Libraries/Strings/StringBuilder.h"
 
@@ -23,12 +24,12 @@ struct Tool
 {
     struct Arguments
     {
-        Console&          console;
-        SmallString<1024> libraryDirectory;
-        SmallString<1024> toolSource;
-        SmallString<1024> toolDestination;
-        StringView        tool   = StringView();
-        StringView        action = StringView();
+        Console&   console;
+        StringPath libraryDirectory;
+        StringPath toolSource;
+        StringPath toolDestination;
+        StringView tool   = StringView();
+        StringView action = StringView();
 
         Span<const StringView> arguments;
     };

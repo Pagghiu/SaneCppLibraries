@@ -55,8 +55,8 @@ void SC::AsyncTest::processExit()
 
 void SC::AsyncTest::processInputOutput(bool useThreadPool)
 {
-    StringSpan params[] = {report.executableFile, "--quiet",        "--test",
-                           "AsyncTest",           "--test-section", "process input output child"};
+    StringSpan params[] = {report.executableFile.view(), "--quiet", "--test", "AsyncTest", "--test-section",
+                           "process input output child"};
     ThreadPool threadPool;
     if (useThreadPool)
     {

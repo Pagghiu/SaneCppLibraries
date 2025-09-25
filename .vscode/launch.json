@@ -264,5 +264,20 @@
                 "command source \"${workspaceRoot}/Support/DebugVisualizers/LLDB/.lldbinit\""
             ],
         },
+        {
+            "name": "Debug SC-format arm64 [windows]",
+            "type": "cppvsdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/_Build/_Tools/Windows/SC-format.exe",
+            "args": [
+                "${workspaceFolder}",
+                "${workspaceFolder}/Tools",
+                "${workspaceFolder}/_Build"
+            ],
+            "cwd": "${workspaceRoot}",
+            "stopAtEntry": false,
+            "environment": [],
+            "console": "integratedTerminal"
+        },
     ]
 }

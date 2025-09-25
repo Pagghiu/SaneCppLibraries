@@ -24,11 +24,11 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     SmallStringNative<255> dirPath  = StringEncoding::Native;
     const StringView       name     = "AsyncTest";
     const StringView       fileName = "test.txt";
-    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
     // 4. Open the destination file and associate it with the event loop
@@ -126,7 +126,7 @@ void SC::AsyncTest::fileReadWrite(bool useThreadPool)
     // 11. Remove test files
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
     SC_TEST_EXPECT(fs.removeFile(fileName));
-    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
 }
 
@@ -151,11 +151,11 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     SmallStringNative<255> dirPath  = StringEncoding::Native;
     const StringView       name     = "AsyncTest";
     const StringView       fileName = "test.txt";
-    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
     {
@@ -228,7 +228,7 @@ void SC::AsyncTest::fileEndOfFile(bool useThreadPool)
     SC_TEST_EXPECT(fd.close());
 
     SC_TEST_EXPECT(fs.removeFile(fileName));
-    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
 }
 
@@ -250,11 +250,11 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SmallStringNative<255> dirPath  = StringEncoding::Native;
     const StringView       name     = "AsyncTest";
     const StringView       fileName = "test.txt";
-    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, name}));
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
     SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
 
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
 
     // 4. Open the destination file and associate it with the event loop
@@ -318,6 +318,6 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     // 7. Cleanup
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
     SC_TEST_EXPECT(fs.removeFile(fileName));
-    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
 }

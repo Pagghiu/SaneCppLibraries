@@ -39,7 +39,7 @@ void SC::FileSystemIteratorTest::walkRecursive()
 
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = true;
-    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory, entries));
+    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory.view(), entries));
     while (fsIterator.enumerateNext())
     {
         report.console.printLine(fsIterator.get().path);
@@ -58,11 +58,11 @@ void SC::FileSystemIteratorTest::walkNotEnough()
     FileSystemIterator::FolderState folderStates[1];
 
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectory("test"));
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = true;
-    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory, folderStates));
+    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory.view(), folderStates));
     while (fsIterator.enumerateNext())
     {
         report.console.printLine(fsIterator.get().path);
@@ -78,7 +78,7 @@ void SC::FileSystemIteratorTest::walkRecursiveManual()
 
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = false; // As we manually call recurseSubdirectory
-    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory, entries));
+    SC_TEST_EXPECT(fsIterator.init(report.applicationRootDirectory.view(), entries));
     while (fsIterator.enumerateNext())
     {
         const FileSystemIterator::Entry& entry = fsIterator.get();

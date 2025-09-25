@@ -47,11 +47,9 @@ struct TestReport
     };
     IOutput& console;
 
-    StringSpan libraryRootDirectory;     ///< Path to sources directory for library
-    StringSpan executableFile;           ///< Path to current executable
-    StringSpan applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
-    StringPath executableFileStorage;
-    StringPath applicationRootStorage;
+    StringPath libraryRootDirectory;     ///< Path to sources directory for library
+    StringPath executableFile;           ///< Path to current executable
+    StringPath applicationRootDirectory; ///< Path to application (on macOS is different from executable path)
 
     // Options
     bool abortOnFirstFailedTest = true;  ///< If `true` will abort after first failed test

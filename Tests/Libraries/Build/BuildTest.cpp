@@ -15,7 +15,7 @@ struct SC::BuildTest : public SC::TestCase
     {
         String buildDir;
         {
-            String targetDirectory = report.applicationRootDirectory;
+            String targetDirectory = report.applicationRootDirectory.view();
             SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
             // Normalizing is not strictly necessary but it helps when debugging the test
             SC_TRUST_RESULT(Path::normalize(buildDir, targetDirectory.view(), Path::AsNative));
@@ -30,7 +30,7 @@ struct SC::BuildTest : public SC::TestCase
         SC_TRUST_RESULT(Path::join(directories.packagesCacheDirectory, {buildDir.view(), "_PackagesCache"}));
         SC_TRUST_RESULT(Path::join(directories.packagesInstallDirectory, {buildDir.view(), "_Packages"}));
 
-        directories.libraryDirectory = report.libraryRootDirectory;
+        directories.libraryDirectory = report.libraryRootDirectory.view();
 
         if (test_section("Visual Studio 2022"))
         {

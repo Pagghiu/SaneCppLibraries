@@ -82,7 +82,7 @@ struct SC::FileSystemTest : public SC::TestCase
 void SC::FileSystemTest::formatError()
 {
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     fs.preciseErrorMessages = true;
 
     Result res = fs.removeEmptyDirectory("randomNonExistingDirectory");
@@ -97,7 +97,7 @@ void SC::FileSystemTest::makeRemoveIsDirectory()
 {
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Make directory and check that it's a directory and not a file
     SC_TEST_EXPECT(not fs.existsAndIsDirectory("Test0"));
@@ -128,7 +128,7 @@ void SC::FileSystemTest::makeDirectoryRecursive()
     //! [makeDirectoryRecursive]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a directory with 2 levels of nesting
     SC_TEST_EXPECT(fs.makeDirectoryRecursive("Test3/Subdir"));
@@ -148,7 +148,7 @@ void SC::FileSystemTest::writeReadRemoveFile()
     //! [writeReadRemoveFileSnippet]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     StringView content = "ASDF content";
 
     // Check that file doesn't exists before write-ing it and then check that it exist
@@ -172,7 +172,7 @@ void SC::FileSystemTest::copyExistsFile()
     //! [copyExistsFileSnippet]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a File names 'sourceFile.txt'
     StringView contentSource = "this is some content";
@@ -213,7 +213,7 @@ void SC::FileSystemTest::copyDirectoryRecursive()
     //! [copyDirectoryRecursiveSnippet]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a nested directory structure with some files too
     SC_TEST_EXPECT(fs.makeDirectory("copyDirectory"));
@@ -252,7 +252,7 @@ void SC::FileSystemTest::removeDirectoryRecursive()
     //! [removeDirectoryRecursiveSnippet]
     FileSystem fs;
     // Make all operations relative to applicationRootDirectory
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a nested directory structure with some files too
     SC_TEST_EXPECT(fs.makeDirectory("removeDirectoryTest"));
@@ -275,7 +275,7 @@ void SC::FileSystemTest::renameFile()
 {
     //! [renameFileSnippet]
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a file and check that it exists
     SC_TEST_EXPECT(fs.writeString("renameTest.txt", "asdf"));
@@ -304,7 +304,7 @@ void SC::FileSystemTest::renameDirectory()
 {
     //! [renameDirectorySnippet]
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
     // Create a directory and check that it exists
     SC_TEST_EXPECT(fs.makeDirectory("renameDirectoryTest"));
@@ -345,7 +345,7 @@ void SC::FileSystemTest::snippet()
     //! [FileSystemQuickSheetSnippet]
 FileSystem fs;
 // Make all operations relative to applicationRootDirectory
-SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
 
 // Create a nested directory structure with some files too
 SC_TEST_EXPECT(fs.makeDirectoryRecursive("copyDirectory/subdirectory"));

@@ -61,7 +61,7 @@ void SC::AsyncTest::fileSystemOperationOpen()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.writeString("FileSystemOperationOpen.txt", "FileSystemOperationOpen"));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -84,7 +84,7 @@ void SC::AsyncTest::fileSystemOperationOpen()
     // Start the open operation on the given file
     // IMPORTANT! The path string passed in must be in Native Encoding (that means UTF16 on Windows)
     String path = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationOpen.txt"}));
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationOpen.txt"}));
     SC_TEST_EXPECT(asyncFileSystemOperation.open(eventLoop, path.view(), FileOpen::Read));
     SC_TEST_EXPECT(eventLoop.run());
 
@@ -108,7 +108,7 @@ void SC::AsyncTest::fileSystemOperationClose()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.writeString("FileSystemOperationClose.txt", "FileSystemOperationClose"));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -125,7 +125,7 @@ void SC::AsyncTest::fileSystemOperationClose()
 
     FileDescriptor fd;
     String         path = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationClose.txt"}));
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationClose.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
@@ -154,13 +154,13 @@ void SC::AsyncTest::fileSystemOperationRead()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.writeString("FileSystemOperationRead.txt", "FileSystemOperationRead"));
 
     // Open the file first
     FileDescriptor fd;
     String         path = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationRead.txt"}));
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationRead.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Read));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
@@ -204,7 +204,7 @@ void SC::AsyncTest::fileSystemOperationWrite()
     // Open the file first
     FileDescriptor fd;
     String         path = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory, "FileSystemOperationWrite.txt"}));
+    SC_TEST_EXPECT(Path::join(path, {report.applicationRootDirectory.view(), "FileSystemOperationWrite.txt"}));
     SC_TEST_EXPECT(fd.open(path.view(), FileOpen::Write));
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
     SC_TEST_EXPECT(fd.get(handle, Result::Error("Invalid FD")));
@@ -233,7 +233,7 @@ void SC::AsyncTest::fileSystemOperationWrite()
 
     // Remove test files
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeFile("FileSystemOperationWrite.txt"));
     //! [AsyncFileSystemOperationWriteSnippet]
 }
@@ -253,7 +253,7 @@ void SC::AsyncTest::fileSystemOperationCopy()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.writeString("FileSystemOperationCopy.txt", "FileSystemOperationCopy"));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -267,8 +267,8 @@ void SC::AsyncTest::fileSystemOperationCopy()
     // Copy the file
     String sourcePath = StringEncoding::Native;
     String destPath   = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "FileSystemOperationCopy.txt"}));
-    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "FileSystemOperationCopy2.txt"}));
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory.view(), "FileSystemOperationCopy.txt"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory.view(), "FileSystemOperationCopy2.txt"}));
     SC_TEST_EXPECT(asyncFileSystemOperation.copyFile(eventLoop, sourcePath.view(), destPath.view()));
     SC_TEST_EXPECT(eventLoop.run());
 
@@ -301,7 +301,7 @@ void SC::AsyncTest::fileSystemOperationRename()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.writeString("FileSystemOperationRename.txt", "FileSystemOperationRename"));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -315,8 +315,8 @@ void SC::AsyncTest::fileSystemOperationRename()
     // Rename the file
     String sourcePath = StringEncoding::Native;
     String destPath   = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "FileSystemOperationRename.txt"}));
-    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "FileSystemOperationRename2.txt"}));
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory.view(), "FileSystemOperationRename.txt"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory.view(), "FileSystemOperationRename2.txt"}));
     SC_TEST_EXPECT(asyncFileSystemOperation.rename(eventLoop, sourcePath.view(), destPath.view()));
     SC_TEST_EXPECT(eventLoop.run());
 
@@ -348,9 +348,10 @@ void SC::AsyncTest::fileSystemOperationRemoveEmptyDirectory()
 
     // Create a test directory using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     String dirPath = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory, "FileSystemOperationRemoveEmptyDirectory"}));
+    SC_TEST_EXPECT(
+        Path::join(dirPath, {report.applicationRootDirectory.view(), "FileSystemOperationRemoveEmptyDirectory"}));
     SC_TEST_EXPECT(fs.makeDirectory(dirPath.view()));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -389,9 +390,9 @@ void SC::AsyncTest::fileSystemOperationRemoveFile()
 
     // Create a test file using FileSystem
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     String filePath = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory, "FileSystemOperationRemoveFile.txt"}));
+    SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), "FileSystemOperationRemoveFile.txt"}));
     SC_TEST_EXPECT(fs.writeString(filePath.view(), "FileSystemOperationRemoveFile"));
 
     AsyncFileSystemOperation asyncFileSystemOperation;
@@ -427,7 +428,7 @@ void SC::AsyncTest::fileSystemOperationCopyDirectory()
 
     // Create a test directory structure synchronously
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.makeDirectory("AsyncCopyDir"));
     SC_TEST_EXPECT(fs.writeString("AsyncCopyDir/file1.txt", "data1"));
     SC_TEST_EXPECT(fs.makeDirectory("AsyncCopyDir/subdir"));
@@ -445,8 +446,8 @@ void SC::AsyncTest::fileSystemOperationCopyDirectory()
     // Copy the directory
     String sourcePath = StringEncoding::Native;
     String destPath   = StringEncoding::Native;
-    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory, "AsyncCopyDir"}));
-    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory, "AsyncCopyDirCopy"}));
+    SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory.view(), "AsyncCopyDir"}));
+    SC_TEST_EXPECT(Path::join(destPath, {report.applicationRootDirectory.view(), "AsyncCopyDirCopy"}));
     SC_TEST_EXPECT(asyncFileSystemOperation.copyDirectory(eventLoop, sourcePath.view(), destPath.view()));
     SC_TEST_EXPECT(eventLoop.run());
 

@@ -18,7 +18,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
     FileSystemWatcherAsyncTest(SC::TestReport& report) : TestCase(report, "FileSystemWatcherAsyncTest")
     {
         using namespace SC;
-        const StringView appDirectory = report.applicationRootDirectory;
+        const StringView appDirectory = report.applicationRootDirectory.view();
         eventLoopSubdirectory(appDirectory);
         eventLoopWatchClose(appDirectory);
         eventLoopWatchStop(appDirectory);

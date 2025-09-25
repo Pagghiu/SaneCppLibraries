@@ -13,12 +13,12 @@ struct SupportToolsTest : public TestCase
     SupportToolsTest(SC::TestReport& report) : TestCase(report, "SupportToolsTest")
     {
         using namespace SC::Tools;
-        SmallString<256> outputDirectory;
+        StringPath outputDirectory;
         (void)StringBuilder::format(outputDirectory, "{0}/_Build", report.libraryRootDirectory);
         Tool::Arguments arguments{*globalConsole,
                                   report.libraryRootDirectory,
                                   report.libraryRootDirectory,
-                                  outputDirectory.view(),
+                                  outputDirectory,
                                   StringView(),
                                   StringView(),
                                   {}};

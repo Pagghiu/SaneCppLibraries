@@ -165,11 +165,11 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     // 5. Checks that the content of the writable stream is correct
 
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeFileIfExists("readable.txt"));
     SC_TEST_EXPECT(fs.removeFileIfExists("writable.txt"));
     String readablePath;
-    (void)Path::join(readablePath, {report.applicationRootDirectory, "readable.txt"});
+    (void)Path::join(readablePath, {report.applicationRootDirectory.view(), "readable.txt"});
 
     // Generate test data
     Vector<uint64_t> referenceData;
@@ -213,7 +213,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
 
     FileDescriptor writeDescriptor;
     String         writeablePath;
-    (void)Path::join(writeablePath, {report.applicationRootDirectory, "writeable.txt"});
+    (void)Path::join(writeablePath, {report.applicationRootDirectory.view(), "writeable.txt"});
     FileOpen openModeWrite;
     openModeWrite.mode     = FileOpen::Write;
     openModeWrite.blocking = false; // Windows needs non-blocking flags set
@@ -283,7 +283,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
         source[idx] = idx;
     }
     FileSystem fs;
-    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeFileIfExists("source.txt"));
     SC_TEST_EXPECT(fs.removeFileIfExists("destination.txt"));
     SC_TEST_EXPECT(fs.write("source.txt", source.toSpanConst().reinterpret_as_span_of<const char>()));
@@ -311,7 +311,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     ReadableFileStream readFileStream;
     FileDescriptor     readFd;
     String             fileName;
-    SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "source.txt"}));
+    SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory.view(), "source.txt"}));
     FileOpen openModeRead;
     openModeRead.mode     = FileOpen::Read;
     openModeRead.blocking = true;
@@ -325,7 +325,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     // Create Writable File Stream
     WritableFileStream writeFileStream;
     FileDescriptor     writeFd;
-    SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory, "destination.txt"}));
+    SC_TEST_EXPECT(Path::join(fileName, {report.applicationRootDirectory.view(), "destination.txt"}));
     FileOpen openModeWrite;
     openModeWrite.mode     = FileOpen::Write;
     openModeWrite.blocking = true;
