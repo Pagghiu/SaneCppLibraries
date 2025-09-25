@@ -15,6 +15,8 @@
 #include "../ImguiHelpers.h"
 #include "imgui.h"
 
+#include "Libraries/ContainersSerialization/ContainersSerialization.h"
+#include "Libraries/ContainersSerialization/MemorySerialization.h"
 #include "Libraries/Http/HttpWebServer.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"

@@ -334,6 +334,12 @@ struct ExtendedTypeInfo
     // Struct is packed if all of its members are packed and sum of their size equals size of struct.
     static constexpr bool IsPacked = ExtendedStructTypeInfo<T>().IsPacked;
 };
+
+template <typename MemberVisitor, typename Container, typename ItemType, int N>
+struct VectorArrayVTable
+{
+    static constexpr bool build(MemberVisitor&) { return true; }
+};
 } // namespace Reflection
 } // namespace SC
 

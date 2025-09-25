@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErased.h"
+#include "Libraries/ContainersSerialization/ContainersReflection.h"
+#include "Libraries/ContainersSerialization/MemoryReflection.h"
 #include "Libraries/Testing/Testing.h"
 #include "Tests/Libraries/SerializationBinary/SerializationSuiteTest.h"
 

@@ -46,11 +46,11 @@ struct SerializationBinary
     /// SC_TRY(SerializerWriter::write(objectToSerialize, buffer));
     /// @endcode
 
-    template <typename T>
-    [[nodiscard]] static bool write(T& value, Buffer& buffer, size_t* numberOfWrites = nullptr)
+    template <typename T, typename BufferType>
+    [[nodiscard]] static bool write(T& value, BufferType& buffer, size_t* numberOfWrites = nullptr)
     {
-        SerializationBinaryBufferWriter writer(buffer);
-        using Writer = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferWriter, T>;
+        SerializationBinaryWriter<BufferType> writer(buffer);
+        using Writer = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryWriter<BufferType>, T>;
         if (not Writer::serialize(value, writer))
             return false;
         if (numberOfWrites)
@@ -93,8 +93,8 @@ struct SerializationBinary
     template <typename T>
     [[nodiscard]] static bool loadExact(T& value, Span<const char> buffer, size_t* numberOfReads = nullptr)
     {
-        SerializationBinaryBufferReader bufferReader(buffer);
-        using Reader = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryBufferReader, T>;
+        SerializationBinaryReader bufferReader(buffer);
+        using Reader = Serialization::SerializerBinaryReadWriteExact<SerializationBinaryReader, T>;
         if (not Reader::serialize(value, bufferReader))
             return false;
         if (numberOfReads)
@@ -139,8 +139,8 @@ struct SerializationBinary
     [[nodiscard]] static bool loadVersioned(T& value, Span<const char> buffer, Span<const Reflection::TypeInfo> schema,
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
-        SerializationBinaryBufferReader readerBuffer(buffer);
-        using Reader = Serialization::SerializerBinaryReadVersioned<SerializationBinaryBufferReader, T>;
+        SerializationBinaryReader readerBuffer(buffer);
+        using Reader = Serialization::SerializerBinaryReadVersioned<SerializationBinaryReader, T>;
         SerializationSchema versionSchema(schema);
         versionSchema.options = options;
         if (not Reader::readVersioned(value, readerBuffer, versionSchema))
@@ -155,8 +155,8 @@ struct SerializationBinary
     /// de-serialization trying to match fields with corresponding `memberTag`.
     /// @see SerializationBinary::write
     /// @see SerializationBinary::loadVersionedWithSchema
-    template <typename T>
-    [[nodiscard]] static bool writeWithSchema(T& value, Buffer& buffer, size_t* numberOfWrites = nullptr)
+    template <typename T, typename BufferType>
+    [[nodiscard]] static bool writeWithSchema(T& value, BufferType& buffer, size_t* numberOfWrites = nullptr)
     {
         constexpr auto     typeInfos = Reflection::Schema::template compile<T>().typeInfos;
         constexpr uint32_t numInfos  = typeInfos.size;

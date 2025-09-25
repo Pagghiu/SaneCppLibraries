@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Span.h"
-#include "../../Memory/Buffer.h"
 
 namespace SC
 {
 //! @addtogroup group_serialization_binary
 //! @{
 
-/// @brief A binary serialization bytes writer based on SerializationBinaryBuffer
-struct SerializationBinaryBufferWriter
+/// @brief A binary serialization bytes writer for a Buffer-like object
+template <typename T>
+struct SerializationBinaryWriter
 {
-    Buffer& buffer; ///< The underlying buffer holding serialization data
+    T& buffer; ///< The underlying buffer holding serialization data
 
     size_t numberOfOperations = 0; ///< How many read or write operations have been issued so far
-    SerializationBinaryBufferWriter(Buffer& buffer) : buffer(buffer) {}
+    SerializationBinaryWriter(T& buffer) : buffer(buffer) {}
 
     /// @brief Write given object to buffer
     /// @param object The source object
@@ -35,15 +35,15 @@ struct SerializationBinaryBufferWriter
     }
 };
 
-/// @brief A binary serialization bytes reader based on SerializationBinaryBuffer
-struct SerializationBinaryBufferReader
+/// @brief A binary serialization bytes reader reading from a span of memory
+struct SerializationBinaryReader
 {
     Span<const char> memory;
 
     size_t numberOfOperations = 0; ///< How many read or write operations have been issued so far
     size_t readPosition       = 0; ///< Current read  position in the buffer
 
-    SerializationBinaryBufferReader(Span<const char> memory) : memory(memory) {}
+    SerializationBinaryReader(Span<const char> memory) : memory(memory) {}
 
     [[nodiscard]] bool positionIsAtEnd() const { return readPosition == memory.sizeInBytes(); }
 

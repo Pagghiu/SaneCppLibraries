@@ -89,6 +89,8 @@ struct SerializationTextReadVersioned<TextStream, ImVector<T>> : public Serializ
 } // namespace Serialization
 } // namespace SC
 
+#include "Libraries/ContainersSerialization/ContainersSerialization.h"
+#include "Libraries/ContainersSerialization/MemorySerialization.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Plugin/PluginMacros.h"

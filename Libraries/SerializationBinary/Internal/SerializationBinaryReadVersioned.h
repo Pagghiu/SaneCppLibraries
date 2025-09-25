@@ -1,12 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-// This needs to go before the compiler
-#include "../../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
-// Compiler must be after
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySchema.h"
 
+#include "../../Foundation/Assert.h"
 #include "../../Foundation/Result.h"
 namespace SC
 {
@@ -165,23 +163,6 @@ struct SerializationBinaryVersionedVector
         return SerializerReadVersionedItems<BinaryStream, T>::readVersioned(
             Reflection::ExtendedTypeInfo<Container>::data(object), stream, schema, numSourceItems, NumMaxItems);
     }
-};
-
-template <typename BinaryStream>
-struct SerializerBinaryReadVersioned<BinaryStream, SC::Buffer>
-    : public SerializationBinaryVersionedVector<BinaryStream, SC::Buffer, char, 0xffffffff>
-{
-};
-template <typename BinaryStream, typename T>
-struct SerializerBinaryReadVersioned<BinaryStream, SC::Vector<T>>
-    : public SerializationBinaryVersionedVector<BinaryStream, SC::Vector<T>, T, 0xffffffff>
-{
-};
-
-template <typename BinaryStream, typename T, int N>
-struct SerializerBinaryReadVersioned<BinaryStream, SC::Array<T, N>>
-    : public SerializationBinaryVersionedVector<BinaryStream, SC::Array<T, N>, T, N>
-{
 };
 
 template <typename BinaryStream, typename T>

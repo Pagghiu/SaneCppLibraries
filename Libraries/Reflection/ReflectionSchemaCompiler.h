@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "Reflection.h"
 
 namespace SC
@@ -37,7 +36,31 @@ struct SchemaCompiler
         ArrayWithSize<TypeStringView, NUM_TYPES> typeNames;
         VirtualTablesType                        vtables;
     };
-
+    template <typename Iterator, typename BinaryPredicate>
+    static constexpr void bubbleSort(Iterator first, Iterator last, BinaryPredicate predicate)
+    {
+        if (first >= last)
+        {
+            return;
+        }
+        bool doSwap = true;
+        while (doSwap)
+        {
+            doSwap      = false;
+            Iterator p0 = first;
+            Iterator p1 = first + 1;
+            while (p1 != last)
+            {
+                if (predicate(*p1, *p0))
+                {
+                    swap(*p1, *p0);
+                    doSwap = true;
+                }
+                ++p0;
+                ++p1;
+            }
+        }
+    }
     template <uint32_t MAX_TYPES>
     [[nodiscard]] static constexpr bool appendTypesTo(ArrayWithSize<Type, MAX_TYPES>& types, TypeBuildFunction build,
                                                       SchemaBuilder& builder)
@@ -68,8 +91,8 @@ struct SchemaCompiler
                 types.values[baseLinkID].typeInfo.structInfo.isPacked)
             {
                 // This is a little help for Binary Serialization, as packed structs end up serialized as is
-                Algorithms::bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren,
-                                       OrderByMemberOffset());
+                bubbleSort(types.values + baseLinkID + 1, types.values + baseLinkID + 1 + numberOfChildren,
+                           OrderByMemberOffset());
             }
             types.size += numberOfTypes;
             return true;

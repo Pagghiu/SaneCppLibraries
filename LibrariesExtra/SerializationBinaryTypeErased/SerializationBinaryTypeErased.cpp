@@ -8,9 +8,9 @@ namespace SC
 {
 namespace detail
 {
-[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
-                                                 const Reflection::TypeInfo&       sourceType,
-                                                 SerializationBinaryBufferReader*  sourceObject,
+[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions&    options,
+                                                 const Reflection::TypeInfo&          sourceType,
+                                                 SerializationBinaryTypeErasedReader* sourceObject,
                                                  const Reflection::TypeInfo& sinkType, Span<char>& sinkObject);
 }
 } // namespace SC
@@ -201,7 +201,7 @@ bool SC::SerializationBinaryTypeErasedReadVersioned::readArrayVector()
 
 bool SC::SerializationBinaryTypeErasedReadVersioned::skipCurrent()
 {
-    SC::detail::SerializationBinarySkipper<SerializationBinaryBufferReader> skipper(*sourceObject, sourceTypeIndex);
+    SC::detail::SerializationBinarySkipper<SerializationBinaryTypeErasedReader> skipper(*sourceObject, sourceTypeIndex);
     skipper.sourceTypes = sourceTypes;
     return skipper.skip();
 }
@@ -505,7 +505,7 @@ template <typename SourceType, typename SinkType>
 }
 
 template <typename T>
-[[nodiscard]] static bool tryReadPrimitiveValue(SerializationBinaryBufferReader* sourceObject,
+[[nodiscard]] static bool tryReadPrimitiveValue(SerializationBinaryTypeErasedReader* sourceObject,
                                                 const Reflection::TypeInfo& sinkType, Span<char>& sinkObject)
 {
     T sourceValue;
@@ -536,9 +536,9 @@ template <typename T>
     }
 }
 
-[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions& options,
-                                                 const Reflection::TypeInfo&       sourceType,
-                                                 SerializationBinaryBufferReader*  sourceObject,
+[[nodiscard]] static bool tryPrimitiveConversion(const SerializationBinaryOptions&    options,
+                                                 const Reflection::TypeInfo&          sourceType,
+                                                 SerializationBinaryTypeErasedReader* sourceObject,
                                                  const Reflection::TypeInfo& sinkType, Span<char>& sinkObject)
 {
     switch (sourceType.type)

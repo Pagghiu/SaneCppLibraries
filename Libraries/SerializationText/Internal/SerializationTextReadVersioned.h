@@ -91,28 +91,6 @@ struct SerializationTextVersionedVector
         return SerializationTextExactVector<SerializerStream, Container, T>::serialize(index, object, stream);
     }
 };
-
-template <typename SerializerStream>
-struct SerializationTextReadVersioned<SerializerStream, String>
-{
-    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, String& object, SerializerStream& stream)
-    {
-        return stream.serialize(index, object);
-    }
-};
-
-template <typename SerializerStream, typename T>
-struct SerializationTextReadVersioned<SerializerStream, SC::Vector<T>>
-    : public SerializationTextVersionedVector<SerializerStream, SC::Vector<T>, T>
-{
-};
-
-template <typename SerializerStream, typename T, int N>
-struct SerializationTextReadVersioned<SerializerStream, SC::Array<T, N>>
-    : public SerializationTextVersionedVector<SerializerStream, SC::Array<T, N>, T>
-{
-};
-
 } // namespace Serialization
 
 } // namespace SC

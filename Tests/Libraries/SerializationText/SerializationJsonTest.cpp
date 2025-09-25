@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/SerializationText/SerializationJson.h"
 #include "Libraries/Containers/Vector.h"
+#include "Libraries/ContainersSerialization/ContainersSerialization.h"
+#include "Libraries/ContainersSerialization/MemorySerialization.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

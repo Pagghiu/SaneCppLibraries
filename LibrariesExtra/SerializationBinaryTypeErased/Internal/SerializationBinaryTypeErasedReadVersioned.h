@@ -1,19 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-// This needs to go before the compiler
-#include "../../../Libraries/Reflection/ReflectionSC.h"
-// Compiler must be after
 #include "../../../Libraries/SerializationBinary/Internal/SerializationBinarySchema.h"
 #include "SerializationBinaryTypeErasedCompiler.h"
 namespace SC
 {
-struct SerializationBinaryBufferReader;
+struct SerializationBinaryTypeErasedReader;
 /// @brief De-serializes binary data with its associated schema into object `T`
 struct SerializationBinaryTypeErasedReadVersioned
 {
     template <typename T>
-    [[nodiscard]] bool loadVersioned(T& object, SerializationBinaryBufferReader& source, SerializationSchema& schema)
+    [[nodiscard]] bool loadVersioned(T& object, SerializationBinaryTypeErasedReader& source,
+                                     SerializationSchema& schema)
     {
         constexpr auto flatSchema = Reflection::SchemaTypeErased::compile<T>();
 
@@ -48,10 +46,10 @@ struct SerializationBinaryTypeErasedReadVersioned
     Reflection::TypeInfo             sinkType;
     uint32_t                         sinkTypeIndex = 0;
 
-    Span<const Reflection::TypeInfo> sourceTypes;
-    SerializationBinaryBufferReader* sourceObject = nullptr;
-    Reflection::TypeInfo             sourceType;
-    uint32_t                         sourceTypeIndex = 0;
+    Span<const Reflection::TypeInfo>     sourceTypes;
+    SerializationBinaryTypeErasedReader* sourceObject = nullptr;
+    Reflection::TypeInfo                 sourceType;
+    uint32_t                             sourceTypeIndex = 0;
 
     [[nodiscard]] bool read();
     [[nodiscard]] bool readStruct();

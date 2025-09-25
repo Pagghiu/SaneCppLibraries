@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
+#include "../../Foundation/StringSpan.h"
+#include "../../Reflection/Reflection.h"
 
 namespace SC
 {
@@ -90,26 +91,6 @@ struct SerializationTextExactVector
     }
 };
 
-template <typename TextStream>
-struct SerializationTextReadWriteExact<TextStream, String>
-{
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, String& object, TextStream& stream)
-    {
-        return stream.serialize(index, object);
-    }
-};
-
-template <typename TextStream, typename T>
-struct SerializationTextReadWriteExact<TextStream, SC::Vector<T>>
-    : public SerializationTextExactVector<TextStream, SC::Vector<T>, T>
-{
-};
-
-template <typename TextStream, typename T, int N>
-struct SerializationTextReadWriteExact<TextStream, SC::Array<T, N>>
-    : public SerializationTextExactVector<TextStream, SC::Array<T, N>, T>
-{
-};
 } // namespace Serialization
 
 } // namespace SC

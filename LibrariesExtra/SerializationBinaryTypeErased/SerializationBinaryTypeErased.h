@@ -25,7 +25,7 @@ struct SerializationBinaryTypeErased
     template <typename T>
     [[nodiscard]] static bool write(const T& object, Buffer& buffer, size_t* numberOfWrites = nullptr)
     {
-        SerializationBinaryBufferWriter         binaryBuffer(buffer);
+        SerializationBinaryTypeErasedWriter     binaryBuffer(buffer);
         SerializationBinaryTypeErasedWriteExact writer;
         if (not writer.write(object, binaryBuffer))
             return false;
@@ -43,7 +43,7 @@ struct SerializationBinaryTypeErased
     template <typename T>
     [[nodiscard]] static bool loadExact(T& object, Span<const char> buffer, size_t* numberOfReads = nullptr)
     {
-        SerializationBinaryBufferReader        bufferReader(buffer);
+        SerializationBinaryTypeErasedReader    bufferReader(buffer);
         SerializationBinaryTypeErasedReadExact reader;
         if (not reader.loadExact(object, bufferReader))
             return false;
@@ -67,7 +67,7 @@ struct SerializationBinaryTypeErased
 
         SerializationSchema serializationSchema(schema);
         serializationSchema.options = options;
-        SerializationBinaryBufferReader readerBuffer(buffer);
+        SerializationBinaryTypeErasedReader readerBuffer(buffer);
         if (not loader.loadVersioned(object, readerBuffer, serializationSchema))
             return false;
         if (numberOfReads)

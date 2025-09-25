@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/SerializationBinary/SerializationBinary.h"
+#include "Libraries/ContainersSerialization/ContainersSerialization.h"
+#include "Libraries/ContainersSerialization/MemorySerialization.h"
 #include "Tests/Libraries/SerializationBinary/SerializationSuiteTest.h"
+
 namespace SC
 {
 struct SerializationBinaryTest;

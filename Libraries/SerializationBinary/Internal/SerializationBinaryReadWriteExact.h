@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/Result.h"
-#include "../../Reflection/ReflectionSC.h" // TODO: Split the SC Containers specifics in separate header
+#include "../../Reflection/ReflectionSchemaCompiler.h"
 
 namespace SC
 {
@@ -112,20 +112,6 @@ struct SerializerBinaryExactVector
     }
 };
 
-// clang-format off
-/// @brief Specialization for `SC::Vector<T>` types
-template <typename BinaryStream, typename T>
-struct SerializerBinaryReadWriteExact<BinaryStream, SC::Vector<T>> : public SerializerBinaryExactVector<BinaryStream, SC::Vector<T>, T> { };
-
-/// @brief Specialization for `SC::Array<T, N>` types
-template <typename BinaryStream, typename T, int N>
-struct SerializerBinaryReadWriteExact<BinaryStream, SC::Array<T, N>> : public SerializerBinaryExactVector<BinaryStream, SC::Array<T, N>, T> { };
-
-/// @brief Specialization for `SC::Vector<T>` types
-template <typename BinaryStream>
-struct SerializerBinaryReadWriteExact<BinaryStream, SC::Buffer> : public SerializerBinaryExactVector<BinaryStream, SC::Buffer, char> { };
-
-// clang-format on
 } // namespace Serialization
 
 } // namespace SC

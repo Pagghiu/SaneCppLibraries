@@ -197,6 +197,7 @@ bool SC::SerializationJson::Reader::tokenizeArrayStart(uint32_t index)
         return false;
     return true;
 }
+
 bool SC::SerializationJson::Reader::tokenizeArrayEnd(uint32_t& size)
 {
     auto                 iteratorBackup = iterator;
