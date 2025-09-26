@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Memory/String.h"
 #include "../Strings/StringFormat.h" //StringFormatOutput
 #include "Internal/SerializationTextReadVersioned.h"
 #include "Internal/SerializationTextReadWriteExact.h"
@@ -136,7 +135,12 @@ struct SC::SerializationJson
 
         [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
 
-        [[nodiscard]] bool serialize(uint32_t index, const String& value);
+        template <typename T>
+        [[nodiscard]] bool serializeString(uint32_t index, T& text)
+        {
+            return serializeStringView(index, text.view());
+        }
+
         [[nodiscard]] bool serialize(uint32_t index, float value);
         [[nodiscard]] bool serialize(uint32_t index, double value);
 
@@ -149,10 +153,13 @@ struct SC::SerializationJson
         }
 
       private:
+        [[nodiscard]] bool serializeStringView(uint32_t index, StringView text);
+
         bool eventuallyAddComma(uint32_t index);
 
-        SmallString<64> floatFormat;
-        Options         options;
+        char       floatFormatStorage[5];
+        StringSpan floatFormat;
+        Options    options;
     };
 
     /// @brief Writer interface for Serializer that parses JSON into C++ types.
@@ -195,9 +202,18 @@ struct SC::SerializationJson
         [[nodiscard]] bool serialize(uint32_t index, bool& value);
         [[nodiscard]] bool serialize(uint32_t index, float& value);
         [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
-        [[nodiscard]] bool serialize(uint32_t index, String& text);
+
+        template <typename T>
+        [[nodiscard]] bool serializeString(uint32_t index, T& text)
+        {
+            bool succeeded;
+            auto result = serializeString(index, succeeded);
+            return succeeded and text.assign(result);
+        }
 
       private:
+        [[nodiscard]] StringView serializeString(uint32_t index, bool& succeeded);
+
         [[nodiscard]] bool tokenizeArrayStart(uint32_t index);
         [[nodiscard]] bool tokenizeArrayEnd(uint32_t& size);
         [[nodiscard]] bool eventuallyExpectComma(uint32_t index);

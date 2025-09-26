@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "SerializationJson.h"
 #include "../Foundation/Result.h"
-#include "../Strings/StringBuilder.h"
 #include "Internal/JsonTokenizer.h"
 
+#include <stdio.h>
 bool SC::SerializationJson::Writer::onSerializationStart()
 {
     output.onFormatBegin();
@@ -16,7 +16,9 @@ bool SC::SerializationJson::Writer::onSerializationEnd() { return output.onForma
 bool SC::SerializationJson::Writer::setOptions(Options opt)
 {
     options = opt;
-    return StringBuilder::format(floatFormat, ".{}", options.floatDigits);
+    ::snprintf(floatFormatStorage, sizeof(floatFormatStorage), ".%d", options.floatDigits);
+    floatFormat = StringSpan::fromNullTerminated(floatFormatStorage, StringEncoding::Ascii);
+    return true;
 }
 
 bool SC::SerializationJson::Writer::startObject(uint32_t index)
@@ -42,23 +44,23 @@ bool SC::SerializationJson::Writer::startObjectField(uint32_t index, StringView 
     return output.append("\"") and output.append(text) and output.append("\"") and output.append(":"_a8);
 }
 
-bool SC::SerializationJson::Writer::serialize(uint32_t index, const String& value)
+bool SC::SerializationJson::Writer::serializeStringView(uint32_t index, StringView text)
 {
     SC_TRY(eventuallyAddComma(index));
     // TODO: Escape JSON string
-    return output.append("\"") and output.append(value.view()) and output.append("\"");
+    return output.append("\"") and output.append(text) and output.append("\"");
 }
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, float value)
 {
     SC_TRY(eventuallyAddComma(index));
-    return StringFormatterFor<float>::format(output, floatFormat.view(), value);
+    return StringFormatterFor<float>::format(output, floatFormat, value);
 }
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, double value)
 {
     SC_TRY(eventuallyAddComma(index));
-    return StringFormatterFor<double>::format(output, floatFormat.view(), value);
+    return StringFormatterFor<double>::format(output, floatFormat, value);
 }
 
 bool SC::SerializationJson::Writer::eventuallyAddComma(uint32_t index) { return index > 0 ? output.append(",") : true; }
@@ -105,15 +107,20 @@ bool SC::SerializationJson::Reader::eventuallyExpectComma(uint32_t index)
     return true;
 }
 
-bool SC::SerializationJson::Reader::serialize(uint32_t index, String& text)
+SC::StringView SC::SerializationJson::Reader::serializeString(uint32_t index, bool& succeeded)
 {
-    SC_COMPILER_UNUSED(text);
-    SC_TRY(eventuallyExpectComma(index));
-    JsonTokenizer::Token token;
-    SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
-    SC_TRY(token.getType() == JsonTokenizer::Token::String);
     // TODO: Escape JSON string
-    return text.assign(token.getToken(iteratorText));
+    succeeded = false;
+    if (eventuallyExpectComma(index))
+    {
+        JsonTokenizer::Token token;
+        if (JsonTokenizer::tokenizeNext(iterator, token) and token.getType() == JsonTokenizer::Token::String)
+        {
+            succeeded = true;
+            return token.getToken(iteratorText);
+        }
+    }
+    return {};
 }
 
 bool SC::SerializationJson::Reader::startObjectField(uint32_t index, StringView text)

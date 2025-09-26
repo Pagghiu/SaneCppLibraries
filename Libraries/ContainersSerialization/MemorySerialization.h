@@ -33,7 +33,7 @@ struct SerializationTextReadWriteExact<TextStream, String, void>
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, String& object, TextStream& stream)
     {
-        return stream.serialize(index, object);
+        return stream.serializeString(index, object);
     }
 };
 
@@ -42,7 +42,7 @@ struct SerializationTextReadVersioned<SerializerStream, String, void>
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, String& object, SerializerStream& stream)
     {
-        return stream.serialize(index, object);
+        return stream.serializeString(index, object);
     }
 };
 
