@@ -17,6 +17,33 @@ struct SerializationTextReadWriteExact
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
     {
+        return stream.serialize(index, object);
+    }
+};
+
+template <typename TextStream, typename T, int N>
+struct SerializationTextReadWriteExact<TextStream, T[N]>
+{
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T (&object)[N], TextStream& stream)
+    {
+        if (not stream.startArray(index))
+            return false;
+        uint32_t arrayIndex = 0;
+        for (auto& item : object)
+        {
+            if (not SerializationTextReadWriteExact<TextStream, T>::serialize(arrayIndex++, item, stream))
+                return false;
+        }
+        return stream.endArray();
+    }
+};
+
+template <typename TextStream, typename T>
+struct SerializationTextReadWriteExact<TextStream, T,
+                                       typename SC::TypeTraits::EnableIf<Reflection::IsStruct<T>::value>::type>
+{
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
+    {
         if (not stream.startObject(index))
             return false;
         if (not Reflection::Reflect<T>::visit(MemberIterator{stream, object}))
@@ -41,33 +68,6 @@ struct SerializationTextReadWriteExact
             return SerializationTextReadWriteExact<TextStream, R>::serialize(0, object.*field, stream);
         }
     };
-};
-
-template <typename TextStream, typename T, int N>
-struct SerializationTextReadWriteExact<TextStream, T[N]>
-{
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, T (&object)[N], TextStream& stream)
-    {
-        if (not stream.startArray(index))
-            return false;
-        uint32_t arrayIndex = 0;
-        for (auto& item : object)
-        {
-            if (not SerializationTextReadWriteExact<TextStream, T>::serialize(arrayIndex++, item, stream))
-                return false;
-        }
-        return stream.endArray();
-    }
-};
-
-template <typename TextStream, typename T>
-struct SerializationTextReadWriteExact<TextStream, T,
-                                       typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
-{
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
-    {
-        return stream.serialize(index, object);
-    }
 };
 
 template <typename TextStream, typename Container, typename T>

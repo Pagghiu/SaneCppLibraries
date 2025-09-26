@@ -63,6 +63,12 @@ bool SC::SerializationJson::Writer::serialize(uint32_t index, double value)
     return StringFormatterFor<double>::format(output, floatFormat, value);
 }
 
+bool SC::SerializationJson::Writer::serialize(uint32_t index, int value)
+{
+    SC_TRY(eventuallyAddComma(index));
+    return StringFormatterFor<int>::format(output, StringView(), value);
+}
+
 bool SC::SerializationJson::Writer::eventuallyAddComma(uint32_t index) { return index > 0 ? output.append(",") : true; }
 
 bool SC::SerializationJson::Reader::startObject(uint32_t index)
@@ -107,7 +113,7 @@ bool SC::SerializationJson::Reader::eventuallyExpectComma(uint32_t index)
     return true;
 }
 
-SC::StringView SC::SerializationJson::Reader::serializeString(uint32_t index, bool& succeeded)
+SC::StringView SC::SerializationJson::Reader::serializeInternal(uint32_t index, bool& succeeded)
 {
     // TODO: Escape JSON string
     succeeded = false;

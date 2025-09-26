@@ -16,6 +16,25 @@ struct SerializationTextReadVersioned
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
     {
+        return stream.serialize(index, object);
+    }
+};
+
+template <typename SerializerStream, typename T, int N>
+struct SerializationTextReadVersioned<SerializerStream, T[N]>
+{
+    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T (&object)[N], SerializerStream& stream)
+    {
+        return SerializationTextReadWriteExact<SerializerStream, T[N]>::serialize(index, object, stream);
+    }
+};
+
+template <typename SerializerStream, typename T>
+struct SerializationTextReadVersioned<SerializerStream, T,
+                                      typename SC::TypeTraits::EnableIf<Reflection::IsStruct<T>::value>::type>
+{
+    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
+    {
         if (not stream.startObject(index))
             return false;
         StringSpan fieldToFind;
@@ -61,25 +80,6 @@ struct SerializationTextReadVersioned
             return true;
         }
     };
-};
-
-template <typename SerializerStream, typename T, int N>
-struct SerializationTextReadVersioned<SerializerStream, T[N]>
-{
-    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T (&object)[N], SerializerStream& stream)
-    {
-        return SerializationTextReadWriteExact<SerializerStream, T[N]>::serialize(index, object, stream);
-    }
-};
-
-template <typename SerializerStream, typename T>
-struct SerializationTextReadVersioned<SerializerStream, T,
-                                      typename SC::TypeTraits::EnableIf<Reflection::IsPrimitive<T>::value>::type>
-{
-    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
-    {
-        return stream.serialize(index, object);
-    }
 };
 
 template <typename SerializerStream, typename Container, typename T>

@@ -227,6 +227,7 @@ template <> struct Reflect<bool>     : public ReflectPrimitive {static constexpr
 
 /// @brief Checks if a given type is primitive
 template <typename T> struct IsPrimitive { static constexpr bool value = TypeInfo::isPrimitiveCategory(Reflect<T>::getCategory()); };
+template <typename T> struct IsStruct { static constexpr bool value = Reflect<T>::getCategory() == TypeCategory::TypeStruct; };
 
 // clang-format on
 

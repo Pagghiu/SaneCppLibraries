@@ -136,21 +136,14 @@ struct SC::SerializationJson
         [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
 
         template <typename T>
-        [[nodiscard]] bool serializeString(uint32_t index, T& text)
+        [[nodiscard]] bool serialize(uint32_t index, T& text)
         {
             return serializeStringView(index, text.view());
         }
 
         [[nodiscard]] bool serialize(uint32_t index, float value);
         [[nodiscard]] bool serialize(uint32_t index, double value);
-
-        template <typename T>
-        [[nodiscard]] bool serialize(uint32_t index, T value)
-        {
-            if (not eventuallyAddComma(index))
-                return false;
-            return StringFormatterFor<T>::format(output, StringView(), value);
-        }
+        [[nodiscard]] bool serialize(uint32_t index, int value);
 
       private:
         [[nodiscard]] bool serializeStringView(uint32_t index, StringView text);
@@ -204,15 +197,15 @@ struct SC::SerializationJson
         [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
 
         template <typename T>
-        [[nodiscard]] bool serializeString(uint32_t index, T& text)
+        [[nodiscard]] bool serialize(uint32_t index, T& text)
         {
             bool succeeded;
-            auto result = serializeString(index, succeeded);
+            auto result = serializeInternal(index, succeeded);
             return succeeded and text.assign(result);
         }
 
       private:
-        [[nodiscard]] StringView serializeString(uint32_t index, bool& succeeded);
+        [[nodiscard]] StringView serializeInternal(uint32_t index, bool& succeeded);
 
         [[nodiscard]] bool tokenizeArrayStart(uint32_t index);
         [[nodiscard]] bool tokenizeArrayEnd(uint32_t& size);
