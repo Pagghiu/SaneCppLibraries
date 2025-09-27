@@ -67,6 +67,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             processExit();
         }
+#if SC_XCTEST
+#else
         if (test_section("process input output"))
         {
             processInputOutput(false);
@@ -75,6 +77,7 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             processInputOutput(true);
         }
+#endif
         if (test_section("socket TCP accept"))
         {
             socketTCPAccept();

@@ -197,7 +197,10 @@ int main(int argc, const char* argv[])
     runHttpURLParserTest(report);
 
     // Plugin tests
+#if SC_XCTEST
+#else
     runPluginTest(report);
+#endif
 
     // Process tests
     runProcessTest(report);

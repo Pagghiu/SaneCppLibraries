@@ -1351,15 +1351,28 @@ SC::Result SC::FileSystem::Operations::removeDirectoryRecursive(StringSpan path)
                  "removeDirectoryRecursive: Failed to remove directory");
     return Result(true);
 }
-
+#if SC_XCTEST
+#include "../Memory/Memory.h" // OPTIONAL DEPENDENCY
+#include "Path.h"             // OPTIONAL DEPENDENCY
+#include <dlfcn.h>
+#endif
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
+#if SC_XCTEST
+    Dl_info dlinfo;
+    int     res = dladdr((void*)Memory::allocate, &dlinfo);
+    if (res != 0 and executablePath.assign(StringSpan::fromNullTerminated(dlinfo.dli_fname, StringEncoding::Utf8)))
+    {
+        return executablePath.view();
+    }
+#else
     uint32_t executableLength = static_cast<uint32_t>(StringPath::MaxPath);
     if (::_NSGetExecutablePath(executablePath.writableSpan().data(), &executableLength) == 0)
     {
         (void)executablePath.resize(::strlen(executablePath.view().bytesIncludingTerminator()));
         return executablePath.view();
     }
+#endif
     return {};
 }
 
@@ -1375,6 +1388,16 @@ SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath
 
 SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPath& applicationRootDirectory)
 {
+#if SC_XCTEST
+    StringView appDir = getExecutablePath(applicationRootDirectory);
+    if (not appDir.isEmpty())
+    {
+        if (applicationRootDirectory.assign(Path::dirname(appDir, Path::AsNative, 3)))
+        {
+            return applicationRootDirectory.view();
+        }
+    }
+#else
     CFBundleRef mainBundle = CFBundleGetMainBundle();
     if (mainBundle != nullptr)
     {
@@ -1391,6 +1414,7 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
             CFRelease(bundleURL);
         }
     }
+#endif
     return {};
 }
 
