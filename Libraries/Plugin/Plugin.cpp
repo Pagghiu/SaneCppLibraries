@@ -756,14 +756,18 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     auto deferWrite = MakeDeferred(
         [&]
         {
-            const size_t last      = lastErrorLogCopy.sizeInBytes() - 1;
-            lastErrorLogCopy[last] = 0;
-            lastErrorLog           = {lastErrorLogCopy, true, StringEncoding::Ascii};
+            if (lastErrorLogCopy.sizeInBytes() > 0)
+            {
+                const size_t last      = lastErrorLogCopy.sizeInBytes() - 1;
+                lastErrorLogCopy[last] = 0;
+            }
+            lastErrorLog = {lastErrorLogCopy, true, StringEncoding::Ascii};
         });
     SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLogCopy), "Compile failed");
 #if SC_PLATFORM_WINDOWS
     ::Sleep(400); // Sometimes file is locked...
 #endif
+    lastErrorLogCopy = {errorStorage, sizeof(errorStorage) - 1};
     SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy),
                "Link failes");
     deferWrite.disarm();
