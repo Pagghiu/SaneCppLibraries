@@ -83,6 +83,7 @@ struct SC_COMPILER_EXPORT Process
             growableBuffer = &gbuf;
             operation      = Operation::GrowableBuffer;
         }
+
         ~StdStream()
         {
             if (growableBuffer)
@@ -133,7 +134,7 @@ struct SC_COMPILER_EXPORT Process
         Operation operation = Operation::Inherit;
 
         Span<const char> readableSpan;
-        Span<char>       writableSpan;
+        Span<char>*      writableSpan = nullptr;
 
         IGrowableBuffer*                  growableBuffer = nullptr;
         AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
@@ -156,7 +157,7 @@ struct SC_COMPILER_EXPORT Process
         StdOut(Inherit) { operation = Operation::Inherit; }
         
         /// @brief Read the process standard output/error into the given Span
-        StdOut(Span<char> span) { operation = Operation::WritableSpan; writableSpan = span; }
+        StdOut(Span<char>& span) { operation = Operation::WritableSpan; writableSpan = &span; }
         
         using StdStream::StdStream;
         friend struct ProcessChain;

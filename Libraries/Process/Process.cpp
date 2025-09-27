@@ -240,7 +240,8 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
         }
         case StdStream::Operation::WritableSpan: {
             Span<char> actuallyRead;
-            SC_TRY(pipe.readPipe.read(outputObject.writableSpan, actuallyRead));
+            SC_TRY(pipe.readPipe.read(*outputObject.writableSpan, actuallyRead));
+            *outputObject.writableSpan = actuallyRead;
             return pipe.close();
         }
         case StdStream::Operation::ReadableSpan: {
