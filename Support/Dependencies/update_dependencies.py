@@ -24,18 +24,21 @@ Features and workflow (step by step):
    - Existing '# Dependencies' sections are replaced.
    - Naming conventions are consistent between library name, file name, and link references.
 9. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
+10. Computes ranks for layering libraries in the dependency graph (Foundation at bottom, then layers based on minimal dependencies).
+11. Writes dependencies to Documentation/Pages/Dependencies.dot in DOT format with layered ranks for visualization using Graphviz (you can generate an image with: `dot -Tpng Documentation/Pages/Dependencies.dot -o Documentation/Pages/Dependencies.png`).
 
 Usage:
     python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]
 
 If <SANE_CPP_LIBRARIES_ROOT> is not provided, the current directory is used.
 
-This will update Documentation/Pages/Dependencies.md, the # Dependencies and # Statistics sections of each library's documentation file and create Support/Dependencies/Dependencies.json.
+This will update Documentation/Pages/Dependencies.md, the # Dependencies sections of each library's documentation file, create Support/Dependencies/Dependencies.json, and generate Documentation/Pages/Dependencies.dot for graph visualization.
 """
 import os
 import re
 import sys
 import json
+from collections import defaultdict
 
 if len(sys.argv) > 2:
     print("Usage: python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]")
@@ -184,6 +187,32 @@ def write_dependencies_json(dep_map, transitive_map, minimal_map):
 
     print(f"Dependencies JSON file written to {OUTPUT_JSON}")
 
+def write_dot(minimal_map, rank_map, ranks):
+    dot_path = os.path.join(PROJECT_ROOT, 'Documentation', 'Pages', 'Dependencies.dot')
+    with open(dot_path, 'w', encoding='utf-8') as f:
+        f.write('digraph LibraryDependencies {\n')
+        f.write('  node [shape=box];\n')
+        f.write('  splines=line;\n')
+        f.write('\n')
+        # Nodes
+        for lib in sorted(libraries):
+            f.write(f'  {lib};\n')
+        f.write('\n')
+        # Ranks
+        for rank in sorted(ranks.keys()):
+            f.write(f'  subgraph rank{rank} {{\n')
+            f.write('    rank=same;\n')
+            for lib in sorted(ranks[rank]):
+                f.write(f'    {lib};\n')
+            f.write('  }\n')
+        f.write('\n')
+        # Edges
+        for lib in sorted(libraries):
+            for dep in sorted(minimal_map[lib]):
+                f.write(f'  {lib} -> {dep};\n')
+        f.write('}\n')
+    print(f"DOT file written to {dot_path}")
+
 def main():
     # Write Markdown output
     with open(OUTPUT_MD, 'w', encoding='utf-8') as out:
@@ -205,7 +234,30 @@ def main():
     # Write dependencies to JSON file
     write_dependencies_json(dep_map, transitive_map, minimal_map)
 
-    print(f"Dependency file written to {OUTPUT_MD}") 
+    # Compute ranks for layering
+    rank_map = {}
+    def get_rank(lib):
+        if lib in rank_map:
+            return rank_map[lib]
+        if not minimal_map[lib]:
+            rank_map[lib] = 0
+            return 0
+        deps_ranks = [get_rank(dep) for dep in minimal_map[lib]]
+        rank = max(deps_ranks) + 1 if deps_ranks else 0
+        rank_map[lib] = rank
+        return rank
+
+    for lib in libraries:
+        get_rank(lib)
+
+    ranks = defaultdict(list)
+    for lib, rank in rank_map.items():
+        ranks[rank].append(lib)
+
+    # Write DOT file with layers
+    write_dot(minimal_map, rank_map, ranks)
+
+    print(f"Dependency file written to {OUTPUT_MD}")
 
 if __name__ == '__main__':
     main()
