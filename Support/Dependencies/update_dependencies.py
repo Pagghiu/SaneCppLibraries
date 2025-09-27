@@ -13,15 +13,17 @@ Features and workflow (step by step):
    - Skips any #include line that contains '// OPTIONAL DEPENDENCY' after the include.
 4. Builds a direct dependency map for each library.
 5. Computes all (direct + indirect) dependencies for each library using a transitive closure.
-6. Writes the results to Documentation/Pages/Dependencies.md in Markdown format, listing for each library:
+6. Computes minimal dependencies for each library (minimal set of direct dependencies that are not implied by others).
+7. Writes the results to Documentation/Pages/Dependencies.md in Markdown format, listing for each library:
    - Direct dependencies
+   - Minimal dependencies
    - All dependencies (direct + indirect)
    - Each dependency is a Markdown link to the corresponding Doxygen page, e.g. [Foundation](@ref library_foundation), with camel case converted to snake_case for the @ref.
-7. For each library, updates or inserts a '# Dependencies' section in its documentation file (Documentation/Libraries/{Library}.md):
-   - The '# Dependencies' section lists direct and all dependencies, using the same link format as above.
+8. For each library, updates or inserts a '# Dependencies' section in its documentation file (Documentation/Libraries/{Library}.md):
+   - The '# Dependencies' section lists direct, minimal, and all dependencies, using the same link format as above.
    - Existing '# Dependencies' sections are replaced.
    - Naming conventions are consistent between library name, file name, and link references.
-8. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
+9. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
 
 Usage:
     python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]
@@ -100,6 +102,22 @@ def compute_transitive(lib, dep_map):
 
 transitive_map = {lib: compute_transitive(lib, dep_map) for lib in libraries}
 
+# Step 5: Compute minimal dependencies (minimal set of direct dependencies)
+def compute_minimal(lib, dep_map, transitive_map):
+    direct = dep_map[lib]
+    minimal = set()
+    for dep in direct:
+        is_implied = False
+        for other_dep in direct:
+            if other_dep != dep and dep in transitive_map[other_dep]:
+                is_implied = True
+                break
+        if not is_implied:
+            minimal.add(dep)
+    return minimal
+
+minimal_map = {lib: compute_minimal(lib, dep_map, transitive_map) for lib in libraries}
+
 def camel_to_snake(name):
     import re
     return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
@@ -111,7 +129,7 @@ def format_deps(deps):
 
 DOC_LIBRARIES_DIR = os.path.join(PROJECT_ROOT, 'Documentation', 'Libraries')
 
-def update_library_md(lib, direct_deps, all_deps):
+def update_library_md(lib, direct_deps, minimal_deps, all_deps):
     md_path = os.path.join(DOC_LIBRARIES_DIR, f'{lib}.md')
     if not os.path.isfile(md_path):
         return  # Skip if no doc file exists
@@ -123,7 +141,7 @@ def update_library_md(lib, direct_deps, all_deps):
     content = dep_section_pattern.sub('', content)
 
     # Prepare new dependencies section
-    dep_section = f'# Dependencies\n- Direct dependencies: {format_deps(direct_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n'
+    dep_section = f'# Dependencies\n- Dependencies: {format_deps(minimal_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n'
 
     # Find where to insert:
     # 1. Before # Statistics if it exists
@@ -131,37 +149,39 @@ def update_library_md(lib, direct_deps, all_deps):
     # 3. At the end otherwise
     stats_match = re.search(r'^# Statistics', content, re.MULTILINE)
     features_match = re.search(r'^# Features', content, re.MULTILINE)
-    
+
     if stats_match:
         insert_pos = stats_match.start()
     elif features_match:
         insert_pos = features_match.start()
     else:
         insert_pos = len(content.rstrip()) + 1  # +1 for newline
-        
+
     new_content = content[:insert_pos] + dep_section + content[insert_pos:]
-    
+
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
 
-def write_dependencies_json(dep_map, transitive_map):
+def write_dependencies_json(dep_map, transitive_map, minimal_map):
     """
     Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
     """
     dependencies_data = {}
-    
+
     for lib in sorted(libraries):
         direct_deps = list(dep_map[lib])
         all_deps = list(transitive_map[lib])
-        
+        minimal_deps = list(minimal_map[lib])
+
         dependencies_data[lib] = {
             "direct_dependencies": sorted(direct_deps),
+            "minimal_dependencies": sorted(minimal_deps),
             "all_dependencies": sorted(all_deps)
         }
-    
+
     with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
         json.dump(dependencies_data, f, indent=4, ensure_ascii=False)
-    
+
     print(f"Dependencies JSON file written to {OUTPUT_JSON}")
 
 def main():
@@ -173,18 +193,19 @@ def main():
         out.write('This file describes what each library depends on.\n\n')
         for lib in sorted(libraries):
             direct = dep_map[lib]
+            minimal = minimal_map[lib]
             all_deps = transitive_map[lib]
             out.write(f'# [{lib}](@ref library_{camel_to_snake(lib)})\n')
-            out.write(f'- Direct dependencies: {format_deps(direct)}\n')
+            out.write(f'- Dependencies: {format_deps(minimal)}\n')
             out.write(f'- All dependencies: {format_deps(all_deps)}\n')
             out.write(f'\n')
             # Update the library's own .md file
-            update_library_md(lib, direct, all_deps)
+            update_library_md(lib, direct, minimal, all_deps)
     
     # Write dependencies to JSON file
-    write_dependencies_json(dep_map, transitive_map)
+    write_dependencies_json(dep_map, transitive_map, minimal_map)
 
     print(f"Dependency file written to {OUTPUT_MD}") 
 
 if __name__ == '__main__':
-    main() 
+    main()
