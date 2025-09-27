@@ -45,7 +45,7 @@ bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
     return true;
 }
 
-SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(String& fullDynamicPath) const
+SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
     StringBuilder builder(fullDynamicPath);
@@ -59,7 +59,7 @@ SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(String& fullDynam
     return Result(true);
 }
 
-SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const
+SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
     StringBuilder builder(fullDynamicPath);
@@ -82,30 +82,32 @@ bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefini
     {
         if (key == "Name")
         {
-            gotFields[0]                   = true;
-            pluginDefinition.identity.name = value;
+            gotFields[0] = true;
+            SC_TRY_MSG(pluginDefinition.identity.name.assign(value), "Name exceeds fixed size");
         }
         else if (key == "Version")
         {
-            gotFields[1]                      = true;
-            pluginDefinition.identity.version = value;
+            gotFields[1] = true;
+            SC_TRY_MSG(pluginDefinition.identity.version.assign(value), "Version exceeds fixed size");
         }
         else if (key == "Description")
         {
-            gotFields[2]                 = true;
-            pluginDefinition.description = value;
+            gotFields[2] = true;
+            SC_TRY_MSG(pluginDefinition.description.assign(value), "Description exceeds fixed size");
         }
         else if (key == "Category")
         {
-            gotFields[3]              = true;
-            pluginDefinition.category = value;
+            gotFields[3] = true;
+            SC_TRY_MSG(pluginDefinition.category.assign(value), "Category exceeds fixed size");
         }
         else if (key == "Dependencies") // Optional
         {
             StringViewTokenizer tokenizer = value;
             while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
             {
-                SC_TRY(pluginDefinition.dependencies.push_back(tokenizer.component));
+                PluginIdentifier identifier;
+                SC_TRY(identifier.assign(tokenizer.component));
+                SC_TRY(pluginDefinition.dependencies.push_back(move(identifier)));
             }
         }
         else if (key == "Build") // Optional
@@ -113,7 +115,9 @@ bool SC::PluginDefinition::parse(StringView text, PluginDefinition& pluginDefini
             StringViewTokenizer tokenizer = value;
             while (tokenizer.tokenizeNext(',', StringViewTokenizer::SkipEmpty))
             {
-                SC_TRY(pluginDefinition.build.push_back(tokenizer.component));
+                PluginBuildOption option;
+                SC_TRY_MSG(option.assign(tokenizer.component), "Build option exceeds fixed size");
+                SC_TRY(pluginDefinition.build.push_back(option));
             }
         }
     }
@@ -178,7 +182,7 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
 }
 
 SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<PluginDefinition> definitions,
-                                            Span<PluginDefinition>& foundDefinitions)
+                                            IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
 {
     FileSystemIterator::FolderState recurseStack[16];
 
@@ -201,7 +205,6 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
     // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
     // Both no plugin definition (identity.identifier.isEmpty()) and multiple
     // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin PluginDefinition
-    String file = StringEncoding::Ascii;
     while (fsIterator.enumerateNext())
     {
         const auto& item = fsIterator.get();
@@ -233,9 +236,10 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
                 SC_TRY(pluginFile.absolutePath.assign(item.path));
                 SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
             }
-            SC_TRY(fs.read(item.path, file));
+            SC_TRY(fs.read(item.path, move(tempFileBuffer)));
             StringView extracted;
-            if (PluginDefinition::find(file.view(), extracted))
+            StringView fileView = {{tempFileBuffer.data(), tempFileBuffer.size()}, false, StringEncoding::Utf8};
+            if (PluginDefinition::find(fileView, extracted))
             {
                 if (PluginDefinition::parse(extracted, pluginDefinition))
                 {
@@ -248,7 +252,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
                     else
                     {
                         multiplePluginDefinitions            = true;
-                        pluginDefinition.identity.identifier = StringView();
+                        pluginDefinition.identity.identifier = {};
                     }
                 }
             }
@@ -306,9 +310,9 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     };
 #if SC_PLATFORM_WINDOWS
     // TODO: can we use findLatest in order to avoid finding best compiler version...?
-    FixedVector<String, 16> rootPaths;
+    FixedVector<StringPath, 8> rootPaths;
     SC_TRY(VisualStudioPathFinder().findAll(rootPaths))
-    for (String& base : rootPaths)
+    for (auto& base : rootPaths)
         (void)Path::join(base, {base.view(), "VC", "Tools", "MSVC"});
 
     compiler.type = Type::MicrosoftCompiler;
@@ -317,7 +321,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 
     StringPath bestCompiler;
     StringPath bestLinker;
-    for (const String& basePath : rootPaths)
+    for (const auto& basePath : rootPaths)
     {
         FileSystemIterator::FolderState recurseStack[16];
         FileSystemIterator              fsIterator;
@@ -417,7 +421,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 
 SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
                                            const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
-                                           StringView objectFile, String& standardOutput) const
+                                           StringView objectFile, Span<char>& standardOutput) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -510,7 +514,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     }
     if (process.getExitStatus() == 0)
     {
-        StringBuilder(standardOutput, StringBuilder::Clear);
+        standardOutput = {};
         return Result(true);
     }
     else
@@ -521,7 +525,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
 
 SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const PluginSysroot& sysroot,
                                        const PluginCompilerEnvironment& compilerEnvironment,
-                                       String&                          standardOutput) const
+                                       Span<char>&                      standardOutput) const
 {
     // TODO: Spawn parallel tasks
     StringPath destFile;
@@ -540,7 +544,7 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
 
 SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const PluginSysroot& sysroot,
                                     const PluginCompilerEnvironment& compilerEnvironment, StringView executablePath,
-                                    String& linkerLog) const
+                                    Span<char>& linkerLog) const
 {
     static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
 
@@ -615,7 +619,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
         SC_TRY(arena.appendAsSingleString({dirname, SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}));
     }
 
-    String destFile = StringEncoding::Native;
+    StringPath destFile;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(destFile));
 #if SC_PLATFORM_WINDOWS
     SC_TRY(arena.appendAsSingleString({SC_NATIVE_STR("/OUT:"), destFile.view()}));
@@ -639,7 +643,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     }
     if (process.getExitStatus() == 0)
     {
-        StringBuilder(linkerLog, StringBuilder::Clear);
+        linkerLog = {};
         return Result(true);
     }
     else
@@ -654,7 +658,7 @@ SC::Result SC::PluginDynamicLibrary::unload()
 #if SC_PLATFORM_WINDOWS
     if (Debugger::isDebuggerConnected())
     {
-        String pdbFile = StringEncoding::Native;
+        StringPath pdbFile;
         SC_TRY(definition.getDynamicLibraryPDBAbsolutePath(pdbFile));
         FileSystem fs;
         if (fs.existsAndIsFile(pdbFile.view()))
@@ -682,7 +686,7 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
 
     FileSystemIterator fsIterator;
     SC_TRY_MSG(fsIterator.init(baseInclude, recurseStack), "Missing Windows Kits 10 directory");
-    String windowsSdkVersion;
+    StringPath windowsSdkVersion;
     while (fsIterator.enumerateNext())
     {
         if (fsIterator.get().isDirectory())
@@ -745,14 +749,25 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     {
         SC_TRY(environment.get(index, name, compilerEnvironment.ldFlags));
     }
-    StringBuilder(lastErrorLog, StringBuilder::Clear);
-    SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLog), "Compile failed");
+    lastErrorLog = {};
+
+    Span<char> lastErrorLogCopy = {errorStorage, sizeof(errorStorage) - 1};
+
+    auto deferWrite = MakeDeferred(
+        [&]
+        {
+            const size_t last      = lastErrorLogCopy.sizeInBytes() - 1;
+            lastErrorLogCopy[last] = 0;
+            lastErrorLog           = {lastErrorLogCopy, true, StringEncoding::Ascii};
+        });
+    SC_TRY_MSG(compiler.compile(definition, sysroot, compilerEnvironment, lastErrorLogCopy), "Compile failed");
 #if SC_PLATFORM_WINDOWS
     ::Sleep(400); // Sometimes file is locked...
 #endif
-    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLog), "Link failes");
-
-    String buffer = StringEncoding::Native;
+    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy),
+               "Link failes");
+    deferWrite.disarm();
+    StringPath buffer;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
     SC_TRY(dynamicLibrary.load(buffer.view()));
 
@@ -791,7 +806,7 @@ SC::Result SC::PluginRegistry::close()
 
 SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& definitions)
 {
-    FixedVector<String, 16> librariesToUnload;
+    FixedVector<PluginIdentifier, 16> librariesToUnload;
     // Unload libraries that have no match in the definitions
     for (PluginDynamicLibrary& item : libraries)
     {
@@ -808,11 +823,11 @@ SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& defin
         }
         if (not found)
         {
-            SC_TRY(librariesToUnload.push_back(libraryId));
+            SC_TRY(librariesToUnload.push_back(item.definition.identity.identifier));
         }
     }
 
-    for (String& identifier : librariesToUnload)
+    for (auto& identifier : librariesToUnload)
     {
         SC_TRY(unloadPlugin(identifier.view()));
         PluginDynamicLibrary* plugin = findPlugin(identifier.view());
@@ -839,7 +854,8 @@ SC::Result SC::PluginRegistry::replaceDefinitions(Span<PluginDefinition>&& defin
         {
             SC_TRY_MSG(libraries.sizeInElements() < storage.sizeInElements(),
                        "Exceeded number of Plugins storage space");
-            libraries                                 = {storage.data(), libraries.sizeInElements() + 1};
+            libraries = {storage.data(), libraries.sizeInElements() + 1};
+
             libraries[libraries.sizeInElements() - 1] = move(pdl);
         }
     }
@@ -851,7 +867,7 @@ SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identi
 {
     for (PluginDynamicLibrary& item : libraries)
     {
-        if (item.definition.identity.identifier == identifier)
+        if (item.definition.identity.identifier.view() == identifier)
         {
             return &item;
         }

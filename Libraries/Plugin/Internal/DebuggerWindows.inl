@@ -3,7 +3,6 @@
 #pragma once
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
-#include "../../Memory/Memory.h"
 #include "../../Strings/StringView.h"
 
 namespace SC
@@ -79,8 +78,8 @@ struct SC::Debugger::Internal
         StringView theFileDirectory;
         (void)theFile.splitAfter(theFileParsed.root, theFileDirectory);
 
-        void* nameMemory   = Memory::allocate(USHRT_MAX * sizeof(WCHAR), sizeof(WCHAR));
-        auto  deleteMemory = MakeDeferred([&] { Memory::release(nameMemory); });
+        void* nameMemory   = ::malloc(USHRT_MAX * sizeof(WCHAR));
+        auto  deleteMemory = MakeDeferred([&] { ::free(nameMemory); });
 
         Span<WCHAR> nameBuffer = {static_cast<WCHAR*>(nameMemory), USHRT_MAX};
 

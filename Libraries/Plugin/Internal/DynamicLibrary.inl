@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Memory/String.h"
 #include "DynamicLibrary.h"
 
 #if SC_PLATFORM_WINDOWS

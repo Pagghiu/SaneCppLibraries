@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
-#include "../Memory/Memory.h"
+#include "../Memory/Memory.h" // OPTIONAL DEPENDENCY
 #include "PluginHash.h"
 
 //

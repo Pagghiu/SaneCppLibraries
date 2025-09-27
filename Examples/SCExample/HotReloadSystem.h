@@ -80,7 +80,8 @@ struct HotReloadSystem
     {
         PluginDefinition       definitions[16];
         Span<PluginDefinition> definitionSpan;
-        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions, definitionSpan))
+        Buffer                 fileBuffer;
+        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions, fileBuffer, definitionSpan))
         SC_TRY(registry.replaceDefinitions(move(definitionSpan)));
         return Result(true);
     }
@@ -210,7 +211,7 @@ struct HotReloadView
                     ImGui::PopStyleColor();
                     if (ImGui::IsItemHovered())
                     {
-                        ImGui::SetTooltip("%s", library.lastErrorLog.view().bytesIncludingTerminator());
+                        ImGui::SetTooltip("%s", library.lastErrorLog.bytesIncludingTerminator());
                     }
                 }
 
@@ -280,7 +281,7 @@ struct HotReloadView
             ImGui::Text("Example %s failed to compile:",
                         library.definition.identity.name.view().bytesIncludingTerminator());
             ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
-            ImGui::Text("%s", library.lastErrorLog.view().bytesIncludingTerminator());
+            ImGui::Text("%s", library.lastErrorLog.bytesIncludingTerminator());
             ImGui::PopStyleColor();
         }
     }

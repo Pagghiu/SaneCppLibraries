@@ -3,7 +3,6 @@
 #pragma once
 #include "../Foundation/Function.h"
 #include "../Foundation/StringPath.h"
-#include "../Memory/String.h"
 #include "../Time/Time.h"
 #include "Internal/DynamicLibrary.h"
 
@@ -18,19 +17,21 @@ struct PluginCompiler;
 struct PluginCompilerEnvironment;
 struct PluginSysroot;
 struct PluginRegistry;
-using PluginIdentifier = String;
+template <int N>
+using FixedString       = detail::StringNativeFixed<N>;
+using PluginIdentifier  = FixedString<64>;
+using PluginBuildOption = FixedString<32>;
 
 template <typename T, size_t N>
 struct FixedVector
 {
-    T      values[N] = {};
-    size_t numValues = 0;
-
     constexpr size_t size() const { return numValues; }
     constexpr void   clear() { numValues = 0; }
 
     operator Span<const T>() const { return {values, numValues}; }
-    [[nodiscard]] constexpr bool contains(T value, size_t* outIndex = nullptr) const
+
+    template <typename U>
+    [[nodiscard]] constexpr bool contains(const U& value, size_t* outIndex = nullptr) const
     {
         for (size_t idx = 0; idx < numValues; ++idx)
         {
@@ -62,7 +63,12 @@ struct FixedVector
     constexpr const T* begin() const { return values; }
     constexpr const T* end() const { return values + numValues; }
     constexpr const T& operator[](size_t idx) const { return values[idx]; }
+
+  private:
+    T      values[N];
+    size_t numValues = 0;
 };
+
 //! @defgroup group_plugin Plugin
 //! @copybrief library_plugin (see @ref library_plugin for more details)
 //!
@@ -74,33 +80,34 @@ struct FixedVector
 /// @brief Holds path to a given plugin source file
 struct PluginFile
 {
-    String absolutePath; ///< Absolute path to a plugin source file
+    StringPath absolutePath; ///< Absolute path to a plugin source file
 };
 
 /// @brief Represents the unique signature / identity of a Plugin
 struct PluginIdentity
 {
     PluginIdentifier identifier; ///< Unique string identifying the plugin
-    String           name;       ///< Plugin name
-    String           version;    ///< Plugin version (x.y.z)
+    FixedString<64>  name;       ///< Plugin name
+    FixedString<16>  version;    ///< Plugin version (x.y.z)
 
     /// @brief Compares two plugins on Identity::identifier
     /// @param other Other plugin to compare
     /// @return `true` if the two plugins share the same identifier
-    bool operator==(const PluginIdentity& other) const { return identifier == other.identifier; }
+    bool operator==(const PluginIdentity& other) const { return identifier.view() == other.identifier.view(); }
 };
 
 /// @brief Plugin description, category, dependencies, files and directory location
 struct PluginDefinition
 {
-    PluginIdentity identity;    ///< Uniquely identifier a plugin
-    String         description; ///< Long description of plugin
-    String         category;    ///< Category where plugin belongs to
-    String         directory;   ///< Path to the directory holding the plugin
+    PluginIdentity identity; ///< Uniquely identifier a plugin
 
-    FixedVector<PluginIdentifier, 8> dependencies; ///< Dependencies necessary to load this plugin
-    FixedVector<String, 8>           build;        ///< Build options
-    FixedVector<PluginFile, 10>      files;        ///< Source files that compose this plugin
+    FixedString<256> description; ///< Long description of plugin
+    FixedString<64>  category;    ///< Category where plugin belongs to
+    StringPath       directory;   ///< Path to the directory holding the plugin
+
+    FixedVector<PluginIdentifier, 8>  dependencies; ///< Dependencies necessary to load this plugin
+    FixedVector<PluginBuildOption, 8> build;        ///< Build options
+    FixedVector<PluginFile, 10>       files;        ///< Source files that compose this plugin
 
     /// @brief Get main plugin file, holding plugin definition
     /// @return File holding main plugin definition
@@ -125,12 +132,12 @@ struct PluginDefinition
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled dynamic library from plugin
     /// @return Valid result if string can be allocated successfully
-    Result getDynamicLibraryAbsolutePath(String& fullDynamicPath) const;
+    Result getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const;
 
     /// @brief Gets absolute path of where compiled Program Database File will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled Program Database File from plugin
     /// @return Valid result if string can be allocated successfully
-    Result getDynamicLibraryPDBAbsolutePath(String& fullDynamicPath) const;
+    Result getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const;
 
   private:
     [[nodiscard]] static bool parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value);
@@ -145,10 +152,19 @@ struct PluginScanner
     /// @brief Scans a directory for PluginDefinition
     /// @param directory Root directory holding plugins (will recurse in subdirectories)
     /// @param definitionsStorage Storage to where to save PluginDefinition
+    /// @param tempFileBuffer Storage to save contents when reading source files
     /// @param foundDefinitions Parsed definitions (it's a slice of definitionsStorage)
     /// @return Valid result if the given directory is accessible and valid PluginDefinition can be parsed
-    [[nodiscard]] static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
-                                              Span<PluginDefinition>& foundDefinitions);
+    template <typename T>
+    static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
+                                T& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
+    {
+        return scanDirectory(directory, definitionsStorage, GrowableBuffer<T>{tempFileBuffer}, foundDefinitions);
+    }
+
+  private:
+    static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
+                                IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions);
 };
 
 /// @brief Compiles a plugin to a dynamic library
@@ -161,7 +177,7 @@ struct PluginCompiler
     /// @param compilerLog If provided, will receive the log output produced by the compiler
     /// @return Valid result if all files of given definition can be compiled to valid object files
     Result compile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                   const PluginCompilerEnvironment& environment, String& compilerLog) const;
+                   const PluginCompilerEnvironment& environment, Span<char>& compilerLog) const;
 
     /// @brief Links a Definition into a dynamic library, with symbols from `executablePath`
     /// @param definition A valid Definition already compiled with PluginCompiler::compile
@@ -171,7 +187,7 @@ struct PluginCompiler
     /// @param linkerLog If provided, will receive the log output produced by the linker
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
     Result link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                const PluginCompilerEnvironment& environment, StringView executablePath, String& linkerLog) const;
+                const PluginCompilerEnvironment& environment, StringView executablePath, Span<char>& linkerLog) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -199,7 +215,7 @@ struct PluginCompiler
 
     Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
                        const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
-                       StringView objectFile, String& compilerLog) const;
+                       StringView objectFile, Span<char>& compilerLog) const;
     struct Internal;
 };
 
@@ -235,7 +251,9 @@ struct PluginDynamicLibrary
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
     Time::Absolute       lastLoadTime;   ///< Last time when this plugin was last loaded
     uint32_t             numReloads;     ///< Number of times that the plugin has been hot-reloaded
-    String               lastErrorLog;   ///< Last error log of compiler / linker (if any)
+
+    char       errorStorage[1024 * 8] = {}; ///< Storage for last error log (below)
+    StringView lastErrorLog;                ///< Last error log of compiler / linker (if any)
 
     /// @brief Try to obtain a given interface as exported by a plugin through SC_PLUGIN_EXPORT_INTERFACES macro
     /// @param[out] outInterface Pointer to the interface that will be returned by the plugin, if it exists

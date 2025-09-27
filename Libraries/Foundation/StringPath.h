@@ -16,10 +16,10 @@ struct StringNativeFixed
     size_t        length = 0;
     native_char_t buffer[N];
 
-    [[nodiscard]] StringSpan view() const { return StringSpan({buffer, length}, true, StringEncoding::Native); }
-
-    [[nodiscard]] Span<native_char_t> writableSpan() { return {buffer, N}; }
-
+    [[nodiscard]] auto view() const { return StringSpan({buffer, length}, true, StringEncoding::Native); }
+    [[nodiscard]] bool isEmpty() const { return length == 0; }
+    [[nodiscard]] auto writableSpan() { return Span<native_char_t>{buffer, N}; }
+    [[nodiscard]] bool operator==(StringSpan other) const { return view() == other; }
     [[nodiscard]] bool assign(StringSpan str)
     {
         length = 0;

@@ -19,23 +19,22 @@ struct VisualStudioPathFinder
     {
         const StringView wsp = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
         if (FileSystem().exists(wsp))
-            vswherePath = wsp;
+            vsWherePath = wsp;
     }
 
     /// @brief Finds newest version of the installed Visual Studio instance(s)
     /// @param[out] vsPath Path where Visual Studio is installed
     /// @return Valid Result if a Visual Studio path has been found successfully
-    Result findLatest(String& vsPath)
+    Result findLatest(StringPath& vsPath)
     {
-        if (vswherePath.isEmpty())
+        if (vsWherePath.isEmpty())
             return Result::Error("Visual Studio Locator not found.");
 
-        String output = StringEncoding::Ascii;
-        if (not Process().exec({vswherePath, "-prerelease", "-latest", "-property", "installationPath"}, output))
+        StringPath output;
+        if (not Process().exec({vsWherePath, "-prerelease", "-latest", "-property", "installationPath"}, output))
             return Result::Error("Visual Studio Locator cannot be executed.");
 
-        vsPath = StringView(output.view()).trimEndAnyOf({'\r', '\n'});
-        return Result(true);
+        return Result(vsPath.assign(StringView(output.view()).trimEndAnyOf({'\r', '\n'})));
     }
 
     /// @brief Collects every Visual Studio version that installed on the current system
@@ -44,22 +43,29 @@ struct VisualStudioPathFinder
     template <typename Container>
     Result findAll(Container& vsPaths)
     {
-        if (vswherePath.isEmpty())
+        if (vsWherePath.isEmpty())
             return Result::Error("Visual Studio Locator not found.");
-
-        String output = StringEncoding::Ascii;
-        if (not Process().exec({vswherePath, "-prerelease", "-property", "installationPath"}, output))
+        char       outputStorage[MAX_PATH * 2 + 1];
+        Span<char> output = {outputStorage};
+        if (not Process().exec({vsWherePath, "-prerelease", "-property", "installationPath"}, output))
             return Result::Error("Visual Studio Locator cannot be executed.");
 
-        StringViewTokenizer tokenizer(output.view());
+        // TODO: Check if VSWhere output is actually UTF8
+        StringViewTokenizer tokenizer(StringView::fromNullTerminated(outputStorage, StringEncoding::Utf8));
         while (tokenizer.tokenizeNext('\n', StringViewTokenizer::SkipEmpty))
-            (void)vsPaths.push_back(tokenizer.component.trimEndAnyOf({'\r'}));
+        {
+            StringPath path;
+            if (path.assign(tokenizer.component.trimEndAnyOf({'\r'})))
+            {
+                SC_TRY(vsPaths.push_back(path));
+            }
+        }
 
         return Result(true);
     }
 
   private:
-    StringView vswherePath;
+    StringView vsWherePath;
 };
 
 //! @}

@@ -4,6 +4,8 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
+#include "Libraries/Memory/Buffer.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -41,10 +43,10 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(PluginDefinition::parse(extracted, definition));
             SC_TEST_EXPECT(definition.identity.name == "Test Plugin");
             SC_TEST_EXPECT(definition.identity.version == "1");
-            SC_TEST_EXPECT(definition.description == "A Simple text plugin");
-            SC_TEST_EXPECT(definition.category == "Generic");
-            SC_TEST_EXPECT(definition.dependencies[0] == "TestPluginChild");
-            SC_TEST_EXPECT(definition.dependencies[1] == "TestPlugin02");
+            SC_TEST_EXPECT(definition.description.view() == "A Simple text plugin");
+            SC_TEST_EXPECT(definition.category.view() == "Generic");
+            SC_TEST_EXPECT(definition.dependencies[0].view() == "TestPluginChild");
+            SC_TEST_EXPECT(definition.dependencies[1].view() == "TestPlugin02");
             SC_TEST_EXPECT(definition.build[0] == "libc");
             SC_TEST_EXPECT(definition.build[1] == "libc++");
         }
@@ -58,11 +60,15 @@ struct SC::PluginTest : public SC::TestCase
                 // Test that it fails with insufficient span
                 PluginDefinition       definitions[1];
                 Span<PluginDefinition> definitionsSpan;
-                SC_TEST_EXPECT(not PluginScanner::scanDirectory(testPluginsPath.view(), definitions, definitionsSpan));
+                Buffer                 fileStorage;
+                SC_TEST_EXPECT(not PluginScanner::scanDirectory(testPluginsPath.view(), definitions, fileStorage,
+                                                                definitionsSpan));
             }
             PluginDefinition       definitions[3];
             Span<PluginDefinition> definitionsSpan;
-            SC_TEST_EXPECT(PluginScanner::scanDirectory(testPluginsPath.view(), definitions, definitionsSpan));
+            Buffer                 fileStorage;
+            SC_TEST_EXPECT(
+                PluginScanner::scanDirectory(testPluginsPath.view(), definitions, fileStorage, definitionsSpan));
             SC_TEST_EXPECT(definitionsSpan.sizeInElements() == 2);
 
             // Save parent and child plugin identifiers and paths
@@ -249,7 +255,8 @@ struct PluginHost
         // Max 16 definitions, but you can use heap allocation if you need an arbitrary limit
         PluginDefinition       definitions[16];
         Span<PluginDefinition> definitionsSpan;
-        SC_TRY(PluginScanner::scanDirectory(pluginsPath.view(), definitions, definitionsSpan))
+        Buffer                 fileStorage;
+        SC_TRY(PluginScanner::scanDirectory(pluginsPath.view(), definitions, fileStorage, definitionsSpan))
         SC_TRY(registry.replaceDefinitions(move(definitionsSpan)));
         return Result(true);
     }
