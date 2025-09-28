@@ -232,16 +232,8 @@ def update_library_doc_statistics(library_name, root_dir, header_code_loc, heade
 | Sum       | {total_code_loc}\t\t\t| {total_comment_loc}\t\t| {total_loc}\t|
 """
 
-    # Find dependencies section to insert after
-    dep_section_pattern = r'(^# Dependencies\n(?:.*?\n)*?)(?=\n#|\Z)'
-    dep_match = re.search(dep_section_pattern, content, re.MULTILINE)
-
-    if dep_match:
-        dep_section = dep_match.group(0)
-        new_content = content.replace(dep_section, dep_section.rstrip() + stats_section)
-    else:
-        # If no dependencies section, append at the end
-        new_content = content.rstrip() + '\n\n' + stats_section.lstrip()
+    # Always append the statistics section at the end of the markdown page
+    new_content = content.rstrip() + '\n\n' + stats_section.lstrip()
 
     with open(doc_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
@@ -327,8 +319,8 @@ def update_libraries_md_table(lib_line_counts, root_dir):
     libraries_md_path = os.path.join(root_dir, 'Documentation', 'Pages', 'Libraries.md')
     update_table_loc_in_file(libraries_md_path, lib_line_counts, is_readme=False)
 
-    readme_md_path = os.path.join(root_dir, 'README.md')
-    update_table_loc_in_file(readme_md_path, lib_line_counts, is_readme=True)
+    # readme_md_path = os.path.join(root_dir, 'README.md')
+    # update_table_loc_in_file(readme_md_path, lib_line_counts, is_readme=True)
 
 def add_total_loc_after_table(file_path, total_loc_str, is_readme=False):
     if not os.path.isfile(file_path):
@@ -515,8 +507,8 @@ def main():
         libraries_md_path = os.path.join(root_dir, 'Documentation', 'Pages', 'Libraries.md')
         add_total_loc_after_table(libraries_md_path, total_loc_str, is_readme=False)
 
-        readme_md_path = os.path.join(root_dir, 'README.md')
-        add_total_loc_after_table(readme_md_path, total_loc_str, is_readme=True)
+        # readme_md_path = os.path.join(root_dir, 'README.md')
+        # add_total_loc_after_table(readme_md_path, total_loc_str, is_readme=True)
 
 if __name__ == '__main__':
     sys.exit(main())
