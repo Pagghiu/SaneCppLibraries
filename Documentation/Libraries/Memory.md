@@ -11,8 +11,10 @@
 Most classes have been originally part of the [Foundation](@ref library_foundation) library.
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation)
+- Dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](Memory.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

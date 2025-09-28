@@ -7,8 +7,10 @@
 [SaneCppTime.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTime.h) contains classes to measure time and compute or measure time intervals.
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation)
+- Dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](Time.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

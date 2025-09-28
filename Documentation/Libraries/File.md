@@ -7,8 +7,10 @@
 [TOC]
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation)
+- Dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](File.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

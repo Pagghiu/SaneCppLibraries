@@ -7,8 +7,10 @@
 [SaneCppFileSystemWatcher.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h) is a library that allows watching directories for changes that happen to them.  
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
+- Dependencies: [Threading](@ref library_threading)
 - All dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)
+
+![Dependency Graph](FileSystemWatcher.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

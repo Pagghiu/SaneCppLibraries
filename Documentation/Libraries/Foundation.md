@@ -9,8 +9,10 @@ As this is included and needed by almost every other library, it tries to keep b
 Detailed documentation is in the @ref group_foundation topic.
 
 # Dependencies
-- Direct dependencies: *(none)*
+- Dependencies: *(none)*
 - All dependencies: *(none)*
+
+![Dependency Graph](Foundation.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

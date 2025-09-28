@@ -10,8 +10,10 @@ Path is able to parse and manipulate windows and posix paths.
 @note SC::String and SC::SmallString, the "classic C++ style" string containers are defined in [Memory](@ref library_memory) because they are based on SC::Buffer and they use dynamic memory allocation provided by the Memory library.
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation)
+- Dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](Strings.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

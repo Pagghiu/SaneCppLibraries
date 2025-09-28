@@ -9,8 +9,10 @@
 @note Even if the state machine is not strictly depending on @ref library_async, most practical uses of this library will be using it, so it can be considered an extension of @ref library_async
 
 # Dependencies
-- Direct dependencies: [Async](@ref library_async), [Foundation](@ref library_foundation)
+- Dependencies: [Async](@ref library_async)
 - All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
+
+![Dependency Graph](AsyncStreams.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

@@ -9,8 +9,10 @@
 @note You need to include headers from [Serialization Adapters](@ref library_containers_serialization) in order to use `SC::Vector` or `SC::String` or any other reflect-able class provided by other libraries with this one.
 
 # Dependencies
-- Direct dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- Dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](Reflection.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

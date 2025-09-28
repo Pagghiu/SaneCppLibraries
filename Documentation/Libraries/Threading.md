@@ -7,8 +7,10 @@
 [SaneCppThreading.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppThreading.h) is a library defining basic primitives for user-space threading and synchronization.
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation)
+- Dependencies: [Foundation](@ref library_foundation)
 - All dependencies: [Foundation](@ref library_foundation)
+
+![Dependency Graph](Threading.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

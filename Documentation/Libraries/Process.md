@@ -11,8 +11,10 @@
 \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessQuickSheetSnippet
 
 # Dependencies
-- Direct dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
+- Dependencies: [File](@ref library_file)
 - All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
+
+![Dependency Graph](Process.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

@@ -7,8 +7,10 @@
 [TOC]
 
 # Dependencies
-- Direct dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- Dependencies: [Memory](@ref library_memory)
 - All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+
+![Dependency Graph](Containers.svg)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
