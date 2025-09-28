@@ -63,4 +63,4 @@ alternatively if you have node.js installed run:
 node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
 ```
 
-As a third alternative you can use [SingleFileLibs](@ref page_single_file_libs)
+As a third alternative you can assemble them in the browser at the [SingleFileLibs](@ref page_single_file_libs) page
