@@ -26,6 +26,7 @@ Features and workflow (step by step):
 9. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
 10. Computes ranks for layering libraries in the dependency graph (Foundation at bottom, then layers based on minimal dependencies).
 11. Writes dependencies to Documentation/Pages/Dependencies.dot in DOT format with layered ranks for visualization using Graphviz (you can generate an image with: `dot -Tpng Documentation/Pages/Dependencies.dot -o Documentation/Pages/Dependencies.png`).
+12. Writes dependencies to Documentation/Pages/Dependencies.html as an interactive HTML graph using vis.js with layered layout, click highlighting, and multiple selection support.
 
 Usage:
     python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]
@@ -41,6 +42,7 @@ import library_scanner
 import include_parser
 import dependency_calculator
 import output_generator
+import interactive_dependencies
 
 
 def main():
@@ -65,6 +67,9 @@ def main():
     transitive_map = dependency_calculator.compute_transitive_dependencies(dep_map)
     minimal_map = dependency_calculator.compute_minimal_dependencies(dep_map, transitive_map)
 
+    # Compute reverse dependencies
+    reverse_map = dependency_calculator.compute_reverse_dependencies(dep_map)
+
     # Compute ranks
     rank_map, ranks = dependency_calculator.compute_ranks(minimal_map)
 
@@ -72,6 +77,7 @@ def main():
     output_generator.write_markdown(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
     output_generator.write_json(PROJECT_ROOT, libraries, dep_map, transitive_map, minimal_map)
     output_generator.write_dot(PROJECT_ROOT, minimal_map, rank_map, ranks)
+    interactive_dependencies.write_interactive_html(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map, reverse_map, rank_map, ranks)
 
 
 if __name__ == '__main__':

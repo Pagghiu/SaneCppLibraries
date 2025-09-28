@@ -58,6 +58,8 @@ def write_markdown(project_root, libraries, dep_map, minimal_map, transitive_map
     with open(output_path, 'w', encoding='utf-8') as out:
         out.write('@page page_dependencies Dependencies\n')
         out.write('This file describes what each library depends on.\n\n')
+        out.write('# Interactive Dependencies\n\n')
+        out.write('@htmlinclude Documentation/Pages/Dependencies.html\n\n\n')
         for lib in sorted(libraries):
             minimal = minimal_map[lib]
             all_deps = transitive_map[lib]

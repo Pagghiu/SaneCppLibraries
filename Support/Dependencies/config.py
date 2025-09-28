@@ -16,6 +16,7 @@ OPTIONAL_DEPENDENCY_MARKER = '// OPTIONAL DEPENDENCY'
 OUTPUT_MD = os.path.join('Documentation', 'Pages', 'Dependencies.md')
 OUTPUT_JSON = os.path.join('Support', 'Dependencies', 'Dependencies.json')
 OUTPUT_DOT = os.path.join('Documentation', 'Pages', 'Dependencies.dot')
+OUTPUT_HTML = os.path.join('Documentation', 'Pages', 'Dependencies.html')
 
 # Directories
 LIBRARIES_DIR = 'Libraries'

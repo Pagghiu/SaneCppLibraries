@@ -37,6 +37,18 @@ def compute_minimal_dependencies(dep_map, transitive_map):
     return {lib: get_minimal(lib) for lib in dep_map}
 
 
+def compute_reverse_dependencies(dep_map):
+    """
+    Computes reverse dependencies (who depends on whom).
+    """
+    reverse_map = defaultdict(set)
+    for lib in sorted(dep_map.keys()):
+        deps = dep_map[lib]
+        for dep in sorted(list(deps)):
+            reverse_map[dep].add(lib)
+    return dict(reverse_map)
+
+
 def compute_ranks(minimal_map):
     """
     Computes ranks for layering libraries in the dependency graph.
