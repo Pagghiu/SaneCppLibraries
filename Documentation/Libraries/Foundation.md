@@ -4,7 +4,7 @@
 
 [TOC]
 
-Foundation library provides many fundamental type definitions and types widely used by other libraries.  
+[SaneCppFoundation.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFoundation.h) is a library that provides many fundamental type definitions and types widely used by other libraries.  
 As this is included and needed by almost every other library, it tries to keep bloat to the bare minimum.  
 Detailed documentation is in the @ref group_foundation topic.
 

@@ -4,7 +4,7 @@
 
 [TOC]
 
-SC::FileSystemWatcher allows watching directories for changes that happen to them.  
+[SaneCppFileSystemWatcher.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h) is a library that allows watching directories for changes that happen to them.  
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation), [Threading](@ref library_threading)

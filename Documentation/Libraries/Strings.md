@@ -4,11 +4,10 @@
 
 [TOC]
 
-Strings library allow read-only and write string operations and UTF Conversions.
+[SaneCppStrings.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppStrings.h) library allow read-only and write string operations and UTF Conversions.
 Path is able to parse and manipulate windows and posix paths.
 
 @note SC::String and SC::SmallString, the "classic C++ style" string containers are defined in [Memory](@ref library_memory) because they are based on SC::Buffer and they use dynamic memory allocation provided by the Memory library.
-
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation)

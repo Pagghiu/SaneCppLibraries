@@ -4,7 +4,7 @@
 
 [TOC]
 
-@copydetails group_socket
+[SaneCppSocket.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSocket.h) is a library implementing synchronous socket networking and DNS lookup.
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation)
@@ -26,6 +26,10 @@
 | SC::SocketIPAddress       | @copybrief SC::SocketIPAddress    |
 | SC::SocketDNS             | @copybrief SC::SocketDNS          |
 | SC::SocketNetworking      | @copybrief SC::SocketNetworking   |
+
+# Details
+
+@copydetails group_socket
 
 # Status
 

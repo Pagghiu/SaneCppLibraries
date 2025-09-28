@@ -4,7 +4,7 @@
 
 [TOC]
 
-Plugin library allows extending application compiling C++ source to executable code at runtime.
+[SaneCppPlugin.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppPlugin.h) is a library that allows extending application compiling C++ source to executable code at runtime.
 
 # Quick Sheet
 

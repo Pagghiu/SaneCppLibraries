@@ -4,9 +4,9 @@
 
 [TOC]
 
-Memory library helps tracking and limiting runtime / dynamic allocations through the use of custom allocators.
+[SaneCppMemory.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppMemory.h) is library tracking and limiting runtime / dynamic allocations through the use of custom allocators.
 
-If a library doesn't directly or indirectly depend on the Memory library, you can assume that it will not do any runtime / dynamic allocation.
+@note If a library doesn't directly or indirectly depend on the Memory library, you can assume that it will not do any runtime / dynamic allocation.
 
 Most classes have been originally part of the [Foundation](@ref library_foundation) library.
 

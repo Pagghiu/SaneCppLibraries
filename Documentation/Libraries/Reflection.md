@@ -4,7 +4,7 @@
 
 [TOC]
 
-@copydetails group_reflection
+[SaneCppReflection.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppReflection.h) is a library building a compile time schema describing a struct with the main objective of serialization.
 
 @note You need to include headers from [Serialization Adapters](@ref library_containers_serialization) in order to use `SC::Vector` or `SC::String` or any other reflect-able class provided by other libraries with this one.
 
@@ -20,6 +20,7 @@
 | Sum       | 684			| 310		| 994	|
 
 # Features
+
 - Reflection info is built at compile time
 - Free of heap allocations
 - Describe primitive types
@@ -27,6 +28,10 @@
 - Describe SC::Vector, SC::VectorMap, SC::Array, SC::String
 - Describe Structs composition of any supported type
 - Identify types that can be serialized with a single memcpy
+
+# Details
+
+@copydetails group_reflection
 
 # Status
 

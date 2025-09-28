@@ -4,7 +4,7 @@
 
 [TOC]
 
-Threading is a library defining basic primitives for user-space threading and synchronization.
+[SaneCppThreading.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppThreading.h) is a library defining basic primitives for user-space threading and synchronization.
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation)

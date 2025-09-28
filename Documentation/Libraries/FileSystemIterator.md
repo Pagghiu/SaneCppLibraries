@@ -4,7 +4,7 @@
 
 [TOC]
 
-SC::FileSystemIterator enumerates files and directories at a given path.
+[SaneCppFileSystemIterator.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemIterator.h) is a library that enumerates files and directories at a given path.
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation)

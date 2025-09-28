@@ -4,7 +4,7 @@
 
 [TOC]
 
-@copydetails group_serialization_text
+[SaneCppSerializationText.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSerializationText.h) implements binary serialization on top of the [Reflection](@ref library_reflection) library.
 
 @note You need to include headers from [Serialization Adapters](@ref library_containers_serialization) in order to use `SC::Vector` or `SC::String` or any other serializable class provided by other libraries with this one.
 
@@ -25,6 +25,10 @@
 - Serialize SC::Vector, SC::Array, SC::String
 - Serialize `T[N]` arrays
 - Serialize structs made of above types or other structs
+
+# Details
+
+@copydetails group_serialization_text
 
 # Status
 

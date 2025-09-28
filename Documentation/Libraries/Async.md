@@ -4,9 +4,7 @@
 
 [TOC]
 
-Async is a multi-platform / event-driven asynchronous I/O library.  
-
-@copydetails group_async
+[SaneCppAsync.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h) is a multi-platform / event-driven asynchronous I/O library.  
 
 @note
 Check @ref library_async_streams for an higher level construct when streaming data
@@ -43,6 +41,10 @@ This is the list of supported async operations:
 | [AsyncFilePoll](@ref SC::AsyncFilePoll)                       | @copybrief SC::AsyncFilePoll              |
 | [AsyncSequence](@ref SC::AsyncSequence)                       | @copybrief SC::AsyncSequence              |
 | [AsyncFileSystemOperation](@ref SC::AsyncFileSystemOperation) | @copybrief SC::AsyncFileSystemOperation   |
+
+# Details
+
+@copydetails group_async
 
 # Status
 🟨 MVP  

@@ -4,7 +4,7 @@
 
 [TOC]
 
-Library contains classes to measure time and compute or measure time intervals.
+[SaneCppTime.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTime.h) contains classes to measure time and compute or measure time intervals.
 
 # Dependencies
 - Direct dependencies: [Foundation](@ref library_foundation)

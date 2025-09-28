@@ -4,7 +4,7 @@
 
 [TOC]
 
-SC::FileSystemWatcherAsync is an implementation of SC::FileSystemWatcher that uses SC::Async to deliver notifications.
+[SaneCppFileSystemWatcherAsync.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcherAsync.h) is an implementation of SC::FileSystemWatcher that uses SC::AsyncEventLoop to deliver notifications.
 
 # Dependencies
 - Direct dependencies: [Async](@ref library_async), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation)

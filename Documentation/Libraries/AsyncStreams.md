@@ -4,11 +4,9 @@
 
 [TOC]
 
-Async Streams read and write data concurrently from async sources to destinations.
+[SaneCppAsyncStreams.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsyncStreams.h) is a library that reads and writes data concurrently from async sources to destinations.
 
 @note Even if the state machine is not strictly depending on @ref library_async, most practical uses of this library will be using it, so it can be considered an extension of @ref library_async
-
-@copydetails group_async_streams
 
 # Dependencies
 - Direct dependencies: [Async](@ref library_async), [Foundation](@ref library_foundation)
@@ -37,6 +35,9 @@ This is the list of implemented objects stream types
 | [ReadableSocketStream](@ref SC::ReadableSocketStream) | @copybrief SC::ReadableSocketStream   |
 | [WritableSocketStream](@ref SC::WritableSocketStream) | @copybrief SC::WritableSocketStream   |
 
+# Details
+
+@copydetails group_async_streams
 
 # Status
 🟨 MVP  

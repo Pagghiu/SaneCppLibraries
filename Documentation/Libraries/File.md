@@ -2,7 +2,7 @@
 
 @brief 🟩 Synchronous Disk File I/O
 
-File library allows synchronous I/O operations on files and pipes.  
+[SaneCppFile.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFile.h) is a library implementing synchronous I/O operations on files and pipes.  
 
 [TOC]
 
@@ -16,6 +16,7 @@ File library allows synchronous I/O operations on files and pipes.
 | Headers   | 97			| 129		| 226	|
 | Sources   | 639			| 106		| 745	|
 | Sum       | 736			| 235		| 971	|
+
 
 # Features
 | SC::FileDescriptor                        | @copybrief SC::FileDescriptor                         |
