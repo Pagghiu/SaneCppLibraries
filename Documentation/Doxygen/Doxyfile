@@ -12,7 +12,9 @@ DISTRIBUTE_GROUP_DOC   = YES
 SHOW_GROUPED_MEMB_INC  = YES
 SORT_GROUP_NAMES       = YES
 WARN_AS_ERROR          = YES
-INPUT                  = ../../Documentation/Pages \
+INPUT                  = ../../_Build/_Dependencies/Dependencies.md \
+                         ../../_Build/_Dependencies/Dependencies.svg \
+                         ../../Documentation/Pages \
                          ../../Documentation/Libraries \
                          ../../Documentation/LibrariesExtra \
                          ../../Libraries/Async \
@@ -102,8 +104,33 @@ HTML_EXTRA_FILES       = ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_P
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-custom/toggle-alternative-theme.js \
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-awesome-interactive-toc.js \
                          ../../_Build/_Packages/doxygen-awesome-css_$(PACKAGES_PLATFORM)/doxygen-awesome-tabs.js\
+                         ../../_Build/_Dependencies/Dependencies.dot \
+                         ../../_Build/_Dependencies/Dependencies.svg \
+                         ../../_Build/_Dependencies/Dependencies.html \
                          ../../Support/Dependencies/Dependencies.json \
-                         ../../Documentation/Pages/Dependencies.html \
+                         ../../_Build/_Dependencies/Async.svg \
+                         ../../_Build/_Dependencies/AsyncStreams.svg \
+                         ../../_Build/_Dependencies/Containers.svg \
+                         ../../_Build/_Dependencies/ContainersSerialization.svg \
+                         ../../_Build/_Dependencies/File.svg \
+                         ../../_Build/_Dependencies/FileSystem.svg \
+                         ../../_Build/_Dependencies/FileSystemIterator.svg \
+                         ../../_Build/_Dependencies/FileSystemWatcher.svg \
+                         ../../_Build/_Dependencies/FileSystemWatcherAsync.svg \
+                         ../../_Build/_Dependencies/Foundation.svg \
+                         ../../_Build/_Dependencies/Hashing.svg \
+                         ../../_Build/_Dependencies/Http.svg \
+                         ../../_Build/_Dependencies/Memory.svg \
+                         ../../_Build/_Dependencies/Plugin.svg \
+                         ../../_Build/_Dependencies/Process.svg \
+                         ../../_Build/_Dependencies/Reflection.svg \
+                         ../../_Build/_Dependencies/SerializationBinary.svg \
+                         ../../_Build/_Dependencies/SerializationText.svg \
+                         ../../_Build/_Dependencies/Socket.svg \
+                         ../../_Build/_Dependencies/Strings.svg \
+                         ../../_Build/_Dependencies/Testing.svg \
+                         ../../_Build/_Dependencies/Threading.svg \
+                         ../../_Build/_Dependencies/Time.svg \                         
                          ../../Support/SingleFileLibs/SaneCppFoundation.json \
                          ../../Support/SingleFileLibs/javascript/single_file_libs.html \
                          ../../Support/SingleFileLibs/javascript/app.js \

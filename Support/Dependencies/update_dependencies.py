@@ -26,14 +26,16 @@ Features and workflow (step by step):
 9. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
 10. Computes ranks for layering libraries in the dependency graph (Foundation at bottom, then layers based on minimal dependencies).
 11. Writes dependencies to Documentation/Pages/Dependencies.dot in DOT format with layered ranks for visualization using Graphviz (you can generate an image with: `dot -Tpng Documentation/Pages/Dependencies.dot -o Documentation/Pages/Dependencies.png`).
-12. Writes dependencies to Documentation/Pages/Dependencies.html as an interactive HTML graph using vis.js with layered layout, click highlighting, and multiple selection support.
+12. Writes individual DOT files for each library in _Build/_Dependencies/ for per-library dependency graphs.
+13. Automatically generates SVG files from all DOT files using Graphviz dot command.
+14. Writes dependencies to Documentation/Pages/Dependencies.html as an interactive HTML graph using vis.js with layered layout, click highlighting, and multiple selection support.
 
 Usage:
     python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]
 
 If <SANE_CPP_LIBRARIES_ROOT> is not provided, the current directory is used.
 
-This will update Documentation/Pages/Dependencies.md, the # Dependencies sections of each library's documentation file, create Support/Dependencies/Dependencies.json, and generate Documentation/Pages/Dependencies.dot for graph visualization.
+This will update Documentation/Pages/Dependencies.md, the # Dependencies sections of each library's documentation file, create Support/Dependencies/Dependencies.json, generate Documentation/Pages/Dependencies.dot and individual library DOT files for graph visualization, and automatically create SVG files from all DOT files.
 """
 import os
 import sys
@@ -77,6 +79,8 @@ def main():
     output_generator.write_markdown(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
     output_generator.write_json(PROJECT_ROOT, libraries, dep_map, transitive_map, minimal_map)
     output_generator.write_dot(PROJECT_ROOT, minimal_map, rank_map, ranks)
+    output_generator.write_individual_dots(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
+    output_generator.generate_svgs(PROJECT_ROOT)
     interactive_dependencies.write_interactive_html(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map, reverse_map, rank_map, ranks)
 
 

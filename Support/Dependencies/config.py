@@ -13,10 +13,10 @@ INCLUDE_PATTERN = r'#include\s+"(?:\.\./)+([A-Za-z0-9_]+)/'
 OPTIONAL_DEPENDENCY_MARKER = '// OPTIONAL DEPENDENCY'
 
 # Output file paths (relative to project root)
-OUTPUT_MD = os.path.join('Documentation', 'Pages', 'Dependencies.md')
+OUTPUT_MD = os.path.join('_Build', '_Dependencies', 'Dependencies.md')
 OUTPUT_JSON = os.path.join('Support', 'Dependencies', 'Dependencies.json')
-OUTPUT_DOT = os.path.join('Documentation', 'Pages', 'Dependencies.dot')
-OUTPUT_HTML = os.path.join('Documentation', 'Pages', 'Dependencies.html')
+OUTPUT_DOT = os.path.join('_Build', '_Dependencies', 'Dependencies.dot')
+OUTPUT_HTML = os.path.join('_Build', '_Dependencies', 'Dependencies.html')
 
 # Directories
 LIBRARIES_DIR = 'Libraries'

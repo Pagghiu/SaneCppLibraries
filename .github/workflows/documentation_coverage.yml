@@ -35,12 +35,16 @@ jobs:
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: Generate Single File Libs (Javascript)
       run: node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
-    - name: Check if Single File Libs are equal
-      run: python3 Support/SingleFileLibs/check_if_equal.py _Build/_SingleFileLibraries _Build/_SingleFileLibrariesJS
-    - name: install
+    - name: install graphviz
       run: |
         sudo apt-get update
-        sudo apt-get install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev
+        sudo apt-get install -y graphviz
+    - name: Generate Dependencies
+      run: python3 Support/Dependencies/update_dependencies.py
+    - name: Check if Single File Libs are equal
+      run: python3 Support/SingleFileLibs/check_if_equal.py _Build/_SingleFileLibraries _Build/_SingleFileLibrariesJS
+    - name: install dependencies
+      run: sudo apt-get install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev graphviz
     - name: clang-format
       run: ./SC.sh format check
     - name: build documentation

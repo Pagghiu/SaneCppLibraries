@@ -4,6 +4,7 @@ Module for generating output files: Markdown, JSON, DOT, and updating library do
 import os
 import re
 import json
+import subprocess
 import config
 
 
@@ -33,7 +34,8 @@ def update_library_md(project_root, lib, direct_deps, minimal_deps, all_deps):
     content = dep_section_pattern.sub('', content)
 
     # Prepare new section
-    dep_section = f'# Dependencies\n- Dependencies: {format_deps(minimal_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n'
+    svg_path = f'{lib}.svg'
+    dep_section = f'# Dependencies\n- Dependencies: {format_deps(minimal_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n![Dependency Graph]({svg_path})\n\n'
 
     # Insert before # Statistics or # Features, or at end
     stats_match = re.search(r'^# Statistics', content, re.MULTILINE)
@@ -55,18 +57,22 @@ def update_library_md(project_root, lib, direct_deps, minimal_deps, all_deps):
 def write_markdown(project_root, libraries, dep_map, minimal_map, transitive_map):
     """Writes the main Dependencies.md file."""
     output_path = os.path.join(project_root, config.OUTPUT_MD)
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as out:
         out.write('@page page_dependencies Dependencies\n')
         out.write('This file describes what each library depends on.\n\n')
-        out.write('# Interactive Dependencies\n\n')
-        out.write('@htmlinclude Documentation/Pages/Dependencies.html\n\n\n')
+        out.write('# Dependencies\n\n')
+        out.write('![Dependency Graph](Dependencies.svg)\n\n\n')
+        out.write('# Dependencies (interactive visualization)\n\n')
+        out.write('@htmlinclude _Build/_Dependencies/Dependencies.html\n\n\n')
         for lib in sorted(libraries):
             minimal = minimal_map[lib]
             all_deps = transitive_map[lib]
-            out.write(f'# [{lib}](@ref library_{camel_to_snake(lib)})\n')
-            out.write(f'- Dependencies: {format_deps(minimal)}\n')
-            out.write(f'- All dependencies: {format_deps(all_deps)}\n')
-            out.write('\n')
+            # out.write(f'# [{lib}](@ref library_{camel_to_snake(lib)})\n')
+            # out.write(f'- Dependencies: {format_deps(minimal)}\n')
+            # out.write(f'- All dependencies: {format_deps(all_deps)}\n')
+            # out.write('\n')
             # Update library's own .md
             update_library_md(project_root, lib, dep_map[lib], minimal, all_deps)
     print(f"Dependency file written to {output_path}")
@@ -90,6 +96,8 @@ def write_json(project_root, libraries, dep_map, transitive_map, minimal_map):
 def write_dot(project_root, minimal_map, rank_map, ranks):
     """Writes Dependencies.dot for Graphviz."""
     output_path = os.path.join(project_root, config.OUTPUT_DOT)
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('digraph LibraryDependencies {\n')
         f.write('  node [shape=box];\n')
@@ -113,3 +121,51 @@ def write_dot(project_root, minimal_map, rank_map, ranks):
                 f.write(f'  {lib} -> {dep};\n')
         f.write('}\n')
     print(f"DOT file written to {output_path}")
+
+
+def write_individual_dots(project_root, libraries, dep_map, minimal_map, transitive_map):
+    """Writes individual DOT files for each library."""
+    output_dir = os.path.join(project_root, '_Build', '_Dependencies')
+    os.makedirs(output_dir, exist_ok=True)
+    for lib in sorted(libraries):
+        output_path = os.path.join(output_dir, f'{lib}.dot')
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write(f'digraph {lib}Dependencies {{\n')
+            f.write('  node [shape=box];\n')
+            f.write('  splines=line;\n')
+            f.write('\n')
+            # Nodes: the library and its transitive dependencies
+            all_nodes = {lib} | set(transitive_map[lib])
+            for node in sorted(all_nodes):
+                f.write(f'  {node};\n')
+            f.write('\n')
+            # Edges: lib to its minimal deps, then deps to their minimal deps
+            edges = set()
+            # First, lib to minimal deps
+            for dep in sorted(minimal_map[lib]):
+                edges.add((lib, dep))
+            # Then, for all nodes in transitive deps, add their minimal deps if within subgraph
+            for node in sorted(transitive_map[lib]):
+                for dep in sorted(minimal_map.get(node, [])):
+                    if dep in all_nodes:
+                        edges.add((node, dep))
+            for src, dst in sorted(edges):
+                f.write(f'  {src} -> {dst};\n')
+            f.write('}\n')
+        print(f"Individual DOT file written to {output_path}")
+
+
+def generate_svgs(project_root):
+    """Generates SVG files from all DOT files using Graphviz dot command."""
+    dot_dir = os.path.join(project_root, '_Build', '_Dependencies')
+    if not os.path.exists(dot_dir):
+        return
+    for filename in os.listdir(dot_dir):
+        if filename.endswith('.dot'):
+            dot_path = os.path.join(dot_dir, filename)
+            svg_path = dot_path.replace('.dot', '.svg')
+            result = subprocess.run(['dot', '-Tsvg', dot_path, '-o', svg_path], capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"Generated SVG: {svg_path}")
+            else:
+                print(f"Failed to generate SVG for {dot_path}: {result.stderr}")

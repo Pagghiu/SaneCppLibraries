@@ -11,6 +11,8 @@ def write_interactive_html(project_root, libraries, dep_map, minimal_map, transi
     Generates interactive HTML file for dependency graph.
     """
     output_path = os.path.join(project_root, config.OUTPUT_HTML)
+    # Create output directory if it doesn't exist
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     # Prepare data for JavaScript
     nodes = []
