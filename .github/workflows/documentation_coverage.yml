@@ -39,6 +39,8 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y graphviz
+    - name: Check Dependencies
+      run: python3 Support/Dependencies/update_dependencies.py --check
     - name: Generate Dependencies
       run: python3 Support/Dependencies/update_dependencies.py
     - name: Check if Single File Libs are equal

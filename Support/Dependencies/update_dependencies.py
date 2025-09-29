@@ -14,7 +14,7 @@ Features and workflow (step by step):
 4. Builds a direct dependency map for each library.
 5. Computes all (direct + indirect) dependencies for each library using a transitive closure.
 6. Computes minimal dependencies for each library (minimal set of direct dependencies that are not implied by others).
-7. Writes the results to Documentation/Pages/Dependencies.md in Markdown format, listing for each library:
+7. Writes the results to Dependencies.md in Markdown format, listing for each library:
    - Direct dependencies
    - Minimal dependencies
    - All dependencies (direct + indirect)
@@ -25,35 +25,42 @@ Features and workflow (step by step):
    - Naming conventions are consistent between library name, file name, and link references.
 9. Writes dependencies to Support/Dependencies/Dependencies.json in JSON format.
 10. Computes ranks for layering libraries in the dependency graph (Foundation at bottom, then layers based on minimal dependencies).
-11. Writes dependencies to Documentation/Pages/Dependencies.dot in DOT format with layered ranks for visualization using Graphviz (you can generate an image with: `dot -Tpng Documentation/Pages/Dependencies.dot -o Documentation/Pages/Dependencies.png`).
+11. Writes dependencies to Dependencies.dot in DOT format with layered ranks for visualization using Graphviz (you can generate an image with: `dot -Tpng Dependencies.dot -o Dependencies.png`).
 12. Writes individual DOT files for each library in _Build/_Dependencies/ for per-library dependency graphs.
 13. Automatically generates SVG files from all DOT files using Graphviz dot command.
-14. Writes dependencies to Documentation/Pages/Dependencies.html as an interactive HTML graph using vis.js with layered layout, click highlighting, and multiple selection support.
+14. Writes dependencies to Dependencies.html as an interactive HTML graph using vis.js with layered layout, click highlighting, and multiple selection support.
 
 Usage:
-    python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]
+    python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>] [--check]
+
+Options:
+    --check    Check if dependencies match existing Dependencies.json without updating files.
+               Exits with error code 1 if changes are detected.
 
 If <SANE_CPP_LIBRARIES_ROOT> is not provided, the current directory is used.
 
-This will update Documentation/Pages/Dependencies.md, the # Dependencies sections of each library's documentation file, create Support/Dependencies/Dependencies.json, generate Documentation/Pages/Dependencies.dot and individual library DOT files for graph visualization, and automatically create SVG files from all DOT files.
+This will update Dependencies.md, the # Dependencies sections of each library's documentation file, create Support/Dependencies/Dependencies.json, generate Dependencies.dot and individual library DOT files for graph visualization, and automatically create SVG files from all DOT files.
 """
 import os
 import sys
+import argparse
 
 import library_scanner
 import include_parser
 import dependency_calculator
 import output_generator
 import interactive_dependencies
+import check_dependencies
 
 
 def main():
-    if len(sys.argv) > 2:
-        print("Usage: python3 update_dependencies.py [<SANE_CPP_LIBRARIES_ROOT>]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Update dependencies for Sane C++ Libraries.")
+    parser.add_argument('project_root', nargs='?', default=None, help="Path to the project root (default: auto-detect)")
+    parser.add_argument('--check', action='store_true', help="Check if dependencies match existing Dependencies.json without updating")
+    args = parser.parse_args()
 
-    if len(sys.argv) == 2:
-        PROJECT_ROOT = os.path.abspath(sys.argv[1])
+    if args.project_root:
+        PROJECT_ROOT = os.path.abspath(args.project_root)
     else:
         # Assume the script is in Support/Dependencies, project root is two levels up
         script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -69,19 +76,23 @@ def main():
     transitive_map = dependency_calculator.compute_transitive_dependencies(dep_map)
     minimal_map = dependency_calculator.compute_minimal_dependencies(dep_map, transitive_map)
 
-    # Compute reverse dependencies
-    reverse_map = dependency_calculator.compute_reverse_dependencies(dep_map)
+    if args.check:
+        if not check_dependencies.check_dependencies(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map):
+            sys.exit(1)
+    else:
+        # Compute reverse dependencies
+        reverse_map = dependency_calculator.compute_reverse_dependencies(dep_map)
 
-    # Compute ranks
-    rank_map, ranks = dependency_calculator.compute_ranks(minimal_map)
+        # Compute ranks
+        rank_map, ranks = dependency_calculator.compute_ranks(minimal_map)
 
-    # Write outputs
-    output_generator.write_markdown(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
-    output_generator.write_json(PROJECT_ROOT, libraries, dep_map, transitive_map, minimal_map)
-    output_generator.write_dot(PROJECT_ROOT, minimal_map, rank_map, ranks)
-    output_generator.write_individual_dots(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
-    output_generator.generate_svgs(PROJECT_ROOT)
-    interactive_dependencies.write_interactive_html(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map, reverse_map, rank_map, ranks)
+        # Write outputs
+        output_generator.write_markdown(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
+        output_generator.write_json(PROJECT_ROOT, libraries, dep_map, transitive_map, minimal_map)
+        output_generator.write_dot(PROJECT_ROOT, minimal_map, rank_map, ranks)
+        output_generator.write_individual_dots(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map)
+        output_generator.generate_svgs(PROJECT_ROOT)
+        interactive_dependencies.write_interactive_html(PROJECT_ROOT, libraries, dep_map, minimal_map, transitive_map, reverse_map, rank_map, ranks)
 
 
 if __name__ == '__main__':

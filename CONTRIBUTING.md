@@ -21,12 +21,10 @@ And very importantly, try your best to be nice when interacting with other peopl
 
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)
 - [X](https://x.com/pagghiu_) `@pagghiu_`
-- [Mastodon](https://mastodon.gamedev.place/@pagghiu) `@pagghiu`
 - [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
 
 Alternatively I am also reading the following discords too:
 - [Italian C++ Discord](https://discord.gg/GPATr8QxfS) (`@Pagghiu` from any appropriate channel or just a DM, english and italian are both fine)
-- [Handmade Network Discord](https://discord.gg/hmn) (`@Pagghiu` from any appropriate channel or just a DM)
 
 ## Finding something to do
 
@@ -66,6 +64,12 @@ It's also positively accepted any use of existing Operating System API (properly
 > Exceptions will need to be made on `Linux` as some functionality is not part of the kernel, and presence of a given user-land library is not guaranteed.  
 The exact mechanism to deliver such dependencies is still to be investigated,  defined and regulated.
 In any case Linux dependencies will need to be wrapped so that they will still not require or impose any build system. 
+
+## No accidental (internal) dependencies
+
+This project also tries hard to keep each library independent from others, so that it can be more easily consumed as a SingleFile Library.  
+Do not add new internal dependencies unless they've been widely discussed in any of the `Discussing` channels and approved prior to sending the PR.  
+An automatic check on the CI prevents the accidental inclusion of unneeded dependencies.
 
 ## OS Specific code
 
