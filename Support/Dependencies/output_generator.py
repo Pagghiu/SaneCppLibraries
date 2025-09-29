@@ -29,26 +29,34 @@ def update_library_md(project_root, lib, direct_deps, minimal_deps, all_deps):
     with open(md_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-    # Remove existing # Dependencies section
-    dep_section_pattern = re.compile(r'(^# Dependencies\n(?:.*?\n)*?)(?=^# |\Z)', re.MULTILINE)
-    content = dep_section_pattern.sub('', content)
-
     # Prepare new section
     svg_path = f'{lib}.svg'
-    dep_section = f'# Dependencies\n- Dependencies: {format_deps(minimal_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n![Dependency Graph]({svg_path})\n\n'
+    dep_section = f'# Dependencies\n- Dependencies: {format_deps(minimal_deps)}\n- All dependencies: {format_deps(all_deps)}\n\n![Dependency Graph]({svg_path})\n\n\n'
 
-    # Insert before # Statistics or # Features, or at end
-    stats_match = re.search(r'^# Statistics', content, re.MULTILINE)
-    features_match = re.search(r'^# Features', content, re.MULTILINE)
-
-    if stats_match:
-        insert_pos = stats_match.start()
-    elif features_match:
-        insert_pos = features_match.start()
+    # Find existing # Dependencies section
+    dep_start = content.find('# Dependencies')
+    if dep_start != -1:
+        # Find the end of the section (beginning of next # section)
+        next_section_match = re.search(r'^# ', content[dep_start + len('# Dependencies'):-1], re.MULTILINE)
+        if next_section_match:
+            dep_end = dep_start + len('# Dependencies') + next_section_match.start()
+        else:
+            dep_end = len(content)
+        # Replace the section
+        new_content = content[:dep_start] + dep_section + content[dep_end:]
     else:
-        insert_pos = len(content.rstrip()) + 1
+        # Insert before # Statistics or # Features, or at end
+        stats_match = re.search(r'^# Statistics', content, re.MULTILINE)
+        features_match = re.search(r'^# Features', content, re.MULTILINE)
 
-    new_content = content[:insert_pos] + dep_section + content[insert_pos:]
+        if stats_match:
+            insert_pos = stats_match.start()
+        elif features_match:
+            insert_pos = features_match.start()
+        else:
+            insert_pos = len(content.rstrip()) + 1
+
+        new_content = content[:insert_pos] + dep_section + content[insert_pos:]
 
     with open(md_path, 'w', encoding='utf-8') as f:
         f.write(new_content)
