@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Http.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 220			| 199		| 419	|
-| Sources   | 1037			| 182		| 1219	|
-| Sum       | 1257			| 381		| 1638	|
 
 # Features
 - HTTP 1.1 Parser
@@ -60,6 +54,13 @@ Some relevant blog posts are:
 - [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpWebServer and SC::HttpServer
 - Unit tests show how to use SC::HttpWebServer, SC::HttpServer and SC::HttpClient
 
+
+# Blog
+
+Some relevant blog posts are:
+
+- [September 2025 Update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
+
 # Roadmap
 
 🟨 MVP
@@ -78,3 +79,10 @@ Some relevant blog posts are:
 💡 Unplanned Features:
 - Http 2.0 
 - Http 3.0
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 222			| 200		| 422	|
+| Sources   | 1142			| 219		| 1361	|
+| Sum       | 1364			| 419		| 1783	|

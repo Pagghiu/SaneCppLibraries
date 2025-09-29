@@ -12,12 +12,6 @@
 
 ![Dependency Graph](FileSystemWatcher.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 128			| 111		| 239	|
-| Sources   | 1171			| 262		| 1433	|
-| Sum       | 1299			| 373		| 1672	|
 
 # Features
 - Get notified about modified files or directories
@@ -74,3 +68,10 @@ The behavior between these different system also depends on the file system wher
 💡 Unplanned Features:
 - Having a thread based polling stat watcher that checks file modifications on intervals as fallback
 - Allow users to provide their own thread instead of creating it behind the scenes
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 128			| 111		| 239	|
+| Sources   | 1172			| 262		| 1434	|
+| Sum       | 1300			| 373		| 1673	|

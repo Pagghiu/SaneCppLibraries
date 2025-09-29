@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Threading.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 407			| 249		| 656	|
-| Sources   | 917			| 168		| 1085	|
-| Sum       | 1324			| 417		| 1741	|
 
 # Features
 | Class                 | Description                       |
@@ -81,3 +75,10 @@ This is the list of videos that have been recorded showing some of the internal 
 
 🟦 Complete Features:
 - Support more types in Atomic<T>
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 407			| 249		| 656	|
+| Sources   | 917			| 168		| 1085	|
+| Sum       | 1324			| 417		| 1741	|

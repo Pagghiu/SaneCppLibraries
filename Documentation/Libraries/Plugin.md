@@ -18,12 +18,6 @@
 
 ![Dependency Graph](Plugin.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 309			| 216		| 525	|
-| Sources   | 1125			| 206		| 1331	|
-| Sum       | 1434			| 422		| 1856	|
 
 # Features
 - Compile and link cpp files to dynamic library
@@ -106,3 +100,10 @@ any system or compiler header.
 - Compile plugins to WASM ?
 - Deploy closed-source (already compiled) binary plugins
 - Allow plugin to be compiled with different compiler from the one used in the Host
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 363			| 230		| 593	|
+| Sources   | 1246			| 218		| 1464	|
+| Sum       | 1609			| 448		| 2057	|

@@ -16,12 +16,6 @@
 
 ![Dependency Graph](FileSystem.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 119			| 227		| 346	|
-| Sources   | 1213			| 211		| 1424	|
-| Sum       | 1332			| 438		| 1770	|
 
 # Features
 
@@ -130,3 +124,10 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 - `sendfile`
 - `stat`
 - `statfs`
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 117			| 232		| 349	|
+| Sources   | 1408			| 230		| 1638	|
+| Sum       | 1525			| 462		| 1987	|

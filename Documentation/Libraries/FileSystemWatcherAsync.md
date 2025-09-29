@@ -12,12 +12,6 @@
 
 ![Dependency Graph](FileSystemWatcherAsync.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 29			| 37		| 66	|
-| Sources   | 77			| 23		| 100	|
-| Sum       | 106			| 60		| 166	|
 
 # Features
 - Implement SC::FileSystemWatcher::EventLoopRunner for macOS, Windows and Linux
@@ -39,3 +33,10 @@ Some relevant blog posts are:
 
 💡 Unplanned Features:
 - Not sure what else could be useful here
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 29			| 37		| 66	|
+| Sources   | 77			| 23		| 100	|
+| Sum       | 106			| 60		| 166	|

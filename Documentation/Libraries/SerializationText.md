@@ -14,12 +14,6 @@
 
 ![Dependency Graph](SerializationText.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 309			| 136		| 445	|
-| Sources   | 336			| 76		| 412	|
-| Sum       | 645			| 212		| 857	|
 
 # Features 
 ## JSON Serializer
@@ -74,3 +68,10 @@ trivially done by just pushing the outputs of the tokenizer into a hierarchical 
 💡 Unplanned Features:
 - XML Serializer
 - YAML Serializer
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 280			| 133		| 413	|
+| Sources   | 348			| 78		| 426	|
+| Sum       | 628			| 211		| 839	|

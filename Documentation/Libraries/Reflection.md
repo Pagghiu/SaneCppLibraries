@@ -14,12 +14,6 @@
 
 ![Dependency Graph](Reflection.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 684			| 310		| 994	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 684			| 310		| 994	|
 
 # Features
 
@@ -270,3 +264,10 @@ Lastly it's also possible associating to a field an `MemberTag` integer field, t
 
 @note It's possible also trying the experimental `SC_REFLECT_AUTOMATIC` mode by using [Reflection Auto](@ref library_reflection_auto) library that automatically lists struct members. This makes sense only if used with [Serialization Binary](@ref library_serialization_binary), as `SC_REFLECT_AUTOMATIC` cannot obtain field names as strings, so any text based serialization format like [Serialization Text](@ref library_serialization_text) cannot work.  
 [Reflection Auto](@ref library_reflection_auto) library is an experimental library, unfortunately using some more obscure C++ meta-programming techniques, part of [Libraries Extra](@ref libraries_extra).
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 601			| 267		| 868	|
+| Sources   | 0			| 0		| 0	|
+| Sum       | 601			| 267		| 868	|

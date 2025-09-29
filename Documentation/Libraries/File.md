@@ -12,13 +12,6 @@
 
 ![Dependency Graph](File.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 97			| 129		| 226	|
-| Sources   | 639			| 106		| 745	|
-| Sum       | 736			| 235		| 971	|
-
 
 # Features
 | SC::FileDescriptor                        | @copybrief SC::FileDescriptor                         |
@@ -66,3 +59,10 @@ It can also be used to read or write the standard input, output or error from cu
 
 💡 Unplanned Features:
 - None for now
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 97			| 129		| 226	|
+| Sources   | 667			| 106		| 773	|
+| Sum       | 764			| 235		| 999	|

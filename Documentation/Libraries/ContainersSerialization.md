@@ -18,6 +18,6 @@ Its headers are only meant to be included anywhere the reflection / serializatio
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 97			| 129		| 226	|
-| Sources   | 639			| 106		| 745	|
-| Sum       | 736			| 235		| 971	|
+| Headers   | 207			| 98		| 305	|
+| Sources   | 0			| 0		| 0	|
+| Sum       | 207			| 98		| 305	|

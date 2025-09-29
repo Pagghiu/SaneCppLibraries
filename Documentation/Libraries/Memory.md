@@ -16,12 +16,6 @@ Most classes have been originally part of the [Foundation](@ref library_foundati
 
 ![Dependency Graph](Memory.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 304			| 284		| 588	|
-| Sources   | 915			| 195		| 1110	|
-| Sum       | 1219			| 479		| 1698	|
 
 # Features
 
@@ -90,3 +84,9 @@ These blog posts have been written after the split from foundation:
 @note In [Principles](@ref page_principles) there is a rule that discourages allocations of large number of tiny objects and also creating systems with unclear or shared memory ownership.
 For this reason this library is missing Smart Pointers.
 
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 433			| 398		| 831	|
+| Sources   | 1037			| 219		| 1256	|
+| Sum       | 1470			| 617		| 2087	|

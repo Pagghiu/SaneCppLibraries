@@ -14,12 +14,6 @@ Detailed documentation is in the @ref group_foundation topic.
 
 ![Dependency Graph](Foundation.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1026			| 672		| 1698	|
-| Sources   | 147			| 34		| 181	|
-| Sum       | 1173			| 706		| 1879	|
 
 # Features
 
@@ -79,3 +73,10 @@ Some relevant blog posts are:
 
 🟦 Complete Features:
 - Things will be added as needed
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 1074			| 693		| 1767	|
+| Sources   | 243			| 48		| 291	|
+| Sum       | 1317			| 741		| 2058	|

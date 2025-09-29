@@ -15,12 +15,6 @@ Check @ref library_async_streams for an higher level construct when streaming da
 
 ![Dependency Graph](Async.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 754			| 725		| 1479	|
-| Sources   | 4972			| 1176		| 6148	|
-| Sum       | 5726			| 1901		| 7627	|
 
 # Features
 
@@ -190,3 +184,10 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 🟦 Complete Features:
 - TTY with ANSI Escape Codes
 - Signal handling
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 754			| 725		| 1479	|
+| Sources   | 4984			| 1176		| 6160	|
+| Sum       | 5738			| 1901		| 7639	|

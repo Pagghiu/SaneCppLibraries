@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Hashing.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 86			| 96		| 182	|
-| Sources   | 267			| 51		| 318	|
-| Sum       | 353			| 147		| 500	|
 
 # Features
 | Hashing Algorithm         | Description                           |
@@ -41,3 +35,10 @@ The library is very simple it it has what is needed so far (mainly by [Build](@r
 
 💡 Unplanned Features:  
 - None for now
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 86			| 96		| 182	|
+| Sources   | 267			| 51		| 318	|
+| Sum       | 353			| 147		| 500	|

@@ -14,12 +14,6 @@
 
 ![Dependency Graph](AsyncStreams.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 454			| 328		| 782	|
-| Sources   | 1523			| 268		| 1791	|
-| Sum       | 1977			| 596		| 2573	|
 
 # Features
 
@@ -93,3 +87,10 @@ Some relevant blog posts are:
 💡 Unplanned Features:
 - Object Mode
 - readable + read mode
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 454			| 328		| 782	|
+| Sources   | 1523			| 268		| 1791	|
+| Sum       | 1977			| 596		| 2573	|

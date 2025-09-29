@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Testing.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 96			| 88		| 184	|
-| Sources   | 241			| 22		| 263	|
-| Sum       | 337			| 110		| 447	|
 
 # Features
 | Class             | Description               |
@@ -50,3 +44,10 @@ So far it doesn't support test discovery and all tests must be manually invoked 
 
 💡 Unplanned Features:
 - Template tests
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 130			| 93		| 223	|
+| Sources   | 240			| 23		| 263	|
+| Sum       | 370			| 116		| 486	|

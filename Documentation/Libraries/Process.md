@@ -16,12 +16,6 @@
 
 ![Dependency Graph](Process.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 246			| 242		| 488	|
-| Sources   | 1078			| 294		| 1372	|
-| Sum       | 1324			| 536		| 1860	|
 
 # Features
 | Class                     | Description
@@ -74,3 +68,10 @@ Some relevant blog posts are:
 
 💡 Unplanned Features:
 - None so far
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 246			| 243		| 489	|
+| Sources   | 1078			| 294		| 1372	|
+| Sum       | 1324			| 537		| 1861	|

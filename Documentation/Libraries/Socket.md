@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Socket.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 133			| 190		| 323	|
-| Sources   | 722			| 142		| 864	|
-| Sum       | 855			| 332		| 1187	|
 
 # Features
 | Class                     | Description
@@ -83,3 +77,10 @@ Some relevant blog posts are:
 
 💡 Unplanned Features:
 - None so far
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 133			| 190		| 323	|
+| Sources   | 722			| 142		| 864	|
+| Sum       | 855			| 332		| 1187	|

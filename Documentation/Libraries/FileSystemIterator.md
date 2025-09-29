@@ -12,12 +12,6 @@
 
 ![Dependency Graph](FileSystemIterator.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 78			| 72		| 150	|
-| Sources   | 350			| 68		| 418	|
-| Sum       | 428			| 140		| 568	|
 
 # Features
 - Iterate files in directory
@@ -47,3 +41,10 @@ Some relevant blog posts are:
 
 💡 Unplanned Features:
 - No hypothesis has been made so far
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 78			| 72		| 150	|
+| Sources   | 352			| 68		| 420	|
+| Sum       | 430			| 140		| 570	|

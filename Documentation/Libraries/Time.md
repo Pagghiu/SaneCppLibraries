@@ -12,12 +12,6 @@
 
 ![Dependency Graph](Time.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 127			| 136		| 263	|
-| Sources   | 219			| 37		| 256	|
-| Sum       | 346			| 173		| 519	|
 
 # Features
 
@@ -84,3 +78,10 @@ Some relevant blog posts are:
 
 💡 Unplanned Features:
 - No Plan
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 124			| 136		| 260	|
+| Sources   | 219			| 37		| 256	|
+| Sum       | 343			| 173		| 516	|

@@ -14,12 +14,6 @@
 
 ![Dependency Graph](SerializationBinary.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 572			| 290		| 862	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 572			| 290		| 862	|
 
 # Features
 - No heap allocations
@@ -116,3 +110,10 @@ This can be solved implementing streaming binary serializer or experimenting wit
 
 💡 Unplanned Features:
 - None so far
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 552			| 278		| 830	|
+| Sources   | 0			| 0		| 0	|
+| Sum       | 552			| 278		| 830	|

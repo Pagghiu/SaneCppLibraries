@@ -15,12 +15,6 @@ Path is able to parse and manipulate windows and posix paths.
 
 ![Dependency Graph](Strings.svg)
 
-# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1054			| 1285		| 2339	|
-| Sources   | 2308			| 338		| 2646	|
-| Sum       | 3362			| 1623		| 4985	|
 
 # Features
 
@@ -183,3 +177,10 @@ we will investigate if there OS functions allowing to achieve that functionality
 💡 Unplanned Features:
 - UTF word breaking
 - Grapheme Cluster iteration
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 942			| 1083		| 2025	|
+| Sources   | 2170			| 332		| 2502	|
+| Sum       | 3112			| 1415		| 4527	|
