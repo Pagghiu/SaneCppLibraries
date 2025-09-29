@@ -13,8 +13,7 @@
 
 ![Sane Cpp](https://pagghiu.github.io/images/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
-[Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):
-
+- [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
 ✅ Fast compile times  
 ✅ Bloat free  
 ✅ Simple and readable code  
@@ -23,24 +22,25 @@
 ⛔️ No third party build dependencies (prefer OS API)
 
 - [Documentation](https://pagghiu.github.io/SaneCppLibraries/index.html)
-- [DeepWiki/SaneCppLibraries](https://deepwiki.com/Pagghiu/SaneCppLibraries) (AI-guided walkthrough of the project)
 - [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html)
+- [Libraries](https://pagghiu.github.io/SaneCppLibraries/libraries.html)
+- [Dependencies (internal)](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html)
 
 # Libraries
 
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
-[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, threads)      | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h)                   
+[Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, tasks)        | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h)                   
 [Async Streams](https://pagghiu.github.io/SaneCppLibraries/library_async_streams.html)                          | 🟨 Concurrently read, write and transform byte streams                    | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsyncStreams.h)            
-[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)       | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainers.h)              
-[Containers Serialization](https://pagghiu.github.io/SaneCppLibraries/library_containers_serialization.html)    | 🟨 Containers specializations for Reflection and Serialization.           | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainersSerialization.h) 
+[Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html)                                | 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array)            | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainers.h)              
+[Containers Serialization](https://pagghiu.github.io/SaneCppLibraries/library_containers_serialization.html)    | 🟨 Containers specializations for Reflection and Serialization            | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainersSerialization.h) 
 [File](https://pagghiu.github.io/SaneCppLibraries/library_file.html)                                            | 🟩 Synchronous Disk File I/O                                              | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFile.h)                    
-[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                              | 🟩 File System operations (like copy / delete) for files / directories    | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystem.h)              
+[File System](https://pagghiu.github.io/SaneCppLibraries/library_file_system.html)                              | 🟩 File System operations (like copy / delete) for files / dirs           | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystem.h)              
 [File System Iterator](https://pagghiu.github.io/SaneCppLibraries/library_file_system_iterator.html)            | 🟩 Enumerates files and directories inside a given path                   | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemIterator.h)      
-[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)              | 🟩 Notifications {add, remove, rename, modified} for files / directories  | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h)       
+[File System Watcher](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher.html)              | 🟩 Notifications {add,remove,rename,modify} for files / dirs              | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcher.h)       
 [File System Watcher Async](https://pagghiu.github.io/SaneCppLibraries/library_file_system_watcher_async.html)  | 🟩 Async backend for FileSystemWatcher                                    | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemWatcherAsync.h)  
-[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                                | 🟩 Primitive types, asserts, compiler macros, Function, Span, Result      | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFoundation.h)              
-[Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                                      | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for a stream of bytes         | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHashing.h)                 
+[Foundation](https://pagghiu.github.io/SaneCppLibraries/library_foundation.html)                                | 🟩 Primitive types, asserts, macros, Function, Span, Result               | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFoundation.h)              
+[Hashing](https://pagghiu.github.io/SaneCppLibraries/library_hashing.html)                                      | 🟩 Compute `MD5`, `SHA1` or `SHA256` hashes for bytes streams             | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHashing.h)                 
 [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html)                                            | 🟥 HTTP parser, client and server                                         | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttp.h)                    
 [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html)                                        | 🟩 Custom allocators, Virtual Memory, Buffer, Segment                     | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppMemory.h)                  
 [Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html)                                        | 🟨 Minimal dependency based plugin system with hot-reload                 | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppPlugin.h)                  
@@ -59,9 +59,8 @@ Each library is color-coded to signal its status:
 🟥 Draft (incomplete, WIP, works on basic case)  
 🟨 MVP (minimum set of features have been implemented)  
 🟩 Usable (a reasonable set of useful features has been implemented)  
-🟦 Complete (all planned features have been implemented)  
 
-# How to include them in your project
+# How to use Sane C++ Libraries in your project
 
 # Option 1: use single file libraries
 - Obtain a specific library: 
@@ -89,7 +88,6 @@ Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_b
 # Getting in touch
 
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
-![Discord](https://img.shields.io/discord/1195076118307426384)
 - [X](https://x.com/pagghiu_) `@pagghiu_`
 - [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
 
@@ -115,3 +113,6 @@ Relevant yearly posts:
 
 - [Blog Post - Sane C++ Libraries (Open Sourcing)](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
 - [Blog Post - 1st Year of Sane C++ Libraries](https://pagghiu.github.io/site/blog/2024-12-23-SaneCpp1Year.html)
+
+# External
+- [DeepWiki/SaneCppLibraries](https://deepwiki.com/Pagghiu/SaneCppLibraries) (AI-guided walkthrough of the project)
