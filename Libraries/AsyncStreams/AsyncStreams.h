@@ -55,7 +55,6 @@ struct AsyncBufferView
         explicit constexpr ID(int32_t value) : identifier(value) {}
 
         [[nodiscard]] constexpr bool operator==(ID other) const { return identifier == other.identifier; }
-        [[nodiscard]] constexpr bool isValid() const { return identifier != InvalidValue; }
     };
 
     Span<char> data;

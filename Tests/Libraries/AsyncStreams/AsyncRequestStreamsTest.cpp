@@ -59,7 +59,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
                 // Use *SocketStream as readable and writable are two SocketDescriptor
                 // Sockets are duplex so the choice of who is writable and who is readable is just arbitrary
-                fileCompressRemote<ReadableSocketStream, WritableSocketStream>(eventLoop, writable, readable, false);
+                fileCompressRemote<ReadableSocketStream, WritableSocketStream, AsyncZLibTransformStream>(
+                    eventLoop, writable, readable, false);
             }
 
             if (test_section("file to pipe to file (async)"))
@@ -75,7 +76,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
                 // Use *FileStream as readPipe and writePipe are two FileDescriptor
                 // In Pipes there is a defined writeside and readside so the order of arguments here is important
-                fileCompressRemote<ReadableFileStream, WritableFileStream>(eventLoop, writable, readable, blocking);
+                fileCompressRemote<ReadableFileStream, WritableFileStream, AsyncZLibTransformStream>(
+                    eventLoop, writable, readable, blocking);
             }
 
             if (test_section("file to pipe to file (sync)"))
@@ -91,7 +93,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
                 // Use *FileStream as readPipe and writePipe are two FileDescriptor
                 // In Pipes there is a defined writeside and readside so the order of arguments here is important
-                fileCompressRemote<ReadableFileStream, WritableFileStream>(eventLoop, writable, readable, blocking);
+                fileCompressRemote<ReadableFileStream, WritableFileStream, SyncZLibTransformStream>(eventLoop, writable,
+                                                                                                    readable, blocking);
             }
 
             if (numTestsToRun == 2)
@@ -109,9 +112,19 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
     void fileToFile();
 
-    template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename DESCRIPTOR_TYPE>
+    template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename ZLIB_STREAM_TYPE, typename DESCRIPTOR_TYPE>
     void fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide, DESCRIPTOR_TYPE& readSide,
                             bool useStreamThreadPool);
+
+    void setThreadPoolFor(AsyncZLibTransformStream& stream, AsyncEventLoop& eventLoop, ThreadPool& threadPool,
+                          const char* name)
+    {
+        SC_TEST_EXPECT(stream.asyncWork.setThreadPool(threadPool));
+        stream.setEventLoop(eventLoop);
+        stream.asyncWork.setDebugName(name);
+    }
+
+    void setThreadPoolFor(SyncZLibTransformStream&, AsyncEventLoop&, ThreadPool&, const char*) {}
 };
 
 void SC::AsyncRequestStreamsTest::createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,
@@ -254,7 +267,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(fs.removeFiles({"readable.txt", "writeable.txt"}));
 }
 
-template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename DESCRIPTOR_TYPE>
+template <typename READABLE_TYPE, typename WRITABLE_TYPE, typename ZLIB_STREAM_TYPE, typename DESCRIPTOR_TYPE>
 void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, DESCRIPTOR_TYPE& writeSide,
                                                      DESCRIPTOR_TYPE& readSide, bool useStreamThreadPool)
 {
@@ -385,14 +398,12 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
 
     // Create first transform stream (compression)
-    AsyncZLibTransformStream     compressStream;
+    ZLIB_STREAM_TYPE             compressStream;
     AsyncWritableStream::Request compressWriteRequests[numberOfBuffers1 + 1];
     AsyncReadableStream::Request compressReadRequests[numberOfBuffers1 + 1];
     SC_TEST_EXPECT(compressStream.init(buffersPool1, compressReadRequests, compressWriteRequests));
     SC_TEST_EXPECT(compressStream.stream.init(ZLibStream::CompressZLib));
-    SC_TEST_EXPECT(compressStream.asyncWork.setThreadPool(compressionThreadPool));
-    compressStream.setEventLoop(eventLoop);
-    compressStream.asyncWork.setDebugName("CompressStream");
+    setThreadPoolFor(compressStream, eventLoop, compressionThreadPool, "CompressStream");
 
     // Create first Async Pipeline (file to socket)
     AsyncDuplexStream*   transforms1[1] = {&compressStream};
@@ -402,14 +413,12 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     SC_TEST_EXPECT(pipeline0.pipe(readFileStream, transforms1, {sinks1}));
 
     // Create second transform stream (decompression)
-    AsyncZLibTransformStream     decompressStream;
+    ZLIB_STREAM_TYPE             decompressStream;
     AsyncWritableStream::Request decompressWriteRequests[numberOfBuffers2 + 1];
     AsyncReadableStream::Request decompressReadRequests[numberOfBuffers2 + 1];
     SC_TEST_EXPECT(decompressStream.init(buffersPool2, decompressReadRequests, decompressWriteRequests));
     SC_TEST_EXPECT(decompressStream.stream.init(ZLibStream::DecompressZLib));
-    SC_TEST_EXPECT(decompressStream.asyncWork.setThreadPool(compressionThreadPool));
-    decompressStream.setEventLoop(eventLoop);
-    decompressStream.asyncWork.setDebugName("DecompressStream");
+    setThreadPoolFor(decompressStream, eventLoop, compressionThreadPool, "DecompressStream");
 
     // Create second Async Pipeline (socket to file)
     AsyncDuplexStream*   transforms2[1] = {&decompressStream};
