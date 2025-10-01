@@ -229,8 +229,6 @@ struct FileSystemWatcher
         FolderWatcher* back  = nullptr; // has no next
         FolderWatcher* front = nullptr; // has no prev
 
-        [[nodiscard]] bool isEmpty() const { return front == nullptr; }
-
         void queueBack(FolderWatcher& watcher);
         void remove(FolderWatcher& watcher);
     };

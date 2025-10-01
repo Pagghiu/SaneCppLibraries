@@ -53,7 +53,9 @@ void SC::SocketTest::parseAddress()
     SocketIPAddress address;
     SC_TEST_EXPECT(not address.fromAddressPort("1223.22.44.1", 6666));
     SC_TEST_EXPECT(address.fromAddressPort("127.0.0.1", 123));
-    SC_TEST_EXPECT(address.fromAddressPort("::1", 123));
+    SC_TEST_EXPECT(address.getPort() == 123);
+    SC_TEST_EXPECT(address.fromAddressPort("::1", 456));
+    SC_TEST_EXPECT(address.getPort() == 456);
     //! [socketIpAddressSnippet]
 }
 

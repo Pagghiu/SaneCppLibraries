@@ -28,10 +28,7 @@ SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
     {
         res = ::connect(openedSocket, &ipAddress.handle.reinterpret_as<const struct sockaddr>(), nativeSize);
     } while (res == SOCKET_ERROR and errno == EINTR);
-    if (res == SOCKET_ERROR)
-    {
-        return Result::Error("connect failed");
-    }
+    SC_TRY_MSG(res != SOCKET_ERROR, "connect failed");
     return Result(true);
 }
 
@@ -45,14 +42,8 @@ SC::Result SC::SocketClient::write(Span<const char> data)
     const auto sizeInBytes = data.sizeInBytes();
 #endif
     const auto written = ::send(nativeSocket, data.data(), sizeInBytes, 0);
-    if (written < 0)
-    {
-        return Result::Error("send error");
-    }
-    if (static_cast<decltype(data.sizeInBytes())>(written) != data.sizeInBytes())
-    {
-        return Result::Error("send error");
-    }
+    SC_TRY_MSG(written >= 0, "send error");
+    SC_TRY_MSG(static_cast<decltype(data.sizeInBytes())>(written) == data.sizeInBytes(), "send didn't write all bytes");
     return Result(true);
 }
 
@@ -66,10 +57,7 @@ SC::Result SC::SocketClient::read(Span<char> data, Span<char>& readData)
     const auto sizeInBytes = data.sizeInBytes();
 #endif
     const auto recvSize = ::recv(nativeSocket, data.data(), sizeInBytes, 0);
-    if (recvSize < 0)
-    {
-        return Result::Error("recv error");
-    }
+    SC_TRY_MSG(recvSize >= 0, "recv error");
     readData = {data.data(), static_cast<size_t>(recvSize)};
     return Result(true);
 }
@@ -91,13 +79,6 @@ SC::Result SC::SocketClient::readWithTimeout(Span<char> data, Span<char>& readDa
     int maxFd = nativeSocket;
 #endif
     const auto result = ::select(maxFd + 1, &fds, nullptr, nullptr, &tv);
-    if (result == SOCKET_ERROR)
-    {
-        return Result::Error("select failed");
-    }
-    if (FD_ISSET(nativeSocket, &fds))
-    {
-        return read(data, readData);
-    }
-    return Result(false);
+    SC_TRY_MSG(result != SOCKET_ERROR, "select failed");
+    return FD_ISSET(nativeSocket, &fds) ? read(data, readData) : Result(false);
 }

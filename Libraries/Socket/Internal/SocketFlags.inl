@@ -9,59 +9,14 @@
 
 SC::SocketFlags::AddressFamily SC::SocketFlags::AddressFamilyFromInt(int value)
 {
-    switch (value)
-    {
-    case AF_INET: return SocketFlags::AddressFamilyIPV4;
-    case AF_INET6: return SocketFlags::AddressFamilyIPV6;
-    }
-    Assert::unreachable();
+    return value == AF_INET ? SocketFlags::AddressFamilyIPV4 : SocketFlags::AddressFamilyIPV6;
 }
 
 unsigned char SC::SocketFlags::toNative(SocketFlags::AddressFamily type)
 {
-    switch (type)
-    {
-    case SocketFlags::AddressFamilyIPV4: return AF_INET;
-    case SocketFlags::AddressFamilyIPV6: return AF_INET6;
-    }
-    Assert::unreachable();
+    return type == SocketFlags::AddressFamilyIPV4 ? AF_INET : AF_INET6;
 }
 
-SC::SocketFlags::SocketType SC::SocketFlags::SocketTypeFromInt(int value)
-{
-    switch (value)
-    {
-    case SOCK_STREAM: return SocketStream;
-    case SOCK_DGRAM: return SocketDgram;
-    }
-    Assert::unreachable();
-}
-int SC::SocketFlags::toNative(SocketType type)
-{
-    switch (type)
-    {
-    case SocketStream: return SOCK_STREAM;
-    case SocketDgram: return SOCK_DGRAM;
-    }
-    Assert::unreachable();
-}
+int SC::SocketFlags::toNative(SocketType type) { return type == SocketStream ? SOCK_STREAM : SOCK_DGRAM; }
 
-SC::SocketFlags::ProtocolType SC::SocketFlags::ProtocolTypeFromInt(int value)
-{
-    switch (value)
-    {
-    case IPPROTO_TCP: return ProtocolTcp;
-    case IPPROTO_UDP: return ProtocolUdp;
-    }
-    Assert::unreachable();
-}
-
-int SC::SocketFlags::toNative(ProtocolType family)
-{
-    switch (family)
-    {
-    case ProtocolTcp: return IPPROTO_TCP;
-    case ProtocolUdp: return IPPROTO_UDP;
-    }
-    Assert::unreachable();
-}
+int SC::SocketFlags::toNative(ProtocolType family) { return family == ProtocolTcp ? IPPROTO_TCP : IPPROTO_UDP; }

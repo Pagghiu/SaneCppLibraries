@@ -75,8 +75,6 @@ struct SC::HttpRequest
 /// @brief Http response that will be sent to a client
 struct SC::HttpResponse
 {
-    ArenaMapKey<HttpServerClient> getClientKey() const { return key; }
-
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
     Result startResponse(int httpCode);
 
@@ -89,8 +87,6 @@ struct SC::HttpResponse
     /// @brief Finalizes response appending some data
     /// @warning The SC::HttpResponse / SC::HttpRequest pair will be invalidated on next SC::AsyncEventLoop run
     Result end(Span<const char> data);
-
-    HttpServer& getServer() { return *server; }
 
   private:
     friend struct HttpServer;

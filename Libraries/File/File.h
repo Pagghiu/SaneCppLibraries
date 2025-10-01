@@ -183,9 +183,9 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
 
     /// @brief Changes the current position in the file descriptor, if seekable.
     /// @param seekMode How the offset is defined (from start, end, current)
-    /// @param offset An offset to be applied according to seekMode to this descriptor
+    /// @param offset An offset to be applied according to seekMode to this descriptor (can be negative)
     /// @return Valid result if seek succeeds
-    Result seek(SeekMode seekMode, uint64_t offset);
+    Result seek(SeekMode seekMode, int64_t offset);
 
     /// @brief Gets current descriptor position (if seekable)
     /// @param position (output) current position of file descriptor

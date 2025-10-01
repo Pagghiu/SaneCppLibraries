@@ -146,7 +146,7 @@ int main(int argc, const char* argv[])
     }
     SC_ASSERT_RELEASE(report.libraryRootDirectory.assign(correctedPath.view()));
     report.debugBreakOnFailedTest = true;
-
+    runTimeTest(report);
     // Foundation tests
     runBaseTest(report);
     runStringSpanTest(report);
@@ -247,7 +247,7 @@ int main(int argc, const char* argv[])
 
     // Build tests
     runBuildTest(report);
-
+    SocketNetworking::shutdownNetworking();
     report.runGlobalMemoryReport(Globals::get(Globals::Global).allocator.statistics);
     return report.getTestReturnCode();
 }

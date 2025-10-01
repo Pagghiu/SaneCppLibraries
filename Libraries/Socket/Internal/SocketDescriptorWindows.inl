@@ -57,8 +57,6 @@ SC::Result SC::SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType
     int how = 0;
     switch (shutdownType)
     {
-    case SocketFlags::ShutdownRead: how = SD_RECEIVE; break;
-    case SocketFlags::ShutdownWrite: how = SD_SEND; break;
     case SocketFlags::ShutdownBoth: how = SD_BOTH; break;
     default: return Result::Error("Invalid shutdown type");
     }
@@ -145,7 +143,7 @@ SC::Result SC::SocketNetworking::initNetworking()
     return Result(true);
 }
 
-SC::Result SC::SocketNetworking::shutdownNetworking()
+void SC::SocketNetworking::shutdownNetworking()
 {
     WSACleanup();
 #if SC_COMPILER_MSVC
@@ -155,5 +153,4 @@ SC::Result SC::SocketNetworking::shutdownNetworking()
 #elif SC_COMPILER_GCC
     Internal::get().store(false);
 #endif
-    return Result(true);
 }

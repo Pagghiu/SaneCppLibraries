@@ -37,6 +37,12 @@ StringView StringBuilder::finalize()
         finalizedView = {{buffer->data(), buffer->size()}, true, encoding};
         buffer        = nullptr;
     }
+    return view();
+}
+
+StringView StringBuilder::view()
+{
+    SC_ASSERT_RELEASE(buffer == nullptr);
     return finalizedView;
 }
 

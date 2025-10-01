@@ -30,11 +30,7 @@ SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress)
 #endif
     const struct sockaddr* sa     = &nativeAddress.handle.reinterpret_as<const struct sockaddr>();
     const socklen_t        saSize = nativeAddress.sizeOfHandle();
-    if (::bind(listenSocket, sa, saSize) == SOCKET_ERROR)
-    {
-        SC_TRUST_RESULT(socket.close());
-        return Result::Error("Could not bind socket to port");
-    }
+    SC_TRY_MSG(::bind(listenSocket, sa, saSize) != SOCKET_ERROR, "Could not bind socket to port");
     return Result(true);
 }
 
@@ -44,11 +40,7 @@ SC::Result SC::SocketServer::listen(uint32_t numberOfWaitingConnections)
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
-    if (::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) == SOCKET_ERROR)
-    {
-        SC_TRUST_RESULT(socket.close());
-        return Result::Error("Could not listen");
-    }
+    SC_TRY_MSG(::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) != SOCKET_ERROR, "listen failed");
     return Result(true);
 }
 

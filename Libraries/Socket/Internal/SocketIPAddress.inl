@@ -63,7 +63,6 @@ SC::SocketIPAddress::SocketIPAddress(SocketFlags::AddressFamily addressFamily)
         sa.sin6_family   = AF_INET6;
     }
     break;
-    default: Assert::unreachable();
     }
 }
 
@@ -74,11 +73,11 @@ SC::SocketFlags::AddressFamily SC::SocketIPAddress::getAddressFamily() const
     {
         return SocketFlags::AddressFamilyIPV4;
     }
-    else if (sa->sin_family == AF_INET6)
+    else
     {
+        SC_ASSERT_RELEASE(sa->sin_family == AF_INET6);
         return SocketFlags::AddressFamilyIPV6;
     }
-    Assert::unreachable();
 }
 
 SC::uint16_t SC::SocketIPAddress::getPort() const
@@ -89,56 +88,49 @@ SC::uint16_t SC::SocketIPAddress::getPort() const
         const sockaddr_in* sa_in = (struct sockaddr_in*)sa;
         return ntohs(sa_in->sin_port);
     }
-    else if (sa->sin_family == AF_INET6)
+    else
     {
+        SC_ASSERT_RELEASE(sa->sin_family == AF_INET6);
         const sockaddr_in6* sa_in6 = (struct sockaddr_in6*)sa;
         return ntohs(sa_in6->sin6_port);
     }
-    Assert::unreachable();
 }
 
 SC::uint32_t SC::SocketIPAddress::sizeOfHandle() const
 {
-    switch (getAddressFamily())
-    {
-    case SocketFlags::AddressFamilyIPV4: return sizeof(sockaddr_in);
-    case SocketFlags::AddressFamilyIPV6: return sizeof(sockaddr_in6);
-    }
-    Assert::unreachable();
+    return getAddressFamily() == SocketFlags::AddressFamilyIPV4 ? sizeof(sockaddr_in) : sizeof(sockaddr_in6);
 }
 
 bool SC::SocketIPAddress::isValid() const
 {
     static_assert(MAX_ASCII_STRING_LENGTH <= INET6_ADDRSTRLEN, "MAX_ASCII_STRING_LENGTH");
-    char ipstr[INET6_ADDRSTRLEN];
-    return not toString(ipstr).isEmpty();
+    char       ipstr[INET6_ADDRSTRLEN];
+    StringSpan outSpan;
+    return toString(ipstr, outSpan);
 }
 
-SC::StringSpan SC::SocketIPAddress::formatAddress(Span<char> inOutString) const
+bool SC::SocketIPAddress::toString(Span<char> inputSpan, StringSpan& outputSpan) const
 {
-    const sockaddr* sa = &handle.reinterpret_as<struct sockaddr const>();
+    const sockaddr* sa = &handle.reinterpret_as<struct sockaddr>();
+    SC_TRY(inputSpan.sizeInBytes() >= MAX_ASCII_STRING_LENGTH);
 
-    char* ipstr = inOutString.data();
+    char* ipstr = inputSpan.data();
 
     if (sa->sa_family == AF_INET)
     {
-        struct sockaddr_in* sa_in = (struct sockaddr_in*)sa;
-        if (::inet_ntop(AF_INET, &(sa_in->sin_addr), ipstr, (socklen_t)inOutString.sizeInBytes()) == nullptr)
-        {
-            return {};
-        }
-        return StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        const struct sockaddr_in* sa_in = &handle.reinterpret_as<struct sockaddr_in>();
+        SC_TRY(::inet_ntop(AF_INET, &(sa_in->sin_addr), ipstr, (socklen_t)inputSpan.sizeInBytes()) != 0);
+        outputSpan = StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        return true;
     }
-    else if (sa->sa_family == AF_INET6)
+    else
     {
-        struct sockaddr_in6* sa_in6 = (struct sockaddr_in6*)sa;
-        if (::inet_ntop(AF_INET6, &(sa_in6->sin6_addr), ipstr, (socklen_t)inOutString.sizeInBytes()) == nullptr)
-        {
-            return {};
-        }
-        return StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        SC_ASSERT_RELEASE(sa->sa_family == AF_INET6);
+        const struct sockaddr_in6* sa_in6 = &handle.reinterpret_as<struct sockaddr_in6>();
+        SC_TRY(::inet_ntop(AF_INET6, &(sa_in6->sin6_addr), ipstr, (socklen_t)inputSpan.sizeInBytes()) != 0);
+        outputSpan = StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
+        return true;
     }
-    return {};
 }
 
 SC::Result SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uint16_t port)

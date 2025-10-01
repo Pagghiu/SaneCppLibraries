@@ -26,6 +26,35 @@ struct SC::BaseTest : public SC::TestCase
         {
             Assert::printBacktrace("a!=b", "FileName.cpp", "Function", 12);
         }
+
+        if (test_section("Limits (coverage)"))
+        {
+            uint8_t  maxU8  = MaxValue();
+            uint16_t maxU16 = MaxValue();
+            uint32_t maxU32 = MaxValue();
+            uint64_t maxU64 = MaxValue();
+            int8_t   maxI8  = MaxValue();
+            int16_t  maxI16 = MaxValue();
+            int32_t  maxI32 = MaxValue();
+            int64_t  maxI64 = MaxValue();
+            ssize_t  maxSS  = MaxValue();
+            size_t   maxS   = MaxValue();
+            float    maxF   = MaxValue();
+            double   maxD   = MaxValue();
+
+            SC_COMPILER_UNUSED(maxU8);
+            SC_COMPILER_UNUSED(maxU16);
+            SC_COMPILER_UNUSED(maxU32);
+            SC_COMPILER_UNUSED(maxU64);
+            SC_COMPILER_UNUSED(maxI8);
+            SC_COMPILER_UNUSED(maxI16);
+            SC_COMPILER_UNUSED(maxI32);
+            SC_COMPILER_UNUSED(maxI64);
+            SC_COMPILER_UNUSED(maxSS);
+            SC_COMPILER_UNUSED(maxS);
+            SC_COMPILER_UNUSED(maxF);
+            SC_COMPILER_UNUSED(maxD);
+        }
     }
 };
 

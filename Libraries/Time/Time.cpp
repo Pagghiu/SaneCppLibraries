@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include <time.h>
 
+#include "../Foundation/Result.h"
 #include "../Time/Time.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -28,10 +29,8 @@ struct SC::Time::Absolute::Internal
 
         local.isDaylightSaving = result.tm_isdst > 0;
 
-        if (::strftime(local.monthName, sizeof(local.monthName), "%b", &result) == 0)
-            return false;
-        if (::strftime(local.dayName, sizeof(local.dayName), "%a", &result) == 0)
-            return false;
+        SC_TRY(::strftime(local.monthName, sizeof(local.monthName), "%B", &result) != 0);
+        SC_TRY(::strftime(local.dayName, sizeof(local.dayName), "%A", &result) != 0);
 
         return true;
     }
@@ -78,15 +77,9 @@ bool SC::Time::Absolute::parseLocal(ParseResult& result) const
     const time_t seconds = static_cast<time_t>(milliseconds / 1000);
     struct tm    parsedTm;
 #if SC_PLATFORM_WINDOWS
-    if (_localtime64_s(&parsedTm, &seconds) != 0)
-    {
-        return false;
-    }
+    SC_TRY(::_localtime64_s(&parsedTm, &seconds) == 0);
 #else
-    if (localtime_r(&seconds, &parsedTm) == nullptr)
-    {
-        return false;
-    }
+    SC_TRY(::localtime_r(&seconds, &parsedTm) != 0);
 #endif
     return Internal::tmToParsed(parsedTm, result);
 }
@@ -96,15 +89,9 @@ bool SC::Time::Absolute::parseUTC(ParseResult& result) const
     const time_t seconds = static_cast<time_t>(milliseconds / 1000);
     struct tm    parsedTm;
 #if SC_PLATFORM_WINDOWS
-    if (_gmtime64_s(&parsedTm, &seconds) != 0)
-    {
-        return false;
-    }
+    SC_TRY(::_gmtime64_s(&parsedTm, &seconds) == 0);
 #else
-    if (gmtime_r(&seconds, &parsedTm) == nullptr)
-    {
-        return false;
-    }
+    SC_TRY(::gmtime_r(&seconds, &parsedTm) != 0);
 #endif
     return Internal::tmToParsed(parsedTm, result);
 }

@@ -74,6 +74,9 @@ struct SC::StringTest : public SC::TestCase
             SC_TEST_EXPECT(ss.data.size() == 5);
             SC_TEST_EXPECT(ss.data.capacity() == 5);
             SC_TEST_EXPECT(ss.data.isInline());
+
+            String fromBuffer = {move(ss.data), ss.getEncoding()};
+            SC_TEST_EXPECT(fromBuffer == test);
         }
     }
 };

@@ -54,11 +54,7 @@ struct SC_COMPILER_EXPORT StringBuilder
 
     /// @brief Obtains view after finalize has been previously called
     /// @warning Calling this method before finalize() will assert
-    [[nodiscard]] StringView view()
-    {
-        SC_ASSERT_RELEASE(buffer == nullptr);
-        return finalizedView;
-    }
+    [[nodiscard]] StringView view();
 
     /// @brief Uses StringFormat to format the given StringView against args, replacing destination contents.
     /// @tparam Types Type of Args
@@ -169,10 +165,7 @@ inline bool SC::StringBuilder::format(T& buffer, StringView fmt, Types&&... args
 template <typename... Types>
 inline bool SC::StringBuilder::append(StringView fmt, Types&&... args)
 {
-    if (fmt.getEncoding() == StringEncoding::Utf16)
-    {
-        return false; // UTF16 format strings are not supported
-    }
+    SC_TRY(fmt.getEncoding() != StringEncoding::Utf16); // UTF16 format strings are not supported
     // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
     // because on a valid UTF8 string, these chars are unambiguously recognizable
     StringFormatOutput sfo(encoding, *buffer);

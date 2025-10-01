@@ -22,11 +22,7 @@ SC::Result SC::SocketDNS::resolveDNS(StringSpan host, Span<char>& ipAddress)
     SC_TRY_MSG(host.getEncoding() == StringEncoding::Ascii, "Only ASCII encoding is supported");
     SC_TRY_MSG(detail::writeNullTerminatedToBuffer(host.toCharSpan(), nullTerminated), "host is too big");
     // Get address information
-    const int status = ::getaddrinfo(nullTerminated, NULL, &hints, &res);
-    if (status != 0)
-    {
-        return Result::Error("SocketDNS::resolveDNS: getaddrinfo error");
-    }
+    SC_TRY_MSG(::getaddrinfo(nullTerminated, NULL, &hints, &res) == 0, "getaddrinfo error");
 
     // Loop through results and print IP addresses
     for (p = res; p != NULL; p = p->ai_next)

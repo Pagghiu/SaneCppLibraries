@@ -62,15 +62,6 @@ struct SC::StringView : public StringSpan
     }
 #endif
 
-    /// @brief Directly access the memory of this null terminated-StringView.
-    /// @return Pointer to start of StringView memory.
-    /// On Windows return type will be `wchar_t`.
-    /// On other platforms return type will be `char`.
-    /// @warning This method will assert that the string is null terminated.
-    ///          On Windows this will assert that encoding is UTF16.
-    ///          On other platforms this will assert that encoding is UTF8 or ASCII.
-    auto getNullTerminatedNative() const;
-
     /// @brief Obtain a `const uint8_t` Span from this StringView
     /// @return Span representing this StringView
     Span<const uint8_t> toBytesSpan() const SC_LANGUAGE_LIFETIME_BOUND
@@ -611,17 +602,6 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
     case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>(), points);
     }
     Assert::unreachable();
-}
-
-[[nodiscard]] inline auto SC::StringView::getNullTerminatedNative() const
-{
-#if SC_PLATFORM_WINDOWS
-    SC_ASSERT_RELEASE(hasNullTerm && (getEncoding() == StringEncoding::Utf16));
-    return reinterpret_cast<const wchar_t*>(text);
-#else
-    SC_ASSERT_RELEASE(hasNullTerm && (getEncoding() == StringEncoding::Utf8 || getEncoding() == StringEncoding::Ascii));
-    return text;
-#endif
 }
 
 [[nodiscard]] constexpr bool SC::StringView::operator==(StringSpan other) const

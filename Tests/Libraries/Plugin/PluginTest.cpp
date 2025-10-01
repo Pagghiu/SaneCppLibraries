@@ -108,6 +108,7 @@ struct SC::PluginTest : public SC::TestCase
             ITestInterface1* interface1 = nullptr;
             SC_TEST_EXPECT(pluginChild->queryInterface(interface1));
             SC_TEST_EXPECT(interface1 != nullptr);
+            SC_TEST_EXPECT(interface1->InterfaceHash == SC::PluginHash("ITestInterface1"));
             SC_TEST_EXPECT(interface1->multiplyInt(2) == 4);
             ITestInterface2* interface2 = nullptr;
             SC_TEST_EXPECT(pluginChild->queryInterface(interface2));

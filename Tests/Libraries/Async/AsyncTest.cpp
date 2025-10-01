@@ -433,7 +433,9 @@ receiveAsync.callback = [&](AsyncSocketReceive::Result& res)
             // Get the source address / port of the received data
             SocketIPAddress sourceAddress = res.getSourceAddress();
             SocketIPAddress::AsciiBuffer buffer;
-            console.print("Source address: {}:{}", sourceAddress.toString(buffer), sourceAddress.getPort());
+            StringView formattedAddress;
+            (void)sourceAddress.toString(buffer, formattedAddress);
+            console.print("Source address: {}:{}", formattedAddress, sourceAddress.getPort());
             
             // IMPORTANT: Reactivate the request to receive more data
             res.reactivateRequest(true);

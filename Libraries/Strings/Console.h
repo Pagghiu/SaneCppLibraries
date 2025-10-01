@@ -57,9 +57,6 @@ struct SC_COMPILER_EXPORT Console
     /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)
     static bool tryAttachingToParentConsole();
 
-    /// @brief Returns true if current process has an active console (Windows only, returns true elsewhere)
-    static bool isAttachedToConsole();
-
   private:
     Span<char> conversionBuffer;
 #if SC_PLATFORM_WINDOWS

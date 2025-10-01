@@ -834,9 +834,20 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
         arguments[numArguments++] = "-format";      // 4
         arguments[numArguments++] = "html";         // 5
         // TODO: De-hardcode this filter and pass it as a parameter
-        arguments[numArguments++] = "-ignore-filename-regex=" // 6
-                                    "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
-                                    ".*\\/Tests/.*\\.*|.*\\/LibrariesExtra/.*\\.*)$";
+        arguments[numArguments++] = "-ignore-filename-regex=^(" // 6
+                                    ".*\\/Tools.*|"
+                                    ".*\\Test.(cpp|h|c)|"
+                                    ".*\\test.(c|h)|"
+                                    ".*\\/Tests/.*\\.*|"
+                                    ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
+                                    ".*\\/Assert.h|"                       // Can't test Assert::unreachable
+                                    ".*\\/PluginMacros.h|"                 // macros for client plugins
+                                    ".*\\/InitializerList.h|"              // C++ Language Support
+                                    ".*\\/Reflection/.*\\.*|"              // constexpr and templates
+                                    ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates
+                                    ".*\\/SerializationBinary/.*\\.*|"     // constexpr and templates
+                                    ".*\\/LibrariesExtra/.*\\.*"
+                                    ")$";
         arguments[numArguments++] = "--output-dir";                    // 7
         arguments[numArguments++] = "coverage";                        // 8
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
@@ -854,9 +865,20 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
         arguments[numArguments++] = llvmCov.view(); // 2
         arguments[numArguments++] = "report";       // 3
         // TODO: De-hardcode this filter and pass it as a parameter
-        arguments[numArguments++] = "-ignore-filename-regex=" // 6
-                                    "^(.*\\/SC-.*\\.*|.*\\/Tools.*|.*\\Test.(cpp|h|c)|.*\\test.(c|h)|"
-                                    ".*\\/Tests/.*\\.*|.*\\/LibrariesExtra/.*\\.*)$";
+        arguments[numArguments++] = "-ignore-filename-regex=^(" // 6
+                                    ".*\\/Tools.*|"
+                                    ".*\\Test.(cpp|h|c)|"
+                                    ".*\\test.(c|h)|"
+                                    ".*\\/Tests/.*\\.*|"
+                                    ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
+                                    ".*\\/Assert.h|"                       // Can't test Assert::unreachable
+                                    ".*\\/PluginMacros.h|"                 // macros for client plugins
+                                    ".*\\/InitializerList.h|"              // C++ Language Support
+                                    ".*\\/Reflection/.*\\.*|"              // constexpr and templates
+                                    ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates
+                                    ".*\\/SerializationBinary/.*\\.*|"     // constexpr and templates
+                                    ".*\\/LibrariesExtra/.*\\.*"
+                                    ")$";
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
         arguments[numArguments++] = executablePath.view();             // 10
 
@@ -881,7 +903,7 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
             // Define coverage badge color
             StringView coverageColor;
             float      coverageFloat;
-            SC_TRY(coverageString.parseFloat(coverageFloat));
+            SC_TRY_MSG(coverageString.parseFloat(coverageFloat), "Cannot parse coverage percentage");
             if (coverageFloat < 80)
                 coverageColor = "e05d44"; // red
             else if (coverageFloat < 90)

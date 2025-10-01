@@ -79,9 +79,7 @@ struct SocketFlags
     /// @brief Sets the type of shutdown to perform
     enum ShutdownType
     {
-        ShutdownRead,  ///< Shuts down the socket for reading
-        ShutdownWrite, ///< Shuts down the socket for writing
-        ShutdownBoth   ///< Shuts down the socket for both reading and writing
+        ShutdownBoth ///< Shuts down the socket for both reading and writing
     };
 
   private:
@@ -89,11 +87,9 @@ struct SocketFlags
     friend struct SocketIPAddressInternal;
     [[nodiscard]] static AddressFamily AddressFamilyFromInt(int value);
     [[nodiscard]] static unsigned char toNative(AddressFamily family);
-    [[nodiscard]] static SocketType    SocketTypeFromInt(int value);
-    [[nodiscard]] static int           toNative(SocketType family);
 
-    [[nodiscard]] static ProtocolType ProtocolTypeFromInt(int value);
-    [[nodiscard]] static int          toNative(ProtocolType family);
+    [[nodiscard]] static int toNative(SocketType family);
+    [[nodiscard]] static int toNative(ProtocolType family);
 };
 
 /// @brief Native representation of an IP Address.
@@ -133,21 +129,15 @@ struct SocketIPAddress
     [[nodiscard]] bool isValid() const;
 
     /// @brief Returns the text representation of this SocketIPAddress
-    /// @param buffer Buffer to store the ASCII representation of the IP Address
-    /// @return A sub-Span of `buffer` that has the length of actually written bytes
+    /// @param inputSpan Buffer to store the ASCII representation of the IP Address
+    /// @param outputSpan A sub-Span of `inputSpan` that has the length of actually written bytes
     /// @note The buffer must be at least `MAX_ASCII_STRING_LENGTH` bytes long
-    template <size_t N>
-    [[nodiscard]] StringSpan toString(char (&buffer)[N]) const
-    {
-        static_assert(N >= MAX_ASCII_STRING_LENGTH, "Insufficient buffer");
-        return formatAddress(buffer);
-    }
+    [[nodiscard]] bool toString(Span<char> inputSpan, StringSpan& outputSpan) const;
 
     /// @brief Handle to native OS representation of the IP Address
     AlignedStorage<28> handle = {};
 
   private:
-    [[nodiscard]] StringSpan formatAddress(Span<char> buffer) const;
     friend struct SocketServer;
     friend struct SocketClient;
 
@@ -309,8 +299,7 @@ struct SocketNetworking
     [[nodiscard]] static Result initNetworking();
 
     /// @brief Shutdowns Winsock2 on Windows (WSAStartup)
-    /// @return Valid Result if Winsock2 has been successfully shutdown
-    [[nodiscard]] static Result shutdownNetworking();
+    static void shutdownNetworking();
 
     /// @brief Check if initNetworking has been previously called
     /// @return `true` if initNetworking has been previously called

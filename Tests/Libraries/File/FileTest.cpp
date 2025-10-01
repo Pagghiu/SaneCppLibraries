@@ -33,7 +33,6 @@ struct SC::FileTest : public SC::TestCase
 
 void SC::FileTest::testOpen()
 {
-    //! [FileSnippet]
     SmallStringNative<255> filePath = StringEncoding::Native;
     SmallStringNative<255> dirPath  = StringEncoding::Native;
     // Setup the test
@@ -47,6 +46,7 @@ void SC::FileTest::testOpen()
     SC_TEST_EXPECT(fs.makeDirectory(name));
     SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
 
+    //! [FileSnippet]
     // Open a file, write and close it
     FileDescriptor fd;
     SC_TEST_EXPECT(fd.open(filePath.view(), FileOpen::Write));
@@ -60,8 +60,18 @@ void SC::FileTest::testOpen()
     char       buffer[4] = {0};
     Span<char> spanOut;
     SC_TEST_EXPECT(fd.read({buffer, sizeof(buffer)}, spanOut));
-    SC_TEST_EXPECT(fd.close());
+    //! [FileSnippet]
 
+    size_t expectedSize;
+    SC_TEST_EXPECT(fd.sizeInBytes(expectedSize) and expectedSize == 4);
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekEnd, 0));
+    size_t position;
+    SC_TEST_EXPECT(fd.currentPosition(position) and position == expectedSize);
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekCurrent, -1));
+    SC_TEST_EXPECT(fd.currentPosition(position) and position == expectedSize - 1);
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekStart, 0));
+
+    SC_TEST_EXPECT(fd.close());
     // Check if read content matches
     StringView sv(spanOut, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
@@ -70,7 +80,6 @@ void SC::FileTest::testOpen()
     SC_TEST_EXPECT(fs.removeFile(fileName));
     SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
-    //! [FileSnippet]
 }
 
 void SC::FileTest::testOpenStdHandles()

@@ -34,8 +34,6 @@ struct SC::StringConverter::Internal
         size_t size() const { return directAccess.sizeInBytes; }
         char*  data() const { return static_cast<char*>(directAccess.data); }
 
-        Span<const char> toSpanConst() const { return {data(), size()}; }
-
         [[nodiscard]] bool append(Span<const char> span, size_t extraZeroes = 0)
         {
             const size_t oldSize = size();

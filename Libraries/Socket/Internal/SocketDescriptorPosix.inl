@@ -19,10 +19,7 @@ static SC::Result getFileFlags(int flagRead, const int fileDescriptor, int& outF
     {
         outFlags = ::fcntl(fileDescriptor, flagRead);
     } while (outFlags == -1 && errno == EINTR);
-    if (outFlags == -1)
-    {
-        return SC::Result::Error("fcntl getFlag failed");
-    }
+    SC_TRY_MSG(outFlags != -1, "fcntl getFlag failed");
     return SC::Result(true);
 }
 static SC::Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
@@ -33,10 +30,7 @@ static SC::Result setFileFlags(int flagRead, int flagWrite, const int fileDescri
     {
         oldFlags = ::fcntl(fileDescriptor, flagRead);
     } while (oldFlags == -1 && errno == EINTR);
-    if (oldFlags == -1)
-    {
-        return SC::Result::Error("fcntl getFlag failed");
-    }
+    SC_TRY_MSG(oldFlags != -1, "fcntl getFlag failed");
     const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
     if (newFlags != oldFlags)
     {
@@ -45,10 +39,7 @@ static SC::Result setFileFlags(int flagRead, int flagWrite, const int fileDescri
         {
             res = ::fcntl(fileDescriptor, flagWrite, newFlags);
         } while (res == -1 && errno == EINTR);
-        if (res != 0)
-        {
-            return SC::Result::Error("fcntl setFlag failed");
-        }
+        SC_TRY_MSG(res == 0, "fcntl setFlag failed");
     }
     return SC::Result(true);
 }
@@ -113,27 +104,10 @@ SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
 
 SC::Result SC::SocketDescriptor::shutdown(SocketFlags::ShutdownType shutdownType)
 {
+    SC_TRY_MSG(shutdownType == SocketFlags::ShutdownBoth, "Invalid shutdown type");
     int how = 0;
-    switch (shutdownType)
-    {
-    case SocketFlags::ShutdownRead: how = SHUT_RD; break;
-    case SocketFlags::ShutdownWrite: how = SHUT_WR; break;
-    case SocketFlags::ShutdownBoth: how = SHUT_RDWR; break;
-    default: return Result::Error("Invalid shutdown type");
-    }
-    if (::shutdown(handle, how) == 0)
-    {
-        return Result(true);
-    }
-    const int err = errno;
-    switch (err)
-    {
-    case ENOTCONN: return Result::Error("Socket is not connected");
-    case ESHUTDOWN: return Result::Error("Socket is already shutdown");
-    case EINVAL: return Result::Error("Invalid shutdown type");
-    case ENOTSOCK: return Result::Error("Socket is not a socket");
-    default: return Result::Error("Failed to shutdown socket");
-    }
+    SC_TRY_MSG(::shutdown(handle, how) == 0, "shutdown failed");
+    return Result(true);
 }
 
 SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, SocketFlags::SocketType socketType,
@@ -183,5 +157,5 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
 }
 
 SC::Result SC::SocketNetworking::initNetworking() { return Result(true); }
-SC::Result SC::SocketNetworking::shutdownNetworking() { return Result(true); }
+void       SC::SocketNetworking::shutdownNetworking() {}
 bool       SC::SocketNetworking::isNetworkingInited() { return Result(true); }

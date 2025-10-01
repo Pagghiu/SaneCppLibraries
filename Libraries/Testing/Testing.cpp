@@ -63,7 +63,7 @@ SC::TestReport::~TestReport()
     else
     {
         console.print(greenEMOJI);
-        console.print(" TOTAL Succeeded = {}", numTestsSucceeded);
+        console.print(" TOTAL Succeeded = {}", numTestsSucceeded, numTestsSucceeded);
     }
     console.print("\n---------------------------------------------------\n");
 }
@@ -220,14 +220,7 @@ void SC::TestReport::printSectionResult(TestCase& testCase)
         return;
     }
     console.print("\t- ");
-    if (testCase.numSectionTestsFailed > 0)
-    {
-        console.print(redEMOJI);
-    }
-    else
-    {
-        console.print(greenEMOJI);
-    }
+    console.print(testCase.numSectionTestsFailed > 0 ? redEMOJI : greenEMOJI);
     console.print(" {}::{}\n", testCase.testName, currentSection);
 }
 
@@ -248,14 +241,4 @@ bool SC::TestReport::isSectionEnabled(StringSpan sectionName) const
     return sectionToRun.isEmpty() || sectionName == sectionToRun;
 }
 
-int SC::TestReport::getTestReturnCode() const
-{
-    if (numTestsFailed > 0)
-    {
-        return -1;
-    }
-    else
-    {
-        return 0;
-    }
-}
+int SC::TestReport::getTestReturnCode() const { return numTestsFailed > 0 ? -1 : 0; }

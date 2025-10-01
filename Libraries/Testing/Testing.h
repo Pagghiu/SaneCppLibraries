@@ -152,11 +152,10 @@ struct TestCase
     bool     printedSection;
 };
 
+// clang-format off
 /// Records a test expectation (eventually aborting or breaking o n failed test)
-#define SC_TEST_EXPECT(e)                                                                                              \
-    recordExpectation(StringSpan(#e), (e))                                                                             \
-        ? (void)0                                                                                                      \
-        : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)
+#define SC_TEST_EXPECT(e) recordExpectation(StringSpan(#e), (e)) ? (void)0  : (TestCase::report.debugBreakOnFailedTest ? SC_COMPILER_DEBUG_BREAK : (void)0)
+// clang-format on
 
 //! @}
 } // namespace SC

@@ -97,7 +97,7 @@ struct SC::FileDescriptor::Internal
     }
 };
 
-SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
+SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
     int flags = 0;
     switch (seekMode)
@@ -110,7 +110,7 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     DWORD       offsetHigh = static_cast<DWORD>((offset >> 32) & 0xffffffff);
     const DWORD newPos     = ::SetFilePointer(handle, offsetLow, (LONG*)&offsetHigh, flags);
     SC_TRY_MSG(newPos != INVALID_SET_FILE_POINTER, "SetFilePointer failed");
-    return Result(static_cast<uint64_t>(newPos) == offset);
+    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
@@ -309,18 +309,6 @@ struct SC::FileDescriptor::Internal
             return Result::Error("read failed");
         }
     }
-    static Result getFileFlags(int flagRead, const int fileDescriptor, int& outFlags)
-    {
-        do
-        {
-            outFlags = ::fcntl(fileDescriptor, flagRead);
-        } while (outFlags == -1 and errno == EINTR);
-        if (outFlags == -1)
-        {
-            return Result::Error("fcntl getFlag failed");
-        }
-        return Result(true);
-    }
 
     static Result setFileFlags(int flagRead, int flagWrite, const int fileDescriptor, const bool setFlag,
                                const int flag)
@@ -329,11 +317,8 @@ struct SC::FileDescriptor::Internal
         do
         {
             oldFlags = ::fcntl(fileDescriptor, flagRead);
-        } while (oldFlags == -1 and errno == EINTR);
-        if (oldFlags == -1)
-        {
-            return Result::Error("fcntl getFlag failed");
-        }
+        } while (oldFlags == -1 && errno == EINTR);
+        SC_TRY_MSG(oldFlags != -1, "fcntl getFlag failed");
         const int newFlags = setFlag ? oldFlags | flag : oldFlags & (~flag);
         if (newFlags != oldFlags)
         {
@@ -341,23 +326,10 @@ struct SC::FileDescriptor::Internal
             do
             {
                 res = ::fcntl(fileDescriptor, flagWrite, newFlags);
-            } while (res == -1 and errno == EINTR);
-            if (res != 0)
-            {
-                return Result::Error("fcntl setFlag failed");
-            }
+            } while (res == -1 && errno == EINTR);
+            SC_TRY_MSG(res == 0, "fcntl setFlag failed");
         }
-        return Result(true);
-    }
-
-    template <int flag>
-    static Result hasFileStatusFlags(int fileDescriptor, bool& hasFlag)
-    {
-        static_assert(flag == O_NONBLOCK, "hasFileStatusFlags invalid value");
-        int flags = 0;
-        SC_TRY(getFileFlags(F_GETFL, fileDescriptor, flags));
-        hasFlag = (flags & flag) != 0;
-        return Result(true);
+        return SC::Result(true);
     }
 
     template <int flag>
@@ -411,18 +383,15 @@ int SC::FileOpen::toPosixAccess() const { return S_IRUSR | S_IWUSR | S_IRGRP | S
 
 SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
-    if (filePath.getEncoding() == StringEncoding::Utf16)
-    {
-        return Result::Error("FileDescriptor::open: POSIX supports only UTF8 and ASCII encoding");
-    }
+    SC_TRY_MSG(filePath.getEncoding() != StringEncoding::Utf16,
+               "FileDescriptor::open: POSIX supports only UTF8 and ASCII encoding");
     const int flags  = mode.toPosixFlags();
     const int access = mode.toPosixAccess();
 
     StringPath nullTerminated;
     SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
     const char* nullTerminatedPath = nullTerminated.view().bytesIncludingTerminator();
-    if (nullTerminatedPath[0] != '/')
-        return Result::Error("FileDescriptor::open - Path must be absolute");
+    SC_TRY_MSG(nullTerminatedPath[0] == '/', "FileDescriptor::open - Path must be absolute");
     const int fileDescriptor = ::open(nullTerminatedPath, flags, access);
     SC_TRY_MSG(fileDescriptor != -1, "open failed");
     SC_TRY(assign(fileDescriptor));
@@ -433,7 +402,7 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
     return Result(true);
 }
 
-SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
+SC::Result SC::FileDescriptor::seek(SeekMode seekMode, int64_t offset)
 {
     int flags = 0;
     switch (seekMode)
@@ -444,29 +413,23 @@ SC::Result SC::FileDescriptor::seek(SeekMode seekMode, uint64_t offset)
     }
     const off_t res = ::lseek(handle, static_cast<off_t>(offset), flags);
     SC_TRY_MSG(res >= 0, "lseek failed");
-    return Result(static_cast<uint64_t>(res) == offset);
+    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::currentPosition(size_t& position) const
 {
     const off_t fileSize = ::lseek(handle, 0, SEEK_CUR);
-    if (fileSize >= 0)
-    {
-        position = static_cast<size_t>(fileSize);
-        return Result(true);
-    }
-    return Result::Error("lseek failed");
+    SC_TRY_MSG(fileSize >= 0, "lseek failed");
+    position = static_cast<size_t>(fileSize);
+    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
 {
     struct stat fileStat;
-    if (::fstat(handle, &fileStat) == 0)
-    {
-        sizeInBytes = static_cast<size_t>(fileStat.st_size);
-        return Result(true);
-    }
-    return Result::Error("fstat failed");
+    SC_TRY_MSG(::fstat(handle, &fileStat) == 0, "fstat failed");
+    sizeInBytes = static_cast<size_t>(fileStat.st_size);
+    return Result(true);
 }
 
 SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
@@ -544,11 +507,8 @@ SC::Result SC::FileDescriptor::openStdOutDuplicate()
     }
     return assign(duplicated);
 #else
-    int duplicated = ::dup(STDOUT_FILENO);
-    if (duplicated == -1)
-    {
-        return Result::Error("dup failed");
-    }
+    const int duplicated = ::dup(STDOUT_FILENO);
+    SC_TRY_MSG(duplicated != -1, "dup failed");
     return assign(duplicated);
 #endif
 }
@@ -570,11 +530,8 @@ SC::Result SC::FileDescriptor::openStdErrDuplicate()
     }
     return assign(duplicated);
 #else
-    int duplicated = ::dup(STDERR_FILENO);
-    if (duplicated == -1)
-    {
-        return Result::Error("dup failed");
-    }
+    const int duplicated = ::dup(STDERR_FILENO);
+    SC_TRY_MSG(duplicated != -1, "dup failed");
     return assign(duplicated);
 #endif
 }
@@ -596,11 +553,8 @@ SC::Result SC::FileDescriptor::openStdInDuplicate()
     }
     return assign(duplicated);
 #else
-    int duplicated = ::dup(STDIN_FILENO);
-    if (duplicated == -1)
-    {
-        return Result::Error("dup failed");
-    }
+    const int duplicated = ::dup(STDIN_FILENO);
+    SC_TRY_MSG(duplicated != -1, "dup failed");
     return assign(duplicated);
 #endif
 }
@@ -735,10 +689,7 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
         res = ::pipe(pipes);
     } while (res == -1 and errno == EINTR);
 
-    if (res != 0)
-    {
-        return Result::Error("PipeDescriptor::createPipe - pipe failed");
-    }
+    SC_TRY_MSG(res == 0, "PipeDescriptor::createPipe - pipe failed");
     SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe");
     SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
     // On Posix by default descriptors are inheritable

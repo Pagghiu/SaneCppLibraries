@@ -14,9 +14,21 @@ struct SC::StringSpanTest : public SC::TestCase
 {
     StringSpanTest(SC::TestReport& report) : TestCase(report, "StringSpanTest")
     {
+
+        if (test_section("StringSpan"))
+        {
+            testStringSpan();
+        }
+        if (test_section("StringPath"))
+        {
+            testStringPath();
+        }
+    }
+
+    void testStringSpan()
+    {
         using SS = StringSpan;
         using C  = SS::Comparison;
-
         // Test operator==
         {
             SS a("hello");
@@ -230,6 +242,17 @@ struct SC::StringSpanTest : public SC::TestCase
             SS emoji2_span(utf8_emoji2, false, StringEncoding::Utf8);
             SC_TEST_EXPECT(emoji1_span.compare(emoji2_span) == C::Smaller);
         }
+    }
+
+    void testStringPath()
+    {
+        StringPath test;
+
+        SC_TEST_EXPECT(test.assign(report.libraryRootDirectory.view()));
+        GrowableBuffer<StringPath> bufTest = {test};
+        SC_TEST_EXPECT(not bufTest.tryGrowTo(StringPath::MaxPath * 3));
+        char excessivePath[StringPath::MaxPath + 1] = {'a'};
+        SC_TEST_EXPECT(not test.assign({{excessivePath, StringPath::MaxPath + 1}, false, StringEncoding::Ascii}));
     }
 };
 

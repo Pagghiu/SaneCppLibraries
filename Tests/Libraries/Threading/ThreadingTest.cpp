@@ -60,9 +60,26 @@ void SC::ThreadingTest::testThread()
         threadCalled = true;
     };
     SC_TEST_EXPECT(thread.start(lambda));
+    SC_TEST_EXPECT(thread.threadID() != 0);
     SC_TEST_EXPECT(thread.join());
+    SC_TEST_EXPECT(thread.threadID() == 0);
     SC_TEST_EXPECT(not thread.detach());
     SC_TEST_EXPECT(threadCalled);
+
+    Atomic<int> atomicInt(0);
+
+    auto lambdaDetach = [&](Thread& thread)
+    {
+        thread.setThreadName(SC_NATIVE_STR("detach thread"));
+        atomicInt.exchange(1);
+    };
+    thread.start(lambdaDetach);
+    SC_TEST_EXPECT(thread.detach());
+    SC_TEST_EXPECT(thread.threadID() == 0);
+    while (atomicInt.load() == 0)
+    {
+        Thread::Sleep(1);
+    }
 }
 
 void SC::ThreadingTest::testEventObject()

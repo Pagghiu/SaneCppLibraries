@@ -26,6 +26,11 @@ struct SC::ConsoleTest : public SC::TestCase
         {
             String str = StringView("Test Test\n");
             console.print(str.view());
+            console.print({});
+            SC_TEST_EXPECT(console.print("test {}", 1));
+            SC_TEST_EXPECT(not console.print("test {}"_u16, 1));
+            SC_TEST_EXPECT(console.print("test {}", StringSpan("1")));
+            SC_TEST_EXPECT(not console.print("test {}"_u16, StringSpan("1")));
         }
     }
 };

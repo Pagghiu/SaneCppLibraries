@@ -28,15 +28,6 @@ bool SC::Console::tryAttachingToParentConsole()
 #endif
 }
 
-bool SC::Console::isAttachedToConsole()
-{
-#if SC_PLATFORM_WINDOWS
-    return ::GetConsoleWindow() != 0;
-#else
-    return true;
-#endif
-}
-
 void SC::Console::printLine(const StringSpan str)
 {
     print(str);

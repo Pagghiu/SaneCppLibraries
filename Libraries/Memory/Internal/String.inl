@@ -45,8 +45,7 @@ bool SC::String::assign(StringSpan sv)
     encoding             = sv.getEncoding();
     const size_t length  = sv.sizeInBytes();
     const size_t numZero = StringEncodingGetSize(encoding);
-    if (not data.resizeWithoutInitializing(length + numZero))
-        return false;
+    SC_TRY(data.resizeWithoutInitializing(length + numZero));
     if (sv.isNullTerminated())
     {
         memcpy(data.data(), sv.bytesWithoutTerminator(), length + numZero);
