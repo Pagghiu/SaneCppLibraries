@@ -6,6 +6,7 @@
 #include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringConverter.h"
 
 #include "Examples/ISCExample.h"
 
@@ -198,7 +199,10 @@ struct HotReloadView
                 {
                     ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
                 }
-                ImGui::Text("%s", library.definition.identity.name.view().bytesIncludingTerminator());
+                SmallString<256> pluginUTF8 = StringEncoding::Utf8;
+                (void)StringConverter::appendEncodingTo(StringEncoding::Utf8, library.definition.identity.name.view(),
+                                                        pluginUTF8, StringConverter::NullTerminate);
+                ImGui::Text("%s", pluginUTF8.view().bytesIncludingTerminator());
                 if (library.lastErrorLog.isEmpty())
                 {
                     if (ImGui::IsItemHovered())
@@ -254,7 +258,10 @@ struct HotReloadView
             const PluginDynamicLibrary& library = system.registry.getPluginDynamicLibraryAt(idx);
             ImGui::SameLine();
 
-            if (ImGui::Button(library.definition.identity.name.view().bytesIncludingTerminator()))
+            SmallString<256> pluginUTF8 = StringEncoding::Utf8;
+            (void)StringConverter::appendEncodingTo(StringEncoding::Utf8, library.definition.identity.name.view(),
+                                                    pluginUTF8, StringConverter::NullTerminate);
+            if (ImGui::Button(pluginUTF8.view().bytesIncludingTerminator()))
             {
                 res            = true;
                 viewState.page = idx;
@@ -278,8 +285,10 @@ struct HotReloadView
         }
         else if (not library.lastErrorLog.isEmpty())
         {
-            ImGui::Text("Example %s failed to compile:",
-                        library.definition.identity.name.view().bytesIncludingTerminator());
+            SmallString<256> pluginUTF8 = StringEncoding::Utf8;
+            (void)StringConverter::appendEncodingTo(StringEncoding::Utf8, library.definition.identity.name.view(),
+                                                    pluginUTF8, StringConverter::NullTerminate);
+            ImGui::Text("Example %s failed to compile:", pluginUTF8.view().bytesIncludingTerminator());
             ImGui::PushStyleColor(ImGuiCol_Text, 0xff0000ff);
             ImGui::Text("%s", library.lastErrorLog.bytesIncludingTerminator());
             ImGui::PopStyleColor();
