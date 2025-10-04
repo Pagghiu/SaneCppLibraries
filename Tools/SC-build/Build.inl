@@ -842,6 +842,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
                                     ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
                                     ".*\\/Assert.h|"                       // Can't test Assert::unreachable
                                     ".*\\/PluginMacros.h|"                 // macros for client plugins
+                                    ".*\\/ProcessPosixFork.inl|"           // Can't compute coverage for fork
+                                    ".*\\/EnvironmentTable.h|"             // Can't compute coverage for fork
                                     ".*\\/InitializerList.h|"              // C++ Language Support
                                     ".*\\/Reflection/.*\\.*|"              // constexpr and templates
                                     ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates
@@ -873,6 +875,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
                                     ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
                                     ".*\\/Assert.h|"                       // Can't test Assert::unreachable
                                     ".*\\/PluginMacros.h|"                 // macros for client plugins
+                                    ".*\\/ProcessPosixFork.inl|"           // Can't compute coverage for fork
+                                    ".*\\/EnvironmentTable.h|"             // Can't compute coverage for fork
                                     ".*\\/InitializerList.h|"              // C++ Language Support
                                     ".*\\/Reflection/.*\\.*|"              // constexpr and templates
                                     ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates

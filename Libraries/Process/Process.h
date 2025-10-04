@@ -78,9 +78,9 @@ struct SC_COMPILER_EXPORT Process
         template <typename T>
         StdStream(T& destination)
         {
-            GrowableBuffer<T>& gbuf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
-            placementNew(gbuf, destination);
-            growableBuffer = &gbuf;
+            GrowableBuffer<T>& buf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
+            placementNew(buf, destination);
+            growableBuffer = &buf;
             operation      = Operation::GrowableBuffer;
         }
 
@@ -301,8 +301,11 @@ struct SC_COMPILER_EXPORT Process
     Process* next = nullptr;
     Process* prev = nullptr;
     struct Internal;
+    struct InternalFork;
     friend struct ProcessFork;
     Result launchImplementation();
+    Result launchForkChild(PipeDescriptor& pipe);
+    Result launchForkParent(PipeDescriptor& pipe, const void* previousSignals);
 };
 
 /// @brief Execute multiple child processes chaining input / output between them.

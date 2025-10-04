@@ -3,13 +3,14 @@
 #include "Process.h"
 #include "../File/File.h"
 
-#include "Internal/EnvironmentTable.h"
+#include "Internal/EnvironmentTable.h" // Needed for SingleFileLibs
 #include "Internal/StringsArena.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ProcessWindows.inl"
 #else
-#include "Internal/ProcessPosix.inl" // IWYU pragma: keep
+#include "Internal/ProcessPosix.inl"     // IWYU pragma: keep
+#include "Internal/ProcessPosixFork.inl" // IWYU pragma: keep
 #endif
 
 //-------------------------------------------------------------------------------------------------------
