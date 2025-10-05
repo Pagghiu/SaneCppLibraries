@@ -4,6 +4,7 @@
 #include "../../Foundation/Result.h"
 #include "../../Process/Process.h"
 #include "../../Strings/StringView.h"
+#include "PluginFileSystem.h"
 
 namespace SC
 {
@@ -17,8 +18,8 @@ struct VisualStudioPathFinder
     /// @brief Constructs a VisualStudioPathFinder and check if VS locator exists or not
     VisualStudioPathFinder()
     {
-        const StringView wsp = "C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
-        if (FileSystem().exists(wsp))
+        const StringView wsp = L"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+        if (PluginFileSystem::existsAndIsFileAbsolute(wsp))
             vsWherePath = wsp;
     }
 

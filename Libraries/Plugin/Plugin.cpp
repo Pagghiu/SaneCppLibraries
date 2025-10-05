@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
-#include "../FileSystem/FileSystem.h"
 #include "../FileSystemIterator/FileSystemIterator.h"
 #include "../Foundation/Deferred.h"
 #include "../Process/Internal/StringsArena.h"
@@ -10,6 +9,7 @@
 #include "../Strings/Path.h"
 #include "../Strings/StringBuilder.h"
 
+#include "Internal/PluginFileSystem.h" // This must be included before VisualStudioPathFinder.h for the unity build
 #if SC_PLATFORM_WINDOWS
 #include "Internal/DebuggerWindows.inl"
 #include "Internal/VisualStudioPathFinder.h"
@@ -189,8 +189,6 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
     FileSystemIterator fsIterator;
     fsIterator.options.recursive = false; // Manually recurse only first level dirs
     SC_TRY(fsIterator.init(directory, recurseStack));
-    FileSystem fs;
-    SC_TRY(fs.init(directory));
     bool   multiplePluginDefinitions = false;
     size_t numDefinitions            = 0;
     auto   deferWriteDefinitions     = MakeDeferred(
@@ -236,7 +234,7 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
                 SC_TRY(pluginFile.absolutePath.assign(item.path));
                 SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
             }
-            SC_TRY(fs.read(item.path, move(tempFileBuffer)));
+            SC_TRY(PluginFileSystem::readAbsoluteFile(item.path, move(tempFileBuffer)));
             StringView extracted;
             StringView fileView = {{tempFileBuffer.data(), tempFileBuffer.size()}, false, StringEncoding::Utf8};
             if (PluginDefinition::find(fileView, extracted))
@@ -356,10 +354,9 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
                 StringBuilder compilerBuilder2(bestCompiler, StringBuilder::DoNotClear);
                 SC_TRY(compilerBuilder2.append(L"cl.exe"));
                 compilerBuilder2.finalize();
-                FileSystem fs;
-                if (fs.init(base))
                 {
-                    if (fs.existsAndIsFile(bestCompiler.view()) and fs.existsAndIsFile(bestLinker.view()))
+                    if (PluginFileSystem::existsAndIsFileAbsolute(bestCompiler.view()) and
+                        PluginFileSystem::existsAndIsFileAbsolute(bestLinker.view()))
                     {
                         StringViewTokenizer tokenizer(candidate);
                         int                 idx = 0;
@@ -660,11 +657,10 @@ SC::Result SC::PluginDynamicLibrary::unload()
     {
         StringPath pdbFile;
         SC_TRY(definition.getDynamicLibraryPDBAbsolutePath(pdbFile));
-        FileSystem fs;
-        if (fs.existsAndIsFile(pdbFile.view()))
+        if (PluginFileSystem::existsAndIsFileAbsolute(pdbFile.view()))
         {
             SC_TRY(Debugger::unlockFileFromAllProcesses(pdbFile.view()));
-            SC_TRY(Debugger::deleteForcefullyUnlockedFile(pdbFile.view()))
+            SC_TRY(Debugger::deleteForcefullyUnlockedFile(pdbFile.view()));
         }
     }
 #endif
@@ -954,31 +950,29 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
     PluginDynamicLibrary* res = findPlugin(identifier);
     SC_TRY(res != nullptr);
     PluginDynamicLibrary& lib = *res;
-    FileSystem            fs;
-    SC_TRY(fs.init(lib.definition.directory.view()));
-    StringPath buffer;
+    StringPath            buffer;
 
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(StringBuilder::format(buffer, "{}.lib", identifier));
-    SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(StringBuilder::format(buffer, "{}.exp", identifier));
-    SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(StringBuilder::format(buffer, "{}.ilk", identifier));
-    SC_TRY(fs.removeFile(buffer.view()));
-    SC_TRY(StringBuilder::format(buffer, "{}.dll", identifier));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".lib"));
+    SC_TRY(PluginFileSystem::removeFileAbsolute(buffer.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".exp"));
+    SC_TRY(PluginFileSystem::removeFileAbsolute(buffer.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".ilk"));
+    SC_TRY(PluginFileSystem::removeFileAbsolute(buffer.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".dll"));
     int numTries = 10;
-    while (not fs.removeFile(buffer.view()))
+    while (not PluginFileSystem::removeFileAbsolute(buffer.view()))
     {
         ::Sleep(10); // It looks like FreeLibrary needs some time to avoid getting access denied
         numTries--;
         SC_TRY_MSG(numTries >= 0, "PluginRegistry: Cannot remove dll");
     }
 #elif SC_PLATFORM_APPLE
-    SC_TRY(StringBuilder::format(buffer, "{}.dylib", identifier));
-    SC_TRY(fs.removeFile(buffer.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".dylib"));
+    SC_TRY(PluginFileSystem::removeFileAbsolute(buffer.view()));
 #else
-    SC_TRY(StringBuilder::format(buffer, "{}.so", identifier));
-    SC_TRY(fs.removeFile(buffer.view()));
+    SC_TRY(StringBuilder::format(buffer, "{}/{}{}", lib.definition.directory.view(), identifier, ".so"));
+    SC_TRY(PluginFileSystem::removeFileAbsolute(buffer.view()));
 #endif
     for (auto& file : lib.definition.files)
     {
@@ -989,7 +983,7 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
         SC_TRY(Path::join(destFile, {dirname, outputName}));
         StringBuilder builder(destFile);
         SC_TRY(builder.append(".o"));
-        SC_TRY(fs.removeFile(builder.finalize()));
+        SC_TRY(PluginFileSystem::removeFileAbsolute(builder.finalize()));
     }
     return Result(true);
 }

@@ -13,8 +13,8 @@
 @note The above code is simplified. For a more complete implementation of an hot-reload system see [SCExample](@ref page_examples) code (`HotReloadSystem.h`).
 
 # Dependencies
-- Dependencies: [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
-- All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
+- Dependencies: [FileSystemIterator](@ref library_file_system_iterator), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
+- All dependencies: [File](@ref library_file), [FileSystemIterator](@ref library_file_system_iterator), [Foundation](@ref library_foundation), [Process](@ref library_process), [Strings](@ref library_strings), [Time](@ref library_time)
 
 ![Dependency Graph](Plugin.svg)
 

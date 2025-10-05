@@ -197,7 +197,6 @@
     },
     "Plugin": {
         "direct_dependencies": [
-            "FileSystem",
             "FileSystemIterator",
             "Foundation",
             "Process",
@@ -205,7 +204,6 @@
             "Time"
         ],
         "minimal_dependencies": [
-            "FileSystem",
             "FileSystemIterator",
             "Process",
             "Strings",
@@ -213,7 +211,6 @@
         ],
         "all_dependencies": [
             "File",
-            "FileSystem",
             "FileSystemIterator",
             "Foundation",
             "Process",
