@@ -165,6 +165,7 @@ struct PluginScanner
   private:
     static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
                                 IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions);
+    struct ScannerState;
 };
 
 /// @brief Compiles a plugin to a dynamic library
@@ -216,7 +217,7 @@ struct PluginCompiler
     Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
                        const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
                        StringView objectFile, Span<char>& compilerLog) const;
-    struct Internal;
+    struct CompilerFinder;
 };
 
 /// @brief Holds include and library paths for a system toolchain, used to let plugins link to libc and libc++

@@ -181,92 +181,62 @@ bool SC::PluginDefinition::parseLine(StringIteratorASCII& iterator, StringView& 
     return value.sizeInBytes() > 0;
 }
 
-SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<PluginDefinition> definitions,
-                                            IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
+struct SC::PluginScanner::ScannerState
 {
-    FileSystemIterator::FolderState recurseStack[16];
+    Span<PluginDefinition> definitions;
 
-    FileSystemIterator fsIterator;
-    fsIterator.options.recursive = false; // Manually recurse only first level dirs
-    SC_TRY(fsIterator.init(directory, recurseStack));
-    bool   multiplePluginDefinitions = false;
-    size_t numDefinitions            = 0;
-    auto   deferWriteDefinitions     = MakeDeferred(
-        [&]
-        {
-            if (numDefinitions > 0)
-                foundDefinitions = {definitions.data(), numDefinitions};
-            else
-                foundDefinitions = {};
-        });
-    // Iterate each directory at first level and tentatively build a Plugin PluginDefinition.
-    // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
-    // Both no plugin definition (identity.identifier.isEmpty()) and multiple
-    // contradictory plugin definitions (multiplePluginDefinitions) will prevent creation of the Plugin PluginDefinition
-    while (fsIterator.enumerateNext())
+    size_t numDefinitions      = 0;
+    bool   multipleDefinitions = false;
+
+    Result storeTentativePluginFolder(StringView pluginDirectory)
     {
-        const auto& item = fsIterator.get();
-        if (item.isDirectory() and item.level == 0) // only recurse first level
+        if (numDefinitions == 0 or not definitions[numDefinitions - 1].identity.identifier.isEmpty())
         {
-            SC_TRY(fsIterator.recurseSubdirectory());
-            const StringView pluginDirectory = item.path;
-            if (numDefinitions == 0 or not definitions[numDefinitions - 1].identity.identifier.isEmpty())
-            {
-                if (numDefinitions >= definitions.sizeInElements())
-                    return Result::Error("Insufficient size of PluginDefinitions span");
-                numDefinitions++;
-                definitions[numDefinitions - 1] = {};
-            }
-            PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
-            pluginDefinition.files.clear();
-            SC_TRY(pluginDefinition.directory.assign(pluginDirectory));
-            multiplePluginDefinitions = false;
+            if (numDefinitions >= definitions.sizeInElements())
+                return Result::Error("Insufficient size of PluginDefinitions span");
+            numDefinitions++;
+            definitions[numDefinitions - 1] = {};
         }
-        if (item.level == 1 and StringView(item.name).endsWith(SC_NATIVE_STR(".cpp")))
+        PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
+        pluginDefinition.files.clear();
+        SC_TRY(pluginDefinition.directory.assign(pluginDirectory));
+        multipleDefinitions = false;
+        return Result(true);
+    }
+
+    Result tryParseCandidate(StringView candidate, IGrowableBuffer&& tempFileBuffer)
+    {
+        PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
         {
-            if (multiplePluginDefinitions)
+            PluginFile pluginFile;
+            SC_TRY(pluginFile.absolutePath.assign(candidate));
+            SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
+        }
+        SC_TRY(PluginFileSystem::readAbsoluteFile(candidate, move(tempFileBuffer)));
+        StringView extracted;
+        StringView fileView = {{tempFileBuffer.data(), tempFileBuffer.size()}, false, StringEncoding::Utf8};
+        if (PluginDefinition::find(fileView, extracted))
+        {
+            if (PluginDefinition::parse(extracted, pluginDefinition))
             {
-                continue;
-            }
-            PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
-            {
-                PluginFile pluginFile;
-                SC_TRY(pluginFile.absolutePath.assign(item.path));
-                SC_TRY(pluginDefinition.files.push_back(move(pluginFile)));
-            }
-            SC_TRY(PluginFileSystem::readAbsoluteFile(item.path, move(tempFileBuffer)));
-            StringView extracted;
-            StringView fileView = {{tempFileBuffer.data(), tempFileBuffer.size()}, false, StringEncoding::Utf8};
-            if (PluginDefinition::find(fileView, extracted))
-            {
-                if (PluginDefinition::parse(extracted, pluginDefinition))
+                if (pluginDefinition.identity.identifier.isEmpty())
                 {
-                    if (pluginDefinition.identity.identifier.isEmpty())
-                    {
-                        const StringView identifier = Path::basename(pluginDefinition.directory.view(), Path::AsNative);
-                        SC_TRY(pluginDefinition.identity.identifier.assign(identifier));
-                        pluginDefinition.pluginFileIndex = pluginDefinition.files.size() - 1;
-                    }
-                    else
-                    {
-                        multiplePluginDefinitions            = true;
-                        pluginDefinition.identity.identifier = {};
-                    }
+                    const StringView identifier = Path::basename(pluginDefinition.directory.view(), Path::AsNative);
+                    SC_TRY(pluginDefinition.identity.identifier.assign(identifier));
+                    pluginDefinition.pluginFileIndex = pluginDefinition.files.size() - 1;
+                }
+                else
+                {
+                    multipleDefinitions                  = true;
+                    pluginDefinition.identity.identifier = {};
                 }
             }
         }
+        return Result(true);
     }
-    // Cleanup the last definition if case it's not valid
-    if (numDefinitions != 0)
-    {
-        PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
-        if (pluginDefinition.identity.identifier.isEmpty())
-        {
-            numDefinitions--;
-            definitions[numDefinitions] = {};
-        }
-    }
-    auto bubbleSort = [](auto first, auto last, auto predicate)
+
+    template <typename T, typename P>
+    static void bubbleSort(T* first, T* last, P predicate)
     {
         if (first >= last)
         {
@@ -290,13 +260,72 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
             }
         }
     };
-    bubbleSort(definitions.begin(), definitions.begin() + numDefinitions,
-               [](const PluginDefinition& a, const PluginDefinition& b)
-               { return a.identity.name.view() < b.identity.name.view(); });
+
+    void writeDefinitions(Span<PluginDefinition>& foundDefinitions)
+    {
+        // Cleanup the last definition if case it's not valid
+        if (numDefinitions != 0)
+        {
+            PluginDefinition& pluginDefinition = definitions[numDefinitions - 1];
+            if (pluginDefinition.identity.identifier.isEmpty())
+            {
+                numDefinitions--;
+                definitions[numDefinitions] = {};
+            }
+        }
+        bubbleSort(definitions.begin(), definitions.begin() + numDefinitions,
+                   [](const PluginDefinition& a, const PluginDefinition& b)
+                   { return a.identity.name.view() < b.identity.name.view(); });
+
+        if (numDefinitions > 0)
+        {
+            foundDefinitions = {definitions.data(), numDefinitions};
+        }
+        else
+        {
+            foundDefinitions = {};
+        }
+    }
+};
+
+SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<PluginDefinition> definitions,
+                                            IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
+{
+    ScannerState scannerState = {definitions};
+
+    FileSystemIterator::FolderState recurseStack[16];
+    FileSystemIterator              fsIterator;
+    fsIterator.options.recursive = false; // Manually recurse only first level dirs
+    SC_TRY(fsIterator.init(directory, recurseStack));
+    // Iterate each directory at first level and tentatively build a Plugin PluginDefinition.
+    // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
+    // Both no plugin definition (identity.identifier.isEmpty()) and multiple contradictory plugin
+    // definitions (multipleDefinitions) will prevent creation of the Plugin PluginDefinition.
+    while (fsIterator.enumerateNext())
+    {
+        const auto& item = fsIterator.get();
+        if (item.isDirectory() and item.level == 0)
+        {
+            // Immediately recurse to find candidates (enumerateNext will list files inside this folder)
+            SC_TRY(fsIterator.recurseSubdirectory());
+            SC_TRY(scannerState.storeTentativePluginFolder(item.path));
+        }
+        if (item.level == 1 and StringView(item.name).endsWith(SC_NATIVE_STR(".cpp")))
+        {
+            // Inside any of the folder that have been tentatively added
+            if (scannerState.multipleDefinitions)
+            {
+                continue;
+            }
+            SC_TRY(scannerState.tryParseCandidate(item.path, move(tempFileBuffer)));
+        }
+    }
+
+    scannerState.writeDefinitions(foundDefinitions);
     return fsIterator.checkErrors();
 }
-
-SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
+#if SC_PLATFORM_WINDOWS
+struct SC::PluginCompiler::CompilerFinder
 {
     struct Version
     {
@@ -306,6 +335,81 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
 
         bool operator<(const Version other) const { return value() < other.value(); }
     };
+
+    StringPath bestCompiler;
+    StringPath bestLinker;
+    bool       found = false;
+    Version    version, bestVersion;
+
+    Result tryFindCompiler(StringView base, StringView candidate, PluginCompiler& compiler)
+    {
+
+        StringBuilder compilerBuilder(bestCompiler, StringBuilder::Clear);
+        SC_TRY(compilerBuilder.append(base));
+        SC_TRY(compilerBuilder.append(SC_NATIVE_STR("/")));
+        SC_TRY(compilerBuilder.append(candidate));
+#if SC_PLATFORM_ARM64
+        SC_TRY(compilerBuilder.append(SC_NATIVE_STR("/bin/Hostarm64/arm64/")));
+#else
+#if SC_PLATFORM_64_BIT
+        SC_TRY(compilerBuilder.append(SC_NATIVE_STR("/bin/Hostx64/x64/")));
+#else
+        SC_TRY(compilerBuilder.append(SC_NATIVE_STR("/bin/Hostx64/x86/")));
+#endif
+#endif
+        compilerBuilder.finalize();
+
+        SC_TRY(bestLinker.assign(bestCompiler.view()));
+        StringBuilder linkerBuilder(bestLinker);
+        SC_TRY(linkerBuilder.append(SC_NATIVE_STR("link.exe")));
+        linkerBuilder.finalize();
+        StringBuilder compilerBuilder2(bestCompiler, StringBuilder::DoNotClear);
+        SC_TRY(compilerBuilder2.append(SC_NATIVE_STR("cl.exe")));
+        compilerBuilder2.finalize();
+        {
+            if (PluginFileSystem::existsAndIsFileAbsolute(bestCompiler.view()) and
+                PluginFileSystem::existsAndIsFileAbsolute(bestLinker.view()))
+            {
+                StringViewTokenizer tokenizer(candidate);
+                int                 idx = 0;
+                while (tokenizer.tokenizeNext('.', StringViewTokenizer::SkipEmpty))
+                {
+                    int number;
+                    if (not tokenizer.component.parseInt32(number) or number < 0 or number > 255 or idx > 2)
+                    {
+                        continue;
+                    }
+                    version.version[idx] = static_cast<unsigned char>(number);
+                    idx++;
+                }
+                if (bestVersion < version)
+                {
+                    bestVersion = version;
+                    SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
+                    SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
+                    StringPath sysrootInclude;
+                    SC_TRY(StringBuilder::format(sysrootInclude, "{0}/{1}/include", base, candidate));
+                    SC_TRY(compiler.compilerIncludePaths.push_back(sysrootInclude));
+                    StringPath sysrootLib;
+                    StringView instructionSet = "x86_64";
+                    switch (HostInstructionSet)
+                    {
+                    case InstructionSet::Intel32: instructionSet = "x86"; break;
+                    case InstructionSet::Intel64: instructionSet = "x64"; break;
+                    case InstructionSet::ARM64: instructionSet = "arm64"; break;
+                    }
+                    SC_TRY(StringBuilder::format(sysrootLib, "{0}/{1}/lib/{2}", base, candidate, instructionSet));
+                    SC_TRY(compiler.compilerLibraryPaths.push_back(sysrootLib));
+                }
+                found = true;
+            }
+        }
+        return Result(true);
+    }
+};
+#endif
+SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
+{
 #if SC_PLATFORM_WINDOWS
     // TODO: can we use findLatest in order to avoid finding best compiler version...?
     FixedVector<StringPath, 8> rootPaths;
@@ -314,11 +418,7 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
         (void)Path::join(base, {base.view(), "VC", "Tools", "MSVC"});
 
     compiler.type = Type::MicrosoftCompiler;
-    bool    found = false;
-    Version version, bestVersion;
-
-    StringPath bestCompiler;
-    StringPath bestLinker;
+    CompilerFinder compilerFinder;
     for (const auto& basePath : rootPaths)
     {
         FileSystemIterator::FolderState recurseStack[16];
@@ -332,75 +432,15 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
             if (fsIterator.get().isDirectory())
             {
                 const StringView candidate = fsIterator.get().name;
-                StringBuilder    compilerBuilder(bestCompiler, StringBuilder::Clear);
-                SC_TRY(compilerBuilder.append(base));
-                SC_TRY(compilerBuilder.append(L"/"));
-                SC_TRY(compilerBuilder.append(candidate));
-#if SC_PLATFORM_ARM64
-                SC_TRY(compilerBuilder.append(L"/bin/Hostarm64/arm64/"));
-#else
-#if SC_PLATFORM_64_BIT
-                SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x64/"));
-#else
-                SC_TRY(compilerBuilder.append(L"/bin/Hostx64/x86/"));
-#endif
-#endif
-                compilerBuilder.finalize();
-
-                SC_TRY(bestLinker.assign(bestCompiler.view()));
-                StringBuilder linkerBuilder(bestLinker);
-                SC_TRY(linkerBuilder.append(L"link.exe"));
-                linkerBuilder.finalize();
-                StringBuilder compilerBuilder2(bestCompiler, StringBuilder::DoNotClear);
-                SC_TRY(compilerBuilder2.append(L"cl.exe"));
-                compilerBuilder2.finalize();
-                {
-                    if (PluginFileSystem::existsAndIsFileAbsolute(bestCompiler.view()) and
-                        PluginFileSystem::existsAndIsFileAbsolute(bestLinker.view()))
-                    {
-                        StringViewTokenizer tokenizer(candidate);
-                        int                 idx = 0;
-                        while (tokenizer.tokenizeNext('.', StringViewTokenizer::SkipEmpty))
-                        {
-                            int number;
-                            if (not tokenizer.component.parseInt32(number) or number < 0 or number > 255 or idx > 2)
-                            {
-                                continue;
-                            }
-                            version.version[idx] = static_cast<char>(number);
-                            idx++;
-                        }
-                        if (bestVersion < version)
-                        {
-                            bestVersion = version;
-                            SC_TRY(compiler.compilerPath.assign(bestCompiler.view()));
-                            SC_TRY(compiler.linkerPath.assign(bestLinker.view()));
-                            StringPath sysrootInclude;
-                            SC_TRY(StringBuilder::format(sysrootInclude, "{0}/{1}/include", base, candidate));
-                            SC_TRY(compiler.compilerIncludePaths.push_back(sysrootInclude));
-                            StringPath sysrootLib;
-                            StringView instructionSet = "x86_64";
-                            switch (HostInstructionSet)
-                            {
-                            case InstructionSet::Intel32: instructionSet = "x86"; break;
-                            case InstructionSet::Intel64: instructionSet = "x64"; break;
-                            case InstructionSet::ARM64: instructionSet = "arm64"; break;
-                            }
-                            SC_TRY(
-                                StringBuilder::format(sysrootLib, "{0}/{1}/lib/{2}", base, candidate, instructionSet));
-                            SC_TRY(compiler.compilerLibraryPaths.push_back(sysrootLib));
-                        }
-                        found = true;
-                    }
-                }
+                SC_TRY(compilerFinder.tryFindCompiler(base, candidate, compiler));
             }
         }
-        if (found)
+        if (compilerFinder.found)
         {
             break;
         }
     }
-    if (not found)
+    if (not compilerFinder.found)
     {
         return Result::Error("Visual Studio PluginCompiler not found");
     }
