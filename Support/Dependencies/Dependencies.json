@@ -197,21 +197,18 @@
     },
     "Plugin": {
         "direct_dependencies": [
-            "FileSystemIterator",
             "Foundation",
             "Process",
             "Strings",
             "Time"
         ],
         "minimal_dependencies": [
-            "FileSystemIterator",
             "Process",
             "Strings",
             "Time"
         ],
         "all_dependencies": [
             "File",
-            "FileSystemIterator",
             "Foundation",
             "Process",
             "Strings",

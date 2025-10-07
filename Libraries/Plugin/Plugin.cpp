@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
-#include "../FileSystemIterator/FileSystemIterator.h"
 #include "../Foundation/Deferred.h"
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
@@ -13,8 +12,10 @@
 #if SC_PLATFORM_WINDOWS
 #include "Internal/DebuggerWindows.inl"
 #include "Internal/VisualStudioPathFinder.h"
+
 #endif
 #include "Internal/DynamicLibrary.inl"
+#include "Internal/PluginFileSystemIterator.h"
 
 struct SC::PluginCompilerEnvironment::Internal
 {
@@ -293,36 +294,52 @@ SC::Result SC::PluginScanner::scanDirectory(const StringView directory, Span<Plu
 {
     ScannerState scannerState = {definitions};
 
-    FileSystemIterator::FolderState recurseStack[16];
-    FileSystemIterator              fsIterator;
-    fsIterator.options.recursive = false; // Manually recurse only first level dirs
-    SC_TRY(fsIterator.init(directory, recurseStack));
-    // Iterate each directory at first level and tentatively build a Plugin PluginDefinition.
-    // A plugin will be valid if only a single Plugin PluginDefinition will be parsed.
-    // Both no plugin definition (identity.identifier.isEmpty()) and multiple contradictory plugin
-    // definitions (multipleDefinitions) will prevent creation of the Plugin PluginDefinition.
-    while (fsIterator.enumerateNext())
+    StringPath pathBuffer;
+    SC_TRY(pathBuffer.assign(directory));
+
+    PluginFileSystemIterator iterator;
+    SC_TRY(iterator.init(directory));
+    PluginFileSystemIterator::Entry entry;
+    while (iterator.next(entry))
     {
-        const auto& item = fsIterator.get();
-        if (item.isDirectory() and item.level == 0)
+        if (entry.name == SC_NATIVE_STR(".") or entry.name == SC_NATIVE_STR(".."))
         {
-            // Immediately recurse to find candidates (enumerateNext will list files inside this folder)
-            SC_TRY(fsIterator.recurseSubdirectory());
-            SC_TRY(scannerState.storeTentativePluginFolder(item.path));
+            continue; // skip . and ..
         }
-        if (item.level == 1 and StringView(item.name).endsWith(SC_NATIVE_STR(".cpp")))
+        StringPath fullPath = pathBuffer;
+        SC_TRY(fullPath.append(iterator.pathSeparator));
+        SC_TRY(fullPath.append(entry.name));
+        if (entry.isDirectory)
         {
-            // Inside any of the folder that have been tentatively added
-            if (scannerState.multipleDefinitions)
+            // Immediately recurse to find candidates
+            SC_TRY(scannerState.storeTentativePluginFolder(fullPath.view()));
+            // Scan subdirectory for .cpp files
+            PluginFileSystemIterator subIterator;
+            SC_TRY(subIterator.init(fullPath.view()));
+            PluginFileSystemIterator::Entry subEntry;
+            while (subIterator.next(subEntry))
             {
-                continue;
+                if (subEntry.name == SC_NATIVE_STR(".") or subEntry.name == SC_NATIVE_STR(".."))
+                {
+                    continue; // skip . and ..
+                }
+                StringPath subFullPath = fullPath;
+                SC_TRY(subFullPath.append(subIterator.pathSeparator));
+                SC_TRY(subFullPath.append(subEntry.name));
+                if (!subEntry.isDirectory and subEntry.name.endsWith(SC_NATIVE_STR(".cpp")))
+                {
+                    // It's a regular file ending with .cpp
+                    if (scannerState.multipleDefinitions)
+                    {
+                        continue;
+                    }
+                    SC_TRY(scannerState.tryParseCandidate(subFullPath.view(), move(tempFileBuffer)));
+                }
             }
-            SC_TRY(scannerState.tryParseCandidate(item.path, move(tempFileBuffer)));
         }
     }
-
     scannerState.writeDefinitions(foundDefinitions);
-    return fsIterator.checkErrors();
+    return Result(true);
 }
 #if SC_PLATFORM_WINDOWS
 struct SC::PluginCompiler::CompilerFinder
@@ -421,20 +438,21 @@ SC::Result SC::PluginCompiler::findBestCompiler(PluginCompiler& compiler)
     CompilerFinder compilerFinder;
     for (const auto& basePath : rootPaths)
     {
-        FileSystemIterator::FolderState recurseStack[16];
-        FileSystemIterator              fsIterator;
-
-        StringView base = basePath.view();
-        if (not fsIterator.init(base, recurseStack))
+        StringView               base = basePath.view();
+        PluginFileSystemIterator iterator;
+        if (not iterator.init(base))
             continue;
-        while (fsIterator.enumerateNext())
+        PluginFileSystemIterator::Entry entry;
+        while (iterator.next(entry))
         {
-            if (fsIterator.get().isDirectory())
+            if (entry.isDirectory and entry.name != SC_NATIVE_STR(".") and entry.name != SC_NATIVE_STR(".."))
             {
-                const StringView candidate = fsIterator.get().name;
-                SC_TRY(compilerFinder.tryFindCompiler(base, candidate, compiler));
+                SC_TRY(compilerFinder.tryFindCompiler(base, entry.name, compiler));
+                if (compilerFinder.found)
+                    break;
             }
         }
+
         if (compilerFinder.found)
         {
             break;
@@ -718,19 +736,21 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
     StringView baseDirectory = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10");
     StringView baseInclude   = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
 
-    FileSystemIterator::FolderState recurseStack[16];
-
-    FileSystemIterator fsIterator;
-    SC_TRY_MSG(fsIterator.init(baseInclude, recurseStack), "Missing Windows Kits 10 directory");
     StringPath windowsSdkVersion;
-    while (fsIterator.enumerateNext())
+    StringView searchPath = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
+
+    PluginFileSystemIterator iterator;
+    SC_TRY(iterator.init(searchPath));
+    PluginFileSystemIterator::Entry entry;
+    while (iterator.next(entry))
     {
-        if (fsIterator.get().isDirectory())
+        if (entry.isDirectory and entry.name != SC_NATIVE_STR(".") and entry.name != SC_NATIVE_STR(".."))
         {
-            SC_TRY(windowsSdkVersion.assign(fsIterator.get().name));
+            SC_TRY(windowsSdkVersion.assign(entry.name));
             break;
         }
     }
+
     SC_TRY_MSG(not windowsSdkVersion.isEmpty(), "Cannot find Windows Kits 10 include directory")
     switch (compilerType)
     {
@@ -804,8 +824,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     ::Sleep(400); // Sometimes file is locked...
 #endif
     lastErrorLogCopy = {errorStorage, sizeof(errorStorage) - 1};
-    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy),
-               "Link failes");
+    SC_TRY_MSG(compiler.link(definition, sysroot, compilerEnvironment, executablePath, lastErrorLogCopy), "Link fails");
     deferWrite.disarm();
     StringPath buffer;
     SC_TRY(definition.getDynamicLibraryAbsolutePath(buffer));
