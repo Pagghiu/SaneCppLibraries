@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Function.h"
+#include "../Foundation/Platform.h"
+#include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/StringPath.h"
-#include "../Time/Time.h"
 #include "Internal/DynamicLibrary.h"
-
 namespace SC
 {
+
 struct PluginDefinition;
 struct PluginScanner;
 struct PluginFile;
@@ -250,7 +251,7 @@ struct PluginDynamicLibrary
 {
     PluginDefinition     definition;     ///< Definition of the loaded plugin
     SystemDynamicLibrary dynamicLibrary; ///< System handle of plugin's dynamic library
-    Time::Absolute       lastLoadTime;   ///< Last time when this plugin was last loaded
+    TimeMs               lastLoadTime;   ///< Last time when this plugin was last loaded
     uint32_t             numReloads;     ///< Number of times that the plugin has been hot-reloaded
 
     char       errorStorage[1024 * 8] = {}; ///< Storage for last error log (below)
@@ -269,7 +270,7 @@ struct PluginDynamicLibrary
         return false;
     }
 
-    PluginDynamicLibrary() : lastLoadTime(Time::Realtime::now()) { numReloads = 0; }
+    PluginDynamicLibrary();
 
   private:
     void* instance                      = nullptr;
@@ -345,7 +346,7 @@ struct PluginRegistry
     /// @param relativePath A relative path of the file that has been modified
     /// @param tolerance How many milliseconds must be passed to consider a file as modified
     /// @param onPlugin Callback that will be called with Plugins affected by the modification
-    void getPluginsToReloadBecauseOf(StringView relativePath, Time::Milliseconds tolerance,
+    void getPluginsToReloadBecauseOf(StringView relativePath, TimeMs tolerance,
                                      Function<void(const PluginIdentifier&)> onPlugin);
 
   private:

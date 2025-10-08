@@ -12,11 +12,34 @@
 #if SC_PLATFORM_WINDOWS
 #include "Internal/DebuggerWindows.inl"
 #include "Internal/VisualStudioPathFinder.h"
-
+#include <sys/timeb.h>
+#else
+#include <time.h>
 #endif
 #include "Internal/DynamicLibrary.inl"
 #include "Internal/PluginFileSystemIterator.h"
 
+namespace SC
+{
+
+namespace
+{
+//! @brief Get current time in milliseconds since epoch (realtime clock)
+inline TimeMs PluginNow()
+{
+#if SC_PLATFORM_WINDOWS
+    struct _timeb t;
+    _ftime_s(&t);
+    return {static_cast<int64_t>(t.time) * 1000 + t.millitm};
+#else
+    struct timespec nowTimeSpec;
+    clock_gettime(CLOCK_REALTIME, &nowTimeSpec);
+    return {static_cast<int64_t>((nowTimeSpec.tv_nsec >> 20) + nowTimeSpec.tv_sec * 1000)};
+#endif
+}
+
+} // anonymous namespace
+} // namespace SC
 struct SC::PluginCompilerEnvironment::Internal
 {
     [[nodiscard]] static bool writeFlags(const StringView flags, StringsArena& arena)
@@ -707,6 +730,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     }
 }
 
+SC::PluginDynamicLibrary::PluginDynamicLibrary() : lastLoadTime(PluginNow()) { numReloads = 0; }
 SC::Result SC::PluginDynamicLibrary::unload()
 {
     SC_TRY(dynamicLibrary.close());
@@ -837,7 +861,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY(StringBuilder::format(buffer, "{}QueryInterface", definition.identity.identifier.view()));
     SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     numReloads += 1;
-    lastLoadTime = Time::Realtime::now();
+    lastLoadTime = PluginNow();
     return Result(true);
 }
 
@@ -934,7 +958,7 @@ SC::PluginDynamicLibrary* SC::PluginRegistry::findPlugin(const StringView identi
     return nullptr;
 }
 
-void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Time::Milliseconds tolerance,
+void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, TimeMs tolerance,
                                                      Function<void(const PluginIdentifier&)> onPlugin)
 {
     const size_t numberOfPlugins = getNumberOfEntries();
@@ -946,8 +970,8 @@ void SC::PluginRegistry::getPluginsToReloadBecauseOf(StringView relativePath, Ti
             StringView filePath = file.absolutePath.view();
             if (filePath.endsWith(relativePath))
             {
-                const Time::Milliseconds elapsed = Time::Realtime::now().subtractExact(library.lastLoadTime);
-                if (elapsed > tolerance)
+                const int64_t elapsed = PluginNow().milliseconds - library.lastLoadTime.milliseconds;
+                if (elapsed > tolerance.milliseconds)
                 {
                     // Only reload if at least tolerance ms have passed, as sometimes FSEvents on
                     // macOS likes to send multiple events that are difficult to filter properly

@@ -199,20 +199,17 @@
         "direct_dependencies": [
             "Foundation",
             "Process",
-            "Strings",
-            "Time"
+            "Strings"
         ],
         "minimal_dependencies": [
             "Process",
-            "Strings",
-            "Time"
+            "Strings"
         ],
         "all_dependencies": [
             "File",
             "Foundation",
             "Process",
-            "Strings",
-            "Time"
+            "Strings"
         ]
     },
     "Process": {

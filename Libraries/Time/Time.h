@@ -45,6 +45,7 @@ struct Time::Milliseconds
     constexpr explicit Milliseconds(int64_t ms) : ms(ms) {};
     int64_t ms;
 
+    [[nodiscard]] operator TimeMs() const { return {ms}; }
     [[nodiscard]] bool operator>(const Milliseconds other) const { return ms > other.ms; }
     [[nodiscard]] bool operator<(const Milliseconds other) const { return ms < other.ms; }
     [[nodiscard]] bool operator==(const Milliseconds other) const { return ms == other.ms; }
