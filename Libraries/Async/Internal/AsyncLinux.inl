@@ -170,7 +170,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    void copyReadyCompletions(AsyncEventLoop& eventLoop, const Time::Absolute* nextTimer)
+    void copyReadyCompletions(AsyncEventLoop& eventLoop, const TimeMs* nextTimer)
     {
         KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         // Read up to totalNumEvents completions, copy them into a local array and
@@ -210,8 +210,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        AsyncLoopTimeout*     loopTimeout = nullptr;
-        const Time::Absolute* nextTimer   = nullptr;
+        AsyncLoopTimeout* loopTimeout = nullptr;
+        const TimeMs*     nextTimer   = nullptr;
         if (syncMode == Internal::SyncMode::ForcedForwardProgress)
         {
             loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
@@ -225,7 +225,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode, const Time::Absolute* nextTimer)
+    Result flushSubmissions(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode, const TimeMs* nextTimer)
     {
         KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         while (true)
@@ -351,7 +351,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime = eventLoop.getLoopTime().offsetBy(async.relativeTimeout);
+        async.expirationTime.milliseconds = eventLoop.getLoopTime().milliseconds + async.relativeTimeout.milliseconds;
         return Result(true);
     }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Time/Time.h"
 
 void SC::AsyncTest::loopFreeSubmittingOnClose()
 {

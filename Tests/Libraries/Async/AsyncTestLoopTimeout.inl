@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/Time/Time.h"
 
 void SC::AsyncTest::loopTimeout()
 {
@@ -11,7 +12,7 @@ void SC::AsyncTest::loopTimeout()
     int timeout2Called = 0;
     timeout1.callback  = [&](AsyncLoopTimeout::Result& res)
     {
-        SC_TEST_EXPECT(res.getAsync().relativeTimeout == 1_ms);
+        SC_TEST_EXPECT(res.getAsync().relativeTimeout.milliseconds == 1);
         SC_TEST_EXPECT(res.getAsync().isFree());
         SC_TEST_EXPECT(not res.getAsync().isActive());
         SC_TEST_EXPECT(not res.getAsync().isCancelling());

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/Time/Time.h"
 
 void SC::AsyncTest::loopWakeUpFromExternalThread()
 {

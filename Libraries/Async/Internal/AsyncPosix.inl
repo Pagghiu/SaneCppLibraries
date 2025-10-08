@@ -473,17 +473,17 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         return true;
     }
 
-    static struct timespec timerToRelativeTimespec(const Time::Absolute& loopTime, const Time::Absolute* nextTimer)
+    static struct timespec timerToRelativeTimespec(const TimeMs& loopTime, const TimeMs* nextTimer)
     {
         struct timespec specTimeout;
         if (nextTimer)
         {
-            if (nextTimer->isLaterThanOrEqualTo(loopTime))
+            if (nextTimer->milliseconds >= loopTime.milliseconds)
             {
-                const Time::Milliseconds diff = nextTimer->subtractExact(loopTime);
+                const auto diff = nextTimer->milliseconds - loopTime.milliseconds;
 
-                specTimeout.tv_sec  = diff.ms / 1000;
-                specTimeout.tv_nsec = (diff.ms % 1000) * 1000 * 1000;
+                specTimeout.tv_sec  = diff / 1000;
+                specTimeout.tv_nsec = (diff % 1000) * 1000 * 1000;
                 return specTimeout;
             }
         }
@@ -494,8 +494,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        AsyncLoopTimeout*     loopTimeout = nullptr;
-        const Time::Absolute* nextTimer   = nullptr;
+        AsyncLoopTimeout* loopTimeout = nullptr;
+        const TimeMs*     nextTimer   = nullptr;
         if (syncMode == Internal::SyncMode::ForcedForwardProgress)
         {
             loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
@@ -561,7 +561,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime = eventLoop.getLoopTime().offsetBy(async.relativeTimeout);
+        async.expirationTime.milliseconds = eventLoop.getLoopTime().milliseconds + async.relativeTimeout.milliseconds;
         return Result(true);
     }
 

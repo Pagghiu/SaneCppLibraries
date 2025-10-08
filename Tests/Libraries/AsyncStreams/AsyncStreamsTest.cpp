@@ -10,6 +10,7 @@
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Time/Time.h"
 
 namespace SC
 {

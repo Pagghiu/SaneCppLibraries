@@ -10,7 +10,6 @@
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/ThreadPool.h"
-#include "../Time/Time.h"
 
 namespace SC
 {
@@ -308,19 +307,19 @@ struct AsyncLoopTimeout : public AsyncRequest
     using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, Time::Milliseconds relativeTimeout);
+    SC::Result start(AsyncEventLoop& eventLoop, TimeMs relativeTimeout);
 
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
 
-    Time::Milliseconds relativeTimeout; ///< First timer expiration (relative) time in milliseconds
+    TimeMs relativeTimeout; ///< First timer expiration (relative) time in milliseconds
 
     /// @brief Gets computed absolute expiration time that determines when this timeout get executed
-    Time::Absolute getExpirationTime() const { return expirationTime; }
+    TimeMs getExpirationTime() const { return expirationTime; }
 
   private:
     SC::Result validate(AsyncEventLoop&);
     friend struct AsyncEventLoop;
-    Time::Absolute expirationTime;
+    TimeMs expirationTime;
 };
 
 /// @brief Starts a wake-up operation, allowing threads to execute callbacks on loop thread. @n
@@ -1315,8 +1314,8 @@ struct AsyncEventLoop
     /// Updates loop time to "now"
     void updateTime();
 
-    /// Get Loop time
-    [[nodiscard]] Time::Monotonic getLoopTime() const;
+    /// Get Loop time (monotonic)
+    [[nodiscard]] TimeMs getLoopTime() const;
 
     /// Obtain the total number of active requests
     [[nodiscard]] int getNumberOfActiveRequests() const;

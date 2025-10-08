@@ -113,7 +113,7 @@ struct SC::AsyncEventLoop::Internal
 
     ThreadSafeLinkedList<AsyncRequest> manualThreadPoolCompletions;
 
-    Time::Monotonic loopTime;
+    TimeMs loopTime;
 
     AsyncEventLoopListeners* listeners = nullptr;
 
@@ -136,7 +136,7 @@ struct SC::AsyncEventLoop::Internal
     // Timers
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    void invokeExpiredTimers(AsyncEventLoop& eventLoop, Time::Absolute currentTime);
+    void invokeExpiredTimers(AsyncEventLoop& eventLoop, TimeMs currentTime);
     void updateTime();
 
     Result stop(AsyncEventLoop& eventLoop, AsyncRequest& async, Function<void(AsyncResult&)>* onClose);

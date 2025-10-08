@@ -279,8 +279,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     Result syncWithKernel(AsyncEventLoop& eventLoop, Internal::SyncMode syncMode)
     {
-        AsyncLoopTimeout*     loopTimeout = nullptr;
-        const Time::Absolute* nextTimer   = nullptr;
+        AsyncLoopTimeout* loopTimeout = nullptr;
+        const TimeMs*     nextTimer   = nullptr;
         if (syncMode == Internal::SyncMode::ForcedForwardProgress)
         {
             loopTimeout = eventLoop.internal.findEarliestLoopTimeout();
@@ -293,16 +293,16 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         FileDescriptor::Handle  loopFd;
         SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopFd, errorResult));
 
-        Time::Milliseconds timeout;
+        TimeMs timeout;
         if (nextTimer)
         {
-            if (nextTimer->isLaterThanOrEqualTo(eventLoop.internal.loopTime))
+            if (nextTimer->milliseconds >= eventLoop.internal.loopTime.milliseconds)
             {
-                timeout = nextTimer->subtractExact(eventLoop.internal.loopTime);
+                timeout.milliseconds = nextTimer->milliseconds - eventLoop.internal.loopTime.milliseconds;
             }
         }
         const DWORD ms =
-            nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.ms) : INFINITE;
+            nextTimer or syncMode == Internal::SyncMode::NoWait ? static_cast<ULONG>(timeout.milliseconds) : INFINITE;
         ULONG      ulongEvents = static_cast<ULONG>(newEvents);
         const BOOL res         = ::GetQueuedCompletionStatusEx(loopFd, events, totalNumEvents, &ulongEvents, ms, FALSE);
         newEvents              = static_cast<int>(ulongEvents);
@@ -353,7 +353,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime = eventLoop.getLoopTime().offsetBy(async.relativeTimeout);
+        async.expirationTime.milliseconds = eventLoop.getLoopTime().milliseconds + async.relativeTimeout.milliseconds;
         return Result(true);
     }
 

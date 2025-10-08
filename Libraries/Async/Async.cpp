@@ -9,9 +9,11 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
+#include <sys/timeb.h>
 #else
 #if SC_PLATFORM_LINUX
 #include "Internal/AsyncLinuxKernelEvents.h"
+#include <time.h>
 #endif
 #include "Internal/AsyncPosix.inl"
 #if SC_PLATFORM_LINUX
@@ -208,7 +210,7 @@ void SC::AsyncResult::reactivateRequest(bool shouldBeReactivated)
 //-------------------------------------------------------------------------------------------------------
 SC::Result SC::AsyncLoopTimeout::validate(AsyncEventLoop&) { return SC::Result(true); }
 
-SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& eventLoop, Time::Milliseconds timeout)
+SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& eventLoop, TimeMs timeout)
 {
     relativeTimeout = timeout;
     return eventLoop.start(*this);
@@ -807,7 +809,7 @@ SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(FileDescriptor& outDescr
 
 void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }
 
-SC::Time::Monotonic SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
+SC::TimeMs SC::AsyncEventLoop::getLoopTime() const { return internal.loopTime; }
 
 int SC::AsyncEventLoop::getNumberOfActiveRequests() const { return internal.getTotalNumberOfActiveHandle(); }
 
@@ -825,8 +827,9 @@ SC::AsyncLoopTimeout* SC::AsyncEventLoop::findEarliestLoopTimeout() const
             AsyncLoopTimeout& timeout = *static_cast<AsyncLoopTimeout*>(async);
             // We need to store computed expiration time, even if it will be recomputed later
             // in order to compare the ones that are still on the submission queue.
-            timeout.expirationTime = internal.loopTime.offsetBy(timeout.relativeTimeout);
-            if (earliestTime == nullptr or earliestTime->expirationTime.isLaterThanOrEqualTo(timeout.expirationTime))
+            timeout.expirationTime.milliseconds = internal.loopTime.milliseconds + timeout.relativeTimeout.milliseconds;
+            if (earliestTime == nullptr or
+                earliestTime->expirationTime.milliseconds >= timeout.expirationTime.milliseconds)
             {
                 earliestTime = &timeout;
             }
@@ -1058,14 +1061,14 @@ void SC::AsyncEventLoop::Internal::clearSequence(AsyncSequence& sequence)
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
 
-void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop, Time::Absolute currentTime)
+void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop, TimeMs currentTime)
 {
     AsyncLoopTimeout* async = activeLoopTimeouts.front;
     while (async != nullptr)
     {
         AsyncLoopTimeout* current = async;
         async                     = static_cast<AsyncLoopTimeout*>(async->next);
-        if (currentTime.isLaterThanOrEqualTo(current->expirationTime))
+        if (currentTime.milliseconds >= current->expirationTime.milliseconds)
         {
             removeActiveHandle(*current);
             Result                   res(true);
@@ -1850,8 +1853,22 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
 
 void SC::AsyncEventLoop::Internal::updateTime()
 {
-    Time::Monotonic newTime = Time::Monotonic::now();
-    SC_ASSERT_RELEASE(newTime.isLaterThanOrEqualTo(loopTime));
+#if SC_PLATFORM_WINDOWS
+    LARGE_INTEGER queryPerformanceFrequency;
+    LARGE_INTEGER performanceCounter;
+    // Since WinXP this is guaranteed to succeed
+    QueryPerformanceFrequency(&queryPerformanceFrequency);
+    QueryPerformanceCounter(&performanceCounter);
+    TimeMs newTime = {static_cast<int64_t>(performanceCounter.QuadPart * 1000 / queryPerformanceFrequency.QuadPart)};
+
+#else
+    struct timespec nowTimeSpec;
+    clock_gettime(CLOCK_MONOTONIC, &nowTimeSpec);
+    int64_t ms = static_cast<int64_t>(nowTimeSpec.tv_sec) * 1000;
+    ms += static_cast<int64_t>(nowTimeSpec.tv_nsec / (1000 * 1000));
+    TimeMs newTime = {ms};
+#endif
+    SC_ASSERT_RELEASE(newTime.milliseconds >= loopTime.milliseconds);
     loopTime = newTime;
 }
 
@@ -1963,7 +1980,7 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
         while (iterator)
         {
             // isLaterThan ensures items with same expiration time to be sub-ordered by their scheduling order
-            if (iterator->expirationTime.isLaterThan(timeout.expirationTime))
+            if (iterator->expirationTime.milliseconds >= timeout.expirationTime.milliseconds)
             {
                 // middle
                 timeout.prev = iterator->prev;

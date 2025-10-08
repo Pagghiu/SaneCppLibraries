@@ -5,23 +5,20 @@
             "FileSystem",
             "Foundation",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ],
         "minimal_dependencies": [
             "File",
             "FileSystem",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ],
         "all_dependencies": [
             "File",
             "FileSystem",
             "Foundation",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ]
     },
     "AsyncStreams": {
@@ -38,8 +35,7 @@
             "FileSystem",
             "Foundation",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ]
     },
     "Containers": {
@@ -135,8 +131,7 @@
             "FileSystemWatcher",
             "Foundation",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ]
     },
     "Foundation": {
@@ -169,7 +164,8 @@
         "minimal_dependencies": [
             "Async",
             "Containers",
-            "Strings"
+            "Strings",
+            "Time"
         ],
         "all_dependencies": [
             "Async",

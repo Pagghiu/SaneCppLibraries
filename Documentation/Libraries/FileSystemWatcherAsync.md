@@ -8,7 +8,7 @@
 
 # Dependencies
 - Dependencies: [Async](@ref library_async), [FileSystemWatcher](@ref library_file_system_watcher)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading), [Time](@ref library_time)
+- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [FileSystemWatcher](@ref library_file_system_watcher), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)
 
 ![Dependency Graph](FileSystemWatcherAsync.svg)
 
