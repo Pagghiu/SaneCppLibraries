@@ -6,9 +6,8 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
-#else
-#include <stdio.h> // stdout
 #endif
+#include <stdio.h> // stdout
 
 SC::Console::Console(Span<char> conversionBuffer) : conversionBuffer(conversionBuffer)
 {
