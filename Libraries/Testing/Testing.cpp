@@ -49,6 +49,7 @@ SC::TestReport::TestReport(IOutput& console, int argc, const char** argv) : cons
     {
         console.print("\n");
     }
+    console.flush();
 }
 
 SC::TestReport::~TestReport()
@@ -66,6 +67,7 @@ SC::TestReport::~TestReport()
         console.print(" TOTAL Succeeded = {}", numTestsSucceeded, numTestsSucceeded);
     }
     console.print("\n---------------------------------------------------\n");
+    console.flush();
 }
 
 void SC::TestReport::internalRunGlobalMemoryReport(MemoryStatistics stats, bool reportFailure)
@@ -91,6 +93,7 @@ void SC::TestReport::internalRunGlobalMemoryReport(MemoryStatistics stats, bool 
         }
     }
     console.print("---------------------------------------------------\n");
+    console.flush();
 }
 
 //-------------------------------------------------------------------------------------------
@@ -103,6 +106,7 @@ SC::TestCase::TestCase(TestReport& report, StringSpan testName)
         if (not report.quietMode)
         {
             report.console.print("[[ {} ]]\n\n", testName);
+            report.console.flush();
         }
         report.firstFailedTest = StringSpan();
         report.currentSection  = StringSpan();
@@ -138,6 +142,7 @@ SC::TestCase::~TestCase()
             }
             report.console.print("---------------------------------------------------\n");
         }
+        report.console.flush();
         report.numTestsFailed += numTestsFailed;
         report.numTestsSucceeded += numTestsSucceeded;
         report.testCaseFinished(*this);
@@ -167,6 +172,7 @@ bool SC::TestCase::recordExpectation(StringSpan expression, bool status, StringS
         {
             report.console.print(" [FAIL] {} - Error: {}\n", expression, detailedError);
         }
+        report.console.flush();
         if (report.firstFailedTest.isEmpty())
         {
             report.firstFailedTest = expression;
@@ -222,6 +228,7 @@ void SC::TestReport::printSectionResult(TestCase& testCase)
     console.print("\t- ");
     console.print(testCase.numSectionTestsFailed > 0 ? redEMOJI : greenEMOJI);
     console.print(" {}::{}\n", testCase.testName, currentSection);
+    console.flush();
 }
 
 void SC::TestReport::testCaseFinished(TestCase& testCase)

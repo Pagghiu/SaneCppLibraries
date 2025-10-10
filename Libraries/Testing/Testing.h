@@ -24,6 +24,7 @@ struct TestReport
     {
         virtual ~IOutput() = default;
 
+        virtual void flush()                                              = 0;
         virtual void printLine(StringSpan text)                           = 0;
         virtual void print(StringSpan text)                               = 0;
         virtual void print(StringSpan text, StringSpan p0)                = 0;
@@ -38,6 +39,7 @@ struct TestReport
         ConsoleType& console;
         Output(ConsoleType& console) : console(console) {}
 
+        virtual void flush() override { console.flush(); }
         virtual void printLine(StringSpan text) override { console.printLine(text); }
         virtual void print(StringSpan text) override { console.print(text); }
         virtual void print(StringSpan text, StringSpan p0) override { console.print(text, p0); }
