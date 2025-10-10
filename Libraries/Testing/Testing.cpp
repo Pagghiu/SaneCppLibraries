@@ -7,8 +7,8 @@
 
 namespace SC
 {
-static const StringSpan redEMOJI   = StringSpan("\xf0\x9f\x9f\xa5", true, StringEncoding::Utf8);
-static const StringSpan greenEMOJI = StringSpan("\xf0\x9f\x9f\xa9", true, StringEncoding::Utf8);
+static const StringSpan redEMOJI   = StringSpan({"\xf0\x9f\x9f\xa5", 4}, true, StringEncoding::Utf8);
+static const StringSpan greenEMOJI = StringSpan({"\xf0\x9f\x9f\xa9", 4}, true, StringEncoding::Utf8);
 
 } // namespace SC
 SC::TestReport::TestReport(IOutput& console, int argc, const char** argv) : console(console)
@@ -81,7 +81,7 @@ void SC::TestReport::internalRunGlobalMemoryReport(MemoryStatistics stats, bool 
         if (stats.numAllocate == stats.numRelease)
         {
             console.print(greenEMOJI);
-            console.print(" [[ Memory Report ]] SUCCEDED = 1\n");
+            console.print(" [[ Memory Report ]] SUCCEEDED = 1\n");
         }
         else
         {

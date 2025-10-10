@@ -128,7 +128,7 @@ void SC::FunctionTest::deduct()
 void SC::FunctionTest::reference()
 {
 
-    // Try assigning a lanbda with a reference
+    // Try assigning a lambda with a reference
     Function<void(int&)> incrementWithReference = [](int& val) { val += 1; };
 
     int val = 0;
@@ -157,7 +157,7 @@ struct UnrelatedFunctor
 
 void SC::FunctionTest::functor()
 {
-    // Initialize the efunction with a stateful functor (setting data == 1)
+    // Initialize the function with a stateful functor (setting data == 1)
     Function<int(void)> callback = Functor{1};
     // Check that data is actually 1
     SC_TEST_EXPECT(callback() == 1);
@@ -165,7 +165,7 @@ void SC::FunctionTest::functor()
     SC_TEST_EXPECT(callback.dynamicCastTo<UnrelatedFunctor>() == nullptr);
     // We know that a Functor was bound and we can retrieve and modify it
     callback.dynamicCastTo<Functor>()->data = 123;
-    // Check that previous call succeded in getting us the proper functor object
+    // Check that previous call succeeded in getting us the proper functor object
     SC_TEST_EXPECT(callback() == 123);
 }
 //! [FunctionFunctorSnippet]
