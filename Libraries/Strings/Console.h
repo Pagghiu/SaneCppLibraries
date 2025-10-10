@@ -53,6 +53,9 @@ struct SC_COMPILER_EXPORT Console
     /// @param str The StringSpan to print
     void printLine(const StringSpan str);
 
+    /// @brief Flushes the console output buffer
+    void flush();
+
     /// @brief Tries attaching current process to parent console (Windows only, has no effect elsewhere)
     /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)
     static bool tryAttachingToParentConsole();

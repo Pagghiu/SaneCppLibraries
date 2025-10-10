@@ -33,6 +33,15 @@ void SC::Console::printLine(const StringSpan str)
     print("\n"_a8);
 }
 
+void SC::Console::flush()
+{
+#if SC_PLATFORM_WINDOWS
+    ::FlushFileBuffers(handle);
+#else
+    ::fflush(stdout);
+#endif
+}
+
 void SC::Console::print(const StringSpan str)
 {
     if (str.isEmpty())
@@ -206,6 +215,6 @@ void SC::Console::print(const StringSpan str)
         conversionBuffer = {};
     }
 #else
-    fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
+    ::fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
 #endif
 }
