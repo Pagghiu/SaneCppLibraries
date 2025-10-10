@@ -129,9 +129,19 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             Thread::Sleep(100);
             // On different OS and FileSystems it's possible to get completely random number of changes
             SC_TEST_EXPECT(eventLoop.runOnce());
-            Thread::Sleep(100);
-            SC_TEST_EXPECT(eventLoop.runNoWait());
-            SC_TEST_EXPECT(params.changes >= 2);
+            int numTries = 10;
+            do
+            {
+                if (numTries < 10)
+                {
+                    report.console.print("Try to sleep waiting for new fs events ({} of 10)\n",
+                                         size_t(10 - numTries + 1));
+                }
+                Thread::Sleep(100);
+                SC_TEST_EXPECT(eventLoop.runNoWait());
+                numTries--;
+            } while (params.changes < 2 and numTries > 0);
+            SC_TEST_EXPECT(numTries > 0);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs.removeFiles({"salve.txt", "a_tutti.txt"}));
         }
