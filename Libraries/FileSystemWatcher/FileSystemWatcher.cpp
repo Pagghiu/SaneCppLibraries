@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../FileSystemWatcher/FileSystemWatcher.h"
 #include "../Foundation/Assert.h"
+#include "Internal/FileSystemWatcherThreading.h" // Needed for the single file build
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"
 #elif SC_PLATFORM_APPLE

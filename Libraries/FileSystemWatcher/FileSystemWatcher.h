@@ -6,7 +6,6 @@
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
-#include "../Threading/Threading.h" // sizeof(Mutex)
 
 namespace SC
 {
@@ -46,7 +45,7 @@ struct FileSystemWatcher
     struct InternalDefinition
     {
         static constexpr int Windows = 3 * sizeof(void*);
-        static constexpr int Apple   = 43 * sizeof(void*) + sizeof(Mutex);
+        static constexpr int Apple   = 42 * sizeof(void*);
         static constexpr int Linux   = sizeof(void*) * 4;
         static constexpr int Default = Linux;
 
@@ -68,10 +67,10 @@ struct FileSystemWatcher
     struct ThreadRunnerDefinition
     {
         static constexpr int MaxWatchablePaths = 1024;
-        static constexpr int Windows =
-            (2 * MaxWatchablePaths) * sizeof(void*) + sizeof(uint64_t) + sizeof(Thread) + sizeof(Action);
+
+        static constexpr int Windows = (2 * MaxWatchablePaths + 2) * sizeof(void*) + sizeof(uint64_t);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = sizeof(Thread) + sizeof(void*) * 2;
+        static constexpr int Linux   = sizeof(void*) * 6;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -84,10 +83,11 @@ struct FileSystemWatcher
     {
         static constexpr int MaxNumberOfSubdirs   = 128; // Max number of subfolders tracked in a watcher
         static constexpr int MaxChangesBufferSize = 1024;
-        static constexpr int Windows              = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
-        static constexpr int Apple                = sizeof(void*);
-        static constexpr int Linux                = 1056 + 1024 + 8;
-        static constexpr int Default              = Linux;
+
+        static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
+        static constexpr int Apple   = sizeof(void*);
+        static constexpr int Linux   = 1056 + 1024 + 8;
+        static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
 

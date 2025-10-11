@@ -103,15 +103,13 @@
     },
     "FileSystemWatcher": {
         "direct_dependencies": [
-            "Foundation",
-            "Threading"
+            "Foundation"
         ],
         "minimal_dependencies": [
-            "Threading"
+            "Foundation"
         ],
         "all_dependencies": [
-            "Foundation",
-            "Threading"
+            "Foundation"
         ]
     },
     "FileSystemWatcherAsync": {

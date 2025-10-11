@@ -7,6 +7,7 @@
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Threading.h"
 
 namespace SC
 {

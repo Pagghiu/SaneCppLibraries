@@ -1,8 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
-#include "../../Threading/Atomic.h"
-#include "../../Threading/Threading.h"
+#include "FileSystemWatcherThreading.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -16,14 +15,14 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
-    Thread thread;
+    FSWThread thread;
 
     static constexpr int N = ThreadRunnerDefinition::MaxWatchablePaths;
 
     HANDLE         hEvents[N] = {0};
     FolderWatcher* entries[N] = {nullptr};
     DWORD          numEntries = 0;
-    Atomic<bool>   shouldStop = false;
+    FSWAtomicBool  shouldStop;
 };
 
 struct SC::FileSystemWatcher::Internal
@@ -174,14 +173,18 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
-            Function<void(Thread&)> threadFunction;
-            threadFunction.bind<Internal, &Internal::threadRun>(*this);
-            SC_TRY(threadingRunner->thread.start(move(threadFunction)))
+            SC_TRY(threadingRunner->thread.start(&threadDispatch, this));
         }
         return Result(true);
     }
+    static DWORD threadDispatch(LPVOID arg)
+    {
+        Internal& self = *static_cast<Internal*>(arg);
+        self.threadRun(self.threadingRunner->thread);
+        return 0;
+    }
 
-    void threadRun(Thread& thread)
+    void threadRun(FSWThread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("FileSystemWatcher::init"));
         ThreadRunnerInternal& runner = *threadingRunner;

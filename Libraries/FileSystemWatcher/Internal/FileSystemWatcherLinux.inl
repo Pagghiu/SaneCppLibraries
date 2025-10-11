@@ -1,11 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
+#include "FileSystemWatcherThreading.h"
 
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
-#include "../../Threading/Atomic.h"
-#include "../../Threading/Threading.h"
 
 #include <dirent.h>      // opendir, readdir, closedir
 #include <errno.h>       // errno
@@ -39,8 +38,8 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 
 struct SC::FileSystemWatcher::ThreadRunnerInternal
 {
-    Thread       thread;
-    Atomic<bool> shouldStop = false;
+    FSWThread     thread;
+    FSWAtomicBool shouldStop;
 
     // Allows unblocking the ::read() when stopping the watcher [0]=read end, [1]=write end
     int shutdownPipe[2] = {-1, -1};
@@ -318,14 +317,14 @@ struct SC::FileSystemWatcher::Internal
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
             threadingRunner->shouldStop.exchange(false);
-            Function<void(Thread&)> threadFunction;
+            Function<void(FSWThread&)> threadFunction;
             threadFunction.bind<Internal, &Internal::threadRun>(*this);
             SC_TRY(threadingRunner->thread.start(move(threadFunction)))
         }
         return Result(true);
     }
 
-    void threadRun(Thread& thread)
+    void threadRun(FSWThread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("FileSystemWatcher"));
         ThreadRunnerInternal& runner = *threadingRunner;

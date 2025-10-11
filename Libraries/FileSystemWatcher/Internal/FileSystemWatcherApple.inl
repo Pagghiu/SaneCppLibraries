@@ -3,10 +3,9 @@
 
 //! [OpaqueDefinition1Snippet]
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
-
 #include "../../Foundation/Deferred.h"
-#include "../../Threading/Atomic.h"
-#include "../../Threading/Threading.h"
+#include "FileSystemWatcherThreading.h"
+
 #include <CoreServices/CoreServices.h> // FSEvents
 
 #include <AvailabilityMacros.h>
@@ -22,16 +21,16 @@ struct SC::FileSystemWatcher::Internal
     CFRunLoopRef       runLoop       = nullptr;
     CFRunLoopSourceRef refreshSignal = nullptr;
     FSEventStreamRef   fsEventStream = nullptr;
-    Thread             pollingThread;
+    FSWThread          pollingThread;
     Result             signalReturnCode = Result(false);
-    EventObject        refreshSignalFinished;
-    Mutex              mutex;
+    FSWEventObject     refreshSignalFinished;
+    FSWMutex           mutex;
     EventLoopRunner*   eventLoopRunner = nullptr;
 
     // Used to pass data from thread to async callback
     Notification   notification;
     FolderWatcher* watcher;
-    Atomic<bool>   closing = false;
+    FSWAtomicBool  closing;
 
     //...
     //! [OpaqueDefinition1Snippet]
@@ -63,8 +62,9 @@ struct SC::FileSystemWatcher::Internal
         refreshSignal         = CFRunLoopSourceCreate(nullptr, 0, &signalContext);
         SC_TRY_MSG(refreshSignal != nullptr, "CFRunLoopSourceCreate failed");
 
-        EventObject eventObject;
-        auto        pollingFunction = [&](Thread& thread)
+        FSWEventObject eventObject;
+
+        auto pollingFunction = [&](FSWThread& thread)
         {
             thread.setThreadName("FileSystemWatcher::init");
             threadInit(); // Obtain the CFRunLoop for this thread
