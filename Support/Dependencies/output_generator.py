@@ -71,6 +71,8 @@ def write_markdown(project_root, libraries, dep_map, minimal_map, transitive_map
         out.write('@page page_dependencies Dependencies\n')
         out.write('This file describes what each library depends on.\n\n')
         out.write('# Dependencies\n\n')
+        out.write('![Dependency Graph](https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg)\n\n')
+        out.write('# Dependencies (automatically generated)\n\n')
         out.write('![Dependency Graph](Dependencies.svg)\n\n\n')
         out.write('# Dependencies (interactive visualization)\n\n')
         out.write('@htmlinclude _Build/_Dependencies/Dependencies.html\n\n\n')

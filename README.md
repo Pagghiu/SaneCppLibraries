@@ -13,7 +13,7 @@
 
 ![Sane Cpp](https://pagghiu.github.io/images/2023-12-23-SaneCppLibrariesRelease/article.svg)
 
-- [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
+[Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
 ✅ Fast compile times  
 ✅ Bloat free  
 ✅ Simple and readable code  
@@ -21,12 +21,10 @@
 ⛔️ No C++ Standard Library / Exceptions / RTTI  
 ⛔️ No third party build dependencies (prefer OS API)
 
-- [Documentation](https://pagghiu.github.io/SaneCppLibraries/index.html)
-- [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html)
-- [Libraries](https://pagghiu.github.io/SaneCppLibraries/libraries.html)
-- [Dependencies (internal)](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html)
+[Documentation](https://pagghiu.github.io/SaneCppLibraries/index.html)  
+[Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html)  
 
-# Libraries
+# [Libraries](https://pagghiu.github.io/SaneCppLibraries/libraries.html)
 
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
@@ -54,11 +52,19 @@ Library                                                                         
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟩 Atomic, thread, mutex, semaphore, barrier, rw-lock, condition          | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppThreading.h)               
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                            | 🟨 Time handling (relative, absolute, high resolution)                    | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTime.h)                    
 
-Each library is color-coded to signal its status:  
+- Each library is color-coded to signal its status:  
+  - 🟥 Draft (incomplete, WIP, works on basic case)
+  - 🟨 MVP (minimum set of features have been implemented)
+  - 🟩 Usable (a reasonable set of useful features has been implemented)
+- Libraries are designed to be used independently of each other.
+- Most libraries are free of dynamic memory allocation (only dependents of `Memory` do allocate)
+- Most libraries depend only on `Foundation` (basic compiler macros / types).
+- Advanced libraries like `Async` or `Process` depend on one or more lower-level ones.
 
-🟥 Draft (incomplete, WIP, works on basic case)  
-🟨 MVP (minimum set of features have been implemented)  
-🟩 Usable (a reasonable set of useful features has been implemented)  
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependenciesDark.svg">
+  <img alt="Sane C++ Libraries dependencies" src="https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg">
+</picture>
 
 # How to use Sane C++ Libraries in your project
 
@@ -68,7 +74,7 @@ Each library is color-coded to signal its status:
     - Assembling it from current `main` branch using the [Single File Library](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) browser app
 - `#define SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
 - `#include SaneCppLIBRARY.h` in your headers
-- `#define SANE_CPP_IMPLEMENTATION` + `#include SaneCppLIBRARY.h` in one of your `.cpp` files
+- `#define SANE_CPP_IMPLEMENTATION` + `#include "SaneCppLIBRARY.h"` in one of your `.cpp` files
 
 See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) for details on the (system) libraries to link.  
 

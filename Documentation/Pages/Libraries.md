@@ -35,6 +35,8 @@ Implementation    | 19812
 Comments          | 10401
 *Total*           | 38544
 
+![Dependency Graph](https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg)
+
 Some libraries have [C Bindings](@ref group_c_bindings):
 
 Library                                     | Description
