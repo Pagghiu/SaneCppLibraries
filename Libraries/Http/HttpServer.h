@@ -6,8 +6,8 @@
 #include "../Containers/ArenaMapKey.h"
 #include "../Containers/Vector.h"
 #include "../Foundation/Function.h"
+#include "../Foundation/StringSpan.h"
 #include "../Memory/Buffer.h"
-#include "../Strings/StringView.h"
 
 namespace SC
 {
@@ -48,15 +48,15 @@ struct SC::HttpRequest
 {
     /// @brief Finds a specific HttpParser::Result in the list of parsed header
     /// @param token The result to look for (Method, Url etc.)
-    /// @param res A StringView, pointing at headerBuffer containing the found result
+    /// @param res A StringSpan, pointing at headerBuffer containing the found result
     /// @return `true` if the result has been found
-    [[nodiscard]] bool find(HttpParser::Token token, StringView& res) const;
+    [[nodiscard]] bool find(HttpParser::Token token, StringSpan& res) const;
 
     /// @brief Gets the associated HttpParser
     const HttpParser& getParser() const { return parser; }
 
     /// @brief Gets the request URL
-    StringView getURL() const { return url; }
+    StringSpan getURL() const { return url; }
 
   private:
     friend struct HttpServer;
@@ -66,7 +66,7 @@ struct SC::HttpRequest
     bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
 
     HttpParser parser;       ///< The parser used to parse headers
-    StringView url;          ///< The url extracted from parsed headers
+    StringSpan url;          ///< The url extracted from parsed headers
     Buffer     headerBuffer; ///< Buffer containing all headers
 
     Vector<HttpHeaderOffset> headerOffsets; ///< Headers, defined as offsets in headerBuffer
@@ -79,7 +79,7 @@ struct SC::HttpResponse
     Result startResponse(int httpCode);
 
     /// @brief Writes an http header to this response
-    Result addHeader(StringView headerName, StringView headerValue);
+    Result addHeader(StringSpan headerName, StringSpan headerValue);
 
     /// @brief Appends some data to the response
     Result write(Span<const char> data);
@@ -131,7 +131,7 @@ struct SC::HttpServer
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
     /// @return Valid Result if http listening has been started successfully
-    Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringView address, uint16_t port);
+    Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringSpan address, uint16_t port);
 
     /// @brief Stops http server asynchronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
     Result stopAsync();

@@ -3,6 +3,7 @@
 #include "Libraries/Http/HttpWebServer.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Http/HttpClient.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 namespace SC
 {
@@ -53,7 +54,7 @@ void SC::HttpWebServerTest::httpWebServerTest()
     client.callback = [this, &context](HttpClient& result)
     {
         context.numRequests++;
-        SC_TEST_EXPECT(result.getResponse().containsString("Response from file"));
+        SC_TEST_EXPECT(StringView(result.getResponse()).containsString("Response from file"));
         SC_TEST_EXPECT(context.httpServer.stopAsync());
         SC_TEST_EXPECT(context.httpWebServer.stopAsync());
     };

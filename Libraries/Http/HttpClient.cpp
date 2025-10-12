@@ -2,12 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
 #include "HttpURLParser.h"
+#include "Internal/HttpStringAppend.h"
 
-#include "../Memory/String.h"
-#include "../Strings/StringBuilder.h"
-#include "../Strings/StringView.h"
-
-SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
+SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
 {
     eventLoop = &loop;
 
@@ -24,22 +21,27 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringView url)
     SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
     SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
 
-    StringBuilder sb(content, StringEncoding::Ascii, StringBuilder::Clear);
+    {
+        GrowableBuffer<decltype(content)> gb = {content};
+        HttpStringAppend&                 sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
 
-    SC_TRY(sb.append("GET {} HTTP/1.1\r\n"
-                     "User-agent: {}\r\n"
-                     "Host: {}\r\n\r\n",
-                     parser.path, "SC", "127.0.0.1"));
-    sb.finalize();
+        sb.clear();
+        SC_TRY(sb.append("GET "));
+        SC_TRY(sb.append(parser.path));
+        SC_TRY(sb.append(" HTTP/1.1\r\n"));
+        SC_TRY(sb.append("User-agent: SC\r\n"));
+        SC_TRY(sb.append("Host: 127.0.0.1\r\n\r\n"));
+    }
+
     const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
     connectAsync.setDebugName(dbgName);
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
-SC::StringView SC::HttpClient::getResponse() const
+SC::StringSpan SC::HttpClient::getResponse() const
 {
-    return StringView(content.toSpanConst(), false, StringEncoding::Ascii);
+    return StringSpan(content.toSpanConst(), false, StringEncoding::Ascii);
 }
 
 void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)

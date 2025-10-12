@@ -3,9 +3,9 @@
 #pragma once
 #include "../Async/Async.h"
 #include "../Containers/Vector.h"
+#include "../Foundation/StringSpan.h"
 #include "../Memory/String.h"
 #include "../Socket/Socket.h"
-#include "../Strings/StringView.h"
 namespace SC
 {
 /// @brief HTTP parser, client and server (see @ref library_http)
@@ -25,14 +25,14 @@ struct SC::HttpClient
     /// @param loop The AsyncEventLoop to use for monitoring network packets
     /// @param url The url to `GET`
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
-    Result get(AsyncEventLoop& loop, StringView url);
+    Result get(AsyncEventLoop& loop, StringSpan url);
 
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
-    /// @brief Get the response StringView sent by the server
-    [[nodiscard]] StringView getResponse() const;
+    /// @brief Get the response StringSpan sent by the server
+    [[nodiscard]] StringSpan getResponse() const;
 
-    Result setCustomDebugName(const StringView debugName) { return Result(customDebugName.assign(debugName)); }
+    Result setCustomDebugName(const StringSpan debugName) { return Result(customDebugName.assign(debugName)); }
 
   private:
     void onConnected(AsyncSocketConnect::Result& result);

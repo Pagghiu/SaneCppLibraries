@@ -2,20 +2,20 @@
 // SPDX-License-Identifier: MIT
 #include "HttpWebServer.h"
 #include "../FileSystem/FileSystem.h"
-#include "../Strings/Path.h"
-#include "../Strings/StringBuilder.h"
 #include "../Time/Time.h"
+#include "Internal/HttpStringIterator.h"
+#include <stdio.h>
 
 struct SC::HttpWebServer::Internal
 {
-    static Result     writeGMTHeaderTime(StringView headerName, HttpResponse& response,
-                                         const Time::Absolute::ParseResult& local);
-    static StringView getContentType(const StringView extension);
+    static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response,
+                                     const Time::Absolute::ParseResult& local);
+    static Result readFile(StringSpan initialDirectory, HttpRequest& request, HttpResponse& response);
 
-    static Result readFile(StringView initialDirectory, HttpRequest& request, HttpResponse& response);
+    static StringSpan getContentType(const StringSpan extension);
 };
 
-SC::Result SC::HttpWebServer::init(StringView directoryToServe)
+SC::Result SC::HttpWebServer::init(StringSpan directoryToServe)
 {
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
     SC_TRY(directory.assign(directoryToServe));
@@ -33,13 +33,13 @@ void SC::HttpWebServer::serveFile(HttpRequest& request, HttpResponse& response)
     }
 }
 
-SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpRequest& request, HttpResponse& response)
+SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpRequest& request, HttpResponse& response)
 {
-    if (not request.getURL().startsWith("/"))
+    if (not HttpStringIterator::startsWith(request.getURL(), "/"))
     {
         return Result::Error("Wrong url");
     }
-    StringView url = request.getURL().sliceStart(1);
+    StringSpan url = HttpStringIterator::sliceStart(request.getURL(), 1);
     if (url.isEmpty())
     {
         url = "index.html";
@@ -50,8 +50,8 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpReque
     {
         FileSystem::FileStat fileStat;
         SC_TRY(fileSystem.getFileStat(url, fileStat));
-        StringView name, extension;
-        SC_TRY(Path::parseNameExtension(url, name, extension));
+        StringSpan name, extension;
+        SC_TRY(HttpStringIterator::parseNameExtension(url, name, extension));
         Buffer data;
         SC_TRY(fileSystem.read(url, data));
         SC_TRY(response.startResponse(200));
@@ -68,18 +68,23 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringView directory, HttpReque
     return Result(true);
 }
 
-SC::Result SC::HttpWebServer::Internal::writeGMTHeaderTime(StringView headerName, HttpResponse& response,
+SC::Result SC::HttpWebServer::Internal::writeGMTHeaderTime(StringSpan headerName, HttpResponse& response,
                                                            const Time::Absolute::ParseResult& local)
 {
-    SmallString<512> buffer;
-    SC_TRY(StringBuilder::format(buffer, "{}, {:02} {} {} {:02}:{:02}:{:02} GMT", local.getDay(), local.dayOfMonth,
-                                 local.getMonth(), local.year, local.hour, local.minutes, local.seconds));
+    char   bufferData[128];
+    size_t len = static_cast<size_t>(::snprintf(bufferData, sizeof(bufferData), "%s, %02u %s %04u %02u:%02u:%02u GMT",
+                                                local.getDay(), local.dayOfMonth, local.getMonth(), local.year,
+                                                local.hour, local.minutes, local.seconds));
+    if (len == 0 or len >= sizeof(bufferData))
+    {
+        return Result::Error("Failed to format time");
+    }
 
-    SC_TRY(response.addHeader(headerName, buffer.view()));
+    SC_TRY(response.addHeader(headerName, {{bufferData, len}, true, StringEncoding::Ascii}));
     return Result(true);
 }
 
-SC::StringView SC::HttpWebServer::Internal::getContentType(const StringView extension)
+SC::StringSpan SC::HttpWebServer::Internal::getContentType(const StringSpan extension)
 {
     if (extension == "htm" or extension == "html")
     {

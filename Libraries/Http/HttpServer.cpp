@@ -5,16 +5,16 @@
 #include "../Containers/ArenaMap.h"
 #include "../Memory/String.h"
 #include "../Socket/Socket.h"
-#include "../Strings/StringBuilder.h"
+#include "Internal/HttpStringAppend.h"
 
 // HttpRequest
-bool SC::HttpRequest::find(HttpParser::Token token, StringView& res) const
+bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
 {
     size_t found = 0;
     if (headerOffsets.find([token](const auto& it) { return it.token == token; }, &found))
     {
         const HttpHeaderOffset& header = headerOffsets[found];
-        res = StringView({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
+        res = StringSpan({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
         return true;
     }
     return false;
@@ -23,21 +23,28 @@ bool SC::HttpRequest::find(HttpParser::Token token, StringView& res) const
 // HttpResponse
 SC::Result SC::HttpResponse::startResponse(int code)
 {
-    StringBuilder sb(outputBuffer, StringEncoding::Ascii, StringBuilder::Clear);
+    GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+
+    HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+
+    sb.clear();
     SC_TRY(sb.append("HTTP/1.1 "));
     switch (code)
     {
-    case 200: SC_TRY(sb.append("{} OK\r\n", code)); break;
-    case 404: SC_TRY(sb.append("{} Not Found\r\n", code)); break;
-    case 405: SC_TRY(sb.append("{} Not Allowed\r\n", code)); break;
+    case 200: SC_TRY(sb.append("200 OK\r\n")); break;
+    case 404: SC_TRY(sb.append("404 Not Found\r\n")); break;
+    case 405: SC_TRY(sb.append("405 Not Allowed\r\n")); break;
     }
     responseEnded = false;
     return Result(true);
 }
 
-SC::Result SC::HttpResponse::addHeader(StringView headerName, StringView headerValue)
+SC::Result SC::HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 {
-    StringBuilder sb(outputBuffer, StringEncoding::Ascii);
+    GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+
+    HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+
     SC_TRY(sb.append(headerName));
     SC_TRY(sb.append(": "));
     SC_TRY(sb.append(headerValue));
@@ -47,9 +54,12 @@ SC::Result SC::HttpResponse::addHeader(StringView headerName, StringView headerV
 
 SC::Result SC::HttpResponse::end(Span<const char> span)
 {
-    StringBuilder sb(outputBuffer, StringEncoding::Ascii);
-    SC_TRY(sb.append("Content-Length: {}\r\n\r\n", span.sizeInBytes()));
-    sb.finalize();
+    {
+        GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+
+        HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+        SC_TRY(sb.append("Content-Length: {}\r\n\r\n", span.sizeInBytes()));
+    }
     SC_TRY(not outputBuffer.isEmpty());
     SC_TRY(outputBuffer.resizeWithoutInitializing(outputBuffer.size() - 1)); // pop null terminator
     SC_TRY(outputBuffer.append(span));
@@ -72,8 +82,9 @@ struct SC::HttpServer::Internal
     }
 
     ArenaMap<HttpServerClient> clients;
-    SocketDescriptor           serverSocket;
-    AsyncSocketAccept          asyncServerAccept;
+
+    SocketDescriptor  serverSocket;
+    AsyncSocketAccept asyncServerAccept;
 
     uint32_t maxHeaderSize;
 
@@ -110,7 +121,7 @@ SC::HttpServer::HttpServer() : internal(*reinterpret_cast<Internal*>(internalRaw
 
 SC::HttpServer::~HttpServer() { internal.~Internal(); }
 
-SC::Result SC::HttpServer::start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringView address,
+SC::Result SC::HttpServer::start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringSpan address,
                                  uint16_t port)
 {
     SC_TRY(internal.clients.resize(maxConcurrentRequests));
@@ -189,7 +200,7 @@ SC::Result SC::HttpServer::Internal::parse(HttpRequest& request, const uint32_t 
         parsedSuccessfully = false;
         return Result::Error("Header size exceeded limit");
     }
-    // SC_TRY(request.headerBuffer.append(readData));
+
     size_t readBytes;
     while (request.parsedSuccessfully and not readData.empty())
     {
@@ -228,7 +239,7 @@ void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
 
     ArenaMapKey<HttpServerClient> clientKey = clients.allocate();
 
-    // Allocate always succeds because we pause asyncAccept when the arena is full
+    // Allocate always succeeds because we pause asyncAccept when the arena is full
     SC_TRUST_RESULT(clientKey.isValid());
 
     HttpServerClient& client = *clients.get(clientKey);

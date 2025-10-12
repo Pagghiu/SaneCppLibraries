@@ -156,13 +156,11 @@
             "Foundation",
             "Memory",
             "Socket",
-            "Strings",
             "Time"
         ],
         "minimal_dependencies": [
             "Async",
             "Containers",
-            "Strings",
             "Time"
         ],
         "all_dependencies": [
@@ -173,7 +171,6 @@
             "Foundation",
             "Memory",
             "Socket",
-            "Strings",
             "Threading",
             "Time"
         ]

@@ -20,7 +20,7 @@ struct SC_COMPILER_EXPORT HttpWebServer;
 struct SC::HttpWebServer
 {
     /// @brief Initialize the web server on the given file system directory to serve
-    Result init(StringView directoryToServe);
+    Result init(StringSpan directoryToServe);
 
     /// @brief Release all resources allocated by this web server
     Result stopAsync();

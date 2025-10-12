@@ -83,9 +83,9 @@ void SC::HttpServerTest::httpServerTest()
     {
         SC_TEST_EXPECT(StringBuilder::format(buffer, "HttpClient [{}]", idx));
         SC_TEST_EXPECT(client[idx].setCustomDebugName(buffer.view()));
-        client[idx].callback = [this, &clientContext](HttpClient& result)
+        client[idx].callback = [this, &clientContext](HttpClient& client)
         {
-            SC_TEST_EXPECT(result.getResponse().containsString("This is a title"));
+            SC_TEST_EXPECT(StringView(client.getResponse()).containsString("This is a title"));
             clientContext.numRequests++;
             if (clientContext.numRequests == clientContext.wantedNumRequests)
             {
