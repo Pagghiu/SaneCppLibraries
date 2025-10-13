@@ -9,6 +9,7 @@
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/AsyncWindows.inl"
+#include <stdint.h>
 #include <sys/timeb.h>
 #else
 #if SC_PLATFORM_LINUX
@@ -995,6 +996,9 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     eventLoop = nullptr;
     return Result(true);
 }
+//-------------------------------------------------------------------------------------------------------
+// AsyncEventLoop::Internal
+//-------------------------------------------------------------------------------------------------------
 
 void SC::AsyncEventLoop::Internal::popNextInSequence(AsyncSequence& sequence)
 {
@@ -1006,10 +1010,6 @@ void SC::AsyncEventLoop::Internal::popNextInSequence(AsyncSequence& sequence)
         clearSequence(sequence);
     }
 }
-
-//-------------------------------------------------------------------------------------------------------
-// AsyncEventLoop::Internal
-//-------------------------------------------------------------------------------------------------------
 
 void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
 {
@@ -1979,8 +1979,9 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
         // TODO: Replace code below with a heap or some sorted data structure...
         while (iterator)
         {
-            // isLaterThan ensures items with same expiration time to be sub-ordered by their scheduling order
-            if (iterator->expirationTime.milliseconds >= timeout.expirationTime.milliseconds)
+            // It's important to compare with '>' and not '>=' to allow timers with same expiration time to be
+            // sub-ordered by their scheduling order
+            if (iterator->expirationTime.milliseconds > timeout.expirationTime.milliseconds)
             {
                 // middle
                 timeout.prev = iterator->prev;
@@ -2071,6 +2072,16 @@ template <>
 void SC::AsyncEventLoop::Internal::KernelQueueOpaque::destruct(Object& obj)
 {
     obj.~Object();
+}
+
+SC::TimeMs SC::AsyncEventLoop::Internal::offsetTimeClamped(TimeMs time, TimeMs offset)
+{
+    constexpr int64_t maxValue = INT64_MAX;
+    if (time.milliseconds > maxValue - offset.milliseconds)
+    {
+        return TimeMs{maxValue};
+    }
+    return TimeMs{time.milliseconds + offset.milliseconds};
 }
 
 //-------------------------------------------------------------------------------------------------------

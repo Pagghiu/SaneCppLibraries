@@ -351,7 +351,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     //-------------------------------------------------------------------------------------------------------
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncLoopTimeout& async)
     {
-        async.expirationTime.milliseconds = eventLoop.getLoopTime().milliseconds + async.relativeTimeout.milliseconds;
+        async.expirationTime = Internal::offsetTimeClamped(eventLoop.getLoopTime(), async.relativeTimeout);
         return Result(true);
     }
 

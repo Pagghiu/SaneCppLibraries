@@ -236,4 +236,6 @@ struct SC::AsyncEventLoop::Internal
         }
         return summedSizeBytes;
     }
+
+    static TimeMs offsetTimeClamped(TimeMs time, TimeMs offset);
 };
