@@ -56,6 +56,10 @@ void SC::SocketTest::parseAddress()
     SC_TEST_EXPECT(address.getPort() == 123);
     SC_TEST_EXPECT(address.fromAddressPort("::1", 456));
     SC_TEST_EXPECT(address.getPort() == 456);
+
+    const char  badMemory[]  = "oh yeah that's a really broken socket ip address";
+    const auto& badIPAddress = *reinterpret_cast<const SocketIPAddress*>(&badMemory);
+    SC_TEST_EXPECT(not badIPAddress.isValid());
     //! [socketIpAddressSnippet]
 }
 

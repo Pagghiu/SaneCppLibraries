@@ -123,14 +123,14 @@ bool SC::SocketIPAddress::toString(Span<char> inputSpan, StringSpan& outputSpan)
         outputSpan = StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
         return true;
     }
-    else
+    else if (sa->sa_family == AF_INET6)
     {
-        SC_ASSERT_RELEASE(sa->sa_family == AF_INET6);
         const struct sockaddr_in6* sa_in6 = &handle.reinterpret_as<struct sockaddr_in6>();
         SC_TRY(::inet_ntop(AF_INET6, &(sa_in6->sin6_addr), ipstr, (socklen_t)inputSpan.sizeInBytes()) != 0);
         outputSpan = StringSpan({ipstr, ::strlen(ipstr)}, true, StringEncoding::Ascii);
         return true;
     }
+    return false;
 }
 
 SC::Result SC::SocketIPAddress::fromAddressPort(StringSpan interfaceAddress, uint16_t port)
