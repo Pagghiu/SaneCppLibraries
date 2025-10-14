@@ -130,55 +130,64 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
             action.target = arguments.arguments[0];
         }
     }
-    if (arguments.arguments.sizeInElements() >= 2)
+    StringSpan args[3];
+
+    for (size_t idx = 1; idx < min(size_t(4), arguments.arguments.sizeInElements()); ++idx)
     {
-        action.configuration = arguments.arguments[1];
+        auto arg = arguments.arguments[idx];
+        if (arg == "--")
+        {
+            (void)arguments.arguments.sliceStart(idx + 1, action.additionalArguments);
+            break;
+        }
+        args[idx - 1] = arg;
     }
-    if (arguments.arguments.sizeInElements() >= 3)
+
+    if (not args[0].isEmpty())
     {
-        if (arguments.arguments[2] == "xcode")
-        {
-            action.parameters.generator = Build::Generator::XCode;
-        }
-        else if (arguments.arguments[2] == "make")
-        {
-            action.parameters.generator = Build::Generator::Make;
-        }
-        else if (arguments.arguments[2] == "vs2022")
-        {
-            action.parameters.generator = Build::Generator::VisualStudio2022;
-        }
-        else if (arguments.arguments[2] == "vs2019")
-        {
-            action.parameters.generator = Build::Generator::VisualStudio2019;
-        }
-        else if (arguments.arguments[2] == "default")
-        {
-            // Defaults already set
-        }
+        action.configuration = args[0];
     }
-    if (arguments.arguments.sizeInElements() >= 4)
+
+    if (args[1] == "xcode")
     {
-        if (arguments.arguments[3] == "arm64")
-        {
-            action.parameters.architecture = Build::Architecture::Arm64;
-        }
-        else if (arguments.arguments[3] == "intel32")
-        {
-            action.parameters.architecture = Build::Architecture::Intel32;
-        }
-        else if (arguments.arguments[3] == "intel64")
-        {
-            action.parameters.architecture = Build::Architecture::Intel64;
-        }
-        else if (arguments.arguments[3] == "wasm")
-        {
-            action.parameters.architecture = Build::Architecture::Wasm;
-        }
-        else if (arguments.arguments[3] == "any")
-        {
-            action.parameters.architecture = Build::Architecture::Any;
-        }
+        action.parameters.generator = Build::Generator::XCode;
+    }
+    else if (args[1] == "make")
+    {
+        action.parameters.generator = Build::Generator::Make;
+    }
+    else if (args[1] == "vs2022")
+    {
+        action.parameters.generator = Build::Generator::VisualStudio2022;
+    }
+    else if (args[1] == "vs2019")
+    {
+        action.parameters.generator = Build::Generator::VisualStudio2019;
+    }
+    else if (args[1] == "default")
+    {
+        // Defaults already set
+    }
+
+    if (args[2] == "arm64")
+    {
+        action.parameters.architecture = Build::Architecture::Arm64;
+    }
+    else if (args[2] == "intel32")
+    {
+        action.parameters.architecture = Build::Architecture::Intel32;
+    }
+    else if (args[2] == "intel64")
+    {
+        action.parameters.architecture = Build::Architecture::Intel64;
+    }
+    else if (args[2] == "wasm")
+    {
+        action.parameters.architecture = Build::Architecture::Wasm;
+    }
+    else if (args[2] == "any")
+    {
+        action.parameters.architecture = Build::Architecture::Any;
     }
 
     return Build::executeAction(action);

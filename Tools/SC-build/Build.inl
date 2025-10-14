@@ -664,6 +664,7 @@ struct SC::Build::Action::Internal
     static Result coverage(StringView workspaceName, const Action& action);
     static Result executeInternal(StringView workspaceName, const Action& action, Span<StringView> environment = {},
                                   String* outputExecutable = nullptr);
+    static Result runExecutable(StringView executablePath, Span<StringView> arguments, const Action& action);
 
     static Result toVisualStudioArchitecture(Architecture::Type architectureType, StringView& architecture)
     {
@@ -933,6 +934,30 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
     return Result(true);
 }
 
+SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath, Span<StringView> arguments,
+                                                      const Build::Action& action)
+{
+    Process runProcess;
+    size_t  numArgs = 1;
+    arguments[0]    = StringView(executablePath).trimWhiteSpaces();
+    globalConsole->print("COMMAND = {}\n", arguments[0]);
+    for (size_t idx = 0; idx < action.additionalArguments.sizeInElements(); ++idx)
+    {
+        if (numArgs == arguments.sizeInElements())
+        {
+            globalConsole->printLine("Exceeded max number of arguments that can be passed to the executable");
+            break;
+        }
+        arguments[numArgs] = action.additionalArguments[idx];
+        globalConsole->print("ARGS[{}] = {}\n", idx, arguments[numArgs]);
+        numArgs++;
+    }
+    globalConsole->flush();
+    SC_TRY(runProcess.exec({arguments.data(), numArgs}));
+    SC_TRY_MSG(runProcess.getExitStatus() == 0, "Run exited with non zero status");
+    return Result(true);
+}
+
 SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName, const Action& action,
                                                         Span<StringView> environment, String* outputExecutable)
 {
@@ -1028,9 +1053,8 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             SC_TRY(Path::join(userExecutable, {path, "/", targetName}));
             if (action.action == Action::Run)
             {
-                Process testProcess;
-                SC_TRY(testProcess.exec({userExecutable.view()}));
-                SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+                StringView executablePath = userExecutable.view();
+                SC_TRY(runExecutable(executablePath, arguments, action));
             }
             else if (action.action == Action::Print)
             {
@@ -1095,9 +1119,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             SC_TRY_MSG(not executablePath.isEmpty(), "Cannot find executable path from .vcxproj");
             if (action.action == Action::Run)
             {
-                Process testProcess;
-                SC_TRY(testProcess.exec({executablePath}));
-                SC_TRY_MSG(testProcess.getExitStatus() == 0, "Run exited with non zero status");
+                SC_TRY(runExecutable(executablePath, arguments, action));
             }
             else if (action.action == Action::Print)
             {
@@ -1131,7 +1153,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
 
         StringView architecture;
         SC_TRY(toMakefileArchitecture(action.parameters.architecture, architecture));
-        StringView arguments[16];
+        StringView arguments[32];
         size_t     numArgs   = 0;
         arguments[numArgs++] = "make"; // 1
 
@@ -1150,7 +1172,8 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         }
         break;
         case Action::Run: {
-            SC_TRY(StringBuilder::format(targetName, "{}_RUN", selectedTarget));
+            // Not using the _RUN target to avoid one level of indirection
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", selectedTarget));
         }
         break;
         case Action::Print: {
@@ -1182,6 +1205,15 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             SC_TRY(process.exec({arguments, numArgs}, *outputExecutable));
             StringView out    = outputExecutable->view();
             *outputExecutable = out.trimWhiteSpaces();
+        }
+        else if (action.action == Action::Run)
+        {
+            // We are actually invoking _PRINT_EXECUTABLE_PATH
+            String executableName;
+            SC_TRY(process.exec({arguments, numArgs}, executableName));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Print returned error");
+            StringView executablePath = executableName.view();
+            SC_TRY(runExecutable(executablePath, arguments, action));
         }
         else
         {

@@ -476,6 +476,8 @@ struct Action
     StringView target;
     StringView workspaceName;
 
+    Span<const StringView> additionalArguments;
+
   private:
     struct Internal;
 };
