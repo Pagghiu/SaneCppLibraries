@@ -213,6 +213,7 @@ struct SC_COMPILER_EXPORT GrowableBuffer<String> final : public IGrowableBuffer
     String::GrowableImplementation gi;
     GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
     virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
+    static auto  getEncodingFor(const String& str) { return str.getEncoding(); }
 };
 
 template <int N>
@@ -221,5 +222,6 @@ struct SC_COMPILER_EXPORT GrowableBuffer<SmallString<N>> final : public IGrowabl
     String::GrowableImplementation gi;
     GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
     virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
+    static auto  getEncodingFor(const SmallString<N>& str) { return str.getEncoding(); }
 };
 } // namespace SC

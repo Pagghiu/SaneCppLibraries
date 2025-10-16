@@ -34,6 +34,7 @@ StringView StringBuilder::finalize()
         {
             buffer->~IGrowableBuffer();
         }
+        // TODO: This is potentially accessing buffer after it has been destroyed.
         finalizedView = {{buffer->data(), buffer->size()}, true, encoding};
         buffer        = nullptr;
     }

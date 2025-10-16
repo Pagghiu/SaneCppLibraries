@@ -97,6 +97,9 @@ SC::String::GrowableImplementation::~GrowableImplementation()
     {
         (void)string.data.resizeWithoutInitializing(da.sizeInBytes + numZeros);
         Internal::ensureZeroTermination(string.data, string.getEncoding());
+
+        da = {string.data.isEmpty() ? 0 : string.data.size() - numZeros,
+              string.data.capacity() > numZeros ? string.data.capacity() - numZeros : 0, string.data.data()};
     }
 }
 

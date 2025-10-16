@@ -42,7 +42,7 @@ struct SC_COMPILER_EXPORT StringBuilder
     {
         GrowableBuffer<T>& bufferT = bufferStorage.reinterpret_as<GrowableBuffer<T>>();
         placementNew(bufferT, string);
-        initWithEncoding(bufferT, string.getEncoding(), flags);
+        initWithEncoding(bufferT, GrowableBuffer<T>::getEncodingFor(string), flags);
     }
 
     StringBuilder(IGrowableBuffer& bufferT, StringEncoding encoding, Flags flags);

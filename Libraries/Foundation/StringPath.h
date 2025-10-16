@@ -69,5 +69,6 @@ struct SC_COMPILER_EXPORT GrowableBuffer<StringPath> final : public IGrowableBuf
     GrowableBuffer(StringPath& string);
     virtual ~GrowableBuffer() override;
     virtual bool tryGrowTo(size_t newSize) override;
+    static auto  getEncodingFor(const StringPath& sp) { return sp.getEncoding(); }
 };
 } // namespace SC
