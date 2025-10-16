@@ -297,14 +297,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
 
         builder.append("      <ConformanceMode>true</ConformanceMode>\n");
-        builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         builder.append("      <UseFullPaths>false</UseFullPaths>\n");
         builder.append("      <TreatWarningAsError>true</TreatWarningAsError>\n");
-        if (compileFlags.enableExceptions)
-        {
-            builder.append("      <ExceptionHandling>true</ExceptionHandling>\n");
-        }
-        else
+        if (not compileFlags.enableExceptions)
         {
             builder.append("      <ExceptionHandling>false</ExceptionHandling>\n");
         }
