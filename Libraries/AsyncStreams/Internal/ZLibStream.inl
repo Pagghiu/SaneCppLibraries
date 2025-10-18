@@ -147,6 +147,7 @@ SC::ZLibStream::~ZLibStream()
         zlib.inflateEnd(stream);
         break;
     }
+    zlib.unload();
 }
 
 SC::Result SC::ZLibStream::init(Algorithm wantedAlgorithm)

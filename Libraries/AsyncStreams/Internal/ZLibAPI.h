@@ -119,7 +119,7 @@ struct SC::ZLibAPI
     Error(SC_ZLIB_API_CC* pInflateInit2)(void* strm, int windowBits, const char* version, int stream_size) = nullptr;
 #undef SC_ZLIB_API_CC
     // Handle for dynamic library
-    void* library = nullptr;
-
+    void* library  = nullptr;
+    int   refCount = 0;
     struct Internal;
 };

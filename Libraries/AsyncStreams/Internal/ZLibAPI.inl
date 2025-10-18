@@ -75,7 +75,10 @@ struct SC::ZLibAPI::Internal
 SC::Result SC::ZLibAPI::load(const char* libPath)
 {
     if (library != nullptr)
+    {
+        refCount++;
         return Result(true);
+    }
 #if _WIN32
     const char* zlib_library_path = "zlib1.dll";
 #elif __APPLE__
@@ -112,11 +115,17 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
     SC_TRY(Internal::loadSymbol(*this, pInflateEnd, "inflateEnd"));
     SC_TRY(Internal::loadSymbol(*this, pDeflateInit2, "deflateInit2_"));
     SC_TRY(Internal::loadSymbol(*this, pInflateInit2, "inflateInit2_"));
+    refCount = 1;
     return Result(true);
 }
 
 void SC::ZLibAPI::unload()
 {
+    --refCount;
+    if (refCount > 0)
+    {
+        return;
+    }
     if (library)
     {
 #ifdef _WIN32
