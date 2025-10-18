@@ -55,9 +55,8 @@ struct SC::Process::Internal
 
 SC::Result SC::Process::waitForExitSync()
 {
-    HANDLE hProcess;
-    SC_TRY(handle.get(hProcess, Result::Error("ProcesEntry::waitProcessExit - Invalid handle")));
-    WaitForSingleObject(hProcess, INFINITE);
+    HANDLE hProcess = handle;
+    WaitForSingleObject(handle, INFINITE);
     DWORD processStatus;
     if (GetExitCodeProcess(hProcess, &processStatus))
     {
@@ -169,7 +168,7 @@ SC::Result SC::Process::launchImplementation()
     ::CloseHandle(processInfo.hThread);
 
     processID.pid = processInfo.dwProcessId;
-    SC_TRY(handle.assign(processInfo.hProcess));
+    handle        = processInfo.hProcess;
     SC_TRY(stdInFd.close());
     SC_TRY(stdOutFd.close());
     SC_TRY(stdErrFd.close());

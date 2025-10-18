@@ -17,10 +17,6 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(processSuccess.launch({"sleep", "0.2"})); // Returns 0 error code
     SC_TEST_EXPECT(processFailure.launch({"ls", "/~"}));     // Returns 1 error code
 #endif
-    ProcessDescriptor::Handle processHandleSuccess = 0;
-    SC_TEST_EXPECT(processSuccess.handle.get(processHandleSuccess, Result::Error("Invalid Handle 1")));
-    ProcessDescriptor::Handle processHandleFailure = 0;
-    SC_TEST_EXPECT(processFailure.handle.get(processHandleFailure, Result::Error("Invalid Handle 2")));
     AsyncProcessExit asyncSuccess;
     AsyncProcessExit asyncFailure;
 
@@ -43,8 +39,8 @@ void SC::AsyncTest::processExit()
         SC_TEST_EXPECT(res.get(outParams2.exitStatus));
         outParams2.numCallbackCalled++;
     };
-    SC_TEST_EXPECT(asyncSuccess.start(eventLoop, processHandleSuccess));
-    SC_TEST_EXPECT(asyncFailure.start(eventLoop, processHandleFailure));
+    SC_TEST_EXPECT(asyncSuccess.start(eventLoop, processSuccess.handle));
+    SC_TEST_EXPECT(asyncFailure.start(eventLoop, processFailure.handle));
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(outParams1.numCallbackCalled == 1);

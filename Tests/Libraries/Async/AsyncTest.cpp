@@ -222,8 +222,6 @@ SC::Result snippetForProcess(AsyncEventLoop& eventLoop, Console& console)
 // ...
 Process process;
 SC_TRY(process.launch({"executable", "--parameter"}));
-ProcessDescriptor::Handle processHandle;
-SC_TRY(process.handle.get(processHandle, Result::Error("Invalid Handle")));
 AsyncProcessExit processExit; //  Memory lifetime must be valid until callback is called
 processExit.callback = [&](AsyncProcessExit::Result& res)
 {
@@ -233,7 +231,7 @@ processExit.callback = [&](AsyncProcessExit::Result& res)
         console.print("Process Exit status = {}", exitStatus);
     }
 };
-SC_TRY(processExit.start(eventLoop, processHandle));
+SC_TRY(processExit.start(eventLoop, process.handle));
 //! [AsyncProcessSnippet]
 SC_TRY(eventLoop.run());
 return Result(true);

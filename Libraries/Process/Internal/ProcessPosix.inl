@@ -105,7 +105,7 @@ SC::Result SC::Process::launchForkParent(PipeDescriptor& pipe, const void* previ
         // Error received inside childErrno
         return Result::Error("Process::launchImplementation - execve failed");
     }
-    SC_TRY_MSG(handle.assign(processID.pid), "Process::launchImplementation - handle not assigned");
+    handle = processID.pid;
     SC_TRY(stdInFd.close());
     SC_TRY(stdOutFd.close());
     SC_TRY(stdErrFd.close());

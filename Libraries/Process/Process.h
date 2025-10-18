@@ -11,7 +11,11 @@ namespace SC
 {
 struct SC_COMPILER_EXPORT ProcessChain;
 
-using ProcessDescriptor = FileDescriptor;
+struct SC_COMPILER_EXPORT ProcessDescriptor
+{
+    using Handle                  = detail::FileDescriptorDefinition::Handle;
+    static constexpr auto Invalid = detail::FileDescriptorDefinition::Invalid;
+};
 
 /// @brief Wraps the code returned by a process that has exited
 struct ProcessExitStatus
@@ -188,9 +192,10 @@ struct SC_COMPILER_EXPORT Process
         // clang-format on
     };
 
-    ProcessDescriptor handle;    ///< Handle to the OS process
-    ProcessID         processID; ///< ID of the process (can be the same as handle on some OS)
-    Options           options;   ///< Options for the child process (hide console window etc.)
+    ProcessID processID; ///< ID of the process (can be the same as handle on Posix)
+    Options   options;   ///< Options for the child process (hide console window etc.)
+
+    ProcessDescriptor::Handle handle = ProcessDescriptor::Invalid;
 
     /// @brief Waits (blocking) for process to exit after launch. It can only be called if Process::launch succeeded.
     Result waitForExitSync();
