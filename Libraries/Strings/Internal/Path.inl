@@ -393,6 +393,8 @@ bool SC::Path::normalize(IGrowableBuffer&& output, StringEncoding encoding, Stri
         case AsWindows: view = "\\\\"; break;
         case AsPosix: view = "/"; break;
         }
+        StringBuilder sb(output, encoding, StringBuilder::Clear);
+        return sb.append(view);
     }
     bool normalizationHappened = false;
 
@@ -419,8 +421,20 @@ bool SC::Path::normalize(IGrowableBuffer&& output, StringEncoding encoding, Stri
 #endif
     };
     // Need to IncludeEmpty in order to preserve starting /
-    size_t numComponents = 0;
+    size_t     numComponents = 0;
+    StringView remaining     = tokenizer.remaining;
     while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::IncludeEmpty))
+    {
+        const auto component = tokenizer.component;
+        if (not component.isEmpty())
+        {
+            tokenizer = remaining;
+            break;
+        }
+        remaining = tokenizer.remaining;
+        numComponents++;
+    }
+    while (tokenizer.tokenizeNext({'/', '\\'}))
     {
         const auto component = tokenizer.component;
 
@@ -463,7 +477,7 @@ bool SC::Path::normalize(IGrowableBuffer&& output, StringEncoding encoding, Stri
             numComponents += 1;
         }
     }
-
+    normalizationHappened = normalizationHappened or (tokenizer.numSplitsTotal != tokenizer.numSplitsNonEmpty);
     if (normalizationHappened)
     {
         StringBuilder          sb(output, encoding, StringBuilder::Clear);

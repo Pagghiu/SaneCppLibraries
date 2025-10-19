@@ -261,6 +261,7 @@ void SC::PathTest::testNormalize(TestReport&)
     SC_TEST_EXPECT(Path::normalize(path, "///", Path::AsPosix) and path == "/");
     SC_TEST_EXPECT(Path::normalize(path, "\\\\", Path::AsWindows) and path == "\\\\");
     SC_TEST_EXPECT(Path::normalize(path, "/a/b/c/../d/e//", Path::AsPosix) and path == "/a/b/d/e");
+    SC_TEST_EXPECT(Path::normalize(path, "/a/b/c/../d///e", Path::AsPosix) and path == "/a/b/d/e");
     SC_TEST_EXPECT(Path::normalize(path, "a\\b\\..\\c\\d\\..\\e", Path::AsPosix) and path == "a/c/e");
     SC_TEST_EXPECT(Path::normalize(path, "..\\a\\b\\c", Path::AsWindows) and path == "..\\a\\b\\c");
     SC_TEST_EXPECT(Path::normalize(path, "C:\\Users\\SC\\..\\Documents\\", Path::AsWindows) and
