@@ -47,6 +47,9 @@ Some relevant blog posts are:
 
 # Definition
 
+## StringBuilder
+@copydoc SC::StringBuilder
+
 ## StringView
 @copydoc SC::StringView
 
@@ -103,21 +106,6 @@ Some relevant blog posts are:
 
 ### StringViewTokenizer::countTokens
 @copydoc SC::StringViewTokenizer::countTokens
-
-## StringBuilder
-@copydoc SC::StringBuilder
-
-### StringBuilder::format
-@copydoc SC::StringBuilder::format
-
-### StringBuilder::append
-@copydoc SC::StringBuilder::append
-
-### StringBuilder::appendReplaceAll
-@copydoc SC::StringBuilder::appendReplaceAll
-
-### StringBuilder::appendHex
-@copydoc SC::StringBuilder::appendHex
 
 ## StringIterator
 @copydoc SC::StringIterator

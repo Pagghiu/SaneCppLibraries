@@ -78,7 +78,7 @@ SC::StringSpan SC::String::view() const SC_LANGUAGE_LIFETIME_BOUND
     return StringSpan({items, isEmpty ? 0 : data.size() - StringEncodingGetSize(encoding)}, not isEmpty, encoding);
 }
 
-SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da)
+SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da) noexcept
     : string(string), da(da)
 {
     const size_t numZeros = StringEncodingGetSize(string.getEncoding());
@@ -86,7 +86,9 @@ SC::String::GrowableImplementation::GrowableImplementation(String& string, IGrow
           string.data.capacity() > numZeros ? string.data.capacity() - numZeros : 0, string.data.data()};
 }
 
-SC::String::GrowableImplementation::~GrowableImplementation()
+SC::String::GrowableImplementation::~GrowableImplementation() noexcept { finalize(); }
+
+void SC::String::GrowableImplementation::finalize() noexcept
 {
     const size_t numZeros = StringEncodingGetSize(string.getEncoding());
     if (da.sizeInBytes == 0)
@@ -103,7 +105,7 @@ SC::String::GrowableImplementation::~GrowableImplementation()
     }
 }
 
-bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize)
+bool SC::String::GrowableImplementation::tryGrowTo(size_t newSize) noexcept
 {
     // ensure size is correct before trying to grow to avoid losing data
     (void)string.data.resizeWithoutInitializing(da.sizeInBytes);

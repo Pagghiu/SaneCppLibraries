@@ -17,8 +17,8 @@
 // ProcessChain
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::ProcessChain::launch(const Process::StdOut& stdOut, const Process::StdIn& stdIn,
-                                    const Process::StdErr& stdErr)
+SC::Result SC::ProcessChain::internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn,
+                                            const Process::StdErr& stdErr)
 {
     if (processes.isEmpty())
     {

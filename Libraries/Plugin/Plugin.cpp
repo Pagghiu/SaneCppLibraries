@@ -72,7 +72,7 @@ bool SC::PluginDefinition::find(const StringView text, StringView& extracted)
 SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
-    StringBuilder builder(fullDynamicPath);
+    auto builder = StringBuilder::createForAppendingTo(fullDynamicPath);
 #if SC_PLATFORM_WINDOWS
     SC_TRY(builder.append(".dll"));
 #elif SC_PLATFORM_APPLE
@@ -86,7 +86,7 @@ SC::Result SC::PluginDefinition::getDynamicLibraryAbsolutePath(StringPath& fullD
 SC::Result SC::PluginDefinition::getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const
 {
     SC_TRY(Path::join(fullDynamicPath, {directory.view(), identity.identifier.view()}));
-    StringBuilder builder(fullDynamicPath);
+    auto builder = StringBuilder::createForAppendingTo(fullDynamicPath);
 #if SC_PLATFORM_WINDOWS
     SC_TRY(builder.append(".pdb"));
 #elif SC_PLATFORM_APPLE
@@ -384,7 +384,7 @@ struct SC::PluginCompiler::CompilerFinder
     Result tryFindCompiler(StringView base, StringView candidate, PluginCompiler& compiler)
     {
 
-        StringBuilder compilerBuilder(bestCompiler, StringBuilder::Clear);
+        auto compilerBuilder = StringBuilder::create(bestCompiler);
         SC_TRY(compilerBuilder.append(base));
         SC_TRY(compilerBuilder.append(SC_NATIVE_STR("/")));
         SC_TRY(compilerBuilder.append(candidate));
@@ -400,10 +400,10 @@ struct SC::PluginCompiler::CompilerFinder
         compilerBuilder.finalize();
 
         SC_TRY(bestLinker.assign(bestCompiler.view()));
-        StringBuilder linkerBuilder(bestLinker);
+        auto linkerBuilder = StringBuilder::createForAppendingTo(bestLinker);
         SC_TRY(linkerBuilder.append(SC_NATIVE_STR("link.exe")));
         linkerBuilder.finalize();
-        StringBuilder compilerBuilder2(bestCompiler, StringBuilder::DoNotClear);
+        auto compilerBuilder2 = StringBuilder::createForAppendingTo(bestCompiler);
         SC_TRY(compilerBuilder2.append(SC_NATIVE_STR("cl.exe")));
         compilerBuilder2.finalize();
         {
@@ -612,7 +612,7 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
         StringView dirname    = Path::dirname(file.absolutePath.view(), Path::AsNative);
         StringView outputName = Path::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
         SC_TRY(Path::join(destFile, {dirname, outputName}));
-        StringBuilder builder(destFile);
+        auto builder = StringBuilder::createForAppendingTo(destFile);
         SC_TRY(builder.append(SC_NATIVE_STR(".o")));
         SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), builder.finalize(),
                            standardOutput));
@@ -1064,7 +1064,7 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifie
 
         StringPath destFile;
         SC_TRY(Path::join(destFile, {dirname, outputName}));
-        StringBuilder builder(destFile);
+        auto builder = StringBuilder::createForAppendingTo(destFile);
         SC_TRY(builder.append(".o"));
         SC_TRY(PluginFileSystem::removeFileAbsolute(builder.finalize()));
     }

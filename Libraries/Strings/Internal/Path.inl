@@ -353,7 +353,6 @@ bool SC::Path::join(IGrowableBuffer&& output, StringEncoding encoding, Span<cons
             SC_TRY(sb.append(separator));
         }
     }
-    sb.finalize();
     return true;
 }
 
@@ -586,7 +585,6 @@ bool SC::Path::relativeFromTo(IGrowableBuffer&& output, StringEncoding encoding,
         }
         SC_TRY(builder.append(Path::removeTrailingSeparator(destRemaining)));
     }
-    builder.finalize();
     return true;
 }
 
@@ -598,7 +596,7 @@ bool SC::Path::endsWithSeparator(StringView path) { return path.endsWithAnyOf({'
 
 bool SC::Path::append(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> paths, Type type)
 {
-    StringBuilder builder(output, encoding, StringBuilder::DoNotClear);
+    StringBuilder builder(output, encoding, StringBuilder::Append);
     for (auto& path : paths)
     {
         if (isAbsolute(path, type))

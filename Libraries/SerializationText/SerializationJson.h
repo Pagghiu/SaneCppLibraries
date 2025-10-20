@@ -54,13 +54,16 @@ struct SC::SerializationJson
     /// representation of a given C++ serializable structure.
     /// @tparam T Type of object to write
     /// @param object Object to write
-    /// @param output Output string interface
+    /// @param buffer Output string or buffer
     /// @param options JSON formatting options
     /// @return `true` if write succeeded
     /// @see SC::SerializationJson for example usage
-    template <typename T>
-    [[nodiscard]] static bool write(T& object, StringFormatOutput& output, Options options = Options())
+    template <typename T, typename B>
+    [[nodiscard]] static bool write(T& object, B& buffer, Options options = Options())
     {
+        GrowableBuffer<B>  gb = {buffer};
+        StringFormatOutput output(StringEncoding::Ascii, gb);
+
         Writer stream(output, options);
         if (not stream.onSerializationStart())
             return false;

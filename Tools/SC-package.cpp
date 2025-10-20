@@ -28,7 +28,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     switch (HostPlatform)
     {
     case Platform::Apple: {
-        StringBuilder sb(download.url, StringBuilder::DoNotClear);
+        auto sb = StringBuilder::createForAppendingTo(download.url);
         SC_TRY(sb.append("Doxygen-{0}.dmg", download.packageVersion));
         sb.finalize();
         download.packagePlatform  = "macos";
@@ -55,7 +55,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
         case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
         default: break;
         }
-        StringBuilder sb(download.url, StringBuilder::DoNotClear);
+        auto sb = StringBuilder::createForAppendingTo(download.url);
         SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", download.packageVersion));
         sb.finalize();
         download.packagePlatform  = "linux";
@@ -66,7 +66,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     }
     break;
     case Platform::Windows: {
-        StringBuilder sb(download.url, StringBuilder::DoNotClear);
+        auto sb = StringBuilder::createForAppendingTo(download.url);
         SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", download.packageVersion));
         sb.finalize();
         download.packagePlatform = "windows";
@@ -292,8 +292,8 @@ Result findSystemClangFormat(Console& console, StringView wantedMajorVersion, St
         if (Process().exec({"brew", "--prefix", llvmVersion.view()}, foundPath))
         {
             (void)foundPath.assign(StringView(foundPath.view()).trimEndAnyOf('\n'));
-            StringBuilder sb(foundPath, StringBuilder::DoNotClear);
-            bool          res = sb.append("/bin/clang-format");
+            auto sb  = StringBuilder::createForAppendingTo(foundPath);
+            bool res = sb.append("/bin/clang-format");
             sb.finalize();
             if (res)
             {
@@ -483,7 +483,8 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     SmallStringNative<256> packagesCacheDirectory;
     SmallStringNative<256> packagesInstallDirectory;
     SmallStringNative<256> buffer;
-    StringBuilder          builder(buffer);
+
+    auto builder = StringBuilder::create(buffer);
     SC_TRY(Path::join(packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
     SC_TRY(Path::join(packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("packagesCache    = \"{}\"\n", packagesCacheDirectory.view()));

@@ -53,7 +53,7 @@ struct ProjectWriter
         {
             if (it.searchFor == it.replaceWith)
                 continue;
-            StringBuilder sb(other, StringBuilder::Clear);
+            auto sb = StringBuilder::create(other);
             SC_TRY(sb.appendReplaceAll(tempBuffer.view(), it.searchFor, it.replaceWith));
             sb.finalize();
             swap(other, tempBuffer);
@@ -229,7 +229,7 @@ struct SC::Build::WriterInternal
             {
                 RenderItem renderItem;
                 renderItem.name = StringView(StringEncoding::Utf8); // To unify hashes
-                StringBuilder sb(renderItem.name);
+                auto sb         = StringBuilder::createForAppendingTo(renderItem.name);
                 SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
                 auto nameView = sb.finalize();
                 if (nameView.endsWith(".h"))

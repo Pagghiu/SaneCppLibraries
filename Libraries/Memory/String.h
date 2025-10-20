@@ -156,9 +156,10 @@ struct SC::String
 
         IGrowableBuffer::DirectAccess& da;
 
-        GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da);
-        ~GrowableImplementation();
-        bool tryGrowTo(size_t newSize);
+        GrowableImplementation(String& string, IGrowableBuffer::DirectAccess& da) noexcept;
+        ~GrowableImplementation() noexcept;
+        void finalize() noexcept;
+        bool tryGrowTo(size_t newSize) noexcept;
     };
 
     StringEncoding encoding;
@@ -208,20 +209,32 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(
 
 // Enables File library from reading data from file descriptor into a String
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<String> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<String> : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
-    GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
-    virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
-    static auto  getEncodingFor(const String& str) { return str.getEncoding(); }
+    GrowableBuffer(String& string)
+        : IGrowableBuffer(&GrowableBuffer::tryGrowTo), gi(string, IGrowableBuffer::directAccess)
+    {}
+    static bool tryGrowTo(IGrowableBuffer& gb, size_t newSize) noexcept
+    {
+        return static_cast<GrowableBuffer&>(gb).gi.tryGrowTo(newSize);
+    }
+    static auto getEncodingFor(const String& str) noexcept { return str.getEncoding(); }
+    void        finalize() noexcept { gi.finalize(); }
 };
 
 template <int N>
-struct SC_COMPILER_EXPORT GrowableBuffer<SmallString<N>> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<SmallString<N>> : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
-    GrowableBuffer(String& string) : gi(string, IGrowableBuffer::directAccess) {}
-    virtual bool tryGrowTo(size_t newSize) override { return gi.tryGrowTo(newSize); }
-    static auto  getEncodingFor(const SmallString<N>& str) { return str.getEncoding(); }
+    GrowableBuffer(String& string)
+        : IGrowableBuffer(&GrowableBuffer::tryGrowTo), gi(string, IGrowableBuffer::directAccess)
+    {}
+    static bool tryGrowTo(IGrowableBuffer& gb, size_t newSize) noexcept
+    {
+        return static_cast<GrowableBuffer&>(gb).gi.tryGrowTo(newSize);
+    }
+    static auto getEncodingFor(const SmallString<N>& str) noexcept { return str.getEncoding(); }
+    void        finalize() noexcept { gi.finalize(); }
 };
 } // namespace SC

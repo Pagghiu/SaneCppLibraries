@@ -8,43 +8,20 @@
 namespace SC
 {
 
-StringBuilder::StringBuilder(IGrowableBuffer& bufferT, StringEncoding encoding, Flags flags)
+StringBuilder::StringBuilder(IGrowableBuffer& ibuffer, StringEncoding encoding, Flags flags) noexcept
 {
-    destroyBuffer = false;
-    initWithEncoding(bufferT, encoding, flags);
+    initWithEncoding(ibuffer, encoding, flags);
 }
 
-void StringBuilder::initWithEncoding(IGrowableBuffer& ibuffer, StringEncoding stringEncoding, Flags flags)
+void StringBuilder::initWithEncoding(IGrowableBuffer& ibuffer, StringEncoding stringEncoding, Flags flags) noexcept
 {
     encoding = stringEncoding;
     buffer   = &ibuffer;
     if (flags == Clear)
     {
-        clear();
+        if (buffer)
+            buffer->clear();
     }
-}
-
-StringBuilder::~StringBuilder() { finalize(); }
-
-StringView StringBuilder::finalize()
-{
-    if (buffer)
-    {
-        if (destroyBuffer)
-        {
-            buffer->~IGrowableBuffer();
-        }
-        // TODO: This is potentially accessing buffer after it has been destroyed.
-        finalizedView = {{buffer->data(), buffer->size()}, true, encoding};
-        buffer        = nullptr;
-    }
-    return view();
-}
-
-StringView StringBuilder::view()
-{
-    SC_ASSERT_RELEASE(buffer == nullptr);
-    return finalizedView;
 }
 
 bool StringBuilder::append(StringView str)
@@ -122,12 +99,6 @@ bool StringBuilder::appendHex(Span<const uint8_t> data, AppendHexCase casing)
         }
     }
     return true;
-}
-
-void StringBuilder::clear()
-{
-    if (buffer)
-        buffer->clear();
 }
 
 } // namespace SC

@@ -43,7 +43,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         Hashing::Result res;
         SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
+        SC_TRY(StringBuilder::create(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(StringView(tmpHash.view()).sliceStartLength(0, 24));
     }
 
@@ -55,7 +55,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         Hashing::Result res;
         SC_TRY(hashing.getHash(res));
         SmallString<64> tmpHash = StringEncoding::Ascii;
-        SC_TRY(StringBuilder(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
+        SC_TRY(StringBuilder::create(tmpHash).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
         return hash.assign(StringView(tmpHash.view()).sliceStartLength(0, 24));
     }
 
@@ -217,7 +217,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             if (not file.platformFilters.isEmpty())
             {
                 platformFilters = " platformFilters = (";
-                StringBuilder sb(platformFilters, StringBuilder::DoNotClear);
+                auto sb         = StringBuilder::createForAppendingTo(platformFilters);
                 for (size_t idx = 0; idx < file.platformFilters.size(); ++idx)
                 {
                     sb.append(file.platformFilters[idx].view());
@@ -235,7 +235,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                 const CompileFlags& compileFlags = *file.compileFlags;
 
                 compilerFlags = " settings = {COMPILER_FLAGS = \"";
-                StringBuilder sb(compilerFlags, StringBuilder::DoNotClear);
+                auto sb       = StringBuilder::createForAppendingTo(compilerFlags);
                 for (const String& includePath : compileFlags.includePaths)
                 {
                     // TODO: Escape double quotes
@@ -938,14 +938,14 @@ struct SC::Build::ProjectWriter::WriterXCode
             if (framework)
             {
                 xcodeFile.name = Path::basename(it.view(), Path::AsPosix);
-                SC_TRY(StringBuilder(xcodeFile.name, StringBuilder::DoNotClear).append(".framework"));
+                SC_TRY(StringBuilder::createForAppendingTo(xcodeFile.name).append(".framework"));
                 xcodeFile.type = RenderItem::Framework;
                 SC_TRY(Path::join(xcodeFile.path, {"System/Library/Frameworks", xcodeFile.name.view()}, "/"));
             }
             else
             {
                 xcodeFile.name = "lib";
-                StringBuilder sb(xcodeFile.name, StringBuilder::DoNotClear);
+                auto sb        = StringBuilder::createForAppendingTo(xcodeFile.name);
                 SC_TRY(sb.append(Path::basename(it.view(), Path::AsPosix)));
                 SC_TRY(sb.append(".tbd"));
                 xcodeFile.type = RenderItem::SystemLibrary;

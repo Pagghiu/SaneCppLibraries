@@ -24,24 +24,8 @@ struct StringFormatterFor
 /// @brief Allows pushing results of StringFormat to a buffer or to the console
 struct SC_COMPILER_EXPORT StringFormatOutput
 {
-    /// @brief Constructs a StringFormatOutput object pushing to a destination buffer
-    /// @param encoding The given encoding
-    /// @param destination The destination buffer
-    template <typename T>
-    StringFormatOutput(StringEncoding encoding, T& destination) : encoding(encoding)
-    {
-        GrowableBuffer<T>& gbuf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
-        placementNew(gbuf, destination);
-        growableBuffer = &gbuf;
-    }
-
-    StringFormatOutput(StringEncoding encoding, IGrowableBuffer& buffer) : encoding(encoding)
-    {
-        growableBuffer = &buffer;
-        destroyBuffer  = false;
-    }
-
-    ~StringFormatOutput();
+    StringFormatOutput(StringEncoding encoding, IGrowableBuffer& buffer) : encoding(encoding), growableBuffer(&buffer)
+    {}
 
     /// @brief Constructs a StringFormatOutput object pushing to a console
     /// @param encoding The given encoding
@@ -64,9 +48,6 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     [[nodiscard]] bool onFormatSucceeded();
 
   private:
-    AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
-
-    bool             destroyBuffer  = true;
     IGrowableBuffer* growableBuffer = nullptr;
     StringEncoding   encoding;
 
@@ -223,6 +204,7 @@ template <typename RangeIterator>
 template <typename... Types>
 bool SC::StringFormat<RangeIterator>::format(StringFormatOutput& data, StringView fmt, Types&&... args)
 {
+    SC_TRY(fmt.getEncoding() != StringEncoding::Utf16); // UTF16 format strings are not supported
     data.onFormatBegin();
     if (Implementation::executeFormat(data, fmt.getIterator<RangeIterator>(), forward<Types>(args)...))
         SC_LANGUAGE_LIKELY { return data.onFormatSucceeded(); }

@@ -79,35 +79,24 @@ struct SC_COMPILER_EXPORT Process
     struct StdStream
     {
         /// @brief Read the process standard output/error into the given String / Buffer
-        template <typename T>
-        StdStream(T& destination)
+        StdStream(IGrowableBuffer& destination)
         {
-            GrowableBuffer<T>& buf = growableBufferStorage.reinterpret_as<GrowableBuffer<T>>();
-            placementNew(buf, destination);
-            growableBuffer = &buf;
+            growableBuffer = &destination;
             operation      = Operation::GrowableBuffer;
         }
 
-        ~StdStream()
-        {
-            if (growableBuffer)
-            {
-                growableBuffer->~IGrowableBuffer();
-            }
-        }
-
         /// @brief Redirects child process standard output/error to a given file descriptor
-        StdStream(FileDescriptor&& file)
+        StdStream(GrowableBuffer<FileDescriptor>& file)
         {
             operation = Operation::FileDescriptor;
-            (void)file.get(fileDescriptor, Result::Error("Invalid redirection file descriptor"));
-            file.detach();
+            (void)file.content.get(fileDescriptor, Result::Error("Invalid redirection file descriptor"));
+            file.content.detach();
         }
 
-        StdStream(PipeDescriptor& pipe)
+        StdStream(GrowableBuffer<PipeDescriptor>& pipe)
         {
             operation      = Operation::ExternalPipe;
-            pipeDescriptor = &pipe;
+            pipeDescriptor = &pipe.content;
         }
 
         StdStream(const StdStream&)            = delete;
@@ -140,8 +129,7 @@ struct SC_COMPILER_EXPORT Process
         Span<const char> readableSpan;
         Span<char>*      writableSpan = nullptr;
 
-        IGrowableBuffer*                  growableBuffer = nullptr;
-        AlignedStorage<6 * sizeof(void*)> growableBufferStorage;
+        IGrowableBuffer* growableBuffer = nullptr;
 
         FileDescriptor::Handle fileDescriptor;
 
@@ -154,14 +142,17 @@ struct SC_COMPILER_EXPORT Process
         struct Ignore{};
         struct Inherit{};
         
+        
         /// @brief Ignores child process standard output/error (child process output will be silenced)
-        StdOut(Ignore) { operation = Operation::Ignore; }
+        StdOut(GrowableBuffer<StdOut::Ignore>) { operation = Operation::Ignore; }
         
         /// @brief Inherits child process standard output/error (child process will print into parent process console)
-        StdOut(Inherit) { operation = Operation::Inherit; }
+        StdOut(GrowableBuffer<StdOut::Inherit>) { operation = Operation::Inherit; }
+        StdOut(GrowableBuffer<StdOut>) { operation = Operation::Inherit; }
+        StdOut() { operation = Operation::Inherit; }
         
         /// @brief Read the process standard output/error into the given Span
-        StdOut(Span<char>& span) { operation = Operation::WritableSpan; writableSpan = &span; }
+        StdOut(GrowableBuffer<Span<char>>& span) { operation = Operation::WritableSpan; writableSpan = &span.content; }
         
         using StdStream::StdStream;
         friend struct ProcessChain;
@@ -176,16 +167,18 @@ struct SC_COMPILER_EXPORT Process
         struct Inherit{};
         
         /// @brief Inherits child process Input from parent process
-        StdIn(Inherit) { operation = Operation::Inherit; }
-        
+        StdIn(GrowableBuffer<Inherit>) { operation = Operation::Inherit; }
+        StdIn(GrowableBuffer<StdIn>) { operation = Operation::Inherit; }
+        StdIn() { operation = Operation::Inherit; }
+
         /// @brief Fills standard input with content of a C-String
-        template <int N> StdIn(const char (&item)[N]) : StdIn(StringSpan({item, N - 1}, true, StringEncoding::Ascii)) {}
+        template <int N> StdIn(GrowableBuffer<const char [N]>& item) { operation = Operation::ReadableSpan; readableSpan = {item.content, N - 1}; }
         
         /// @brief Fills standard input with content of a StringSpan
-        StdIn(StringSpan string) : StdIn(string.toCharSpan()) {}
+        StdIn(GrowableBuffer<StringSpan> string) { operation = Operation::ReadableSpan; readableSpan = string.content.toCharSpan();}
         
         /// @brief Fills standard input with content of a Span
-        StdIn(Span<const char> span) { operation = Operation::ReadableSpan; readableSpan = span;}
+        StdIn(GrowableBuffer<Span<const char>> span) { operation = Operation::ReadableSpan; readableSpan = span.content;}
         
         using StdStream::StdStream;
         friend struct ProcessChain;
@@ -207,13 +200,14 @@ struct SC_COMPILER_EXPORT Process
     /// StringSpan/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    Result launch(Span<const StringSpan> cmd,                        //
-                  const StdOut&          stdOut = StdOut::Inherit{}, //
-                  const StdIn&           stdIn  = StdIn::Inherit{},  //
-                  const StdErr&          stdErr = StdErr::Inherit{})
+    template <typename Out = StdOut, typename In = StdIn, typename Err = StdErr>
+    Result launch(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(formatArguments(cmd));
-        return launch(stdOut, stdIn, stdErr);
+        GrowableBuffer<typename TypeTraits::RemoveReference<Out>::type> gbOut = {stdOut};
+        GrowableBuffer<typename TypeTraits::RemoveReference<In>::type>  gbIn  = {stdIn};
+        GrowableBuffer<typename TypeTraits::RemoveReference<Err>::type> gbErr = {stdErr};
+        return launch(StdOut(gbOut), StdIn(gbIn), StdErr(gbErr));
     }
 
     /// @brief Executes a  child process with the given arguments, waiting (blocking) until it's fully finished
@@ -223,10 +217,8 @@ struct SC_COMPILER_EXPORT Process
     /// StringSpan/String/Vector/Span
     /// @param stdErr Process::StdErr::Ignore{}, Process::StdErr::Inherit{} or redirect stderr to String/Vector/Span
     /// @returns Error if the requested executable doesn't exist / is not accessible / it cannot be executed
-    Result exec(Span<const StringSpan> cmd,                        //
-                const StdOut&          stdOut = StdOut::Inherit{}, //
-                const StdIn&           stdIn  = StdIn::Inherit{},  //
-                const StdErr&          stdErr = StdErr::Inherit{})
+    template <typename Out = StdOut, typename In = StdIn, typename Err = StdErr>
+    Result exec(Span<const StringSpan> cmd, Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(launch(cmd, stdOut, stdIn, stdErr));
         return waitForExitSync();
@@ -341,9 +333,14 @@ struct SC_COMPILER_EXPORT ProcessChain
     /// @brief Launch the entire chain of processes. Reading from pipes can be done after launching.
     /// You can then call ProcessChain::waitForExitSync to block until the child process is fully finished.
     /// @return Valid result if given process chain has been launched successfully
-    Result launch(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
-                  const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
-                  const Process::StdErr& stdErr = Process::StdErr::Inherit{});
+    template <typename Out = Process::StdOut, typename In = Process::StdIn, typename Err = Process::StdErr>
+    Result launch(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
+    {
+        GrowableBuffer<typename TypeTraits::RemoveReference<Out>::type> gbOut = {stdOut};
+        GrowableBuffer<typename TypeTraits::RemoveReference<In>::type>  gbIn  = {stdIn};
+        GrowableBuffer<typename TypeTraits::RemoveReference<Err>::type> gbErr = {stdErr};
+        return internalLaunch(gbOut, gbIn, gbErr);
+    }
 
     /// @brief Waits (blocking) for entire process chain to exit. Can be called only after ProcessChain::launch.
     /// @return Valid result if the given process chain exited normally without aborting
@@ -351,15 +348,15 @@ struct SC_COMPILER_EXPORT ProcessChain
 
     /// @brief Launch the entire chain of processes and waits for the results (calling ProcessChain::waitForExitSync)
     /// @return Valid result if given process chain has been launched and waited for exit successfully
-    Result exec(const Process::StdOut& stdOut = Process::StdOut::Inherit{}, //
-                const Process::StdIn&  stdIn  = Process::StdIn::Inherit{},  //
-                const Process::StdErr& stdErr = Process::StdErr::Inherit{})
+    template <typename Out = Process::StdOut, typename In = Process::StdIn, typename Err = Process::StdErr>
+    Result exec(Out&& stdOut = Out(), In&& stdIn = In(), Err&& stdErr = Err())
     {
         SC_TRY(launch(stdOut, stdIn, stdErr));
         return waitForExitSync();
     }
 
   private:
+    Result internalLaunch(const Process::StdOut& stdOut, const Process::StdIn& stdIn, const Process::StdErr& stdErr);
     // Trimmed duplicate of IntrusiveDoubleLinkedList<T>
     struct ProcessLinkedList
     {

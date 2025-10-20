@@ -38,7 +38,7 @@ inline void printFlatSchema(ConsoleType& console, const Reflection::TypeInfo (&t
     int    typeIndex = 0;
     while (typeIndex < NUM_TYPES)
     {
-        StringBuilder builder(buffer, StringBuilder::Clear);
+        auto builder = StringBuilder::create(buffer);
         typeIndex += printTypes(builder, typeIndex, type + typeIndex, names + typeIndex) + 1;
         console.print(builder.finalize());
     }

@@ -68,29 +68,33 @@ struct SC_COMPILER_EXPORT Buffer;
 
 // Enables File library from reading data from file descriptor into a Buffer
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> : public IGrowableBuffer
 {
     Buffer& buffer;
-    GrowableBuffer(Buffer& buffer);
-    ~GrowableBuffer();
-    virtual bool tryGrowTo(size_t newSize) override;
+    GrowableBuffer(Buffer& buffer) noexcept;
+    ~GrowableBuffer() noexcept;
+    static bool tryGrowTo(IGrowableBuffer&, size_t newSize) noexcept;
+    void        finalize() noexcept;
 };
 
 template <int N>
-struct SC_COMPILER_EXPORT GrowableBuffer<SmallBuffer<N>> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<SmallBuffer<N>> : public IGrowableBuffer
 {
     Buffer& buffer;
-    GrowableBuffer(Buffer& buffer) : buffer(buffer)
+    GrowableBuffer(Buffer& buffer) noexcept : IGrowableBuffer(&GrowableBuffer::tryGrowTo), buffer(buffer)
     {
         IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
     }
-    ~GrowableBuffer() { (void)buffer.resizeWithoutInitializing(IGrowableBuffer::directAccess.sizeInBytes); }
-    virtual bool tryGrowTo(size_t newSize) override
+    ~GrowableBuffer() noexcept { finalize(); }
+
+    static bool tryGrowTo(IGrowableBuffer& gb, size_t newSize) noexcept
     {
-        const bool result             = buffer.resizeWithoutInitializing(newSize);
-        IGrowableBuffer::directAccess = {buffer.size(), buffer.capacity(), buffer.data()};
+        GrowableBuffer& self   = static_cast<GrowableBuffer&>(gb);
+        const bool      result = self.buffer.resizeWithoutInitializing(newSize);
+        self.directAccess      = {self.buffer.size(), self.buffer.capacity(), self.buffer.data()};
         return result;
     }
+    void finalize() noexcept { (void)buffer.resizeWithoutInitializing(IGrowableBuffer::directAccess.sizeInBytes); }
 };
 //! @}
 } // namespace SC

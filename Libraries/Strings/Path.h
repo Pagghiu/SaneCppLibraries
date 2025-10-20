@@ -82,7 +82,7 @@ struct SC_COMPILER_EXPORT Path
     [[nodiscard]] static bool join(T& output, Span<const StringView> inputs,
                                    StringView separator = SeparatorStringView(), bool skipEmpty = false)
     {
-        return join(GrowableBuffer<T>{output}, output.getEncoding(), inputs, separator, skipEmpty);
+        return join(GrowableBuffer<T>{output}, GrowableBuffer<T>::getEncodingFor(output), inputs, separator, skipEmpty);
     }
 
     [[nodiscard]] static bool join(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> inputs,
@@ -244,7 +244,7 @@ struct SC_COMPILER_EXPORT Path
     template <typename T>
     [[nodiscard]] static bool append(T& output, Span<const StringView> paths, Type inputType)
     {
-        return append(GrowableBuffer<T>{output}, output.getEncoding(), paths, inputType);
+        return append(GrowableBuffer<T>{output}, GrowableBuffer<T>::getEncodingFor(output), paths, inputType);
     }
 
     [[nodiscard]] static bool append(IGrowableBuffer&& output, StringEncoding encoding, Span<const StringView> paths,

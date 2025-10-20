@@ -20,7 +20,7 @@ struct SC::StringFormatTest : public SC::TestCase
         {
             String buffer(StringEncoding::Ascii);
             {
-                StringBuilder builder(buffer);
+                auto builder = StringBuilder::create(buffer);
                 SC_TEST_EXPECT(builder.append(StringView()));
                 SC_TEST_EXPECT(buffer.isEmpty());
                 SC_TEST_EXPECT(builder.append(""));
@@ -59,7 +59,7 @@ struct SC::StringFormatTest : public SC::TestCase
         {
             String buffer(StringEncoding::Ascii);
             {
-                StringBuilder builder(buffer);
+                auto builder = StringBuilder::create(buffer);
                 SC_TEST_EXPECT(not builder.append("{", 1));
                 SC_TEST_EXPECT(not builder.append("", 123));
                 SC_TEST_EXPECT(builder.append("{}", 123));
@@ -78,8 +78,8 @@ struct SC::StringFormatTest : public SC::TestCase
         }
         if (test_section("append_formats"))
         {
-            String        buffer(StringEncoding::Ascii);
-            StringBuilder builder(buffer);
+            String buffer(StringEncoding::Ascii);
+            auto   builder = StringBuilder::create(buffer);
             SC_TEST_EXPECT(builder.append("__{}__", static_cast<uint64_t>(MaxValue())));
             SC_TEST_EXPECT(builder.finalize() == "__18446744073709551615__");
             SC_TEST_EXPECT(StringBuilder::format(buffer, "__{}__", static_cast<int64_t>(MaxValue())));

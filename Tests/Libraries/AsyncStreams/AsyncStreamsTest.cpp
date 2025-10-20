@@ -321,7 +321,7 @@ void SC::AsyncStreamsTest::writableStream()
         Span<const char> data;
         SC_TEST_EXPECT(context.writable.getBuffersPool().getData(bufferID, data));
         StringView sv(data, false, StringEncoding::Ascii);
-        SC_TEST_EXPECT(StringBuilder(context.concatenated).append(sv));
+        SC_TEST_EXPECT(StringBuilder::createForAppendingTo(context.concatenated).append(sv));
         context.bufferID = bufferID;
         return Result(true);
     };

@@ -31,9 +31,9 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         Hashing::Result res;
         SC_TRY(hashing.getHash(res));
         String hexString;
-        SC_TRY(StringBuilder(hexString).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
-        StringBuilder guidBuilder(projectGuid);
-        StringView    hexView = hexString.view();
+        SC_TRY(StringBuilder::create(hexString).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::UpperCase));
+        auto       guidBuilder = StringBuilder::createForAppendingTo(projectGuid);
+        StringView hexView     = hexString.view();
         SC_TRY(guidBuilder.append("{"));
         SC_TRY(guidBuilder.append(hexView.sliceStartEnd(0, 8)));
         SC_TRY(guidBuilder.append("-"));
@@ -392,8 +392,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             writeForAllArchitectures("PreprocessorDefinitions", builder, project, define.view());
         }
 
-        String        allWarnings;
-        StringBuilder sb(allWarnings, StringBuilder::DoNotClear);
+        String allWarnings;
+        auto   sb = StringBuilder::createForAppendingTo(allWarnings);
         for (const Warning& warning : file.compileFlags->warnings)
         {
             if (warning.state == Warning::Disabled and warning.type == Warning::MSVCWarning)

@@ -212,18 +212,6 @@ StringFormatOutput::StringFormatOutput(StringEncoding encoding, Console& newCons
     console = &newConsole;
 }
 
-StringFormatOutput::~StringFormatOutput()
-{
-    if (growableBuffer != nullptr)
-    {
-        if (destroyBuffer)
-        {
-            growableBuffer->~IGrowableBuffer();
-        }
-        growableBuffer = nullptr;
-    }
-}
-
 void StringFormatOutput::onFormatBegin()
 {
     if (growableBuffer != nullptr)
@@ -237,10 +225,6 @@ bool StringFormatOutput::onFormatSucceeded()
     if (growableBuffer != nullptr)
     {
         SC_TRY(StringConverter::appendEncodingTo(encoding, {}, *growableBuffer, StringConverter::DoNotTerminate));
-        if (destroyBuffer)
-        {
-            growableBuffer->~IGrowableBuffer();
-        }
         growableBuffer = nullptr;
         return true;
     }
@@ -252,10 +236,6 @@ void StringFormatOutput::onFormatFailed()
     if (growableBuffer != nullptr)
     {
         SC_ASSERT_RELEASE(growableBuffer->resizeWithoutInitializing(backupSize));
-        if (destroyBuffer)
-        {
-            growableBuffer->~IGrowableBuffer();
-        }
         growableBuffer = nullptr;
     }
 }

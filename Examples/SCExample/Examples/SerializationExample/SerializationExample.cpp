@@ -174,9 +174,8 @@ struct SC::SerializationExampleModel
 
     Result saveToJSONFile(StringView jsonPath)
     {
-        Buffer             buffer;
-        StringFormatOutput output(StringEncoding::Ascii, buffer);
-        SC_TRY(SC::SerializationJson::write(modelState, output));
+        Buffer buffer;
+        SC_TRY(SC::SerializationJson::write(modelState, buffer));
         Span<const char> jsonSpan;
         SC_TRY(buffer.toSpanConst().sliceStartLength(0, buffer.size() - 1, jsonSpan));
         return FileSystem().writeString(jsonPath, {jsonSpan, false, StringEncoding::Ascii});

@@ -216,11 +216,11 @@ bool SC::Build::Project::addFiles(StringView subdirectory, StringView filter)
             return false; // cannot be both absolute
         String relativePath;
         SC_TRY(Path::relativeFromTo(relativePath, rootDirectory.view(), source, Path::AsNative));
-        SC_TRY(StringBuilder(dest, StringBuilder::Clear).appendReplaceAll(relativePath.view(), "\\", "/"));
+        SC_TRY(StringBuilder::create(dest).appendReplaceAll(relativePath.view(), "\\", "/"));
     }
     else
     {
-        SC_TRY(StringBuilder(dest, StringBuilder::Clear).appendReplaceAll(source, "\\", "/"));
+        SC_TRY(StringBuilder::create(dest).appendReplaceAll(source, "\\", "/"));
     }
 
     return files.selection.push_back(move(selection));
@@ -538,7 +538,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             StringView            projectName = project.name.view();
             SC_TRY(writer.prepare(project, renderer));
             {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+                auto builder = StringBuilder::create(buffer);
                 SC_TRY(writer.writeProject(builder, project, renderer));
                 builder.finalize();
                 SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj", projectName));
@@ -549,7 +549,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
             }
             {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+                auto builder = StringBuilder::create(buffer);
                 SC_TRY(writer.writeScheme(builder, project, renderer, projectName));
                 SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/xcshareddata", projectName));
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
@@ -564,14 +564,14 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             {
             case TargetType::ConsoleExecutable: break;
             case TargetType::GUIApplication: {
-                StringBuilder builderEntitlements(buffer, StringBuilder::Clear);
+                auto builderEntitlements = StringBuilder::create(buffer);
                 SC_TRY(StringBuilder::format(prjName, "{0}.entitlements", projectName));
                 SC_TRY(writer.writeEntitlements(builderEntitlements, project));
                 builderEntitlements.finalize();
                 SC_TRY(fs.removeFileIfExists(prjName.view()));
                 SC_TRY(fs.writeString(prjName.view(), buffer.view()));
 
-                StringBuilder builderStoryboard(buffer, StringBuilder::Clear);
+                auto builderStoryboard = StringBuilder::create(buffer);
                 SC_TRY(StringBuilder::format(prjName, "{0}.storyboard", projectName));
                 SC_TRY(writer.writeStoryboard(builderStoryboard, project));
                 builderStoryboard.finalize();
@@ -585,7 +585,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
         }
         // Write workspace
         {
-            StringBuilder builder(buffer, StringBuilder::Clear);
+            auto builder = StringBuilder::create(buffer);
             SC_TRY(WriterXCode::writeWorkspace(builder, workspace.projects.toSpanConst()));
             builder.finalize();
             SC_TRY(StringBuilder::format(prjName, "{}.xcworkspace", workspace.name));
@@ -613,7 +613,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             SC_TRY(writer.prepare(project, renderer));
             SC_TRY(writer.generateGuidFor(project.name.view(), writer.hashing, writer.projectGuid));
             {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+                auto builder = StringBuilder::create(buffer);
                 SC_TRY(writer.writeProject(builder, project, renderer));
                 String prjName;
                 SC_TRY(StringBuilder::format(prjName, "{}.vcxproj", project.name));
@@ -621,7 +621,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(fs.writeString(prjName.view(), builder.finalize()));
             }
             {
-                StringBuilder builder(buffer, StringBuilder::Clear);
+                auto builder = StringBuilder::create(buffer);
                 SC_TRY(writer.writeFilters(builder, renderer));
                 String prjFilterName;
                 SC_TRY(StringBuilder::format(prjFilterName, "{}.vcxproj.filters", project.name));
@@ -632,7 +632,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
         }
         // Write solution for all projects
         {
-            StringBuilder builder(buffer, StringBuilder::Clear);
+            auto builder = StringBuilder::create(buffer);
             SC_TRY(WriterVisualStudio::writeSolution(builder, workspace.projects.toSpanConst(),
                                                      projectsGuids.toSpanConst()));
             String slnName;
@@ -646,7 +646,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
         WriterMakefile           writer(definition, filePathsResolver, directories);
         WriterMakefile::Renderer renderer;
         {
-            StringBuilder builder(buffer, StringBuilder::Clear);
+            auto builder = StringBuilder::create(buffer);
             SC_TRY(writer.writeMakefile(builder, workspace, renderer));
             builder.finalize();
             SC_TRY(fs.removeFileIfExists("Makefile"));
@@ -805,8 +805,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
 
         if (major > 0)
         {
-            SC_TRY(StringBuilder(llvmProfData, StringBuilder::DoNotClear).append("-{}", major));
-            SC_TRY(StringBuilder(llvmCov, StringBuilder::DoNotClear).append("-{}", major));
+            SC_TRY(StringBuilder::createForAppendingTo(llvmProfData).append("-{}", major));
+            SC_TRY(StringBuilder::createForAppendingTo(llvmCov).append("-{}", major));
         }
 
         break;
@@ -974,7 +974,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
                           {action.parameters.directories.projectsDirectory.view(),
                            Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
         StringView extension = action.target.isEmpty() ? ".xcworkspace"_a8 : ".xcodeproj"_a8;
-        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(extension));
+        SC_TRY(StringBuilder::createForAppendingTo(solutionLocation).append(extension));
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
         SmallString<32> formattedPlatform;
@@ -1077,7 +1077,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
                           {action.parameters.directories.projectsDirectory.view(),
                            Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
         StringView extension = action.target.isEmpty() ? ".sln"_a8 : ".vcxproj"_a8;
-        SC_TRY(StringBuilder(solutionLocation, StringBuilder::DoNotClear).append(extension));
+        SC_TRY(StringBuilder::createForAppendingTo(solutionLocation).append(extension));
         SmallString<32> platformConfiguration;
         SC_TRY(StringBuilder::format(platformConfiguration, "/p:Configuration={}", configuration));
 

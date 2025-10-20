@@ -112,7 +112,7 @@ struct CustomFunctions
             Hashing::Result res;
             SC_TRY(hashing.getHash(res));
             SmallString<32> result;
-            SC_TRY(StringBuilder(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
+            SC_TRY(StringBuilder::create(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
             SC_TRY_MSG(result.view() == wantedMD5, "MD5 doesn't match");
             return Result(true);
         }

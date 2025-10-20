@@ -129,12 +129,13 @@ struct SC::PluginTest : public SC::TestCase
             FileSystem::FileStat scriptFileStat;
             SC_TEST_EXPECT(fs.getFileStat(pluginScriptPath.view(), scriptFileStat));
             String sourceMod1;
-            SC_TEST_EXPECT(StringBuilder(sourceMod1)
+            SC_TEST_EXPECT(StringBuilder::create(sourceMod1)
                                .appendReplaceAll(sourceContent.view(), //
                                                  "bool isPluginOriginal() { return true; }",
                                                  "bool isPluginOriginal() { return false; }"));
             String sourceMod2;
-            SC_TEST_EXPECT(StringBuilder(sourceMod2).appendReplaceAll(sourceMod1.view(), "original", "MODIFIED"));
+            SC_TEST_EXPECT(
+                StringBuilder::create(sourceMod2).appendReplaceAll(sourceMod1.view(), "original", "MODIFIED"));
             SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceMod2.view()));
 
             // Reload child plugin

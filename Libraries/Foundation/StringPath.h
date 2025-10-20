@@ -63,12 +63,13 @@ struct SC_COMPILER_EXPORT StringPath
 };
 
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<StringPath> final : public IGrowableBuffer
+struct SC_COMPILER_EXPORT GrowableBuffer<StringPath> : public IGrowableBuffer
 {
     StringPath& sp;
-    GrowableBuffer(StringPath& string);
-    virtual ~GrowableBuffer() override;
-    virtual bool tryGrowTo(size_t newSize) override;
-    static auto  getEncodingFor(const StringPath& sp) { return sp.getEncoding(); }
+    GrowableBuffer(StringPath& string) noexcept;
+    ~GrowableBuffer() noexcept;
+    static bool tryGrowTo(IGrowableBuffer& gb, size_t newSize) noexcept;
+    static auto getEncodingFor(const StringPath& sp) noexcept { return sp.getEncoding(); }
+    void        finalize() noexcept;
 };
 } // namespace SC

@@ -98,7 +98,7 @@ int main(int argc, const char* argv[])
     SC::Time::Realtime started = SC::Time::Realtime::now();
 
     SC_TRY(StringBuilder::format(gFormatString, "{} \"{}\" started\n", arguments.tool, arguments.action));
-    StringBuilder builder(gFormatString, StringBuilder::DoNotClear);
+    auto builder = StringBuilder::createForAppendingTo(gFormatString);
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
     SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolSource));
     SC_TRY(builder.append("toolDestination  = \"{}\"\n", arguments.toolDestination));

@@ -27,22 +27,26 @@ struct SC::StringBuilderTest : public SC::TestCase
         {
             appendHexTest();
         }
+        if (test_section("format"))
+        {
+            formatTest();
+        }
     }
 
     void appendTest();
     void appendReplaceAllTest();
     void appendHexTest();
+    void formatTest();
 };
 
 void SC::StringBuilderTest::appendTest()
 {
     //! [stringBuilderTestAppendSnippet]
-    String        buffer(StringEncoding::Ascii);
-    StringBuilder builder(buffer);
-    SC_TEST_EXPECT(builder.append(StringView({"asdf", 3}, false, StringEncoding::Ascii)));
-    SC_TEST_EXPECT(builder.append("asd"));
-    SC_TEST_EXPECT(builder.append(String("asd").view()));
-    SC_TEST_EXPECT(builder.finalize() == "asdasdasd");
+    String buffer(StringEncoding::Ascii);           // or SmallString<N> / Buffer
+    auto   builder = StringBuilder::create(buffer); // or StringBuilder::createAppend(buffer)
+    SC_TEST_EXPECT(builder.append("Salve"));
+    SC_TEST_EXPECT(builder.append(" {1} {0}!!!", "tutti", "a"));
+    SC_ASSERT_RELEASE(builder.finalize() == "Salve a tutti!!!");
     //! [stringBuilderTestAppendSnippet]
 }
 
@@ -51,13 +55,13 @@ void SC::StringBuilderTest::appendReplaceAllTest()
     //! [stringBuilderTestAppendReplaceAllSnippet]
     String buffer(StringEncoding::Ascii);
     {
-        StringBuilder builder(buffer);
+        auto builder = StringBuilder::create(buffer);
         SC_TEST_EXPECT(builder.appendReplaceAll("123 456 123 10", "123", "1234"));
         SC_TEST_EXPECT(builder.finalize() == "1234 456 1234 10");
     }
     buffer = String();
     {
-        StringBuilder builder(buffer);
+        auto builder = StringBuilder::create(buffer);
         SC_TEST_EXPECT(builder.appendReplaceAll("088123", "123", "1"));
         SC_TEST_EXPECT(builder.finalize() == "0881");
     }
@@ -69,11 +73,20 @@ void SC::StringBuilderTest::appendHexTest()
     //! [stringBuilderTestAppendHexSnippet]
     uint8_t bytes[4] = {0x12, 0x34, 0x56, 0x78};
 
-    String        buffer;
-    StringBuilder builder(buffer);
+    String buffer;
+    auto   builder = StringBuilder::create(buffer);
     SC_TEST_EXPECT(builder.appendHex({bytes, sizeof(bytes)}, StringBuilder::AppendHexCase::UpperCase));
     SC_TEST_EXPECT(builder.finalize() == "12345678");
     //! [stringBuilderTestAppendHexSnippet]
+}
+
+void SC::StringBuilderTest::formatTest()
+{
+    //! [stringBuilderFormatSnippet]
+    String buffer(StringEncoding::Ascii); // or SmallString<N> / Buffer
+    SC_TEST_EXPECT(StringBuilder::format(buffer, "[{1}-{0}]", "Storia", "Bella"));
+    SC_TEST_EXPECT(buffer.view() == "[Bella-Storia]");
+    //! [stringBuilderFormatSnippet]
 }
 
 namespace SC

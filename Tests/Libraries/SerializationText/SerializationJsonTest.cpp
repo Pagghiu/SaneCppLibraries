@@ -70,11 +70,11 @@ void SC::SerializationJsonTest::jsonWrite()
 {
     //! [serializationJsonWriteSnippet]
     constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
-    Test                 test;
-    SmallBuffer<256>     buffer;
-    StringFormatOutput   output(StringEncoding::Ascii, buffer);
 
-    SC_TEST_EXPECT(SerializationJson::write(test, output));
+    SmallBuffer<256> buffer;
+
+    Test test;
+    SC_TEST_EXPECT(SerializationJson::write(test, buffer));
     // Note: StringFormatOutput will NOT null terminate the string
     const StringView serializedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(serializedJSON == testJSON);

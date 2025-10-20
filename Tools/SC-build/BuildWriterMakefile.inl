@@ -254,7 +254,7 @@ endif # $(CONFIG)
     {
         SC_TRY_MSG(not input.isEmpty(), "Project name is empty");
         // TODO: Actually implement name sanitization
-        if (not StringBuilder(output, StringBuilder::Clear).appendReplaceAll(input, ".", "_"))
+        if (not StringBuilder::create(output).appendReplaceAll(input, ".", "_"))
         {
             return Result::Error("sanitizeName");
         }
@@ -339,9 +339,9 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
             const StringView extension = RenderItem::getExtension(item.type);
             if (extension.isEmpty())
                 continue;
-            StringBuilder(escapedPath, StringBuilder::Clear).appendReplaceAll(item.path.view(), " ", "\\ ");
+            StringBuilder::create(escapedPath).appendReplaceAll(item.path.view(), " ", "\\ ");
             StringView itemName = Path::basename(item.name.view(), extension);
-            StringBuilder(escapedName, StringBuilder::Clear).appendReplaceAll(itemName, " ", "\\ ");
+            StringBuilder::create(escapedName).appendReplaceAll(itemName, " ", "\\ ");
             StringView flagsGroup = "";
             String     buffer;
             if (item.compileFlags != nullptr)
@@ -678,8 +678,8 @@ endif
                                  StringView intermediatesPath)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        String        intermediate;
-        StringBuilder intermediateBuilder(intermediate);
+        String intermediate;
+        auto   intermediateBuilder = StringBuilder::create(intermediate);
 
         WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", intermediateBuilder, intermediatesPath,
                                                     relativeDirectories.relativeProjectsToIntermediates.view());
@@ -724,8 +724,8 @@ $({0}_INTERMEDIATE_DIR):
                            const RelativeDirectories& relativeDirectories, StringView configName, StringView outputPath)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        String        output;
-        StringBuilder outputBuilder(output);
+        String output;
+        auto   outputBuilder = StringBuilder::create(output);
         WriterInternal::appendPrefixIfRelativePosix("$(CURDIR_ESCAPED)", outputBuilder, outputPath,
                                                     relativeDirectories.relativeProjectsToOutputs.view());
         SC_TRY(appendVariable(outputBuilder, outputPath, makeTarget, relativeDirectories));
