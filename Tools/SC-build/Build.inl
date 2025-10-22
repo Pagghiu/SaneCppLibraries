@@ -35,6 +35,7 @@ SC::Result SC::Build::CompileFlags::merge(Span<const CompileFlags*> opinions, Co
     Internal::writeStrongest(&CompileFlags::enableExceptions, opinions, flags);
     Internal::writeStrongest(&CompileFlags::enableStdCpp, opinions, flags);
     Internal::writeStrongest(&CompileFlags::enableCoverage, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::cppStandard, opinions, flags);
 
     // TODO: Implement ability to "remove" paths from stronger opinions
     for (const CompileFlags* opinion : opinions)
@@ -167,7 +168,7 @@ bool SC::Build::Project::addPresetConfiguration(Configuration::Preset preset, co
 
 SC::Build::Configuration* SC::Build::Project::getConfiguration(StringView configurationName)
 {
-    size_t index;
+    size_t index = 0;
     if (configurations.find([=](auto it) { return it.name == configurationName; }, &index))
     {
         return &configurations[index];

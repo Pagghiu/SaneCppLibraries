@@ -619,7 +619,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool writeCommonOptions(StringBuilder& builder, const Project& project)
+    [[nodiscard]] bool writeCommonOptions(StringBuilder& builder, const Project& project, CppStandard::Type cppStandard)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(
@@ -627,8 +627,9 @@ struct SC::Build::ProjectWriter::WriterXCode
                        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
                        CLANG_ANALYZER_NONNULL = YES;
                        CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
-                       CLANG_CXX_LANGUAGE_STANDARD = "c++14";
-                       CURRENT_PROJECT_VERSION = 1;)delimiter");
+                       CLANG_CXX_LANGUAGE_STANDARD = "{0}";
+                       CURRENT_PROJECT_VERSION = 1;)delimiter",
+                       CppStandard::toString(cppStandard));
 
         if (project.targetType == TargetType::GUIApplication)
         {
@@ -741,7 +742,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             buildSettings = {{)delimiter",
             xcodeObject.referenceHash.view(), xcodeObject.name.view());
 
-        writeCommonOptions(builder, project);
+        writeCommonOptions(builder, project, compileFlags.cppStandard);
         writeDirectories(builder, configuration);
 
         if (compileFlags.enableRTTI)

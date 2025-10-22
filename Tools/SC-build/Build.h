@@ -167,6 +167,48 @@ struct Warning
     Warning(State state, uint32_t number) : state(state), type(MSVCWarning), number(number) {}
 };
 
+struct CppStandard
+{
+    enum Type
+    {
+        CPP11,
+        CPP14,
+        CPP17,
+        CPP20,
+        CPP23,
+    };
+
+    /// @brief Get StringView from CppStandard::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case CPP11: return "c++11";
+        case CPP14: return "c++14";
+        case CPP17: return "c++17";
+        case CPP20: return "c++20";
+        case CPP23: return "c++23";
+        }
+        Assert::unreachable();
+    }
+
+    /// @brief Get MSVC LanguageStandard value from CppStandard::Type (e.g., stdcpp14)
+    static constexpr StringView toMSVCString(Type type)
+    {
+        switch (type)
+        {
+        case CPP11: return "stdcpp11";
+        case CPP14: return "stdcpp14";
+        case CPP17: return "stdcpp17";
+        case CPP20: return "stdcpp20";
+        case CPP23: return "stdcpp23";
+        }
+        Assert::unreachable();
+    }
+
+    /// @brief Get Makefile -std= flag from CppStandard::Type
+    static StringView toMakefileFlag(Type type) { return toString(type); }
+};
 /// @brief Compile flags (include paths, preprocessor defines etc.)
 struct CompileFlags
 {
@@ -181,6 +223,8 @@ struct CompileFlags
     Parameter<bool> enableExceptions = false; ///< Enable C++ Exceptions
     Parameter<bool> enableStdCpp     = false; ///< Enable and include C++ Standard Library
     Parameter<bool> enableCoverage   = false; ///< Enables code coverage instrumentation
+
+    Parameter<CppStandard::Type> cppStandard = CppStandard::CPP14; ///< C++ language standard version
 
     /// @brief Merges opinions about flags into target flags
     /// @param opinions Opinions about flags from strongest to weakest

@@ -318,6 +318,11 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
 
         builder.append("      <MultiProcessorCompilation>true</MultiProcessorCompilation>\n");
+        if (compileFlags.cppStandard != CppStandard::CPP14)
+        {
+            builder.append("      <LanguageStandard>{}</LanguageStandard>\n",
+                           CppStandard::toMSVCString(compileFlags.cppStandard));
+        }
         builder.append("    </ClCompile>\n");
         builder.append("    <Link>\n");
         switch (project.targetType)

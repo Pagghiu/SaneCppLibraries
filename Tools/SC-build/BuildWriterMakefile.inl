@@ -573,8 +573,8 @@ endif
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
 
-        // TODO: De-hardcode -std=c++14
-        builder.append("\n{0}_COMMON_CXXFLAGS := -std=c++14", makeTarget);
+        builder.append("\n{0}_COMMON_CXXFLAGS := -std={1}", makeTarget,
+                       CppStandard::toString(compileFlags.cppStandard));
 
         if (not compileFlags.enableRTTI)
         {

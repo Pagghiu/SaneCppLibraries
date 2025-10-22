@@ -58,7 +58,6 @@ Each library is color-coded to signal its status:
 🟩 Usable (a reasonable set of useful features has been implemented)  
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependenciesDark.svg">
   <img alt="Sane C++ Libraries dependencies" src="https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg">
 </picture>
 
