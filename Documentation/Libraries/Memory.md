@@ -6,9 +6,13 @@
 
 [SaneCppMemory.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppMemory.h) is library tracking and limiting runtime / dynamic allocations through the use of custom allocators.
 
-@note If a library doesn't directly or indirectly depend on the Memory library, you can assume that it will not do any runtime / dynamic allocation.
+All libraries are designed to let you use your favorite externally provided `string` / `vector` classes BUT if you've been sold on using also the [Containers](@ref library_containers) library then here you will find scoped `allocator` / `arena` infrastructure used by them.
 
-Most classes have been originally part of the [Foundation](@ref library_foundation) library.
+@note See `Tests/InteropSTL/*.cpp` for an example of externally provided Container classes.
+
+The "owned" String class is here and not in [Strings](@ref library_strings) library because it needs allocator support.
+
+@note If a library doesn't directly or indirectly depend on the Memory library, you can assume that it will not do any runtime / dynamic allocation.
 
 # Dependencies
 - Dependencies: [Foundation](@ref library_foundation)

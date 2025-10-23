@@ -145,6 +145,34 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     return Result(true);
 }
 
+Result buildInteropSTL(const Parameters& parameters, Project& project)
+{
+    project = {TargetType::ConsoleExecutable, "InteropSTL"};
+
+    // All relative paths are evaluated from this project root directory.
+    project.setRootDirectory(parameters.directories.libraryDirectory.view());
+
+    // Project Configurations
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    // Enable C++ STL, exceptions and RTTI
+    project.files.compile.enableStdCpp     = true;
+    project.files.compile.enableExceptions = true;
+    project.files.compile.enableRTTI       = true;
+    project.files.compile.cppStandard      = CppStandard::CPP17; // string_view requires C++17
+
+    // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
+    project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
+    project.addIncludePaths({
+        ".", // Libraries path
+    });
+    addSaneCppLibraries(project, parameters);
+    project.addFiles("Tests/InteropSTL", "*.cpp");
+    project.addFiles("Tests/InteropSTL", "*.h");
+    return Result(true);
+}
+
 static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
 Result buildExampleProject(const Parameters& parameters, Project& project)
@@ -271,9 +299,10 @@ static constexpr StringView DEFAULT_WORKSPACE_NAME = "SCWorkspace";
 Result configure(Definition& definition, const Parameters& parameters)
 {
     Workspace workspace = {DEFAULT_WORKSPACE_NAME};
-    SC_TRY(workspace.projects.resize(2));
+    SC_TRY(workspace.projects.resize(3));
     SC_TRY(buildTestProject(parameters, workspace.projects[0]));
     SC_TRY(buildExampleProject(parameters, workspace.projects[1]));
+    SC_TRY(buildInteropSTL(parameters, workspace.projects[2]))
     definition.workspaces.push_back(move(workspace));
 
     // Ignore errors from building single file libraries

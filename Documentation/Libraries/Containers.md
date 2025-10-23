@@ -2,9 +2,13 @@
 
 @brief 🟨 Generic containers (SC::Vector, SC::SmallVector, SC::Array etc.)
 
+[TOC]
+
 [SaneCppContainers.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainers.h) is a library holding some commonly used templated data structures.
 
-[TOC]
+While all libraries are designed to let you use your favorite externally provided `string` / `vector` classes, there is also an choice of basic containers (mainly `Vector<T>` incarnations), with support for inline buffer and custom scoped allocators provided by [Memory](@ref library_memory) library.
+
+@note See `Tests/InteropSTL/*.cpp` for an example of externally provided Container classes.
 
 # Dependencies
 - Dependencies: [Memory](@ref library_memory)

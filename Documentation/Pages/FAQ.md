@@ -19,6 +19,12 @@ Yes, if you disable the Standard C++ Library, you can also disable Exceptions an
     - Set **Enable C++ Exceptions** to **No**
     - Set **Enable Runtime Type Information** set to **No** (**GR-**)
 
+# Can I use STL types like std::string or std::vector or my own containers?
+Yes you can, see the example at `Tests/InteropSTL`.  
+You don't have to use the STL then, just any container library that you happen to like.   
+The integration is efficient in the sense that for example String format or File Read will write data directly to the memory provided by your supplied string and/or container.  
+The abstraction tries to be efficient issuing an indirect function pointer call only if an actual allocation is needed (after entirely using the provided initial capacity).
+
 # Does the library have debug visualizers?
 
 Yes, this library contains debug visualizers for:

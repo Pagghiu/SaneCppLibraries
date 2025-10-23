@@ -23,8 +23,9 @@
 
 ## [Libraries](https://pagghiu.github.io/SaneCppLibraries/libraries.html)
 
-- Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal inter-[dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html).  
-- `Memory`, `Containers` and `Http` are the only ones doing dynamic memory allocation.  
+- Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal inter-[dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html).
+- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html), [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) and [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html) are the only ones doing dynamic memory allocation.
+- Libraries are designed to let you use your favorite externally provided `string` / `vector` classes if you don't like the ones provided by this project (see [InteropSTL](Tests/InteropSTL) for an example).
 
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
