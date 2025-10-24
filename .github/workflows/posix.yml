@@ -33,18 +33,22 @@ jobs:
       run: ./SC.sh build configure SCTest ${{ matrix.config }}
     - name: configure SCSingleFileLibs
       run: ./SC.sh build configure "SCSingleFileLibs:" ${{ matrix.config }}
-    - name: compile single file libs
-      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
-    - name: compile
+    - name: compile SCTest
       run: ./SC.sh build compile SCTest ${{ matrix.config }}
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
-    - name: test
+    - name: compile SCSingleFileLibs
+      run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
+    - name: compile InteropSTL
+      run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
+    - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }}
-      if:  matrix.params.os != 'macos-latest' || matrix.config != 'Release'
-    - name: compile
+      if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: test InteropSTL
+      run: ./SC.sh build run InteropSTL ${{ matrix.config }}
+    - name: compile SCTest xcode
       run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-    - name: test
+    - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     # - name: install gdb

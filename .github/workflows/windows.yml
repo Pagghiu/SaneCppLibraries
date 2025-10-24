@@ -28,12 +28,18 @@ jobs:
     - name: configure SCSingleFileLibs
       shell: cmd
       run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
-    - name: compile single file libs
+    - name: compile SCSingleFileLibs
       shell: cmd
       run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
-    - name: compile
+    - name: compile SCTest
       shell: cmd
       run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
-    - name: test
+    - name: compile InteropSTL
+      shell: cmd
+      run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: test SCTest
       shell: cmd
       run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: test InteropSTL
+      shell: cmd
+      run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
