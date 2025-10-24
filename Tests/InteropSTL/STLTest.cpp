@@ -11,6 +11,7 @@
 namespace SC
 {
 void runCppSTLStringsTest(SC::TestReport& report);
+void runCppSTLFileSystemTest(SC::TestReport& report);
 } // namespace SC
 
 SC::Console* globalConsole = nullptr;
@@ -31,6 +32,7 @@ int main(int argc, const char* argv[])
     report.debugBreakOnFailedTest = true;
 
     runCppSTLStringsTest(report);
+    runCppSTLFileSystemTest(report);
 
     return report.getTestReturnCode();
 }
