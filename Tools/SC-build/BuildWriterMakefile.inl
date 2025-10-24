@@ -442,7 +442,11 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
 ifneq ($(and $({0}_TARGET_DIR),$({0}_INTERMEDIATE_DIR)),)
 {0}_CLEAN:
 	@echo Cleaning {0}
-	$(VRBS)rm -rf $({0}_TARGET_DIR)/$(TARGET) $({0}_INTERMEDIATE_DIR)
+	$(VRBS)rm -f $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+	$(VRBS)rm -f $({0}_OBJECT_FILES) $({0}_OBJECT_FILES:.o=.d) $({0}_OBJECT_FILES:.o=.json) $({0}_OBJECT_FILES:.o=.o.json)
+	$(VRBS)rm -f $({0}_INTERMEDIATE_DIR)/compile_commands.json
+	$(VRBS)if [ -d "$({0}_INTERMEDIATE_DIR)" ]; then rmdir "$({0}_INTERMEDIATE_DIR)" 2>/dev/null || true; fi
+	$(VRBS)if [ -d "$({0}_TARGET_DIR)" ]; then rmdir "$({0}_TARGET_DIR)" 2>/dev/null || true; fi
 else
 {0}_CLEAN:
 	@echo "Cleaning {0} (skipped for config '$(CONFIG)')"
