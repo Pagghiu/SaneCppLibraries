@@ -36,6 +36,9 @@ set "TOOL_NAME=build"
 set "TOOL_NAME=%4"
 )
 
+@REM Save the arguments for later use
+set "TOOL_ARGS=%*"
+
 set TOOL=SC-%TOOL_NAME%
 if not exist "%TOOL_SOURCE_DIR%\%TOOL%.cpp" (
 if not exist "%TOOL_NAME%" (
@@ -65,17 +68,22 @@ nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%T
 call :get_total_centisecs start_centisecs "%START_TIME%"
 call :get_total_centisecs end_centisecs "%TIME%"
 set /A total_centisecs = end_centisecs - start_centisecs
-set /A build_time = total_centisecs / 100
-set /A build_time_frac = (total_centisecs %% 100) * 10
-set frac=000!build_time_frac!
-set frac=!frac:~-3!
-echo Time to compile "%TOOL_NAME%" tool: !build_time!.!frac! seconds
+if !total_centisecs! lss 0 set /A total_centisecs += 8640000
+if !total_centisecs! gtr 8640000 set /A total_centisecs -= 8640000
+call :calculate_and_print_time total_centisecs "compile" "%TOOL_NAME%"
 
 IF not %ERRORLEVEL% == 0 (
     @rem It could have failed because of moved files, let's re-try after cleaning
+    set RE_START_TIME=%TIME%
     nmake clean /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
     timeout /t 1 /nobreak >nul
     nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+    call :get_total_centisecs re_start_centisecs "%RE_START_TIME%"
+    call :get_total_centisecs re_end_centisecs "%TIME%"
+    set /A re_total_centisecs = re_end_centisecs - re_start_centisecs
+    if !re_total_centisecs! lss 0 set /A re_total_centisecs += 8640000
+    if !re_total_centisecs! gtr 8640000 set /A re_total_centisecs -= 8640000
+    call :calculate_and_print_time re_total_centisecs "re-compile" "%TOOL_NAME%" " after clean"
 )
 
 IF not %ERRORLEVEL% == 0 (
@@ -84,7 +92,7 @@ IF not %ERRORLEVEL% == 0 (
 
 cd /d "%TOOL_OUTPUT_DIR%/Windows"
 @echo Starting %TOOL%
-"%TOOL%.exe" %*
+"%TOOL%.exe" !TOOL_ARGS!
 
 goto :after
 
@@ -108,8 +116,31 @@ goto :after
 
 :get_total_centisecs
 for /f "tokens=1-4 delims=:.," %%a in ("%~2") do (
-    set /A "%~1= (%%a*360000) + (%%b*6000) + (%%c*100) + %%d"
+    set temp_h=%%a
+    set temp_m=%%b
+    set temp_s=%%c
+    set temp_mi=%%d
 )
+set temp_h=00!temp_h!
+set temp_h=!temp_h:~-2!
+set temp_m=00!temp_m!
+set temp_m=!temp_m:~-2!
+set temp_s=00!temp_s!
+set temp_s=!temp_s:~-2!
+set temp_mi=00!temp_mi!
+set temp_mi=!temp_mi:~-2!
+set /A "%~1 = temp_h * 360000"
+set /A "%~1 = %~1 + temp_m * 6000"
+set /A "%~1 = %~1 + temp_s * 100"
+set /A "%~1 = %~1 + temp_mi"
+exit /b
+
+:calculate_and_print_time
+set /A build_time_temp = %~1 / 100
+set /A build_time_frac_temp = (%~1 %% 100) * 10
+set frac_temp=000!build_time_frac_temp!
+set frac_temp=!frac_temp:~-3!
+echo Time to %~2 "%~3" tool%~4: !build_time_temp!.!frac_temp! seconds
 exit /b
 
 :after
