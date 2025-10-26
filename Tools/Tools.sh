@@ -42,13 +42,24 @@ execute_tool () {
 
 OS=$(uname -s)
 
+# Cross-platform time measurement function
+get_time_ms() {
+    if [[ "$OS" == "Darwin" ]]; then
+        # macOS doesn't support %N, use Perl (pre-installed) for millisecond precision
+        perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1000'
+    else
+        # Linux supports nanoseconds
+        echo $(($(date +%s%N) / 1000000))
+    fi
+}
+
 # Time the initial build
-start_time=$(date +%s%N)
+start_time=$(get_time_ms)
 call_make build
 initial_exit_code=$?
-end_time=$(date +%s%N)
-build_time=$(( (end_time - start_time) / 1000000000 ))
-build_time_frac=$(( (end_time - start_time) % 1000000000 / 1000000 ))
+end_time=$(get_time_ms)
+build_time=$(( (end_time - start_time) / 1000 ))
+build_time_frac=$(( (end_time - start_time) % 1000 ))
 printf "Time to compile \"${TOOL_NAME}\" tool: %d.%03d seconds\n" $build_time $build_time_frac
 
 if [ $initial_exit_code -eq 0 ]; then
@@ -57,12 +68,12 @@ else
     # It could have failed because of moved files, let's re-try after cleaning
     call_make clean
     # Time the clean and rebuild
-    start_time=$(date +%s%N)
+    start_time=$(get_time_ms)
     call_make build
     rebuild_exit_code=$?
-    end_time=$(date +%s%N)
-    rebuild_time=$(( (end_time - start_time) / 1000000000 ))
-    rebuild_time_frac=$(( (end_time - start_time) % 1000000000 / 1000000 ))
+    end_time=$(get_time_ms)
+    rebuild_time=$(( (end_time - start_time) / 1000 ))
+    rebuild_time_frac=$(( (end_time - start_time) % 1000 ))
     printf "Time to re-compile \"${TOOL_NAME}\" tool after clean: %d.%03d seconds\n" $rebuild_time $rebuild_time_frac
     if [ $rebuild_exit_code -eq 0 ]; then
         execute_tool "$@"
