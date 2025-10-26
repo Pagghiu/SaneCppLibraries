@@ -60,7 +60,16 @@ mkdir "%TOOL_OUTPUT_DIR%" 2>nul
 cd /d "%LIBRARY_DIR%/Tools/Build/Windows"
 
 @rem Call NMAKE
+set START_TIME=%TIME%
 nmake build /nologo /f "Makefile" CONFIG=Debug "TOOL=%TOOL%" "TOOL_SOURCE_DIR=%TOOL_SOURCE_DIR%" "TOOL_OUTPUT_DIR=%TOOL_OUTPUT_DIR%"
+call :get_total_centisecs start_centisecs "%START_TIME%"
+call :get_total_centisecs end_centisecs "%TIME%"
+set /A total_centisecs = end_centisecs - start_centisecs
+set /A build_time = total_centisecs / 100
+set /A build_time_frac = (total_centisecs %% 100) * 10
+set frac=000!build_time_frac!
+set frac=!frac:~-3!
+echo Time to compile "%TOOL_NAME%" tool: !build_time!.!frac! seconds
 
 IF not %ERRORLEVEL% == 0 (
     @rem It could have failed because of moved files, let's re-try after cleaning
@@ -96,6 +105,12 @@ goto :after
     set "%~1=%~x2"
     exit /b
 )
+
+:get_total_centisecs
+for /f "tokens=1-4 delims=:.," %%a in ("%~2") do (
+    set /A "%~1= (%%a*360000) + (%%b*6000) + (%%c*100) + %%d"
+)
+exit /b
 
 :after
 
