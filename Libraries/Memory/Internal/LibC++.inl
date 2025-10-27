@@ -23,9 +23,15 @@ void operator delete[](void* p, size_t) noexcept
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
-
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#pragma warning(push)
+#pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
+#endif
 void* operator new(size_t len) { return ::malloc(len); }
 void* operator new[](size_t len) { return ::malloc(len); }
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#pragma warning(pop)
+#endif
 #endif
 
 void* __cxa_pure_virtual   = 0;

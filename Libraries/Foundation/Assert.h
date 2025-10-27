@@ -27,7 +27,7 @@ struct SC::Assert
     [[noreturn]] static void exit(int code);
 
     /// @brief Prints an assertion to standard output
-    static void printBacktrace(const char* expression, const char* filename, const char* function, int line);
+    static void printBacktrace(const char* expression, const native_char_t* filename, const char* function, int line);
 
   private:
     struct Internal;
@@ -36,14 +36,18 @@ struct SC::Assert
 
 //! @addtogroup group_foundation_compiler_macros
 //! @{
-
+#if SC_PLATFORM_WINDOWS
+#define WFILE WIDEN(__FILE__)
+#else
+#define WFILE __FILE__
+#endif
 /// Assert expression `e` to be true. If Failed, prints the failed assertion with backtrace, breaks debugger and exits
 /// (-1)
 #define SC_ASSERT_RELEASE(e)                                                                                           \
     if (!(e))                                                                                                          \
         SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
-            SC::Assert::printBacktrace(#e, __FILE__, __func__, __LINE__);                                              \
+            SC::Assert::printBacktrace(#e, WFILE, __func__, __LINE__);                                                 \
             SC_COMPILER_DEBUG_BREAK;                                                                                   \
             SC::Assert::exit(-1);                                                                                      \
         }                                                                                                              \

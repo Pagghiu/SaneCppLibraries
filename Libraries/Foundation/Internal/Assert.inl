@@ -94,11 +94,16 @@ struct SC::Assert::Internal
     }
 };
 
-void SC::Assert::printBacktrace(const char* expression, const char* filename, const char* function, int line)
+void SC::Assert::printBacktrace(const char* expression, const native_char_t* filename, const char* function, int line)
 {
     char buffer[2048];
+#if SC_PLATFORM_WINDOWS
+    ::snprintf(buffer, sizeof(buffer), "Assertion failed: (%s)\nFile: %ws\nFunction: %s\nLine: %d\n", expression,
+               filename, function, line);
+#else
     ::snprintf(buffer, sizeof(buffer), "Assertion failed: (%s)\nFile: %s\nFunction: %s\nLine: %d\n", expression,
                filename, function, line);
+#endif
     Internal::printAscii(buffer);
     void* backtraceBuffer[256];
     Internal::printBacktrace(backtraceBuffer, sizeof(backtraceBuffer));

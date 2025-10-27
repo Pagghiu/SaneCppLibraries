@@ -4,11 +4,14 @@
 #include "../../Memory/Globals.h"
 #include "../../Memory/Memory.h"
 #include "SortedAllocations.inl"
+
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
 #define _CRTDBG_MAP_ALLOC
 #ifdef _malloca
 #undef _malloca
 #endif
+#pragma warning(push)
+#pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
 #include <crtdbg.h>
 #endif
 #include <stdlib.h>
@@ -142,3 +145,6 @@ SC::Globals* SC::Globals::pop(Type type)
 }
 
 SC::Globals& SC::Globals::get(Type type) { return *Internal::getStatic(type).current; }
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#pragma warning(pop)
+#endif

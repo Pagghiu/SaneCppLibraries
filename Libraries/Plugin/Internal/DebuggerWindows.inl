@@ -67,6 +67,10 @@ typedef struct _OBJECT_NAME_INFORMATION
 {
     UNICODE_STRING Name;
 } OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#pragma warning(push)
+#pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
+#endif
 
 struct SC::Debugger::Internal
 {
@@ -77,7 +81,6 @@ struct SC::Debugger::Internal
         (void)Path::parse(theFile, theFileParsed, Path::Type::AsWindows);
         StringView theFileDirectory;
         (void)theFile.splitAfter(theFileParsed.root, theFileDirectory);
-
         void* nameMemory   = ::malloc(USHRT_MAX * sizeof(WCHAR));
         auto  deleteMemory = MakeDeferred([&] { ::free(nameMemory); });
 
@@ -115,7 +118,7 @@ struct SC::Debugger::Internal
         }
 
         ULONG                      handleInfoSize = 0x100000;
-        PSYSTEM_HANDLE_INFORMATION handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(malloc(handleInfoSize));
+        PSYSTEM_HANDLE_INFORMATION handleInfo = reinterpret_cast<PSYSTEM_HANDLE_INFORMATION>(::malloc(handleInfoSize));
 
         auto deferDeleteHandleInfo = SC::MakeDeferred(
             [&]
@@ -127,7 +130,7 @@ struct SC::Debugger::Internal
                STATUS_INFO_LENGTH_MISMATCH)
         {
             handleInfoSize *= 2;
-            void* newMemory = realloc(handleInfo, handleInfoSize);
+            void* newMemory = ::realloc(handleInfo, handleInfoSize);
             if (newMemory == nullptr)
                 return false;
             handleInfo = (PSYSTEM_HANDLE_INFORMATION)newMemory;
@@ -217,6 +220,9 @@ struct SC::Debugger::Internal
         return false;
     }
 };
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#pragma warning(pop)
+#endif
 
 // Find all processes that have an handle open on the given fileName and unlock it
 // https://devblogs.microsoft.com/oldnewthing/20120217-00/?p=8283
