@@ -244,6 +244,28 @@ Example:
 This allows modifying and recompiling a script, or compiling different scripts spending negligible (often sub-second) time, to just compile/link script logic.  
 This is because all Sane C++ Libraries are compiled just once (the first time, in no more than a couple of seconds) inside `Tools.cpp`.
 
+# Bootstrap Sequence
+
+SC::Tools define an handy way of invoking an on the fly compiled program that has Sane C++ Libraries.
+The bootstrap process bringing from the command line to final execution is the following:
+
+1. The user invokes a tool like for example: `./SC.sh build compile SCTest Debug`
+2. The first argument to the `SC.sh` is the `${TOOL_NAME}` (in this case `build`)
+3. `SC.sh` checks if `Tools/ToolsBootstrap` executable exists and is up to date with `Tools/ToolsBootstrap.cpp`
+4. If not, it compiles `Tools/ToolsBootstrap.cpp` to create the bootstrap executable
+5. `SC.sh` invokes `Tools/ToolsBootstrap` with the library directory, tool source directory, build directory, tool name, and any additional arguments
+6. A similar process occurs on Windows with `SC.bat` setting up the MSVC environment and compiling `Tools/ToolsBootstrap.exe` if needed
+7. `ToolsBootstrap` receives 3 predefined arguments:
+    a. The directory of SC Libraries `${LIBRARY_DIR}`
+    b. The directory containing Tools `${TOOL_SOURCE_DIR}`
+    c. The build products directory `${BUILD_DIR}` containing intermediates and final products
+8. Additional arguments are the tool name and action/parameters
+9. `ToolsBootstrap` checks if the SC-build executable exists and is up to date
+10. If not, `ToolsBootstrap` compiles `Tools/Tools.cpp` and `Tools/SC-build.cpp` (and their dependencies) to create the SC-build executable
+11. `ToolsBootstrap` invokes the SC-build executable with the original action and parameters
+12. The SC-build tool proceeds to configure projects, compile, or perform other actions based on the arguments
+
+
 # Roadmap
 
 - Generate ready made .vscode configurations to debug the programs easily
