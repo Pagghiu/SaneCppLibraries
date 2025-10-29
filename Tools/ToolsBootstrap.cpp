@@ -188,7 +188,13 @@ struct CommandLine
 {
     std::string command;
 
-    CommandLine(const std::string& program) { command = program; }
+    CommandLine(const std::string& program)
+    {
+        // Quote the program to handle paths with spaces
+        command = '"';
+        command += program;
+        command += '"';
+    }
 
     void arg(const std::string& argument)
     {
@@ -348,8 +354,10 @@ CompilationInfo setupCompilation(const BootloaderArgs& args)
 std::vector<std::string> parseJsonDependencies(FILE* file)
 {
     std::vector<std::string> deps;
-    char                     line[2048];
-    bool                     inIncludes = false;
+
+    char line[2048];
+    bool inIncludes = false;
+    bool inArray    = false;
     while (fgets(line, sizeof(line), file))
     {
         std::string str = line;
@@ -357,7 +365,19 @@ std::vector<std::string> parseJsonDependencies(FILE* file)
         {
             inIncludes = true;
         }
-        if (inIncludes && str.find('"') != std::string::npos)
+        if (inIncludes)
+        {
+            if (str.find('[') != std::string::npos)
+            {
+                inArray = true;
+            }
+            if (str.find(']') != std::string::npos)
+            {
+                inArray = false;
+                break; // End of array
+            }
+        }
+        if (inIncludes && inArray && str.find('"') != std::string::npos)
         {
             size_t start = 0, end;
             while ((start = str.find('"', start + 1)) != std::string::npos)
@@ -367,7 +387,8 @@ std::vector<std::string> parseJsonDependencies(FILE* file)
                 {
                     std::string dep = str.substr(start + 1, end - start - 1);
                     if (!dep.empty() && dep.find("windows kits") == std::string::npos &&
-                        dep.find("microsoft visual studio") == std::string::npos)
+                        dep.find("microsoft visual studio") == std::string::npos && dep != "Includes" &&
+                        dep != "ImportedModules")
                     {
                         deps.push_back(dep);
                     }
@@ -376,19 +397,41 @@ std::vector<std::string> parseJsonDependencies(FILE* file)
                 else
                     break;
             }
-            if (str.find(']') != std::string::npos)
-                break; // End of array
         }
     }
     return deps;
 }
 
-std::vector<std::string> parseMakeDependencies(FILE* file)
+std::string unescapeMakeDependency(const std::string& input)
+{
+    std::string out;
+    bool        escaping = false;
+    for (char c : input)
+    {
+        if (escaping)
+        {
+            out += c;
+            escaping = false;
+        }
+        else if (c == '\\')
+        {
+            escaping = true;
+        }
+        else
+        {
+            out += c;
+        }
+    }
+    return out;
+}
+
+std::vector<std::string> parseMakeDependencies(FILE* file, const std::string& baseDir)
 {
     std::vector<std::string> deps;
-    char                     line[1024];
-    bool                     afterColon = false;
-    std::string              continuation;
+
+    char        line[1024];
+    bool        afterColon = false;
+    std::string continuation;
     while (fgets(line, sizeof(line), file))
     {
         std::string str = line;
@@ -420,32 +463,41 @@ std::vector<std::string> parseMakeDependencies(FILE* file)
 
         if (afterColon)
         {
-            size_t pos = 0;
-            while ((pos = str.find(' ', pos)) != std::string::npos || !str.empty())
+            size_t start = str.find_first_not_of(" \t");
+            while (start != std::string::npos)
             {
-                size_t start = str.find_first_not_of(" \t");
-                if (start == std::string::npos)
-                    break;
-                size_t end = str.find(' ', start);
-                if (end == std::string::npos)
-                    end = str.size();
-                std::string dep = str.substr(start, end - start);
+                size_t end = start;
+                while (end < str.length() && str[end] != ' ')
+                {
+                    if (str[end] == '\\' && end + 1 < str.length() && str[end + 1] == ' ')
+                    {
+                        end += 2; // skip \ and space
+                    }
+                    else
+                    {
+                        end++;
+                    }
+                }
+                size_t      actual_end = (end < str.length()) ? end : end;
+                std::string dep        = str.substr(start, actual_end - start);
                 if (!dep.empty())
                 {
                     if (dep.size() >= 2 && dep[0] == '"' && dep.back() == '"')
                     {
                         dep = dep.substr(1, dep.size() - 2);
                     }
+                    // Unescape backslash sequences in make dependencies (e.g., \ for spaces)
+                    dep = unescapeMakeDependency(dep);
                     deps.push_back(dep);
                 }
-                str = (end < str.size()) ? str.substr(end + 1) : "";
+                start = (end < str.length()) ? str.find_first_not_of(" \t", end) : std::string::npos;
             }
         }
     }
     return deps;
 }
 
-std::vector<std::string> parseDependencies(const std::string& depFilePath)
+std::vector<std::string> parseDependencies(const std::string& depFilePath, const std::string& baseDir)
 {
     FILE* file = FileSystem::open(depFilePath, "r");
     if (!file)
@@ -460,7 +512,15 @@ std::vector<std::string> parseDependencies(const std::string& depFilePath)
     }
     else
     {
-        deps = parseMakeDependencies(file);
+        deps = parseMakeDependencies(file, baseDir);
+    }
+    for (auto& dep : deps)
+    {
+        bool is_absolute = dep[0] == '/' || dep[0] == '\\' || (dep.size() >= 3 && dep[1] == ':' && dep[2] == '\\');
+        if (!is_absolute)
+        {
+            dep = Path::join(baseDir, dep);
+        }
     }
     fclose(file);
     return deps;
@@ -471,6 +531,11 @@ bool checkNeedsRebuild(TimePoint objTime, const std::vector<std::string>& source
 {
     for (const auto& src : sources)
     {
+        if (!FileSystem::exists(src))
+        {
+            fprintf(stderr, "Error: Source file %s does not exist\n", src.c_str());
+            return true;
+        }
         TimePoint srcTime = FileSystem::getModificationTime(src);
         if (srcTime > objTime)
         {
@@ -484,15 +549,22 @@ bool checkNeedsRebuild(TimePoint objTime, const std::vector<std::string>& source
     }
     for (const auto& dep : dependencies)
     {
-        TimePoint depTime = FileSystem::getModificationTime(dep);
-        if (depTime > objTime)
+        if (!FileSystem::exists(dep))
         {
-            if (printMessages)
+            fprintf(stderr, "Error: Dependency file %s does not exist\n", dep.c_str());
+        }
+        else
+        {
+            TimePoint depTime = FileSystem::getModificationTime(dep);
+            if (depTime > objTime)
             {
-                printf("  Dependency %s modified (time %lld > %lld), needs rebuild\n", dep.c_str(),
-                       static_cast<long long>(depTime), static_cast<long long>(objTime));
+                if (printMessages)
+                {
+                    printf("  Dependency %s modified (time %lld > %lld), needs rebuild\n", dep.c_str(),
+                           static_cast<long long>(depTime), static_cast<long long>(objTime));
+                }
+                return true;
             }
-            return true;
         }
     }
     return false;
@@ -511,7 +583,7 @@ bool needsRebuildTools(const CompilationInfo& ci)
         return true; // Obj doesn't exist
     }
 
-    std::vector<std::string> toolsDeps = parseDependencies(ci.toolsDepFile);
+    std::vector<std::string> toolsDeps = parseDependencies(ci.toolsDepFile, ci.intermediateDir);
     if (printMessages)
     {
         printf("- Found %zu dependencies for \"%s\"\n", toolsDeps.size(), ci.toolsDepFile.c_str());
@@ -549,7 +621,7 @@ bool needsRebuildToolObj(const CompilationInfo& ci)
     {
         sources.push_back(ci.toolH);
     }
-    std::vector<std::string> toolDeps = parseDependencies(ci.toolDepFile);
+    std::vector<std::string> toolDeps = parseDependencies(ci.toolDepFile, ci.intermediateDir);
     if (printMessages)
     {
         printf("- Found %zu dependencies for %s \n", toolDeps.size(), ci.toolCpp.c_str());
@@ -646,7 +718,7 @@ int compilePOSIX(const CompilationInfo& ci)
         cmd.argQuoted(toolsObj);
         cmd.arg("-c");
         cmd.argQuoted(ci.toolsCpp);
-        printf("Tools.cpp");
+        printf("Tools.cpp\n");
         if (cmd.run() != 0)
             return 1;
     }
@@ -696,7 +768,8 @@ int linkWindows(const CompilationInfo& ci)
     std::string linkFlags   = " Advapi32.lib Shell32.lib";
     CommandLine cmd("link");
     cmd.arg("/nologo");
-    cmd.arg("/OUT:" + ci.toolExe);
+    std::string outArg = "/OUT:\"" + ci.toolExe + "\"";
+    cmd.arg(outArg);
     cmd.argQuoted(toolsObj);
     cmd.argQuoted(toolObj);
     cmd.arg(linkFlags);
@@ -723,8 +796,8 @@ bool compileWindows(const CompilationInfo& ci, bool& objsCompiled)
         cmd.arg("/sourceDependencies");
         cmd.argQuoted(toolsJson);
         cmd.arg("/c");
-        cmd.arg("/Fd" + Path::join(ci.intermediateDir, "Tools.pdb"));
-        cmd.arg("/Fo" + toolsObj);
+        cmd.arg("/Fd\"" + Path::join(ci.intermediateDir, "Tools.pdb") + "\"");
+        cmd.arg("/Fo\"" + toolsObj + "\"");
         cmd.argQuoted(ci.toolsCpp);
         if (cmd.run() != 0)
             return false;
@@ -742,8 +815,9 @@ bool compileWindows(const CompilationInfo& ci, bool& objsCompiled)
         cmd.arg("/sourceDependencies");
         cmd.argQuoted(toolJson);
         cmd.arg("/c");
-        cmd.arg("/Fd" + Path::join(ci.intermediateDir, toolObjName.substr(0, toolObjName.size() - 4) + ".pdb"));
-        cmd.arg("/Fo" + toolObj);
+        std::string pdbPath = toolObjName.substr(0, toolObjName.size() - 4) + ".pdb";
+        cmd.arg("/Fd\"" + Path::join(ci.intermediateDir, pdbPath) + "\"");
+        cmd.arg("/Fo\"" + toolObj + "\"");
         cmd.argQuoted(ci.toolCpp);
         if (cmd.run() != 0)
             return false;
