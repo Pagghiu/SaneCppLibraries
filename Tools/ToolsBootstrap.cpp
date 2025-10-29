@@ -10,14 +10,15 @@
 #include <vector>
 
 #ifdef _WIN32
+#include <Windows.h>
+// Order is important
 #include <direct.h>
+#include <shellapi.h>
 #include <sys/stat.h>
-#include <windows.h>
 #define stat       _stat
 #define S_ISDIR(m) ((m) & _S_IFDIR)
 #define POPEN      _popen
 #define PCLOSE     _pclose
-#include <shellapi.h>
 #else
 #include <dirent.h>
 #include <sys/stat.h>
@@ -30,7 +31,10 @@
 #include <cstdint>
 #include <ctime>
 
+namespace
+{
 bool printMessages = false;
+
 // Platform agnostic types
 using TimePoint = time_t;
 
@@ -42,149 +46,126 @@ std::wstring utf8_to_wstring(const std::string& s)
     MultiByteToWideChar(CP_UTF8, 0, s.c_str(), -1, &ws[0], len);
     return ws;
 }
+#endif
+} // namespace
 
-std::string utf8_to_console(const std::string& s)
+namespace Path
 {
-    std::wstring ws  = utf8_to_wstring(s);
-    int          len = WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, NULL, 0, NULL, NULL);
-    std::string  str(len, 0);
-    WideCharToMultiByte(CP_ACP, 0, ws.c_str(), -1, &str[0], len, NULL, NULL);
-    if (!str.empty() && str.back() == '\0')
-        str.pop_back();
-    return str;
-}
+#ifdef _WIN32
+constexpr char Separator = '\\';
+#else
+constexpr char Separator = '/';
+#endif
 
-bool wide_file_exists(const std::string& path)
+std::string join(const std::string& a, const std::string& b)
 {
-    std::wstring wpath = utf8_to_wstring(path);
-    struct _stat info;
-    return _wstat(wpath.c_str(), &info) == 0;
+    if (a.empty())
+        return b;
+    if (b.empty())
+        return a;
+    return a + Separator + b;
 }
+} // namespace Path
 
-TimePoint wide_get_file_mod_time(const std::string& path)
+namespace FileSystem
 {
-    std::wstring wpath = utf8_to_wstring(path);
-    struct _stat info;
-    if (_wstat(wpath.c_str(), &info) == 0)
-    {
-        return info.st_mtime;
-    }
-    return 0;
-}
-
-bool wide_is_directory(const std::string& path)
-{
-    std::wstring wpath = utf8_to_wstring(path);
-    struct _stat info;
-    return _wstat(wpath.c_str(), &info) == 0 && (info.st_mode & _S_IFDIR);
-}
-
-int wide_create_directory(const std::string& path)
-{
-    std::wstring wpath = utf8_to_wstring(path);
-    return _wmkdir(wpath.c_str());
-}
-
-FILE* wide_fopen(const std::string& path, const char* mode)
+#ifdef _WIN32
+FILE* open(const std::string& path, const char* mode)
 {
     std::wstring wpath = utf8_to_wstring(path);
     std::wstring wmode = utf8_to_wstring(std::string(mode));
     return _wfopen(wpath.c_str(), wmode.c_str());
 }
+#else
+FILE* open(const std::string& path, const char* mode) { return fopen(path.c_str(), mode); }
 #endif
 
-TimePoint getFileModificationTime(const char* path)
+TimePoint getModificationTime(const std::string& path)
 {
-#ifdef _WIN32
-    std::string p(path);
-    return wide_get_file_mod_time(p);
-#else
     struct stat info;
-    if (stat(path, &info) == 0)
+#ifdef _WIN32
+    std::wstring wpath = utf8_to_wstring(path);
+    if (_wstat(wpath.c_str(), &info) == 0)
+#else
+    if (stat(path.c_str(), &info) == 0)
+#endif
     {
         return info.st_mtime;
     }
     return 0;
-#endif
 }
 
-bool fileExists(const char* path)
+bool exists(const std::string& path)
 {
-#ifdef _WIN32
-    std::string p(path);
-    return wide_file_exists(p);
-#else
     struct stat info;
-    return stat(path, &info) == 0;
+#ifdef _WIN32
+    std::wstring wpath = utf8_to_wstring(path);
+    return _wstat(wpath.c_str(), &info) == 0;
+#else
+    return stat(path.c_str(), &info) == 0;
 #endif
 }
 
-bool isDirectory(const char* path)
+bool isDirectory(const std::string& path)
 {
-#ifdef _WIN32
-    std::string p(path);
-    return wide_is_directory(p);
-#else
     struct stat info;
-    return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
+#ifdef _WIN32
+    std::wstring wpath = utf8_to_wstring(path);
+    if (_wstat(wpath.c_str(), &info) != 0)
+        return false;
+#else
+    if (stat(path.c_str(), &info) != 0)
+        return false;
+#endif
+    return S_ISDIR(info.st_mode);
+}
+
+int createDirectory(const std::string& path)
+{
+#ifdef _WIN32
+    std::wstring wpath = utf8_to_wstring(path);
+    return _wmkdir(wpath.c_str());
+#else
+    return mkdir(path.c_str(), 0755);
 #endif
 }
 
-int createDirectory(const char* path)
+int createDirectoryRecursive(const std::string& path)
 {
-#ifdef _WIN32
-    std::string p(path);
-    return wide_create_directory(p);
-#else
-    return mkdir(path, 0755);
-#endif
-}
-
-int createDirectoryRecursive(const char* path)
-{
-#ifdef _WIN32
-    // Split and create using wide functions.
-    std::string p   = path;
-    size_t      pos = 0;
-    while ((pos = p.find('\\', pos)) != std::string::npos)
+    std::string subpath;
+    subpath.reserve(path.length());
+    for (size_t i = 0; i < path.length(); ++i)
     {
-        std::string sub = p.substr(0, pos);
-        if (!sub.empty() && !isDirectory(sub.c_str()))
+        subpath += path[i];
+        if (path[i] == Path::Separator)
         {
-            wide_create_directory(sub);
+            if (!subpath.empty() && !isDirectory(subpath))
+            {
+                if (createDirectory(subpath) != 0)
+                {
+                    return -1;
+                }
+            }
         }
-        pos++;
     }
-    wide_create_directory(p);
-#else
-    // Assuming Unix-like
-    std::string p   = path;
-    size_t      pos = 0;
-    while ((pos = p.find('/', pos)) != std::string::npos)
+    if (!isDirectory(path))
     {
-        std::string sub = p.substr(0, pos);
-        if (!sub.empty() && !isDirectory(sub.c_str()))
-        {
-            mkdir(sub.c_str(), 0755);
-        }
-        pos++;
+        return createDirectory(path);
     }
-    mkdir(path, 0755);
-#endif
     return 0;
 }
+} // namespace FileSystem
 
-int runCommand(const char* command)
+int runCommand(const std::string& command)
 {
     if (printMessages)
     {
-        printf("Running: %s\n", command);
+        printf("Running: %s\n", command.c_str());
     }
 #ifdef _WIN32
     STARTUPINFOW        si = {sizeof(si)};
     PROCESS_INFORMATION pi;
-    std::string         cmdStr  = command;
-    std::wstring        wideCmd = utf8_to_wstring(cmdStr);
+    std::wstring        wideCmd = utf8_to_wstring(command);
     if (CreateProcessW(NULL, &wideCmd[0], NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi))
     {
         WaitForSingleObject(pi.hProcess, INFINITE);
@@ -199,18 +180,32 @@ int runCommand(const char* command)
         return 1;
     }
 #else
-    return system(command);
+    return system(command.c_str());
 #endif
 }
 
-std::string joinPaths(const std::string& a, const std::string& b)
+struct CommandLine
 {
-#ifdef _WIN32
-    return a + "\\" + b;
-#else
-    return a + "/" + b;
-#endif
-}
+    std::string command;
+
+    CommandLine(const std::string& program) { command = program; }
+
+    void arg(const std::string& argument)
+    {
+        command += ' ';
+        command += argument;
+    }
+
+    void argQuoted(const std::string& argument)
+    {
+        command += ' ';
+        command += '"';
+        command += argument;
+        command += '"';
+    }
+
+    int run() { return runCommand(command); }
+};
 
 // Parse positional bootloader arguments
 struct BootloaderArgs
@@ -223,17 +218,17 @@ struct BootloaderArgs
     std::vector<std::string> remainingArgs;
 };
 
-BootloaderArgs parseArgs(int argc, char* argv[])
+BootloaderArgs parseArgs(const std::vector<std::string>& argv)
 {
     BootloaderArgs args;
     // Assume the first 4 are from SC.sh/bat, then tool name, then args
-    if (argc >= 4)
+    if (argv.size() >= 4)
     {
         args.libraryDir    = argv[1];
         args.toolSourceDir = argv[2];
         args.buildDir      = argv[3];
-        args.toolName      = (argc >= 5) ? argv[4] : "build";
-        for (int i = 5; i < argc; ++i)
+        args.toolName      = (argv.size() >= 5) ? argv[4] : "build";
+        for (size_t i = 5; i < argv.size(); ++i)
         {
             args.remainingArgs.push_back(argv[i]);
         }
@@ -266,16 +261,16 @@ CompilationInfo setupCompilation(const BootloaderArgs& args)
     CompilationInfo ci;
     ci.args = &args;
     // Resolve tool cpp path
-    std::string toolCpp       = joinPaths(args.toolSourceDir, "SC-" + args.toolName + ".cpp");
+    std::string toolCpp       = Path::join(args.toolSourceDir, "SC-" + args.toolName + ".cpp");
     std::string toolSourceDir = args.toolSourceDir;
     std::string toolName      = args.toolName;
     std::string toolH         = "";
 
-    if (!fileExists(toolCpp.c_str()))
+    if (!FileSystem::exists(toolCpp))
     {
         // Try if toolName is a path to cpp file
         std::string potentialCpp = args.toolName;
-        if (fileExists(potentialCpp.c_str()))
+        if (FileSystem::exists(potentialCpp))
         {
             // Assume it's a cpp file
             if (potentialCpp.find(".cpp") == std::string::npos)
@@ -284,12 +279,7 @@ CompilationInfo setupCompilation(const BootloaderArgs& args)
                 exit(1);
             }
             // Get dir and name
-#ifdef _WIN32
-            // Simple path handling
-            size_t lastSlash = potentialCpp.find_last_of("\\");
-#else
-            size_t lastSlash = potentialCpp.find_last_of("/");
-#endif
+            size_t lastSlash = potentialCpp.find_last_of(Path::Separator);
             if (lastSlash != std::string::npos)
             {
                 toolSourceDir        = potentialCpp.substr(0, lastSlash);
@@ -310,7 +300,7 @@ CompilationInfo setupCompilation(const BootloaderArgs& args)
     }
     else
     {
-        toolH = joinPaths(toolSourceDir, "SC-" + toolName + ".h");
+        toolH = Path::join(toolSourceDir, "SC-" + toolName + ".h");
     }
 
     std::string exeName = "SC-" + toolName;
@@ -337,163 +327,183 @@ CompilationInfo setupCompilation(const BootloaderArgs& args)
 #endif
 
     // Use absolute paths for all file paths to avoid current directory issues
-    std::string pathSep = ci.targetOS == "Windows" ? "\\" : "/";
-    ci.toolOutputDir    = args.buildDir + pathSep + "_Tools";
-    ci.intermediateDir  = ci.toolOutputDir + pathSep + "_Intermediates" + pathSep + ci.targetOS;
+    ci.toolOutputDir   = Path::join(args.buildDir, "_Tools");
+    ci.intermediateDir = Path::join(Path::join(ci.toolOutputDir, "_Intermediates"), ci.targetOS);
 
     // For dependency files, absolute paths
-    ci.toolsDepFile = ci.intermediateDir + pathSep + "Tools" + (ci.targetOS == "Windows" ? ".json" : ".d");
-    ci.toolDepFile =
-        ci.intermediateDir + pathSep + "SC-" + ci.args->toolName + (ci.targetOS == "Windows" ? ".json" : ".d");
+    ci.toolsDepFile =
+        Path::join(ci.intermediateDir, std::string("Tools") + (ci.targetOS == "Windows" ? ".json" : ".d"));
+    ci.toolDepFile = Path::join(ci.intermediateDir,
+                                std::string("SC-") + ci.args->toolName + (ci.targetOS == "Windows" ? ".json" : ".d"));
 
     ci.toolCpp  = toolCpp;
-    ci.scCpp    = joinPaths(args.libraryDir, "SC.cpp");
-    ci.toolsCpp = joinPaths(toolSourceDir, "Tools.cpp");
+    ci.scCpp    = Path::join(args.libraryDir, "SC.cpp");
+    ci.toolsCpp = Path::join(toolSourceDir, "Tools.cpp");
     ci.toolH    = toolH;
-    ci.toolExe  = joinPaths(joinPaths(ci.toolOutputDir, ci.targetOS), exeName + exeExt);
+    ci.toolExe  = Path::join(Path::join(ci.toolOutputDir, ci.targetOS), exeName + exeExt);
 
     return ci;
 }
 
-// Parse .d or .json file to get dependencies
-std::vector<std::string> parseDependencies(const std::string& depFilePath)
+std::vector<std::string> parseJsonDependencies(FILE* file)
 {
     std::vector<std::string> deps;
-    bool                     isJson = depFilePath.size() > 5 && depFilePath.substr(depFilePath.size() - 5) == ".json";
-
-    if (isJson)
+    char                     line[2048];
+    bool                     inIncludes = false;
+    while (fgets(line, sizeof(line), file))
     {
-        // Parse JSON dependency file (similar to jsonToDependencies.ps1)
-#ifdef _WIN32
-        FILE* file = wide_fopen(depFilePath, "r");
-#else
-        FILE* file = fopen(depFilePath.c_str(), "r");
-#endif
-        if (!file)
-            return deps;
-
-        char line[2048];
-        bool inIncludes = false;
-        while (fgets(line, sizeof(line), file))
+        std::string str = line;
+        if (str.find("\"Includes\"") != std::string::npos)
         {
-            std::string str = line;
-            // Simple parse: look for Includes array
-            if (str.find("\"Includes\"") != std::string::npos)
+            inIncludes = true;
+        }
+        if (inIncludes && str.find('"') != std::string::npos)
+        {
+            size_t start = 0, end;
+            while ((start = str.find('"', start + 1)) != std::string::npos)
             {
-                inIncludes = true;
-            }
-            if (inIncludes && str.find('"') != std::string::npos)
-            {
-                // Extract includes between quotes, filter out system headers
-                size_t      start = 0, end;
-                std::string includeStr;
-                while ((start = str.find('"', start + 1)) != std::string::npos)
+                end = str.find('"', start + 1);
+                if (end != std::string::npos)
                 {
-                    end = str.find('"', start + 1);
-                    if (end != std::string::npos)
+                    std::string dep = str.substr(start + 1, end - start - 1);
+                    if (!dep.empty() && dep.find("windows kits") == std::string::npos &&
+                        dep.find("microsoft visual studio") == std::string::npos)
                     {
-                        std::string dep = str.substr(start + 1, end - start - 1);
-                        // Filter out system headers (like jsonToDependencies.ps1 does)
-                        if (!dep.empty() && dep.find("windows kits") == std::string::npos &&
-                            dep.find("microsoft visual studio") == std::string::npos)
-                        {
-                            deps.push_back(dep);
-                        }
-                        start = end;
+                        deps.push_back(dep);
                     }
-                    else
-                        break;
+                    start = end;
                 }
-                if (str.find(']') != std::string::npos)
-                    break; // End of array
+                else
+                    break;
+            }
+            if (str.find(']') != std::string::npos)
+                break; // End of array
+        }
+    }
+    return deps;
+}
+
+std::vector<std::string> parseMakeDependencies(FILE* file)
+{
+    std::vector<std::string> deps;
+    char                     line[1024];
+    bool                     afterColon = false;
+    std::string              continuation;
+    while (fgets(line, sizeof(line), file))
+    {
+        std::string str = line;
+        if (!str.empty() && str.back() == '\n')
+            str.pop_back();
+        if (!str.empty() && str.back() == '\r')
+            str.pop_back();
+
+        if (!continuation.empty())
+        {
+            str = continuation + str;
+            continuation.clear();
+        }
+        if (!str.empty() && str.back() == '\\')
+        {
+            continuation = str.substr(0, str.size() - 1);
+            continue;
+        }
+
+        if (!afterColon)
+        {
+            size_t colon = str.find(':');
+            if (colon != std::string::npos)
+            {
+                str        = str.substr(colon + 1);
+                afterColon = true;
             }
         }
-        fclose(file);
+
+        if (afterColon)
+        {
+            size_t pos = 0;
+            while ((pos = str.find(' ', pos)) != std::string::npos || !str.empty())
+            {
+                size_t start = str.find_first_not_of(" \t");
+                if (start == std::string::npos)
+                    break;
+                size_t end = str.find(' ', start);
+                if (end == std::string::npos)
+                    end = str.size();
+                std::string dep = str.substr(start, end - start);
+                if (!dep.empty())
+                {
+                    if (dep.size() >= 2 && dep[0] == '"' && dep.back() == '"')
+                    {
+                        dep = dep.substr(1, dep.size() - 2);
+                    }
+                    deps.push_back(dep);
+                }
+                str = (end < str.size()) ? str.substr(end + 1) : "";
+            }
+        }
+    }
+    return deps;
+}
+
+std::vector<std::string> parseDependencies(const std::string& depFilePath)
+{
+    FILE* file = FileSystem::open(depFilePath, "r");
+    if (!file)
+        return {};
+
+    std::vector<std::string> deps;
+
+    bool isJson = depFilePath.size() > 5 && depFilePath.substr(depFilePath.size() - 5) == ".json";
+    if (isJson)
+    {
+        deps = parseJsonDependencies(file);
     }
     else
     {
-        // Parse .d file (POSIX style)
-#ifdef _WIN32
-        FILE* file = wide_fopen(depFilePath, "r");
-#else
-        FILE* file = fopen(depFilePath.c_str(), "r");
-#endif
-        if (!file)
-            return deps;
-
-        char        line[1024];
-        bool        afterColon = false;
-        std::string continuation;
-
-        while (fgets(line, sizeof(line), file))
-        {
-            std::string str = line;
-            // Remove trailing newline
-            if (!str.empty() && str.back() == '\n')
-                str.pop_back();
-            if (!str.empty() && str.back() == '\r')
-                str.pop_back();
-
-            // Handle continuation
-            if (!continuation.empty())
-            {
-                str = continuation + str;
-                continuation.clear();
-            }
-            if (!str.empty() && str.back() == '\\')
-            {
-                continuation = str.substr(0, str.size() - 1);
-                continue;
-            }
-
-            // Parse after colon
-            if (!afterColon)
-            {
-                size_t colon = str.find(':');
-                if (colon != std::string::npos)
-                {
-                    str        = str.substr(colon + 1);
-                    afterColon = true;
-                }
-            }
-
-            if (afterColon)
-            {
-                // Split by spaces, trim quotes
-                size_t pos = 0;
-                while ((pos = str.find(' ', pos)) != std::string::npos || !str.empty())
-                {
-                    size_t start = str.find_first_not_of(" \t");
-                    if (start == std::string::npos)
-                        break;
-                    size_t end = str.find(' ', start);
-                    if (end == std::string::npos)
-                        end = str.size();
-                    std::string dep = str.substr(start, end - start);
-                    if (!dep.empty())
-                    {
-                        // Remove quotes
-                        if (dep.size() >= 2 && dep[0] == '"' && dep.back() == '"')
-                        {
-                            dep = dep.substr(1, dep.size() - 2);
-                        }
-                        deps.push_back(dep);
-                    }
-                    str = (end < str.size()) ? str.substr(end + 1) : "";
-                }
-            }
-        }
-        fclose(file);
+        deps = parseMakeDependencies(file);
     }
+    fclose(file);
     return deps;
+}
+
+bool checkNeedsRebuild(TimePoint objTime, const std::vector<std::string>& sources,
+                       const std::vector<std::string>& dependencies)
+{
+    for (const auto& src : sources)
+    {
+        TimePoint srcTime = FileSystem::getModificationTime(src);
+        if (srcTime > objTime)
+        {
+            if (printMessages)
+            {
+                printf("  Source %s modified (time %lld > %lld), needs rebuild\n", src.c_str(),
+                       static_cast<long long>(srcTime), static_cast<long long>(objTime));
+            }
+            return true;
+        }
+    }
+    for (const auto& dep : dependencies)
+    {
+        TimePoint depTime = FileSystem::getModificationTime(dep);
+        if (depTime > objTime)
+        {
+            if (printMessages)
+            {
+                printf("  Dependency %s modified (time %lld > %lld), needs rebuild\n", dep.c_str(),
+                       static_cast<long long>(depTime), static_cast<long long>(objTime));
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 // Check if Tools.o needs rebuilding
 bool needsRebuildTools(const CompilationInfo& ci)
 {
     std::string objExt   = ci.targetOS == "Windows" ? ".obj" : ".o";
-    std::string toolsObj = joinPaths(ci.intermediateDir, "Tools" + objExt);
-    TimePoint   objTime  = getFileModificationTime(toolsObj.c_str());
+    std::string toolsObj = Path::join(ci.intermediateDir, "Tools" + objExt);
+    TimePoint   objTime  = FileSystem::getModificationTime(toolsObj);
     if (objTime == 0)
     {
         if (printMessages)
@@ -501,48 +511,14 @@ bool needsRebuildTools(const CompilationInfo& ci)
         return true; // Obj doesn't exist
     }
 
-    // Check core sources for Tools.o
-    TimePoint scTime = getFileModificationTime(ci.scCpp.c_str());
-    if (scTime > objTime)
-    {
-        if (printMessages)
-        {
-            printf("  SC.cpp modified (time %lld > %lld), needs rebuild\n", static_cast<long long>(scTime),
-                   static_cast<long long>(objTime));
-        }
-        return true;
-    }
-    TimePoint cppTime = getFileModificationTime(ci.toolsCpp.c_str());
-    if (cppTime > objTime)
-    {
-        if (printMessages)
-        {
-
-            printf("  Tools.cpp modified (time %lld > %lld), needs rebuild\n", static_cast<long long>(cppTime),
-                   static_cast<long long>(objTime));
-        }
-        return true;
-    }
-
-    // Check dependencies
     std::vector<std::string> toolsDeps = parseDependencies(ci.toolsDepFile);
     if (printMessages)
     {
         printf("- Found %zu dependencies for \"%s\"\n", toolsDeps.size(), ci.toolsDepFile.c_str());
     }
-    for (const auto& dep : toolsDeps)
+    if (checkNeedsRebuild(objTime, {ci.scCpp, ci.toolsCpp}, toolsDeps))
     {
-        TimePoint depTime = getFileModificationTime(dep.c_str());
-        if (depTime > objTime)
-        {
-            if (printMessages)
-            {
-
-                printf("  Dependency %s modified (time %lld > %lld), needs rebuild\n", dep.c_str(),
-                       static_cast<long long>(depTime), static_cast<long long>(objTime));
-            }
-            return true;
-        }
+        return true;
     }
 
     if (printMessages)
@@ -557,8 +533,8 @@ bool needsRebuildToolObj(const CompilationInfo& ci)
 {
     std::string objExt      = ci.targetOS == "Windows" ? ".obj" : ".o";
     std::string toolObjName = "SC-" + ci.args->toolName + objExt;
-    std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
-    TimePoint   objTime     = getFileModificationTime(toolObj.c_str());
+    std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
+    TimePoint   objTime     = FileSystem::getModificationTime(toolObj);
     if (objTime == 0)
     {
         if (printMessages)
@@ -568,49 +544,19 @@ bool needsRebuildToolObj(const CompilationInfo& ci)
         return true; // Obj doesn't exist
     }
 
-    // Check tool sources and headers
-    TimePoint cppTime = getFileModificationTime(ci.toolCpp.c_str());
-    if (cppTime > objTime)
-    {
-        if (printMessages)
-        {
-            printf("  Cpp %s modified (time %lld > %lld), needs rebuild\n", ci.toolCpp.c_str(),
-                   static_cast<long long>(cppTime), static_cast<long long>(objTime));
-        }
-        return true;
-    }
+    std::vector<std::string> sources = {ci.toolCpp};
     if (!ci.toolH.empty())
     {
-        TimePoint hTime = getFileModificationTime(ci.toolH.c_str());
-        if (hTime > objTime)
-        {
-            if (printMessages)
-            {
-                printf("  Header %s modified (time %lld > %lld), needs rebuild\n", ci.toolH.c_str(),
-                       static_cast<long long>(hTime), static_cast<long long>(objTime));
-            }
-            return true;
-        }
+        sources.push_back(ci.toolH);
     }
-
-    // Check dependencies from tool .d or .json
     std::vector<std::string> toolDeps = parseDependencies(ci.toolDepFile);
     if (printMessages)
     {
         printf("- Found %zu dependencies for %s \n", toolDeps.size(), ci.toolCpp.c_str());
     }
-    for (const auto& dep : toolDeps)
+    if (checkNeedsRebuild(objTime, sources, toolDeps))
     {
-        TimePoint depTime = getFileModificationTime(dep.c_str());
-        if (depTime > objTime)
-        {
-            if (printMessages)
-            {
-                printf("  Dependency %s modified (time %lld > %lld), needs rebuild\n", dep.c_str(),
-                       static_cast<long long>(depTime), static_cast<long long>(objTime));
-            }
-            return true;
-        }
+        return true;
     }
 
     if (printMessages)
@@ -623,16 +569,17 @@ bool needsRebuildToolObj(const CompilationInfo& ci)
 // Simple check if need to rebuild (link)
 bool needsRebuildExe(const CompilationInfo& ci)
 {
-    TimePoint exeTime = getFileModificationTime(ci.toolExe.c_str());
+    TimePoint exeTime = FileSystem::getModificationTime(ci.toolExe);
     if (exeTime == 0)
         return true; // Exe doesn't exist
 
-    std::string toolsObj    = joinPaths(ci.intermediateDir, "Tools.o");
-    std::string toolObjName = "SC-" + ci.args->toolName + ".o";
-    std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
+    std::string objExt      = ci.targetOS == "Windows" ? ".obj" : ".o";
+    std::string toolsObj    = Path::join(ci.intermediateDir, "Tools" + objExt);
+    std::string toolObjName = "SC-" + ci.args->toolName + objExt;
+    std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
 
-    TimePoint toolsObjTime = getFileModificationTime(toolsObj.c_str());
-    TimePoint toolObjTime  = getFileModificationTime(toolObj.c_str());
+    TimePoint toolsObjTime = FileSystem::getModificationTime(toolsObj);
+    TimePoint toolObjTime  = FileSystem::getModificationTime(toolObj);
 
     if (toolsObjTime > exeTime || toolObjTime > exeTime)
         return true;
@@ -643,15 +590,8 @@ bool needsRebuildExe(const CompilationInfo& ci)
 int compilePOSIX(const CompilationInfo& ci)
 {
     // Create directories recursively
-    if (!isDirectory(ci.intermediateDir.c_str()))
-    {
-        createDirectoryRecursive(ci.intermediateDir.c_str());
-    }
-    std::string outputDir = joinPaths(ci.toolOutputDir, ci.targetOS);
-    if (!isDirectory(outputDir.c_str()))
-    {
-        createDirectoryRecursive(outputDir.c_str());
-    }
+    FileSystem::createDirectoryRecursive(ci.intermediateDir);
+    FileSystem::createDirectoryRecursive(Path::join(ci.toolOutputDir, ci.targetOS));
 
     // Flags
     std::string commonFlags = " -I\"../../..\" -std=c++14 -pthread -fstrict-aliasing -fvisibility=hidden "
@@ -659,7 +599,7 @@ int compilePOSIX(const CompilationInfo& ci)
     std::string linkFlags   = " -ldl -lpthread";
 
     // Determine OS and compiler (match Makefile logic)
-    std::string targetOS  = "";
+    std::string targetOS;
     FILE*       unameFile = POPEN("uname", "r");
     if (unameFile)
     {
@@ -698,9 +638,16 @@ int compilePOSIX(const CompilationInfo& ci)
     // Compile Tools.o if needed
     if (needsRebuildTools(ci))
     {
-        std::string toolsObj = joinPaths(ci.intermediateDir, "Tools.o");
-        std::string cmd1 = compiler + " " + commonFlags + " -MMD -o \"" + toolsObj + "\" -c \"" + ci.toolsCpp + "\"";
-        if (runCommand(cmd1.c_str()) != 0)
+        std::string toolsObj = Path::join(ci.intermediateDir, "Tools.o");
+        CommandLine cmd(compiler);
+        cmd.arg(commonFlags);
+        cmd.arg("-MMD");
+        cmd.arg("-o");
+        cmd.argQuoted(toolsObj);
+        cmd.arg("-c");
+        cmd.argQuoted(ci.toolsCpp);
+        printf("Tools.cpp");
+        if (cmd.run() != 0)
             return 1;
     }
 
@@ -708,54 +655,78 @@ int compilePOSIX(const CompilationInfo& ci)
     if (needsRebuildToolObj(ci))
     {
         std::string toolObjName = "SC-" + ci.args->toolName + ".o";
-        std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
-        std::string cmd2 = compiler + " " + commonFlags + " -MMD -o \"" + toolObj + "\" -c \"" + ci.toolCpp + "\"";
-        if (runCommand(cmd2.c_str()) != 0)
+        std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
+        CommandLine cmd(compiler);
+        cmd.arg(commonFlags);
+        cmd.arg("-MMD");
+        cmd.arg("-o");
+        cmd.argQuoted(toolObj);
+        cmd.arg("-c");
+        cmd.argQuoted(ci.toolCpp);
+        printf("SC-%s.cpp\n", ci.args->toolName.c_str());
+        if (cmd.run() != 0)
             return 1;
     }
 
     // Link if needed
     if (needsRebuildExe(ci))
     {
-        std::string toolsObj    = joinPaths(ci.intermediateDir, "Tools.o");
+        std::string toolsObj    = Path::join(ci.intermediateDir, "Tools.o");
         std::string toolObjName = "SC-" + ci.args->toolName + ".o";
-        std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
-        std::string cmd3 =
-            compiler + " -o \"" + ci.toolExe + "\" \"" + toolsObj + "\" \"" + toolObj + "\" " + linkFlags;
-        if (runCommand(cmd3.c_str()) != 0)
+        std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
+        CommandLine cmd(compiler);
+        cmd.arg("-o");
+        cmd.argQuoted(ci.toolExe);
+        cmd.argQuoted(toolsObj);
+        cmd.argQuoted(toolObj);
+        cmd.arg(linkFlags);
+        if (cmd.run() != 0)
             return 1;
     }
 
     return 0;
 }
 
+int linkWindows(const CompilationInfo& ci)
+{
+    printf("Linking %s\n", ci.args->toolName.c_str());
+    std::string toolsObj    = Path::join(ci.intermediateDir, "Tools.obj");
+    std::string toolObjName = "SC-" + ci.args->toolName + ".obj";
+    std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
+    std::string linkFlags   = " Advapi32.lib Shell32.lib";
+    CommandLine cmd("link");
+    cmd.arg("/nologo");
+    cmd.arg("/OUT:" + ci.toolExe);
+    cmd.argQuoted(toolsObj);
+    cmd.argQuoted(toolObj);
+    cmd.arg(linkFlags);
+    return cmd.run();
+}
+
 bool compileWindows(const CompilationInfo& ci, bool& objsCompiled)
 {
     // Create directories recursively
-    if (!isDirectory(ci.intermediateDir.c_str()))
-    {
-        createDirectoryRecursive(ci.intermediateDir.c_str());
-    }
-    std::string outputDir = joinPaths(ci.toolOutputDir, ci.targetOS);
-    if (!isDirectory(outputDir.c_str()))
-    {
-        createDirectoryRecursive(outputDir.c_str());
-    }
+    FileSystem::createDirectoryRecursive(ci.intermediateDir);
+    FileSystem::createDirectoryRecursive(Path::join(ci.toolOutputDir, ci.targetOS));
 
     // Flags
     std::string commonFlags = " /nologo /I\"../../..\" /std:c++14 /MTd /permissive- /EHsc";
-    std::string linkFlags   = " Advapi32.lib Shell32.lib";
 
     // Compile Tools.obj if needed
     if (needsRebuildTools(ci))
     {
         objsCompiled          = true;
-        std::string toolsObj  = joinPaths(ci.intermediateDir, "Tools.obj");
-        std::string toolsJson = joinPaths(ci.intermediateDir, "Tools.json");
-        std::string cmd1      = "cl.exe " + commonFlags + " /sourceDependencies \"" + toolsJson + "\" /c /Fd\"" +
-                           joinPaths(ci.intermediateDir, "Tools.pdb") + "\" /Fo\"" + toolsObj + "\" \"" + ci.toolsCpp +
-                           "\"";
-        if (runCommand(cmd1.c_str()) != 0)
+        std::string toolsObj  = Path::join(ci.intermediateDir, "Tools.obj");
+        std::string toolsJson = Path::join(ci.intermediateDir, "Tools.json");
+        CommandLine cmd("cl.exe");
+        cmd.arg(commonFlags);
+        cmd.arg("/sourceDependencies");
+        cmd.argQuoted(toolsJson);
+        cmd.arg("/c");
+        cmd.arg("/Fd" + Path::join(ci.intermediateDir, "Tools.pdb"));
+        cmd.arg("/Fo" + toolsObj);
+        cmd.argQuoted(ci.toolsCpp);
+        if (cmd.run() != 0)
             return false;
     }
 
@@ -764,32 +735,37 @@ bool compileWindows(const CompilationInfo& ci, bool& objsCompiled)
     {
         objsCompiled            = true;
         std::string toolObjName = "SC-" + ci.args->toolName + ".obj";
-        std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
-        std::string toolJson    = joinPaths(ci.intermediateDir, "SC-" + ci.args->toolName + ".json");
-        std::string cmd2        = "cl.exe " + commonFlags + " /sourceDependencies \"" + toolJson + "\" /c /Fd\"" +
-                           joinPaths(ci.intermediateDir, toolObjName.substr(0, toolObjName.size() - 4) + ".pdb") +
-                           "\" /Fo\"" + toolObj + "\" \"" + ci.toolCpp + "\"";
-        if (runCommand(cmd2.c_str()) != 0)
+        std::string toolObj     = Path::join(ci.intermediateDir, toolObjName);
+        std::string toolJson    = Path::join(ci.intermediateDir, "SC-" + ci.args->toolName + ".json");
+        CommandLine cmd("cl.exe");
+        cmd.arg(commonFlags);
+        cmd.arg("/sourceDependencies");
+        cmd.argQuoted(toolJson);
+        cmd.arg("/c");
+        cmd.arg("/Fd" + Path::join(ci.intermediateDir, toolObjName.substr(0, toolObjName.size() - 4) + ".pdb"));
+        cmd.arg("/Fo" + toolObj);
+        cmd.argQuoted(ci.toolCpp);
+        if (cmd.run() != 0)
             return false;
     }
-
-    // Link if needed (or if objs compiled)
-    // Note: Link is outside, handled by caller
     return true;
 }
 
 int executeTool(const BootloaderArgs& args, const CompilationInfo& ci)
 {
-    std::string cmd = "\"" + ci.toolExe + "\" \"" + args.libraryDir + "\" \"" + args.toolSourceDir + "\" \"" +
-                      args.buildDir + "\" \"" + args.toolName + "\"";
+    CommandLine cmd(ci.toolExe);
+    cmd.argQuoted(args.libraryDir);
+    cmd.argQuoted(args.toolSourceDir);
+    cmd.argQuoted(args.buildDir);
+    cmd.argQuoted(args.toolName);
     for (const auto& arg : args.remainingArgs)
     {
-        cmd += " \"" + arg + "\"";
+        cmd.argQuoted(arg);
     }
-    return runCommand(cmd.c_str());
+    return cmd.run();
 }
 
-int main(int argc, char* argv[])
+std::vector<std::string> getArgv(int& argc, char* argv[])
 {
 #ifdef _WIN32
     // Set console output to UTF-8 to properly display Unicode
@@ -801,7 +777,7 @@ int main(int argc, char* argv[])
     if (!wargv)
     {
         fprintf(stderr, "CommandLineToArgvW failed\n");
-        return 1;
+        exit(1);
     }
     std::vector<std::string> new_argv;
     for (int i = 0; i < argc; ++i)
@@ -809,49 +785,52 @@ int main(int argc, char* argv[])
         int         len = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, NULL, 0, NULL, NULL);
         std::string str(len, 0);
         WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, &str[0], len, NULL, NULL);
+        if (!str.empty() && str.back() == '\0')
+            str.pop_back();
         new_argv.push_back(str);
     }
     LocalFree(wargv);
-
-    std::vector<char*> new_argv_ptr;
-    for (auto& s : new_argv)
+    return new_argv;
+#else
+    std::vector<std::string> new_argv;
+    for (int i = 0; i < argc; ++i)
     {
-        new_argv_ptr.push_back(&s[0]);
+        new_argv.push_back(argv[i]);
     }
-    argc = new_argv_ptr.size();
-    argv = new_argv_ptr.data();
+    return new_argv;
 #endif
-    BootloaderArgs  args = parseArgs(argc, argv);
-    CompilationInfo ci   = setupCompilation(args);
+}
 
-    bool rebuildNeeded = needsRebuildTools(ci) || needsRebuildToolObj(ci) || needsRebuildExe(ci);
+int main(int argc, char* argv[])
+{
+    std::vector<std::string> string_argv = getArgv(argc, argv);
+    BootloaderArgs           args        = parseArgs(string_argv);
+    CompilationInfo          ci          = setupCompilation(args);
 
-    if (rebuildNeeded)
+    bool needsCompile = needsRebuildTools(ci) || needsRebuildToolObj(ci);
+    bool needsLink    = needsRebuildExe(ci);
+
+    if (needsCompile || needsLink)
     {
         if (printMessages)
         {
             printf("Rebuilding %s tool...\n", args.toolName.c_str());
         }
-        auto start_time   = std::chrono::high_resolution_clock::now();
-        bool objsCompiled = false;
+        auto start_time = std::chrono::high_resolution_clock::now();
 #ifdef _WIN32
+        bool objsCompiled = false;
         if (!compileWindows(ci, objsCompiled))
         {
             fprintf(stderr, "Compilation failed\n");
             return 1;
         }
-        if (objsCompiled || needsRebuildExe(ci))
+        if (objsCompiled || needsLink)
         {
-            printf("Linking %s\n", args.toolName.c_str());
-            std::string objExt      = ci.targetOS == "Windows" ? ".obj" : ".o";
-            std::string toolsObj    = joinPaths(ci.intermediateDir, "Tools" + objExt);
-            std::string toolObjName = "SC-" + ci.args->toolName + objExt;
-            std::string toolObj     = joinPaths(ci.intermediateDir, toolObjName);
-            std::string linkFlags   = " Advapi32.lib Shell32.lib";
-            std::string cmd3 =
-                "link /nologo /OUT:\"" + ci.toolExe + "\" \"" + toolsObj + "\" \"" + toolObj + "\" " + linkFlags;
-            if (runCommand(cmd3.c_str()) != 0)
+            if (linkWindows(ci) != 0)
+            {
+                fprintf(stderr, "Linking failed\n");
                 return 1;
+            }
         }
 #else
         if (compilePOSIX(ci) != 0)

@@ -11,6 +11,7 @@ mkdir -p "${SCRIPT_DIR}/_Build/_Tools/${PLATFORM}"
 
 # Check if ToolsBootstrap needs to be built
 if [ ! -f "$BOOTSTRAP_EXE" ] || [ "${SCRIPT_DIR}/Tools/ToolsBootstrap.cpp" -nt "$BOOTSTRAP_EXE" ]; then
+    echo "ToolsBootstrap.cpp"
     if command -v clang++ >/dev/null 2>&1; then
         clang++ -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.cpp" -std=c++14 -pthread
     else
