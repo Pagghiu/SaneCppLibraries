@@ -189,5 +189,5 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 754			| 725		| 1479	|
-| Sources   | 4984			| 1176		| 6160	|
-| Sum       | 5738			| 1901		| 7639	|
+| Sources   | 5010			| 1180		| 6190	|
+| Sum       | 5764			| 1905		| 7669	|

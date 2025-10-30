@@ -169,6 +169,6 @@ we will investigate if there OS functions allowing to achieve that functionality
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 942			| 1083		| 2025	|
-| Sources   | 2170			| 332		| 2502	|
-| Sum       | 3112			| 1415		| 4527	|
+| Headers   | 902			| 1035		| 1937	|
+| Sources   | 2143			| 326		| 2469	|
+| Sum       | 3045			| 1361		| 4406	|

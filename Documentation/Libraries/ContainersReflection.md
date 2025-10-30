@@ -24,6 +24,6 @@ The reason for this library to exist is only to allow [Reflection](@ref library_
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 207			| 98		| 305	|
+| Headers   | 213			| 98		| 311	|
 | Sources   | 0			| 0		| 0	|
-| Sum       | 207			| 98		| 305	|
+| Sum       | 213			| 98		| 311	|

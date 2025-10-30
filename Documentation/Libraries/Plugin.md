@@ -104,6 +104,6 @@ any system or compiler header.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 363			| 230		| 593	|
-| Sources   | 1246			| 218		| 1464	|
-| Sum       | 1609			| 448		| 2057	|
+| Headers   | 364			| 230		| 594	|
+| Sources   | 1477			| 259		| 1736	|
+| Sum       | 1841			| 489		| 2330	|

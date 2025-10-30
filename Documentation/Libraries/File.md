@@ -64,5 +64,5 @@ It can also be used to read or write the standard input, output or error from cu
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 97			| 129		| 226	|
-| Sources   | 667			| 106		| 773	|
-| Sum       | 764			| 235		| 999	|
+| Sources   | 619			| 105		| 724	|
+| Sum       | 716			| 234		| 950	|
