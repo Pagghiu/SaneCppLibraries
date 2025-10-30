@@ -14,8 +14,8 @@
 #include "LibrariesExtra/ReflectionAuto/ReflectionAutoStructured.h"
 #endif
 #endif
-#include "Libraries/ContainersSerialization/ContainersReflection.h"
-#include "Libraries/ContainersSerialization/MemoryReflection.h"
+#include "Libraries/ContainersReflection/ContainersReflection.h"
+#include "Libraries/ContainersReflection/MemoryReflection.h"
 #include "Libraries/Reflection/ReflectionSchemaCompiler.h"
 
 namespace TestNamespace

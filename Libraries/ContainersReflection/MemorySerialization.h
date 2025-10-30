@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../ContainersSerialization/MemoryReflection.h"
+#include "../ContainersReflection/MemoryReflection.h"
 
 namespace SC
 {
@@ -13,12 +13,18 @@ template <typename BinaryStream, typename T, typename SFINAESelector>
 struct SerializerBinaryReadWriteExact;
 template <typename BinaryStream, typename Container, typename T>
 struct SerializerBinaryExactVector;
+template <typename BinaryStream, typename T, typename SFINAESelector>
+struct SerializerBinaryReadVersioned;
+template <typename BinaryStream, typename Container, typename T, size_t NumMaxItems>
+struct SerializationBinaryVersionedVector;
 
 // Forward Declarations (to avoid depending on SerializationText)
 template <typename TextStream, typename T, typename SFINAESelector>
 struct SerializationTextReadWriteExact;
 template <typename TextStream, typename Container, typename T>
 struct SerializationTextExactVector;
+template <typename SerializerStream, typename T, typename SFINAESelector>
+struct SerializationTextReadVersioned;
 
 // clang-format off
 /// @brief Specialization for `SC::Buffer` type

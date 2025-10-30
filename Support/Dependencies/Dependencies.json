@@ -51,7 +51,7 @@
             "Memory"
         ]
     },
-    "ContainersSerialization": {
+    "ContainersReflection": {
         "direct_dependencies": [
             "Containers",
             "Memory",

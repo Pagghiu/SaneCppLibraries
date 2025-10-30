@@ -1,17 +1,17 @@
-@page library_containers_serialization Containers Serialization
+@page library_containers_reflection Containers Reflection
 
 @brief 🟨 Containers specializations for [Reflection](@ref library_reflection) and Serialization.
 
 [TOC]
 
-[SaneCppContainersSerialization.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainersSerialization.h) is a support library holding all partial specializations for [Reflection](@ref library_reflection), [Serialization Binary](@ref library_serialization_binary) and [Serialization Text](@ref library_serialization_text).  
+[SaneCppContainersReflection.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppContainersReflection.h) is a support library holding all partial specializations for [Reflection](@ref library_reflection), [Serialization Binary](@ref library_serialization_binary) and [Serialization Text](@ref library_serialization_text).  
 Its headers are only meant to be included anywhere the reflection / serialization systems are being used so that both systems "know" how to handle things like `SC::Vector` or `SC::String`.
 
 # Dependencies
 - Dependencies: [Containers](@ref library_containers), [Reflection](@ref library_reflection)
 - All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 
-![Dependency Graph](ContainersSerialization.svg)
+![Dependency Graph](ContainersReflection.svg)
 
 
 # Status

@@ -98,7 +98,7 @@ struct SC::SerializationJson
     [[nodiscard]] static bool loadVersioned(T& object, StringView text)
     {
         Reader stream(text);
-        return Serialization::SerializationTextReadVersioned<Reader, T>::loadVersioned(0, object, stream);
+        return Serialization::SerializationTextReadVersioned<Reader, T, void>::loadVersioned(0, object, stream);
     }
 
   private:

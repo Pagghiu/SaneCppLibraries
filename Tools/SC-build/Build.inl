@@ -841,15 +841,15 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
                                     ".*\\Test.(cpp|h|c)|"
                                     ".*\\test.(c|h)|"
                                     ".*\\/Tests/.*\\.*|"
-                                    ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
-                                    ".*\\/Assert.h|"                       // Can't test Assert::unreachable
-                                    ".*\\/PluginMacros.h|"                 // macros for client plugins
-                                    ".*\\/ProcessPosixFork.inl|"           // Can't compute coverage for fork
-                                    ".*\\/EnvironmentTable.h|"             // Can't compute coverage for fork
-                                    ".*\\/InitializerList.h|"              // C++ Language Support
-                                    ".*\\/Reflection/.*\\.*|"              // constexpr and templates
-                                    ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates
-                                    ".*\\/SerializationBinary/.*\\.*|"     // constexpr and templates
+                                    ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
+                                    ".*\\/Assert.h|"                    // Can't test Assert::unreachable
+                                    ".*\\/PluginMacros.h|"              // macros for client plugins
+                                    ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
+                                    ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
+                                    ".*\\/InitializerList.h|"           // C++ Language Support
+                                    ".*\\/Reflection/.*\\.*|"           // constexpr and templates
+                                    ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
+                                    ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
                                     ".*\\/LibrariesExtra/.*\\.*"
                                     ")$";
         arguments[numArguments++] = "--output-dir";                    // 7
@@ -874,15 +874,15 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
                                     ".*\\Test.(cpp|h|c)|"
                                     ".*\\test.(c|h)|"
                                     ".*\\/Tests/.*\\.*|"
-                                    ".*\\/LibC\\+\\+.inl|"                 // new / delete overloads
-                                    ".*\\/Assert.h|"                       // Can't test Assert::unreachable
-                                    ".*\\/PluginMacros.h|"                 // macros for client plugins
-                                    ".*\\/ProcessPosixFork.inl|"           // Can't compute coverage for fork
-                                    ".*\\/EnvironmentTable.h|"             // Can't compute coverage for fork
-                                    ".*\\/InitializerList.h|"              // C++ Language Support
-                                    ".*\\/Reflection/.*\\.*|"              // constexpr and templates
-                                    ".*\\/ContainersSerialization/.*\\.*|" // constexpr and templates
-                                    ".*\\/SerializationBinary/.*\\.*|"     // constexpr and templates
+                                    ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
+                                    ".*\\/Assert.h|"                    // Can't test Assert::unreachable
+                                    ".*\\/PluginMacros.h|"              // macros for client plugins
+                                    ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
+                                    ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
+                                    ".*\\/InitializerList.h|"           // C++ Language Support
+                                    ".*\\/Reflection/.*\\.*|"           // constexpr and templates
+                                    ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
+                                    ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
                                     ".*\\/LibrariesExtra/.*\\.*"
                                     ")$";
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9

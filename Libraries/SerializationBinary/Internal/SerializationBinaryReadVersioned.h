@@ -11,7 +11,7 @@ namespace SC
 
 namespace Serialization
 {
-template <typename BinaryStream, typename T, typename SFINAESelector = void>
+template <typename BinaryStream, typename T, typename SFINAESelector>
 struct SerializerBinaryReadVersioned;
 
 template <typename BinaryStream, typename T, typename SFINAESelector>
@@ -66,7 +66,7 @@ struct SerializerBinaryReadVersioned
             {
                 consumed = true;
                 consumedWithSuccess =
-                    SerializerBinaryReadVersioned<BinaryStream, R>::readVersioned(object.*field, stream, schema);
+                    SerializerBinaryReadVersioned<BinaryStream, R, void>::readVersioned(object.*field, stream, schema);
                 return false; // stop iterations
             }
             return true;
@@ -106,7 +106,7 @@ struct SerializerReadVersionedItems
         for (uint32_t idx = 0; idx < commonSubsetItems; ++idx)
         {
             schema.sourceTypeIndex = arrayItemTypeIndex;
-            if (not SerializerBinaryReadVersioned<BinaryStream, T>::readVersioned(object[idx], stream, schema))
+            if (not SerializerBinaryReadVersioned<BinaryStream, T, void>::readVersioned(object[idx], stream, schema))
                 return false;
         }
 
@@ -128,7 +128,7 @@ struct SerializerReadVersionedItems
 };
 
 template <typename BinaryStream, typename T, int N>
-struct SerializerBinaryReadVersioned<BinaryStream, T[N]>
+struct SerializerBinaryReadVersioned<BinaryStream, T[N], void>
 {
     [[nodiscard]] static constexpr bool readVersioned(T (&object)[N], BinaryStream& stream, SerializationSchema& schema)
     {

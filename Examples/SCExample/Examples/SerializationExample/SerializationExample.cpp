@@ -74,7 +74,7 @@ namespace Serialization
 {
 // clang-format off
 template <typename BinaryStream, typename T>
-struct SerializerBinaryReadVersioned<BinaryStream, ImVector<T>> : public SerializationBinaryVersionedVector<BinaryStream, ImVector<T>, T, 0xffffffff> { };
+struct SerializerBinaryReadVersioned<BinaryStream, ImVector<T>, void> : public SerializationBinaryVersionedVector<BinaryStream, ImVector<T>, T, 0xffffffff> { };
 
 template <typename BinaryStream, typename T>
 struct SerializerBinaryReadWriteExact<BinaryStream, ImVector<T>> : public SerializerBinaryExactVector<BinaryStream, ImVector<T>, T> { };
@@ -83,14 +83,14 @@ template <typename TextStream, typename T>
 struct SerializationTextReadWriteExact<TextStream, ImVector<T>> : public SerializationTextExactVector<TextStream, ImVector<T>, T> { };
 
 template <typename TextStream, typename T>
-struct SerializationTextReadVersioned<TextStream, ImVector<T>> : public SerializationTextVersionedVector<TextStream, ImVector<T>, T> { };
+struct SerializationTextReadVersioned<TextStream, ImVector<T>, void> : public SerializationTextVersionedVector<TextStream, ImVector<T>, T> { };
 // clang-format on
 
 } // namespace Serialization
 } // namespace SC
 
-#include "Libraries/ContainersSerialization/ContainersSerialization.h"
-#include "Libraries/ContainersSerialization/MemorySerialization.h"
+#include "Libraries/ContainersReflection/ContainersReflection.h"
+#include "Libraries/ContainersReflection/MemorySerialization.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Plugin/PluginMacros.h"

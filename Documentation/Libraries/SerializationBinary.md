@@ -6,7 +6,7 @@
 
 [SaneCppSerializationBinary.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppSerializationBinary.h) implements binary serialization on top of the [Reflection](@ref library_reflection) library.
 
-@note You need to include headers from [Serialization Adapters](@ref library_containers_serialization) in order to use `SC::Vector` or `SC::String` or any other serializable class provided by other libraries with this one.
+@note You need to include headers from [Serialization Adapters](@ref library_containers_reflection) in order to use `SC::Vector` or `SC::String` or any other serializable class provided by other libraries with this one.
 
 # Dependencies
 - Dependencies: [Reflection](@ref library_reflection)

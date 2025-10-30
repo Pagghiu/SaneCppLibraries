@@ -140,7 +140,7 @@ struct SerializationBinary
                                             SerializationBinaryOptions options = {}, size_t* numberOfReads = nullptr)
     {
         SerializationBinaryReader readerBuffer(buffer);
-        using Reader = Serialization::SerializerBinaryReadVersioned<SerializationBinaryReader, T>;
+        using Reader = Serialization::SerializerBinaryReadVersioned<SerializationBinaryReader, T, void>;
         SerializationSchema versionSchema(schema);
         versionSchema.options = options;
         if (not Reader::readVersioned(value, readerBuffer, versionSchema))

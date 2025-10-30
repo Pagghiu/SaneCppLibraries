@@ -8,8 +8,6 @@ namespace SC
 /// @brief Serializes structured formats mostly text based, like JSON (see @ref library_serialization_text).
 namespace Serialization
 {
-template <typename SerializerStream, typename T, typename SFINAESelector = void>
-struct SerializationTextReadVersioned;
 
 template <typename SerializerStream, typename T, typename SFINAESelector>
 struct SerializationTextReadVersioned
@@ -21,7 +19,7 @@ struct SerializationTextReadVersioned
 };
 
 template <typename SerializerStream, typename T, int N>
-struct SerializationTextReadVersioned<SerializerStream, T[N]>
+struct SerializationTextReadVersioned<SerializerStream, T[N], void>
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T (&object)[N], SerializerStream& stream)
     {
@@ -74,7 +72,7 @@ struct SerializationTextReadVersioned<SerializerStream, T,
             {
                 consumed = true;
                 consumedWithSuccess =
-                    SerializationTextReadVersioned<SerializerStream, R>::loadVersioned(0, object.*field, stream);
+                    SerializationTextReadVersioned<SerializerStream, R, void>::loadVersioned(0, object.*field, stream);
                 return false; // stop iterating members
             }
             return true;
