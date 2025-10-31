@@ -42,15 +42,15 @@ mkdir "%SCRIPT_DIR%\_Build\_Tools\Windows" 2>nul
 if not exist "%BOOTSTRAP_EXE%" (
     set build_bootstrap=1
 ) else (
-    for %%f in ("%SCRIPT_DIR%\Tools\ToolsBootstrap.cpp") do set source_time=%%~tf
+    for %%f in ("%SCRIPT_DIR%\Tools\ToolsBootstrap.c") do set source_time=%%~tf
     for %%f in ("%BOOTSTRAP_EXE%") do set exe_time=%%~tf
     if "!source_time!" gtr "!exe_time!" (set build_bootstrap=1) else (set build_bootstrap=0)
 )
 
 if !build_bootstrap! equ 1 (
-    set SRC_FILE=!SCRIPT_DIR!\Tools\ToolsBootstrap.cpp
+    set SRC_FILE=!SCRIPT_DIR!\Tools\ToolsBootstrap.c
     set OBJ_FILE=!SCRIPT_DIR!\_Build\_Tools\Windows\ToolsBootstrap.obj
-    cl.exe /nologo /std:c++14 /MTd /Fo"!OBJ_FILE!" /c "!SRC_FILE!" 2>&1
+    cl.exe /nologo /MTd /Fo"!OBJ_FILE!" /c "!SRC_FILE!" 2>&1
     if !errorlevel! neq 0 (
         echo Failed to build ToolsBootstrap
         exit /b 1

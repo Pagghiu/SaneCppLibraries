@@ -10,12 +10,12 @@ BOOTSTRAP_EXE="${SCRIPT_DIR}/_Build/_Tools/${PLATFORM}/ToolsBootstrap"
 mkdir -p "${SCRIPT_DIR}/_Build/_Tools/${PLATFORM}"
 
 # Check if ToolsBootstrap needs to be built
-if [ ! -f "$BOOTSTRAP_EXE" ] || [ "${SCRIPT_DIR}/Tools/ToolsBootstrap.cpp" -nt "$BOOTSTRAP_EXE" ]; then
-    echo "ToolsBootstrap.cpp"
-    if command -v clang++ >/dev/null 2>&1; then
-        clang++ -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.cpp" -std=c++14 -pthread
+if [ ! -f "$BOOTSTRAP_EXE" ] || [ "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -nt "$BOOTSTRAP_EXE" ]; then
+    echo "ToolsBootstrap.c"
+    if command -v cc >/dev/null 2>&1; then
+        cc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99
     else
-        g++ -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.cpp" -std=c++14 -pthread
+        gcc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99
     fi
     if [ $? -ne 0 ]; then
         echo "Failed to build ToolsBootstrap"
