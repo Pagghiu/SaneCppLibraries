@@ -50,12 +50,12 @@ if not exist "%BOOTSTRAP_EXE%" (
 if !build_bootstrap! equ 1 (
     set SRC_FILE=!SCRIPT_DIR!\Tools\ToolsBootstrap.c
     set OBJ_FILE=!SCRIPT_DIR!\_Build\_Tools\Windows\ToolsBootstrap.obj
-    cl.exe /nologo /MTd /Fo"!OBJ_FILE!" /c "!SRC_FILE!" 2>&1
+    cl.exe /nologo /MTd /Zi /Od /D_DEBUG=1 /Fo"!OBJ_FILE!" /c "!SRC_FILE!" 2>&1
     if !errorlevel! neq 0 (
         echo Failed to build ToolsBootstrap
         exit /b 1
     )
-    link /nologo /OUT:"!BOOTSTRAP_EXE!" "!OBJ_FILE!" Shell32.lib 2>&1
+    link /nologo /DEBUG /OUT:"!BOOTSTRAP_EXE!" "!OBJ_FILE!" Shell32.lib 2>&1
     if !errorlevel! neq 0 (
         echo Failed to link ToolsBootstrap
         exit /b 1

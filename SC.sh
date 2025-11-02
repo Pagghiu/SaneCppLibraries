@@ -13,9 +13,9 @@ mkdir -p "${SCRIPT_DIR}/_Build/_Tools/${PLATFORM}"
 if [ ! -f "$BOOTSTRAP_EXE" ] || [ "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -nt "$BOOTSTRAP_EXE" ]; then
     echo "ToolsBootstrap.c"
     if command -v cc >/dev/null 2>&1; then
-        cc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99
+        cc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99 -D_DEBUG=1 -g -ggdb -O0
     else
-        gcc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99
+        gcc -o "$BOOTSTRAP_EXE" "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -std=c99 -D_DEBUG=1 -g -ggdb -O0
     fi
     if [ $? -ne 0 ]; then
         echo "Failed to build ToolsBootstrap"

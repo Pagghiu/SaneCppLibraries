@@ -1106,6 +1106,10 @@ int compilePOSIX(CompilationInfo* ci) {
         CommandLine_arg(&cmd, "-fvisibility-inlines-hidden");
         CommandLine_arg(&cmd, "-fno-rtti");
         CommandLine_arg(&cmd, "-fno-exceptions");
+        CommandLine_arg(&cmd, "-D_DEBUG=1");
+        CommandLine_arg(&cmd, "-g");
+        CommandLine_arg(&cmd, "-ggdb");
+        CommandLine_arg(&cmd, "-O0");
         if (useClang) {
             CommandLine_arg(&cmd, "-nostdinc++");
         }
@@ -1137,6 +1141,10 @@ int compilePOSIX(CompilationInfo* ci) {
         CommandLine_arg(&cmd, "-fvisibility-inlines-hidden");
         CommandLine_arg(&cmd, "-fno-rtti");
         CommandLine_arg(&cmd, "-fno-exceptions");
+        CommandLine_arg(&cmd, "-D_DEBUG=1");
+        CommandLine_arg(&cmd, "-g");
+        CommandLine_arg(&cmd, "-ggdb");
+        CommandLine_arg(&cmd, "-O0");
         if (useClang) {
             CommandLine_arg(&cmd, "-nostdinc++");
         }
@@ -1201,10 +1209,18 @@ int linkWindows(CompilationInfo* ci) {
     CommandLine cmd;
     CommandLine_init(&cmd, "link");
     CommandLine_arg(&cmd, "/nologo");
+    CommandLine_arg(&cmd, "/DEBUG");
     StringBuilder sb = StringBuilder_init(256);
     StringBuilder_append(&sb, "/OUT:\"");
     StringBuilder_append(&sb, ci->toolExe);
     StringBuilder_append(&sb, "\"");
+    StringBuilder_append(&sb, " /PDB:\"");
+    StringBuilder_append(&sb, ci->toolOutputDir);
+    StringBuilder_append(&sb, "/");
+    StringBuilder_append(&sb, ci->targetOS);
+    StringBuilder_append(&sb, "/SC-");
+    StringBuilder_append(&sb, ci->args->toolName);
+    StringBuilder_append(&sb,".pdb\"");
     CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb));
     StringBuilder_destroy(&sb);
     CommandLine_argQuoted(&cmd, toolsObj);
@@ -1320,7 +1336,11 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         CommandLine_arg(&cmd, "/nologo");
         CommandLine_arg(&cmd, "/I.");
         CommandLine_arg(&cmd, "/std:c++14");
+        CommandLine_arg(&cmd, "/D_DEBUG");
+        CommandLine_arg(&cmd, "/Zi");
         CommandLine_arg(&cmd, "/MTd");
+        CommandLine_arg(&cmd, "/GS");
+        CommandLine_arg(&cmd, "/Od");
         CommandLine_arg(&cmd, "/permissive-");
         CommandLine_arg(&cmd, "/EHsc");
         CommandLine_arg(&cmd, "/sourceDependencies");
@@ -1361,7 +1381,11 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         CommandLine_arg(&cmd, "/nologo");
         CommandLine_arg(&cmd, "/I.");
         CommandLine_arg(&cmd, "/std:c++14");
+        CommandLine_arg(&cmd, "/D_DEBUG");
+        CommandLine_arg(&cmd, "/Zi");
         CommandLine_arg(&cmd, "/MTd");
+        CommandLine_arg(&cmd, "/GS");
+        CommandLine_arg(&cmd, "/Od");
         CommandLine_arg(&cmd, "/permissive-");
         CommandLine_arg(&cmd, "/EHsc");
         CommandLine_arg(&cmd, "/sourceDependencies");

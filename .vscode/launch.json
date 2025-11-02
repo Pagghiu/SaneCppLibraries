@@ -233,14 +233,19 @@
             ],
         },
         {
-            "name": "Debug SC-format arm64 [apple]",
+            // Manually invoke "Build SCTest Debug" for your architecture before launching debug
+            "name": "Debug SC-build [apple]",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Tools/Darwin/SC-format",
+            "program": "${workspaceFolder}/_Build/_Tools/Darwin/SC-build",
             "args": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/Tools",
-                "${workspaceFolder}/_Build"
+                "${workspaceFolder}/_Build",
+                "build",
+                "configure",
+                "SCTest",
+                "Debug"
             ],
             "cwd": "${workspaceRoot}",
             "console": "integratedTerminal",
@@ -249,14 +254,19 @@
             ],
         },
         {
-            "name": "Debug SC-format arm64 [linux] (lldb)",
+            // Manually invoke "Build SCTest Debug" for your architecture before launching debug
+            "name": "Debug SC-build [linux] (lldb)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Tools/Linux/SC-format",
+            "program": "${workspaceFolder}/_Build/_Tools/Linux/SC-build",
             "args": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/Tools",
-                "${workspaceFolder}/_Build"
+                "${workspaceFolder}/_Build",
+                "build",
+                "configure",
+                "SCTest",
+                "Debug"
             ],
             "cwd": "${workspaceRoot}",
             "console": "integratedTerminal",
@@ -265,14 +275,19 @@
             ],
         },
         {
-            "name": "Debug SC-format arm64 [windows]",
+            // Manually invoke "Build SCTest Debug" for your architecture before launching debug
+            "name": "Debug SC-build [windows]",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Tools/Windows/SC-format.exe",
+            "program": "${workspaceFolder}/_Build/_Tools/Windows/SC-build.exe",
             "args": [
-                "${workspaceFolder}",
+               "${workspaceFolder}",
                 "${workspaceFolder}/Tools",
-                "${workspaceFolder}/_Build"
+                "${workspaceFolder}/_Build",
+                "build",
+                "configure",
+                "SCTest",
+                "Debug"
             ],
             "cwd": "${workspaceRoot}",
             "stopAtEntry": false,
