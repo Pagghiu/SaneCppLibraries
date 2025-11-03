@@ -27,6 +27,7 @@ extern int pclose(FILE *stream);
 #include <dirent.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 #define POPEN popen
 #define PCLOSE pclose
@@ -1077,6 +1078,64 @@ int needsRebuildExe(CompilationInfo* ci) {
     return (toolsObjTime > exeTime || toolObjTime > exeTime);
 }
 
+// Helper functions for building compile commands
+void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char* output, const char* input, int useClang) {
+    CommandLine_init(cmd, compiler);
+    CommandLine_arg(cmd, "-I../../..");
+    CommandLine_arg(cmd, "-std=c++14");
+    CommandLine_arg(cmd, "-pthread");
+    CommandLine_arg(cmd, "-MMD");
+    CommandLine_arg(cmd, "-fstrict-aliasing");
+    CommandLine_arg(cmd, "-fvisibility=hidden");
+    CommandLine_arg(cmd, "-fvisibility-inlines-hidden");
+    CommandLine_arg(cmd, "-fno-rtti");
+    CommandLine_arg(cmd, "-fno-exceptions");
+    CommandLine_arg(cmd, "-D_DEBUG=1");
+    CommandLine_arg(cmd, "-g");
+    CommandLine_arg(cmd, "-ggdb");
+    CommandLine_arg(cmd, "-O0");
+    if (useClang) {
+        CommandLine_arg(cmd, "-nostdinc++");
+    }
+    CommandLine_arg(cmd, "-o");
+    CommandLine_argQuoted(cmd, output);
+    CommandLine_arg(cmd, "-c");
+    CommandLine_argQuoted(cmd, input);
+}
+
+void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, const char* output, const char* input, const char* jsonFile, const char* pdbName) {
+    CommandLine_init(cmd, "cl.exe");
+    CommandLine_arg(cmd, "/nologo");
+    CommandLine_arg(cmd, "/I.");
+    CommandLine_arg(cmd, "/std:c++14");
+    CommandLine_arg(cmd, "/D_DEBUG");
+    CommandLine_arg(cmd, "/Zi");
+    CommandLine_arg(cmd, "/MTd");
+    CommandLine_arg(cmd, "/GS");
+    CommandLine_arg(cmd, "/Od");
+    CommandLine_arg(cmd, "/permissive-");
+    CommandLine_arg(cmd, "/EHsc");
+    CommandLine_arg(cmd, "/sourceDependencies");
+    CommandLine_argQuoted(cmd, jsonFile);
+    CommandLine_arg(cmd, "/c");
+    StringBuilder sb1 = StringBuilder_init(256);
+    StringBuilder_append(&sb1, "/Fd\"");
+    StringBuilder_append(&sb1, intermediateDir);
+    StringBuilder_append(&sb1, "/");
+    StringBuilder_append(&sb1, pdbName);
+    StringBuilder_append(&sb1, ".pdb\"");
+    CommandLine_arg(cmd, StringBuilder_get_buffer(&sb1));
+    StringBuilder_destroy(&sb1);
+    StringBuilder sb2 = StringBuilder_init(256);
+    StringBuilder_append(&sb2, "/Fo\"");
+    StringBuilder_append(&sb2, output);
+    StringBuilder_append(&sb2, "\"");
+    CommandLine_arg(cmd, StringBuilder_get_buffer(&sb2));
+    StringBuilder_destroy(&sb2);
+    CommandLine_argQuoted(cmd, input);
+}
+
+#ifndef _WIN32
 int compilePOSIX(CompilationInfo* ci) {
     // Simplified: assume clang++ or g++
     FileSystem_createDirectoryRecursive(ci->intermediateDir);
@@ -1093,71 +1152,63 @@ int compilePOSIX(CompilationInfo* ci) {
         return 1;
     }
 
-    if (needsRebuildTools(ci)) {
+    int needTools = needsRebuildTools(ci);
+    int needTool = needsRebuildToolObj(ci);
+
+    if (needTools && needTool) {
+        // Compile both in parallel
+        pid_t pid1 = fork();
+        if (pid1 == 0) {
+            // Compile Tools.cpp
+            char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
+            CommandLine cmd;
+            buildCompileCommandPOSIX(&cmd, compiler, toolsObj, ci->toolsCpp, useClang);
+            int ret = CommandLine_run(&cmd);
+            CommandLine_destroy(&cmd);
+            free(toolsObj);
+            exit(ret);
+        }
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            // Compile SC-tool.cpp
+            char* toolObj = Path_join(ci->intermediateDir, "SC-");
+            toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
+            sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
+            CommandLine cmd;
+            buildCompileCommandPOSIX(&cmd, compiler, toolObj, ci->toolCpp, useClang);
+            int ret = CommandLine_run(&cmd);
+            CommandLine_destroy(&cmd);
+            free(toolObj);
+            exit(ret);
+        }
+        int status1, status2;
+        waitpid(pid1, &status1, 0);
+        waitpid(pid2, &status2, 0);
+        if (WEXITSTATUS(status1) != 0 || WEXITSTATUS(status2) != 0) return 1;
+        printf("Tools.cpp\n");
+        printf("SC-%s.cpp\n", ci->args->toolName);
+    } else if (needTools) {
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
         CommandLine cmd;
-        CommandLine_init(&cmd, compiler);
-        CommandLine_arg(&cmd, "-I../../..");
-        CommandLine_arg(&cmd, "-std=c++14");
-        CommandLine_arg(&cmd, "-pthread");
-        CommandLine_arg(&cmd, "-MMD");
-        CommandLine_arg(&cmd, "-fstrict-aliasing");
-        CommandLine_arg(&cmd, "-fvisibility=hidden");
-        CommandLine_arg(&cmd, "-fvisibility-inlines-hidden");
-        CommandLine_arg(&cmd, "-fno-rtti");
-        CommandLine_arg(&cmd, "-fno-exceptions");
-        CommandLine_arg(&cmd, "-D_DEBUG=1");
-        CommandLine_arg(&cmd, "-g");
-        CommandLine_arg(&cmd, "-ggdb");
-        CommandLine_arg(&cmd, "-O0");
-        if (useClang) {
-            CommandLine_arg(&cmd, "-nostdinc++");
-        }
-        CommandLine_arg(&cmd, "-o");
-        CommandLine_argQuoted(&cmd, toolsObj);
-        CommandLine_arg(&cmd, "-c");
-        CommandLine_argQuoted(&cmd, ci->toolsCpp);
+        buildCompileCommandPOSIX(&cmd, compiler, toolsObj, ci->toolsCpp, useClang);
         printf("Tools.cpp\n");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
         if (ret != 0) return 1;
-    } else {
-        printf("\"%s\" is up to date\n", ci->toolsCpp);
-    }
-
-    if (needsRebuildToolObj(ci)) {
+    } else if (needTool) {
         char* toolObj = Path_join(ci->intermediateDir, "SC-");
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
         sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
         CommandLine cmd;
-        CommandLine_init(&cmd, compiler);
-        CommandLine_arg(&cmd, "-I../../..");
-        CommandLine_arg(&cmd, "-std=c++14");
-        CommandLine_arg(&cmd, "-pthread");
-        CommandLine_arg(&cmd, "-MMD");
-        CommandLine_arg(&cmd, "-fstrict-aliasing");
-        CommandLine_arg(&cmd, "-fvisibility=hidden");
-        CommandLine_arg(&cmd, "-fvisibility-inlines-hidden");
-        CommandLine_arg(&cmd, "-fno-rtti");
-        CommandLine_arg(&cmd, "-fno-exceptions");
-        CommandLine_arg(&cmd, "-D_DEBUG=1");
-        CommandLine_arg(&cmd, "-g");
-        CommandLine_arg(&cmd, "-ggdb");
-        CommandLine_arg(&cmd, "-O0");
-        if (useClang) {
-            CommandLine_arg(&cmd, "-nostdinc++");
-        }
-        CommandLine_arg(&cmd, "-o");
-        CommandLine_argQuoted(&cmd, toolObj);
-        CommandLine_arg(&cmd, "-c");
-        CommandLine_argQuoted(&cmd, ci->toolCpp);
+        buildCompileCommandPOSIX(&cmd, compiler, toolObj, ci->toolCpp, useClang);
         printf("SC-%s.cpp\n", ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);
         if (ret != 0) return 1;
     } else {
+        printf("\"%s\" is up to date\n", ci->toolsCpp);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
 
@@ -1194,6 +1245,7 @@ int compilePOSIX(CompilationInfo* ci) {
     }
     return 0;
 }
+#endif
 
 int linkWindows(CompilationInfo* ci) {
     printf("Linking %s\n", ci->args->toolName);
@@ -1327,48 +1379,113 @@ int compileWindows(CompilationInfo* ci, int* objsCompiled) {
 FileSystem_createDirectoryRecursive(ci->intermediateDir);
     FileSystem_createDirectoryRecursive(ci->toolOutputDir);
 
-    if (needsRebuildTools(ci)) {
+    int needTools = needsRebuildTools(ci);
+    int needTool = needsRebuildToolObj(ci);
+
+    if (needTools && needTool) {
+        // Compile both in parallel
+#ifdef _WIN32
+        HANDLE processes[2];
+        int count = 0;
+#endif
+        // Spawn Tools.obj compilation
+        {
+            *objsCompiled = 1;
+            char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
+            char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
+            CommandLine cmd;
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, toolsObj, ci->toolsCpp, toolsJson, "Tools");
+#ifdef _WIN32
+            char* command = StringVector_join(&cmd.args, " ");
+            STARTUPINFOW si = {sizeof(si)};
+            PROCESS_INFORMATION pi;
+            size_t len = strlen(command);
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
+            if (wlen > 0) {
+                wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
+                if (wcmd) {
+                    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
+                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                        processes[count++] = pi.hProcess;
+                        CloseHandle(pi.hThread);
+                    }
+                    free(wcmd);
+                }
+            }
+            free(command);
+#else
+            int ret = CommandLine_run(&cmd);
+            if (ret != 0) return 0;
+#endif
+            CommandLine_destroy(&cmd);
+            free(toolsObj);
+            free(toolsJson);
+        }
+        // Spawn SC-tool.obj compilation
+        {
+            char* toolObj = Path_join(ci->intermediateDir, "SC-");
+            toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".obj") + 1);
+            sprintf(toolObj + strlen(toolObj), "%s.obj", ci->args->toolName);
+            char* toolJson = Path_join(ci->intermediateDir, "SC-");
+            toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
+            sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
+            CommandLine cmd;
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, toolObj, ci->toolCpp, toolJson, ci->args->toolName);
+#ifdef _WIN32
+            char* command = StringVector_join(&cmd.args, " ");
+            STARTUPINFOW si = {sizeof(si)};
+            PROCESS_INFORMATION pi;
+            size_t len = strlen(command);
+            int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
+            if (wlen > 0) {
+                wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
+                if (wcmd) {
+                    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
+                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                        processes[count++] = pi.hProcess;
+                        CloseHandle(pi.hThread);
+                    }
+                    free(wcmd);
+                }
+            }
+            free(command);
+#else
+            int ret = CommandLine_run(&cmd);
+            if (ret != 0) return 0;
+#endif
+            CommandLine_destroy(&cmd);
+            free(toolObj);
+            free(toolJson);
+        }
+#ifdef _WIN32
+        // Wait for both
+        if (count == 2) {
+            WaitForMultipleObjects(2, processes, TRUE, INFINITE);
+            DWORD exit1, exit2;
+            GetExitCodeProcess(processes[0], &exit1);
+            GetExitCodeProcess(processes[1], &exit2);
+            CloseHandle(processes[0]);
+            CloseHandle(processes[1]);
+            if (exit1 != 0 || exit2 != 0) return 0;
+        } else {
+            return 0;
+        }
+#else
+        printf("Tools.cpp\n");
+        printf("SC-%s.cpp\n", ci->args->toolName);
+#endif
+    } else if (needTools) {
         *objsCompiled = 1;
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
         char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
         CommandLine cmd;
-        CommandLine_init(&cmd, "cl.exe");
-        CommandLine_arg(&cmd, "/nologo");
-        CommandLine_arg(&cmd, "/I.");
-        CommandLine_arg(&cmd, "/std:c++14");
-        CommandLine_arg(&cmd, "/D_DEBUG");
-        CommandLine_arg(&cmd, "/Zi");
-        CommandLine_arg(&cmd, "/MTd");
-        CommandLine_arg(&cmd, "/GS");
-        CommandLine_arg(&cmd, "/Od");
-        CommandLine_arg(&cmd, "/permissive-");
-        CommandLine_arg(&cmd, "/EHsc");
-        CommandLine_arg(&cmd, "/sourceDependencies");
-        CommandLine_argQuoted(&cmd, toolsJson);
-        CommandLine_arg(&cmd, "/c");
-        StringBuilder sb1 = StringBuilder_init(256);
-        StringBuilder_append(&sb1, "/Fd\"");
-        StringBuilder_append(&sb1, ci->intermediateDir);
-        StringBuilder_append(&sb1, "/Tools.pdb\"");
-        CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb1));
-        StringBuilder_destroy(&sb1);
-        StringBuilder sb2 = StringBuilder_init(256);
-        StringBuilder_append(&sb2, "/Fo\"");
-        StringBuilder_append(&sb2, toolsObj);
-        StringBuilder_append(&sb2, "\"");
-        CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb2));
-        StringBuilder_destroy(&sb2);
-        CommandLine_argQuoted(&cmd, ci->toolsCpp);
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, toolsObj, ci->toolsCpp, toolsJson, "Tools");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
         free(toolsJson);
         if (ret != 0) return 0;
-    } else {
-        printf("\"%s\" is up to date\n", ci->toolsCpp);
-    }
-
-    if (needsRebuildToolObj(ci)) {
+    } else if (needTool) {
         *objsCompiled = 1;
         char* toolObj = Path_join(ci->intermediateDir, "SC-");
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".obj") + 1);
@@ -1377,41 +1494,14 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
         sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
         CommandLine cmd;
-        CommandLine_init(&cmd, "cl.exe");
-        CommandLine_arg(&cmd, "/nologo");
-        CommandLine_arg(&cmd, "/I.");
-        CommandLine_arg(&cmd, "/std:c++14");
-        CommandLine_arg(&cmd, "/D_DEBUG");
-        CommandLine_arg(&cmd, "/Zi");
-        CommandLine_arg(&cmd, "/MTd");
-        CommandLine_arg(&cmd, "/GS");
-        CommandLine_arg(&cmd, "/Od");
-        CommandLine_arg(&cmd, "/permissive-");
-        CommandLine_arg(&cmd, "/EHsc");
-        CommandLine_arg(&cmd, "/sourceDependencies");
-        CommandLine_argQuoted(&cmd, toolJson);
-        CommandLine_arg(&cmd, "/c");
-        StringBuilder sb1 = StringBuilder_init(256);
-        StringBuilder_append(&sb1, "/Fd\"");
-        StringBuilder_append(&sb1, ci->intermediateDir);
-        StringBuilder_append(&sb1, "/SC-");
-        StringBuilder_append(&sb1, ci->args->toolName);
-        StringBuilder_append(&sb1, ".pdb\"");
-        CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb1));
-        StringBuilder_destroy(&sb1);
-        StringBuilder sb2 = StringBuilder_init(256);
-        StringBuilder_append(&sb2, "/Fo\"");
-        StringBuilder_append(&sb2, toolObj);
-        StringBuilder_append(&sb2, "\"");
-        CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb2));
-        StringBuilder_destroy(&sb2);
-        CommandLine_argQuoted(&cmd, ci->toolCpp);
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, toolObj, ci->toolCpp, toolJson, ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);
         free(toolJson);
-        return ret == 0;
+        if (ret != 0) return 0;
     } else {
+        printf("\"%s\" is up to date\n", ci->toolsCpp);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
     return 1;
