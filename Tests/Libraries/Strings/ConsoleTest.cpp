@@ -32,6 +32,12 @@ struct SC::ConsoleTest : public SC::TestCase
             SC_TEST_EXPECT(console.print("test {}", StringSpan("1")));
             SC_TEST_EXPECT(not console.print("test {}"_u16, StringSpan("1")));
         }
+        if (test_section("printError"))
+        {
+            console.printError("Test Error\n");
+            console.printErrorLine("Test Error Line");
+            console.flushStdErr();
+        }
     }
 };
 

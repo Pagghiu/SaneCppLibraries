@@ -27,15 +27,49 @@ struct SC_COMPILER_EXPORT Console
     /// @param conversionBuffer The optional buffer used for UTF conversions
     Console(Span<char> conversionBuffer = {});
 
-    /// @brief Prints a formatted string using SC::StringFormat
-    /// @tparam Types Types of `args`
-    /// @param fmt Format string
-    /// @param args Arguments to be formatted in the string
+    /// @brief Prints a formatted string using SC::StringFormat to stdout
     /// @return `true` if message has been printed successfully to Console
     template <typename... Types>
     bool print(StringSpan fmt, Types&&... args)
     {
-        StringFormatOutput output(fmt.getEncoding(), *this);
+        return printInternal(true, fmt, forward<Types>(args)...);
+    }
+
+    /// @brief Prints a formatted string using SC::StringFormat to stderr
+    /// @return `true` if message has been printed successfully to Console
+    template <typename... Types>
+    bool printError(StringSpan fmt, Types&&... args)
+    {
+        return printInternal(false, fmt, forward<Types>(args)...);
+    }
+
+    /// @brief Prints a string to console
+    void print(const StringSpan str);
+
+    /// @brief Prints a string to stderr
+    void printError(const StringSpan str);
+
+    /// @brief Flushes stdout
+    void flush();
+
+    /// @brief Flushes stderr
+    void flushStdErr();
+
+    /// @brief Prints a string to stdout and adds a newline at the end of it
+    void printLine(const StringSpan str);
+
+    /// @brief Prints a string to stderr and adds a newline at the end of it
+    void printErrorLine(const StringSpan str);
+
+    /// @brief Tries attaching current process to parent console (Windows only, has no effect elsewhere)
+    /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)
+    static bool tryAttachingToParentConsole();
+
+  private:
+    template <typename... Types>
+    bool printInternal(bool useStdOut, StringSpan fmt, Types&&... args)
+    {
+        StringFormatOutput output(fmt.getEncoding(), *this, useStdOut);
         if (fmt.getEncoding() == StringEncoding::Ascii || fmt.getEncoding() == StringEncoding::Utf8)
         {
             // It's ok parsing format string '{' and '}' both for utf8 and ascii with StringIteratorASCII
@@ -44,26 +78,12 @@ struct SC_COMPILER_EXPORT Console
         }
         return false; // UTF16/32 format strings are not supported
     }
-
-    /// @brief Prints a StringSpan to console
-    /// @param str The StringSpan to print
-    void print(const StringSpan str);
-
-    /// @brief Prints a StringSpan to console and adds a newline at the end of it
-    /// @param str The StringSpan to print
-    void printLine(const StringSpan str);
-
-    /// @brief Flushes the console output buffer
-    void flush();
-
-    /// @brief Tries attaching current process to parent console (Windows only, has no effect elsewhere)
-    /// @returns `true` if the parent console has been attached (Windows only, returns true elsewhere)
-    static bool tryAttachingToParentConsole();
-
-  private:
     Span<char> conversionBuffer;
 #if SC_PLATFORM_WINDOWS
-    void* handle;
+    void printWindows(const StringSpan str, void* handle);
+
+    void* hStdOut;
+    void* hStdErr;
     bool  isConsole  = true;
     bool  isDebugger = true;
 #endif

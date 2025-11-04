@@ -12,8 +12,9 @@
 SC::Console::Console(Span<char> conversionBuffer) : conversionBuffer(conversionBuffer)
 {
 #if SC_PLATFORM_WINDOWS
-    handle     = ::GetStdHandle(STD_OUTPUT_HANDLE);
-    isConsole  = ::GetFileType(handle) == FILE_TYPE_CHAR;
+    hStdOut    = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    hStdErr    = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    isConsole  = ::GetFileType(hStdOut) == FILE_TYPE_CHAR;
     isDebugger = ::IsDebuggerPresent() == TRUE;
 #endif
 }
@@ -33,12 +34,27 @@ void SC::Console::printLine(const StringSpan str)
     print("\n"_a8);
 }
 
+void SC::Console::printErrorLine(const StringSpan str)
+{
+    printError(str);
+    printError("\n"_a8);
+}
+
 void SC::Console::flush()
 {
 #if SC_PLATFORM_WINDOWS
-    ::FlushFileBuffers(handle);
+    ::FlushFileBuffers(hStdOut);
 #else
     ::fflush(stdout);
+#endif
+}
+
+void SC::Console::flushStdErr()
+{
+#if SC_PLATFORM_WINDOWS
+    ::FlushFileBuffers(hStdErr);
+#else
+    ::fflush(stderr);
 #endif
 }
 
@@ -47,6 +63,26 @@ void SC::Console::print(const StringSpan str)
     if (str.isEmpty())
         return;
 #if SC_PLATFORM_WINDOWS
+    printWindows(str, hStdOut);
+#else
+    ::fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
+#endif
+}
+
+void SC::Console::printError(const StringSpan str)
+{
+    if (str.isEmpty())
+        return;
+#if SC_PLATFORM_WINDOWS
+    printWindows(str, hStdErr);
+#else
+    ::fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stderr);
+#endif
+}
+
+#if SC_PLATFORM_WINDOWS
+void SC::Console::printWindows(const StringSpan str, void* handle)
+{
     char fallbackBuffer[256];
     if (conversionBuffer.sizeInBytes() < 256)
     {
@@ -214,7 +250,5 @@ void SC::Console::print(const StringSpan str)
     {
         conversionBuffer = {};
     }
-#else
-    ::fwrite(str.bytesWithoutTerminator(), sizeof(char), str.sizeInBytes(), stdout);
-#endif
 }
+#endif

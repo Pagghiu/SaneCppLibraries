@@ -30,7 +30,8 @@ struct SC_COMPILER_EXPORT StringFormatOutput
     /// @brief Constructs a StringFormatOutput object pushing to a console
     /// @param encoding The given encoding
     /// @param destination The destination console
-    StringFormatOutput(StringEncoding encoding, Console& destination);
+    /// @param useStdOut If `true` output is sent to stdout, otherwise to stderr
+    StringFormatOutput(StringEncoding encoding, Console& destination, bool useStdOut);
 
     /// @brief Appends the StringView (eventually converting it) to destination buffer
     /// @param text The StringView to be appended to buffer or console
@@ -50,6 +51,7 @@ struct SC_COMPILER_EXPORT StringFormatOutput
   private:
     IGrowableBuffer* growableBuffer = nullptr;
     StringEncoding   encoding;
+    bool             useStdOut = true;
 
     Console* console    = nullptr;
     size_t   backupSize = 0;

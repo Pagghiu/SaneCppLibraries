@@ -193,7 +193,14 @@ bool StringFormatOutput::append(StringView text)
     }
     if (console != nullptr)
     {
-        console->print(text);
+        if (useStdOut)
+        {
+            console->print(text);
+        }
+        else
+        {
+            console->printError(text);
+        }
         return true;
     }
     else if (growableBuffer != nullptr)
@@ -207,7 +214,8 @@ bool StringFormatOutput::append(StringView text)
     }
 }
 
-StringFormatOutput::StringFormatOutput(StringEncoding encoding, Console& newConsole) : encoding(encoding)
+StringFormatOutput::StringFormatOutput(StringEncoding encoding, Console& newConsole, bool useStdOut)
+    : encoding(encoding), useStdOut(useStdOut)
 {
     console = &newConsole;
 }
