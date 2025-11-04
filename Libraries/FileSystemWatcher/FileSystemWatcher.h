@@ -23,6 +23,12 @@ namespace SC
 /// - Added, removed and renamed files and directories
 /// - Modified files
 ///
+/// @warning Modifications to files that do not affect directory entries may not trigger notifications. @n
+/// This includes modifications made through symbolic or hard links located outside the watched directory,
+/// pointing to a file of the watched directory. @n
+/// Modifications made through memory-mapped file operations (mmap) can also exhibit the same behaviour. @n
+/// The underlying OS APIs monitor directory entries rather than all possible file access methods.
+///
 /// There are two modes in which FileSystemWatcher can be initialized, defining how notifications are delivered:
 ///
 /// | Mode                                  | Description                                       |
