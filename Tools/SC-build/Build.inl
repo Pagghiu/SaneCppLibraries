@@ -1218,8 +1218,37 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         }
         else
         {
-            SC_TRY(process.exec({arguments, numArgs}));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
+            String stdError;
+            SC_TRY(process.exec({arguments, numArgs}, {}, {}, stdError));
+            if (not stdError.isEmpty())
+            {
+                globalConsole->printError(stdError.view());
+                globalConsole->flushStdErr();
+            }
+            if (process.getExitStatus() == 0)
+            {
+                return Result(true);
+            }
+            else if (StringView(stdError.view()).startsWith("make: *** No rule to make target"))
+            {
+                globalConsole->print("Compile failed. Cleaning the project and trying again...\n");
+                globalConsole->flush();
+                arguments[1] = "clean";
+                Process cleanProcess;
+                SC_TRY(cleanProcess.exec({arguments, numArgs}));
+                if (cleanProcess.getExitStatus() == 0)
+                {
+                    arguments[1] = targetName.view();
+                    Process retryProcess;
+                    SC_TRY(retryProcess.exec({arguments, numArgs}));
+                    if (retryProcess.getExitStatus() == 0)
+                    {
+                        return Result(true);
+                    }
+                }
+                return Result::Error("Compile returned error");
+            }
+            return Result::Error("Compile returned error");
         }
     }
     break;
