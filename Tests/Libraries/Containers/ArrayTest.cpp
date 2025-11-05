@@ -152,6 +152,20 @@ struct SC::ArrayTest : public SC::TestCase
             }
             SC_TEST_EXPECT(failedComparisons == 0);
             myArr1 = move(myArr2);
+
+            auto myArr3 = myArr1;
+            SC_TEST_EXPECT(myArr3.size() == myArr1.size());
+            SC_TEST_EXPECT(memcmp(myArr3.data(), myArr1.data(), myArr1.size() * sizeof(int)) == 0);
+
+            decltype(myArr1) myArr5 = myArr1.toSpanConst();
+            SC_TEST_EXPECT(myArr5.size() == myArr1.size());
+            SC_TEST_EXPECT(myArr1.getInlineCapacity() / sizeof(int) == myArr1.capacity());
+            SC_TEST_EXPECT(memcmp(myArr5.data(), myArr1.data(), myArr1.size() * sizeof(int)) == 0);
+
+            auto myArr4 = move(myArr1);
+            SC_TEST_EXPECT(myArr4.size() == myArr3.size());
+            SC_TEST_EXPECT(memcmp(myArr4.data(), myArr3.data(), myArr3.size() * sizeof(int)) == 0);
+
         }
         if (test_section("append"))
         {

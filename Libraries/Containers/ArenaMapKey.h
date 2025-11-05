@@ -30,7 +30,6 @@ struct SC::ArenaMapKey
             used       = 0;
             generation = 0;
         }
-        bool operator==(const Generation other) const { return used == other.used and generation == other.generation; }
         bool operator!=(const Generation other) const { return used != other.used or generation != other.generation; }
     };
     Generation generation;
