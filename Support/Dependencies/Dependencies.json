@@ -155,13 +155,11 @@
             "FileSystem",
             "Foundation",
             "Memory",
-            "Socket",
-            "Time"
+            "Socket"
         ],
         "minimal_dependencies": [
             "Async",
-            "Containers",
-            "Time"
+            "Containers"
         ],
         "all_dependencies": [
             "Async",
@@ -171,8 +169,7 @@
             "Foundation",
             "Memory",
             "Socket",
-            "Threading",
-            "Time"
+            "Threading"
         ]
     },
     "Memory": {
