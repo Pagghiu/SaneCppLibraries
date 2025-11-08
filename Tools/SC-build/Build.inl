@@ -330,6 +330,22 @@ SC::Result SC::Build::Definition::configure(StringView workspaceName, const Buil
     return Result(writer.write(workspaceName));
 }
 
+bool SC::Build::Definition::findConfiguration(StringView workspaceName, StringView projectName,
+                                              StringView configurationName, Workspace*& workspace, Project*& project,
+                                              Configuration*& configuration)
+{
+    size_t workspaceIdx;
+    SC_TRY(workspaces.find([&](auto& it) { return it.name == workspaceName; }, &workspaceIdx));
+    workspace = &workspaces[workspaceIdx];
+    size_t projectIdx;
+    SC_TRY(workspace->projects.find([&](auto& it) { return it.name == projectName; }, &projectIdx));
+    project = &workspace->projects[projectIdx];
+    size_t configurationIdx;
+    SC_TRY(project->configurations.find([&](auto& it) { return it.name == configurationName; }, &configurationIdx));
+    configuration = &project->configurations[configurationIdx];
+    return true;
+}
+
 SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView                         path,
                                                                 const VectorSet<FilesSelection>&   filters,
                                                                 VectorMap<String, Vector<String>>& filtersToFiles)
@@ -661,9 +677,9 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
 
 struct SC::Build::Action::Internal
 {
-    static Result configure(ConfigureFunction configure, StringView workspaceName, const Action& action);
-    static Result coverage(StringView workspaceName, const Action& action);
-    static Result executeInternal(StringView workspaceName, const Action& action, Span<StringView> environment = {},
+    static Result configure(ConfigureFunction configure, const Action& action);
+    static Result coverage(ConfigureFunction configure, const Action& action);
+    static Result compileRunPrint(const Action& action, Span<StringView> environment = {},
                                   String* outputExecutable = nullptr);
     static Result runExecutable(StringView executablePath, Span<StringView> arguments, const Action& action);
 
@@ -714,28 +730,44 @@ struct SC::Build::Action::Internal
 SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure,
                                       StringView defaultWorkspaceName)
 {
-    StringView workspaceName = action.workspaceName.isEmpty() ? defaultWorkspaceName : action.workspaceName;
+    Action newAction = action;
+
+    if (newAction.workspaceName.isEmpty())
+    {
+        newAction.workspaceName = defaultWorkspaceName;
+    }
+    if (newAction.projectName.isEmpty())
+    {
+        newAction.allTargets  = true;
+        newAction.projectName = newAction.workspaceName;
+    }
+    else
+    {
+        newAction.allTargets = false;
+    }
+    if (newAction.configurationName.isEmpty())
+    {
+        newAction.configurationName = "Debug";
+    }
     switch (action.action)
     {
     case Print:
     case Run:
-    case Compile: return Internal::executeInternal(workspaceName, action);
-    case Coverage: return Internal::coverage(workspaceName, action);
-    case Configure: return Internal::configure(configure, workspaceName, action);
+    case Compile: return Internal::compileRunPrint(newAction);
+    case Coverage: return Internal::coverage(configure, newAction);
+    case Configure: return Internal::configure(configure, newAction);
     }
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, StringView workspaceName,
-                                                  const Action& action)
+SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, const Action& action)
 {
     Build::Definition definition;
     SC_TRY(configure(definition, action.parameters));
-    SC_TRY(definition.configure(workspaceName, action.parameters));
+    SC_TRY(definition.configure(action.workspaceName, action.parameters));
     return Result(true);
 }
-
-SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const Action& action)
+SC::Result SC::Build::Action::Internal::coverage(ConfigureFunction configure, const Action& action)
 {
     Action newAction = action;
     String executablePath;
@@ -743,11 +775,25 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
     // Build the configuration with coverage information
     newAction.action         = Action::Compile;
     StringView environment[] = {"CC", "clang", "CXX", "clang++"};
-    SC_TRY(executeInternal(workspaceName, newAction, environment));
+    SC_TRY(compileRunPrint(newAction, environment));
 
     // Get coverage configuration executable path
     newAction.action = Action::Print;
-    SC_TRY(executeInternal(workspaceName, newAction, environment, &executablePath));
+    SC_TRY(compileRunPrint(newAction, environment, &executablePath));
+
+    Build::Definition definition;
+    SC_TRY(configure(definition, action.parameters));
+    Workspace*     workspace     = nullptr;
+    Project*       project       = nullptr;
+    Configuration* configuration = nullptr;
+    SC_TRY(definition.findConfiguration(action.workspaceName, action.projectName, action.configurationName, workspace,
+                                        project, configuration));
+    String coverageExcludeRegex;
+    if (not configuration->coverage.excludeRegex.isEmpty())
+    {
+        SC_TRY(StringBuilder::format(coverageExcludeRegex, "-ignore-filename-regex=^({})$",
+                                     configuration->coverage.excludeRegex.view()));
+    }
     String coverageDirectory;
     SC_TRY(Path::join(coverageDirectory, {action.parameters.directories.projectsDirectory.view(), "..", "_Coverage"}));
 
@@ -789,8 +835,8 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
         String version;
         SC_TRY_MSG(Process().exec({"clang", "--version"}, version), "Cannot run clang --version");
         StringViewTokenizer tokenizer(version.view());
-        int                 major = -1;
 
+        int major = -1;
         while (tokenizer.tokenizeNext({' '}))
         {
             StringViewTokenizer subTokenizer(tokenizer.component);
@@ -835,23 +881,11 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
         arguments[numArguments++] = "show";         // 3
         arguments[numArguments++] = "-format";      // 4
         arguments[numArguments++] = "html";         // 5
-        // TODO: De-hardcode this filter and pass it as a parameter
-        arguments[numArguments++] = "-ignore-filename-regex=^(" // 6
-                                    ".*\\/Tools.*|"
-                                    ".*\\Test.(cpp|h|c)|"
-                                    ".*\\test.(c|h)|"
-                                    ".*\\/Tests/.*\\.*|"
-                                    ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
-                                    ".*\\/Assert.h|"                    // Can't test Assert::unreachable
-                                    ".*\\/PluginMacros.h|"              // macros for client plugins
-                                    ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
-                                    ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
-                                    ".*\\/InitializerList.h|"           // C++ Language Support
-                                    ".*\\/Reflection/.*\\.*|"           // constexpr and templates
-                                    ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
-                                    ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
-                                    ".*\\/LibrariesExtra/.*\\.*"
-                                    ")$";
+
+        if (not coverageExcludeRegex.isEmpty())
+        {
+            arguments[numArguments++] = coverageExcludeRegex.view(); // 6
+        }
         arguments[numArguments++] = "--output-dir";                    // 7
         arguments[numArguments++] = "coverage";                        // 8
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
@@ -868,23 +902,12 @@ SC::Result SC::Build::Action::Internal::coverage(StringView workspaceName, const
         SC_TRY(process.setWorkingDirectory(coverageDirectory.view()));
         arguments[numArguments++] = llvmCov.view(); // 2
         arguments[numArguments++] = "report";       // 3
-        // TODO: De-hardcode this filter and pass it as a parameter
-        arguments[numArguments++] = "-ignore-filename-regex=^(" // 6
-                                    ".*\\/Tools.*|"
-                                    ".*\\Test.(cpp|h|c)|"
-                                    ".*\\test.(c|h)|"
-                                    ".*\\/Tests/.*\\.*|"
-                                    ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
-                                    ".*\\/Assert.h|"                    // Can't test Assert::unreachable
-                                    ".*\\/PluginMacros.h|"              // macros for client plugins
-                                    ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
-                                    ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
-                                    ".*\\/InitializerList.h|"           // C++ Language Support
-                                    ".*\\/Reflection/.*\\.*|"           // constexpr and templates
-                                    ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
-                                    ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
-                                    ".*\\/LibrariesExtra/.*\\.*"
-                                    ")$";
+
+        if (not coverageExcludeRegex.isEmpty())
+        {
+            arguments[numArguments++] = coverageExcludeRegex.view(); // 4
+        }
+
         arguments[numArguments++] = "-instr-profile=profile.profdata"; // 9
         arguments[numArguments++] = executablePath.view();             // 10
 
@@ -959,11 +982,9 @@ SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath,
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName, const Action& action,
-                                                        Span<StringView> environment, String* outputExecutable)
+SC::Result SC::Build::Action::Internal::compileRunPrint(const Action& action, Span<StringView> environment,
+                                                        String* outputExecutable)
 {
-    const StringView configuration  = action.configuration.isEmpty() ? "Debug" : action.configuration;
-    const StringView selectedTarget = action.target.isEmpty() ? workspaceName : action.target;
 
     SmallString<256> solutionLocation;
 
@@ -971,10 +992,10 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
     switch (action.parameters.generator)
     {
     case Generator::XCode: {
-        SC_TRY(Path::join(solutionLocation,
-                          {action.parameters.directories.projectsDirectory.view(),
-                           Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
-        StringView extension = action.target.isEmpty() ? ".xcworkspace"_a8 : ".xcodeproj"_a8;
+        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
+                                             Generator::toString(action.parameters.generator), action.workspaceName,
+                                             action.projectName}));
+        StringView extension = action.allTargets ? ".xcworkspace"_a8 : ".xcodeproj"_a8;
         SC_TRY(StringBuilder::createForAppendingTo(solutionLocation).append(extension));
         StringView architecture;
         SC_TRY(toXCodeArchitecture(action.parameters.architecture, architecture));
@@ -994,10 +1015,10 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
         }
-        arguments[numArgs++] = "-configuration"; // 3
-        arguments[numArgs++] = configuration;    // 4
+        arguments[numArgs++] = "-configuration";         // 3
+        arguments[numArgs++] = action.configurationName; // 4
         String defaultScheme;
-        if (action.target.isEmpty())
+        if (action.allTargets)
         {
             arguments[numArgs++] = "-workspace";            // 5
             arguments[numArgs++] = solutionLocation.view(); // 6
@@ -1074,13 +1095,13 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
     break;
     case Generator::VisualStudio2019:
     case Generator::VisualStudio2022: {
-        SC_TRY(Path::join(solutionLocation,
-                          {action.parameters.directories.projectsDirectory.view(),
-                           Generator::toString(action.parameters.generator), workspaceName, selectedTarget}));
-        StringView extension = action.target.isEmpty() ? ".sln"_a8 : ".vcxproj"_a8;
+        SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
+                                             Generator::toString(action.parameters.generator), action.workspaceName,
+                                             action.projectName}));
+        StringView extension = action.allTargets ? ".sln"_a8 : ".vcxproj"_a8;
         SC_TRY(StringBuilder::createForAppendingTo(solutionLocation).append(extension));
         SmallString<32> platformConfiguration;
-        SC_TRY(StringBuilder::format(platformConfiguration, "/p:Configuration={}", configuration));
+        SC_TRY(StringBuilder::format(platformConfiguration, "/p:Configuration={}", action.configurationName));
 
         StringView architecture;
         SC_TRY(Internal::toVisualStudioArchitecture(action.parameters.architecture, architecture));
@@ -1137,7 +1158,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
     break;
     case Generator::Make: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
-                                             Generator::toString(action.parameters.generator), workspaceName}));
+                                             Generator::toString(action.parameters.generator), action.workspaceName}));
         if (action.parameters.generator == Generator::Make)
         {
             if (action.parameters.platform == Platform::Linux)
@@ -1150,7 +1171,7 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
             }
         }
         SmallString<32> platformConfiguration;
-        SC_TRY(StringBuilder::format(platformConfiguration, "CONFIG={}", configuration));
+        SC_TRY(StringBuilder::format(platformConfiguration, "CONFIG={}", action.configurationName));
 
         StringView architecture;
         SC_TRY(toMakefileArchitecture(action.parameters.architecture, architecture));
@@ -1162,23 +1183,23 @@ SC::Result SC::Build::Action::Internal::executeInternal(StringView workspaceName
         switch (action.action)
         {
         case Action::Compile: {
-            if (action.target.isEmpty())
+            if (action.allTargets)
             {
                 targetName = "all";
             }
             else
             {
-                SC_TRY(StringBuilder::format(targetName, "{}_COMPILE_COMMANDS", selectedTarget));
+                SC_TRY(StringBuilder::format(targetName, "{}_COMPILE_COMMANDS", action.projectName));
             }
         }
         break;
         case Action::Run: {
             // Not using the _RUN target to avoid one level of indirection
-            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", selectedTarget));
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", action.projectName));
         }
         break;
         case Action::Print: {
-            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", selectedTarget));
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", action.projectName));
         }
         break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");

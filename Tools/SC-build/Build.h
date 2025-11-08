@@ -304,6 +304,12 @@ struct SourceFiles
     [[nodiscard]] bool removeSelection(StringView directory, StringView filter);
 };
 
+/// @brief Coverage specific flags
+struct CoverageFlags
+{
+    String excludeRegex; ///< Regex of files to exclude from coverage
+};
+
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
 struct Configuration
 {
@@ -349,6 +355,8 @@ struct Configuration
 
     CompileFlags compile; ///< Configuration compile flags
     LinkFlags    link;    ///< Configuration link flags
+
+    CoverageFlags coverage; ///< Configuration coverage flags
 
     Architecture::Type architecture = Architecture::Any; ///< Restrict this configuration to a specific architecture
 
@@ -491,6 +499,10 @@ struct Definition
     /// @param workspaceName Name of the workspace to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
     Result configure(StringView workspaceName, const Parameters& parameters) const;
+
+    /// @brief Finds the configuration with given name in given workspace and project
+    [[nodiscard]] bool findConfiguration(StringView workspaceName, StringView projectName, StringView configurationName,
+                                         Workspace*& workspace, Project*& project, Configuration*& configuration);
 };
 
 //! @}
@@ -516,9 +528,11 @@ struct Action
     Type action = Configure;
 
     Parameters parameters;
-    StringView configuration;
-    StringView target;
+    StringView configurationName;
+    StringView projectName;
     StringView workspaceName;
+
+    bool allTargets = false;
 
     Span<const StringView> additionalArguments;
 

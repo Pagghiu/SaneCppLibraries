@@ -99,6 +99,21 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
+    project.configurations.back().coverage.excludeRegex =
+        ".*\\/Tools.*|"
+        ".*\\Test.(cpp|h|c)|"
+        ".*\\test.(c|h)|"
+        ".*\\/Tests/.*\\.*|"
+        ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
+        ".*\\/Assert.h|"                    // Can't test Assert::unreachable
+        ".*\\/PluginMacros.h|"              // macros for client plugins
+        ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
+        ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
+        ".*\\/InitializerList.h|"           // C++ Language Support
+        ".*\\/Reflection/.*\\.*|"           // constexpr and templates
+        ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
+        ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
+        ".*\\/LibrariesExtra/.*\\.*";
     if (parameters.platform == Platform::Linux)
     {
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters, "DebugValgrind");

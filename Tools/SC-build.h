@@ -62,11 +62,11 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
         StringView afterSplit;
         if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
         {
-            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.target));
+            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.projectName));
         }
         else
         {
-            action.target = arguments.arguments[0];
+            action.projectName = arguments.arguments[0];
         }
     }
     // TODO: We should run a matrix of all generators / platforms / architectures
@@ -124,11 +124,11 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
         StringView afterSplit;
         if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
         {
-            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.target));
+            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.projectName));
         }
         else
         {
-            action.target = arguments.arguments[0];
+            action.projectName = arguments.arguments[0];
         }
     }
     StringSpan args[3];
@@ -146,7 +146,7 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 
     if (not args[0].isEmpty())
     {
-        action.configuration = args[0];
+        action.configurationName = args[0];
     }
 
     if (args[1] == "xcode")
