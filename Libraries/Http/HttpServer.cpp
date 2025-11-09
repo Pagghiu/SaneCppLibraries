@@ -6,6 +6,7 @@
 #include "../Memory/String.h"
 #include "../Socket/Socket.h"
 #include "Internal/HttpStringAppend.h"
+#include <stdio.h>
 
 // HttpRequest
 bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
@@ -58,11 +59,20 @@ SC::Result SC::HttpResponse::end(Span<const char> span)
         GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
-        SC_TRY(sb.append("Content-Length: {}\r\n\r\n", span.sizeInBytes()));
+        SC_TRY(sb.append("Content-Length:"));
+        char bufferSize[32];
+        snprintf(bufferSize, sizeof(bufferSize), "%zu", span.sizeInBytes());
+        StringSpan ss = {{bufferSize, strlen(bufferSize)}, false, StringEncoding::Ascii};
+        SC_TRY(sb.append(ss));
+        SC_TRY(sb.append("\r\n\r\n"));
     }
     SC_TRY(not outputBuffer.isEmpty());
-    SC_TRY(outputBuffer.resizeWithoutInitializing(outputBuffer.size() - 1)); // pop null terminator
     SC_TRY(outputBuffer.append(span));
+    return end();
+}
+
+SC::Result SC::HttpResponse::end()
+{
     responseEnded = true;
     return Result(true);
 }

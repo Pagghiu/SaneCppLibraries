@@ -70,6 +70,13 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpReque
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", response, fileStat.modifiedTime.milliseconds));
         SC_TRY(response.end(data.toSpanConst()));
     }
+    else
+    {
+        response.startResponse(404);
+        SC_TRY(response.addHeader("Connection", "Closed"));
+        SC_TRY(response.addHeader("Server", "SC"));
+        response.end();
+    }
     return Result(true);
 }
 
@@ -94,6 +101,30 @@ SC::StringSpan SC::HttpWebServer::Internal::getContentType(const StringSpan exte
     if (extension == "svg")
     {
         return "image/svg+xml";
+    }
+    if (extension == "js")
+    {
+        return "application/javascript";
+    }
+    if (extension == "json")
+    {
+        return "application/json";
+    }
+    if (extension == "xml")
+    {
+        return "application/xml";
+    }
+    if (extension == "pdf")
+    {
+        return "application/pdf";
+    }
+    if (extension == "ico")
+    {
+        return "image/x-icon";
+    }
+    if (extension == "txt")
+    {
+        return "text/plain";
     }
     return "text/html";
 }

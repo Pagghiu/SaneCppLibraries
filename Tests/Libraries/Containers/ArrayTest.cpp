@@ -165,7 +165,6 @@ struct SC::ArrayTest : public SC::TestCase
             auto myArr4 = move(myArr1);
             SC_TEST_EXPECT(myArr4.size() == myArr3.size());
             SC_TEST_EXPECT(memcmp(myArr4.data(), myArr3.data(), myArr3.size() * sizeof(int)) == 0);
-
         }
         if (test_section("append"))
         {

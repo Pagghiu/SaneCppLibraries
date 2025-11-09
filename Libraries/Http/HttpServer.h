@@ -87,6 +87,7 @@ struct SC::HttpResponse
     /// @brief Finalizes response appending some data
     /// @warning The SC::HttpResponse / SC::HttpRequest pair will be invalidated on next SC::AsyncEventLoop run
     Result end(Span<const char> data);
+    Result end();
 
   private:
     friend struct HttpServer;
