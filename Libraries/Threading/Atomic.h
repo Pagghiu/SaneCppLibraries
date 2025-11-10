@@ -41,7 +41,7 @@ template <typename T>
 struct Atomic;
 
 template <>
-struct Atomic<int32_t>
+struct SC_COMPILER_EXPORT Atomic<int32_t>
 {
     Atomic(int32_t value = 0);
 
@@ -69,7 +69,7 @@ struct Atomic<int32_t>
 };
 
 template <>
-struct Atomic<bool>
+struct SC_COMPILER_EXPORT Atomic<bool>
 {
     Atomic(bool value = false);
 
