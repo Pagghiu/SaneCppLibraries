@@ -8,6 +8,7 @@
 #include "Libraries/Memory/Globals.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Time/Time.h"
 #include "SCExampleSokol.h"
@@ -237,10 +238,14 @@ SC::ApplicationSystem* gModelSystem = nullptr;
 SC::ApplicationViewState gViewState;
 
 static sg_pass_action gGlobalPassAction;
+SC::Console*          globalConsole;
 
 sapp_desc sokol_main(int, char*[])
 {
     using namespace SC;
+    Console console;
+    globalConsole = &console;
+
     Globals::init(Globals::Global);
     sapp_desc desc = {};
 

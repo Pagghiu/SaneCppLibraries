@@ -28,8 +28,12 @@ void SC::HttpServerTest::httpServerTest()
     SC_TEST_EXPECT(eventLoop.create());
 
     //! [HttpServerSnippet]
-    HttpServer server;
-    SC_TEST_EXPECT(server.start(eventLoop, 10, "127.0.0.1", 6152));
+    constexpr int NUM_CLIENTS = 3;
+
+    HttpServerClient   clients[NUM_CLIENTS];
+    HttpServer::Memory serverMemory = {clients};
+    HttpServer         server;
+    SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 6152, serverMemory));
 
     struct ServerContext
     {

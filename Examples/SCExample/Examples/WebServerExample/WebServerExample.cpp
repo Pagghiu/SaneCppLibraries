@@ -35,16 +35,16 @@ struct WebServerExampleViewState;
 struct SC::WebServerExampleModelState
 {
     String  directory;
-    String  interface             = "127.0.0.1";
-    int32_t port                  = 8090;
-    int32_t maxConcurrentRequests = 16;
+    String  interface  = "127.0.0.1";
+    int32_t port       = 8090;
+    int32_t maxClients = 32;
 };
 
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleModelState)
 SC_REFLECT_STRUCT_FIELD(0, directory)
 SC_REFLECT_STRUCT_FIELD(1, interface)
 SC_REFLECT_STRUCT_FIELD(2, port)
-SC_REFLECT_STRUCT_FIELD(3, maxConcurrentRequests)
+SC_REFLECT_STRUCT_FIELD(3, maxClients)
 SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::WebServerExampleViewState
@@ -66,11 +66,18 @@ struct SC::WebServerExampleModel
     HttpServer    httpServer;
     HttpWebServer httpWebServer;
 
+    Span<HttpServerClient> clients;
+
     Result start()
     {
+        const size_t numClients = static_cast<size_t>(modelState.maxClients);
+
+        clients = {new HttpServerClient[numClients], numClients};
+        HttpServer::Memory memory;
+        memory.clients = clients;
         httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
-        SC_TRY(httpServer.start(*eventLoop, static_cast<uint32_t>(modelState.maxConcurrentRequests),
-                                modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
+        SC_TRY(
+            httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port), memory));
         SC_TRY(httpWebServer.init(modelState.directory.view()));
         return Result(true);
     }
@@ -79,6 +86,8 @@ struct SC::WebServerExampleModel
     {
         SC_TRY(httpWebServer.stopAsync());
         SC_TRY(httpServer.stopSync());
+        delete[] clients.data();
+        clients = {};
         return Result(true);
     }
 

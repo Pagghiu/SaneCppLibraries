@@ -151,7 +151,6 @@
     "Http": {
         "direct_dependencies": [
             "Async",
-            "Containers",
             "FileSystem",
             "Foundation",
             "Memory",
@@ -159,11 +158,10 @@
         ],
         "minimal_dependencies": [
             "Async",
-            "Containers"
+            "Memory"
         ],
         "all_dependencies": [
             "Async",
-            "Containers",
             "File",
             "FileSystem",
             "Foundation",

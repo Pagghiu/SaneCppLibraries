@@ -1,24 +1,30 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpServer.h"
-#include "../Async/Async.h"
-#include "../Containers/ArenaMap.h"
-#include "../Memory/String.h"
-#include "../Socket/Socket.h"
 #include "Internal/HttpStringAppend.h"
 #include <stdio.h>
 
 // HttpRequest
 bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
 {
-    size_t found = 0;
-    if (headerOffsets.find([token](const auto& it) { return it.token == token; }, &found))
+    for (size_t idx = 0; idx < numHeaders; ++idx)
     {
-        const HttpHeaderOffset& header = headerOffsets[found];
-        res = StringSpan({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
-        return true;
+        const HttpHeaderOffset& header = headerOffsets[idx];
+        if (header.token == token)
+        {
+            res = StringSpan({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
+            return true;
+        }
     }
     return false;
+}
+
+void SC::HttpRequest::reset()
+{
+    headersEndReceived = false;
+    parsedSuccessfully = true;
+    numHeaders         = 0;
+    parser             = {};
 }
 
 // HttpResponse
@@ -79,130 +85,60 @@ SC::Result SC::HttpResponse::end()
 
 // HttpServer
 
-struct SC::HttpServer::Internal
+SC::Result SC::HttpServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory)
 {
-    HttpServer& server;
-    Internal(HttpServer& server) : server(server)
-    {
-        eventLoop = nullptr;
-        started   = false;
-        stopping  = false;
-
-        maxHeaderSize = 8 * 1024;
-    }
-
-    ArenaMap<HttpServerClient> clients;
-
-    SocketDescriptor  serverSocket;
-    AsyncSocketAccept asyncServerAccept;
-
-    uint32_t maxHeaderSize;
-
-    bool started;
-    bool stopping;
-
-    AsyncEventLoop* eventLoop;
-
-    void onNewClient(AsyncSocketAccept::Result& result);
-    void onReceive(AsyncSocketReceive::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
-
-    void closeAsync(HttpServerClient& requestClient);
-
-    Result parse(HttpRequest& request, const uint32_t maxHeaderSize, Span<const char> readData);
-};
-
-struct SC::HttpServerClient
-{
-    HttpRequest  request;
-    HttpResponse response;
-
-    SocketDescriptor   socket;
-    SmallString<16>    debugName;
-    AsyncSocketReceive asyncReceive;
-    AsyncSocketSend    asyncSend;
-};
-
-SC::HttpServer::HttpServer() : internal(*reinterpret_cast<Internal*>(internalRaw))
-{
-    static_assert(sizeof(Internal) <= sizeof(internalRaw), "size");
-    placementNew(internal, *this);
-}
-
-SC::HttpServer::~HttpServer() { internal.~Internal(); }
-
-SC::Result SC::HttpServer::start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringSpan address,
-                                 uint16_t port)
-{
-    SC_TRY(internal.clients.resize(maxConcurrentRequests));
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
-    internal.eventLoop = &loop;
-    SC_TRY(internal.eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), internal.serverSocket));
-    SocketServer server(internal.serverSocket);
+    eventLoop = &loop;
+    SC_TRY(eventLoop->createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
+    SocketServer server(serverSocket);
     SC_TRY(server.bind(nativeAddress));
     SC_TRY(server.listen(511));
 
-    internal.asyncServerAccept.setDebugName("HttpServer");
-    internal.asyncServerAccept.callback.bind<Internal, &Internal::onNewClient>(internal);
-    SC_TRY(internal.asyncServerAccept.start(*internal.eventLoop, internal.serverSocket));
-    internal.started = true;
+    asyncServerAccept.setDebugName("HttpServer");
+    asyncServerAccept.callback.bind<HttpServer, &HttpServer::onNewClient>(*this);
+    SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
+    started = true;
+
+    clients = memory.clients;
     return Result(true);
 }
 
 SC::Result SC::HttpServer::stopAsync()
 {
-    if (not internal.asyncServerAccept.isFree())
+    if (not asyncServerAccept.isFree())
     {
-        SC_TRY(internal.asyncServerAccept.stop(*internal.eventLoop));
+        SC_TRY(asyncServerAccept.stop(*eventLoop));
     }
 
-    for (HttpServerClient& it : internal.clients)
+    for (HttpServerClient& it : clients)
     {
-        internal.closeAsync(it);
+        if (it.state != HttpServerClient::State::Free)
+        {
+            closeAsync(it);
+        }
     }
     return Result(true);
 }
 
 SC::Result SC::HttpServer::stopSync()
 {
+    stopping = true;
     SC_TRY(stopAsync());
-    while (internal.clients.size() > 0)
+    while (numClients > 0)
     {
-        SC_TRY(internal.eventLoop->runNoWait());
+        SC_TRY(eventLoop->runNoWait());
     }
-    while (not internal.asyncServerAccept.isFree())
+    while (not asyncServerAccept.isFree())
     {
-        SC_TRY(internal.eventLoop->runNoWait());
+        SC_TRY(eventLoop->runNoWait());
     }
-    internal.stopping = false;
-    internal.started  = false;
+    stopping = false;
+    started  = false;
     return Result(true);
 }
 
-bool SC::HttpServer::isStarted() const { return internal.started; }
-
-SC::HttpRequest* SC::HttpServer::getRequest(ArenaMapKey<HttpServerClient> key) const
-{
-    HttpServerClient* client = internal.clients.get(key);
-    return client ? &client->request : nullptr;
-}
-
-SC::HttpResponse* SC::HttpServer::getResponse(ArenaMapKey<HttpServerClient> key) const
-{
-    HttpServerClient* client = internal.clients.get(key);
-    return client ? &client->response : nullptr;
-}
-
-SC::SocketDescriptor* SC::HttpServer::getSocket(ArenaMapKey<HttpServerClient> key) const
-{
-    HttpServerClient* client = internal.clients.get(key);
-    return client ? &client->socket : nullptr;
-}
-
-SC::uint32_t SC::HttpServer::getMaxConcurrentRequests() const { return internal.clients.getNumAllocated(); }
-
-SC::Result SC::HttpServer::Internal::parse(HttpRequest& request, const uint32_t maxSize, Span<const char> readData)
+SC::Result SC::HttpServer::parse(HttpRequest& request, const uint32_t maxSize, Span<const char> readData)
 {
     bool& parsedSuccessfully = request.parsedSuccessfully;
     if (request.headerBuffer.size() > maxSize)
@@ -226,7 +162,15 @@ SC::Result SC::HttpServer::Internal::parse(HttpRequest& request, const uint32_t 
             header.token  = parser.token;
             header.start  = static_cast<uint32_t>(parser.tokenStart);
             header.length = static_cast<uint32_t>(parser.tokenLength);
-            parsedSuccessfully &= request.headerOffsets.push_back(header);
+            if (request.numHeaders < HttpRequest::MaxNumHeaders)
+            {
+                request.headerOffsets[request.numHeaders] = header;
+                request.numHeaders++;
+            }
+            else
+            {
+                parsedSuccessfully = false;
+            }
             if (parser.token == HttpParser::Token::HeadersEnd)
             {
                 request.headersEndReceived = true;
@@ -238,7 +182,7 @@ SC::Result SC::HttpServer::Internal::parse(HttpRequest& request, const uint32_t 
     return Result(parsedSuccessfully);
 }
 
-void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
+void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
     if (not result.moveTo(acceptedClient))
@@ -246,21 +190,27 @@ void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
         // TODO: Invoke an error
         return;
     }
-
-    ArenaMapKey<HttpServerClient> clientKey = clients.allocate();
-
+    size_t idx;
+    for (idx = 0; idx < clients.sizeInElements(); ++idx)
+    {
+        auto& it = clients[idx];
+        if (it.state == HttpServerClient::State::Free)
+        {
+            break;
+        }
+    }
+    numClients++;
     // Allocate always succeeds because we pause asyncAccept when the arena is full
-    SC_TRUST_RESULT(clientKey.isValid());
+    SC_ASSERT_RELEASE(idx != clients.sizeInElements());
+    HttpServerClient& client = clients[idx];
+    client.state             = HttpServerClient::State::Used;
+    client.response.server   = this;
 
-    HttpServerClient& client = *clients.get(clientKey);
-
-    client.response.server = &server;
-
-    client.response.key = clientKey;
+    client.response.key = idx;
     client.socket       = move(acceptedClient);
-    client.asyncSend.setDebugName(client.debugName.bytesIncludingTerminator());
-    client.asyncReceive.setDebugName(client.debugName.bytesIncludingTerminator());
-    client.asyncReceive.callback.bind<Internal, &Internal::onReceive>(*this);
+    client.asyncSend.setDebugName(client.debugName);
+    client.asyncReceive.setDebugName(client.debugName);
+    client.asyncReceive.callback.bind<HttpServer, &HttpServer::onReceive>(*this);
 
     auto& buffer = client.request.headerBuffer;
 
@@ -271,10 +221,10 @@ void SC::HttpServer::Internal::onNewClient(AsyncSocketAccept::Result& result)
     SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, buffer.toSpan()));
 
     // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
-    result.reactivateRequest(not clients.isFull());
+    result.reactivateRequest(numClients < clients.sizeInElements());
 }
 
-void SC::HttpServer::Internal::onReceive(AsyncSocketReceive::Result& result)
+void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
     HttpServerClient& client = SC_COMPILER_FIELD_OFFSET(HttpServerClient, asyncReceive, result.getAsync());
@@ -286,6 +236,7 @@ void SC::HttpServer::Internal::onReceive(AsyncSocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
+    //    globalConsole->print("{}", readData);
     if (not parse(client.request, maxHeaderSize, readData))
     {
         // TODO: Invoke on error
@@ -293,14 +244,14 @@ void SC::HttpServer::Internal::onReceive(AsyncSocketReceive::Result& result)
     }
     if (client.request.headersEndReceived)
     {
-        server.onRequest(client.request, client.response);
+        onRequest(client.request, client.response);
     }
     if (client.response.mustBeFlushed())
     {
-        client.asyncSend.setDebugName(client.debugName.bytesIncludingTerminator());
+        client.asyncSend.setDebugName(client.debugName);
 
         auto outspan = client.response.outputBuffer.toSpan();
-        client.asyncSend.callback.bind<Internal, &Internal::onAfterSend>(*this);
+        client.asyncSend.callback.bind<HttpServer, &HttpServer::onAfterSend>(*this);
         auto res = client.asyncSend.start(*eventLoop, client.socket, outspan);
         if (not res)
         {
@@ -314,7 +265,7 @@ void SC::HttpServer::Internal::onReceive(AsyncSocketReceive::Result& result)
     }
 }
 
-void SC::HttpServer::Internal::onAfterSend(AsyncSocketSend::Result& result)
+void SC::HttpServer::onAfterSend(AsyncSocketSend::Result& result)
 {
     if (result.isValid())
     {
@@ -325,7 +276,7 @@ void SC::HttpServer::Internal::onAfterSend(AsyncSocketSend::Result& result)
     }
 }
 
-void SC::HttpServer::Internal::closeAsync(HttpServerClient& requestClient)
+void SC::HttpServer::closeAsync(HttpServerClient& requestClient)
 {
     if (not requestClient.asyncSend.isFree())
     {
@@ -336,8 +287,10 @@ void SC::HttpServer::Internal::closeAsync(HttpServerClient& requestClient)
         (void)requestClient.asyncReceive.stop(*eventLoop);
     }
     SC_TRUST_RESULT(requestClient.socket.close());
-    const bool wasFull = clients.isFull();
-    SC_TRUST_RESULT(clients.remove(requestClient.response.key));
+    const bool wasFull = numClients == clients.sizeInElements();
+
+    clients[requestClient.response.key].setFree();
+    numClients--;
     if (wasFull and not stopping)
     {
         // Arena was full and in onNewClient asyncAccept has been paused (by avoiding reactivation).

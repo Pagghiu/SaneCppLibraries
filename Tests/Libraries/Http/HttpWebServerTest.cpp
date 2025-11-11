@@ -32,10 +32,15 @@ void SC::HttpWebServerTest::httpWebServerTest()
     SC_TEST_EXPECT(eventLoop.create());
 
     //! [HttpWebServerSnippet]
-    // Creates an HttpServer that serves files from application root directory
+    constexpr int NUM_CLIENTS = 16;
+
+    HttpServerClient   clients[NUM_CLIENTS];
+    HttpServer::Memory serverMemory = {clients};
+
     HttpServer    server;
     HttpWebServer webServer;
-    SC_TEST_EXPECT(server.start(eventLoop, 16, "127.0.0.1", 8090));
+    // Creates an HttpServer that serves files from application root directory
+    SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 8090, serverMemory));
     SC_TEST_EXPECT(webServer.init(report.applicationRootDirectory.view()));
 
     server.onRequest = [&](HttpRequest& req, HttpResponse& res) { webServer.serveFile(req, res); };

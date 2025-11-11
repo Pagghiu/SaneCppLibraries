@@ -525,9 +525,9 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     }
     else
     {
-        SC_TRY(StringBuilder::format(buffer, "SC-format no action named \"{}\" exists", arguments.action));
+        SC_TRY(StringBuilder::format(buffer, "SC-package no action named \"{}\" exists", arguments.action));
         console.printLine(buffer.view());
-        return Result::Error("SC-format error executing action");
+        return Result::Error("SC-package error executing action");
     }
     return Result(true);
 }

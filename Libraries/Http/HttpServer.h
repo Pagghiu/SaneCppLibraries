@@ -3,8 +3,7 @@
 #pragma once
 #include "HttpParser.h"
 
-#include "../Containers/ArenaMapKey.h"
-#include "../Containers/Vector.h"
+#include "../Async/Async.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/StringSpan.h"
 #include "../Memory/Buffer.h"
@@ -12,20 +11,7 @@
 namespace SC
 {
 struct SC_COMPILER_EXPORT HttpServer;
-struct SC_COMPILER_EXPORT HttpRequest;
-struct SC_COMPILER_EXPORT HttpResponse;
-struct SC_COMPILER_EXPORT HttpRequest;
-
-struct AsyncEventLoop;
-struct SocketDescriptor;
-struct HttpServerClient;
-} // namespace SC
-
-//! @addtogroup group_http
-//! @{
-
-namespace SC
-{
+struct SC_COMPILER_EXPORT HttpServerClient;
 namespace detail
 {
 struct SC_COMPILER_EXPORT HttpHeaderOffset
@@ -37,14 +23,11 @@ struct SC_COMPILER_EXPORT HttpHeaderOffset
 };
 } // namespace detail
 
-#if !DOXYGEN
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Vector<detail::HttpHeaderOffset>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT ArenaMapKey<HttpServerClient>;
-#endif
-} // namespace SC
+//! @addtogroup group_http
+//! @{
 
 /// @brief Http request received from a client
-struct SC::HttpRequest
+struct SC_COMPILER_EXPORT HttpRequest
 {
     /// @brief Finds a specific HttpParser::Result in the list of parsed header
     /// @param token The result to look for (Method, Url etc.)
@@ -58,6 +41,8 @@ struct SC::HttpRequest
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
 
+    void reset();
+
   private:
     friend struct HttpServer;
     using HttpHeaderOffset = detail::HttpHeaderOffset; // TODO: hide class implementation
@@ -69,11 +54,13 @@ struct SC::HttpRequest
     StringSpan url;          ///< The url extracted from parsed headers
     Buffer     headerBuffer; ///< Buffer containing all headers
 
-    Vector<HttpHeaderOffset> headerOffsets; ///< Headers, defined as offsets in headerBuffer
+    static constexpr size_t MaxNumHeaders = 64;
+    HttpHeaderOffset        headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
+    size_t                  numHeaders = 0;
 };
 
 /// @brief Http response that will be sent to a client
-struct SC::HttpResponse
+struct SC_COMPILER_EXPORT HttpResponse
 {
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
     Result startResponse(int httpCode);
@@ -89,13 +76,19 @@ struct SC::HttpResponse
     Result end(Span<const char> data);
     Result end();
 
+    void reset()
+    {
+        responseEnded = false;
+        outputBuffer.clear();
+    }
+
   private:
     friend struct HttpServer;
     [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
 
     HttpServer* server = nullptr;
 
-    ArenaMapKey<HttpServerClient> key;
+    size_t key;
 
     Buffer outputBuffer;
 
@@ -103,11 +96,34 @@ struct SC::HttpResponse
     size_t highwaterMark = 1024;
 };
 
-namespace SC
+struct SC_COMPILER_EXPORT HttpServerClient
 {
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&, HttpResponse&)>;
-}
+    enum class State
+    {
+        Free,
+        Used
+    };
+    State state = State::Free;
 
+    HttpRequest  request;
+    HttpResponse response;
+
+    void setFree()
+    {
+        request.reset();
+        response.reset();
+        state = State::Free;
+    }
+
+    SocketDescriptor   socket;
+    char               debugName[16] = {0};
+    AsyncSocketReceive asyncReceive;
+    AsyncSocketSend    asyncSend;
+};
+#if !DOXYGEN
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&, HttpResponse&)>;
+SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Span<HttpServerClient>;
+#endif
 /// @brief Async Http server
 ///
 /// Usage:
@@ -117,22 +133,18 @@ SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&
 /// @see SC::HttpWebServer
 ///
 /// \snippet Tests/Libraries/Http/HttpServerTest.cpp HttpServerSnippet
-struct SC::HttpServer
+struct SC_COMPILER_EXPORT HttpServer
 {
-    HttpServer();
-    ~HttpServer();
-    HttpServer(const HttpServer&)            = delete;
-    HttpServer& operator=(const HttpServer&) = delete;
-    HttpServer(HttpServer&&)                 = delete;
-    HttpServer& operator=(HttpServer&&)      = delete;
-
+    struct Memory
+    {
+        Span<HttpServerClient> clients;
+    };
     /// @brief Starts the http server on the given AsyncEventLoop, address and port
     /// @param loop The event loop to be used, where to add the listening socket
-    /// @param maxConcurrentRequests Maximum number of concurrent requests
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
     /// @return Valid Result if http listening has been started successfully
-    Result start(AsyncEventLoop& loop, uint32_t maxConcurrentRequests, StringSpan address, uint16_t port);
+    Result start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory);
 
     /// @brief Stops http server asynchronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
     Result stopAsync();
@@ -141,7 +153,7 @@ struct SC::HttpServer
     Result stopSync();
 
     /// @brief Check if the server is started
-    [[nodiscard]] bool isStarted() const;
+    [[nodiscard]] bool isStarted() const { return started; }
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     /// @warning Both references can be invalidated in later stages of the http request lifetime.
@@ -149,29 +161,27 @@ struct SC::HttpServer
     /// SC::HttpServer::getRequest, SC::HttpServer::getResponse or SC::HttpServer::getSocket
     Function<void(HttpRequest&, HttpResponse&)> onRequest;
 
-    /// @brief Obtain client request (or a nullptr if it doesn't exists) with the key returned by
-    /// SC::HttpResponse::getClientKey
-    [[nodiscard]] HttpRequest* getRequest(ArenaMapKey<HttpServerClient> key) const;
-
-    /// @brief Obtain client response (or a nullptr if it doesn't exists) with the key returned by
-    /// SC::HttpResponse::getClientKey
-    [[nodiscard]] HttpResponse* getResponse(ArenaMapKey<HttpServerClient> key) const;
-
-    /// @brief Obtain client socket (or a nullptr if it doesn't exists) with the key returned by
-    /// SC::HttpResponse::getClientKey
-    [[nodiscard]] SocketDescriptor* getSocket(ArenaMapKey<HttpServerClient> key) const;
-
-    /// @brief Return maximum number of concurrent requests, corresponding to size of clients arena
-    [[nodiscard]] uint32_t getMaxConcurrentRequests() const;
-
   private:
-    struct Internal;
-#if SC_PLATFORM_WINDOWS
-    uint64_t internalRaw[72];
-#else
-    uint64_t internalRaw[32];
-#endif
-    Internal& internal;
+    void onNewClient(AsyncSocketAccept::Result& result);
+    void onReceive(AsyncSocketReceive::Result& result);
+    void onAfterSend(AsyncSocketSend::Result& result);
+    void closeAsync(HttpServerClient& requestClient);
+
+    Result parse(HttpRequest& request, const uint32_t maxHeaderSize, Span<const char> readData);
+
+    Span<HttpServerClient> clients;
+    size_t                 numClients = 0;
+
+    SocketDescriptor  serverSocket;
+    AsyncSocketAccept asyncServerAccept;
+
+    uint32_t maxHeaderSize = 8 * 1024;
+
+    bool started  = false;
+    bool stopping = false;
+
+    AsyncEventLoop* eventLoop = nullptr;
 };
+} // namespace SC
 
 //! @}
