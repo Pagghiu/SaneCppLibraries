@@ -66,6 +66,8 @@ struct SC::WebServerExampleModel
     HttpServer    httpServer;
     HttpWebServer httpWebServer;
 
+    Buffer                 headerBuffer;
+    GrowableBuffer<Buffer> gb = {headerBuffer};
     Span<HttpServerClient> clients;
 
     Result start()
@@ -73,8 +75,8 @@ struct SC::WebServerExampleModel
         const size_t numClients = static_cast<size_t>(modelState.maxClients);
 
         clients = {new HttpServerClient[numClients], numClients};
-        HttpServer::Memory memory;
-        memory.clients = clients;
+        SC_TRY(gb.resizeWithoutInitializing(1024 * 8 * numClients));
+        HttpServer::Memory memory = {gb, clients};
         httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
         SC_TRY(
             httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port), memory));

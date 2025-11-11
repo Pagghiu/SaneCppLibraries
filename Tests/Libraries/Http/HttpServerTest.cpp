@@ -29,10 +29,16 @@ void SC::HttpServerTest::httpServerTest()
 
     //! [HttpServerSnippet]
     constexpr int NUM_CLIENTS = 3;
+    Buffer        headersMemory;
+    SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * 8 * 1024));
 
-    HttpServerClient   clients[NUM_CLIENTS];
-    HttpServer::Memory serverMemory = {clients};
-    HttpServer         server;
+    Buffer requestsMemory;
+    SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * 1024 * 2));
+
+    HttpServerClient       clients[NUM_CLIENTS];
+    GrowableBuffer<Buffer> headers      = {headersMemory};
+    HttpServer::Memory     serverMemory = {headers, clients};
+    HttpServer             server;
     SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 6152, serverMemory));
 
     struct ServerContext

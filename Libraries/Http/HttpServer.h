@@ -50,9 +50,11 @@ struct SC_COMPILER_EXPORT HttpRequest
     bool headersEndReceived = false; ///< All headers have been received
     bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
 
-    HttpParser parser;       ///< The parser used to parse headers
-    StringSpan url;          ///< The url extracted from parsed headers
-    Buffer     headerBuffer; ///< Buffer containing all headers
+    HttpParser parser; ///< The parser used to parse headers
+    StringSpan url;    ///< The url extracted from parsed headers
+
+    Span<char> readHeaders;
+    Span<char> availableHeader; ///< Space to save headers to
 
     static constexpr size_t MaxNumHeaders = 64;
     HttpHeaderOffset        headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
@@ -137,6 +139,8 @@ struct SC_COMPILER_EXPORT HttpServer
 {
     struct Memory
     {
+        IGrowableBuffer& headersMemory;
+
         Span<HttpServerClient> clients;
     };
     /// @brief Starts the http server on the given AsyncEventLoop, address and port
@@ -169,6 +173,8 @@ struct SC_COMPILER_EXPORT HttpServer
     void closeAsync(HttpServerClient& requestClient);
 
     Result parse(HttpRequest& request, const uint32_t maxHeaderSize, Span<const char> readData);
+
+    IGrowableBuffer* headersMemory = nullptr;
 
     Span<HttpServerClient> clients;
     size_t                 numClients = 0;

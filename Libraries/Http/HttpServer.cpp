@@ -12,7 +12,7 @@ bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
         const HttpHeaderOffset& header = headerOffsets[idx];
         if (header.token == token)
         {
-            res = StringSpan({headerBuffer.data() + header.start, header.length}, false, StringEncoding::Ascii);
+            res = StringSpan({readHeaders.data() + header.start, header.length}, false, StringEncoding::Ascii);
             return true;
         }
     }
@@ -100,7 +100,8 @@ SC::Result SC::HttpServer::start(AsyncEventLoop& loop, StringSpan address, uint1
     SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
     started = true;
 
-    clients = memory.clients;
+    clients       = memory.clients;
+    headersMemory = &memory.headersMemory;
     return Result(true);
 }
 
@@ -141,7 +142,7 @@ SC::Result SC::HttpServer::stopSync()
 SC::Result SC::HttpServer::parse(HttpRequest& request, const uint32_t maxSize, Span<const char> readData)
 {
     bool& parsedSuccessfully = request.parsedSuccessfully;
-    if (request.headerBuffer.size() > maxSize)
+    if (request.readHeaders.sizeInBytes() > maxSize)
     {
         parsedSuccessfully = false;
         return Result::Error("Header size exceeded limit");
@@ -212,13 +213,12 @@ void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
     client.asyncReceive.setDebugName(client.debugName);
     client.asyncReceive.callback.bind<HttpServer, &HttpServer::onReceive>(*this);
 
-    auto& buffer = client.request.headerBuffer;
+    const size_t headerBufferSize = headersMemory->size() / clients.sizeInElements();
 
-    // TODO: This can potentially fail
-    SC_TRUST_RESULT(buffer.resizeWithoutInitializing(1024));
-
+    client.request.availableHeader = {headersMemory->data(), headerBufferSize};
+    client.request.readHeaders     = {headersMemory->data(), 0};
     // This cannot fail because start reports only incorrect API usage (AsyncRequest already in use etc.)
-    SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, buffer.toSpan()));
+    SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, client.request.availableHeader));
 
     // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(numClients < clients.sizeInElements());
@@ -236,10 +236,19 @@ void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
-    //    globalConsole->print("{}", readData);
+    client.request.readHeaders = {client.request.readHeaders.data(),
+                                  client.request.readHeaders.sizeInBytes() + readData.sizeInBytes()};
+    const bool hasHeaderSpace =
+        client.request.availableHeader.sliceStart(readData.sizeInBytes(), client.request.availableHeader);
+
     if (not parse(client.request, maxHeaderSize, readData))
     {
         // TODO: Invoke on error
+        return;
+    }
+    else if (not hasHeaderSpace)
+    {
+        // TODO: Invoke on error (no more header space)
         return;
     }
     if (client.request.headersEndReceived)

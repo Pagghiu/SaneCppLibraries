@@ -33,9 +33,15 @@ void SC::HttpWebServerTest::httpWebServerTest()
 
     //! [HttpWebServerSnippet]
     constexpr int NUM_CLIENTS = 16;
+    Buffer        headersMemory;
+    SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * 8 * 1024));
 
-    HttpServerClient   clients[NUM_CLIENTS];
-    HttpServer::Memory serverMemory = {clients};
+    Buffer requestsMemory;
+    SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * 1024 * 2));
+
+    HttpServerClient       clients[NUM_CLIENTS];
+    GrowableBuffer<Buffer> headers      = {headersMemory};
+    HttpServer::Memory     serverMemory = {headers, clients};
 
     HttpServer    server;
     HttpWebServer webServer;
