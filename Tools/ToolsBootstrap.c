@@ -1368,10 +1368,18 @@ int main(int argc, char* argv[]) {
     }
 
     int ret = executeTool(&args, &ci);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Tool \"%s\" execution failed with code %d\n", args.toolName, ret);
+    }
+    else
+    {
+        printf("Tool \"%s\" executed successfully\n", args.toolName);
+    }
     CompilationInfo_destroy(&ci);
     BootloaderArgs_destroy(&args);
     freeArgs(new_argc, new_argv);
-    return ret;
+    return ret == 0 ? 0 : -1;
 }
 
 int compileWindows(CompilationInfo* ci, int* objsCompiled) {

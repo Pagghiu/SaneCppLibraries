@@ -46,13 +46,13 @@ void SC::HttpServerTest::httpServerTest()
         if (request.getParser().method != HttpParser::Method::HttpGET)
         {
             SC_TEST_EXPECT(response.startResponse(405));
-            SC_TEST_EXPECT(response.end(""));
+            SC_TEST_EXPECT(response.end());
             return;
         }
         if (request.getURL() != "/index.html" and request.getURL() != "/")
         {
             SC_TEST_EXPECT(response.startResponse(404));
-            SC_TEST_EXPECT(response.end(""));
+            SC_TEST_EXPECT(response.end());
             return;
         }
         serverContext.numRequests++;

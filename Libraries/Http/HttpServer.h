@@ -143,6 +143,7 @@ struct SC_COMPILER_EXPORT HttpServer
     /// @param loop The event loop to be used, where to add the listening socket
     /// @param address The address of local interface where to listen to
     /// @param port The local port where to start listening to
+    /// @param memory Memory buffers to be used by the http server
     /// @return Valid Result if http listening has been started successfully
     Result start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory);
 
@@ -182,6 +183,6 @@ struct SC_COMPILER_EXPORT HttpServer
 
     AsyncEventLoop* eventLoop = nullptr;
 };
-} // namespace SC
-
 //! @}
+
+} // namespace SC

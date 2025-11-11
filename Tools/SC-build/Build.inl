@@ -334,13 +334,13 @@ bool SC::Build::Definition::findConfiguration(StringView workspaceName, StringVi
                                               StringView configurationName, Workspace*& workspace, Project*& project,
                                               Configuration*& configuration)
 {
-    size_t workspaceIdx;
+    size_t workspaceIdx = 0;
     SC_TRY(workspaces.find([&](auto& it) { return it.name == workspaceName; }, &workspaceIdx));
-    workspace = &workspaces[workspaceIdx];
-    size_t projectIdx;
+    workspace         = &workspaces[workspaceIdx];
+    size_t projectIdx = 0;
     SC_TRY(workspace->projects.find([&](auto& it) { return it.name == projectName; }, &projectIdx));
-    project = &workspace->projects[projectIdx];
-    size_t configurationIdx;
+    project                 = &workspace->projects[projectIdx];
+    size_t configurationIdx = 0;
     SC_TRY(project->configurations.find([&](auto& it) { return it.name == configurationName; }, &configurationIdx));
     configuration = &project->configurations[configurationIdx];
     return true;
