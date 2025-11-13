@@ -238,11 +238,8 @@ void SC::AsyncRequestStreamsTest::fileToFile()
 
     // Create Pipeline
 
-    AsyncWritableStream* sinks[1];
-    sinks[0] = &writable;
-
-    AsyncPipeline pipeline;
-    SC_TEST_EXPECT(pipeline.pipe(readable, {sinks, 1}));
+    AsyncPipeline pipeline = {&readable, {}, {&writable}};
+    SC_TEST_EXPECT(pipeline.pipe());
     SC_TEST_EXPECT(pipeline.start());
 
     SC_TEST_EXPECT(eventLoop.run());
@@ -406,11 +403,9 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     setThreadPoolFor(compressStream, eventLoop, compressionThreadPool, "CompressStream");
 
     // Create first Async Pipeline (file to socket)
-    AsyncDuplexStream*   transforms1[1] = {&compressStream};
-    AsyncWritableStream* sinks1[1]      = {&writeSideStream};
-    AsyncPipeline        pipeline0;
+    AsyncPipeline pipeline0 = {&readFileStream, {&compressStream}, {&writeSideStream}};
     (void)pipeline0.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    SC_TEST_EXPECT(pipeline0.pipe(readFileStream, transforms1, {sinks1}));
+    SC_TEST_EXPECT(pipeline0.pipe());
 
     // Create second transform stream (decompression)
     ZLIB_STREAM_TYPE             decompressStream;
@@ -421,11 +416,9 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     setThreadPoolFor(decompressStream, eventLoop, compressionThreadPool, "DecompressStream");
 
     // Create second Async Pipeline (socket to file)
-    AsyncDuplexStream*   transforms2[1] = {&decompressStream};
-    AsyncWritableStream* sinks2[1]      = {&writeFileStream};
-    AsyncPipeline        pipeline1;
+    AsyncPipeline pipeline1 = {&readSideStream, {&decompressStream}, {&writeFileStream}};
     (void)pipeline1.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    SC_TEST_EXPECT(pipeline1.pipe(readSideStream, transforms2, {sinks2}));
+    SC_TEST_EXPECT(pipeline1.pipe());
 
     // Start both pipelines
     SC_TEST_EXPECT(pipeline0.start());
@@ -446,7 +439,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     SC_TEST_EXPECT(fs.read("destination.txt", destination));
     SC_TEST_EXPECT(destination.size() == source.size() * sizeof(uint64_t));
 
-    SC_TEST_EXPECT(memcmp(destination.data(), source.data(), destination.size()) == 0);
+    SC_TEST_EXPECT(::memcmp(destination.data(), source.data(), destination.size()) == 0);
 
     SC_TEST_EXPECT(fs.removeFiles({"source.txt", "destination.txt"}));
 }

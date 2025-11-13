@@ -4,17 +4,19 @@
 #include "../Foundation/Assert.h"
 #include "../Foundation/Deferred.h"
 
+namespace SC
+{
 //-------------------------------------------------------------------------------------------------------
 // AsyncBufferView
 //-------------------------------------------------------------------------------------------------------
-void SC::AsyncBuffersPool::refBuffer(AsyncBufferView::ID bufferID)
+void AsyncBuffersPool::refBuffer(AsyncBufferView::ID bufferID)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
     SC_ASSERT_RELEASE(buffer);
     buffer->refs++;
 }
 
-void SC::AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
+void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
     SC_ASSERT_RELEASE(buffer);
@@ -26,7 +28,7 @@ void SC::AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
     }
 }
 
-SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<const char>& data)
+Result AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<const char>& data)
 {
     Span<char> mutableData;
     SC_TRY(getData(bufferID, mutableData));
@@ -34,7 +36,7 @@ SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<cons
     return Result(true);
 }
 
-SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char>& data)
+Result AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char>& data)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
     if (buffer == nullptr)
@@ -45,15 +47,14 @@ SC::Result SC::AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char
     return Result(true);
 }
 
-SC::AsyncBufferView* SC::AsyncBuffersPool::getBuffer(AsyncBufferView::ID bufferID)
+AsyncBufferView* AsyncBuffersPool::getBuffer(AsyncBufferView::ID bufferID)
 {
     if (bufferID.identifier >= 0 and buffers.sizeInElements() > unsigned(bufferID.identifier))
         return &buffers[unsigned(bufferID.identifier)];
     return nullptr;
 }
 
-SC::Result SC::AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBufferView::ID& bufferID,
-                                                  Span<char>& data)
+Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data)
 {
     for (AsyncBufferView& buffer : buffers)
     {
@@ -68,7 +69,7 @@ SC::Result SC::AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, Asy
     return Result::Error("AsyncBuffersPool::requestNewBuffer failed");
 }
 
-void SC::AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes)
+void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
     if (buffer and (newSizeInBytes < buffer->originalData.sizeInBytes()))
@@ -81,7 +82,7 @@ void SC::AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t
 // AsyncReadableStream
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncReadableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
+Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
 {
     SC_TRY_MSG(state == State::Stopped, "Can init only in Stopped state")
     buffers   = &buffersPool;
@@ -90,14 +91,14 @@ SC::Result SC::AsyncReadableStream::init(AsyncBuffersPool& buffersPool, Span<Req
     return Result(true);
 }
 
-SC::Result SC::AsyncReadableStream::start()
+Result AsyncReadableStream::start()
 {
     SC_TRY_MSG(state == State::CanRead, "Can start only in CanRead state")
     executeRead();
     return Result(true);
 }
 
-void SC::AsyncReadableStream::emitOnData()
+void AsyncReadableStream::emitOnData()
 {
     Request request;
     while (readQueue.popFront(request))
@@ -107,7 +108,7 @@ void SC::AsyncReadableStream::emitOnData()
     }
 }
 
-void SC::AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
+void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
 {
     if (state == State::Destroying)
     {
@@ -158,7 +159,7 @@ void SC::AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     }
 }
 
-void SC::AsyncReadableStream::reactivate(bool doReactivate)
+void AsyncReadableStream::reactivate(bool doReactivate)
 {
     switch (state)
     {
@@ -190,7 +191,7 @@ void SC::AsyncReadableStream::reactivate(bool doReactivate)
     }
 }
 
-void SC::AsyncReadableStream::pause()
+void AsyncReadableStream::pause()
 {
     switch (state)
     {
@@ -207,7 +208,7 @@ void SC::AsyncReadableStream::pause()
     }
 }
 
-void SC::AsyncReadableStream::resumeReading()
+void AsyncReadableStream::resumeReading()
 {
     switch (state)
     {
@@ -231,7 +232,7 @@ void SC::AsyncReadableStream::resumeReading()
     }
 }
 
-void SC::AsyncReadableStream::destroy()
+void AsyncReadableStream::destroy()
 {
     switch (state)
     {
@@ -257,12 +258,12 @@ void SC::AsyncReadableStream::destroy()
     }
 }
 
-void SC::AsyncReadableStream::executeRead()
+void AsyncReadableStream::executeRead()
 {
     state = State::Reading;
     while (true)
     {
-        const SC::Result res = asyncRead();
+        const Result res = asyncRead();
         if (res)
         {
             switch (state)
@@ -291,7 +292,7 @@ void SC::AsyncReadableStream::executeRead()
     }
 }
 
-void SC::AsyncReadableStream::pushEnd()
+void AsyncReadableStream::pushEnd()
 {
     switch (state)
     {
@@ -319,12 +320,11 @@ void SC::AsyncReadableStream::pushEnd()
     }
 }
 
-SC::AsyncBuffersPool& SC::AsyncReadableStream::getBuffersPool() { return *buffers; }
+AsyncBuffersPool& AsyncReadableStream::getBuffersPool() { return *buffers; }
 
-void SC::AsyncReadableStream::emitError(Result error) { eventError.emit(error); }
+void AsyncReadableStream::emitError(Result error) { eventError.emit(error); }
 
-bool SC::AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID,
-                                               Span<char>& data)
+bool AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data)
 {
     if (getBuffersPool().requestNewBuffer(minumumSizeInBytes, bufferID, data))
     {
@@ -341,7 +341,7 @@ bool SC::AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncB
 // AsyncWritableStream
 //-------------------------------------------------------------------------------------------------------
 
-SC::Result SC::AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
+Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
 {
     SC_TRY_MSG(state == State::Stopped, "AsyncWritableStream::init - can only be called when stopped");
     buffers    = &buffersPool;
@@ -349,7 +349,7 @@ SC::Result SC::AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Req
     return Result(true);
 }
 
-SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+Result AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     if (state == State::Ended or state == State::Ending)
     {
@@ -367,7 +367,7 @@ SC::Result SC::AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function
     return Result(true);
 }
 
-void SC::AsyncWritableStream::resumeWriting()
+void AsyncWritableStream::resumeWriting()
 {
     switch (state)
     {
@@ -396,7 +396,7 @@ void SC::AsyncWritableStream::resumeWriting()
     }
 }
 
-SC::Result SC::AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb)
+Result AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& cb)
 {
     Request request;
     request.cb       = move(cb);
@@ -407,18 +407,18 @@ SC::Result SC::AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Functi
     return Result(true);
 }
 
-SC::Result SC::AsyncWritableStream::write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb)
+Result AsyncWritableStream::write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb)
 {
     AsyncBufferView::ID bufferID;
     Span<char>          bufferData;
     SC_TRY(buffers->requestNewBuffer(data.sizeInBytes(), bufferID, bufferData)); // 3a. unrefBuffer below
-    memcpy(bufferData.data(), data.data(), data.sizeInBytes());
+    ::memcpy(bufferData.data(), data.data(), data.sizeInBytes());
     buffers->setNewBufferSize(bufferID, data.sizeInBytes());
     auto deferredUnref = MakeDeferred([this, bufferID] { buffers->unrefBuffer(bufferID); }); // 3b. requestNewBuffer
     return write(bufferID, cb);
 }
 
-void SC::AsyncWritableStream::tryAsync(Result potentialError)
+void AsyncWritableStream::tryAsync(Result potentialError)
 {
     if (not potentialError)
     {
@@ -426,8 +426,8 @@ void SC::AsyncWritableStream::tryAsync(Result potentialError)
     }
 }
 
-void SC::AsyncWritableStream::finishedWriting(AsyncBufferView::ID                   bufferID,
-                                              Function<void(AsyncBufferView::ID)>&& callback, Result res)
+void AsyncWritableStream::finishedWriting(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& callback,
+                                          Result res)
 {
     SC_ASSERT_RELEASE(state == State::Writing or state == State::Ending);
 
@@ -474,7 +474,7 @@ void SC::AsyncWritableStream::finishedWriting(AsyncBufferView::ID               
     }
 }
 
-void SC::AsyncWritableStream::end()
+void AsyncWritableStream::end()
 {
     switch (state)
     {
@@ -511,21 +511,20 @@ void SC::AsyncWritableStream::end()
     }
 }
 
-SC::AsyncBuffersPool& SC::AsyncWritableStream::getBuffersPool() { return *buffers; }
+AsyncBuffersPool& AsyncWritableStream::getBuffersPool() { return *buffers; }
 
-void SC::AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
+void AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
 //-------------------------------------------------------------------------------------------------------
 // AsyncDuplexStream
 //-------------------------------------------------------------------------------------------------------
 
-SC::AsyncDuplexStream::AsyncDuplexStream()
+AsyncDuplexStream::AsyncDuplexStream()
 {
     asyncRead.bind([] { return Result(true); });
 }
 
-SC::Result SC::AsyncDuplexStream::init(AsyncBuffersPool&                  buffersPool,
-                                       Span<AsyncReadableStream::Request> readableRequests,
-                                       Span<AsyncWritableStream::Request> writableRequests)
+Result AsyncDuplexStream::init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
+                               Span<AsyncWritableStream::Request> writableRequests)
 {
     SC_TRY(AsyncReadableStream::init(buffersPool, readableRequests));
     SC_TRY(AsyncWritableStream::init(buffersPool, writableRequests));
@@ -535,14 +534,14 @@ SC::Result SC::AsyncDuplexStream::init(AsyncBuffersPool&                  buffer
 //-------------------------------------------------------------------------------------------------------
 // AsyncTransformStream
 //-------------------------------------------------------------------------------------------------------
-SC::AsyncTransformStream::AsyncTransformStream()
+AsyncTransformStream::AsyncTransformStream()
 {
     using Self = AsyncTransformStream;
     AsyncWritableStream::asyncWrite.bind<Self, &Self::transform>(*this);
     AsyncWritableStream::canEndWritable.bind<Self, &Self::canEndTransform>(*this);
 }
 
-SC::Result SC::AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+Result AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     switch (state)
     {
@@ -567,7 +566,7 @@ SC::Result SC::AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Fun
     return Result(true);
 }
 
-SC::Result SC::AsyncTransformStream::prepare(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+Result AsyncTransformStream::prepare(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     inputCallback = move(cb);
     inputBufferID = bufferID;
@@ -585,7 +584,7 @@ SC::Result SC::AsyncTransformStream::prepare(AsyncBufferView::ID bufferID, Funct
     }
 }
 
-void SC::AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<char> outputAfter)
+void AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<char> outputAfter)
 {
     const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
     if (consumedOutput > 0)
@@ -614,7 +613,7 @@ void SC::AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<ch
     }
 }
 
-void SC::AsyncTransformStream::afterFinalize(Span<char> outputAfter, bool streamEnded)
+void AsyncTransformStream::afterFinalize(Span<char> outputAfter, bool streamEnded)
 {
     const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
     if (consumedOutput > 0)
@@ -634,7 +633,7 @@ void SC::AsyncTransformStream::afterFinalize(Span<char> outputAfter, bool stream
     }
 }
 
-void SC::AsyncTransformStream::tryFinalize()
+void AsyncTransformStream::tryFinalize()
 {
     if (getBufferOrPause(0, outputBufferID, outputData))
     {
@@ -652,7 +651,7 @@ void SC::AsyncTransformStream::tryFinalize()
     }
 }
 
-bool SC::AsyncTransformStream::canEndTransform()
+bool AsyncTransformStream::canEndTransform()
 {
     switch (state)
     {
@@ -675,20 +674,25 @@ bool SC::AsyncTransformStream::canEndTransform()
 //-------------------------------------------------------------------------------------------------------
 // AsyncPipeline
 //-------------------------------------------------------------------------------------------------------
-SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks)
+
+AsyncPipeline::~AsyncPipeline() { SC_ASSERT_DEBUG(unpipe()); }
+
+Result AsyncPipeline::validate()
 {
-    return pipe(asyncSource, {}, asyncSinks);
+    int validSinks = 0;
+    for (size_t idx = 0; idx < MaxSinks; ++idx)
+    {
+        if (sinks[idx] != nullptr)
+            validSinks++;
+    }
+    SC_TRY_MSG(source != nullptr, "AsyncPipeline::validate() invalid source");
+    SC_TRY_MSG(validSinks > 0, "AsyncPipeline::validate() invalid 0 sized list of sinks");
+    return Result(true);
 }
-SC::AsyncPipeline::~AsyncPipeline() { SC_ASSERT_DEBUG(unpipe()); }
 
-SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncDuplexStream*> asyncTransforms,
-                                   Span<AsyncWritableStream*> asyncSinks)
+Result AsyncPipeline::pipe()
 {
-    source     = &asyncSource;
-    transforms = asyncTransforms;
-    sinks      = asyncSinks;
-    SC_TRY_MSG(asyncSinks.sizeInElements(), "AsyncPipeline::pipe() invalid 0 sized list of sinks");
-
+    SC_TRY(validate());
     SC_TRY(checkBuffersPool());
 
     AsyncReadableStream* readable = source;
@@ -703,19 +707,27 @@ SC::Result SC::AsyncPipeline::pipe(AsyncReadableStream& asyncSource, Span<AsyncD
     SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventError");
     for (AsyncWritableStream* sink : sinks)
     {
+        if (sink == nullptr)
+            break;
         res = sink->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
         SC_TRY_MSG(res, "AsyncPipeline::pipe() pipe run out of eventError");
     }
     return Result(true);
 }
 
-bool SC::AsyncPipeline::unpipe()
+bool AsyncPipeline::unpipe()
 {
     bool res = true;
     // Deregister all source events
     if (source)
     {
-        if (transforms.empty())
+        int validTransforms = 0;
+        for (size_t idx = 0; idx < MaxTransforms; ++idx)
+        {
+            if (transforms[idx] != nullptr)
+                validTransforms++;
+        }
+        if (validTransforms == 0)
         {
             res = source->eventData.removeAllListenersBoundTo(*this);
             SC_TRY(res);
@@ -737,19 +749,22 @@ bool SC::AsyncPipeline::unpipe()
     }
 
     // Deregister all transforms events
-    size_t transformIndex = 0;
-    for (AsyncDuplexStream* transform : transforms)
+    for (size_t idx = 0; idx < MaxTransforms; ++idx)
     {
-        if (transformIndex + 1 == transforms.sizeInElements())
+        AsyncDuplexStream* transform = transforms[idx];
+        if (transform == nullptr)
+            break;
+        if ((idx + 1 == MaxTransforms) or transforms[idx + 1] == nullptr)
         {
             res = transform->eventData.removeAllListenersBoundTo(*this);
             SC_TRY(res);
             res = transform->eventEnd.removeAllListenersBoundTo(*this);
             SC_TRY(res);
+            break;
         }
         else
         {
-            AsyncDuplexStream&   nextTransform = *transforms[transformIndex + 1];
+            AsyncDuplexStream&   nextTransform = *transforms[idx + 1];
             AsyncWritableStream& nextWritable  = nextTransform;
 
             res = listenToEventData(*transform, nextTransform, false);
@@ -761,39 +776,46 @@ bool SC::AsyncPipeline::unpipe()
         SC_TRY(res);
         res = transform->AsyncWritableStream::eventError.removeAllListenersBoundTo(*this);
         SC_TRY(res);
-        transformIndex++;
     }
-    transforms = {};
+    for (size_t idx = 0; idx < MaxTransforms; ++idx)
+        transforms[idx] = nullptr;
 
     // Deregister all sinks events
     for (AsyncWritableStream* sink : sinks)
     {
+        if (sink == nullptr)
+            break;
         res = sink->eventError.removeListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
         SC_TRY(res);
     }
-    sinks = {};
+    for (size_t idx = 0; idx < MaxSinks; ++idx)
+        sinks[idx] = nullptr;
     return true;
 }
 
-SC::Result SC::AsyncPipeline::start()
+Result AsyncPipeline::start()
 {
-    SC_TRY_MSG(source != nullptr and sinks.sizeInElements() > 0, "AsyncPipeline::pipe has not been called");
+    SC_TRY(validate());
     for (auto transform : transforms)
     {
+        if (transform == nullptr)
+            break;
         SC_TRY(transform->start());
     }
     SC_TRY(source->start());
     return Result(true);
 }
 
-void SC::AsyncPipeline::emitError(Result res) { eventError.emit(res); }
+void AsyncPipeline::emitError(Result res) { eventError.emit(res); }
 
-SC::Result SC::AsyncPipeline::checkBuffersPool()
+Result AsyncPipeline::checkBuffersPool()
 {
     AsyncBuffersPool& buffers = source->getBuffersPool();
 
     for (AsyncWritableStream* sink : sinks)
     {
+        if (sink == nullptr)
+            break;
         if (&sink->getBuffersPool() != &buffers)
         {
             return Result::Error("AsyncPipeline::start - all streams must use the same AsyncBuffersPool");
@@ -802,9 +824,7 @@ SC::Result SC::AsyncPipeline::checkBuffersPool()
     for (AsyncDuplexStream* transform : transforms)
     {
         if (transform == nullptr)
-        {
             break;
-        }
         if ((&transform->AsyncReadableStream::getBuffersPool() != &buffers) and
             (&transform->AsyncWritableStream::getBuffersPool() != &buffers))
         {
@@ -814,7 +834,7 @@ SC::Result SC::AsyncPipeline::checkBuffersPool()
     return Result(true);
 }
 
-bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen)
+bool AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen)
 {
     AsyncDuplexStream* pTransform = &transform;
 
@@ -833,10 +853,14 @@ bool SC::AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDu
     }
 }
 
-SC::Result SC::AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
+Result AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
 {
     for (AsyncDuplexStream* transform : transforms)
     {
+        if (transform == nullptr)
+        {
+            break;
+        }
         bool res;
         res = listenToEventData(*readable, *transform, true);
         SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventData");
@@ -857,7 +881,7 @@ SC::Result SC::AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
     return Result(true);
 }
 
-void SC::AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable)
+void AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable)
 {
     source->getBuffersPool().refBuffer(bufferID);
     Function<void(AsyncBufferView::ID)> func;
@@ -870,31 +894,40 @@ void SC::AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWr
     }
 }
 
-void SC::AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
+void AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 {
     source->getBuffersPool().unrefBuffer(bufferID);
     // Try resume in reverse
-    for (size_t idx = 0; idx < transforms.sizeInElements(); ++idx)
+    for (size_t idx = 0; idx < MaxTransforms; ++idx)
     {
-        AsyncDuplexStream* transform = transforms[transforms.sizeInElements() - 1 - idx];
-        transform->resumeWriting();
-        transform->resumeReading();
+        AsyncDuplexStream* transform = transforms[MaxTransforms - 1 - idx];
+        if (transform)
+        {
+            transform->resumeWriting();
+            transform->resumeReading();
+        }
     }
     source->resumeReading();
 }
 
-void SC::AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
+void AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
 {
     for (AsyncWritableStream* sink : sinks)
     {
+        if (sink == nullptr)
+            break;
         asyncWriteWritable(bufferID, *sink);
     }
 }
 
-void SC::AsyncPipeline::endPipes()
+void AsyncPipeline::endPipes()
 {
     for (AsyncWritableStream* sink : sinks)
     {
+        if (sink == nullptr)
+            break;
         sink->end();
     }
 }
+
+} // namespace SC

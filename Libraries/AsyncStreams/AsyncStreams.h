@@ -324,16 +324,18 @@ struct AsyncTransformStream : public AsyncDuplexStream
     State state = State::None;
 };
 
-/// @brief Pipes reads on SC::AsyncReadableStream to SC::AsyncWritableStream.
-/// Back-pressure happens when the source provides data at a faster rate than what the sink (writable)
-/// is able to process.
-/// When this happens, AsyncPipeline will AsyncReadableStream::pause the (source).
-/// It will also AsyncReadableStream::resume it when some writable has finished writing, freeing one buffer.
+/// @brief Pipes read data from SC::AsyncReadableStream, forwarding them to SC::AsyncWritableStream.
+/// When the source provides data at a faster rate than what the sink (writable) is able to process,
+/// or when running out of buffers to read data into, AsyncPipeline will AsyncReadableStream::pause
+/// the source. This is called "back-pressure" handling in the Async Streams terminology.
+/// When a writable has finished writing, AsyncReadableStream::resume will be called to try un-pausing.
 /// Caller needs to set AsyncPipeline::source field and AsyncPipeline::sinks with valid streams.
 /// @note It's crucial to use the same AsyncBuffersPool for the AsyncReadableStream and all AsyncWritableStream
 struct AsyncPipeline
 {
-    static constexpr int MaxListeners = 8;
+    static constexpr int MaxListeners  = 8;
+    static constexpr int MaxTransforms = 8;
+    static constexpr int MaxSinks      = 8;
 
     AsyncPipeline()                                = default;
     AsyncPipeline(const AsyncPipeline&)            = delete;
@@ -341,16 +343,17 @@ struct AsyncPipeline
     AsyncPipeline& operator=(const AsyncPipeline&) = delete;
     AsyncPipeline& operator=(AsyncPipeline&&)      = delete;
     ~AsyncPipeline();
-    Event<MaxListeners, Result> eventError; /// Reports errors by source, transforms or sinks
 
-    /// @brief Inits the pipeline with a source and some writable sinks
-    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncWritableStream*> asyncSinks);
+    AsyncReadableStream* source                    = nullptr;   /// Provided source (must be != nullptr)
+    AsyncDuplexStream*   transforms[MaxTransforms] = {nullptr}; /// Provided transforms (optional, can be all nullptrs)
+    AsyncWritableStream* sinks[MaxSinks]           = {nullptr}; /// Provided sinks (at least one must be != nullptr)
+    Event<MaxListeners, Result> eventError         = {};        /// Reports errors by source, transforms or sinks
 
-    /// @brief Inits the pipeline with a source, transforms and some writable sinks
-    Result pipe(AsyncReadableStream& asyncSource, Span<AsyncDuplexStream*> asyncTransforms,
-                Span<AsyncWritableStream*> asyncSinks);
+    /// @brief Pipes source, transforms and sinks together
+    /// @note Caller must have already setup source and sinks (and optionally transforms)
+    Result pipe();
 
-    /// @brief Unregisters all events from source, transforms ans sinks
+    /// @brief Unregisters all events from source, transforms and sinks
     [[nodiscard]] bool unpipe();
 
     /// @brief Starts the pipeline
@@ -359,15 +362,10 @@ struct AsyncPipeline
 
     // TODO: Add a pause and cancel/step
   private:
-    AsyncReadableStream* source = nullptr; /// User specified source
-
-    Span<AsyncWritableStream*> sinks; /// User specified sinks
-
-    Span<AsyncDuplexStream*> transforms;
-
     void   emitError(Result res);
     Result checkBuffersPool();
     Result chainTransforms(AsyncReadableStream*& readable);
+    Result validate();
 
     void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable);
     void dispatchToPipes(AsyncBufferView::ID bufferID);
