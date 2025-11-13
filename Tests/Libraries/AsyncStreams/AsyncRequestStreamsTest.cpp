@@ -206,7 +206,9 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
+        buffers[idx] = writableData;
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -308,7 +310,9 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     SC_TEST_EXPECT(buffer1.resizeWithoutInitializing(buffers1Size * numberOfBuffers1));
     for (size_t idx = 0; idx < numberOfBuffers1; ++idx)
     {
-        SC_TEST_EXPECT(buffer1.toSpan().sliceStartLength(idx * buffers1Size, buffers1Size, buffers1[idx].data));
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer1.toSpan().sliceStartLength(idx * buffers1Size, buffers1Size, writableData));
+        buffers1[idx] = writableData;
     }
 
     ThreadPool fileThreadPool;
@@ -354,7 +358,9 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     SC_TEST_EXPECT(buffer2.resizeWithoutInitializing(buffers2Size * numberOfBuffers2));
     for (size_t idx = 0; idx < numberOfBuffers2; ++idx)
     {
-        SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, buffers2[idx].data));
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, writableData));
+        buffers2[idx] = writableData;
     }
     ThreadPool streamPool;
     if (useStreamThreadPool)

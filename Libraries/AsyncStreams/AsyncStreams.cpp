@@ -24,33 +24,44 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
     buffer->refs--;
     if (buffer->refs == 0)
     {
-        buffer->data = buffer->originalData;
+        switch (buffer->type)
+        {
+        case AsyncBufferView::Type::Writable: buffer->writableData = buffer->originalWritableData; break;
+        case AsyncBufferView::Type::ReadOnly: *buffer = {}; break;
+        case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
+        }
     }
 }
 
-Result AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<const char>& data)
+Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<const char>& data)
 {
-    Span<char> mutableData;
-    SC_TRY(getData(bufferID, mutableData));
-    data = mutableData;
+    AsyncBufferView* buffer = getBuffer(bufferID);
+    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getData - Invalid bufferID");
+    switch (buffer->type)
+    {
+    case AsyncBufferView::Type::Writable: data = buffer->writableData; break;
+    case AsyncBufferView::Type::ReadOnly: data = buffer->readonlyData; break;
+    case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
+    }
     return Result(true);
 }
 
-Result AsyncBuffersPool::getData(AsyncBufferView::ID bufferID, Span<char>& data)
+Result AsyncBuffersPool::getWritableData(AsyncBufferView::ID bufferID, Span<char>& data)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    if (buffer == nullptr)
-    {
-        return Result::Error("AsyncBuffersPool::getData - Invalid bufferID");
-    }
-    data = buffer->data;
+    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getWritableData - Invalid bufferID");
+    SC_TRY_MSG(buffer->type == AsyncBufferView::Type::Writable, "AsyncBuffersPool::getWritableData - Readonly buffer");
+    data = buffer->writableData;
     return Result(true);
 }
 
 AsyncBufferView* AsyncBuffersPool::getBuffer(AsyncBufferView::ID bufferID)
 {
     if (bufferID.identifier >= 0 and buffers.sizeInElements() > unsigned(bufferID.identifier))
-        return &buffers[unsigned(bufferID.identifier)];
+    {
+        AsyncBufferView* buffer = &buffers[unsigned(bufferID.identifier)];
+        return buffer->type != AsyncBufferView::Type::Empty ? buffer : nullptr;
+    }
     return nullptr;
 }
 
@@ -58,12 +69,18 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
 {
     for (AsyncBufferView& buffer : buffers)
     {
-        if (buffer.refs == 0 and buffer.data.sizeInBytes() >= minimumSizeInBytes)
+        if (buffer.refs == 0 and buffer.writableData.sizeInBytes() >= minimumSizeInBytes)
         {
-            buffer.refs         = 1;
-            buffer.originalData = buffer.data;
+            buffer.refs = 1;
+
+            switch (buffer.type)
+            {
+            case AsyncBufferView::Type::Writable: buffer.originalWritableData = buffer.writableData; break;
+            case AsyncBufferView::Type::ReadOnly: buffer.originalReadonlyData = buffer.readonlyData; break;
+            case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+            }
             bufferID = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(&buffer - buffers.begin()));
-            return getData(bufferID, data);
+            return getWritableData(bufferID, data);
         }
     }
     return Result::Error("AsyncBuffersPool::requestNewBuffer failed");
@@ -72,10 +89,39 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
 void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    if (buffer and (newSizeInBytes < buffer->originalData.sizeInBytes()))
+    if (buffer != nullptr)
     {
-        buffer->data = {buffer->data.data(), newSizeInBytes};
+        switch (buffer->type)
+        {
+        case AsyncBufferView::Type::Writable:
+            if ((newSizeInBytes < buffer->originalWritableData.sizeInBytes()))
+            {
+                buffer->writableData = {buffer->writableData.data(), newSizeInBytes};
+            }
+            break;
+        case AsyncBufferView::Type::ReadOnly:
+            if ((newSizeInBytes < buffer->originalReadonlyData.sizeInBytes()))
+            {
+                buffer->readonlyData = {buffer->readonlyData.data(), newSizeInBytes};
+            }
+            break;
+        case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+        }
     }
+}
+
+Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::ID& bufferID)
+{
+    for (size_t idx = 0; idx < buffers.sizeInElements(); ++idx)
+    {
+        if (buffers[idx].getType() == AsyncBufferView::Type::Empty)
+        {
+            buffers[idx] = buffer;
+            bufferID     = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(idx));
+            return Result(true);
+        }
+    }
+    return Result::Error("pushBuffer failed");
 }
 
 //-------------------------------------------------------------------------------------------------------
@@ -367,6 +413,13 @@ Result AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(As
     return Result(true);
 }
 
+Result AsyncWritableStream::write(AsyncBufferView&& bufferView, Function<void(AsyncBufferView::ID)> cb)
+{
+    AsyncBufferView::ID bufferID;
+    SC_TRY(buffers->pushBuffer(move(bufferView), bufferID));
+    return write(bufferID, cb);
+}
+
 void AsyncWritableStream::resumeWriting()
 {
     switch (state)
@@ -405,17 +458,6 @@ Result AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(
     // Let's push this request in front instead of to the back
     SC_TRY_MSG(writeQueue.pushFront(request), "unshift failed");
     return Result(true);
-}
-
-Result AsyncWritableStream::write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb)
-{
-    AsyncBufferView::ID bufferID;
-    Span<char>          bufferData;
-    SC_TRY(buffers->requestNewBuffer(data.sizeInBytes(), bufferID, bufferData)); // 3a. unrefBuffer below
-    ::memcpy(bufferData.data(), data.data(), data.sizeInBytes());
-    buffers->setNewBufferSize(bufferID, data.sizeInBytes());
-    auto deferredUnref = MakeDeferred([this, bufferID] { buffers->unrefBuffer(bufferID); }); // 3b. requestNewBuffer
-    return write(bufferID, cb);
 }
 
 void AsyncWritableStream::tryAsync(Result potentialError)
@@ -546,7 +588,7 @@ Result AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Function<vo
     switch (state)
     {
     case State::None: {
-        SC_TRY(AsyncReadableStream::getBuffersPool().getData(bufferID, inputData));
+        SC_TRY(AsyncReadableStream::getBuffersPool().getReadableData(bufferID, inputData));
         return prepare(bufferID, cb);
     }
     case State::Paused: {

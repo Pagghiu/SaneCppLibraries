@@ -56,14 +56,42 @@ struct AsyncBufferView
 
         [[nodiscard]] constexpr bool operator==(ID other) const { return identifier == other.identifier; }
     };
+    enum class Type
+    {
+        Empty,
+        Writable,
+        ReadOnly,
+    };
 
-    Span<char> data;
+    AsyncBufferView() { type = Type::Empty; }
+    AsyncBufferView(Span<char> data) : writableData(data) { type = Type::Writable; }
+    AsyncBufferView(Span<const char> data) : readonlyData(data) { type = Type::ReadOnly; }
+
+    template <int N>
+    AsyncBufferView(const char (&literal)[N])
+    {
+        readonlyData = {literal, N - 1};
+        type         = Type::ReadOnly;
+    }
+
+    Type getType() const { return type; }
 
   private:
-    Span<char> originalData;
+    union
+    {
+        Span<char>       writableData;
+        Span<const char> readonlyData;
+    };
+
+    union
+    {
+        Span<char>       originalWritableData;
+        Span<const char> originalReadonlyData;
+    };
     friend struct AsyncBuffersPool;
 
     int32_t refs = 0; // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
+    Type    type;
 };
 
 /// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams
@@ -81,10 +109,10 @@ struct AsyncBuffersPool
     void unrefBuffer(AsyncBufferView::ID bufferID);
 
     /// @brief Access data span owned by the buffer
-    Result getData(AsyncBufferView::ID bufferID, Span<const char>& data);
+    Result getReadableData(AsyncBufferView::ID bufferID, Span<const char>& data);
 
     /// @brief Access data span owned by the buffer
-    Result getData(AsyncBufferView::ID bufferID, Span<char>& data);
+    Result getWritableData(AsyncBufferView::ID bufferID, Span<char>& data);
 
     /// @brief Access the raw AsyncBufferView (if any) at a given bufferID (or nullptr if invalid)
     AsyncBufferView* getBuffer(AsyncBufferView::ID bufferID);
@@ -94,6 +122,9 @@ struct AsyncBuffersPool
 
     /// @brief Sets the new size in bytes for the buffer
     void setNewBufferSize(AsyncBufferView::ID bufferID, size_t newSizeInBytes);
+
+    /// @brief Adds a buffer to the pool in any empty slot (found by scanning from start to end)
+    Result pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::ID& bufferID);
 };
 
 /// @brief Async source abstraction emitting data events in caller provided byte buffers.
@@ -222,17 +253,9 @@ struct AsyncWritableStream
     /// @return Invalid Result if write queue is full
     Result write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb = {});
 
-    /// @brief Try requesting a buffer big enough and copy data into it
-    /// @return Invalid Result if write queue is full or if there are no available buffers in the pool
-    Result write(Span<const char> data, Function<void(AsyncBufferView::ID)> cb = {});
-
-    /// @brief Write a C-string literal in the stream
-    /// @return Invalid Result if write queue is full or if there are no available buffers in the pool
-    template <size_t N>
-    Result write(const char (&str)[N])
-    {
-        return write(Span<const char>(str, N - 1));
-    }
+    /// @brief Push a new buffer view to the queue, registering it with the allocator
+    /// @return Invalid Result if write queue is full or if there are no available empty buffers slots in the pool
+    Result write(AsyncBufferView&& bufferView, Function<void(AsyncBufferView::ID)> cb = {});
 
     /// @brief Ends the writable stream, waiting for all in-flight and queued writes to finish.
     /// After this happens, AsyncWritableStream::eventFinished will be raised

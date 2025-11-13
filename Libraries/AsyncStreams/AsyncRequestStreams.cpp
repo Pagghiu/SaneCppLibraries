@@ -189,7 +189,7 @@ SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::write(AsyncBufferV
 {
     SC_ASSERT_RELEASE(not callback.isValid());
     callback = move(cb);
-    SC_TRY(getBuffersPool().getData(bufferID, request.buffer));
+    SC_TRY(getBuffersPool().getReadableData(bufferID, request.buffer));
     request.callback = [this, bufferID](typename AsyncWriteRequest::Result& result)
     {
         getBuffersPool().unrefBuffer(bufferID);

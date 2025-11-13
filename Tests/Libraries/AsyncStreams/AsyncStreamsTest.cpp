@@ -135,7 +135,9 @@ void SC::AsyncStreamsTest::readableSyncStream()
     SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
+        buffers[idx] = writableData;
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -178,7 +180,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
         [this, &context](AsyncBufferView::ID bufferID)
         {
             Span<char> data;
-            SC_TEST_EXPECT(context.readable.getBuffersPool().getData(bufferID, data));
+            SC_TEST_EXPECT(context.readable.getBuffersPool().getWritableData(bufferID, data));
 
             if (not data.empty())
             {
@@ -208,7 +210,9 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
     for (size_t idx = 0; idx < numberOfBuffers; ++idx)
     {
-        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
+        buffers[idx] = writableData;
     }
     AsyncBuffersPool pool = {buffers};
 
@@ -263,7 +267,7 @@ void SC::AsyncStreamsTest::readableAsyncStream()
         [this, &context](AsyncBufferView::ID bufferID)
         {
             Span<char> data;
-            SC_TEST_EXPECT(context.readable.getBuffersPool().getData(bufferID, data));
+            SC_TEST_EXPECT(context.readable.getBuffersPool().getWritableData(bufferID, data));
 
             if (not data.empty())
             {
@@ -290,17 +294,9 @@ void SC::AsyncStreamsTest::readableAsyncStream()
 
 void SC::AsyncStreamsTest::writableStream()
 {
-    // Create a pool of byte buffers slicing a single Buffer in multiple AsyncBufferView(s)
     constexpr size_t numberOfBuffers = 2;
-    constexpr size_t bufferBytesSize = sizeof(size_t);
-    AsyncBufferView  buffers[numberOfBuffers];
-    Buffer           buffer;
-    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(bufferBytesSize * numberOfBuffers));
-    for (size_t idx = 0; idx < numberOfBuffers; ++idx)
-    {
-        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, buffers[idx].data));
-    }
-    AsyncBuffersPool pool = {buffers};
+    AsyncBufferView  bufferViews[numberOfBuffers]; // Empty BufferViews (to be filled with ReadOnly ones)
+    AsyncBuffersPool pool = {bufferViews};
 
     AsyncWritableStream          writable;
     AsyncWritableStream::Request writeRequestsQueue[numberOfBuffers + 1]; // Only N-1 slots will be used
@@ -319,7 +315,7 @@ void SC::AsyncStreamsTest::writableStream()
         (void)cb;
         context.numAsyncWrites++;
         Span<const char> data;
-        SC_TEST_EXPECT(context.writable.getBuffersPool().getData(bufferID, data));
+        SC_TEST_EXPECT(context.writable.getBuffersPool().getReadableData(bufferID, data));
         StringView sv(data, false, StringEncoding::Ascii);
         SC_TEST_EXPECT(StringBuilder::createForAppendingTo(context.concatenated).append(sv));
         context.bufferID = bufferID;

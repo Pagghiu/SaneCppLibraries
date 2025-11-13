@@ -18,7 +18,7 @@ SC::Result SC::SyncZLibTransformStream::transform(AsyncBufferView::ID bufferID, 
     // This function will either process the bufferID fully OR it will unshift the buffer, that means placing it
     // again on top of the AsyncWritableStream write queue
     Span<const char> sourceData;
-    SC_TRY(AsyncReadableStream::getBuffersPool().getData(bufferID, sourceData));
+    SC_TRY(AsyncReadableStream::getBuffersPool().getReadableData(bufferID, sourceData));
     Span<const char> inputData;
     SC_TRY(sourceData.sliceStart(consumedInputBytes, inputData));
     while (not inputData.empty())
