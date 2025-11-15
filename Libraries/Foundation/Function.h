@@ -15,11 +15,11 @@ namespace SC
 ///
 /// Example:
 /// \snippet Tests/Libraries/Foundation/FunctionTest.cpp FunctionMainSnippet
-template <typename FuncType>
+template <typename FuncType, int LAMBDA_SIZE = sizeof(void*) * 2>
 struct Function;
 
-template <typename R, typename... Args>
-struct Function<R(Args...)>
+template <int LAMBDA_SIZE, typename R, typename... Args>
+struct Function<R(Args...), LAMBDA_SIZE>
 {
   private:
     enum class Operation
@@ -36,8 +36,6 @@ struct Function<R(Args...)>
         ExecuteFunction   execute;
         OperationFunction operation;
     };
-
-    static const int LAMBDA_SIZE = sizeof(void*) * 2;
 
     const VTable* vtable;
 
@@ -57,7 +55,7 @@ struct Function<R(Args...)>
     /// @brief Constructs an empty Function
     Function()
     {
-        static_assert(sizeof(Function) == sizeof(void*) * 3, "Function Size");
+        static_assert(sizeof(Function) == sizeof(void*) + LAMBDA_SIZE, "Function Size");
         vtable = nullptr;
     }
 
