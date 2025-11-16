@@ -31,7 +31,8 @@ struct Span
     // clang-format off
     using SizeType = size_t;
     using VoidType = typename TypeTraits::SameConstnessAs<Type, void>::type;
-    template <typename U> using TypeIfNotVoid = typename TypeTraits::EnableIf<not TypeTraits::IsSame<U, VoidType>::value, Type>::type;
+    template <typename U> using TypeIfNotVoid = typename  TypeTraits::EnableIf<not TypeTraits::IsSame<U, VoidType>::value, Type>::type;
+    template <typename U> using TypeInitializerList = typename  TypeTraits::EnableIf<TypeTraits::IsConst<U>::value and not TypeTraits::IsSame<U, VoidType>::value, Type>::type;
     template <typename U> using SameType = TypeTraits::IsSame<typename TypeTraits::RemoveConst<U>::type, typename TypeTraits::RemoveConst<Type>::type>;
     template <typename U> using EnableNotVoid = typename TypeTraits::EnableIf<SameType<U>::value and not TypeTraits::IsSame<U, VoidType>::value, bool>::type;
     // clang-format on
@@ -60,7 +61,7 @@ struct Span
     /// @brief Span specialized constructor (mainly used for converting const char* to StringView)
     /// @param list an initializer list of elements
     template <typename U = Type>
-    constexpr Span(std::initializer_list<TypeIfNotVoid<U>> list) : items(nullptr), sizeElements(0)
+    constexpr Span(std::initializer_list<TypeInitializerList<U>> list) : items(nullptr), sizeElements(0)
     {
         // We need this two step initialization to avoid warnings on all compilers
         items        = list.begin();
