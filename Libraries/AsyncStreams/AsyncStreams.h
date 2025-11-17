@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
+#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "Internal/CircularQueue.h"
@@ -61,11 +63,38 @@ struct AsyncBufferView
         Empty,
         Writable,
         ReadOnly,
+        Growable,
     };
 
     AsyncBufferView() { type = Type::Empty; }
     AsyncBufferView(Span<char> data) : writableData(data) { type = Type::Writable; }
     AsyncBufferView(Span<const char> data) : readonlyData(data) { type = Type::ReadOnly; }
+
+    /// @brief Saves a copy (or a moved instance) of a String / Buffer (or anything that works with GrowableBuffer<T>)
+    /// inside an AsyncBufferView in order to access its data later, as long as its size fits inside the inline storage.
+    /// Destroying the AsyncBufferView will also destroy the copied / moved instance.
+    template <typename T>
+    AsyncBufferView(T&& t) // universal reference, it can capture both lvalue and rvalue
+    {
+        type = Type::Growable;
+        // Here we're type-erasing T in our own inline storage provided by a slightly oversized Function<>
+        // that it will be able to construct (and destruct) the right GrowableBuffer<T> from just a piece of storage
+        // and return a pointer to the corresponding IGrowableBuffer* interface
+        getGrowableBuffer = [t = forward<T>(t)](GrowableStorage& storage, bool construct) mutable -> IGrowableBuffer*
+        {
+            using Type = typename TypeTraits::RemoveReference<T>::type;
+            if (construct)
+            {
+                placementNew(storage.reinterpret_as<GrowableBuffer<Type>>(), t);
+                return &storage.reinterpret_as<GrowableBuffer<Type>>();
+            }
+            else
+            {
+                dtor(storage.reinterpret_as<GrowableBuffer<Type>>());
+                return nullptr;
+            }
+        };
+    }
 
     template <int N>
     AsyncBufferView(const char (&literal)[N])
@@ -77,6 +106,12 @@ struct AsyncBufferView
     Type getType() const { return type; }
 
   private:
+    static constexpr int TypeErasedCaptureSize  = sizeof(void*) * 3; // This is enough to hold String / Buffer by copy
+    static constexpr int TypeErasedGrowableSize = sizeof(void*) * 6;
+
+    using GrowableStorage = AlignedStorage<TypeErasedGrowableSize>;
+    Function<IGrowableBuffer*(GrowableStorage&, bool), TypeErasedCaptureSize> getGrowableBuffer;
+
     union
     {
         Span<char>       writableData;

@@ -323,11 +323,13 @@ void SC::AsyncStreamsTest::writableStream()
     };
     int numDrain = 0;
     (void)writable.eventDrain.addListener([&numDrain] { numDrain++; });
-    SC_TEST_EXPECT(writable.write("1")); // Executes asyncWrites and queue slot is freed immediately
+
+    // When passing String(...) the writable takes ownership of the String destroying it after the write
+    SC_TEST_EXPECT(writable.write(String("1"))); // Executes asyncWrites and queue slot is freed immediately
     SC_TEST_EXPECT(context.numAsyncWrites == 1);
-    SC_TEST_EXPECT(writable.write("2"));     // queued, uses first write slot
-    SC_TEST_EXPECT(writable.write("3"));     // queued, uses second write slot
-    SC_TEST_EXPECT(not writable.write("4")); // no more write queue slots
+    SC_TEST_EXPECT(writable.write("2"));         // queued, uses first write slot
+    SC_TEST_EXPECT(writable.write(String("3"))); // queued, uses second write slot
+    SC_TEST_EXPECT(not writable.write("4"));     // no more write queue slots
     SC_TEST_EXPECT(context.numAsyncWrites == 1);
     writable.finishedWriting(context.bufferID, {}, Result(true)); // writes 2
     SC_TEST_EXPECT(context.concatenated == "12");
@@ -335,7 +337,7 @@ void SC::AsyncStreamsTest::writableStream()
     SC_TEST_EXPECT(context.numAsyncWrites == 2);
     SC_TEST_EXPECT(writable.write("4"));
     SC_TEST_EXPECT(context.numAsyncWrites == 2);
-    SC_TEST_EXPECT(not writable.write("5"));
+    SC_TEST_EXPECT(not writable.write(String("5")));
     writable.finishedWriting(context.bufferID, {}, Result(true)); // writes 3
     SC_TEST_EXPECT(context.concatenated == "123");
     SC_TEST_EXPECT(numDrain == 0);
@@ -348,10 +350,10 @@ void SC::AsyncStreamsTest::writableStream()
     SC_TEST_EXPECT(context.numAsyncWrites == 4);
     SC_TEST_EXPECT(writable.write("5"));
     SC_TEST_EXPECT(context.numAsyncWrites == 5);
-    SC_TEST_EXPECT(writable.write("6"));
+    SC_TEST_EXPECT(writable.write(String("6")));
     SC_TEST_EXPECT(context.numAsyncWrites == 5);
     SC_TEST_EXPECT(writable.write("7"));
-    SC_TEST_EXPECT(not writable.write("8"));
+    SC_TEST_EXPECT(not writable.write(String("8")));
     writable.finishedWriting(context.bufferID, {}, Result(true));
     SC_TEST_EXPECT(context.concatenated == "123456");
     SC_TEST_EXPECT(context.numAsyncWrites == 6);

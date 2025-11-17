@@ -28,6 +28,7 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
         {
         case AsyncBufferView::Type::Writable: buffer->writableData = buffer->originalWritableData; break;
         case AsyncBufferView::Type::ReadOnly: *buffer = {}; break;
+        case AsyncBufferView::Type::Growable: *buffer = {}; break;
         case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
         }
     }
@@ -41,6 +42,14 @@ Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<cons
     {
     case AsyncBufferView::Type::Writable: data = buffer->writableData; break;
     case AsyncBufferView::Type::ReadOnly: data = buffer->readonlyData; break;
+    case AsyncBufferView::Type::Growable: {
+        AsyncBufferView::GrowableStorage storage;
+
+        auto da = buffer->getGrowableBuffer(storage, true)->getDirectAccess();
+        data    = {static_cast<char*>(da.data), da.sizeInBytes};
+        (void)buffer->getGrowableBuffer(storage, false); // destruct
+        break;
+    }
     case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
     }
     return Result(true);
@@ -77,6 +86,16 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
             {
             case AsyncBufferView::Type::Writable: buffer.originalWritableData = buffer.writableData; break;
             case AsyncBufferView::Type::ReadOnly: buffer.originalReadonlyData = buffer.readonlyData; break;
+            case AsyncBufferView::Type::Growable: {
+                AsyncBufferView::GrowableStorage storage;
+
+                auto da = buffer.getGrowableBuffer(storage, true)->getDirectAccess();
+
+                buffer.writableData         = {static_cast<char*>(da.data), da.sizeInBytes};
+                buffer.originalWritableData = {static_cast<char*>(da.data), da.sizeInBytes};
+                (void)buffer.getGrowableBuffer(storage, false); // destruct
+                break;
+            }
             case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
             }
             bufferID = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(&buffer - buffers.begin()));
@@ -105,6 +124,22 @@ void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t new
                 buffer->readonlyData = {buffer->readonlyData.data(), newSizeInBytes};
             }
             break;
+        case AsyncBufferView::Type::Growable: {
+            AsyncBufferView::GrowableStorage storage;
+
+            IGrowableBuffer* growable = buffer->getGrowableBuffer(storage, true);
+            if (growable->resizeWithoutInitializing(newSizeInBytes))
+            {
+                auto da = growable->getDirectAccess();
+
+                buffer->writableData         = {static_cast<char*>(da.data), da.sizeInBytes};
+                buffer->originalWritableData = {static_cast<char*>(da.data), da.sizeInBytes};
+            }
+            (void)buffer->getGrowableBuffer(storage, false); // destruct
+            break;
+        }
+
+        break;
         case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
         }
     }
