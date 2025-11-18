@@ -239,7 +239,6 @@ struct AsyncReadableStream
         Pausing,      // Pause requested while read in flight
         Paused,       // Actually paused with no read in flight
         Ended,        // Emitted all data, no more data will be emitted
-        Destroying,   // Readable is waiting for async call before
         Destroyed,    // Readable has been destroyed before emitting all data
         Errored,      // Error occurred
     };

@@ -191,12 +191,6 @@ void AsyncReadableStream::emitOnData()
 
 void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
 {
-    if (state == State::Destroying)
-    {
-        eventClose.emit();
-        state = State::Destroyed;
-        return;
-    }
     if (newSize == 0)
     {
         emitError(Result::Error("AsyncReadableStream::push zero sized buffer is not allowed"));
@@ -323,15 +317,11 @@ void AsyncReadableStream::destroy()
     case State::Paused:
     case State::Pausing:
     case State::Reading:
+    case State::AsyncPushing:
+    case State::AsyncReading:
         state = State::Destroyed;
         eventClose.emit();
         break;
-    case State::AsyncPushing:
-    case State::AsyncReading:
-        // Must wait for async read to finish
-        state = State::Destroying;
-        break;
-    case State::Destroying: emitError(Result::Error("AsyncReadableStream::destroy - already destroying")); break;
     case State::Destroyed: emitError(Result::Error("AsyncReadableStream::destroy - already destroyed")); break;
     case State::Ended: emitError(Result::Error("AsyncReadableStream::destroy - already ended")); break;
     case State::Stopped: emitError(Result::Error("AsyncReadableStream::destroy - already stopped")); break;
@@ -389,10 +379,6 @@ void AsyncReadableStream::pushEnd()
         state = State::Ended;
         eventEnd.emit();
         eventClose.emit();
-        break;
-    case State::Destroying:
-        eventClose.emit();
-        state = State::Destroyed;
         break;
     case State::Destroyed: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is destroyed")); break;
     case State::Ended: emitError(Result::Error("AsyncReadableStream::pushEnd - stream already ended")); break;
