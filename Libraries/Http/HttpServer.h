@@ -43,6 +43,8 @@ struct SC_COMPILER_EXPORT HttpRequest
 
     void reset();
 
+    Result parse(const uint32_t maxHeaderSize, Span<const char> readData);
+
   private:
     friend struct HttpServer;
     using HttpHeaderOffset = detail::HttpHeaderOffset; // TODO: hide class implementation
@@ -171,8 +173,6 @@ struct SC_COMPILER_EXPORT HttpServer
     void onReceive(AsyncSocketReceive::Result& result);
     void onAfterSend(AsyncSocketSend::Result& result);
     void closeAsync(HttpServerClient& requestClient);
-
-    Result parse(HttpRequest& request, const uint32_t maxHeaderSize, Span<const char> readData);
 
     IGrowableBuffer* headersMemory = nullptr;
 

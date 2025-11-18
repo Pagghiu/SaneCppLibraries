@@ -4,8 +4,12 @@
 #include "Internal/HttpStringAppend.h"
 #include <stdio.h>
 
+namespace SC
+{
+//-------------------------------------------------------------------------------------------------------
 // HttpRequest
-bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
+//-------------------------------------------------------------------------------------------------------
+bool HttpRequest::find(HttpParser::Token token, StringSpan& res) const
 {
     for (size_t idx = 0; idx < numHeaders; ++idx)
     {
@@ -19,7 +23,7 @@ bool SC::HttpRequest::find(HttpParser::Token token, StringSpan& res) const
     return false;
 }
 
-void SC::HttpRequest::reset()
+void HttpRequest::reset()
 {
     headersEndReceived = false;
     parsedSuccessfully = true;
@@ -27,8 +31,52 @@ void SC::HttpRequest::reset()
     parser             = {};
 }
 
+Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
+{
+    if (readHeaders.sizeInBytes() > maxSize)
+    {
+        parsedSuccessfully = false;
+        return Result::Error("Header size exceeded limit");
+    }
+
+    size_t readBytes;
+    while (parsedSuccessfully and not readData.empty())
+    {
+        Span<const char> parsedData;
+        parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
+        parsedSuccessfully &= readData.sliceStart(readBytes, readData);
+        if (parser.state == HttpParser::State::Finished)
+            break;
+        if (parser.state == HttpParser::State::Result)
+        {
+            detail::HttpHeaderOffset header;
+            header.token  = parser.token;
+            header.start  = static_cast<uint32_t>(parser.tokenStart);
+            header.length = static_cast<uint32_t>(parser.tokenLength);
+            if (numHeaders < HttpRequest::MaxNumHeaders)
+            {
+                headerOffsets[numHeaders] = header;
+                numHeaders++;
+            }
+            else
+            {
+                parsedSuccessfully = false;
+            }
+            if (parser.token == HttpParser::Token::HeadersEnd)
+            {
+                headersEndReceived = true;
+                SC_TRY(find(HttpParser::Token::Url, url));
+                break;
+            }
+        }
+    }
+    return Result(parsedSuccessfully);
+}
+
+//-------------------------------------------------------------------------------------------------------
 // HttpResponse
-SC::Result SC::HttpResponse::startResponse(int code)
+//-------------------------------------------------------------------------------------------------------
+Result HttpResponse::startResponse(int code)
 {
     GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
 
@@ -46,7 +94,7 @@ SC::Result SC::HttpResponse::startResponse(int code)
     return Result(true);
 }
 
-SC::Result SC::HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
+Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 {
     GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
 
@@ -59,7 +107,7 @@ SC::Result SC::HttpResponse::addHeader(StringSpan headerName, StringSpan headerV
     return Result(true);
 }
 
-SC::Result SC::HttpResponse::end(Span<const char> span)
+Result HttpResponse::end(Span<const char> span)
 {
     {
         GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
@@ -77,15 +125,16 @@ SC::Result SC::HttpResponse::end(Span<const char> span)
     return end();
 }
 
-SC::Result SC::HttpResponse::end()
+Result HttpResponse::end()
 {
     responseEnded = true;
     return Result(true);
 }
 
+//-------------------------------------------------------------------------------------------------------
 // HttpServer
-
-SC::Result SC::HttpServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory)
+//-------------------------------------------------------------------------------------------------------
+Result HttpServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory)
 {
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
@@ -105,7 +154,7 @@ SC::Result SC::HttpServer::start(AsyncEventLoop& loop, StringSpan address, uint1
     return Result(true);
 }
 
-SC::Result SC::HttpServer::stopAsync()
+Result HttpServer::stopAsync()
 {
     if (not asyncServerAccept.isFree())
     {
@@ -122,7 +171,7 @@ SC::Result SC::HttpServer::stopAsync()
     return Result(true);
 }
 
-SC::Result SC::HttpServer::stopSync()
+Result HttpServer::stopSync()
 {
     stopping = true;
     SC_TRY(stopAsync());
@@ -139,51 +188,7 @@ SC::Result SC::HttpServer::stopSync()
     return Result(true);
 }
 
-SC::Result SC::HttpServer::parse(HttpRequest& request, const uint32_t maxSize, Span<const char> readData)
-{
-    bool& parsedSuccessfully = request.parsedSuccessfully;
-    if (request.readHeaders.sizeInBytes() > maxSize)
-    {
-        parsedSuccessfully = false;
-        return Result::Error("Header size exceeded limit");
-    }
-
-    size_t readBytes;
-    while (request.parsedSuccessfully and not readData.empty())
-    {
-        HttpParser&      parser = request.parser;
-        Span<const char> parsedData;
-        parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
-        parsedSuccessfully &= readData.sliceStart(readBytes, readData);
-        if (parser.state == HttpParser::State::Finished)
-            break;
-        if (parser.state == HttpParser::State::Result)
-        {
-            detail::HttpHeaderOffset header;
-            header.token  = parser.token;
-            header.start  = static_cast<uint32_t>(parser.tokenStart);
-            header.length = static_cast<uint32_t>(parser.tokenLength);
-            if (request.numHeaders < HttpRequest::MaxNumHeaders)
-            {
-                request.headerOffsets[request.numHeaders] = header;
-                request.numHeaders++;
-            }
-            else
-            {
-                parsedSuccessfully = false;
-            }
-            if (parser.token == HttpParser::Token::HeadersEnd)
-            {
-                request.headersEndReceived = true;
-                SC_TRY(request.find(HttpParser::Token::Url, request.url));
-                break;
-            }
-        }
-    }
-    return Result(parsedSuccessfully);
-}
-
-void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
+void HttpServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
     if (not result.moveTo(acceptedClient))
@@ -224,7 +229,7 @@ void SC::HttpServer::onNewClient(AsyncSocketAccept::Result& result)
     result.reactivateRequest(numClients < clients.sizeInElements());
 }
 
-void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
+void HttpServer::onReceive(AsyncSocketReceive::Result& result)
 {
     SC_COMPILER_WARNING_PUSH_OFFSETOF
     HttpServerClient& client = SC_COMPILER_FIELD_OFFSET(HttpServerClient, asyncReceive, result.getAsync());
@@ -241,7 +246,7 @@ void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
     const bool hasHeaderSpace =
         client.request.availableHeader.sliceStart(readData.sizeInBytes(), client.request.availableHeader);
 
-    if (not parse(client.request, maxHeaderSize, readData))
+    if (not client.request.parse(maxHeaderSize, readData))
     {
         // TODO: Invoke on error
         return;
@@ -274,7 +279,7 @@ void SC::HttpServer::onReceive(AsyncSocketReceive::Result& result)
     }
 }
 
-void SC::HttpServer::onAfterSend(AsyncSocketSend::Result& result)
+void HttpServer::onAfterSend(AsyncSocketSend::Result& result)
 {
     if (result.isValid())
     {
@@ -285,7 +290,7 @@ void SC::HttpServer::onAfterSend(AsyncSocketSend::Result& result)
     }
 }
 
-void SC::HttpServer::closeAsync(HttpServerClient& requestClient)
+void HttpServer::closeAsync(HttpServerClient& requestClient)
 {
     if (not requestClient.asyncSend.isFree())
     {
@@ -307,3 +312,4 @@ void SC::HttpServer::closeAsync(HttpServerClient& requestClient)
         SC_TRUST_RESULT(asyncServerAccept.start(*eventLoop, serverSocket));
     }
 }
+} // namespace SC
