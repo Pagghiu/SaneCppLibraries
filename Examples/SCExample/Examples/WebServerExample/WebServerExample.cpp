@@ -17,6 +17,7 @@
 
 #include "Libraries/ContainersReflection/ContainersReflection.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
+#include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Http/HttpWebServer.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"
@@ -63,8 +64,8 @@ struct SC::WebServerExampleModel
 
     AsyncEventLoop* eventLoop = nullptr;
 
-    HttpServer    httpServer;
-    HttpWebServer httpWebServer;
+    HttpAsyncServer httpServer;
+    HttpWebServer   httpWebServer;
 
     Buffer                 headerBuffer;
     GrowableBuffer<Buffer> gb = {headerBuffer};
@@ -77,7 +78,7 @@ struct SC::WebServerExampleModel
         clients = {new HttpServerClient[numClients], numClients};
         SC_TRY(gb.resizeWithoutInitializing(1024 * 8 * numClients));
         HttpServer::Memory memory = {gb, clients};
-        httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
+        httpServer.httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
         SC_TRY(
             httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port), memory));
         SC_TRY(httpWebServer.init(modelState.directory.view()));

@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Http/HttpServer.h"
+#include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Http/HttpClient.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -38,16 +38,15 @@ void SC::HttpServerTest::httpServerTest()
     HttpServerClient       clients[NUM_CLIENTS];
     GrowableBuffer<Buffer> headers      = {headersMemory};
     HttpServer::Memory     serverMemory = {headers, clients};
-    HttpServer             server;
-    SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 6152, serverMemory));
+    HttpAsyncServer        asyncServer;
+    SC_TEST_EXPECT(asyncServer.start(eventLoop, "127.0.0.1", 6152, serverMemory));
 
     struct ServerContext
     {
-        int         numRequests;
-        HttpServer& server;
-    } serverContext = {0, server};
+        int numRequests;
+    } serverContext = {0};
 
-    server.onRequest = [this, &serverContext](HttpRequest& request, HttpResponse& response)
+    asyncServer.httpServer.onRequest = [this, &serverContext](HttpRequest& request, HttpResponse& response)
     {
         if (request.getParser().method != HttpParser::Method::HttpGET)
         {
@@ -85,10 +84,11 @@ void SC::HttpServerTest::httpServerTest()
     SmallString<255> buffer;
     struct ClientContext
     {
-        int         numRequests;
-        HttpServer& server;
-        int         wantedNumRequests = 3;
-    } clientContext = {0, server};
+        int numRequests;
+        int wantedNumRequests;
+
+        HttpAsyncServer& asyncServer;
+    } clientContext = {0, 3, asyncServer};
     for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
     {
         SC_TEST_EXPECT(StringBuilder::format(buffer, "HttpClient [{}]", idx));
@@ -99,7 +99,7 @@ void SC::HttpServerTest::httpServerTest()
             clientContext.numRequests++;
             if (clientContext.numRequests == clientContext.wantedNumRequests)
             {
-                SC_TEST_EXPECT(clientContext.server.stopAsync());
+                SC_TEST_EXPECT(clientContext.asyncServer.stopAsync());
             }
         };
         SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));

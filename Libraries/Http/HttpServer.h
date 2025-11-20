@@ -10,6 +10,10 @@
 
 namespace SC
 {
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4251)
+#endif
 struct SC_COMPILER_EXPORT HttpServer;
 struct SC_COMPILER_EXPORT HttpServerClient;
 namespace detail
@@ -43,7 +47,9 @@ struct SC_COMPILER_EXPORT HttpRequest
 
     void reset();
 
-    Result parse(const uint32_t maxHeaderSize, Span<const char> readData);
+    Result     parse(const uint32_t maxHeaderSize, Span<const char> readData);
+    Span<char> readHeaders;
+    Span<char> availableHeader; ///< Space to save headers to
 
   private:
     friend struct HttpServer;
@@ -54,9 +60,6 @@ struct SC_COMPILER_EXPORT HttpRequest
 
     HttpParser parser; ///< The parser used to parse headers
     StringSpan url;    ///< The url extracted from parsed headers
-
-    Span<char> readHeaders;
-    Span<char> availableHeader; ///< Space to save headers to
 
     static constexpr size_t MaxNumHeaders = 64;
     HttpHeaderOffset        headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
@@ -90,10 +93,6 @@ struct SC_COMPILER_EXPORT HttpResponse
     friend struct HttpServer;
     [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
 
-    HttpServer* server = nullptr;
-
-    size_t key;
-
     Buffer outputBuffer;
 
     bool   responseEnded = false;
@@ -111,6 +110,7 @@ struct SC_COMPILER_EXPORT HttpServerClient
 
     HttpRequest  request;
     HttpResponse response;
+    size_t       index = 0;
 
     void setFree()
     {
@@ -119,8 +119,9 @@ struct SC_COMPILER_EXPORT HttpServerClient
         state = State::Free;
     }
 
+    char debugName[16] = {0};
+
     SocketDescriptor   socket;
-    char               debugName[16] = {0};
     AsyncSocketReceive asyncReceive;
     AsyncSocketSend    asyncSend;
 };
@@ -145,22 +146,9 @@ struct SC_COMPILER_EXPORT HttpServer
 
         Span<HttpServerClient> clients;
     };
-    /// @brief Starts the http server on the given AsyncEventLoop, address and port
-    /// @param loop The event loop to be used, where to add the listening socket
-    /// @param address The address of local interface where to listen to
-    /// @param port The local port where to start listening to
+    /// @brief Starts the http server
     /// @param memory Memory buffers to be used by the http server
-    /// @return Valid Result if http listening has been started successfully
-    Result start(AsyncEventLoop& loop, StringSpan address, uint16_t port, Memory& memory);
-
-    /// @brief Stops http server asynchronously pushing cancel and close requests for next SC::AsyncEventLoop::runOnce
-    Result stopAsync();
-
-    /// @brief Stops http server synchronously waiting for SC::AsyncEventLoop::runNoWait to cancel or close all requests
-    Result stopSync();
-
-    /// @brief Check if the server is started
-    [[nodiscard]] bool isStarted() const { return started; }
+    Result start(Memory& memory);
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     /// @warning Both references can be invalidated in later stages of the http request lifetime.
@@ -168,27 +156,27 @@ struct SC_COMPILER_EXPORT HttpServer
     /// SC::HttpServer::getRequest, SC::HttpServer::getResponse or SC::HttpServer::getSocket
     Function<void(HttpRequest&, HttpResponse&)> onRequest;
 
+    Span<HttpServerClient> clients;
+
+    [[nodiscard]] size_t getNumClients() const { return numClients; }
+
+    [[nodiscard]] bool canAcceptMoreClients() const { return numClients < clients.sizeInElements(); }
+    [[nodiscard]] bool allocateClient(size_t& idx);
+    [[nodiscard]] bool deallocateClient(HttpServerClient& client);
+
+    [[nodiscard]] Span<char> processClientReceivedData(size_t idx, Span<const char> readData);
+
   private:
-    void onNewClient(AsyncSocketAccept::Result& result);
-    void onReceive(AsyncSocketReceive::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
     void closeAsync(HttpServerClient& requestClient);
 
     IGrowableBuffer* headersMemory = nullptr;
-
-    Span<HttpServerClient> clients;
-    size_t                 numClients = 0;
-
-    SocketDescriptor  serverSocket;
-    AsyncSocketAccept asyncServerAccept;
+    size_t           numClients    = 0;
 
     uint32_t maxHeaderSize = 8 * 1024;
-
-    bool started  = false;
-    bool stopping = false;
-
-    AsyncEventLoop* eventLoop = nullptr;
 };
 //! @}
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
 
 } // namespace SC

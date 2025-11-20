@@ -11,6 +11,7 @@
 #include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.cpp"
 #include "Libraries/Foundation/Foundation.cpp"
 #include "Libraries/Hashing/Hashing.cpp"
+#include "Libraries/Http/HttpAsyncServer.cpp"
 #include "Libraries/Http/HttpClient.cpp"
 #include "Libraries/Http/HttpParser.cpp"
 #include "Libraries/Http/HttpServer.cpp"
