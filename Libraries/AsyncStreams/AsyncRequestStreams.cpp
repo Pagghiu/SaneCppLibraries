@@ -40,29 +40,24 @@ template <typename AsyncReadRequest>
 SC::AsyncRequestReadableStream<AsyncReadRequest>::AsyncRequestReadableStream()
 {
     AsyncReadableStream::asyncRead.bind<AsyncRequestReadableStream, &AsyncRequestReadableStream::read>(*this);
+    (void)AsyncReadableStream::eventClose
+        .addListener<AsyncRequestReadableStream, &AsyncRequestReadableStream::onCloseStopRequest>(*this);
 }
 
 template <typename AsyncReadRequest>
-void SC::AsyncRequestReadableStream<AsyncReadRequest>::onEndCloseDescriptor()
+void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
 {
-    Result res = Internal::closeDescriptor(request);
-    if (not res)
+    if (not request.isFree())
     {
-        emitError(res);
+        request.stop(*eventLoop);
     }
-}
-
-template <typename AsyncReadRequest>
-SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::registerAutoCloseDescriptor(bool value)
-{
-    using Self = AsyncRequestReadableStream;
-    if (value)
+    if (autoCloseDescriptor)
     {
-        return Result(eventEnd.addListener<Self, &Self::onEndCloseDescriptor>(*this));
-    }
-    else
-    {
-        return Result(eventEnd.removeListener<Self, &Self::onEndCloseDescriptor>(*this));
+        Result res = Internal::closeDescriptor(request);
+        if (not res)
+        {
+            emitError(res);
+        }
     }
 }
 
@@ -89,10 +84,10 @@ template <typename AsyncReadRequest>
 void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncReadRequest::Result& result,
                                                                  AsyncBufferView::ID                bufferID)
 {
-    SC_ASSERT_RELEASE(request.isFree());
     Span<char> data;
     if (result.get(data))
     {
+        SC_ASSERT_RELEASE(request.isFree());
         if (Internal::isEnded(result))
         {
             getBuffersPool().unrefBuffer(bufferID);
@@ -157,29 +152,24 @@ template <typename AsyncWriteRequest>
 SC::AsyncRequestWritableStream<AsyncWriteRequest>::AsyncRequestWritableStream()
 {
     AsyncWritableStream::asyncWrite.bind<AsyncRequestWritableStream, &AsyncRequestWritableStream::write>(*this);
+    (void)AsyncWritableStream::eventFinish
+        .addListener<AsyncRequestWritableStream, &AsyncRequestWritableStream::onFinishStopRequest>(*this);
 }
 
 template <typename AsyncWriteRequest>
-void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onEndCloseDescriptor()
+void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
 {
-    Result res = Internal::closeDescriptor(request);
-    if (not res)
+    if (not request.isFree())
     {
-        emitError(res);
+        request.stop(*eventLoop);
     }
-}
-
-template <typename AsyncWriteRequest>
-SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::registerAutoCloseDescriptor(bool value)
-{
-    using Self = AsyncRequestWritableStream;
-    if (value)
+    if (autoCloseDescriptor)
     {
-        return Result(eventFinish.addListener<Self, &Self::onEndCloseDescriptor>(*this));
-    }
-    else
-    {
-        return Result(eventFinish.removeListener<Self, &Self::onEndCloseDescriptor>(*this));
+        Result res = Internal::closeDescriptor(request);
+        if (not res)
+        {
+            emitError(res);
+        }
     }
 }
 

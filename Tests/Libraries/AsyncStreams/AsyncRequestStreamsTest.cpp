@@ -379,8 +379,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     {
         SC_TEST_EXPECT(writeSideStream.request.executeOn(writeStreamTask, streamPool));
     }
-    SC_TEST_EXPECT(writeSideStream.registerAutoCloseDescriptor(true));
-    writeSide.detach(); // Taken care by registerAutoCloseDescriptor(true)
+    writeSideStream.setAutoCloseDescriptor(true);
+    writeSide.detach(); // Taken care by setAutoCloseDescriptor(true)
 
     // Create Readable Socket Stream
     READABLE_TYPE                readSideStream;
@@ -393,8 +393,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     {
         SC_TEST_EXPECT(readSideStream.request.executeOn(readStreamTask, streamPool));
     }
-    SC_TEST_EXPECT(readSideStream.registerAutoCloseDescriptor(true));
-    readSide.detach(); // Taken care by registerAutoCloseDescriptor(true)
+    readSideStream.setAutoCloseDescriptor(true);
+    readSide.detach(); // Taken care by setAutoCloseDescriptor(true)
     (void)readSideStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
 
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];

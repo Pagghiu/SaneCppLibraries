@@ -13,18 +13,20 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
 {
     AsyncRequestReadableStream();
 
-    /// @brief Registers or unregisters a listener to AsyncReadableStream::eventEnd to close descriptor
-    Result registerAutoCloseDescriptor(bool value);
+    /// @brief Automatically closes descriptor during read stream close event
+    void setAutoCloseDescriptor(bool value) { autoCloseDescriptor = value; }
 
     AsyncRequestType request; /// AsyncFileRead / AsyncFileWrite / AsyncSocketReceive / AsyncSocketSend
   protected:
-    AsyncEventLoop* eventLoop = nullptr;
     struct Internal;
+    AsyncEventLoop* eventLoop = nullptr;
+
+    bool autoCloseDescriptor = false;
 
     Result read();
 
     void afterRead(typename AsyncRequestType::Result& result, AsyncBufferView::ID bufferID);
-    void onEndCloseDescriptor();
+    void onCloseStopRequest();
 };
 
 template <typename AsyncRequestType>
@@ -36,20 +38,22 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const DescriptorType& descriptor);
 
-    /// @brief Registers or unregisters a listener to AsyncWritableStream::eventFinish to close descriptor
-    Result registerAutoCloseDescriptor(bool value);
+    /// @brief Automatically closes descriptor during write stream finish event
+    void setAutoCloseDescriptor(bool value) { autoCloseDescriptor = value; }
 
     AsyncRequestType request; /// AsyncFileRead / AsyncFileWrite / AsyncSocketReceive / AsyncSocketSend
 
   protected:
-    AsyncEventLoop* eventLoop = nullptr;
     struct Internal;
+    AsyncEventLoop* eventLoop = nullptr;
+
+    bool autoCloseDescriptor = false;
 
     Function<void(AsyncBufferView::ID)> callback;
 
     Result write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
 
-    void onEndCloseDescriptor();
+    void onFinishStopRequest();
 };
 
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
