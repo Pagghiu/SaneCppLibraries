@@ -429,10 +429,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(asyncAccept.handle),
                                 &asyncAccept.acceptData->overlapped.get().overlapped);
-        if (res == FALSE)
+        // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
+        if (res == FALSE and GetLastError() != ERROR_NOT_FOUND)
         {
             return Result::Error("AsyncSocketAccept: CancelEx failed");
         }
+        // CancelIoEx queues a cancellation packet on the async queue
         eventLoop.internal.hasPendingKernelCancellations = true;
         return Result(true);
     }
@@ -618,10 +620,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
     {
         BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
-        if (res == FALSE)
+        // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
+        if (res == FALSE and GetLastError() != ERROR_NOT_FOUND)
         {
             return Result::Error("AsyncSocketSendTo: CancelEx failed");
         }
+        // CancelIoEx queues a cancellation packet on the async queue
         eventLoop.internal.hasPendingKernelCancellations = true;
         return Result(true);
     }
@@ -650,10 +654,12 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketReceiveFrom& async)
     {
         BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
-        if (res == FALSE)
+        // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
+        if (res == FALSE and GetLastError() != ERROR_NOT_FOUND)
         {
             return Result::Error("AsyncSocketReceiveFrom: CancelEx failed");
         }
+        // CancelIoEx queues a cancellation packet on the async queue
         eventLoop.internal.hasPendingKernelCancellations = true;
         return Result(true);
     }
@@ -678,7 +684,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketReceive& async)
     {
         BOOL res = ::CancelIoEx(reinterpret_cast<HANDLE>(async.handle), &async.overlapped.get().overlapped);
-        if (res == FALSE)
+        // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
+        if (res == FALSE and GetLastError() != ERROR_NOT_FOUND)
         {
             return Result::Error("AsyncSocketReceive: CancelEx failed");
         }
