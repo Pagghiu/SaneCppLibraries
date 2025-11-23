@@ -19,8 +19,17 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     asyncServerAccept.callback.bind<HttpAsyncServer, &HttpAsyncServer::onNewClient>(*this);
     SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
     started = true;
-
     return httpServer.start(memory);
+}
+
+void HttpAsyncServer::setUseAsyncStreams(bool useAsyncStreams, Span<AsyncReadableStream::Request> readQueue,
+                                         Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers)
+{
+    readQueues  = readQueue;
+    writeQueues = writeQueue;
+    useStreams  = useAsyncStreams;
+
+    buffersPool.buffers = buffers;
 }
 
 Result HttpAsyncServer::stopAsync()
@@ -34,10 +43,7 @@ Result HttpAsyncServer::stopAsync()
 
     for (HttpServerClient& it : httpServer.clients)
     {
-        if (it.state != HttpServerClient::State::Free)
-        {
-            closeAsync(it);
-        }
+        closeAsync(it);
     }
     return Result(true);
 }
@@ -72,17 +78,62 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     SC_ASSERT_RELEASE(httpServer.allocateClient(idx));
 
     HttpServerClient& client = httpServer.clients[idx];
+    client.socket            = move(acceptedClient);
+    if (useStreams)
+    {
+        const size_t readQueueLen  = readQueues.sizeInElements() / httpServer.clients.sizeInElements();
+        const size_t writeQueueLen = writeQueues.sizeInElements() / httpServer.clients.sizeInElements();
+        SC_TRUST_RESULT(readQueueLen > 0);
+        SC_TRUST_RESULT(writeQueueLen > 0);
+        Span<AsyncReadableStream::Request> readQueue;
+        Span<AsyncWritableStream::Request> writeQueue;
+        SC_TRUST_RESULT(readQueues.sliceStartLength(idx * readQueueLen, readQueueLen, readQueue));
+        SC_TRUST_RESULT(writeQueues.sliceStartLength(idx * writeQueueLen, writeQueueLen, writeQueue));
+        SC_TRUST_RESULT(client.readableSocketStream.init(buffersPool, readQueue, *eventLoop, client.socket));
+        SC_TRUST_RESULT(client.writableSocketStream.init(buffersPool, writeQueue, *eventLoop, client.socket));
 
-    client.socket = move(acceptedClient);
-    client.asyncSend.setDebugName(client.debugName);
-    client.asyncReceive.setDebugName(client.debugName);
-    client.asyncReceive.callback.bind<HttpAsyncServer, &HttpAsyncServer::onReceive>(*this);
+        auto onData = [this, idx](AsyncBufferView::ID bufferID) { onStreamReceive(httpServer.clients[idx], bufferID); };
+        SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(onData));
+        SC_TRUST_RESULT(client.readableSocketStream.start());
+    }
+    else
+    {
+        client.asyncSend.setDebugName(client.debugName);
+        client.asyncReceive.setDebugName(client.debugName);
+        client.asyncReceive.callback.bind<HttpAsyncServer, &HttpAsyncServer::onReceive>(*this);
 
-    // This cannot fail because start reports only incorrect API usage (AsyncRequest already in use etc.)
-    SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, client.request.availableHeader));
+        // This cannot fail because start reports only incorrect API usage (AsyncRequest already in use etc.)
+        SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, client.request.availableHeader));
+    }
 
     // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(httpServer.canAcceptMoreClients());
+}
+
+void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView::ID bufferID)
+{
+    Span<char> readData;
+    buffersPool.getWritableData(bufferID, readData);
+    // TODO: Handle error for available headers not big enough
+    SC_ASSERT_RELEASE(readData.sizeInBytes() <= client.request.availableHeader.sizeInBytes());
+    ::memcpy(client.request.availableHeader.data(), readData.data(), readData.sizeInBytes());
+
+    if (not client.request.parse(httpServer.maxHeaderSize, readData))
+    {
+        // TODO: Invoke on error
+        return;
+    }
+    else if (client.request.allHeadersReceived())
+    {
+        httpServer.onRequest(client.request, client.response);
+    }
+
+    if (client.response.mustBeFlushed())
+    {
+        auto onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
+        SC_TRUST_RESULT(client.writableStream->write(client.response.getSpan(), onAfterWrite));
+        client.writableStream->end(); // TODO: This must be called only if actually ended...
+    }
 }
 
 void HttpAsyncServer::onReceive(AsyncSocketReceive::Result& result)
@@ -98,10 +149,19 @@ void HttpAsyncServer::onReceive(AsyncSocketReceive::Result& result)
         return;
     }
 
-    const size_t idx     = static_cast<size_t>(&client - &httpServer.clients[0]);
-    Span<char>   outspan = httpServer.processClientReceivedData(idx, readData);
-    if (not outspan.empty())
+    if (not client.request.parse(httpServer.maxHeaderSize, readData))
     {
+        // TODO: Invoke on error
+        return;
+    }
+    else if (client.request.allHeadersReceived())
+    {
+        httpServer.onRequest(client.request, client.response);
+    }
+
+    if (client.response.mustBeFlushed())
+    {
+        Span<const char> outspan = client.response.getSpan();
         client.asyncSend.setDebugName(client.debugName);
         client.asyncSend.callback.bind<HttpAsyncServer, &HttpAsyncServer::onAfterSend>(*this);
         auto res = client.asyncSend.start(*eventLoop, client.socket, outspan);
@@ -130,15 +190,28 @@ void HttpAsyncServer::onAfterSend(AsyncSocketSend::Result& result)
 
 void HttpAsyncServer::closeAsync(HttpServerClient& requestClient)
 {
-    if (not requestClient.asyncSend.isFree())
+    if (requestClient.state == HttpServerClient::State::Free)
     {
-        (void)requestClient.asyncSend.stop(*eventLoop);
+        return;
     }
-    if (not requestClient.asyncReceive.isFree())
+
+    if (useStreams)
     {
-        (void)requestClient.asyncReceive.stop(*eventLoop);
+        requestClient.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
+        requestClient.writableSocketStream.end();     // emits 'eventFinish' cancelling pending writes
     }
-    SC_TRUST_RESULT(requestClient.socket.close());
+    else
+    {
+        if (not requestClient.asyncSend.isFree())
+        {
+            (void)requestClient.asyncSend.stop(*eventLoop);
+        }
+        if (not requestClient.asyncReceive.isFree())
+        {
+            (void)requestClient.asyncReceive.stop(*eventLoop);
+        }
+        SC_TRUST_RESULT(requestClient.socket.close());
+    }
     const bool wasFull = not httpServer.canAcceptMoreClients();
 
     SC_TRUST_RESULT(httpServer.deallocateClient(requestClient));

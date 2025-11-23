@@ -33,6 +33,15 @@ void HttpRequest::reset()
 
 Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
 {
+    readHeaders               = {readHeaders.data(), readHeaders.sizeInBytes() + readData.sizeInBytes()};
+    const bool hasHeaderSpace = availableHeader.sliceStart(readData.sizeInBytes(), availableHeader);
+
+    if (not hasHeaderSpace)
+    {
+        parsedSuccessfully = false;
+        return Result::Error("Header space is finished");
+    }
+
     if (readHeaders.sizeInBytes() > maxSize)
     {
         parsedSuccessfully = false;
@@ -136,7 +145,6 @@ Result HttpResponse::end()
 //-------------------------------------------------------------------------------------------------------
 Result HttpServer::start(Memory& memory)
 {
-
     clients       = memory.clients;
     headersMemory = &memory.headersMemory;
     return Result(true);
@@ -175,35 +183,6 @@ bool HttpServer::deallocateClient(HttpServerClient& client)
         numClients--;
         return true;
     }
-}
-
-Span<char> HttpServer::processClientReceivedData(size_t idx, Span<const char> readData)
-{
-    HttpServerClient& client   = clients[idx];
-    client.request.readHeaders = {client.request.readHeaders.data(),
-                                  client.request.readHeaders.sizeInBytes() + readData.sizeInBytes()};
-    const bool hasHeaderSpace =
-        client.request.availableHeader.sliceStart(readData.sizeInBytes(), client.request.availableHeader);
-
-    if (not client.request.parse(maxHeaderSize, readData))
-    {
-        // TODO: Invoke on error
-        return {};
-    }
-    else if (not hasHeaderSpace)
-    {
-        // TODO: Invoke on error (no more header space)
-        return {};
-    }
-    if (client.request.headersEndReceived)
-    {
-        onRequest(client.request, client.response);
-    }
-    if (client.response.mustBeFlushed())
-    {
-        return client.response.outputBuffer.toSpan();
-    }
-    return {};
 }
 
 } // namespace SC

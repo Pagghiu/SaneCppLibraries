@@ -7,8 +7,8 @@
 [SaneCppHttp.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttp.h) is a library implementing a hand-written http 1.1 parser, client and server.
 
 # Dependencies
-- Dependencies: [Async](@ref library_async), [Memory](@ref library_memory)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Socket](@ref library_socket), [Threading](@ref library_threading)
+- Dependencies: [AsyncStreams](@ref library_async_streams), [Memory](@ref library_memory)
+- All dependencies: [Async](@ref library_async), [AsyncStreams](@ref library_async_streams), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Socket](@ref library_socket), [Threading](@ref library_threading)
 
 ![Dependency Graph](Http.svg)
 

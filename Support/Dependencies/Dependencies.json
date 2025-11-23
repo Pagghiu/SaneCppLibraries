@@ -151,17 +151,19 @@
     "Http": {
         "direct_dependencies": [
             "Async",
+            "AsyncStreams",
             "FileSystem",
             "Foundation",
             "Memory",
             "Socket"
         ],
         "minimal_dependencies": [
-            "Async",
+            "AsyncStreams",
             "Memory"
         ],
         "all_dependencies": [
             "Async",
+            "AsyncStreams",
             "File",
             "FileSystem",
             "Foundation",

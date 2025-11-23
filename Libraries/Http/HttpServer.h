@@ -4,6 +4,7 @@
 #include "HttpParser.h"
 
 #include "../Async/Async.h"
+#include "../AsyncStreams/AsyncRequestStreams.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/StringSpan.h"
 #include "../Memory/Buffer.h"
@@ -51,6 +52,8 @@ struct SC_COMPILER_EXPORT HttpRequest
     Span<char> readHeaders;
     Span<char> availableHeader; ///< Space to save headers to
 
+    bool allHeadersReceived() const { return headersEndReceived; }
+
   private:
     friend struct HttpServer;
     using HttpHeaderOffset = detail::HttpHeaderOffset; // TODO: hide class implementation
@@ -89,9 +92,11 @@ struct SC_COMPILER_EXPORT HttpResponse
         outputBuffer.clear();
     }
 
+    Span<const char>   getSpan() const { return outputBuffer.toSpanConst(); }
+    [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
+
   private:
     friend struct HttpServer;
-    [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
 
     Buffer outputBuffer;
 
@@ -120,6 +125,12 @@ struct SC_COMPILER_EXPORT HttpServerClient
     }
 
     char debugName[16] = {0};
+
+    ReadableSocketStream readableSocketStream;
+    WritableSocketStream writableSocketStream;
+
+    AsyncReadableStream* readableStream = &readableSocketStream;
+    AsyncWritableStream* writableStream = &writableSocketStream;
 
     SocketDescriptor   socket;
     AsyncSocketReceive asyncReceive;
@@ -164,15 +175,13 @@ struct SC_COMPILER_EXPORT HttpServer
     [[nodiscard]] bool allocateClient(size_t& idx);
     [[nodiscard]] bool deallocateClient(HttpServerClient& client);
 
-    [[nodiscard]] Span<char> processClientReceivedData(size_t idx, Span<const char> readData);
+    uint32_t maxHeaderSize = 8 * 1024;
 
   private:
     void closeAsync(HttpServerClient& requestClient);
 
     IGrowableBuffer* headersMemory = nullptr;
     size_t           numClients    = 0;
-
-    uint32_t maxHeaderSize = 8 * 1024;
 };
 //! @}
 #if SC_COMPILER_MSVC
