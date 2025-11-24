@@ -1262,7 +1262,9 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
     AsyncTeardown teardown;
     prepareTeardown(eventLoop, async, teardown);
     bool hasBeenReactivated = false;
+    async.flags |= Flag_NeedsTeardown;
     SC_TRY(completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode, &hasBeenReactivated));
+    async.flags &= ~Flag_NeedsTeardown;
     // hasBeenReactivated is required to avoid accessing async when it has been not reactivated (and maybe deallocated)
     if (hasBeenReactivated and async.state == AsyncRequest::State::Reactivate)
     {
@@ -1457,8 +1459,15 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
         }
         const int32_t eventIndex = static_cast<int32_t>(idx);
 
-        AsyncRequest& async  = *request;
-        Result        result = Result(kernelEvents.validateEvent(idx, continueProcessing));
+        AsyncRequest& async = *request;
+        if (async.flags & Flag_NeedsTeardown)
+        {
+            // runOnce has been called from a callback for this request on poll based API (kevent / epoll).
+            // As teardown for it has not been executed yet, the kernel will still signal this as writable
+            // or readable for this run too, but it would be incorrect to call its completion again.
+            continue;
+        }
+        Result result = Result(kernelEvents.validateEvent(idx, continueProcessing));
         if (not result)
         {
             reportError(eventLoop, kernelEvents, async, result, eventIndex);

@@ -124,6 +124,7 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_WatcherSet             = 1 << 3; // An event watcher has been set
     static constexpr int16_t Flag_AsyncTaskSequence      = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
     static constexpr int16_t Flag_AsyncTaskSequenceInUse = 1 << 5; // AsyncTaskSequence must still be waited
+    static constexpr int16_t Flag_NeedsTeardown          = 1 << 6; // Request being processed waiting for teardown
 
     Result close(AsyncEventLoop& eventLoop);
 
