@@ -22,6 +22,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
     AsyncEventLoop* eventLoop = nullptr;
 
     bool autoCloseDescriptor = false;
+    bool justUnrefBuffer     = false;
 
     Result read();
 
@@ -48,6 +49,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     AsyncEventLoop* eventLoop = nullptr;
 
     bool autoCloseDescriptor = false;
+    bool justUnrefBuffer     = false;
 
     Function<void(AsyncBufferView::ID)> callback;
 

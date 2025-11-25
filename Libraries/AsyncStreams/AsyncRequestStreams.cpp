@@ -49,7 +49,14 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
 {
     if (not request.isFree())
     {
+        SC::Result res = SC::Result::Error("Fake error to unref bufferID");
+
+        typename AsyncReadRequest::Result result(*eventLoop, request, res, nullptr);
+
+        justUnrefBuffer = true;
+        request.callback(result); // will free bufferID
         request.stop(*eventLoop);
+        justUnrefBuffer = false;
     }
     if (autoCloseDescriptor)
     {
@@ -111,6 +118,8 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
     else
     {
         getBuffersPool().unrefBuffer(bufferID);
+        if (justUnrefBuffer)
+            return;
         AsyncReadableStream::emitError(result.isValid());
     }
 }
@@ -161,7 +170,14 @@ void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
 {
     if (not request.isFree())
     {
+        SC::Result res = SC::Result::Error("Fake error to unref bufferID");
+
+        typename AsyncWriteRequest::Result result(*eventLoop, request, res, nullptr);
+
+        justUnrefBuffer = true;
+        request.callback(result); // will free bufferID
         request.stop(*eventLoop);
+        justUnrefBuffer = false;
     }
     if (autoCloseDescriptor)
     {
@@ -183,6 +199,8 @@ SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::write(AsyncBufferV
     request.callback = [this, bufferID](typename AsyncWriteRequest::Result& result)
     {
         getBuffersPool().unrefBuffer(bufferID);
+        if (justUnrefBuffer)
+            return;
         auto callbackCopy = move(callback);
         callback          = {};
         AsyncWritableStream::finishedWriting(bufferID, move(callbackCopy), result.isValid());
