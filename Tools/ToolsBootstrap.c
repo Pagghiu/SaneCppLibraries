@@ -1097,6 +1097,10 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     if (useClang) {
         CommandLine_arg(cmd, "-nostdinc++");
     }
+    else {
+        CommandLine_arg(cmd, "-DSC_COMPILER_ENABLE_STD_CPP=1"); // Only GCC 13+ supports nostdinc++
+    }
+
     CommandLine_arg(cmd, "-o");
     CommandLine_argQuoted(cmd, output);
     CommandLine_arg(cmd, "-c");
