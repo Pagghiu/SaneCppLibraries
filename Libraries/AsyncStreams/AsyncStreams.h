@@ -208,7 +208,8 @@ struct AsyncReadableStream
     AsyncBuffersPool& getBuffersPool();
 
     /// @brief Use push from inside AsyncReadableStream::asyncRead function to queue received data
-    void push(AsyncBufferView::ID bufferID, size_t newSize);
+    /// @return `true` if the caller can continue pushing
+    [[nodiscard]] bool push(AsyncBufferView::ID bufferID, size_t newSize);
 
     /// @brief Use pushEnd from inside AsyncReadableStream::asyncRead to signal production end
     void pushEnd();

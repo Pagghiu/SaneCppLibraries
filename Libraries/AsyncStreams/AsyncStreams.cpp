@@ -189,12 +189,12 @@ void AsyncReadableStream::emitOnData()
     }
 }
 
-void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
+bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
 {
     if (newSize == 0)
     {
         emitError(Result::Error("AsyncReadableStream::push zero sized buffer is not allowed"));
-        return;
+        return false;
     }
     // Push buffer to the queue
     buffers->setNewBufferSize(bufferID, newSize);
@@ -204,7 +204,7 @@ void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     {
         state = State::Errored;
         emitError(Result::Error("AsyncReadableStream::push dropping buffer"));
-        return;
+        return false;
     }
     buffers->refBuffer(bufferID); // 1a. unrefBuffer in emitOnData()
 
@@ -219,7 +219,10 @@ void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     case State::AsyncPushing:
     case State::AsyncReading: {
         emitOnData();
-        state = State::AsyncPushing;
+        if (state == State::AsyncReading)
+        {
+            state = State::AsyncPushing;
+        }
     }
     break;
     case State::Pausing: {
@@ -232,6 +235,7 @@ void AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     }
     break;
     }
+    return state == State::AsyncPushing or state == State::SyncPushing;
 }
 
 void AsyncReadableStream::reactivate(bool doReactivate)
@@ -652,7 +656,8 @@ void AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<char> 
     const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
     if (consumedOutput > 0)
     {
-        AsyncReadableStream::push(outputBufferID, consumedOutput);
+        // Ignore whatever push returns because later on the stream is either finalizing or pausing either way
+        (void)AsyncReadableStream::push(outputBufferID, consumedOutput);
     }
     AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
     if (inputAfter.empty())
@@ -681,7 +686,8 @@ void AsyncTransformStream::afterFinalize(Span<char> outputAfter, bool streamEnde
     const size_t consumedOutput = outputData.sizeInBytes() - outputAfter.sizeInBytes();
     if (consumedOutput > 0)
     {
-        AsyncReadableStream::push(outputBufferID, consumedOutput);
+        // Ignore whatever push returns because later on the stream is either finalizing or pausing either way
+        (void)AsyncReadableStream::push(outputBufferID, consumedOutput);
     }
     AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
     if (streamEnded)

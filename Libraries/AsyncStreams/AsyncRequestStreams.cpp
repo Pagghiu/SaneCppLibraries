@@ -102,16 +102,20 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
         }
         else
         {
-            AsyncReadableStream::push(bufferID, data.sizeInBytes());
+            const bool continuePushing = AsyncReadableStream::push(bufferID, data.sizeInBytes());
             SC_ASSERT_RELEASE(result.getAsync().isFree());
             getBuffersPool().unrefBuffer(bufferID);
-            if (getBufferOrPause(0, bufferID, result.getAsync().buffer))
+            // Check if we're still pushing (so not, paused, destroyed or errored etc.)
+            if (continuePushing)
             {
-                request.callback = [this, bufferID](typename AsyncReadRequest::Result& result)
-                { afterRead(result, bufferID); };
-                result.reactivateRequest(true);
-                // Stream is in AsyncPushing mode and SC::AsyncResult::reactivateRequest(true) will cause more
-                // data to be delivered here, so it's not necessary calling AsyncReadableStream::reactivate(true).
+                if (getBufferOrPause(0, bufferID, result.getAsync().buffer))
+                {
+                    request.callback = [this, bufferID](typename AsyncReadRequest::Result& result)
+                    { afterRead(result, bufferID); };
+                    result.reactivateRequest(true);
+                    // Stream is in AsyncPushing mode and SC::AsyncResult::reactivateRequest(true) will cause more
+                    // data to be delivered here, so it's not necessary calling AsyncReadableStream::reactivate(true).
+                }
             }
         }
     }

@@ -23,9 +23,11 @@ SC::Result SC::SyncZLibTransformStream::transform(AsyncBufferView::ID bufferID, 
     SC_TRY(sourceData.sliceStart(consumedInputBytes, inputData));
     while (not inputData.empty())
     {
-        Span<char>          outputData;
         AsyncBufferView::ID outputBufferID;
-        if (getBufferOrPause(0, outputBufferID, outputData))
+
+        Span<char> outputData;
+        bool       continuePushing = true;
+        if (getBufferOrPause(0, outputBufferID, outputData) and continuePushing)
         {
             const size_t outputBefore = outputData.sizeInBytes();
             const size_t inputBefore  = inputData.sizeInBytes();
@@ -40,7 +42,7 @@ SC::Result SC::SyncZLibTransformStream::transform(AsyncBufferView::ID bufferID, 
             consumedInputBytes += consumedInput;
             if (consumedOutput > 0)
             {
-                AsyncReadableStream::push(outputBufferID, consumedOutput);
+                continuePushing = AsyncReadableStream::push(outputBufferID, consumedOutput);
             }
             AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
         }
@@ -65,8 +67,10 @@ bool SC::SyncZLibTransformStream::canEndTransform()
     // we need to hold the "Ending" state of the state machine, to finish
     // writing this last trail of transformed data.
     AsyncBufferView::ID outputBufferID;
-    Span<char>          outputBefore;
-    while (getBufferOrPause(0, outputBufferID, outputBefore))
+
+    Span<char> outputBefore;
+    bool       continuePushing = true;
+    while (getBufferOrPause(0, outputBufferID, outputBefore) and continuePushing)
     {
         Span<char> outputData = outputBefore;
 
@@ -80,7 +84,7 @@ bool SC::SyncZLibTransformStream::canEndTransform()
         const size_t outputBytes = outputBefore.sizeInBytes() - outputData.sizeInBytes();
         if (outputBytes > 0)
         {
-            AsyncReadableStream::push(outputBufferID, outputBytes);
+            continuePushing = AsyncReadableStream::push(outputBufferID, outputBytes);
         }
         AsyncReadableStream::getBuffersPool().unrefBuffer(outputBufferID);
         if (streamEnded)

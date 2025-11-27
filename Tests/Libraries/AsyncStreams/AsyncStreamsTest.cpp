@@ -154,7 +154,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
     } context = {readable, 0, 100, {}};
 
     (void)readable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    readable.asyncRead = [&context]() -> Result
+    readable.asyncRead = [this, &context]() -> Result
     {
         if (context.idx < context.max)
         {
@@ -163,7 +163,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
             if (context.readable.getBufferOrPause(sizeof(context.idx), bufferID, data))
             {
                 memcpy(data.data(), &context.idx, sizeof(context.idx));
-                context.readable.push(bufferID, sizeof(context.idx));
+                SC_TEST_EXPECT(context.readable.push(bufferID, sizeof(context.idx)));
                 context.readable.getBuffersPool().unrefBuffer(bufferID);
                 context.idx += 1;
                 context.readable.reactivate(true);
@@ -231,14 +231,14 @@ void SC::AsyncStreamsTest::readableAsyncStream()
 
     SC_TEST_EXPECT(loop.create());
     AsyncLoopTimeout timeout;
-    timeout.callback = [&context](AsyncLoopTimeout::Result&)
+    timeout.callback = [this, &context](AsyncLoopTimeout::Result&)
     {
         AsyncBufferView::ID bufferID;
         Span<char>          data;
         if (context.readable.getBufferOrPause(sizeof(context.idx), bufferID, data))
         {
             memcpy(data.data(), &context.idx, sizeof(context.idx));
-            context.readable.push(bufferID, sizeof(context.idx));
+            SC_TEST_EXPECT(context.readable.push(bufferID, sizeof(context.idx)));
             context.readable.getBuffersPool().unrefBuffer(bufferID);
             context.idx += 1;
             context.readable.reactivate(true);
