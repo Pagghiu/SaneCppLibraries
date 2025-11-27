@@ -159,10 +159,13 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead, u
 
 SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 {
-    DWORD      numberOfReadBytes;
+    DWORD      numberOfReadBytes = 0;
     const BOOL res =
         ::ReadFile(handle, data.data(), static_cast<DWORD>(data.sizeInBytes()), &numberOfReadBytes, nullptr);
-    SC_TRY_MSG(res, "ReadFile failed");
+    if (res == FALSE and ::GetLastError() != ERROR_BROKEN_PIPE)
+    {
+        return Result::Error("ReadFile failed");
+    }
     return Result(data.sliceStartLength(0, static_cast<size_t>(numberOfReadBytes), actuallyRead));
 }
 
