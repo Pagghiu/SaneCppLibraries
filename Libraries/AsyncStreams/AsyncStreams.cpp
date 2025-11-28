@@ -27,8 +27,8 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
         switch (buffer->type)
         {
         case AsyncBufferView::Type::Writable: buffer->writableData = buffer->originalWritableData; break;
-        case AsyncBufferView::Type::ReadOnly: *buffer = {}; break;
-        case AsyncBufferView::Type::Growable: *buffer = {}; break;
+        case AsyncBufferView::Type::ReadOnly: buffer->type = AsyncBufferView::Type::Empty; break;
+        case AsyncBufferView::Type::Growable: buffer->type = AsyncBufferView::Type::Empty; break;
         case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
         }
     }
@@ -78,6 +78,8 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
 {
     for (AsyncBufferView& buffer : buffers)
     {
+        if (buffer.type == AsyncBufferView::Type::Empty)
+            continue;
         if (buffer.refs == 0 and buffer.writableData.sizeInBytes() >= minimumSizeInBytes)
         {
             buffer.refs = 1;
@@ -151,6 +153,7 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
     {
         if (buffers[idx].getType() == AsyncBufferView::Type::Empty)
         {
+            buffer.refs  = 0;
             buffers[idx] = buffer;
             bufferID     = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(idx));
             return Result(true);
