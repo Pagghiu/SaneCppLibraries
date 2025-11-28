@@ -165,7 +165,8 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
 
 Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
 {
-    SC_TRY_MSG(state == State::Stopped, "Can init only in Stopped state")
+    SC_TRY_MSG(state == State::Stopped or state == State::Destroyed or state == State::Ended,
+               "AsyncReadableStream::init - Can be called only in Stopped / Destroyed / Ended state")
     buffers   = &buffersPool;
     readQueue = requests;
     state     = State::CanRead;
@@ -414,9 +415,14 @@ bool AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBuffe
 
 Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
 {
-    SC_TRY_MSG(state == State::Stopped, "AsyncWritableStream::init - can only be called when stopped");
+    SC_TRY_MSG(state == State::Stopped or state == State::Ended,
+               "AsyncWritableStream::init - Can be called only in Stopped or Ended states");
     buffers    = &buffersPool;
     writeQueue = requests;
+    if (state == State::Ended)
+    {
+        state = State::Stopped;
+    }
     return Result(true);
 }
 
