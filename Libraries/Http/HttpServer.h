@@ -111,6 +111,7 @@ struct SC_COMPILER_EXPORT HttpServerClient
         Free,
         Used
     };
+    HttpServerClient();
     State state = State::Free;
 
     HttpRequest  request;

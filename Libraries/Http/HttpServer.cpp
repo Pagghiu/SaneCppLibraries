@@ -7,6 +7,15 @@
 namespace SC
 {
 //-------------------------------------------------------------------------------------------------------
+// HttpServerClient
+//-------------------------------------------------------------------------------------------------------
+HttpServerClient::HttpServerClient()
+{
+    // This is needed on Linux so that ReadableSocketStream constructor don't need to be exported
+    // in order to be used across plugin boundaries.
+}
+
+//-------------------------------------------------------------------------------------------------------
 // HttpRequest
 //-------------------------------------------------------------------------------------------------------
 bool HttpRequest::find(HttpParser::Token token, StringSpan& res) const
