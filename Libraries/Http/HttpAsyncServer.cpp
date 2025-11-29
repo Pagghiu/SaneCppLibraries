@@ -130,8 +130,12 @@ void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView:
 
     if (client.response.mustBeFlushed())
     {
-        auto onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
-        SC_TRUST_RESULT(client.writableStream->write(client.response.getSpan(), onAfterWrite));
+        client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
+        client.readableSocketStream.eventData = {}; // De-register data event
+
+        auto   onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
+        Result res          = client.writableStream->write(client.response.getSpan(), onAfterWrite);
+        SC_TRUST_RESULT(res);
         client.writableStream->end(); // TODO: This must be called only if actually ended...
     }
 }
@@ -195,12 +199,7 @@ void HttpAsyncServer::closeAsync(HttpServerClient& requestClient)
         return;
     }
 
-    if (useStreams)
-    {
-        requestClient.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
-        requestClient.writableSocketStream.end();     // emits 'eventFinish' cancelling pending writes
-    }
-    else
+    if (not useStreams)
     {
         if (not requestClient.asyncSend.isFree())
         {
@@ -210,8 +209,8 @@ void HttpAsyncServer::closeAsync(HttpServerClient& requestClient)
         {
             (void)requestClient.asyncReceive.stop(*eventLoop);
         }
-        SC_TRUST_RESULT(requestClient.socket.close());
     }
+    SC_TRUST_RESULT(requestClient.socket.close());
     const bool wasFull = not httpServer.canAcceptMoreClients();
 
     SC_TRUST_RESULT(httpServer.deallocateClient(requestClient));

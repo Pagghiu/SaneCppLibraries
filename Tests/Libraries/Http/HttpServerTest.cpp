@@ -50,7 +50,7 @@ void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
         for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
         {
             Span<char>   memory;
-            const size_t offset = idx * CLIENT_REQUEST + slice;
+            const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
             SC_TEST_EXPECT(requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory));
             buffers[idx * REQUEST_SLICES + slice] = memory;
         }
