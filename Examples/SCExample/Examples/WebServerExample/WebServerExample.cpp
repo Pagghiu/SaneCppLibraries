@@ -39,6 +39,7 @@ struct SC::WebServerExampleModelState
     String  interface  = "127.0.0.1";
     int32_t port       = 8090;
     int32_t maxClients = 32;
+    bool    useStreams = false;
 };
 
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleModelState)
@@ -46,6 +47,7 @@ SC_REFLECT_STRUCT_FIELD(0, directory)
 SC_REFLECT_STRUCT_FIELD(1, interface)
 SC_REFLECT_STRUCT_FIELD(2, port)
 SC_REFLECT_STRUCT_FIELD(3, maxClients)
+SC_REFLECT_STRUCT_FIELD(4, useStreams)
 SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::WebServerExampleViewState
@@ -67,20 +69,55 @@ struct SC::WebServerExampleModel
     HttpAsyncServer httpServer;
     HttpWebServer   httpWebServer;
 
-    Buffer                 headerBuffer;
+    Buffer requestsMemory;
+    Buffer headerBuffer;
+
     GrowableBuffer<Buffer> gb = {headerBuffer};
     Span<HttpServerClient> clients;
 
+    Span<ReadableFileStream::Request> readRequests;
+    Span<WritableFileStream::Request> writeRequests;
+
+    Span<AsyncBufferView> buffers;
+
     Result start()
     {
+        constexpr int REQUEST_SLICES = 2;
+        constexpr int CLIENT_REQUEST = 1024;
+        constexpr int HEADER_SIZE    = 1024 * 8;
+
         const size_t numClients = static_cast<size_t>(modelState.maxClients);
 
-        clients = {new HttpServerClient[numClients], numClients};
-        SC_TRY(gb.resizeWithoutInitializing(1024 * 8 * numClients));
+        SC_TRY(requestsMemory.resize(numClients * CLIENT_REQUEST));
+
+        // TODO: Simplify this messy manual memory handling
+        clients       = {new HttpServerClient[numClients], numClients};
+        readRequests  = {new ReadableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
+        writeRequests = {new WritableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
+        buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 1)], numClients*(REQUEST_SLICES + 1)};
+
+        Span<char> requestsSpan = requestsMemory.toSpan();
+        for (size_t idx = 0; idx < numClients; ++idx)
+        {
+            for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
+            {
+                Span<char>   memory;
+                const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
+                (void)requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory);
+                buffers[idx * REQUEST_SLICES + slice] = memory;
+            }
+        }
+
+        SC_TRY(gb.resizeWithoutInitializing(HEADER_SIZE * numClients));
         HttpServer::Memory memory = {gb, clients};
         httpServer.httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
-        SC_TRY(
-            httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port), memory));
+        if (modelState.useStreams)
+        {
+            httpServer.setUseAsyncStreams(true, readRequests, writeRequests, buffers);
+        }
+
+        const uint16_t port = static_cast<uint16_t>(modelState.port);
+        SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port, memory));
         SC_TRY(httpWebServer.init(modelState.directory.view()));
         return Result(true);
     }
@@ -90,7 +127,13 @@ struct SC::WebServerExampleModel
         SC_TRY(httpWebServer.stopAsync());
         SC_TRY(httpServer.stopSync());
         delete[] clients.data();
-        clients = {};
+        delete[] readRequests.data();
+        delete[] writeRequests.data();
+        delete[] buffers.data();
+        clients       = {};
+        readRequests  = {};
+        writeRequests = {};
+        buffers       = {};
         return Result(true);
     }
 
@@ -133,6 +176,7 @@ struct SC::WebServerExampleView
         SC_TRY(InputText("Interface", buffer, model.modelState.interface, viewState.needsRestart));
         SC_TRY(InputText("Directory", buffer, model.modelState.directory, viewState.needsRestart));
         viewState.needsRestart |= ImGui::InputInt("Port", &model.modelState.port);
+        viewState.needsRestart |= ImGui::Checkbox("Use Async Streams", &model.modelState.useStreams);
 
         if (not model.httpServer.isStarted())
         {
