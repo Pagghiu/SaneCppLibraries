@@ -781,6 +781,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
                         break;
                     }
                     fullyWrittenBytes += ioVecSize;
+                    indexOfVecToWrite++;
                 }
                 // Number of writes already written of io vector at indexOfVecToWrite
                 const size_t partiallyWrittenBytes = async.totalBytesWritten - fullyWrittenBytes;

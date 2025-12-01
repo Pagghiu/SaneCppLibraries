@@ -298,8 +298,10 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
         SC_TEST_EXPECT(res.get(writtenBytes));
         SC_TEST_EXPECT(writtenBytes == 8);
     };
-    fileWrite[0].handle         = handle;
-    fileWrite[1].handle         = handle;
+    fileWrite[0].handle = handle;
+    fileWrite[1].handle = handle;
+
+    // TODO: Find a way to reliably test partial gather writes
     Span<const char> buffers1[] = {{"PING", 4}, {"PONG", 4}};
     SC_TEST_EXPECT(fileWrite[0].start(eventLoop, buffers1));
     Span<const char> buffers2[] = {{"PENG", 4}, {"PANG", 4}};

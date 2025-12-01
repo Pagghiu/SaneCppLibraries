@@ -295,6 +295,7 @@ void SC::AsyncTest::socketTCPSendMultiple()
     sendAsync[0].executeOn(sendSequence); // executed first
     sendAsync[1].executeOn(sendSequence); // executed second
 
+    // TODO: Find a way to reliably test partial gather writes
     Span<const char> sendData1[] = {{"PING", 4}, {"PONG", 4}};
     SC_TEST_EXPECT(sendAsync[0].start(eventLoop, client, sendData1));
     Span<const char> sendData2[] = {{"PENG", 4}, {"PANG", 4}};
