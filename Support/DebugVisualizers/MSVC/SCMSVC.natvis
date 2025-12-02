@@ -75,4 +75,15 @@
       <ExpandedItem>*(SC::StringSpan*)this</ExpandedItem>
     </Expand>
   </Type>
+  <Type Name="SC::Span&lt;*&gt;">
+    <Intrinsic Name="size" Expression="sizeElements" />
+    <DisplayString>{{ size={sizeElements} }}</DisplayString>
+    <Expand>
+      <Item Name="[size]">sizeElements</Item>
+      <ArrayItems>
+        <Size>sizeElements</Size>
+        <ValuePointer>items</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
 </AutoVisualizer>

@@ -36,6 +36,9 @@ struct SC::DebugVisualizersTest : public SC::TestCase
     ArenaMap<String>       arenaMap; // This has no Debug visualizer
 
     Array<String, 3> array;
+
+    int       arrayOfInts[3] = {1, 2, 3};
+    Span<int> spanOfInts     = arrayOfInts;
     DebugVisualizersTest(SC::TestReport& report) : TestCase(report, "DebugVisualizersTest")
     {
         using namespace SC;

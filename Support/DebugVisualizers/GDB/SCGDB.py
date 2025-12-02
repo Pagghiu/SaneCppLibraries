@@ -201,6 +201,33 @@ class StringPrettyPrinter:
         except Exception as e:
             return f"<string error: {e}>"
 
+class SpanPrettyPrinter:
+    def __init__(self, val):
+        self.val = val
+        self.data_type = self.val.type.template_argument(0)
+        self.item_size = self.data_type.sizeof
+        self.size = int(self.val['sizeElements'])
+        self.items = self.val['items']
+
+    def to_string(self):
+        return f"size={self.size}"
+
+    def children(self):
+        try:
+            # Direct access to items for Span (no offset calculation needed)
+            items = self.items
+            for i in range(self.size):
+                try:
+                    yield f"[{i}]", items[i]
+                except:
+                    break
+        except Exception as e:
+            gdb.write(f"Span items access failed: {e}\n")
+            pass
+
+    def display_hint(self):
+        return 'array'
+
 def build_pretty_printer():
     pp = gdb.printing.RegexpCollectionPrettyPrinter("SC")
 
@@ -218,6 +245,9 @@ def build_pretty_printer():
     pp.add_printer('SC::SmallString', '^SC::SmallString<.*>$', StringPrettyPrinter)
     pp.add_printer('SC::StringSpan', '^SC::StringSpan$', StringPrettyPrinter)
     pp.add_printer('SC::StringView', '^SC::StringView$', StringPrettyPrinter)
+
+    # Span types
+    pp.add_printer('SC::Span', '^SC::Span<.*>$', SpanPrettyPrinter)
 
     return pp
 

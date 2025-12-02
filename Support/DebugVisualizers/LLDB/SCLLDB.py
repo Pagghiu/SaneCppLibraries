@@ -197,7 +197,7 @@ def string_SummaryProvider(valobj, dict):
             if data_size == 0:
                 return '""'
             data = valobj.GetChildMemberWithName("text").GetPointeeData(0, data_size)
-        else:            
+        else:
             data = valobj.GetChildMemberWithName("data").GetNonSyntheticValue()
             prov = buffer_SynthProvider(data, None, "string_SummaryProvider")
             prov.update()
@@ -223,7 +223,7 @@ def string_SummaryProvider(valobj, dict):
             if not error.Fail():
                 try:
                     # Decode the byte_buffer directly
-                    decoded_str : str =  byte_buffer.decode('utf-8') 
+                    decoded_str : str =  byte_buffer.decode('utf-8')
                     return '"' + decoded_str + '"'
                 except UnicodeDecodeError:
                     return "<error: unable to decode as UTF-8>"
@@ -247,6 +247,83 @@ def string_SummaryProvider(valobj, dict):
         # logger >> f"string_SummaryProvider EXCEPTION {str(e)}"
         pass
     return '""'
+
+class span_SynthProvider:
+    def __init__(self, valobj, dict, name="span_SynthProvider"):
+        self.__name = name
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.__init__ "
+        self.valobj = valobj
+        self.items = None
+        self.data_size = 0
+        self.data_type = None
+        self.item_size = 0
+
+    def num_children(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.num_children"
+        try:
+            if not self.items:
+                self.update()
+            return self.data_size
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return 0
+
+    def get_child_index(self, name):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.get_child_index"
+        try:
+            return int(name.lstrip("[").rstrip("]"))
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return -1
+
+    def get_child_at_index(self, index):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.Retrieving child " + str(index)
+        if index < 0:
+            return None
+        if index >= self.num_children():
+            return None
+        try:
+            offset = index * self.item_size
+            return self.items.CreateChildAtOffset("[" + str(index) + "]", offset, self.data_type)
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            return None
+
+    def update(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.update"
+        try:
+            # Get the template argument type (the Type parameter)
+            self.data_type = self.valobj.GetType().GetTemplateArgumentType(0)
+            self.item_size = self.data_type.GetByteSize()
+
+            # Get the items pointer and size
+            items_ptr = self.valobj.GetChildMemberWithName("items")
+            size_elements = self.valobj.GetChildMemberWithName("sizeElements").GetValueAsUnsigned()
+
+            self.data_size = size_elements
+            self.items = items_ptr.Dereference()
+
+            # logger >> f"{self.__name}.size = {self.data_size}"
+            # logger >> f"{self.__name}.data_type = {self.data_type}"
+        except Exception as e:
+            # logger >> f"{self.__name} EXCEPTION\n{e}"
+            pass
+
+    def has_children(self):
+        # logger = lldb.formatters.Logger.Logger()
+        # logger >> f"{self.__name}.has_children"
+        return True
+
+def span_SummaryProvider(valobj, dict):
+    # logger = lldb.formatters.Logger.Logger()
+    raw = valobj.GetNonSyntheticValue()
+    prov = span_SynthProvider(raw, None, "span_SummaryProvider")
+    return f"size={prov.num_children()}"
 
 
 # Add your CustomVector class type here
@@ -286,3 +363,9 @@ def __lldb_init_module(debugger, internal_dict):
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)String$"')
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringView$"')
     debugger.HandleCommand('type summary add -F SCLLDB.string_SummaryProvider -e -x "^(SC::)StringSpan$"')
+
+    ###########################################################################################################
+    # Spans
+    ###########################################################################################################
+    debugger.HandleCommand('type synthetic add -l SCLLDB.span_SynthProvider -x "^(SC::)Span<.+>$"')
+    debugger.HandleCommand('type summary add -F SCLLDB.span_SummaryProvider -e -x "^(SC::)Span<.+>$"')
