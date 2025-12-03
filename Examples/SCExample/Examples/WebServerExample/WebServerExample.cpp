@@ -93,8 +93,9 @@ struct SC::WebServerExampleModel
         // TODO: Simplify this messy manual memory handling
         clients       = {new HttpServerClient[numClients], numClients};
         readRequests  = {new ReadableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
-        writeRequests = {new WritableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
-        buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 1)], numClients*(REQUEST_SLICES + 1)};
+        writeRequests = {new WritableFileStream::Request[numClients * (REQUEST_SLICES + 1)],
+                         numClients*(REQUEST_SLICES + 1)};
+        buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 2)], numClients*(REQUEST_SLICES + 2)};
 
         Span<char> requestsSpan = requestsMemory.toSpan();
         for (size_t idx = 0; idx < numClients; ++idx)

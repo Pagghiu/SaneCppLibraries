@@ -38,7 +38,7 @@ void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
     Buffer requestsMemory;
     SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * CLIENT_REQUEST));
 
-    AsyncBufferView  buffers[NUM_CLIENTS * (REQUEST_SLICES + 1)]; // +1 to accomodate some slots for external bufs
+    AsyncBufferView  buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accomodate some slots for external bufs
     HttpServerClient clients[NUM_CLIENTS];
 
     AsyncReadableStream::Request readQueue[NUM_CLIENTS * REQUEST_SLICES];

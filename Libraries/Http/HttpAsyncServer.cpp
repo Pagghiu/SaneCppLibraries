@@ -123,19 +123,25 @@ void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView:
         // TODO: Invoke on error
         return;
     }
-    else if (client.request.allHeadersReceived())
+    else if (client.request.headersEndReceived)
     {
+        client.response.responseHeaders         = {client.request.availableHeader.data(), 0};
+        client.response.responseHeadersCapacity = client.request.availableHeader.sizeInBytes();
         httpServer.onRequest(client.request, client.response);
     }
 
-    if (client.response.mustBeFlushed())
+    if (client.response.responseEnded)
     {
         client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
         client.readableSocketStream.eventData = {}; // De-register data event
 
-        auto   onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
-        Result res          = client.writableStream->write(client.response.getSpan(), onAfterWrite);
-        SC_TRUST_RESULT(res);
+        auto onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
+
+        // TODO: We need writev support in AsyncStreams to avoid two writes here
+        Result res0 = client.writableStream->write(client.response.getHeadersSpan(), {});
+        Result res1 = client.writableStream->write(client.response.getContentSpan(), onAfterWrite);
+        SC_TRUST_RESULT(res0);
+        SC_TRUST_RESULT(res1);
         client.writableStream->end(); // TODO: This must be called only if actually ended...
     }
 }
@@ -158,17 +164,20 @@ void HttpAsyncServer::onReceive(AsyncSocketReceive::Result& result)
         // TODO: Invoke on error
         return;
     }
-    else if (client.request.allHeadersReceived())
+    else if (client.request.headersEndReceived)
     {
+        client.response.responseHeaders         = {client.request.availableHeader.data(), 0};
+        client.response.responseHeadersCapacity = client.request.availableHeader.sizeInBytes();
         httpServer.onRequest(client.request, client.response);
     }
 
-    if (client.response.mustBeFlushed())
+    if (client.response.responseEnded)
     {
-        Span<const char> outspan = client.response.getSpan();
         client.asyncSend.setDebugName(client.debugName);
         client.asyncSend.callback.bind<HttpAsyncServer, &HttpAsyncServer::onAfterSend>(*this);
-        auto res = client.asyncSend.start(*eventLoop, client.socket, outspan);
+        client.buffers[0] = client.response.getHeadersSpan(); // headers first
+        client.buffers[1] = client.response.getContentSpan(); // content later
+        auto res          = client.asyncSend.start(*eventLoop, client.socket, client.buffers);
         if (not res)
         {
             // TODO: Invoke on error

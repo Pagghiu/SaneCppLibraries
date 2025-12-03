@@ -46,17 +46,19 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
 
+    /// @brief Resets this object for it to be re-usable
     void reset();
 
-    Result     parse(const uint32_t maxHeaderSize, Span<const char> readData);
-    Span<char> readHeaders;
-    Span<char> availableHeader; ///< Space to save headers to
-
-    bool allHeadersReceived() const { return headersEndReceived; }
+    /// @brief Parses an incoming slice of data (must be slice of availableHeader)
+    Result parse(const uint32_t maxHeaderSize, Span<const char> readData);
 
   private:
     friend struct HttpServer;
-    using HttpHeaderOffset = detail::HttpHeaderOffset; // TODO: hide class implementation
+    friend struct HttpAsyncServer;
+    using HttpHeaderOffset = detail::HttpHeaderOffset;
+
+    Span<char> readHeaders;     ///< Headers read so far
+    Span<char> availableHeader; ///< Space to save headers to
 
     bool headersEndReceived = false; ///< All headers have been received
     bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
@@ -65,8 +67,9 @@ struct SC_COMPILER_EXPORT HttpRequest
     StringSpan url;    ///< The url extracted from parsed headers
 
     static constexpr size_t MaxNumHeaders = 64;
-    HttpHeaderOffset        headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
-    size_t                  numHeaders = 0;
+
+    HttpHeaderOffset headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
+    size_t           numHeaders = 0;
 };
 
 /// @brief Http response that will be sent to a client
@@ -78,54 +81,59 @@ struct SC_COMPILER_EXPORT HttpResponse
     /// @brief Writes an http header to this response
     Result addHeader(StringSpan headerName, StringSpan headerValue);
 
-    /// @brief Appends some data to the response
-    Result write(Span<const char> data);
-
     /// @brief Finalizes response appending some data
     /// @warning The SC::HttpResponse / SC::HttpRequest pair will be invalidated on next SC::AsyncEventLoop run
     Result end(Span<const char> data);
     Result end();
 
+    /// @brief Resets this object for it to be re-usable
     void reset()
     {
         responseEnded = false;
         outputBuffer.clear();
     }
 
-    Span<const char>   getSpan() const { return outputBuffer.toSpanConst(); }
-    [[nodiscard]] bool mustBeFlushed() const { return responseEnded or outputBuffer.size() > highwaterMark; }
-
   private:
     friend struct HttpServer;
+    friend struct HttpAsyncServer;
+
+    Span<const char> getContentSpan() const { return outputBuffer.toSpanConst(); }
+    Span<const char> getHeadersSpan() const { return responseHeaders; }
+
+    Span<char> responseHeaders;
+    size_t     responseHeadersCapacity = 0;
 
     Buffer outputBuffer;
 
-    bool   responseEnded = false;
-    size_t highwaterMark = 1024;
+    bool responseEnded = false;
 };
 
 struct SC_COMPILER_EXPORT HttpServerClient
 {
-    enum class State
-    {
-        Free,
-        Used
-    };
     HttpServerClient();
-    State state = State::Free;
 
-    HttpRequest  request;
-    HttpResponse response;
-    size_t       index = 0;
-
-    void setFree()
+    void reset()
     {
         request.reset();
         response.reset();
         state = State::Free;
     }
 
+    HttpRequest  request;
+    HttpResponse response;
+
+  private:
+    enum class State
+    {
+        Free,
+        Used
+    };
+    friend struct HttpServer;
+    friend struct HttpAsyncServer;
     char debugName[16] = {0};
+
+    State  state = State::Free;
+    size_t index = 0;
 
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
@@ -136,6 +144,8 @@ struct SC_COMPILER_EXPORT HttpServerClient
     SocketDescriptor   socket;
     AsyncSocketReceive asyncReceive;
     AsyncSocketSend    asyncSend;
+
+    Span<const char> buffers[2];
 };
 #if !DOXYGEN
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&, HttpResponse&)>;

@@ -42,7 +42,8 @@ void HttpRequest::reset()
 
 Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
 {
-    readHeaders               = {readHeaders.data(), readHeaders.sizeInBytes() + readData.sizeInBytes()};
+    readHeaders = {readHeaders.data(), readHeaders.sizeInBytes() + readData.sizeInBytes()};
+
     const bool hasHeaderSpace = availableHeader.sliceStart(readData.sizeInBytes(), availableHeader);
 
     if (not hasHeaderSpace)
@@ -96,11 +97,11 @@ Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
 //-------------------------------------------------------------------------------------------------------
 Result HttpResponse::startResponse(int code)
 {
-    GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+    SC_TRY_MSG(responseHeaders.sizeInBytes() == 0, "startResponse must be the first call");
+    GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
     HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
 
-    sb.clear();
     SC_TRY(sb.append("HTTP/1.1 "));
     switch (code)
     {
@@ -114,7 +115,8 @@ Result HttpResponse::startResponse(int code)
 
 Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 {
-    GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+    SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
+    GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
     HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
 
@@ -127,8 +129,9 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 
 Result HttpResponse::end(Span<const char> span)
 {
+    SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
     {
-        GrowableBuffer<decltype(outputBuffer)> gb = {outputBuffer};
+        GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
         SC_TRY(sb.append("Content-Length:"));
@@ -138,8 +141,7 @@ Result HttpResponse::end(Span<const char> span)
         SC_TRY(sb.append(ss));
         SC_TRY(sb.append("\r\n\r\n"));
     }
-    SC_TRY(not outputBuffer.isEmpty());
-    SC_TRY(outputBuffer.append(span));
+    SC_TRY(outputBuffer.assign(span));
     return end();
 }
 
@@ -188,7 +190,7 @@ bool HttpServer::deallocateClient(HttpServerClient& client)
     }
     else
     {
-        clients[client.index].setFree();
+        clients[client.index].reset();
         numClients--;
         return true;
     }
