@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Foundation/PrimitiveTypes.h"
+#include "../../Foundation/Span.h"
+
 namespace SC
 {
 /// @brief Interface abstracting a linear binary buffer.
@@ -40,12 +42,41 @@ struct SC_COMPILER_EXPORT IGrowableBuffer
     DirectAccess directAccess;
 };
 
-/// @brief Partial specialize GrowableBuffer deriving from IGrowableBuffer (see how String and Buffer do it)
+/// @brief Partial specialize GrowableBuffer deriving from IGrowableBuffer (see how Span, String and Buffer do it)
 template <typename T>
 struct GrowableBuffer
 {
     T& content;
     GrowableBuffer(T& content) : content(content) {}
+};
+
+template <>
+struct GrowableBuffer<Span<char>> : public IGrowableBuffer
+{
+    Span<char>& content;
+    size_t      capacity;
+    GrowableBuffer(Span<char>& span)
+        : content(span), capacity(content.sizeInBytes()), IGrowableBuffer(&GrowableBuffer::fixedGrowTo)
+    {
+        IGrowableBuffer::directAccess = {span.sizeInBytes(), capacity, span.data()};
+    }
+    GrowableBuffer(Span<char>& span, size_t capacity)
+        : content(span), capacity(capacity), IGrowableBuffer(&GrowableBuffer::fixedGrowTo)
+    {
+        IGrowableBuffer::directAccess = {span.sizeInBytes(), capacity, span.data()};
+    }
+    ~GrowableBuffer() { content = {content.data(), IGrowableBuffer::directAccess.sizeInBytes}; }
+
+    static bool fixedGrowTo(IGrowableBuffer& growableBuffer, size_t newSize)
+    {
+        GrowableBuffer& buffer = static_cast<GrowableBuffer&>(growableBuffer);
+        if (newSize < static_cast<GrowableBuffer&>(growableBuffer).capacity)
+        {
+            buffer.content = {buffer.content.data(), newSize};
+            return true;
+        }
+        return false;
+    }
 };
 
 } // namespace SC
