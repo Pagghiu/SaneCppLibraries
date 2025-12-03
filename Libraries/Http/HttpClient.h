@@ -5,6 +5,7 @@
 #include "../Foundation/StringSpan.h"
 #include "../Memory/String.h"
 #include "../Socket/Socket.h"
+#include "HttpParser.h"
 namespace SC
 {
 /// @brief HTTP parser, client and server (see @ref library_http)
@@ -38,8 +39,15 @@ struct SC::HttpClient
     void onAfterSend(AsyncSocketSend::Result& result);
     void onAfterRead(AsyncSocketReceive::Result& result);
 
+    HttpParser parser;
+
     SmallBuffer<1024> content;
 
+    bool headersReceived = false;
+
+    size_t receivedBytes = 0;
+    size_t parsedBytes   = 0;
+    size_t contentLen    = 0;
     String customDebugName;
 
     AsyncSocketConnect connectAsync;
