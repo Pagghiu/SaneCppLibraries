@@ -53,6 +53,7 @@ void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
             const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
             SC_TEST_EXPECT(requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory));
             buffers[idx * REQUEST_SLICES + slice] = memory;
+            buffers[idx * REQUEST_SLICES + slice].setReusable(true); // We want to recycle these buffers
         }
     }
 

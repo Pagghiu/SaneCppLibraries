@@ -106,6 +106,7 @@ struct SC::WebServerExampleModel
                 const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
                 (void)requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory);
                 buffers[idx * REQUEST_SLICES + slice] = memory;
+                buffers[idx * REQUEST_SLICES + slice].setReusable(true);
             }
         }
 

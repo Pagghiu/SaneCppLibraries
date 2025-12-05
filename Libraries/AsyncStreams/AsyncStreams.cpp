@@ -26,10 +26,24 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
     {
         switch (buffer->type)
         {
-        case AsyncBufferView::Type::Writable: buffer->writableData = buffer->originalWritableData; break;
-        case AsyncBufferView::Type::ReadOnly: buffer->type = AsyncBufferView::Type::Empty; break;
-        case AsyncBufferView::Type::Growable: buffer->type = AsyncBufferView::Type::Empty; break;
+        case AsyncBufferView::Type::Writable:
+            if (buffer->reUse)
+            {
+                buffer->writableData = buffer->originalWritableData;
+            }
+            break;
+        case AsyncBufferView::Type::ReadOnly:
+            if (buffer->reUse)
+            {
+                buffer->readonlyData = buffer->originalReadonlyData;
+            }
+            break;
+        case AsyncBufferView::Type::Growable: break;
         case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
+        }
+        if (not buffer->reUse)
+        {
+            *buffer = {};
         }
     }
 }

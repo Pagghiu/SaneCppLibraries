@@ -58,7 +58,7 @@ struct AsyncBufferView
 
         [[nodiscard]] constexpr bool operator==(ID other) const { return identifier == other.identifier; }
     };
-    enum class Type
+    enum class Type : uint8_t
     {
         Empty,
         Writable,
@@ -69,6 +69,9 @@ struct AsyncBufferView
     AsyncBufferView() { type = Type::Empty; }
     AsyncBufferView(Span<char> data) : writableData(data) { type = Type::Writable; }
     AsyncBufferView(Span<const char> data) : readonlyData(data) { type = Type::ReadOnly; }
+
+    /// @brief Tags this AsyncBufferView as reusable after its refCount goes to zero
+    void setReusable(bool reusable) { reUse = reusable; }
 
     /// @brief Saves a copy (or a moved instance) of a String / Buffer (or anything that works with GrowableBuffer<T>)
     /// inside an AsyncBufferView in order to access its data later, as long as its size fits inside the inline storage.
@@ -125,8 +128,9 @@ struct AsyncBufferView
     };
     friend struct AsyncBuffersPool;
 
-    int32_t refs = 0; // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
-    Type    type;
+    int32_t refs = 0;      // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
+    Type    type;          // If it's Empty, Writable, ReadOnly or Growable
+    bool    reUse = false; // If it can be re-used after refs == 0
 };
 
 /// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams

@@ -138,6 +138,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
         Span<char> writableData;
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
         buffers[idx] = writableData;
+        buffers[idx].setReusable(true);
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -213,6 +214,7 @@ void SC::AsyncStreamsTest::readableAsyncStream()
         Span<char> writableData;
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
         buffers[idx] = writableData;
+        buffers[idx].setReusable(true);
     }
     AsyncBuffersPool pool = {buffers};
 

@@ -209,6 +209,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
         Span<char> writableData;
         SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx * bufferBytesSize, bufferBytesSize, writableData));
         buffers[idx] = writableData;
+        buffers[idx].setReusable(true);
     }
     AsyncBuffersPool pool;
     pool.buffers = {buffers, numberOfBuffers};
@@ -313,6 +314,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
         Span<char> writableData;
         SC_TEST_EXPECT(buffer1.toSpan().sliceStartLength(idx * buffers1Size, buffers1Size, writableData));
         buffers1[idx] = writableData;
+        buffers1[idx].setReusable(true);
     }
 
     ThreadPool fileThreadPool;
@@ -361,6 +363,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
         Span<char> writableData;
         SC_TEST_EXPECT(buffer2.toSpan().sliceStartLength(idx * buffers2Size, buffers2Size, writableData));
         buffers2[idx] = writableData;
+        buffers2[idx].setReusable(true);
     }
     ThreadPool streamPool;
     if (useStreamThreadPool)
