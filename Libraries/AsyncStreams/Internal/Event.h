@@ -51,7 +51,7 @@ struct Event
     /// @brief Adds a listener to this event, optionally saving the index to use for its removal
     /// @see Event::removeListener
     template <typename Func>
-    [[nodiscard]] bool addListener(Func&& func, int* idx = nullptr)
+    [[nodiscard]] bool addListener(Func&& func)
     {
         if (numListeners + 1 > MaxListeners)
         {
@@ -59,10 +59,6 @@ struct Event
         }
         else
         {
-            if (idx)
-            {
-                *idx = numListeners;
-            }
             listeners[numListeners++] = move(func);
             return true;
         }

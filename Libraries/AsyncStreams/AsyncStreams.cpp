@@ -340,10 +340,16 @@ void AsyncReadableStream::destroy()
     case State::Pausing:
     case State::Reading:
     case State::AsyncPushing:
-    case State::AsyncReading:
+    case State::AsyncReading: {
         state = State::Destroyed;
+        Request request;
+        while (readQueue.popFront(request))
+        {
+            buffers->unrefBuffer(request.bufferID); // 1b. refBuffer in push
+        }
         eventClose.emit();
         break;
+    }
     case State::Destroyed: emitError(Result::Error("AsyncReadableStream::destroy - already destroyed")); break;
     case State::Ended: emitError(Result::Error("AsyncReadableStream::destroy - already ended")); break;
     case State::Stopped: emitError(Result::Error("AsyncReadableStream::destroy - already stopped")); break;

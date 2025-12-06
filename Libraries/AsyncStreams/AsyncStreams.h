@@ -275,9 +275,10 @@ struct AsyncWritableStream
     };
     static constexpr int MaxListeners = 8;
 
-    Event<MaxListeners, Result> eventError;  /// Emitted when an error occurs
-    Event<MaxListeners>         eventDrain;  /// Emitted when write queue is empty
-    Event<MaxListeners>         eventFinish; /// Emitted when no more data can be written
+    Event<MaxListeners, Result> eventError; /// Emitted when an error occurs
+
+    Event<MaxListeners> eventDrain;  /// Emitted when write queue is empty
+    Event<MaxListeners> eventFinish; /// Emitted when no more data can be written
 
     /// @brief Inits the writable stream
     /// @param buffersPool An instance of AsyncBuffersPool providing write buffers
