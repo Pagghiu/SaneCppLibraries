@@ -33,23 +33,45 @@ void SC::HttpWebServerTest::httpWebServerTest()
     SC_TEST_EXPECT(eventLoop.create());
 
     //! [HttpWebServerSnippet]
-    constexpr int NUM_CLIENTS = 16;
+    constexpr int NUM_CLIENTS    = 16;
+    constexpr int REQUEST_SLICES = 2;
+    constexpr int CLIENT_REQUEST = 1024;
     Buffer        headersMemory;
-    SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * 8 * 1024));
+    SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * 8 * CLIENT_REQUEST));
 
     Buffer requestsMemory;
-    SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * 1024 * 2));
+    SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * CLIENT_REQUEST * 2));
 
     HttpServerClient clients[NUM_CLIENTS];
 
     GrowableBuffer<Buffer> headers      = {headersMemory};
     HttpServer::Memory     serverMemory = {headers, clients};
 
+    AsyncBufferView buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accomodate some slots for external bufs
+
+    AsyncReadableStream::Request readQueue[NUM_CLIENTS * REQUEST_SLICES];
+    AsyncWritableStream::Request writeQueue[NUM_CLIENTS * REQUEST_SLICES];
+
+    Span<char> requestsSpan = requestsMemory.toSpan();
+    for (size_t idx = 0; idx < NUM_CLIENTS; ++idx)
+    {
+        for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
+        {
+            Span<char>   memory;
+            const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
+            SC_TEST_EXPECT(requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory));
+            buffers[idx * REQUEST_SLICES + slice] = memory;
+            buffers[idx * REQUEST_SLICES + slice].setReusable(true); // We want to recycle these buffers
+        }
+    }
+
     HttpAsyncServer asyncServer;
     HttpWebServer   webServer;
     // Creates an HttpServer that serves files from application root directory
     SC_TEST_EXPECT(asyncServer.start(eventLoop, "127.0.0.1", 8090, serverMemory));
     SC_TEST_EXPECT(webServer.init(report.applicationRootDirectory.view()));
+
+    asyncServer.setupStreamsMemory(readQueue, writeQueue, buffers);
 
     asyncServer.httpServer.onRequest = [&](HttpRequest& req, HttpResponse& res) { webServer.serveFile(req, res); };
     //! [HttpWebServerSnippet]
@@ -67,7 +89,9 @@ void SC::HttpWebServerTest::httpWebServerTest()
     client.callback = [this, &context](HttpClient& result)
     {
         context.numRequests++;
-        SC_TEST_EXPECT(StringView(result.getResponse()).containsString("Response from file"));
+        // TODO: Fix this
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("Response from file"));
         SC_TEST_EXPECT(context.httpAsyncServer.stopAsync());
         SC_TEST_EXPECT(context.httpWebServer.stopAsync());
     };

@@ -28,8 +28,8 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     [[nodiscard]] bool isStarted() const { return started; }
 
     /// @brief Enables using AsyncStreams instead of raw Async Send and Receive
-    void setUseAsyncStreams(bool useAsyncStreams, Span<AsyncReadableStream::Request> readQueue,
-                            Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers);
+    void setupStreamsMemory(Span<AsyncReadableStream::Request> readQueue, Span<AsyncWritableStream::Request> writeQueue,
+                            Span<AsyncBufferView> buffers);
 
     /// @brief The underlying http server
     HttpServer httpServer;
@@ -40,15 +40,11 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     Span<AsyncReadableStream::Request> readQueues;
     Span<AsyncWritableStream::Request> writeQueues;
 
-    bool useStreams = false;
-    bool started    = false;
-    bool stopping   = false;
+    bool started  = false;
+    bool stopping = false;
 
     void onNewClient(AsyncSocketAccept::Result& result);
     void closeAsync(HttpServerClient& requestClient);
-
-    void onReceive(AsyncSocketReceive::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
 
     void onStreamReceive(HttpServerClient& client, AsyncBufferView::ID bufferID);
 

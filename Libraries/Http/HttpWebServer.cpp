@@ -34,11 +34,7 @@ SC::Result SC::HttpWebServer::stopAsync() { return Result(true); }
 
 void SC::HttpWebServer::serveFile(HttpRequest& request, HttpResponse& response)
 {
-    if (not Internal::readFile(directory.view(), request, response))
-    {
-        SC_TRUST_RESULT(response.startResponse(404));
-        SC_TRUST_RESULT(response.end("Error"));
-    }
+    SC_ASSERT_RELEASE(Internal::readFile(directory.view(), request, response));
 }
 
 SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpRequest& request, HttpResponse& response)
@@ -63,19 +59,27 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpReque
         Buffer data;
         SC_TRY(fileSystem.read(url, data));
         SC_TRY(response.startResponse(200));
-        SC_TRY(response.addHeader("Connection", "Closed"));
+        char buffer[20];
+        snprintf(buffer, sizeof(buffer), "%zu", data.size());
+        StringSpan contentLength = {{buffer, ::strlen(buffer)}, true, StringEncoding::Ascii};
+        SC_TRY(response.addHeader("Content-Length", contentLength));
         SC_TRY(response.addHeader("Content-Type", Internal::getContentType(extension)));
-        SC_TRY(response.addHeader("Server", "SC"));
         SC_TRY(Internal::writeGMTHeaderTime("Date", response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", response, fileStat.modifiedTime.milliseconds));
-        SC_TRY(response.end(data.toSpanConst()));
+        SC_TRY(response.addHeader("Server", "SC"));
+        SC_TRY(response.addHeader("Connection", "Closed"));
+
+        SC_TRY(response.sendHeaders());
+        SC_TRY(response.getWritableStream().write(move(data)));
+        SC_TRY(response.end());
     }
     else
     {
-        response.startResponse(404);
-        SC_TRY(response.addHeader("Connection", "Closed"));
+        SC_TRY(response.startResponse(404));
         SC_TRY(response.addHeader("Server", "SC"));
-        response.end();
+        SC_TRY(response.addHeader("Connection", "Closed"));
+        SC_TRY(response.sendHeaders());
+        SC_TRY(response.end());
     }
     return Result(true);
 }

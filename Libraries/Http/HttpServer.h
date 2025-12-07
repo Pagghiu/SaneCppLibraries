@@ -7,7 +7,6 @@
 #include "../AsyncStreams/AsyncRequestStreams.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/StringSpan.h"
-#include "../Memory/Buffer.h"
 
 namespace SC
 {
@@ -81,31 +80,28 @@ struct SC_COMPILER_EXPORT HttpResponse
     /// @brief Writes an http header to this response
     Result addHeader(StringSpan headerName, StringSpan headerValue);
 
-    /// @brief Finalizes response appending some data
-    /// @warning The SC::HttpResponse / SC::HttpRequest pair will be invalidated on next SC::AsyncEventLoop run
-    Result end(Span<const char> data);
-    Result end();
+    /// @brief Start sending response headers, before sending any data
+    Result sendHeaders();
 
     /// @brief Resets this object for it to be re-usable
-    void reset()
-    {
-        responseEnded = false;
-        outputBuffer.clear();
-    }
+    void reset();
+
+    /// @brief Finalizes the writable stream after sending all in progress writes
+    Result end();
+
+    /// @brief Obtain writable stream to write content
+    AsyncWritableStream& getWritableStream() { return *writableStream; }
 
   private:
     friend struct HttpServer;
     friend struct HttpAsyncServer;
 
-    Span<const char> getContentSpan() const { return outputBuffer.toSpanConst(); }
-    Span<const char> getHeadersSpan() const { return responseHeaders; }
-
     Span<char> responseHeaders;
     size_t     responseHeadersCapacity = 0;
 
-    Buffer outputBuffer;
+    bool headersSent = false;
 
-    bool responseEnded = false;
+    AsyncWritableStream* writableStream = nullptr;
 };
 
 struct SC_COMPILER_EXPORT HttpServerClient
@@ -138,14 +134,7 @@ struct SC_COMPILER_EXPORT HttpServerClient
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
 
-    AsyncReadableStream* readableStream = &readableSocketStream;
-    AsyncWritableStream* writableStream = &writableSocketStream;
-
-    SocketDescriptor   socket;
-    AsyncSocketReceive asyncReceive;
-    AsyncSocketSend    asyncSend;
-
-    Span<const char> buffers[2];
+    SocketDescriptor socket;
 };
 #if !DOXYGEN
 SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&, HttpResponse&)>;

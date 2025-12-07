@@ -97,6 +97,7 @@ Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
 //-------------------------------------------------------------------------------------------------------
 Result HttpResponse::startResponse(int code)
 {
+    SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() == 0, "startResponse must be the first call");
     GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
@@ -109,12 +110,12 @@ Result HttpResponse::startResponse(int code)
     case 404: SC_TRY(sb.append("404 Not Found\r\n")); break;
     case 405: SC_TRY(sb.append("405 Not Allowed\r\n")); break;
     }
-    responseEnded = false;
     return Result(true);
 }
 
 Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 {
+    SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
     GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
@@ -127,29 +128,29 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
     return Result(true);
 }
 
-Result HttpResponse::end(Span<const char> span)
+Result HttpResponse::sendHeaders()
 {
+    SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
     {
         GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
-        SC_TRY(sb.append("Content-Length:"));
-        char bufferSize[32];
-        snprintf(bufferSize, sizeof(bufferSize), "%zu", span.sizeInBytes());
-        StringSpan ss = {{bufferSize, strlen(bufferSize)}, false, StringEncoding::Ascii};
-        SC_TRY(sb.append(ss));
-        SC_TRY(sb.append("\r\n\r\n"));
+        SC_TRY(sb.append("\r\n"));
     }
-    SC_TRY(outputBuffer.assign(span));
-    return end();
+    SC_TRY(writableStream->write(responseHeaders, {})); // headers first
+    headersSent = true;
+    return Result(true);
 }
 
 Result HttpResponse::end()
 {
-    responseEnded = true;
+    SC_TRY_MSG(headersSent, "Forgot to send headers");
+    writableStream->end();
     return Result(true);
 }
+
+void HttpResponse::reset() { headersSent = false; }
 
 //-------------------------------------------------------------------------------------------------------
 // HttpServer

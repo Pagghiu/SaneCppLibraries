@@ -14,19 +14,15 @@ struct SC::HttpServerTest : public SC::TestCase
 {
     HttpServerTest(SC::TestReport& report) : TestCase(report, "HttpServerTest")
     {
-        if (test_section("HttpServer Async"))
+        if (test_section("HttpServer"))
         {
-            httpServerTest(false);
-        }
-        if (test_section("HttpServer AsyncStreams"))
-        {
-            httpServerTest(true);
+            httpServerTest();
         }
     }
-    void httpServerTest(bool useAsyncStreams);
+    void httpServerTest();
 };
 
-void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
+void SC::HttpServerTest::httpServerTest()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
@@ -80,12 +76,14 @@ void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
         if (request.getParser().method != HttpParser::Method::HttpGET)
         {
             SC_TEST_EXPECT(response.startResponse(405));
+            SC_TEST_EXPECT(response.sendHeaders());
             SC_TEST_EXPECT(response.end());
             return;
         }
         if (request.getURL() != "/index.html" and request.getURL() != "/")
         {
             SC_TEST_EXPECT(response.startResponse(404));
+            SC_TEST_EXPECT(response.sendHeaders());
             SC_TEST_EXPECT(response.end());
             return;
         }
@@ -102,16 +100,19 @@ void SC::HttpServerTest::httpServerTest(bool useAsyncStreams)
                                   "We must start from somewhere\r\n"
                                   "</body>\r\n"
                                   "</html>\r\n";
-        String     str;
-        SC_TEST_EXPECT(StringBuilder::format(str, sampleHtml, serverContext.numRequests));
-        SC_TEST_EXPECT(response.end(str.view().toCharSpan()));
+
+        String content;
+        SC_TEST_EXPECT(StringBuilder::format(content, sampleHtml, serverContext.numRequests));
+        SmallString<16> contentLength;
+        SC_TEST_EXPECT(StringBuilder::format(contentLength, "{}", content.view().sizeInBytes()));
+        SC_TEST_EXPECT(response.addHeader("Content-Length", contentLength.view()));
+        SC_TEST_EXPECT(response.sendHeaders());
+        SC_TEST_EXPECT(response.getWritableStream().write(move(content)));
+        SC_TEST_EXPECT(response.end());
     };
 
     //! [HttpServerSnippet]
-    if (useAsyncStreams)
-    {
-        server.setUseAsyncStreams(true, readQueue, writeQueue, buffers);
-    }
+    server.setupStreamsMemory(readQueue, writeQueue, buffers);
 
     HttpClient       client[3];
     SmallString<255> buffer;

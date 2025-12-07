@@ -39,7 +39,6 @@ struct SC::WebServerExampleModelState
     String  interface  = "127.0.0.1";
     int32_t port       = 8090;
     int32_t maxClients = 32;
-    bool    useStreams = false;
 };
 
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleModelState)
@@ -47,7 +46,6 @@ SC_REFLECT_STRUCT_FIELD(0, directory)
 SC_REFLECT_STRUCT_FIELD(1, interface)
 SC_REFLECT_STRUCT_FIELD(2, port)
 SC_REFLECT_STRUCT_FIELD(3, maxClients)
-SC_REFLECT_STRUCT_FIELD(4, useStreams)
 SC_REFLECT_STRUCT_LEAVE()
 
 struct SC::WebServerExampleViewState
@@ -113,10 +111,7 @@ struct SC::WebServerExampleModel
         SC_TRY(gb.resizeWithoutInitializing(HEADER_SIZE * numClients));
         HttpServer::Memory memory = {gb, clients};
         httpServer.httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
-        if (modelState.useStreams)
-        {
-            httpServer.setUseAsyncStreams(true, readRequests, writeRequests, buffers);
-        }
+        httpServer.setupStreamsMemory(readRequests, writeRequests, buffers);
 
         const uint16_t port = static_cast<uint16_t>(modelState.port);
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port, memory));
@@ -178,7 +173,6 @@ struct SC::WebServerExampleView
         SC_TRY(InputText("Interface", buffer, model.modelState.interface, viewState.needsRestart));
         SC_TRY(InputText("Directory", buffer, model.modelState.directory, viewState.needsRestart));
         viewState.needsRestart |= ImGui::InputInt("Port", &model.modelState.port);
-        viewState.needsRestart |= ImGui::Checkbox("Use Async Streams", &model.modelState.useStreams);
 
         if (not model.httpServer.isStarted())
         {

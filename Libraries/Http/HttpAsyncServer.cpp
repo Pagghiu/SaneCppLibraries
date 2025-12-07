@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpAsyncServer.h"
+#include "../Foundation/Assert.h"
 #include "../Foundation/Deferred.h"
 
 namespace SC
@@ -22,12 +23,11 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     return httpServer.start(memory);
 }
 
-void HttpAsyncServer::setUseAsyncStreams(bool useAsyncStreams, Span<AsyncReadableStream::Request> readQueue,
+void HttpAsyncServer::setupStreamsMemory(Span<AsyncReadableStream::Request> readQueue,
                                          Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers)
 {
     readQueues  = readQueue;
     writeQueues = writeQueue;
-    useStreams  = useAsyncStreams;
 
     buffersPool.buffers = buffers;
 }
@@ -77,34 +77,24 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     // Allocate always succeeds because we pause asyncAccept when the arena is full
     SC_ASSERT_RELEASE(httpServer.allocateClient(idx));
 
-    HttpServerClient& client = httpServer.clients[idx];
-    client.socket            = move(acceptedClient);
-    if (useStreams)
-    {
-        const size_t readQueueLen  = readQueues.sizeInElements() / httpServer.clients.sizeInElements();
-        const size_t writeQueueLen = writeQueues.sizeInElements() / httpServer.clients.sizeInElements();
-        SC_TRUST_RESULT(readQueueLen > 0);
-        SC_TRUST_RESULT(writeQueueLen > 0);
-        Span<AsyncReadableStream::Request> readQueue;
-        Span<AsyncWritableStream::Request> writeQueue;
-        SC_TRUST_RESULT(readQueues.sliceStartLength(idx * readQueueLen, readQueueLen, readQueue));
-        SC_TRUST_RESULT(writeQueues.sliceStartLength(idx * writeQueueLen, writeQueueLen, writeQueue));
-        SC_TRUST_RESULT(client.readableSocketStream.init(buffersPool, readQueue, *eventLoop, client.socket));
-        SC_TRUST_RESULT(client.writableSocketStream.init(buffersPool, writeQueue, *eventLoop, client.socket));
+    HttpServerClient& client   = httpServer.clients[idx];
+    client.socket              = move(acceptedClient);
+    const size_t readQueueLen  = readQueues.sizeInElements() / httpServer.clients.sizeInElements();
+    const size_t writeQueueLen = writeQueues.sizeInElements() / httpServer.clients.sizeInElements();
+    SC_TRUST_RESULT(readQueueLen > 0);
+    SC_TRUST_RESULT(writeQueueLen > 0);
+    Span<AsyncReadableStream::Request> readQueue;
+    Span<AsyncWritableStream::Request> writeQueue;
+    SC_TRUST_RESULT(readQueues.sliceStartLength(idx * readQueueLen, readQueueLen, readQueue));
+    SC_TRUST_RESULT(writeQueues.sliceStartLength(idx * writeQueueLen, writeQueueLen, writeQueue));
+    SC_TRUST_RESULT(client.readableSocketStream.init(buffersPool, readQueue, *eventLoop, client.socket));
+    SC_TRUST_RESULT(client.writableSocketStream.init(buffersPool, writeQueue, *eventLoop, client.socket));
 
-        auto onData = [this, idx](AsyncBufferView::ID bufferID) { onStreamReceive(httpServer.clients[idx], bufferID); };
-        SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(onData));
-        SC_TRUST_RESULT(client.readableSocketStream.start());
-    }
-    else
-    {
-        client.asyncSend.setDebugName(client.debugName);
-        client.asyncReceive.setDebugName(client.debugName);
-        client.asyncReceive.callback.bind<HttpAsyncServer, &HttpAsyncServer::onReceive>(*this);
+    auto onData = [this, idx](AsyncBufferView::ID bufferID) { onStreamReceive(httpServer.clients[idx], bufferID); };
+    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(onData));
+    SC_TRUST_RESULT(client.readableSocketStream.start());
 
-        // This cannot fail because start reports only incorrect API usage (AsyncRequest already in use etc.)
-        SC_TRUST_RESULT(client.asyncReceive.start(*eventLoop, client.socket, client.request.availableHeader));
-    }
+    client.response.writableStream = &client.writableSocketStream;
 
     // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(httpServer.canAcceptMoreClients());
@@ -113,7 +103,7 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView::ID bufferID)
 {
     Span<char> readData;
-    buffersPool.getWritableData(bufferID, readData);
+    SC_ASSERT_RELEASE(buffersPool.getWritableData(bufferID, readData));
     // TODO: Handle error for available headers not big enough
     SC_ASSERT_RELEASE(readData.sizeInBytes() <= client.request.availableHeader.sizeInBytes());
     ::memcpy(client.request.availableHeader.data(), readData.data(), readData.sizeInBytes());
@@ -127,77 +117,22 @@ void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView:
     {
         client.response.responseHeaders         = {client.request.availableHeader.data(), 0};
         client.response.responseHeadersCapacity = client.request.availableHeader.sizeInBytes();
-        httpServer.onRequest(client.request, client.response);
-    }
-
-    if (client.response.responseEnded)
-    {
         client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
         client.readableSocketStream.eventData = {}; // De-register data event
-
-        auto onAfterWrite = [this, &client](AsyncBufferView::ID) { closeAsync(client); };
-
-        // TODO: We need writev support in AsyncStreams to avoid two writes here
-        Result res0 = client.writableStream->write(client.response.getHeadersSpan(), {});
-        Result res1 = client.writableStream->write(client.response.getContentSpan(), onAfterWrite);
-        SC_TRUST_RESULT(res0);
-        SC_TRUST_RESULT(res1);
-        client.writableStream->end(); // TODO: This must be called only if actually ended...
-    }
-}
-
-void HttpAsyncServer::onReceive(AsyncSocketReceive::Result& result)
-{
-    SC_COMPILER_WARNING_PUSH_OFFSETOF
-    HttpServerClient& client = SC_COMPILER_FIELD_OFFSET(HttpServerClient, asyncReceive, result.getAsync());
-    SC_COMPILER_WARNING_POP
-    SC_ASSERT_RELEASE(&client.asyncReceive == &result.getAsync());
-    Span<char> readData;
-    if (not result.get(readData))
-    {
-        // TODO: Invoke on error
-        return;
-    }
-
-    if (not client.request.parse(httpServer.maxHeaderSize, readData))
-    {
-        // TODO: Invoke on error
-        return;
-    }
-    else if (client.request.headersEndReceived)
-    {
-        client.response.responseHeaders         = {client.request.availableHeader.data(), 0};
-        client.response.responseHeadersCapacity = client.request.availableHeader.sizeInBytes();
         httpServer.onRequest(client.request, client.response);
-    }
 
-    if (client.response.responseEnded)
-    {
-        client.asyncSend.setDebugName(client.debugName);
-        client.asyncSend.callback.bind<HttpAsyncServer, &HttpAsyncServer::onAfterSend>(*this);
-        client.buffers[0] = client.response.getHeadersSpan(); // headers first
-        client.buffers[1] = client.response.getContentSpan(); // content later
-        auto res          = client.asyncSend.start(*eventLoop, client.socket, client.buffers);
-        if (not res)
+        // Using a struct instead of a lambda so it can unregister itself
+        struct AfterWrite
         {
-            // TODO: Invoke on error
-            return;
-        }
-    }
-    else if (not result.completionData.disconnected)
-    {
-        result.reactivateRequest(true);
-    }
-}
-
-void HttpAsyncServer::onAfterSend(AsyncSocketSend::Result& result)
-{
-    if (result.isValid())
-    {
-        SC_COMPILER_WARNING_PUSH_OFFSETOF
-        HttpServerClient& requestClient = SC_COMPILER_FIELD_OFFSET(HttpServerClient, asyncSend, result.getAsync());
-        SC_COMPILER_WARNING_POP
-        closeAsync(requestClient);
+            HttpAsyncServer&  pself;
+            HttpServerClient& client;
+            void              operator()()
+            {
+                SC_ASSERT_RELEASE(client.response.writableStream->eventFinish.removeListener(*this));
+                pself.closeAsync(client);
+            }
+        };
+        SC_ASSERT_RELEASE(client.response.writableStream->eventFinish.addListener(AfterWrite{*this, client}));
     }
 }
 
@@ -208,17 +143,6 @@ void HttpAsyncServer::closeAsync(HttpServerClient& requestClient)
         return;
     }
 
-    if (not useStreams)
-    {
-        if (not requestClient.asyncSend.isFree())
-        {
-            (void)requestClient.asyncSend.stop(*eventLoop);
-        }
-        if (not requestClient.asyncReceive.isFree())
-        {
-            (void)requestClient.asyncReceive.stop(*eventLoop);
-        }
-    }
     SC_TRUST_RESULT(requestClient.socket.close());
     const bool wasFull = not httpServer.canAcceptMoreClients();
 
