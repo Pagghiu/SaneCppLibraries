@@ -73,7 +73,7 @@ void SC::ThreadingTest::testThread()
         thread.setThreadName(SC_NATIVE_STR("detach thread"));
         atomicInt.exchange(1);
     };
-    thread.start(lambdaDetach);
+    SC_TEST_EXPECT(thread.start(lambdaDetach));
     SC_TEST_EXPECT(thread.detach());
     SC_TEST_EXPECT(thread.threadID() == 0);
     while (atomicInt.load() == 0)

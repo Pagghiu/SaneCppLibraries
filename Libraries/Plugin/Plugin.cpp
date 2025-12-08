@@ -867,7 +867,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
 
 void SC::PluginRegistry::init(Span<PluginDynamicLibrary> librariesStorage)
 {
-    close();
+    SC_ASSERT_RELEASE(close());
     storage   = librariesStorage;
     libraries = {};
 }

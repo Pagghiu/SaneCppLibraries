@@ -55,8 +55,12 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
 
         justUnrefBuffer = true;
         request.callback(result); // will free bufferID
-        request.stop(*eventLoop);
+        SC_ASSERT_RELEASE(request.stop(*eventLoop));
         justUnrefBuffer = false;
+        if (not res)
+        {
+            // TODO: Should an error be emitted here?
+        }
     }
     if (autoCloseDescriptor)
     {
@@ -180,7 +184,7 @@ void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
 
         justUnrefBuffer = true;
         request.callback(result); // will free bufferID
-        request.stop(*eventLoop);
+        SC_ASSERT_RELEASE(request.stop(*eventLoop));
         justUnrefBuffer = false;
     }
     if (autoCloseDescriptor)
