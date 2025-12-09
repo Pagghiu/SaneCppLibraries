@@ -123,6 +123,12 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @return Valid result if read succeeded
     Result read(Span<char> data, Span<char>& actuallyRead);
 
+    /// @brief Reads bytes from current position (FileDescriptor::seek) into Span, until full or EOF is reached
+    /// @param data Span of bytes where data should be written to
+    /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.
+    /// @return Valid result if read succeeded
+    Result readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead);
+
     /// @brief Reads bytes from current position (FileDescriptor::seek) into user supplied Span
     /// @param data Span of bytes where data should be written to
     /// @param actuallyRead A sub-span of data of the actually read bytes. A zero sized span means EOF.

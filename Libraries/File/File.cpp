@@ -590,6 +590,21 @@ SC::Result SC::FileDescriptor::write(Span<const uint8_t> data)
     return write({reinterpret_cast<const char*>(data.data()), data.sizeInBytes()});
 }
 
+SC::Result SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char>& actuallyRead)
+{
+    auto availableData = data;
+    while (not availableData.empty())
+    {
+        Span<char> readData;
+        SC_TRY(read(availableData, readData));
+        if (readData.empty())
+            break;
+        availableData = {availableData.data(), availableData.sizeInBytes() - readData.sizeInBytes()};
+    }
+    actuallyRead = {data.data(), data.sizeInBytes() - availableData.sizeInBytes()};
+    return Result(true);
+}
+
 SC::Result SC::FileDescriptor::readUntilEOF(IGrowableBuffer&& adapter)
 {
     char buffer[1024];
