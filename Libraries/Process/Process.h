@@ -152,7 +152,7 @@ struct SC_COMPILER_EXPORT Process
         StdOut() { operation = Operation::Inherit; }
         
         /// @brief Read the process standard output/error into the given Span
-        StdOut(GrowableBuffer<Span<char>>& span) { operation = Operation::WritableSpan; writableSpan = &span.content; }
+        StdOut(GrowableBuffer<Span<char>>& span) { operation = Operation::WritableSpan; writableSpan = &span.content; span.setContentInDestructor = false; }
         
         using StdStream::StdStream;
         friend struct ProcessChain;

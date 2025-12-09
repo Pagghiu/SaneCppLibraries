@@ -55,6 +55,7 @@ struct GrowableBuffer<Span<char>> : public IGrowableBuffer
 {
     Span<char>& content;
     size_t      capacity;
+    bool        setContentInDestructor = true;
     GrowableBuffer(Span<char>& span)
         : content(span), capacity(content.sizeInBytes()), IGrowableBuffer(&GrowableBuffer::fixedGrowTo)
     {
@@ -65,7 +66,11 @@ struct GrowableBuffer<Span<char>> : public IGrowableBuffer
     {
         IGrowableBuffer::directAccess = {span.sizeInBytes(), capacity, span.data()};
     }
-    ~GrowableBuffer() { content = {content.data(), IGrowableBuffer::directAccess.sizeInBytes}; }
+    ~GrowableBuffer()
+    {
+        if (setContentInDestructor)
+            content = {content.data(), IGrowableBuffer::directAccess.sizeInBytes};
+    }
 
     static bool fixedGrowTo(IGrowableBuffer& growableBuffer, size_t newSize)
     {
