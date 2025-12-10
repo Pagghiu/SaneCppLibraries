@@ -31,6 +31,7 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
                        AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
     {
         self.eventLoop = &eventLoop;
+        self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncReadableStream::init(buffersPool, requests);
     }
@@ -160,6 +161,7 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
                        AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
     {
         self.eventLoop = &eventLoop;
+        self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncWritableStream::init(buffersPool, requests);
     }
