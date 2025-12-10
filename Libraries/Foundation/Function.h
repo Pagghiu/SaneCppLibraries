@@ -16,7 +16,7 @@ namespace SC
 /// Example:
 /// \snippet Tests/Libraries/Foundation/FunctionTest.cpp FunctionMainSnippet
 template <typename FuncType, int LAMBDA_SIZE = sizeof(void*) * 2>
-struct Function;
+struct SC_COMPILER_EXPORT Function;
 
 template <int LAMBDA_SIZE, typename R, typename... Args>
 struct Function<R(Args...), LAMBDA_SIZE>
@@ -77,7 +77,7 @@ struct Function<R(Args...), LAMBDA_SIZE>
 
     /// @brief Move constructor for Function wrapper
     /// @param other The moved from function
-    Function(Function&& other)
+    Function(Function&& other) noexcept
     {
         vtable        = other.vtable;
         classInstance = other.classInstance;

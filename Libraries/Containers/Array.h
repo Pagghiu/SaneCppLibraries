@@ -8,7 +8,7 @@ namespace SC
 namespace detail
 {
 template <typename T, int N>
-struct ArrayVTable : public ObjectVTable<T>
+struct SC_COMPILER_EXPORT ArrayVTable : public ObjectVTable<T>
 {
     static constexpr bool IsArray = true;
 
@@ -47,7 +47,7 @@ struct ArrayVTable : public ObjectVTable<T>
 ///
 /// \snippet Tests/Libraries/Containers/ArrayTest.cpp ArraySnippet
 template <typename T, int N>
-struct Array : public Segment<detail::ArrayVTable<T, N>>
+struct SC_COMPILER_EXPORT Array : public Segment<detail::ArrayVTable<T, N>>
 {
     using Parent = Segment<detail::ArrayVTable<T, N>>;
     Array() : Parent(sizeof(T) * N) {};
@@ -113,10 +113,4 @@ struct Array : public Segment<detail::ArrayVTable<T, N>>
 
 //! @}
 
-// Allows using this type across Plugin boundaries
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 64>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 128 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 255 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 512 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Array<char, 1024 * sizeof(native_char_t)>;
 } // namespace SC

@@ -44,10 +44,11 @@
 //! @{
 namespace SC
 {
+
 /// @brief A Span of bytes memory to be read or written by async streams
-struct AsyncBufferView
+struct SC_COMPILER_EXPORT AsyncBufferView
 {
-    struct ID
+    struct SC_COMPILER_EXPORT ID
     {
         using NumericType = int32_t;
         NumericType                  identifier;
@@ -117,13 +118,13 @@ struct AsyncBufferView
 
     union
     {
-        Span<char>       writableData;
+        Span<char>       writableData = {};
         Span<const char> readonlyData;
     };
 
     union
     {
-        Span<char>       originalWritableData;
+        Span<char>       originalWritableData = {};
         Span<const char> originalReadonlyData;
     };
     friend struct AsyncBuffersPool;
@@ -135,7 +136,7 @@ struct AsyncBufferView
 
 /// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams
 /// @note User must fill the AsyncBuffersPool::buffers with a `Span` of AsyncBufferView
-struct AsyncBuffersPool
+struct SC_COMPILER_EXPORT AsyncBuffersPool
 {
     /// @brief Span of buffers to be filled in by the user
     Span<AsyncBufferView> buffers;
@@ -172,7 +173,7 @@ struct AsyncBuffersPool
 /// The stream must be paused when the AsyncBuffersPool is full (use AsyncReadableStream::getBufferOrPause).
 /// Once the stream is ended, it will emit AsyncReadableStream::eventEnd and it cannot be used further.
 /// AsyncReadableStream::eventError will be emitted when an error occurs in any phase.
-struct AsyncReadableStream
+struct SC_COMPILER_EXPORT AsyncReadableStream
 {
     struct Request
     {
@@ -262,7 +263,7 @@ struct AsyncReadableStream
 /// will be made available again (i.e. a write finishes).
 /// User can listen to AsyncWritableStream::eventWritten to know when a buffer is written
 /// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
-struct AsyncWritableStream
+struct SC_COMPILER_EXPORT AsyncWritableStream
 {
     /// @brief Function that every stream must define to implement its custom write operation
     Function<Result(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>)> asyncWrite;
@@ -342,7 +343,7 @@ struct AsyncWritableStream
 };
 
 /// @brief A stream that can both produce and consume buffers
-struct AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStream
+struct SC_COMPILER_EXPORT AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStream
 {
     AsyncDuplexStream();
 
@@ -351,7 +352,7 @@ struct AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStrea
 };
 
 /// @brief A duplex stream that produces new buffers transforming received buffers
-struct AsyncTransformStream : public AsyncDuplexStream
+struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
 {
     AsyncTransformStream();
 
@@ -394,7 +395,7 @@ struct AsyncTransformStream : public AsyncDuplexStream
 /// When a writable has finished writing, AsyncReadableStream::resume will be called to try un-pausing.
 /// Caller needs to set AsyncPipeline::source field and AsyncPipeline::sinks with valid streams.
 /// @note It's crucial to use the same AsyncBuffersPool for the AsyncReadableStream and all AsyncWritableStream
-struct AsyncPipeline
+struct SC_COMPILER_EXPORT AsyncPipeline
 {
     static constexpr int MaxListeners  = 8;
     static constexpr int MaxTransforms = 8;

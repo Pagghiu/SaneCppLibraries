@@ -9,7 +9,7 @@ template <typename Value>
 struct Optional;
 
 template <typename Value>
-struct UniqueOptional;
+struct SC_COMPILER_EXPORT UniqueOptional;
 
 namespace TypeTraits
 {

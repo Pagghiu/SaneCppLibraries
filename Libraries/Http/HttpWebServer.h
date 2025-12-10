@@ -6,8 +6,6 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpWebServer;
-}
 
 /// @brief Http web server helps statically serves files from a directory.
 /// @n
@@ -17,7 +15,7 @@ struct SC_COMPILER_EXPORT HttpWebServer;
 /// @see SC::HttpServer
 ///
 /// \snippet Tests/Libraries/Http/HttpWebServerTest.cpp HttpWebServerSnippet
-struct SC::HttpWebServer
+struct SC_COMPILER_EXPORT HttpWebServer
 {
     /// @brief Initialize the web server on the given file system directory to serve
     Result init(StringSpan directoryToServe);
@@ -34,3 +32,4 @@ struct SC::HttpWebServer
 
     struct Internal;
 };
+} // namespace SC

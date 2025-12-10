@@ -10,10 +10,7 @@
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/ThreadPool.h"
-#if SC_COMPILER_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4251)
-#endif
+
 namespace SC
 {
 struct ThreadPool;
@@ -852,7 +849,7 @@ struct SC_COMPILER_EXPORT AsyncFilePoll : public AsyncRequest
 struct AsyncLoopWork;
 struct AsyncFileSystemOperation;
 
-struct AsyncFileSystemOperationCompletionData : public AsyncCompletionData
+struct SC_COMPILER_EXPORT AsyncFileSystemOperationCompletionData : public AsyncCompletionData
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid; // for open
 
@@ -1434,6 +1431,3 @@ struct SC_COMPILER_EXPORT AsyncEventLoopMonitor
 
 } // namespace SC
 //! @}
-#if SC_COMPILER_MSVC
-#pragma warning(pop)
-#endif

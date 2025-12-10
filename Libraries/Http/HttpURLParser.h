@@ -6,14 +6,11 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpURLParser;
-} // namespace SC
-
 //! @addtogroup group_http
 //! @{
 
 /// @brief Parse an URL splitting it into its base components
-struct SC::HttpURLParser
+struct SC_COMPILER_EXPORT HttpURLParser
 {
     StringSpan protocol; ///< Returns `http` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
     StringSpan username; ///< Returns `user` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
@@ -42,5 +39,6 @@ struct SC::HttpURLParser
     Result parseUserPassword(StringSpan userPassword);
     struct Internal;
 };
-
 //! @}
+
+} // namespace SC

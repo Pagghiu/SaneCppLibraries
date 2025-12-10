@@ -25,7 +25,7 @@ void static_assert_size()
 /// @tparam N Size in bytes of the Operating System Handle
 /// @tparam Alignment Alignment in Bytes of the operating system Handle
 template <int N, int Alignment = alignof(void*)>
-struct AlignedStorage
+struct SC_COMPILER_EXPORT AlignedStorage
 {
     /// @brief  Access wanted OS Handle with it's actual type.
     ///         This is typically done in a .cpp file where the concrete type of the Handle is known

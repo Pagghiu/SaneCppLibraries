@@ -4,10 +4,6 @@
 #include "HttpServer.h"
 namespace SC
 {
-#if SC_COMPILER_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4251)
-#endif
 struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Starts the http server on the given AsyncEventLoop, address and port
@@ -52,7 +48,4 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     SocketDescriptor  serverSocket;
     AsyncSocketAccept asyncServerAccept;
 };
-#if SC_COMPILER_MSVC
-#pragma warning(pop)
-#endif
 } // namespace SC

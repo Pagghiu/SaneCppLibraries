@@ -137,6 +137,8 @@ struct SC::Segment<VTable>::Internal
     }
 };
 
+#if !defined(SC_PLUGIN_LIBRARY)
+
 // clang-format off
 template <typename VTable> SC::Segment<VTable>::Segment() noexcept {}
 template <typename VTable> SC::Segment<VTable>::~Segment() noexcept { Internal::releaseInternal(*this); }
@@ -450,3 +452,4 @@ bool SC::Segment<VTable>::insert(size_t index, Span<const T> data) noexcept
     }
     return true;
 }
+#endif

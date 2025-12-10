@@ -9,7 +9,7 @@
 namespace SC
 {
 template <typename AsyncRequestType>
-struct AsyncRequestReadableStream : public AsyncReadableStream
+struct SC_COMPILER_EXPORT AsyncRequestReadableStream : public AsyncReadableStream
 {
     AsyncRequestReadableStream();
 
@@ -31,7 +31,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
 };
 
 template <typename AsyncRequestType>
-struct AsyncRequestWritableStream : public AsyncWritableStream
+struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStream
 {
     AsyncRequestWritableStream();
 
@@ -59,28 +59,28 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
 };
 
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
-struct ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
+struct SC_COMPILER_EXPORT ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
 {
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
-struct WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
+struct SC_COMPILER_EXPORT WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
 {
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data from a socket
-struct ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>
+struct SC_COMPILER_EXPORT ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>
 {
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const SocketDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a socket
-struct WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>
+struct SC_COMPILER_EXPORT WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>
 {
     Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
                 const SocketDescriptor& descriptor);

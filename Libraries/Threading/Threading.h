@@ -8,14 +8,6 @@
 
 namespace SC
 {
-struct Thread;
-struct ConditionVariable;
-struct Mutex;
-struct RWLock;
-struct Barrier;
-struct EventObject;
-struct Semaphore;
-} // namespace SC
 
 //! @defgroup group_threading Threading
 //! @copybrief library_threading (see @ref library_threading library page for more details)
@@ -27,7 +19,7 @@ struct Semaphore;
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp mutexSnippet
-struct SC::Mutex
+struct SC_COMPILER_EXPORT Mutex
 {
     Mutex();
     ~Mutex();
@@ -62,7 +54,7 @@ struct SC::Mutex
 };
 
 /// @brief A native OS condition variable.
-struct SC::ConditionVariable
+struct SC_COMPILER_EXPORT ConditionVariable
 {
     ConditionVariable();
     ~ConditionVariable();
@@ -117,7 +109,7 @@ struct SC::ConditionVariable
 /// @endcode
 ///
 /// @warning Thread destructor will assert if SC::Thread::detach() or SC::Thread::join() has not been called.
-struct SC::Thread
+struct SC_COMPILER_EXPORT Thread
 {
     Thread() = default;
     ~Thread();
@@ -173,7 +165,7 @@ struct SC::Thread
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp rwlockSnippet
-struct SC::RWLock
+struct SC_COMPILER_EXPORT RWLock
 {
     RWLock()  = default;
     ~RWLock() = default;
@@ -210,7 +202,7 @@ struct SC::RWLock
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp barrierSnippet
-struct SC::Barrier
+struct SC_COMPILER_EXPORT Barrier
 {
     /// @brief Creates a barrier that waits for the specified number of threads
     /// @param count The number of threads that must reach the barrier before any can continue
@@ -233,7 +225,7 @@ struct SC::Barrier
 /// @n
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp eventObjectSnippet
-struct SC::EventObject
+struct SC_COMPILER_EXPORT EventObject
 {
     bool autoReset = true;
 
@@ -254,7 +246,7 @@ struct SC::EventObject
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp semaphoreSnippet
-struct SC::Semaphore
+struct SC_COMPILER_EXPORT Semaphore
 {
     /// @brief Creates a semaphore with an initial count
     /// @param initialCount The initial number of resources available
@@ -274,3 +266,4 @@ struct SC::Semaphore
 };
 
 //! @}
+} // namespace SC

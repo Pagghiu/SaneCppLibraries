@@ -25,7 +25,7 @@ template<>           struct SpanSizeOfType<const void>  { static constexpr auto 
 /// @brief View over a contiguous sequence of items (pointer + size in elements).
 /// @tparam Type Any type
 template <typename Type>
-struct Span
+struct SC_COMPILER_EXPORT Span
 {
   private:
     // clang-format off
@@ -128,6 +128,4 @@ struct Span
 };
 //! @}
 
-// Allows using this type across Plugin boundaries
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Span<char>;
 } // namespace SC

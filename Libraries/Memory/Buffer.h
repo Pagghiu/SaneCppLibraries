@@ -12,7 +12,7 @@ namespace SC
 
 namespace detail
 {
-struct SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePointer<char>
+struct SC_COMPILER_EXPORT SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePointer<char>
 {
     static constexpr bool IsArray = false;
 };
@@ -25,7 +25,7 @@ struct SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePo
 ///
 /// Example:
 /// \snippet Tests/Libraries/Memory/BufferTest.cpp BufferBasicSnippet
-struct Buffer : public Segment<detail::SegmentBuffer>
+struct SC_COMPILER_EXPORT Buffer : public Segment<detail::SegmentBuffer>
 {
     using Segment::Segment;
 };

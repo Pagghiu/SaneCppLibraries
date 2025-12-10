@@ -6,14 +6,12 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpParser;
-} // namespace SC
 
 //! @addtogroup group_http
 //! @{
 
 /// @brief Incremental HTTP request or response parser
-struct SC::HttpParser
+struct SC_COMPILER_EXPORT HttpParser
 {
     /// @brief Method of the current request / response
     enum class Method
@@ -108,3 +106,4 @@ struct SC::HttpParser
 };
 
 //! @}
+} // namespace SC

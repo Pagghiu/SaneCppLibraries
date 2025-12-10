@@ -12,7 +12,7 @@ namespace SC
 /// Listeners can be removed with the integer written by Event::addListener in a parameter pointer.
 /// @note The ordering of listeners will __NOT__ be preserved under multiple add / remove
 template <int MaxListeners, typename... T>
-struct Event
+struct SC_COMPILER_EXPORT Event
 {
     /// @brief Emits the event, calling all registered listeners with the given parameters
     template <typename... U>

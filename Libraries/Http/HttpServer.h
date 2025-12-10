@@ -10,10 +10,6 @@
 
 namespace SC
 {
-#if SC_COMPILER_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4251)
-#endif
 struct SC_COMPILER_EXPORT HttpServer;
 struct SC_COMPILER_EXPORT HttpServerClient;
 namespace detail
@@ -136,10 +132,7 @@ struct SC_COMPILER_EXPORT HttpServerClient
 
     SocketDescriptor socket;
 };
-#if !DOXYGEN
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Function<void(HttpRequest&, HttpResponse&)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT Span<HttpServerClient>;
-#endif
+
 /// @brief Async Http server
 ///
 /// Usage:
@@ -184,8 +177,5 @@ struct SC_COMPILER_EXPORT HttpServer
     size_t           numClients    = 0;
 };
 //! @}
-#if SC_COMPILER_MSVC
-#pragma warning(pop)
-#endif
 
 } // namespace SC

@@ -5,17 +5,14 @@
 
 namespace SC
 {
-struct ThreadPool;
-struct ThreadPoolTask;
-} // namespace SC
-
+struct SC_COMPILER_EXPORT ThreadPool;
 //! @addtogroup group_threading
 //! @{
 
 /// @brief A small task containing a function to execute that can be queued in the thread pool.
 ///
 /// Fill Task::function with any function to execute in the thread pool.
-struct SC::ThreadPoolTask
+struct SC_COMPILER_EXPORT ThreadPoolTask
 {
 
     Function<void()> function; ///< Function that will be executed during the task
@@ -37,7 +34,7 @@ struct SC::ThreadPoolTask
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadPoolTest.cpp threadPoolSnippet
 ///
-struct SC::ThreadPool
+struct SC_COMPILER_EXPORT ThreadPool
 {
     using Task = ThreadPoolTask;
 
@@ -77,3 +74,4 @@ struct SC::ThreadPool
 };
 
 //! @}
+} // namespace SC

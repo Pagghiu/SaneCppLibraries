@@ -8,7 +8,7 @@ namespace SC
 /// @brief A fixed size circular queue (also known as ring buffer)
 /// @note Uses only up to N-1 element slots of the passed in Span
 template <typename T>
-struct CircularQueue
+struct SC_COMPILER_EXPORT CircularQueue
 {
     CircularQueue() = default;
     CircularQueue(Span<T> buffer) : buffer(buffer) {}

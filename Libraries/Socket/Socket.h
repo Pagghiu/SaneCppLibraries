@@ -96,7 +96,7 @@ struct SocketFlags
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketIpAddressSnippet
-struct SocketIPAddress
+struct SC_COMPILER_EXPORT SocketIPAddress
 {
     /// @brief Maximum length of the ASCII representation of an IP Address
     static constexpr int MAX_ASCII_STRING_LENGTH = 46;

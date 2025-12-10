@@ -8,8 +8,8 @@ namespace SC
 {
 template struct Segment<detail::SegmentBuffer>;
 // Explicit instantiation of these methods because they are templated at method level
-template bool Segment<detail::SegmentBuffer>::assign<char>(Span<const char>) noexcept;
-template bool Segment<detail::SegmentBuffer>::append<char>(Span<const char>) noexcept;
+template SC_COMPILER_EXPORT bool Segment<detail::SegmentBuffer>::assign<char>(Span<const char>) noexcept;
+template SC_COMPILER_EXPORT bool Segment<detail::SegmentBuffer>::append<char>(Span<const char>) noexcept;
 
 GrowableBuffer<Buffer>::GrowableBuffer(Buffer& buffer) noexcept
     : IGrowableBuffer(&GrowableBuffer::tryGrowTo), buffer(buffer)

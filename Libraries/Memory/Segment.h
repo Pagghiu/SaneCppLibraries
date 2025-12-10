@@ -34,7 +34,7 @@ struct alignas(uint64_t) SegmentHeader
     uint32_t hasInlineData : 1;
 };
 
-struct SegmentHeaderOffset
+struct SC_COMPILER_EXPORT SegmentHeaderOffset
 {
     using PtrOffset = size_t;
     SegmentHeader header;
@@ -42,7 +42,7 @@ struct SegmentHeaderOffset
 };
 
 template <typename T>
-struct SegmentSelfRelativePointer : protected SegmentHeaderOffset
+struct SC_COMPILER_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOffset
 {
     // clang-format off
     SC_COMPILER_FORCE_INLINE T*       data() noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
@@ -69,7 +69,7 @@ struct SegmentSelfRelativePointer : protected SegmentHeaderOffset
 
 /// @brief Allows SC::Segment handle trivial types
 template <typename T>
-struct SegmentTrivial
+struct SC_COMPILER_EXPORT SegmentTrivial
 {
     using Type = T;
     inline static void destruct(Span<T> data) noexcept;
@@ -87,7 +87,7 @@ struct SegmentTrivial
 /// @brief Helps creating custom Segments
 template <typename ParentSegment, typename CommonParent, int N = 0,
           SegmentAllocator Allocator = SegmentAllocator::ThreadLocal>
-struct SegmentCustom : public ParentSegment
+struct SC_COMPILER_EXPORT SegmentCustom : public ParentSegment
 {
     SegmentCustom() : ParentSegment(N, Allocator) {}
     SegmentCustom(const CommonParent& other) : SegmentCustom() { CommonParent::operator=(other); }
@@ -109,7 +109,7 @@ struct SegmentCustom : public ParentSegment
 /// @note Implementation is in `.inl` to reduce include bloat for non-templated derived classes like SC::Buffer.
 /// This reduces header bloat as the `.inl` can be included where derived class is defined (typically a `.cpp` file).
 template <typename VTable>
-struct Segment : public VTable
+struct SC_COMPILER_EXPORT Segment : public VTable
 {
     using VTable::data;
     using T = typename VTable::Type;

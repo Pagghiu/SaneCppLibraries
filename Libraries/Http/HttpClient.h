@@ -8,10 +8,6 @@
 #include "HttpParser.h"
 namespace SC
 {
-/// @brief HTTP parser, client and server (see @ref library_http)
-struct HttpClient;
-} // namespace SC
-
 //! @defgroup group_http Http
 //! @copybrief library_http (see @ref library_http for more details)
 
@@ -19,7 +15,7 @@ struct HttpClient;
 //! @{
 
 /// @brief Http async client
-struct SC::HttpClient
+struct HttpClient
 {
     /// @brief Setups this client to execute a `GET` request on the given url
     /// @param loop The AsyncEventLoop to use for monitoring network packets
@@ -57,3 +53,4 @@ struct SC::HttpClient
     AsyncEventLoop*    eventLoop = nullptr;
 };
 //! @}
+} // namespace SC

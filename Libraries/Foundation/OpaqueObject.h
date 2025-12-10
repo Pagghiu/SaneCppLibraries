@@ -27,7 +27,7 @@ namespace SC
 /// Declare only two of the four functions to avoid linker errors.
 /// @snippet Libraries/FileSystemWatcher/FileSystemWatcher.cpp OpaqueDefinition2Snippet
 template <typename Definition>
-struct OpaqueObject
+struct SC_COMPILER_EXPORT OpaqueObject
 {
     using Object = typename Definition::Object;
 

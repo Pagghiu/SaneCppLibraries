@@ -6,7 +6,6 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT String;
 template <int N>
 struct SmallString;
 namespace Reflection
@@ -14,7 +13,6 @@ namespace Reflection
 template <typename T>
 struct Reflect;
 }
-} // namespace SC
 
 //! @addtogroup group_memory
 //! @{
@@ -25,7 +23,7 @@ struct Reflect;
 /// A SC::StringSpan can be obtained from it calling SC::String::view method but it's up to the user making sure that
 /// the usage of such SC::StringSpan doesn't exceed lifetime of the SC::String it originated from (but thankfully
 /// Address Sanitizer will catch the issue if it goes un-noticed).
-struct SC::String
+struct SC_COMPILER_EXPORT String
 {
     /// @brief Builds an empty String with a given Encoding
     /// @param encoding The encoding of the String
@@ -172,7 +170,7 @@ struct SC::String
 /// @brief String with compile time configurable inline storage (small string optimization)
 /// @tparam N number of chars to reserve in inline storage
 template <int N>
-struct SC::SmallString : public String
+struct SC_COMPILER_EXPORT SmallString : public String
 {
     // Unfortunately we have to repeat all these overloads to set inline capacity and hasInlineData flag
     SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, N) {}
@@ -195,17 +193,8 @@ struct SC::SmallString : public String
 };
 //! @}
 
-namespace SC
-{
 template <int N>
 using SmallStringNative = SmallString<N * sizeof(native_char_t)>;
-
-// Allows using this type across Plugin boundaries
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<64>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<128 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<255 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<512 * sizeof(native_char_t)>;
-SC_COMPILER_EXTERN template struct SC_COMPILER_EXPORT SmallString<1024 * sizeof(native_char_t)>;
 
 // Enables File library from reading data from file descriptor into a String
 template <>
