@@ -325,6 +325,10 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     /// @brief Will emit error if the passed in Result is false
     void tryAsync(Result potentialError);
 
+    /// @brief Returns true if this stream is writing something
+    bool isStillWriting() const { return state == State::Writing or state == State::Ending; }
+
+  protected:
     void stop() { state = State::Stopped; }
 
   private:
@@ -434,6 +438,7 @@ struct SC_COMPILER_EXPORT AsyncPipeline
     void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable);
     void dispatchToPipes(AsyncBufferView::ID bufferID);
     void endPipes();
+    void afterSinkEnd();
     void afterWrite(AsyncBufferView::ID bufferID);
     bool listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen);
 };

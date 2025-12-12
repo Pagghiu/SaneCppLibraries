@@ -1020,11 +1020,45 @@ void AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
 
 void AsyncPipeline::endPipes()
 {
+    bool allEnded = true;
     for (AsyncWritableStream* sink : sinks)
     {
         if (sink == nullptr)
             break;
+        if (sink->isStillWriting())
+        {
+            const bool res = sink->eventFinish.addListener<AsyncPipeline, &AsyncPipeline::afterSinkEnd>(*this);
+            SC_ASSERT_RELEASE(res);
+            allEnded = false;
+        }
         sink->end();
+    }
+    if (allEnded)
+    {
+        SC_ASSERT_RELEASE(unpipe());
+    }
+}
+
+void AsyncPipeline::afterSinkEnd()
+{
+    bool allEnded = true;
+    for (AsyncWritableStream* sink : sinks)
+    {
+        if (sink == nullptr)
+            break;
+        if (sink->isStillWriting())
+        {
+            allEnded = false;
+        }
+        else
+        {
+            const bool res = sink->eventFinish.removeListener<AsyncPipeline, &AsyncPipeline::afterSinkEnd>(*this);
+            SC_ASSERT_RELEASE(res);
+        }
+    }
+    if (allEnded)
+    {
+        SC_ASSERT_RELEASE(unpipe());
     }
 }
 
