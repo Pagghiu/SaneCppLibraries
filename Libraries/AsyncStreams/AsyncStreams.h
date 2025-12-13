@@ -203,7 +203,8 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @brief Resumes the readable stream paused by AsyncReadableStream::pause
     void resumeReading();
 
-    /// @brief Forcefully destroys the readable stream before it's end event releasing all resources
+    /// @brief Forcefully destroys the readable stream before calling end event releasing all resources
+    /// @note It's safe to call destroy in any state and also when already destroyed (it's idempotent)
     void destroy();
 
     /// @brief Returns true if the stream is ended (AsyncReadableStream::end has been called)
@@ -301,6 +302,10 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     /// @brief Ends the writable stream, waiting for all in-flight and queued writes to finish.
     /// After this happens, AsyncWritableStream::eventFinished will be raised
     void end();
+
+    /// @brief Forcefully destroys the writable stream before calling end event releasing all resources
+    /// @note It's safe to call destroy in any state and also when already destroyed (it's idempotent)
+    void destroy();
 
     /// @brief Obtains the buffers pool to access its data
     AsyncBuffersPool& getBuffersPool();

@@ -350,10 +350,10 @@ void AsyncReadableStream::destroy()
         eventClose.emit();
         break;
     }
-    case State::Destroyed: emitError(Result::Error("AsyncReadableStream::destroy - already destroyed")); break;
-    case State::Ended: emitError(Result::Error("AsyncReadableStream::destroy - already ended")); break;
-    case State::Stopped: emitError(Result::Error("AsyncReadableStream::destroy - already stopped")); break;
-    case State::Errored: emitError(Result::Error("AsyncReadableStream::destroy - already in error state")); break;
+    case State::Destroyed:
+    case State::Ended:
+    case State::Stopped:
+    case State::Errored: break;
     }
 }
 
@@ -604,6 +604,17 @@ void AsyncWritableStream::end()
         eventError.emit(Result::Error("AsyncWritableStream::end - already called"));
     }
     break;
+    }
+}
+
+void AsyncWritableStream::destroy()
+{
+    if (state != State::Ended or state != State::Ending)
+    {
+        // Bypass canEndWritable when destroying
+        decltype(canEndWritable) backupCanEnd = move(canEndWritable);
+        end();
+        canEndWritable = move(backupCanEnd);
     }
 }
 
