@@ -68,9 +68,8 @@ struct SC::WebServerExampleModel
     HttpWebServer   httpWebServer;
 
     Buffer requestsMemory;
-    Buffer headerBuffer;
+    Buffer headersMemory;
 
-    GrowableBuffer<Buffer> gb = {headerBuffer};
     Span<HttpServerClient> clients;
 
     Span<ReadableFileStream::Request> readRequests;
@@ -78,15 +77,15 @@ struct SC::WebServerExampleModel
 
     Span<AsyncBufferView> buffers;
 
+    Span<HttpWebServerStream> fileStreams;
+
     Result start()
     {
         constexpr int REQUEST_SLICES = 2;
-        constexpr int CLIENT_REQUEST = 1024;
+        constexpr int CLIENT_REQUEST = 512 * 1024;
         constexpr int HEADER_SIZE    = 1024 * 8;
 
         const size_t numClients = static_cast<size_t>(modelState.maxClients);
-
-        SC_TRY(requestsMemory.resize(numClients * CLIENT_REQUEST));
 
         // TODO: Simplify this messy manual memory handling
         clients       = {new HttpServerClient[numClients], numClients};
@@ -94,6 +93,10 @@ struct SC::WebServerExampleModel
         writeRequests = {new WritableFileStream::Request[numClients * (REQUEST_SLICES + 1)],
                          numClients*(REQUEST_SLICES + 1)};
         buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 2)], numClients*(REQUEST_SLICES + 2)};
+        fileStreams   = {new HttpWebServerStream[numClients], numClients};
+
+        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * numClients));
+        SC_TRY(requestsMemory.resize(numClients * CLIENT_REQUEST));
 
         Span<char> requestsSpan = requestsMemory.toSpan();
         for (size_t idx = 0; idx < numClients; ++idx)
@@ -108,29 +111,30 @@ struct SC::WebServerExampleModel
             }
         }
 
-        SC_TRY(gb.resizeWithoutInitializing(HEADER_SIZE * numClients));
-        HttpServer::Memory memory = {gb, clients};
-        httpServer.httpServer.onRequest.bind<HttpWebServer, &HttpWebServer::serveFile>(httpWebServer);
-        httpServer.setupStreamsMemory(readRequests, writeRequests, buffers);
+        httpWebServer.serveFilesOn(httpServer.getHttpServer());
+        SC_TRY(httpServer.init(clients, headersMemory.toSpan(), readRequests, writeRequests, buffers));
 
         const uint16_t port = static_cast<uint16_t>(modelState.port);
-        SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port, memory));
-        SC_TRY(httpWebServer.init(modelState.directory.view()));
+        SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port));
+        SC_TRY(httpWebServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
         return Result(true);
     }
 
     Result stop()
     {
-        SC_TRY(httpWebServer.stopAsync());
-        SC_TRY(httpServer.stopSync());
+        SC_TRY(httpServer.stop());
+        SC_TRY(httpServer.waitForStopToFinish());
+        SC_TRY(httpServer.close());
         delete[] clients.data();
         delete[] readRequests.data();
         delete[] writeRequests.data();
         delete[] buffers.data();
+        delete[] fileStreams.data();
         clients       = {};
         readRequests  = {};
         writeRequests = {};
         buffers       = {};
+        fileStreams   = {};
         return Result(true);
     }
 
@@ -228,7 +232,7 @@ struct WebServerExample : public SC::ISCExample
 
     [[nodiscard]] bool init() { return view.init(); }
 
-    [[nodiscard]] bool close() { return true; }
+    [[nodiscard]] bool close() { return model.stop(); }
 
     SC::Result initAsync(SC::AsyncEventLoop& eventLoop)
     {

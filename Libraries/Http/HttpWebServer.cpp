@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpWebServer.h"
 #include "../FileSystem/FileSystem.h"
+#include "../Foundation/Assert.h"
 #include "Internal/HttpStringIterator.h"
 #include <stdio.h>
 #include <time.h>
@@ -16,51 +17,72 @@
 struct SC::HttpWebServer::Internal
 {
     static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response, int64_t millisecondsSinceEpoch);
-    static Result readFile(StringSpan initialDirectory, HttpRequest& request, HttpResponse& response);
+    static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
     static Result formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize, size_t& outLength);
 
     static int64_t    getCurrentTimeMilliseconds();
     static StringSpan getContentType(const StringSpan extension);
 };
 
-SC::Result SC::HttpWebServer::init(StringSpan directoryToServe)
+SC::Result SC::HttpWebServer::init(StringSpan directoryToServe, Span<HttpWebServerStream> streams,
+                                   AsyncBuffersPool& asyncPool, AsyncEventLoop& loop, ThreadPool* pool)
 {
+    fileStreams = streams;
+    buffersPool = &asyncPool;
+    eventLoop   = &loop;
+    threadPool  = pool;
+
+    for (auto& fs : fileStreams)
+    {
+        if (threadPool == nullptr)
+        {
+            fs.readableFileStream.request.disableThreadPool();
+        }
+        else
+        {
+            SC_TRY(fs.readableFileStream.request.executeOn(fs.readStreamTask, *threadPool));
+        }
+    }
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
     SC_TRY(directory.assign(directoryToServe));
     return Result(true);
 }
 
-SC::Result SC::HttpWebServer::stopAsync() { return Result(true); }
-
-void SC::HttpWebServer::serveFile(HttpRequest& request, HttpResponse& response)
+SC::Result SC::HttpWebServer::serveFile(HttpServerClient::ID index, StringSpan url, HttpResponse& response)
 {
-    SC_ASSERT_RELEASE(Internal::readFile(directory.view(), request, response));
-}
-
-SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpRequest& request, HttpResponse& response)
-{
-    if (not HttpStringIterator::startsWith(request.getURL(), "/"))
+    if (not HttpStringIterator::startsWith(url, "/"))
     {
         return Result::Error("Wrong url");
     }
-    StringSpan url = HttpStringIterator::sliceStart(request.getURL(), 1);
-    if (url.isEmpty())
+    StringSpan filePath = HttpStringIterator::sliceStart(url, 1);
+    if (filePath.isEmpty())
     {
-        url = "index.html";
+        filePath = "index.html";
     }
     FileSystem fileSystem;
-    SC_TRY(fileSystem.init(directory));
-    if (fileSystem.existsAndIsFile(url))
+    SC_TRY(fileSystem.init(directory.view()));
+    if (fileSystem.existsAndIsFile(filePath))
     {
         FileSystem::FileStat fileStat;
-        SC_TRY(fileSystem.getFileStat(url, fileStat));
+        SC_TRY(fileSystem.getFileStat(filePath, fileStat));
         StringSpan name, extension;
-        SC_TRY(HttpStringIterator::parseNameExtension(url, name, extension));
-        Buffer data;
-        SC_TRY(fileSystem.read(url, data));
+        SC_TRY(HttpStringIterator::parseNameExtension(filePath, name, extension));
+        StringPath path;
+        SC_TRY(path.assign(directory.view()));
+        SC_TRY(path.append("/"));
+        SC_TRY(path.append(filePath));
+        FileDescriptor fd;
+        SC_TRY(fd.open(path.view(), FileOpen::Read));
+        HttpWebServerStream& stream = fileStreams[index.getIndex()];
+        SC_TRY(stream.readableFileStream.init(*buffersPool, stream.requests, *eventLoop, fd));
+        fd.detach();
+        stream.readableFileStream.setAutoCloseDescriptor(true);
+        stream.pipeline.source   = &stream.readableFileStream;
+        stream.pipeline.sinks[0] = &response.getWritableStream();
+
         SC_TRY(response.startResponse(200));
         char buffer[20];
-        snprintf(buffer, sizeof(buffer), "%zu", data.size());
+        ::snprintf(buffer, sizeof(buffer), "%zu", fileStat.fileSize);
         StringSpan contentLength = {{buffer, ::strlen(buffer)}, true, StringEncoding::Ascii};
         SC_TRY(response.addHeader("Content-Length", contentLength));
         SC_TRY(response.addHeader("Content-Type", Internal::getContentType(extension)));
@@ -70,8 +92,9 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpReque
         SC_TRY(response.addHeader("Connection", "Closed"));
 
         SC_TRY(response.sendHeaders());
-        SC_TRY(response.getWritableStream().write(move(data)));
-        SC_TRY(response.end());
+
+        SC_TRY(stream.pipeline.pipe());
+        SC_TRY(stream.pipeline.start());
     }
     else
     {
@@ -82,6 +105,12 @@ SC::Result SC::HttpWebServer::Internal::readFile(StringSpan directory, HttpReque
         SC_TRY(response.end());
     }
     return Result(true);
+}
+
+void SC::HttpWebServer::serveFilesOn(HttpServer& server)
+{
+    server.onRequest = [this](HttpServerClient& client)
+    { SC_ASSERT_RELEASE(serveFile(client.getClientID(), client.request.getURL(), client.response)); };
 }
 
 SC::StringSpan SC::HttpWebServer::Internal::getContentType(const StringSpan extension)

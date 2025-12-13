@@ -26,6 +26,9 @@ void SC::HttpServerTest::httpServerTest()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
+
+    //! [HttpServerSnippet]
+
     constexpr int NUM_CLIENTS    = 3;
     constexpr int CLIENT_HEADERS = 8 * 1024;
     constexpr int CLIENT_REQUEST = 1024;
@@ -34,7 +37,7 @@ void SC::HttpServerTest::httpServerTest()
     Buffer requestsMemory;
     SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * CLIENT_REQUEST));
 
-    AsyncBufferView  buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accomodate some slots for external bufs
+    AsyncBufferView  buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accommodate some slots for external bufs
     HttpServerClient clients[NUM_CLIENTS];
 
     AsyncReadableStream::Request readQueue[NUM_CLIENTS * REQUEST_SLICES];
@@ -53,26 +56,22 @@ void SC::HttpServerTest::httpServerTest()
         }
     }
 
-    //! [HttpServerSnippet]
-    // constexpr int NUM_CLIENTS    = 3;
-    // constexpr int CLIENT_HEADERS = 8 * 1024;
-
     Buffer headersMemory;
     SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * CLIENT_HEADERS));
 
-    GrowableBuffer<Buffer> headers = {headersMemory};
-    HttpServer::Memory     memory  = {headers, clients};
-    HttpAsyncServer        server;
-
-    SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 6152, memory));
+    HttpAsyncServer server;
+    SC_TEST_EXPECT(server.init(clients, headersMemory.toSpan(), readQueue, writeQueue, buffers));
+    SC_TEST_EXPECT(server.start(eventLoop, "127.0.0.1", 6152));
 
     struct ServerContext
     {
         int numRequests;
     } serverContext = {0};
 
-    server.httpServer.onRequest = [this, &serverContext](HttpRequest& request, HttpResponse& response)
+    server.getHttpServer().onRequest = [this, &serverContext](HttpServerClient& client)
     {
+        HttpRequest&  request  = client.request;
+        HttpResponse& response = client.response;
         if (request.getParser().method != HttpParser::Method::HttpGET)
         {
             SC_TEST_EXPECT(response.startResponse(405));
@@ -112,7 +111,6 @@ void SC::HttpServerTest::httpServerTest()
     };
 
     //! [HttpServerSnippet]
-    server.setupStreamsMemory(readQueue, writeQueue, buffers);
 
     HttpClient       client[3];
     SmallString<255> buffer;
@@ -134,12 +132,13 @@ void SC::HttpServerTest::httpServerTest()
             clientContext.numRequests++;
             if (clientContext.numRequests == clientContext.wantedNumRequests)
             {
-                SC_TEST_EXPECT(clientContext.asyncServer.stopAsync());
+                SC_TEST_EXPECT(clientContext.asyncServer.stop());
             }
         };
         SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));
     }
     SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(server.waitForStopToFinish());
     SC_TEST_EXPECT(serverContext.numRequests == clientContext.wantedNumRequests);
     SC_TEST_EXPECT(clientContext.numRequests == clientContext.wantedNumRequests);
     SC_TEST_EXPECT(eventLoop.close());

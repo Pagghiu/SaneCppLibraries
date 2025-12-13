@@ -6,8 +6,9 @@
 
 namespace SC
 {
-Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port, HttpServer::Memory& memory)
+Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
+    SC_TRY_MSG(memory, "HttpAsyncServer::start - init not called");
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     eventLoop = &loop;
@@ -20,40 +21,60 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     asyncServerAccept.callback.bind<HttpAsyncServer, &HttpAsyncServer::onNewClient>(*this);
     SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
     started = true;
-    return httpServer.start(memory);
+    return Result(true);
 }
 
-void HttpAsyncServer::setupStreamsMemory(Span<AsyncReadableStream::Request> readQueue,
-                                         Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers)
+Result HttpAsyncServer::init(Span<HttpServerClient> clients, Span<char> headersMemory,
+                             Span<AsyncReadableStream::Request> readQueue,
+                             Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers)
 {
+    // TODO: Add some validation of minimum sizes for the queues and the buffers
+    SC_TRY(httpServer.init(clients, headersMemory));
     readQueues  = readQueue;
     writeQueues = writeQueue;
 
     buffersPool.buffers = buffers;
+
+    memory = true;
+    return Result(true);
 }
 
-Result HttpAsyncServer::stopAsync()
+Result HttpAsyncServer::close()
 {
-    stopping       = true;
+    SC_TRY(httpServer.close());
+    readQueues  = {};
+    writeQueues = {};
+
+    buffersPool.buffers = {};
+
+    memory = false;
+    return Result(true);
+}
+
+Result HttpAsyncServer::stop()
+{
+    stopping = true;
+
     auto deferStop = MakeDeferred([this]() { stopping = false; });
     if (not asyncServerAccept.isFree())
     {
         SC_TRY(asyncServerAccept.stop(*eventLoop));
     }
 
-    for (HttpServerClient& it : httpServer.clients)
+    for (size_t idx = 0; idx < httpServer.getNumTotalClients(); ++idx)
     {
-        closeAsync(it);
+        HttpServerClient& client = httpServer.getClientAt(idx);
+        // Destroy can be safely called in any state (including already destroyed)
+        client.readableSocketStream.destroy();
+        client.writableSocketStream.destroy();
+        closeAsync(client);
     }
     return Result(true);
 }
 
-Result HttpAsyncServer::stopSync()
+Result HttpAsyncServer::waitForStopToFinish()
 {
-    stopping       = true;
-    auto deferStop = MakeDeferred([this]() { stopping = false; });
-    SC_TRY(stopAsync());
-    while (httpServer.getNumClients() > 0)
+    while (httpServer.getNumActiveClients() > 0)
     {
         SC_TRY(eventLoop->runNoWait());
     }
@@ -61,6 +82,20 @@ Result HttpAsyncServer::stopSync()
     {
         SC_TRY(eventLoop->runNoWait());
     }
+    bool checkAgainAllClients;
+    do
+    {
+        checkAgainAllClients = false;
+        for (size_t idx = 0; idx < httpServer.getNumTotalClients(); ++idx)
+        {
+            HttpServerClient& client = httpServer.getClientAt(idx);
+            while (not client.readableSocketStream.request.isFree() or not client.writableSocketStream.request.isFree())
+            {
+                SC_TRY(eventLoop->runNoWait());
+                checkAgainAllClients = true;
+            }
+        }
+    } while (checkAgainAllClients);
     started = false;
     return Result(true);
 }
@@ -73,60 +108,57 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
         // TODO: Invoke an error
         return;
     }
-    size_t idx = 0;
-    // Allocate always succeeds because we pause asyncAccept when the arena is full
-    SC_ASSERT_RELEASE(httpServer.allocateClient(idx));
+    HttpServerClient::ID idx;
+    // Activation always succeeds because we pause asyncAccept when the there are not available clients
+    SC_ASSERT_RELEASE(httpServer.activateAvailableClient(idx));
 
-    HttpServerClient& client   = httpServer.clients[idx];
+    HttpServerClient& client   = httpServer.getClient(idx);
     client.socket              = move(acceptedClient);
-    const size_t readQueueLen  = readQueues.sizeInElements() / httpServer.clients.sizeInElements();
-    const size_t writeQueueLen = writeQueues.sizeInElements() / httpServer.clients.sizeInElements();
+    const size_t readQueueLen  = readQueues.sizeInElements() / httpServer.getNumTotalClients();
+    const size_t writeQueueLen = writeQueues.sizeInElements() / httpServer.getNumTotalClients();
     SC_TRUST_RESULT(readQueueLen > 0);
     SC_TRUST_RESULT(writeQueueLen > 0);
     Span<AsyncReadableStream::Request> readQueue;
     Span<AsyncWritableStream::Request> writeQueue;
-    SC_TRUST_RESULT(readQueues.sliceStartLength(idx * readQueueLen, readQueueLen, readQueue));
-    SC_TRUST_RESULT(writeQueues.sliceStartLength(idx * writeQueueLen, writeQueueLen, writeQueue));
+    SC_TRUST_RESULT(readQueues.sliceStartLength(idx.getIndex() * readQueueLen, readQueueLen, readQueue));
+    SC_TRUST_RESULT(writeQueues.sliceStartLength(idx.getIndex() * writeQueueLen, writeQueueLen, writeQueue));
     SC_TRUST_RESULT(client.readableSocketStream.init(buffersPool, readQueue, *eventLoop, client.socket));
     SC_TRUST_RESULT(client.writableSocketStream.init(buffersPool, writeQueue, *eventLoop, client.socket));
 
-    auto onData = [this, idx](AsyncBufferView::ID bufferID) { onStreamReceive(httpServer.clients[idx], bufferID); };
+    auto onData = [this, idx](AsyncBufferView::ID bufferID) { onStreamReceive(httpServer.getClient(idx), bufferID); };
     SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(onData));
     SC_TRUST_RESULT(client.readableSocketStream.start());
 
     client.response.writableStream = &client.writableSocketStream;
 
-    // Only reactivate asyncAccept if arena is not full (otherwise it's being reactivated in closeAsync)
-    result.reactivateRequest(httpServer.canAcceptMoreClients());
+    // Only reactivate asyncAccept if there are available clients (otherwise it's being reactivated in closeAsync)
+    result.reactivateRequest(httpServer.getNumActiveClients() < httpServer.getNumTotalClients());
 }
 
 void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView::ID bufferID)
 {
     Span<char> readData;
     SC_ASSERT_RELEASE(buffersPool.getWritableData(bufferID, readData));
-    // TODO: Handle error for available headers not big enough
-    SC_ASSERT_RELEASE(readData.sizeInBytes() <= client.request.availableHeader.sizeInBytes());
-    ::memcpy(client.request.availableHeader.data(), readData.data(), readData.sizeInBytes());
 
-    if (not client.request.parse(httpServer.maxHeaderSize, readData))
+    if (not client.request.writeHeaders(maxHeaderSize, readData))
     {
         // TODO: Invoke on error
         return;
     }
     else if (client.request.headersEndReceived)
     {
-        client.response.responseHeaders         = {client.request.availableHeader.data(), 0};
-        client.response.responseHeadersCapacity = client.request.availableHeader.sizeInBytes();
+        client.response.grabUnusedHeaderMemory(client.request);
         client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
         client.readableSocketStream.eventData = {}; // De-register data event
-        httpServer.onRequest(client.request, client.response);
+        httpServer.onRequest(client);
 
         // Using a struct instead of a lambda so it can unregister itself
         struct AfterWrite
         {
             HttpAsyncServer&  pself;
             HttpServerClient& client;
-            void              operator()()
+
+            void operator()()
             {
                 SC_ASSERT_RELEASE(client.response.writableStream->eventFinish.removeListener(*this));
                 pself.closeAsync(client);
@@ -136,21 +168,20 @@ void HttpAsyncServer::onStreamReceive(HttpServerClient& client, AsyncBufferView:
     }
 }
 
-void HttpAsyncServer::closeAsync(HttpServerClient& requestClient)
+void HttpAsyncServer::closeAsync(HttpServerClient& client)
 {
-    if (requestClient.state == HttpServerClient::State::Free)
+    if (client.state == HttpServerClient::State::Inactive)
     {
         return;
     }
+    SC_TRUST_RESULT(client.socket.close());
+    const bool wasFull = httpServer.getNumActiveClients() == httpServer.getNumTotalClients();
 
-    SC_TRUST_RESULT(requestClient.socket.close());
-    const bool wasFull = not httpServer.canAcceptMoreClients();
-
-    SC_TRUST_RESULT(httpServer.deallocateClient(requestClient));
+    SC_TRUST_RESULT(httpServer.deactivateClient(client.getClientID()));
     if (wasFull and not stopping)
     {
-        // Arena was full and in onNewClient asyncAccept has been paused (by avoiding reactivation).
-        // Now a slot has been freed so it's possible to start accepting clients again.
+        // onNewClient has paused asyncAccept (by avoiding reactivation) for lack of available clients.
+        // Now a client has just been made available so it's possible to start accepting again.
         SC_TRUST_RESULT(asyncServerAccept.start(*eventLoop, serverSocket));
     }
 }

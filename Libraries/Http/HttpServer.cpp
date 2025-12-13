@@ -15,10 +15,17 @@ HttpServerClient::HttpServerClient()
     // in order to be used across plugin boundaries.
 }
 
+void HttpServerClient::reset()
+{
+    request.reset();
+    response.reset();
+    state = State::Inactive;
+}
+
 //-------------------------------------------------------------------------------------------------------
 // HttpRequest
 //-------------------------------------------------------------------------------------------------------
-bool HttpRequest::find(HttpParser::Token token, StringSpan& res) const
+bool HttpRequest::findParserToken(HttpParser::Token token, StringSpan& res) const
 {
     for (size_t idx = 0; idx < numHeaders; ++idx)
     {
@@ -40,8 +47,12 @@ void HttpRequest::reset()
     parser             = {};
 }
 
-Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
+Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readData)
 {
+    // TODO: Handle error for available headers not big enough
+    SC_TRY_MSG(readData.sizeInBytes() <= availableHeader.sizeInBytes(), "HttpRequest::parseHeaders - readData");
+    ::memcpy(availableHeader.data(), readData.data(), readData.sizeInBytes());
+
     readHeaders = {readHeaders.data(), readHeaders.sizeInBytes() + readData.sizeInBytes()};
 
     const bool hasHeaderSpace = availableHeader.sliceStart(readData.sizeInBytes(), availableHeader);
@@ -68,7 +79,7 @@ Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
             break;
         if (parser.state == HttpParser::State::Result)
         {
-            detail::HttpHeaderOffset header;
+            HttpHeaderOffset header;
             header.token  = parser.token;
             header.start  = static_cast<uint32_t>(parser.tokenStart);
             header.length = static_cast<uint32_t>(parser.tokenLength);
@@ -84,7 +95,7 @@ Result HttpRequest::parse(const uint32_t maxSize, Span<const char> readData)
             if (parser.token == HttpParser::Token::HeadersEnd)
             {
                 headersEndReceived = true;
-                SC_TRY(find(HttpParser::Token::Url, url));
+                SC_TRY(findParserToken(HttpParser::Token::Url, url));
                 break;
             }
         }
@@ -150,32 +161,48 @@ Result HttpResponse::end()
     return Result(true);
 }
 
+void HttpResponse::grabUnusedHeaderMemory(HttpRequest& request)
+{
+    responseHeaders         = {request.availableHeader.data(), 0};
+    responseHeadersCapacity = request.availableHeader.sizeInBytes();
+}
+
 void HttpResponse::reset() { headersSent = false; }
 
 //-------------------------------------------------------------------------------------------------------
 // HttpServer
 //-------------------------------------------------------------------------------------------------------
-Result HttpServer::start(Memory& memory)
+Result HttpServer::init(Span<HttpServerClient> serverClients, Span<char> clientsHeadersMemory)
 {
-    clients       = memory.clients;
-    headersMemory = &memory.headersMemory;
+    SC_TRY_MSG(numClients == 0, "HttpServer::init - numClients != 0");
+    clients       = serverClients;
+    headersMemory = clientsHeadersMemory;
     return Result(true);
 }
 
-bool HttpServer::allocateClient(size_t& idx)
+Result HttpServer::close()
 {
-    for (idx = 0; idx < clients.sizeInElements(); ++idx)
+    SC_TRY_MSG(numClients == 0, "HttpServer::close - numClients != 0");
+    clients       = {};
+    headersMemory = {};
+    return Result(true);
+}
+
+bool HttpServer::activateAvailableClient(HttpServerClient::ID& clientID)
+{
+    for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
     {
         HttpServerClient& client = clients[idx];
-        if (client.state == HttpServerClient::State::Free)
+        if (client.state == HttpServerClient::State::Inactive)
         {
-            client.state = HttpServerClient::State::Used;
-            client.index = idx;
+            client.state    = HttpServerClient::State::Active;
+            clientID.index  = idx;
+            client.clientID = clientID;
 
-            const size_t headerBufferSize = headersMemory->size() / clients.sizeInElements();
+            const size_t headerBufferSize = headersMemory.sizeInBytes() / clients.sizeInElements();
 
-            client.request.availableHeader = {headersMemory->data(), headerBufferSize};
-            client.request.readHeaders     = {headersMemory->data(), 0};
+            client.request.availableHeader = {headersMemory.data(), headerBufferSize};
+            client.request.readHeaders     = {headersMemory.data(), 0};
             numClients++;
             return true;
         }
@@ -183,15 +210,15 @@ bool HttpServer::allocateClient(size_t& idx)
     return false;
 }
 
-bool HttpServer::deallocateClient(HttpServerClient& client)
+bool HttpServer::deactivateClient(HttpServerClient::ID clientID)
 {
-    if (numClients == 0 or client.index >= clients.sizeInElements())
+    if (numClients == 0 or clientID.index >= clients.sizeInElements())
     {
         return false;
     }
     else
     {
-        clients[client.index].reset();
+        clients[clientID.index].reset();
         numClients--;
         return true;
     }

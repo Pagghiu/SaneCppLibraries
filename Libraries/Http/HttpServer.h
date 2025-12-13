@@ -10,31 +10,12 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpServer;
-struct SC_COMPILER_EXPORT HttpServerClient;
-namespace detail
-{
-struct SC_COMPILER_EXPORT HttpHeaderOffset
-{
-    HttpParser::Token token = HttpParser::Token::Method;
-
-    uint32_t start  = 0;
-    uint32_t length = 0;
-};
-} // namespace detail
-
 //! @addtogroup group_http
 //! @{
 
 /// @brief Http request received from a client
 struct SC_COMPILER_EXPORT HttpRequest
 {
-    /// @brief Finds a specific HttpParser::Result in the list of parsed header
-    /// @param token The result to look for (Method, Url etc.)
-    /// @param res A StringSpan, pointing at headerBuffer containing the found result
-    /// @return `true` if the result has been found
-    [[nodiscard]] bool find(HttpParser::Token token, StringSpan& res) const;
-
     /// @brief Gets the associated HttpParser
     const HttpParser& getParser() const { return parser; }
 
@@ -44,14 +25,27 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @brief Resets this object for it to be re-usable
     void reset();
 
-    /// @brief Parses an incoming slice of data (must be slice of availableHeader)
-    Result parse(const uint32_t maxHeaderSize, Span<const char> readData);
-
   private:
     friend struct HttpServer;
+    friend struct HttpResponse;
     friend struct HttpAsyncServer;
-    using HttpHeaderOffset = detail::HttpHeaderOffset;
 
+    /// @brief Finds a specific HttpParser::Result in the list of parsed header
+    /// @param token The result to look for (Method, Url etc.)
+    /// @param res A StringSpan, pointing at headerBuffer containing the found result
+    /// @return `true` if the result has been found
+    [[nodiscard]] bool findParserToken(HttpParser::Token token, StringSpan& res) const;
+
+    /// @brief Parses an incoming slice of data (must be slice of availableHeader)
+    Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData);
+
+    struct SC_COMPILER_EXPORT HttpHeaderOffset
+    {
+        HttpParser::Token token = HttpParser::Token::Method;
+
+        uint32_t start  = 0;
+        uint32_t length = 0;
+    };
     Span<char> readHeaders;     ///< Headers read so far
     Span<char> availableHeader; ///< Space to save headers to
 
@@ -85,12 +79,15 @@ struct SC_COMPILER_EXPORT HttpResponse
     /// @brief Finalizes the writable stream after sending all in progress writes
     Result end();
 
-    /// @brief Obtain writable stream to write content
+    /// @brief Obtain writable stream for sending content back to connected client
     AsyncWritableStream& getWritableStream() { return *writableStream; }
 
   private:
     friend struct HttpServer;
     friend struct HttpAsyncServer;
+
+    /// @brief Uses unused header memory data from the HttpRequest for the response
+    void grabUnusedHeaderMemory(HttpRequest& request);
 
     Span<char> responseHeaders;
     size_t     responseHeadersCapacity = 0;
@@ -104,12 +101,20 @@ struct SC_COMPILER_EXPORT HttpServerClient
 {
     HttpServerClient();
 
-    void reset()
+    struct SC_COMPILER_EXPORT ID
     {
-        request.reset();
-        response.reset();
-        state = State::Free;
-    }
+        size_t getIndex() const { return index; }
+
+      private:
+        friend struct HttpServer;
+        size_t index = 0;
+    };
+
+    /// @brief Prepare this client for re-use, marking it as Inactive
+    void reset();
+
+    /// @brief The Client ID used to find this client in HttpServer clients Span
+    ID getClientID() const { return clientID; }
 
     HttpRequest  request;
     HttpResponse response;
@@ -117,15 +122,14 @@ struct SC_COMPILER_EXPORT HttpServerClient
   private:
     enum class State
     {
-        Free,
-        Used
+        Inactive,
+        Active
     };
     friend struct HttpServer;
     friend struct HttpAsyncServer;
-    char debugName[16] = {0};
 
-    State  state = State::Free;
-    size_t index = 0;
+    State state = State::Inactive;
+    ID    clientID;
 
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
@@ -144,37 +148,40 @@ struct SC_COMPILER_EXPORT HttpServerClient
 /// \snippet Tests/Libraries/Http/HttpServerTest.cpp HttpServerSnippet
 struct SC_COMPILER_EXPORT HttpServer
 {
-    struct Memory
-    {
-        IGrowableBuffer& headersMemory;
+    /// @brief Initializes the server with memory buffers for clients and headers
+    Result init(Span<HttpServerClient> clients, Span<char> headersMemory);
 
-        Span<HttpServerClient> clients;
-    };
-    /// @brief Starts the http server
-    /// @param memory Memory buffers to be used by the http server
-    Result start(Memory& memory);
+    /// @brief Closes the server, removing references to the memory buffers passed during init
+    Result close();
+
+    /// @brief Return the number of active clients
+    [[nodiscard]] size_t getNumActiveClients() const { return numClients; }
+
+    /// @brief Return the total number of clients (active + inactive)
+    [[nodiscard]] size_t getNumTotalClients() const { return clients.sizeInElements(); }
+
+    /// @brief Returns a client by ID
+    [[nodiscard]] HttpServerClient& getClient(HttpServerClient::ID clientID) { return clients[clientID.index]; }
+
+    /// @brief Returns a client in the `[0, getNumTotalClients]` range
+    [[nodiscard]] HttpServerClient& getClientAt(size_t idx) { return clients[idx]; }
+
+    /// @brief Finds an available client (if any), activates it and returns its ID to use with getClient(id)
+    [[nodiscard]] bool activateAvailableClient(HttpServerClient::ID& clientID);
+
+    /// @brief De-activates a client previously returned by activateAvailableClient
+    [[nodiscard]] bool deactivateClient(HttpServerClient::ID clientID);
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
-    /// @warning Both references can be invalidated in later stages of the http request lifetime.
-    /// If necessary, store the client key returned by SC::HttpResponse::getClientKey and use it with
-    /// SC::HttpServer::getRequest, SC::HttpServer::getResponse or SC::HttpServer::getSocket
-    Function<void(HttpRequest&, HttpResponse&)> onRequest;
-
-    Span<HttpServerClient> clients;
-
-    [[nodiscard]] size_t getNumClients() const { return numClients; }
-
-    [[nodiscard]] bool canAcceptMoreClients() const { return numClients < clients.sizeInElements(); }
-    [[nodiscard]] bool allocateClient(size_t& idx);
-    [[nodiscard]] bool deallocateClient(HttpServerClient& client);
-
-    uint32_t maxHeaderSize = 8 * 1024;
+    Function<void(HttpServerClient&)> onRequest;
 
   private:
     void closeAsync(HttpServerClient& requestClient);
 
-    IGrowableBuffer* headersMemory = nullptr;
-    size_t           numClients    = 0;
+    Span<HttpServerClient> clients;
+    Span<char>             headersMemory;
+
+    size_t numClients = 0;
 };
 //! @}
 
