@@ -18,11 +18,10 @@ struct SC_COMPILER_EXPORT Event
     template <typename... U>
     void emit(U&&... t)
     {
-        const auto numListenersCopy = numListeners;
-        const auto listenersCopy    = listeners;
-        for (int idx = 0; idx < numListenersCopy; ++idx)
+        Event eventCopy = *this;
+        for (int idx = 0; idx < eventCopy.numListeners; ++idx)
         {
-            listenersCopy[idx](t...);
+            eventCopy.listeners[idx](t...);
         }
     }
 
