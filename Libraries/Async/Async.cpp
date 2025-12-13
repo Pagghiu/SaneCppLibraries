@@ -1322,7 +1322,7 @@ SC::Result SC::AsyncEventLoop::Internal::submitRequests(AsyncEventLoop& eventLoo
     {
         numberOfSubmissions -= 1;
         auto res = stageSubmission(eventLoop, kernelEvents, *async);
-        if (not res)
+        if (async->state != AsyncRequest::State::Cancelling and not res) // do not report failed cancellations
         {
             reportError(eventLoop, kernelEvents, *async, res, -1);
         }
