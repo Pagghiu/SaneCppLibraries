@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
-#include "HttpURLParser.h"
-#include "Internal/HttpStringAppend.h"
+#include "Libraries/Http/HttpURLParser.h"
+#include "Libraries/Http/Internal/HttpStringAppend.h"
 
 SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
 {
@@ -33,8 +33,6 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
         SC_TRY(sb.append("Host: 127.0.0.1\r\n\r\n"));
     }
 
-    const char* dbgName = customDebugName.isEmpty() ? "HttpClient" : customDebugName.bytesIncludingTerminator();
-    connectAsync.setDebugName(dbgName);
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
     parser      = {};
     parser.type = HttpParser::Type::Response;
@@ -49,9 +47,6 @@ SC::StringSpan SC::HttpClient::getResponse() const
 void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
-    const char* dbgName =
-        customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
-    sendAsync.setDebugName(dbgName);
 
     sendAsync.callback.bind<HttpClient, &HttpClient::onAfterSend>(*this);
     auto res = sendAsync.start(*eventLoop, clientSocket, content.toSpanConst());
@@ -64,11 +59,7 @@ void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
 void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
 {
     SC_COMPILER_UNUSED(result);
-    SC_ASSERT_RELEASE(content.resizeWithoutInitializing(content.capacity()));
-
-    const char* dbgName =
-        customDebugName.isEmpty() ? "HttpClient::clientSocket" : customDebugName.bytesIncludingTerminator();
-    receiveAsync.setDebugName(dbgName);
+    SC_ASSERT_RELEASE(content.resizeWithoutInitializing(1024));
 
     receivedBytes   = 0;
     headersReceived = false;

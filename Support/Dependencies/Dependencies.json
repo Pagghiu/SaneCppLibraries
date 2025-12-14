@@ -153,13 +153,10 @@
             "Async",
             "AsyncStreams",
             "FileSystem",
-            "Foundation",
-            "Memory",
-            "Socket"
+            "Foundation"
         ],
         "minimal_dependencies": [
-            "AsyncStreams",
-            "Memory"
+            "AsyncStreams"
         ],
         "all_dependencies": [
             "Async",
@@ -167,7 +164,6 @@
             "File",
             "FileSystem",
             "Foundation",
-            "Memory",
             "Socket",
             "Threading"
         ]

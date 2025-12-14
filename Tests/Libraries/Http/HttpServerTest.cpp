@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "HttpClient.h"
 #include "Libraries/Http/HttpAsyncServer.h"
-#include "Libraries/Http/HttpClient.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -112,8 +112,7 @@ void SC::HttpServerTest::httpServerTest()
 
     //! [HttpServerSnippet]
 
-    HttpClient       client[3];
-    SmallString<255> buffer;
+    HttpClient client[3];
     struct ClientContext
     {
         int numRequests;
@@ -123,8 +122,6 @@ void SC::HttpServerTest::httpServerTest()
     } clientContext = {0, 3, server};
     for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
     {
-        SC_TEST_EXPECT(StringBuilder::format(buffer, "HttpClient [{}]", idx));
-        SC_TEST_EXPECT(client[idx].setCustomDebugName(buffer.view()));
         client[idx].callback = [this, &clientContext](HttpClient& client)
         {
             StringView response(client.getResponse());
