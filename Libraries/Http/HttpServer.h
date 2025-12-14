@@ -137,15 +137,12 @@ struct SC_COMPILER_EXPORT HttpServerClient
     SocketDescriptor socket;
 };
 
-/// @brief Async Http server
+/// @brief Http server
 ///
-/// Usage:
-/// - Use the SC::HttpServer::onRequest callback to intercept new clients connecting
-/// - Write to SC::HttpResponse or use SC::HttpWebServer to statically serve files
+/// This class holds a fixed slice of clients with their headers memory, managing their active / inactive state.
+/// It's typically not used standalone, but more likely operated by other classes like SC::HttpAsyncServer.
 ///
-/// @see SC::HttpWebServer
-///
-/// \snippet Tests/Libraries/Http/HttpServerTest.cpp HttpServerSnippet
+/// @see SC::HttpAsyncFileServer, SC::HttpAsyncServer
 struct SC_COMPILER_EXPORT HttpServer
 {
     /// @brief Initializes the server with memory buffers for clients and headers
@@ -176,8 +173,6 @@ struct SC_COMPILER_EXPORT HttpServer
     Function<void(HttpServerClient&)> onRequest;
 
   private:
-    void closeAsync(HttpServerClient& requestClient);
-
     Span<HttpServerClient> clients;
     Span<char>             headersMemory;
 

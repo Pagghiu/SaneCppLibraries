@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Http/HttpWebServer.h"
+#include "Libraries/Http/HttpAsyncFileServer.h"
 #include "HttpClient.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Http/HttpAsyncServer.h"
@@ -8,22 +8,22 @@
 #include "Libraries/Testing/Testing.h"
 namespace SC
 {
-struct HttpWebServerTest;
+struct HttpAsyncFileServerTest;
 } // namespace SC
 
-struct SC::HttpWebServerTest : public SC::TestCase
+struct SC::HttpAsyncFileServerTest : public SC::TestCase
 {
-    HttpWebServerTest(SC::TestReport& report) : TestCase(report, "HttpWebServerTest")
+    HttpAsyncFileServerTest(SC::TestReport& report) : TestCase(report, "HttpAsyncFileServerTest")
     {
-        if (test_section("HttpWebServer"))
+        if (test_section("HttpAsyncFileServer"))
         {
-            httpWebServerTest();
+            httpFileServerTest();
         }
     }
-    void httpWebServerTest();
+    void httpFileServerTest();
 };
 
-void SC::HttpWebServerTest::httpWebServerTest()
+void SC::HttpAsyncFileServerTest::httpFileServerTest()
 {
     // Create a test file in the application root directory
     StringView webServerFolder = report.applicationRootDirectory.view();
@@ -33,7 +33,7 @@ void SC::HttpWebServerTest::httpWebServerTest()
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
-    //! [HttpWebServerSnippet]
+    //! [HttpFileServerSnippet]
     constexpr int NUM_CLIENTS    = 16;
     constexpr int REQUEST_SLICES = 2;
     constexpr int CLIENT_REQUEST = 1024;
@@ -64,27 +64,26 @@ void SC::HttpWebServerTest::httpWebServerTest()
         }
     }
 
-    HttpAsyncServer asyncServer;
-    HttpWebServer   webServer;
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
 
-    SC_TEST_EXPECT(asyncServer.init(clients, headersMemory.toSpan(), readQueue, writeQueue, buffers));
+    SC_TEST_EXPECT(httpServer.init(clients, headersMemory.toSpan(), readQueue, writeQueue, buffers));
     // Creates an HttpServer that serves files from application root directory
-    SC_TEST_EXPECT(asyncServer.start(eventLoop, "127.0.0.1", 8090));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
 
-    HttpWebServerStream streams[NUM_CLIENTS];
+    HttpAsyncFileServerStream streams[NUM_CLIENTS];
 
-    SC_TEST_EXPECT(webServer.init(webServerFolder, streams, asyncServer.getBuffersPool(), eventLoop));
+    SC_TEST_EXPECT(fileServer.init(webServerFolder, streams, httpServer.getBuffersPool(), eventLoop));
 
-    webServer.serveFilesOn(asyncServer.getHttpServer());
+    fileServer.serveFilesOn(httpServer.getHttpServer());
 
-    //! [HttpWebServerSnippet]
+    //! [HttpFileServerSnippet]
 
     struct Context
     {
         int              numRequests = 0;
-        HttpWebServer&   httpWebServer;
-        HttpAsyncServer& httpAsyncServer;
-    } context = {0, webServer, asyncServer};
+        HttpAsyncServer& httpServer;
+    } context = {0, httpServer};
 
     // Create an Http Client request for that file
     HttpClient client;
@@ -94,10 +93,10 @@ void SC::HttpWebServerTest::httpWebServerTest()
         context.numRequests++;
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Response from file"));
-        SC_TEST_EXPECT(context.httpAsyncServer.stop());
+        SC_TEST_EXPECT(context.httpServer.stop());
     };
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(asyncServer.waitForStopToFinish());
+    SC_TEST_EXPECT(httpServer.waitForStopToFinish());
 
     // Remove the test file
     SC_TEST_EXPECT(fs.removeFile("file.html"));
@@ -105,5 +104,5 @@ void SC::HttpWebServerTest::httpWebServerTest()
 
 namespace SC
 {
-void runHttpWebServerTest(SC::TestReport& report) { HttpWebServerTest test(report); }
+void runHttpAsyncFileServerTest(SC::TestReport& report) { HttpAsyncFileServerTest test(report); }
 } // namespace SC

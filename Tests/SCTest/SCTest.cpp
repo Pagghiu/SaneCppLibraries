@@ -54,8 +54,8 @@ void runHashingTest(TestReport& report);
 // Http
 void runHttpClientTest(TestReport& report);
 void runHttpParserTest(TestReport& report);
-void runHttpServerTest(TestReport& report);
-void runHttpWebServerTest(TestReport& report);
+void runHttpAsyncServerTest(TestReport& report);
+void runHttpAsyncFileServerTest(TestReport& report);
 void runHttpURLParserTest(TestReport& report);
 
 // Plugin
@@ -192,8 +192,8 @@ int main(int argc, const char* argv[])
     // Http tests
     runHttpParserTest(report);
     runHttpClientTest(report);
-    runHttpServerTest(report);
-    runHttpWebServerTest(report);
+    runHttpAsyncServerTest(report);
+    runHttpAsyncFileServerTest(report);
     runHttpURLParserTest(report);
 
     // Plugin tests

@@ -4,6 +4,18 @@
 #include "HttpServer.h"
 namespace SC
 {
+
+/// @brief Async Http Server
+///
+/// This class handles a fully asynchronous http server staying inside 5 fixed memory regions passed during init.
+///
+/// Usage:
+/// - Use the SC::HttpServer::onRequest callback to intercept new clients connecting
+/// - Write to SC::HttpResponse or use SC::HttpAsyncFileServer to statically serve files
+///
+/// @see SC::HttpAsyncFileServer, SC::HttpServer
+///
+/// \snippet Tests/Libraries/Http/HttpAsyncServerTest.cpp HttpAsyncServerSnippet
 struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers

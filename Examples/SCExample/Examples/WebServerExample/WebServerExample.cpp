@@ -17,8 +17,8 @@
 
 #include "Libraries/ContainersReflection/ContainersReflection.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
+#include "Libraries/Http/HttpAsyncFileServer.h"
 #include "Libraries/Http/HttpAsyncServer.h"
-#include "Libraries/Http/HttpWebServer.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"
 
@@ -64,8 +64,8 @@ struct SC::WebServerExampleModel
 
     AsyncEventLoop* eventLoop = nullptr;
 
-    HttpAsyncServer httpServer;
-    HttpWebServer   httpWebServer;
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
 
     Buffer requestsMemory;
     Buffer headersMemory;
@@ -77,7 +77,7 @@ struct SC::WebServerExampleModel
 
     Span<AsyncBufferView> buffers;
 
-    Span<HttpWebServerStream> fileStreams;
+    Span<HttpAsyncFileServerStream> fileStreams;
 
     Result start()
     {
@@ -93,7 +93,7 @@ struct SC::WebServerExampleModel
         writeRequests = {new WritableFileStream::Request[numClients * (REQUEST_SLICES + 1)],
                          numClients*(REQUEST_SLICES + 1)};
         buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 2)], numClients*(REQUEST_SLICES + 2)};
-        fileStreams   = {new HttpWebServerStream[numClients], numClients};
+        fileStreams   = {new HttpAsyncFileServerStream[numClients], numClients};
 
         SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * numClients));
         SC_TRY(requestsMemory.resize(numClients * CLIENT_REQUEST));
@@ -111,12 +111,12 @@ struct SC::WebServerExampleModel
             }
         }
 
-        httpWebServer.serveFilesOn(httpServer.getHttpServer());
+        fileServer.serveFilesOn(httpServer.getHttpServer());
         SC_TRY(httpServer.init(clients, headersMemory.toSpan(), readRequests, writeRequests, buffers));
 
         const uint16_t port = static_cast<uint16_t>(modelState.port);
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port));
-        SC_TRY(httpWebServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
+        SC_TRY(fileServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
         return Result(true);
     }
 

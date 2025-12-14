@@ -44,14 +44,14 @@ Some relevant blog posts are:
 ## HttpServer
 @copydoc SC::HttpServer
 
-## HttpWebServer
-@copydoc SC::HttpWebServer
+## HttpAsyncFileServer
+@copydoc SC::HttpAsyncFileServer
 
 
 # Examples
 
-- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpWebServer and SC::HttpServer
-- Unit tests show how to use SC::HttpWebServer, SC::HttpServer and SC::HttpClient
+- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpServer
+- Unit tests show how to use SC::HttpAsyncFileServer, SC::HttpServer and SC::HttpClient
 
 
 # Blog

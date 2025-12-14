@@ -7,7 +7,8 @@
 namespace SC
 {
 
-struct SC_COMPILER_EXPORT HttpWebServerStream
+/// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
+struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
 {
     AsyncPipeline      pipeline;
     ReadableFileStream readableFileStream;
@@ -15,18 +16,19 @@ struct SC_COMPILER_EXPORT HttpWebServerStream
 
     AsyncReadableStream::Request requests[3];
 };
+
 /// @brief Http web server helps statically serves files from a directory.
 /// @n
-/// It can be used in conjunction with SC::HttpServer, by calling SC::HttpWebServer::serveFile
+/// It can be used in conjunction with SC::HttpServer, by calling SC::HttpAsyncFileServer::serveFile
 /// inside the SC::HttpServer::onRequest callback to statically serve files.
 ///
 /// @see SC::HttpServer
 ///
-/// \snippet Tests/Libraries/Http/HttpWebServerTest.cpp HttpWebServerSnippet
-struct SC_COMPILER_EXPORT HttpWebServer
+/// \snippet Tests/Libraries/Http/HttpAsyncFileServerTest.cpp HttpFileServerSnippet
+struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
     /// @brief Initialize the web server on the given file system directory to serve
-    Result init(StringSpan directoryToServe, Span<HttpWebServerStream> fileStreams, AsyncBuffersPool& buffersPool,
+    Result init(StringSpan directoryToServe, Span<HttpAsyncFileServerStream> fileStreams, AsyncBuffersPool& buffersPool,
                 AsyncEventLoop& eventLoop, ThreadPool* threadPool = nullptr);
 
     /// @brief Serve the file requested by this Http Client on its channel
@@ -39,7 +41,7 @@ struct SC_COMPILER_EXPORT HttpWebServer
   private:
     StringPath directory;
 
-    Span<HttpWebServerStream> fileStreams;
+    Span<HttpAsyncFileServerStream> fileStreams;
 
     AsyncBuffersPool* buffersPool = nullptr;
     AsyncEventLoop*   eventLoop   = nullptr;
