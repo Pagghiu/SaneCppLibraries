@@ -1,25 +1,24 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "HttpServer.h"
+#include "HttpConnection.h"
 namespace SC
 {
-
 /// @brief Async Http Server
 ///
 /// This class handles a fully asynchronous http server staying inside 5 fixed memory regions passed during init.
 ///
 /// Usage:
-/// - Use the SC::HttpServer::onRequest callback to intercept new clients connecting
+/// - Use the SC::HttpConnectionsPool::onRequest callback to intercept new clients connecting
 /// - Write to SC::HttpResponse or use SC::HttpAsyncFileServer to statically serve files
 ///
-/// @see SC::HttpAsyncFileServer, SC::HttpServer
+/// @see SC::HttpAsyncFileServer, SC::HttpConnectionsPool
 ///
 /// \snippet Tests/Libraries/Http/HttpAsyncServerTest.cpp HttpAsyncServerSnippet
 struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers
-    Result init(Span<HttpServerClient> clients, Span<char> headersMemory, Span<AsyncReadableStream::Request> readQueue,
+    Result init(Span<HttpConnection> clients, Span<char> headersMemory, Span<AsyncReadableStream::Request> readQueue,
                 Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers);
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
@@ -48,12 +47,15 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @brief Access the underlying buffers pool used by the async streams
     AsyncBuffersPool& getBuffersPool() { return buffersPool; }
 
-    /// @brief Access the underlying http server
-    HttpServer& getHttpServer() { return httpServer; }
+    /// @brief Access the underlying http connections
+    HttpConnectionsPool& getConnectionsPool() { return connections; }
+
+    /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
+    Function<void(HttpConnection&)> onRequest;
 
   private:
-    HttpServer       httpServer;
-    AsyncBuffersPool buffersPool;
+    HttpConnectionsPool connections;
+    AsyncBuffersPool    buffersPool;
 
     uint32_t maxHeaderSize = 8 * 1024;
 
@@ -65,9 +67,8 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     bool memory   = false;
 
     void onNewClient(AsyncSocketAccept::Result& result);
-    void closeAsync(HttpServerClient& requestClient);
-
-    void onStreamReceive(HttpServerClient& client, AsyncBufferView::ID bufferID);
+    void closeAsync(HttpConnection& requestClient);
+    void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

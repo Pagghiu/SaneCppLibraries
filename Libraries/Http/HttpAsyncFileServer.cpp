@@ -48,7 +48,7 @@ SC::Result SC::HttpAsyncFileServer::init(StringSpan directoryToServe, Span<HttpA
     return Result(true);
 }
 
-SC::Result SC::HttpAsyncFileServer::serveFile(HttpServerClient::ID index, StringSpan url, HttpResponse& response)
+SC::Result SC::HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response)
 {
     if (not HttpStringIterator::startsWith(url, "/"))
     {
@@ -107,10 +107,10 @@ SC::Result SC::HttpAsyncFileServer::serveFile(HttpServerClient::ID index, String
     return Result(true);
 }
 
-void SC::HttpAsyncFileServer::serveFilesOn(HttpServer& server)
+void SC::HttpAsyncFileServer::registerToServeFilesOn(HttpAsyncServer& server)
 {
-    server.onRequest = [this](HttpServerClient& client)
-    { SC_ASSERT_RELEASE(serveFile(client.getClientID(), client.request.getURL(), client.response)); };
+    server.onRequest = [this](HttpConnection& client)
+    { SC_ASSERT_RELEASE(serveFile(client.getConnectionID(), client.request.getURL(), client.response)); };
 }
 
 SC::StringSpan SC::HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)

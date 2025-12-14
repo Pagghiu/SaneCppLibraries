@@ -70,7 +70,7 @@ struct SC::WebServerExampleModel
     Buffer requestsMemory;
     Buffer headersMemory;
 
-    Span<HttpServerClient> clients;
+    Span<HttpConnection> clients;
 
     Span<ReadableFileStream::Request> readRequests;
     Span<WritableFileStream::Request> writeRequests;
@@ -81,42 +81,47 @@ struct SC::WebServerExampleModel
 
     Result start()
     {
-        constexpr int REQUEST_SLICES = 2;
-        constexpr int CLIENT_REQUEST = 512 * 1024;
-        constexpr int HEADER_SIZE    = 1024 * 8;
+        constexpr int REQUEST_SLICES = 2;          // Number of slices of the request buffer for each connection
+        constexpr int REQUEST_SIZE   = 512 * 1024; // How many bytes are allocated to stream data for each connection
+        constexpr int HEADER_SIZE    = 1024 * 8;   // How many bytes are dedicated to hold request and response headers
 
         const size_t numClients = static_cast<size_t>(modelState.maxClients);
 
         // TODO: Simplify this messy manual memory handling
-        clients       = {new HttpServerClient[numClients], numClients};
+        // 1. headersMemory: Memory for all http headers of all connections
+        // 2. readRequests: Memory to hold all sliced buffers used by the read queues
+        // 3. writeRequests: Memory to hold all sliced buffers used by the write queues
+        // 4. buffers: Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
+        // 5. clients: Memory to hold all http connections
+        // 6. fileStreams: Memory used by the async streams handled by the async file server
+        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * numClients));
         readRequests  = {new ReadableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
         writeRequests = {new WritableFileStream::Request[numClients * (REQUEST_SLICES + 1)],
                          numClients*(REQUEST_SLICES + 1)};
         buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 2)], numClients*(REQUEST_SLICES + 2)};
+        clients       = {new HttpConnection[numClients], numClients};
         fileStreams   = {new HttpAsyncFileServerStream[numClients], numClients};
 
-        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * numClients));
-        SC_TRY(requestsMemory.resize(numClients * CLIENT_REQUEST));
-
+        // Slice memory for buffers
+        SC_TRY(requestsMemory.resize(numClients * REQUEST_SIZE));
         Span<char> requestsSpan = requestsMemory.toSpan();
         for (size_t idx = 0; idx < numClients; ++idx)
         {
             for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
             {
                 Span<char>   memory;
-                const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
-                (void)requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory);
+                const size_t offset = idx * REQUEST_SIZE + slice * REQUEST_SIZE / REQUEST_SLICES;
+                (void)requestsSpan.sliceStartLength(offset, REQUEST_SIZE / REQUEST_SLICES, memory);
                 buffers[idx * REQUEST_SLICES + slice] = memory;
                 buffers[idx * REQUEST_SLICES + slice].setReusable(true);
             }
         }
 
-        fileServer.serveFilesOn(httpServer.getHttpServer());
+        // Initialize and start the http and the file server
+        fileServer.registerToServeFilesOn(httpServer);
         SC_TRY(httpServer.init(clients, headersMemory.toSpan(), readRequests, writeRequests, buffers));
-
-        const uint16_t port = static_cast<uint16_t>(modelState.port);
-        SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), port));
         SC_TRY(fileServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
+        SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
         return Result(true);
     }
 

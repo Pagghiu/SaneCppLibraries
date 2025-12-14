@@ -33,8 +33,8 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     constexpr int CLIENT_REQUEST = 1024;
     constexpr int REQUEST_SLICES = 2;
 
-    AsyncBufferView  buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accommodate some slots for external bufs
-    HttpServerClient clients[NUM_CLIENTS];
+    AsyncBufferView buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accommodate some slots for external bufs
+    HttpConnection  clients[NUM_CLIENTS];
 
     AsyncReadableStream::Request readQueue[NUM_CLIENTS * REQUEST_SLICES];
     AsyncWritableStream::Request writeQueue[NUM_CLIENTS * REQUEST_SLICES];
@@ -66,7 +66,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         int numRequests;
     } serverContext = {0};
 
-    httpServer.getHttpServer().onRequest = [this, &serverContext](HttpServerClient& client)
+    httpServer.onRequest = [this, &serverContext](HttpConnection& client)
     {
         HttpRequest&  request  = client.request;
         HttpResponse& response = client.response;

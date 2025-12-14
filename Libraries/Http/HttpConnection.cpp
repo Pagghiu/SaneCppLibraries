@@ -1,21 +1,21 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "HttpServer.h"
+#include "HttpConnection.h"
 #include "Internal/HttpStringAppend.h"
 #include <stdio.h>
 
 namespace SC
 {
 //-------------------------------------------------------------------------------------------------------
-// HttpServerClient
+// HttpConnection
 //-------------------------------------------------------------------------------------------------------
-HttpServerClient::HttpServerClient()
+HttpConnection::HttpConnection()
 {
     // This is needed on Linux so that ReadableSocketStream constructor don't need to be exported
     // in order to be used across plugin boundaries.
 }
 
-void HttpServerClient::reset()
+void HttpConnection::reset()
 {
     request.reset();
     response.reset();
@@ -170,56 +170,56 @@ void HttpResponse::grabUnusedHeaderMemory(HttpRequest& request)
 void HttpResponse::reset() { headersSent = false; }
 
 //-------------------------------------------------------------------------------------------------------
-// HttpServer
+// HttpConnectionsPool
 //-------------------------------------------------------------------------------------------------------
-Result HttpServer::init(Span<HttpServerClient> serverClients, Span<char> clientsHeadersMemory)
+Result HttpConnectionsPool::init(Span<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage)
 {
-    SC_TRY_MSG(numClients == 0, "HttpServer::init - numClients != 0");
-    clients       = serverClients;
-    headersMemory = clientsHeadersMemory;
+    SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::init - numConnections != 0");
+    connections   = connectionsStorage;
+    headersMemory = headersMemoryStorage;
     return Result(true);
 }
 
-Result HttpServer::close()
+Result HttpConnectionsPool::close()
 {
-    SC_TRY_MSG(numClients == 0, "HttpServer::close - numClients != 0");
-    clients       = {};
+    SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::close - numConnections != 0");
+    connections   = {};
     headersMemory = {};
     return Result(true);
 }
 
-bool HttpServer::activateAvailableClient(HttpServerClient::ID& clientID)
+bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
 {
-    for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
+    for (size_t idx = 0; idx < connections.sizeInElements(); ++idx)
     {
-        HttpServerClient& client = clients[idx];
-        if (client.state == HttpServerClient::State::Inactive)
+        HttpConnection& connection = connections[idx];
+        if (connection.state == HttpConnection::State::Inactive)
         {
-            client.state    = HttpServerClient::State::Active;
-            clientID.index  = idx;
-            client.clientID = clientID;
+            connection.state        = HttpConnection::State::Active;
+            connectionID.index      = idx;
+            connection.connectionID = connectionID;
 
-            const size_t headerBufferSize = headersMemory.sizeInBytes() / clients.sizeInElements();
+            const size_t headerBufferSize = headersMemory.sizeInBytes() / connections.sizeInElements();
 
-            client.request.availableHeader = {headersMemory.data(), headerBufferSize};
-            client.request.readHeaders     = {headersMemory.data(), 0};
-            numClients++;
+            connection.request.availableHeader = {headersMemory.data(), headerBufferSize};
+            connection.request.readHeaders     = {headersMemory.data(), 0};
+            numConnections++;
             return true;
         }
     }
     return false;
 }
 
-bool HttpServer::deactivateClient(HttpServerClient::ID clientID)
+bool HttpConnectionsPool::deactivate(HttpConnection::ID connectionID)
 {
-    if (numClients == 0 or clientID.index >= clients.sizeInElements())
+    if (numConnections == 0 or connectionID.index >= connections.sizeInElements())
     {
         return false;
     }
     else
     {
-        clients[clientID.index].reset();
-        numClients--;
+        connections[connectionID.index].reset();
+        numConnections--;
         return true;
     }
 }

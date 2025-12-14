@@ -6,7 +6,6 @@
 
 namespace SC
 {
-
 //! @addtogroup group_http
 //! @{
 

@@ -2,11 +2,10 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../AsyncStreams/AsyncRequestStreams.h"
-#include "HttpServer.h"
+#include "HttpAsyncServer.h"
 
 namespace SC
 {
-
 /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
 struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
 {
@@ -17,12 +16,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
     AsyncReadableStream::Request requests[3];
 };
 
-/// @brief Http web server helps statically serves files from a directory.
-/// @n
-/// It can be used in conjunction with SC::HttpServer, by calling SC::HttpAsyncFileServer::serveFile
-/// inside the SC::HttpServer::onRequest callback to statically serve files.
-///
-/// @see SC::HttpServer
+/// @brief Http file server statically serves files from a directory
 ///
 /// \snippet Tests/Libraries/Http/HttpAsyncFileServerTest.cpp HttpFileServerSnippet
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
@@ -32,11 +26,11 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
                 AsyncEventLoop& eventLoop, ThreadPool* threadPool = nullptr);
 
     /// @brief Serve the file requested by this Http Client on its channel
-    /// Call this method in response to HttpServer::onRequest to serve a file
-    Result serveFile(HttpServerClient::ID index, StringSpan url, HttpResponse& response);
+    /// Call this method in response to HttpConnectionsPool::onRequest to serve a file
+    Result serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response);
 
-    /// @brief Registers to HttpServer::onRequest callback to serve files from this file server
-    void serveFilesOn(HttpServer& server);
+    /// @brief Registers to HttpConnectionsPool::onRequest callback to serve files from this file server
+    void registerToServeFilesOn(HttpAsyncServer& server);
 
   private:
     StringPath directory;

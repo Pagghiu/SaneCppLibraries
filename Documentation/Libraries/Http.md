@@ -41,17 +41,16 @@ Some relevant blog posts are:
 
 - [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
 
-## HttpServer
-@copydoc SC::HttpServer
+## HttpAsyncServer
+@copydoc SC::HttpAsyncServer
 
 ## HttpAsyncFileServer
 @copydoc SC::HttpAsyncFileServer
 
-
 # Examples
 
-- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpServer
-- Unit tests show how to use SC::HttpAsyncFileServer, SC::HttpServer and SC::HttpClient
+- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpAsyncServer
+- Unit tests show how to use SC::HttpAsyncFileServer, SC::HttpAsyncServer
 
 
 # Blog

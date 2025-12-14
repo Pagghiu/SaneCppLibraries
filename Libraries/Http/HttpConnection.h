@@ -13,7 +13,7 @@ namespace SC
 //! @addtogroup group_http
 //! @{
 
-/// @brief Http request received from a client
+/// @brief Incoming message from the perspective of the participants of an HTTP transaction
 struct SC_COMPILER_EXPORT HttpRequest
 {
     /// @brief Gets the associated HttpParser
@@ -26,7 +26,7 @@ struct SC_COMPILER_EXPORT HttpRequest
     void reset();
 
   private:
-    friend struct HttpServer;
+    friend struct HttpConnectionsPool;
     friend struct HttpResponse;
     friend struct HttpAsyncServer;
 
@@ -61,7 +61,7 @@ struct SC_COMPILER_EXPORT HttpRequest
     size_t           numHeaders = 0;
 };
 
-/// @brief Http response that will be sent to a client
+/// @brief Outgoing message from the perspective of the participants of an HTTP transaction
 struct SC_COMPILER_EXPORT HttpResponse
 {
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
@@ -83,7 +83,7 @@ struct SC_COMPILER_EXPORT HttpResponse
     AsyncWritableStream& getWritableStream() { return *writableStream; }
 
   private:
-    friend struct HttpServer;
+    friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;
 
     /// @brief Uses unused header memory data from the HttpRequest for the response
@@ -97,24 +97,25 @@ struct SC_COMPILER_EXPORT HttpResponse
     AsyncWritableStream* writableStream = nullptr;
 };
 
-struct SC_COMPILER_EXPORT HttpServerClient
+/// @brief Http connection abstraction holding both the incoming and outgoing messages in an HTTP transaction
+struct SC_COMPILER_EXPORT HttpConnection
 {
-    HttpServerClient();
+    HttpConnection();
 
     struct SC_COMPILER_EXPORT ID
     {
         size_t getIndex() const { return index; }
 
       private:
-        friend struct HttpServer;
+        friend struct HttpConnectionsPool;
         size_t index = 0;
     };
 
     /// @brief Prepare this client for re-use, marking it as Inactive
     void reset();
 
-    /// @brief The Client ID used to find this client in HttpServer clients Span
-    ID getClientID() const { return clientID; }
+    /// @brief The ID used to find this client in HttpConnectionsPool
+    ID getConnectionID() const { return connectionID; }
 
     HttpRequest  request;
     HttpResponse response;
@@ -125,11 +126,11 @@ struct SC_COMPILER_EXPORT HttpServerClient
         Inactive,
         Active
     };
-    friend struct HttpServer;
+    friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;
 
     State state = State::Inactive;
-    ID    clientID;
+    ID    connectionID;
 
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
@@ -137,46 +138,41 @@ struct SC_COMPILER_EXPORT HttpServerClient
     SocketDescriptor socket;
 };
 
-/// @brief Http server
-///
-/// This class holds a fixed slice of clients with their headers memory, managing their active / inactive state.
-/// It's typically not used standalone, but more likely operated by other classes like SC::HttpAsyncServer.
-///
-/// @see SC::HttpAsyncFileServer, SC::HttpAsyncServer
-struct SC_COMPILER_EXPORT HttpServer
+/// @brief A pool of HttpConnection that can be active or inactive
+struct SC_COMPILER_EXPORT HttpConnectionsPool
 {
-    /// @brief Initializes the server with memory buffers for clients and headers
-    Result init(Span<HttpServerClient> clients, Span<char> headersMemory);
+    /// @brief Initializes the server with memory buffers for connections and headers
+    Result init(Span<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage);
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
     Result close();
 
-    /// @brief Return the number of active clients
-    [[nodiscard]] size_t getNumActiveClients() const { return numClients; }
+    /// @brief Returns only the number of active connections
+    [[nodiscard]] size_t getNumActiveConnections() const { return numConnections; }
 
-    /// @brief Return the total number of clients (active + inactive)
-    [[nodiscard]] size_t getNumTotalClients() const { return clients.sizeInElements(); }
+    /// @brief Returns the total number of connections (active + inactive)
+    [[nodiscard]] size_t getNumTotalConnections() const { return connections.sizeInElements(); }
 
-    /// @brief Returns a client by ID
-    [[nodiscard]] HttpServerClient& getClient(HttpServerClient::ID clientID) { return clients[clientID.index]; }
+    /// @brief Returns a connection by ID
+    [[nodiscard]] HttpConnection& getConnection(HttpConnection::ID connectionID)
+    {
+        return connections[connectionID.index];
+    }
 
-    /// @brief Returns a client in the `[0, getNumTotalClients]` range
-    [[nodiscard]] HttpServerClient& getClientAt(size_t idx) { return clients[idx]; }
+    /// @brief Returns a connection in the `[0, getNumTotalConnections]` range
+    [[nodiscard]] HttpConnection& getConnectionAt(size_t idx) { return connections[idx]; }
 
-    /// @brief Finds an available client (if any), activates it and returns its ID to use with getClient(id)
-    [[nodiscard]] bool activateAvailableClient(HttpServerClient::ID& clientID);
+    /// @brief Finds an available connection (if any), activates it and returns its ID to use with getConnection(id)
+    [[nodiscard]] bool activateNew(HttpConnection::ID& connectionID);
 
-    /// @brief De-activates a client previously returned by activateAvailableClient
-    [[nodiscard]] bool deactivateClient(HttpServerClient::ID clientID);
-
-    /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
-    Function<void(HttpServerClient&)> onRequest;
+    /// @brief De-activates a connection previously returned by activateNew
+    [[nodiscard]] bool deactivate(HttpConnection::ID connectionID);
 
   private:
-    Span<HttpServerClient> clients;
-    Span<char>             headersMemory;
+    Span<HttpConnection> connections;
+    Span<char>           headersMemory;
 
-    size_t numClients = 0;
+    size_t numConnections = 0;
 };
 //! @}
 
