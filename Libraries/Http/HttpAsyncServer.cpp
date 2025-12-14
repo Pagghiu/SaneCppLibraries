@@ -186,4 +186,24 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
         SC_TRUST_RESULT(asyncServerAccept.start(*eventLoop, serverSocket));
     }
 }
+
+bool HttpAsyncServer::sliceReusableEqualMemoryBuffers(Span<AsyncBufferView> buffers, Span<char> requestsSpan,
+                                                      size_t maxConnections, size_t numSlicesPerConnection,
+                                                      size_t sizeInBytesPerConnection)
+{
+    for (size_t idx = 0; idx < maxConnections; ++idx)
+    {
+        for (size_t slice = 0; slice < numSlicesPerConnection; ++slice)
+        {
+            Span<char>   memory;
+            const size_t offset =
+                idx * sizeInBytesPerConnection + slice * sizeInBytesPerConnection / numSlicesPerConnection;
+            SC_TRY(requestsSpan.sliceStartLength(offset, sizeInBytesPerConnection / numSlicesPerConnection, memory));
+            buffers[idx * numSlicesPerConnection + slice] = memory;
+            buffers[idx * numSlicesPerConnection + slice].setReusable(true); // We want to recycle these buffers
+        }
+    }
+    return true;
+}
+
 } // namespace SC

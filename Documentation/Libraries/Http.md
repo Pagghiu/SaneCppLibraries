@@ -26,7 +26,9 @@ Additionally its API will be changing heavily as it's undergoing major re-design
 The HTTP parser is an incremental parser, that will emit events as soon as a valid element has been successfully parsed.
 This allows handling incomplete responses without needing holding it entirely in memory.
 
-The HTTP server is for now just a basic implementations and it's missing many important features.  
+The HTTP server is for now just a basic implementations and it's missing many important features.
+It's however capable of serving files through http while staying inside a few user provided fixed buffers, without allocating any kind of dynamic memory.
+
 The HTTP client has been for now moved to the tests as it needs significant re-work to become useful.  
 
 # Videos
@@ -40,6 +42,8 @@ This is the list of videos that have been recorded showing some of the internal 
 Some relevant blog posts are:
 
 - [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
+- [September 2025 Update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
+- [November 2025 Update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
 
 ## HttpAsyncServer
 @copydoc SC::HttpAsyncServer
@@ -50,14 +54,7 @@ Some relevant blog posts are:
 # Examples
 
 - [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpAsyncServer
-- Unit tests show how to use SC::HttpAsyncFileServer, SC::HttpAsyncServer
-
-
-# Blog
-
-Some relevant blog posts are:
-
-- [September 2025 Update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
+- Unit tests show how to use SC::HttpAsyncFileServer and SC::HttpAsyncServer
 
 # Roadmap
 

@@ -38,7 +38,11 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     constexpr int REQUEST_SLICES  = 2;        // Number of slices of the request buffer for each connection
     constexpr int REQUEST_SIZE    = 1024;     // How many bytes are allocated to stream data for each connection
     constexpr int HEADER_SIZE     = 1024 * 8; // How many bytes are dedicated to hold request and response headers
-    constexpr int EXTRA_BUFFERS   = 2;        // Extra slots for user to push owned buffers / strings to write queue
+    constexpr int EXTRA_BUFFERS   = 1;        // Extra write slice needed to write headers buffer
+
+    // Note: All fixed arrays could be created dynamically at startup time with new / malloc.
+    // Alternatively it's also possible to reserve memory for some insane large amount of clients (using VirtualMemory
+    // class for example) and just dynamically commit as much memory as one needs to handle a given number of clients
 
     // 1. Memory for all http headers of all connections
     Buffer headersMemory;
@@ -48,28 +52,19 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     AsyncReadableStream::Request readQueue[MAX_CONNECTIONS * REQUEST_SLICES];
 
     // 3. Memory to hold all sliced buffers used by the write queues
-    AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * REQUEST_SLICES];
+    AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
 
     // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     // EXTRA_BUFFERS is used to accommodate some empty slots for external bufs (Strings or other
     // pieces of memory allocated, owned and pushed by the user to the write queue)
     AsyncBufferView buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
 
-    // Slice a buffer in equal parts to create re-usable slices of memory when streaming files
+    // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
+    // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
     Buffer requestsMemory;
     SC_TEST_EXPECT(requestsMemory.resize(MAX_CONNECTIONS * REQUEST_SIZE));
-    Span<char> requestsSpan = requestsMemory.toSpan();
-    for (size_t idx = 0; idx < MAX_CONNECTIONS; ++idx)
-    {
-        for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
-        {
-            Span<char>   memory;
-            const size_t offset = idx * REQUEST_SIZE + slice * REQUEST_SIZE / REQUEST_SLICES;
-            SC_TEST_EXPECT(requestsSpan.sliceStartLength(offset, REQUEST_SIZE / REQUEST_SLICES, memory));
-            buffers[idx * REQUEST_SLICES + slice] = memory;
-            buffers[idx * REQUEST_SLICES + slice].setReusable(true); // We want to recycle these buffers
-        }
-    }
+    SC_TEST_EXPECT(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS,
+                                                                    REQUEST_SLICES, REQUEST_SIZE));
 
     // 5. Memory to hold all http connections
     HttpConnection connections[MAX_CONNECTIONS];

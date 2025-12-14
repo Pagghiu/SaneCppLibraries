@@ -70,56 +70,48 @@ struct SC::WebServerExampleModel
     Buffer requestsMemory;
     Buffer headersMemory;
 
-    Span<HttpConnection> clients;
+    Span<HttpConnection> connections;
 
     Span<ReadableFileStream::Request> readRequests;
     Span<WritableFileStream::Request> writeRequests;
-
-    Span<AsyncBufferView> buffers;
-
-    Span<HttpAsyncFileServerStream> fileStreams;
+    Span<AsyncBufferView>             buffers;
+    Span<HttpAsyncFileServerStream>   fileStreams;
 
     Result start()
     {
         constexpr int REQUEST_SLICES = 2;          // Number of slices of the request buffer for each connection
         constexpr int REQUEST_SIZE   = 512 * 1024; // How many bytes are allocated to stream data for each connection
         constexpr int HEADER_SIZE    = 1024 * 8;   // How many bytes are dedicated to hold request and response headers
+        constexpr int EXTRA_SLICES   = 1;          // Extra write slice needed to write headers buffer
 
-        const size_t numClients = static_cast<size_t>(modelState.maxClients);
+        const size_t maxConnections = static_cast<size_t>(modelState.maxClients);
 
-        // TODO: Simplify this messy manual memory handling
+        // TODO: Show how to use VirtualMemory to handle dynamically increasing connection numbers avoiding start/stop
         // 1. headersMemory: Memory for all http headers of all connections
         // 2. readRequests: Memory to hold all sliced buffers used by the read queues
         // 3. writeRequests: Memory to hold all sliced buffers used by the write queues
         // 4. buffers: Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
         // 5. clients: Memory to hold all http connections
         // 6. fileStreams: Memory used by the async streams handled by the async file server
-        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * numClients));
-        readRequests  = {new ReadableFileStream::Request[numClients * REQUEST_SLICES], numClients* REQUEST_SLICES};
-        writeRequests = {new WritableFileStream::Request[numClients * (REQUEST_SLICES + 1)],
-                         numClients*(REQUEST_SLICES + 1)};
-        buffers       = {new AsyncBufferView[numClients * (REQUEST_SLICES + 2)], numClients*(REQUEST_SLICES + 2)};
-        clients       = {new HttpConnection[numClients], numClients};
-        fileStreams   = {new HttpAsyncFileServerStream[numClients], numClients};
+        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * maxConnections));
+        readRequests  = {new ReadableFileStream::Request[maxConnections * REQUEST_SLICES],
+                         maxConnections* REQUEST_SLICES};
+        writeRequests = {new WritableFileStream::Request[maxConnections * (REQUEST_SLICES + EXTRA_SLICES)],
+                         maxConnections*(REQUEST_SLICES + EXTRA_SLICES)};
+        buffers       = {new AsyncBufferView[maxConnections * (REQUEST_SLICES + EXTRA_SLICES)],
+                         maxConnections*(REQUEST_SLICES + EXTRA_SLICES)};
+        connections   = {new HttpConnection[maxConnections], maxConnections};
+        fileStreams   = {new HttpAsyncFileServerStream[maxConnections], maxConnections};
 
-        // Slice memory for buffers
-        SC_TRY(requestsMemory.resize(numClients * REQUEST_SIZE));
-        Span<char> requestsSpan = requestsMemory.toSpan();
-        for (size_t idx = 0; idx < numClients; ++idx)
-        {
-            for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
-            {
-                Span<char>   memory;
-                const size_t offset = idx * REQUEST_SIZE + slice * REQUEST_SIZE / REQUEST_SLICES;
-                (void)requestsSpan.sliceStartLength(offset, REQUEST_SIZE / REQUEST_SLICES, memory);
-                buffers[idx * REQUEST_SLICES + slice] = memory;
-                buffers[idx * REQUEST_SLICES + slice].setReusable(true);
-            }
-        }
+        // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
+        // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
+        SC_TRY(requestsMemory.resize(maxConnections * REQUEST_SIZE));
+        SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), maxConnections,
+                                                                REQUEST_SLICES, REQUEST_SIZE));
 
         // Initialize and start the http and the file server
         fileServer.registerToServeFilesOn(httpServer);
-        SC_TRY(httpServer.init(clients, headersMemory.toSpan(), readRequests, writeRequests, buffers));
+        SC_TRY(httpServer.init(connections, headersMemory.toSpan(), readRequests, writeRequests, buffers));
         SC_TRY(fileServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
         return Result(true);
@@ -130,12 +122,12 @@ struct SC::WebServerExampleModel
         SC_TRY(httpServer.stop());
         SC_TRY(httpServer.waitForStopToFinish());
         SC_TRY(httpServer.close());
-        delete[] clients.data();
+        delete[] connections.data();
         delete[] readRequests.data();
         delete[] writeRequests.data();
         delete[] buffers.data();
         delete[] fileStreams.data();
-        clients       = {};
+        connections   = {};
         readRequests  = {};
         writeRequests = {};
         buffers       = {};

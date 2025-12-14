@@ -18,6 +18,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
 
 /// @brief Http file server statically serves files from a directory
 ///
+/// This class registers the onRequest callback provided by HttpAsyncServer to serves files from a given directory.
+///
 /// \snippet Tests/Libraries/Http/HttpAsyncFileServerTest.cpp HttpFileServerSnippet
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {

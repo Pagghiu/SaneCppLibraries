@@ -9,8 +9,9 @@ namespace SC
 /// This class handles a fully asynchronous http server staying inside 5 fixed memory regions passed during init.
 ///
 /// Usage:
-/// - Use the SC::HttpConnectionsPool::onRequest callback to intercept new clients connecting
-/// - Write to SC::HttpResponse or use SC::HttpAsyncFileServer to statically serve files
+/// - Use SC::HttpAsyncServer::onRequest callback to intercept requests from http clients
+/// - Write to SC::HttpResponse using the writable stream obtained from HttpConnection::response.getWritableStream()
+/// - Alternatively use SC::HttpAsyncFileServer to statically serve files
 ///
 /// @see SC::HttpAsyncFileServer, SC::HttpConnectionsPool
 ///
@@ -52,6 +53,16 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
+
+    /// @brief Slices a span of memory used for request in equal parts for all buffers, marking them as re-usable
+    /// @param buffers The buffers to be sliced
+    /// @param memory The span of memory to be sliced into buffers
+    /// @param maxConnections The maximum number of connections / buffers to be sliced
+    /// @param numSlicesPerConnection The number of slices to be created for a single connection
+    /// @param sizeInBytesPerConnection The size of each slice for a single connection
+    [[nodiscard]] static bool sliceReusableEqualMemoryBuffers(Span<AsyncBufferView> buffers, Span<char> memory,
+                                                              size_t maxConnections, size_t numSlicesPerConnection,
+                                                              size_t sizeInBytesPerConnection);
 
   private:
     HttpConnectionsPool connections;

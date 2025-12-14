@@ -28,37 +28,41 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     SC_TEST_EXPECT(eventLoop.create());
 
     //! [HttpAsyncServerSnippet]
-    constexpr int NUM_CLIENTS    = 3;
-    constexpr int CLIENT_HEADERS = 8 * 1024;
-    constexpr int CLIENT_REQUEST = 1024;
-    constexpr int REQUEST_SLICES = 2;
+    constexpr int MAX_CONNECTIONS = 3;        // Max number of concurrent http connections
+    constexpr int REQUEST_SIZE    = 1024;     // How many bytes are allocated to stream data for each connection
+    constexpr int REQUEST_SLICES  = 2;        // Number of slices of the request buffer for each connection
+    constexpr int HEADER_SIZE     = 8 * 1024; // How many bytes are dedicated to hold request and response headers
+    constexpr int EXTRA_SLICES    = 2;        // Extra write slices needed to write headers buffer and user string
 
-    AsyncBufferView buffers[NUM_CLIENTS * (REQUEST_SLICES + 2)]; // +2 to accommodate some slots for external bufs
-    HttpConnection  clients[NUM_CLIENTS];
+    // Note: All fixed arrays could be created dynamically at startup time with new / malloc.
+    // Alternatively it's also possible to reserve memory for some insane large amount of clients (using VirtualMemory
+    // class for example) and just dynamically commit as much memory as one needs to handle a given number of clients
 
-    AsyncReadableStream::Request readQueue[NUM_CLIENTS * REQUEST_SLICES];
-    AsyncWritableStream::Request writeQueue[NUM_CLIENTS * REQUEST_SLICES];
-
+    // 1. Memory for all http headers of all connections
     Buffer headersMemory;
-    SC_TEST_EXPECT(headersMemory.resize(NUM_CLIENTS * CLIENT_HEADERS));
+    SC_TEST_EXPECT(headersMemory.resize(MAX_CONNECTIONS * HEADER_SIZE));
 
+    // 2. Memory to hold all sliced buffers used by the read queues
+    AsyncReadableStream::Request readQueue[MAX_CONNECTIONS * REQUEST_SLICES];
+
+    // 3. Memory to hold all sliced buffers used by the write queues
+    AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * REQUEST_SLICES];
+
+    // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
+    AsyncBufferView buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
+
+    // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
+    // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
     Buffer requestsMemory;
-    SC_TEST_EXPECT(requestsMemory.resize(NUM_CLIENTS * CLIENT_REQUEST));
-    Span<char> requestsSpan = requestsMemory.toSpan();
-    for (size_t idx = 0; idx < NUM_CLIENTS; ++idx)
-    {
-        for (size_t slice = 0; slice < REQUEST_SLICES; ++slice)
-        {
-            Span<char>   memory;
-            const size_t offset = idx * CLIENT_REQUEST + slice * CLIENT_REQUEST / REQUEST_SLICES;
-            SC_TEST_EXPECT(requestsSpan.sliceStartLength(offset, CLIENT_REQUEST / REQUEST_SLICES, memory));
-            buffers[idx * REQUEST_SLICES + slice] = memory;
-            buffers[idx * REQUEST_SLICES + slice].setReusable(true); // We want to recycle these buffers
-        }
-    }
+    SC_TEST_EXPECT(requestsMemory.resize(MAX_CONNECTIONS * REQUEST_SIZE));
+    SC_TEST_EXPECT(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS,
+                                                                    REQUEST_SLICES, REQUEST_SIZE));
+    // 5. Memory to hold all http connections
+    HttpConnection connections[MAX_CONNECTIONS];
 
+    // Initialize and start the http server
     HttpAsyncServer httpServer;
-    SC_TEST_EXPECT(httpServer.init(clients, headersMemory.toSpan(), readQueue, writeQueue, buffers));
+    SC_TEST_EXPECT(httpServer.init(connections, headersMemory.toSpan(), readQueue, writeQueue, buffers));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6152));
 
     struct ServerContext
@@ -66,6 +70,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         int numRequests;
     } serverContext = {0};
 
+    // Handle the request and answer accordingly
     httpServer.onRequest = [this, &serverContext](HttpConnection& client)
     {
         HttpRequest&  request  = client.request;
@@ -98,12 +103,19 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
                                   "</body>\r\n"
                                   "</html>\r\n";
 
+        // Create a "user provided" dynamically allocated string, to show this is possible
         String content;
         SC_TEST_EXPECT(StringBuilder::format(content, sampleHtml, serverContext.numRequests));
         SmallString<16> contentLength;
         SC_TEST_EXPECT(StringBuilder::format(contentLength, "{}", content.view().sizeInBytes()));
         SC_TEST_EXPECT(response.addHeader("Content-Length", contentLength.view()));
         SC_TEST_EXPECT(response.sendHeaders());
+        // Note that the system takes ownership of the dynamically allocated user provided string
+        // through type erasure and it will invoke its destructor after th write operation will finish,
+        // freeing user memory as expected.
+        // This write operation succeeds because EXTRA_SLICES allocates one more slot buffer exactly
+        // to hold this user provided buffer, that is not part of the "re-usable" buffers created
+        // at the beginning of this sample.
         SC_TEST_EXPECT(response.getWritableStream().write(move(content)));
         SC_TEST_EXPECT(response.end());
     };
