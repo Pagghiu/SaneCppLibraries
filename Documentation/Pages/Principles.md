@@ -56,5 +56,6 @@
 - Do not use templates for premature optimization, causing unnecessary code to be put in headers
 - Prefer static dispatch to virtual dispatch where technically possible
 - Prefer using `Span<T>` and `StringView` to `Vector<T>` and `String`
-- API should not allocate on the heap if possible
-- API should give control over allocations to the caller where dynamic allocation is necessary
+- Anything behind libraries API should not allocate on the heap
+- API should give control over allocations to the caller where dynamic allocation can't be avoided
+- Consider using pre-defined fixed buffers to avoid dynamic allocation callbacks

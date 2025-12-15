@@ -23,9 +23,7 @@
 
 ## [Libraries](https://pagghiu.github.io/SaneCppLibraries/libraries.html)
 
-- Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal inter-[dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html).
-- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html), [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) and [Http](https://pagghiu.github.io/SaneCppLibraries/library_http.html) are the only ones doing dynamic memory allocation.
-- Libraries are designed to let you use your favorite externally provided `string` / `vector` classes if you don't like the ones provided by this project (see [InteropSTL](Tests/InteropSTL) for an example).
+Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal [dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html) between them and follow a strict **No Allocations** (*) policy.
 
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
@@ -90,6 +88,15 @@ See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_u
 - [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) showcases the [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) event loop integration with a GUI and usage of [Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html).
 - [Tools](https://pagghiu.github.io/SaneCppLibraries/page_tools.html) is a collection of repository / code automation tools built using libraries themselves
   - Includes a fully self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/page_build.html) build system (generator) where builds are imperatively described using C++ code.
+
+## No Allocations
+
+- All libraries do not dynamically allocate memory (excluding [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html))
+- All libraries are designed to work inside user-provided memory buffers.
+- All libraries return error codes when running out of such memory buffers.
+- Third-party container classes, including `std::` ones, are supported (see [InteropSTL](Tests/InteropSTL) for an example).
+- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are fully optional and just provided for convenience if user prefers them to `std::` or other equivalent containers library.
+- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are not used by any other library (excluding [Containers Reflection](https://pagghiu.github.io/SaneCppLibraries/library_containers_reflection.html) a small bridge library to describe [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) to [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html) library for easy serialization).
 
 ## Documentation
 [Documentation](https://pagghiu.github.io/SaneCppLibraries/index.html) is automatically generated using Doxygen and updated at every commit to `main` branch.
