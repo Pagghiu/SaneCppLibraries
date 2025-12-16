@@ -374,7 +374,7 @@ SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead - Zero sized read buffer");
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileRead - Invalid file descriptor");
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         disableThreadPool();
     }
@@ -409,7 +409,7 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& eventLoop)
     totalBytesWritten = 0;
 
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         disableThreadPool();
     }
@@ -512,7 +512,7 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringS
     operation = Operation::Open;
     new (&openData, PlacementNew()) OpenData({path, mode});
     SC_TRY(validate(eventLoop));
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -534,7 +534,7 @@ SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Close;
     new (&closeData, PlacementNew()) CloseData({handle});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -554,7 +554,7 @@ SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDes
     SC_TRY(checkState());
     operation = Operation::Read;
     new (&readData, PlacementNew()) ReadData({handle, buffer, offset});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -577,7 +577,7 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Write;
     new (&writeData, PlacementNew()) WriteData({handle, buffer, offset});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -615,7 +615,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
     SC_TRY(checkState());
     operation = Operation::Rename;
     new (&renameData, PlacementNew()) RenameData({path, newPath});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -634,7 +634,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
     SC_TRY(checkState());
     operation = Operation::RemoveDirectory;
     new (&removeData, PlacementNew()) RemoveData({path});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -653,7 +653,7 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
     SC_TRY(checkState());
     operation = Operation::RemoveFile;
     new (&removeData, PlacementNew()) RemoveData({path});
-    if (not eventLoop.internal.kernelQueue.get().makesSenseToRunInThreadPool(*this))
+    if (not eventLoop.needsThreadPoolForFileOperations())
     {
         return eventLoop.start(*this);
     }
@@ -710,6 +710,11 @@ SC::Result SC::AsyncEventLoop::close()
 void SC::AsyncEventLoop::interrupt() { internal.interrupted = true; }
 
 bool SC::AsyncEventLoop::isInitialized() const { return internal.initialized; }
+
+bool SC::AsyncEventLoop::needsThreadPoolForFileOperations() const
+{
+    return internal.kernelQueue.get().needsThreadPoolForFileOperations();
+}
 
 SC::Result SC::AsyncEventLoop::runOnce() { return internal.runStep(*this, Internal::SyncMode::ForcedForwardProgress); }
 

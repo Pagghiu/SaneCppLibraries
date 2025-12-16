@@ -48,7 +48,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     KernelQueuePosix() {}
     ~KernelQueuePosix() { SC_TRUST_RESULT(close()); }
 
-    [[nodiscard]] static constexpr bool makesSenseToRunInThreadPool(AsyncRequest&) { return true; }
+    [[nodiscard]] static constexpr bool needsThreadPoolForFileOperations() { return true; }
 
     const KernelQueuePosix& getPosix() const { return *this; }
 

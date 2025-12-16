@@ -111,7 +111,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     KernelQueue() {}
 
-    [[nodiscard]] static constexpr bool makesSenseToRunInThreadPool(AsyncRequest&) { return true; }
+    [[nodiscard]] static constexpr bool needsThreadPoolForFileOperations() { return true; }
 
     Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor)
     {

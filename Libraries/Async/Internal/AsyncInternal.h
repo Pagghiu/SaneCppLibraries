@@ -26,7 +26,7 @@ struct SC::AsyncEventLoop::Internal
         KernelQueuePosix&   getPosix();
 
         // On io_uring it doesn't make sense to run operations in a thread pool
-        [[nodiscard]] bool makesSenseToRunInThreadPool(AsyncRequest&) { return isEpoll; }
+        [[nodiscard]] bool needsThreadPoolForFileOperations() { return isEpoll; }
 
         Result close();
         Result createEventLoop(AsyncEventLoop::Options options);

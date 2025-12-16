@@ -318,7 +318,10 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     }
 
     ThreadPool fileThreadPool;
-    SC_TEST_EXPECT(fileThreadPool.create(2));
+    if (eventLoop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(fileThreadPool.create(2));
+    }
 
     ThreadPool compressionThreadPool;
     SC_TEST_EXPECT(compressionThreadPool.create(2));

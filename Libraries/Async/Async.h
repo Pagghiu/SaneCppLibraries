@@ -1191,7 +1191,7 @@ struct SC_COMPILER_EXPORT AsyncEventLoopListeners
 ///
 /// Basic lifetime for an event loop is:
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncEventLoopSnippet
-struct AsyncEventLoop
+struct SC_COMPILER_EXPORT AsyncEventLoop
 {
     /// @brief Options given to AsyncEventLoop::create
     struct Options
@@ -1209,6 +1209,11 @@ struct AsyncEventLoop
 
     AsyncEventLoop();
 
+    AsyncEventLoop(const AsyncEventLoop&)            = delete;
+    AsyncEventLoop(AsyncEventLoop&&)                 = delete;
+    AsyncEventLoop& operator=(AsyncEventLoop&&)      = delete;
+    AsyncEventLoop& operator=(const AsyncEventLoop&) = delete;
+
     /// Creates the event loop kernel object
     Result create(Options options = Options());
 
@@ -1224,6 +1229,9 @@ struct AsyncEventLoop
 
     /// @brief Returns `true` if create has been already called (successfully)
     [[nodiscard]] bool isInitialized() const;
+
+    /// Returns true if backend needs a thread pool for non-blocking fs operations (anything but io_uring basically)
+    [[nodiscard]] bool needsThreadPoolForFileOperations() const;
 
     /// Blocks until there are no more active queued requests, dispatching all completions.
     /// It's useful for applications where the eventLoop is the only (or the main) loop.
@@ -1350,7 +1358,7 @@ struct AsyncEventLoop
     struct Internal;
 
   public:
-    struct InternalDefinition
+    struct SC_COMPILER_EXPORT InternalDefinition
     {
         static constexpr int Windows = 520;
         static constexpr int Apple   = 512;
