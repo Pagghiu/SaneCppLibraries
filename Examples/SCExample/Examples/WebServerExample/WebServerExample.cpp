@@ -21,6 +21,7 @@
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"
+#include "Libraries/Threading/ThreadPool.h"
 
 #include "../ISCExample.h"
 
@@ -67,6 +68,8 @@ struct SC::WebServerExampleModel
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
 
+    ThreadPool threadPool;
+
     Buffer requestsMemory;
     Buffer headersMemory;
 
@@ -83,8 +86,10 @@ struct SC::WebServerExampleModel
         constexpr int REQUEST_SIZE   = 512 * 1024; // How many bytes are allocated to stream data for each connection
         constexpr int HEADER_SIZE    = 1024 * 8;   // How many bytes are dedicated to hold request and response headers
         constexpr int EXTRA_SLICES   = 1;          // Extra write slice needed to write headers buffer
+        constexpr int NUM_FS_THREADS = 4;          // Number of threads for async file stream operations
 
-        const size_t maxConnections = static_cast<size_t>(modelState.maxClients);
+        const size_t     maxConnections = static_cast<size_t>(modelState.maxClients);
+        const StringView directory      = modelState.directory.view();
 
         // TODO: Show how to use VirtualMemory to handle dynamically increasing connection numbers avoiding start/stop
         // 1. headersMemory: Memory for all http headers of all connections
@@ -109,10 +114,15 @@ struct SC::WebServerExampleModel
         SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), maxConnections,
                                                                 REQUEST_SLICES, REQUEST_SIZE));
 
+        // Create thread pool for file operations if needed
+        if (eventLoop->needsThreadPoolForFileOperations()) // no thread pool needed for io_uring
+        {
+            SC_TRY(threadPool.create(NUM_FS_THREADS));
+        }
         // Initialize and start the http and the file server
         fileServer.registerToServeFilesOn(httpServer);
         SC_TRY(httpServer.init(connections, headersMemory.toSpan(), readRequests, writeRequests, buffers));
-        SC_TRY(fileServer.init(modelState.directory.view(), fileStreams, httpServer.getBuffersPool(), *eventLoop));
+        SC_TRY(fileServer.init(directory, fileStreams, httpServer.getBuffersPool(), *eventLoop, threadPool));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
         return Result(true);
     }
@@ -122,6 +132,7 @@ struct SC::WebServerExampleModel
         SC_TRY(httpServer.stop());
         SC_TRY(httpServer.waitForStopToFinish());
         SC_TRY(httpServer.close());
+        SC_TRY(threadPool.destroy());
         delete[] connections.data();
         delete[] readRequests.data();
         delete[] writeRequests.data();

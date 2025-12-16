@@ -39,6 +39,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     constexpr int REQUEST_SIZE    = 1024;     // How many bytes are allocated to stream data for each connection
     constexpr int HEADER_SIZE     = 1024 * 8; // How many bytes are dedicated to hold request and response headers
     constexpr int EXTRA_BUFFERS   = 1;        // Extra write slice needed to write headers buffer
+    constexpr int NUM_FS_THREADS  = 4;        // Number of threads in the thread pool for async file stream operations
 
     // Note: All fixed arrays could be created dynamically at startup time with new / malloc.
     // Alternatively it's also possible to reserve memory for some insane large amount of clients (using VirtualMemory
@@ -75,8 +76,14 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     // Initialize and start the http and the file server
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
+
+    ThreadPool threadPool;
+    if (eventLoop.needsThreadPoolForFileOperations()) // no thread pool needed for io_uring
+    {
+        SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
+    }
     SC_TEST_EXPECT(httpServer.init(connections, headersMemory.toSpan(), readQueue, writeQueue, buffers));
-    SC_TEST_EXPECT(fileServer.init(webServerFolder, streams, httpServer.getBuffersPool(), eventLoop));
+    SC_TEST_EXPECT(fileServer.init(webServerFolder, streams, httpServer.getBuffersPool(), eventLoop, threadPool));
     fileServer.registerToServeFilesOn(httpServer);
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
 

@@ -25,7 +25,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
     /// @brief Initialize the web server on the given file system directory to serve
     Result init(StringSpan directoryToServe, Span<HttpAsyncFileServerStream> fileStreams, AsyncBuffersPool& buffersPool,
-                AsyncEventLoop& eventLoop, ThreadPool* threadPool = nullptr);
+                AsyncEventLoop& eventLoop, ThreadPool& threadPool);
 
     /// @brief Serve the file requested by this Http Client on its channel
     /// Call this method in response to HttpConnectionsPool::onRequest to serve a file

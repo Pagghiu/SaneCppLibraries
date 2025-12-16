@@ -25,24 +25,13 @@ struct SC::HttpAsyncFileServer::Internal
 };
 
 SC::Result SC::HttpAsyncFileServer::init(StringSpan directoryToServe, Span<HttpAsyncFileServerStream> streams,
-                                         AsyncBuffersPool& asyncPool, AsyncEventLoop& loop, ThreadPool* pool)
+                                         AsyncBuffersPool& asyncPool, AsyncEventLoop& loop, ThreadPool& pool)
 {
     fileStreams = streams;
     buffersPool = &asyncPool;
     eventLoop   = &loop;
-    threadPool  = pool;
+    threadPool  = &pool;
 
-    for (auto& fs : fileStreams)
-    {
-        if (threadPool == nullptr)
-        {
-            fs.readableFileStream.request.disableThreadPool();
-        }
-        else
-        {
-            SC_TRY(fs.readableFileStream.request.executeOn(fs.readStreamTask, *threadPool));
-        }
-    }
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
     SC_TRY(directory.assign(directoryToServe));
     return Result(true);
@@ -75,6 +64,7 @@ SC::Result SC::HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSp
         SC_TRY(fd.open(path.view(), FileOpen::Read));
         HttpAsyncFileServerStream& stream = fileStreams[index.getIndex()];
         SC_TRY(stream.readableFileStream.init(*buffersPool, stream.requests, *eventLoop, fd));
+        SC_TRY(stream.readableFileStream.request.executeOn(stream.readStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);
         stream.pipeline.source   = &stream.readableFileStream;
