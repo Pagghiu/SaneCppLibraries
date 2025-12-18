@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Assert.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Memory/Memory.h" // FixedAllocator
 namespace SC
@@ -22,10 +23,12 @@ struct SC_COMPILER_EXPORT VirtualAllocator;
 /// \snippet Tests/Libraries/Memory/VirtualMemoryTest.cpp VirtualMemorySnippet
 struct SC::VirtualMemory
 {
-    size_t reservedBytes  = 0; ///< Maximum amount of reserved memory that can be committed
-    size_t committedBytes = 0; ///< Current amount of committed memory
-
-    void* memory = nullptr; ///< Pointer to start of reserved memory
+    VirtualMemory()                                = default;
+    VirtualMemory(const VirtualMemory&)            = delete;
+    VirtualMemory(VirtualMemory&&)                 = delete;
+    VirtualMemory& operator=(const VirtualMemory&) = delete;
+    VirtualMemory& operator=(VirtualMemory&&)      = delete;
+    ~VirtualMemory() { release(); }
 
     /// @brief Round up the passed in size to system memory page size
     [[nodiscard]] static size_t roundUpToPageSize(size_t size);
@@ -39,15 +42,33 @@ struct SC::VirtualMemory
     [[nodiscard]] bool reserve(size_t maxCapacityInBytes);
 
     /// @brief Reclaims the entire virtual memory block (reserved with VirtualMemory::reserve)
-    [[nodiscard]] bool release();
+    void release();
 
-    /// @brief Ensures at least newCapacityBytes to be committed / accessible from the large maxCapacityInBytes block
-    /// @param newCapacityBytes Indicates how much of the reserved virtual address space that must be accessible
-    /// @note newCapacityBytes must smaller than reservedBytes (previously reserved by VirtualMemory::reserve)
-    [[nodiscard]] bool commit(size_t newCapacityBytes);
+    /// @brief Ensures at least sizeInBytes to be committed / accessible from the large maxCapacityInBytes block
+    /// @param sizeInBytes Indicates how much of the reserved virtual address space that must be accessible
+    /// @note sizeInBytes must smaller than reservedBytes (previously reserved by VirtualMemory::reserve)
+    [[nodiscard]] bool commit(size_t sizeInBytes);
 
-    /// @brief Reclaims all unused pages past newCapacityBytes (previously committed with VirtualMemory::commit)
-    [[nodiscard]] bool shrink(size_t newCapacityBytes);
+    /// @brief Reclaims all unused pages past sizeInBytes (previously committed with VirtualMemory::commit)
+    [[nodiscard]] bool shrink(size_t sizeInBytes);
+
+    /// @brief Returns how many bytes are currently committed / accessible
+    [[nodiscard]] size_t size() const { return committedBytes; }
+
+    /// @brief Returns how many bytes are currently reserved
+    [[nodiscard]] size_t capacity() const { return reservedBytes; }
+
+    /// @brief Returns a pointer to the start of the reserved virtual memory
+    [[nodiscard]] void* data() { return memory; }
+
+    /// @brief Returns a pointer to the start of the reserved virtual memory
+    [[nodiscard]] const void* data() const { return memory; }
+
+  private:
+    size_t reservedBytes  = 0; ///< Maximum amount of reserved memory that can be committed
+    size_t committedBytes = 0; ///< Current amount of committed memory
+
+    void* memory = nullptr; ///< Pointer to start of reserved memory
 };
 
 /// @brief A MemoryAllocator implementation based on a growable slice of VirtualMemory

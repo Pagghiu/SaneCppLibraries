@@ -48,33 +48,33 @@ bool SC::VirtualMemory::reserve(size_t maxCapacityInBytes)
     return memory != nullptr;
 }
 
-bool SC::VirtualMemory::release()
+void SC::VirtualMemory::release()
 {
     if (memory == nullptr)
-        return true;
+        return;
 #if SC_PLATFORM_WINDOWS
     const bool result = ::VirtualFree(memory, 0, MEM_RELEASE) == TRUE;
 #else
     const bool result = ::munmap(memory, reservedBytes) == 0;
 #endif
+    SC_ASSERT_RELEASE(result);
     memory = nullptr;
 
     committedBytes = 0;
     reservedBytes  = 0;
-    return result;
 }
 
-bool SC::VirtualMemory::commit(size_t newCapacityBytes)
+bool SC::VirtualMemory::commit(size_t sizeInBytes)
 {
-    if (memory == nullptr or newCapacityBytes > reservedBytes)
+    if (memory == nullptr or sizeInBytes > reservedBytes)
         return false;
 
-    if (newCapacityBytes <= committedBytes)
+    if (sizeInBytes <= committedBytes)
         return true;
 
-    void*        commitAddress      = reinterpret_cast<char*>(memory) + committedBytes;
-    const size_t alignedNewCapacity = roundUpToPageSize(newCapacityBytes);
-    const size_t sizeToCommit       = alignedNewCapacity - committedBytes;
+    void*        commitAddress = reinterpret_cast<char*>(memory) + committedBytes;
+    const size_t alignedSize   = roundUpToPageSize(sizeInBytes);
+    const size_t sizeToCommit  = alignedSize - committedBytes;
 #if SC_PLATFORM_WINDOWS
     if (::VirtualAlloc(commitAddress, sizeToCommit, MEM_COMMIT, PAGE_READWRITE) == nullptr)
         return false;
@@ -82,20 +82,20 @@ bool SC::VirtualMemory::commit(size_t newCapacityBytes)
     if (::mprotect(commitAddress, sizeToCommit, PROT_READ | PROT_WRITE) != 0)
         return false;
 #endif
-    committedBytes = alignedNewCapacity;
+    committedBytes = alignedSize;
     return true;
 }
 
-bool SC::VirtualMemory::shrink(size_t newCapacityBytes)
+bool SC::VirtualMemory::shrink(size_t sizeInBytes)
 {
     if (memory == nullptr)
         return false;
-    const size_t alignedNewCapacity = roundUpToPageSize(newCapacityBytes);
-    if (alignedNewCapacity >= committedBytes)
+    const size_t alignedSize = roundUpToPageSize(sizeInBytes);
+    if (alignedSize >= committedBytes)
         return true;
 
-    void*        decommitAddress = reinterpret_cast<char*>(memory) + alignedNewCapacity;
-    const size_t sizeToDecommit  = committedBytes - alignedNewCapacity;
+    void*        decommitAddress = reinterpret_cast<char*>(memory) + alignedSize;
+    const size_t sizeToDecommit  = committedBytes - alignedSize;
 
 #if SC_PLATFORM_WINDOWS
     if (::VirtualFree(decommitAddress, sizeToDecommit, MEM_DECOMMIT) == FALSE)
@@ -109,7 +109,7 @@ bool SC::VirtualMemory::shrink(size_t newCapacityBytes)
     if (::madvise(decommitAddress, sizeToDecommit, MADV_DONTNEED) != 0)
         return false;
 #endif
-    committedBytes = alignedNewCapacity;
+    committedBytes = alignedSize;
     return true;
 }
 
@@ -124,7 +124,7 @@ void* SC::VirtualAllocator::allocateImpl(const void* owner, size_t numBytes, siz
 {
     syncFixedAllocator();
     void* fixedMemory = FixedAllocator::allocateImpl(owner, numBytes, alignment);
-    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.committedBytes + numBytes))
+    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.size() + numBytes))
     {
         syncFixedAllocator();
         return FixedAllocator::allocateImpl(owner, numBytes, alignment);
@@ -136,7 +136,7 @@ void* SC::VirtualAllocator::reallocateImpl(void* allocatedMemory, size_t numByte
 {
     syncFixedAllocator();
     void* fixedMemory = FixedAllocator::reallocateImpl(allocatedMemory, numBytes);
-    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.committedBytes + numBytes))
+    if (fixedMemory == nullptr and virtualMemory.commit(virtualMemory.size() + numBytes))
     {
         syncFixedAllocator();
         return FixedAllocator::reallocateImpl(allocatedMemory, numBytes);
@@ -146,6 +146,6 @@ void* SC::VirtualAllocator::reallocateImpl(void* allocatedMemory, size_t numByte
 
 void SC::VirtualAllocator::syncFixedAllocator()
 {
-    FixedAllocator::memory        = virtualMemory.memory;
-    FixedAllocator::capacityBytes = virtualMemory.committedBytes;
+    FixedAllocator::memory        = virtualMemory.data();
+    FixedAllocator::capacityBytes = virtualMemory.size();
 }

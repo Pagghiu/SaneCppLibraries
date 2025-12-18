@@ -43,7 +43,7 @@ void SC::GlobalsContainerTest::virtualGlobal()
     SC_TEST_EXPECT(v1->append({"SALVE"}));
     SC_TEST_EXPECT(v2->append({"SALVE"}));
     SC_TEST_EXPECT(v2->append({"SALVE2"}));
-    SC_TEST_EXPECT(virtualMemory.release());
+    virtualMemory.release();
     Globals::pop(Globals::ThreadLocal);
 }
 
@@ -89,7 +89,7 @@ void SC::GlobalsContainerTest::virtualMemoryDump()
 
     // Save used bytes to memoryDump, checking that one page has been committed
     Span<const void> memory = {allocator.data(), allocator.size()};
-    SC_TEST_EXPECT(virtualMemory.committedBytes == virtualMemory.getPageSize());
+    SC_TEST_EXPECT(virtualMemory.size() == virtualMemory.getPageSize());
     SC_TEST_EXPECT(memory.sizeInBytes() < virtualMemory.getPageSize());
     SC_TEST_EXPECT(memory.data() == &object);
     SC_TEST_EXPECT((size_t(memoryDump.data()) % alignof(ComplexStruct)) == 0);
@@ -97,7 +97,7 @@ void SC::GlobalsContainerTest::virtualMemoryDump()
 
     // Dump AFTER Globals::pop, using default allocator, and release virtual memory
     SC_TEST_EXPECT(memoryDump.append(memory));
-    SC_TEST_EXPECT(virtualMemory.release());
+    virtualMemory.release();
 
     // -----------------------------------------------------------------------------
     // Obtain a read-only view over ComplexStruct by re-interpreting the memory dump

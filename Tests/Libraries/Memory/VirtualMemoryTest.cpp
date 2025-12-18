@@ -45,7 +45,7 @@ void SC::VirtualMemoryTest::virtualMemory()
 
     // Request to use less than one page of virtual memory
     SC_TEST_EXPECT(virtualMemory.commit(lessThanOnePageSize));
-    char* memory = static_cast<char*>(virtualMemory.memory);
+    char* memory = static_cast<char*>(virtualMemory.data());
 
     // Check that memory is writable and fill it with 1
     memset(memory, 1, lessThanOnePageSize);
@@ -57,7 +57,7 @@ void SC::VirtualMemoryTest::virtualMemory()
     memset(memory + lessThanOnePageSize, 1, moreThanOnePageSize - lessThanOnePageSize);
 
     // Make sure that previously reserved address is stable
-    SC_TEST_EXPECT(memory == virtualMemory.memory);
+    SC_TEST_EXPECT(memory == virtualMemory.data());
 
     // Check that all allocated bytes are addressable and contain expected pattern
     SC_TEST_EXPECT(memcmp(memory, reference, moreThanOnePageSize) == 0);
@@ -66,16 +66,16 @@ void SC::VirtualMemoryTest::virtualMemory()
     SC_TEST_EXPECT(virtualMemory.shrink(lessThanOnePageSize));
 
     // Address should stay stable
-    SC_TEST_EXPECT(memory == virtualMemory.memory);
+    SC_TEST_EXPECT(memory == virtualMemory.data());
     SC_TEST_EXPECT(memcmp(memory, reference, lessThanOnePageSize) == 0);
 
     // Decommit everything (not really needed if we're going to release() soon)
     SC_TEST_EXPECT(virtualMemory.shrink(0));
-    SC_TEST_EXPECT(memory == virtualMemory.memory);
+    SC_TEST_EXPECT(memory == virtualMemory.data());
 
     // Finally release (don't forget, VirtualMemory has no destructor!)
-    SC_TEST_EXPECT(virtualMemory.release());
-    SC_TEST_EXPECT(virtualMemory.memory == nullptr);
+    virtualMemory.release();
+    SC_TEST_EXPECT(virtualMemory.data() == nullptr);
     //! [VirtualMemorySnippet]
 }
 
