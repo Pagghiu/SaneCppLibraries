@@ -24,6 +24,7 @@
 #include "Libraries/Threading/ThreadPool.h"
 
 #include "../ISCExample.h"
+#include "StableArray.h"
 
 namespace SC
 {
@@ -70,59 +71,49 @@ struct SC::WebServerExampleModel
 
     ThreadPool threadPool;
 
-    Buffer requestsMemory;
-    Buffer headersMemory;
+    static constexpr size_t MAX_CONNECTIONS = 1000000;    // Reserve space for max 1 million connections
+    static constexpr size_t READ_QUEUE      = 2;          // Number of read queue buffers for each connection
+    static constexpr size_t WRITE_QUEUE     = 3;          // Number of write queue buffers for each connection
+    static constexpr size_t REQUEST_SIZE    = 512 * 1024; // Number of bytes used to stream data for each connection
+    static constexpr size_t HEADER_SIZE     = 1024 * 8;   // Number of bytes used to hold request and response headers
+    static constexpr size_t NUM_FS_THREADS  = 4;          // Number of threads for async file stream operations
 
-    Span<HttpConnection> connections;
+    StableArray<char> requestsMemory = {MAX_CONNECTIONS * REQUEST_SIZE}; // Memory sliced into buffers for streaming
+    StableArray<char> headersMemory  = {MAX_CONNECTIONS * HEADER_SIZE};  // Memory holding request / response headers
 
-    Span<ReadableFileStream::Request> readRequests;
-    Span<WritableFileStream::Request> writeRequests;
-    Span<AsyncBufferView>             buffers;
-    Span<HttpAsyncFileServerStream>   fileStreams;
+    StableArray<HttpConnection>              connections = {MAX_CONNECTIONS};
+    StableArray<AsyncBufferView>             buffers     = {MAX_CONNECTIONS * WRITE_QUEUE}; // WRITE_QUEUE > READ_QUEUE
+    StableArray<ReadableFileStream::Request> readQueue   = {MAX_CONNECTIONS * READ_QUEUE};
+    StableArray<WritableFileStream::Request> writeQueue  = {MAX_CONNECTIONS * WRITE_QUEUE};
+    StableArray<HttpAsyncFileServerStream>   fileStreams = {MAX_CONNECTIONS};
 
     Result start()
     {
-        constexpr int REQUEST_SLICES = 2;          // Number of slices of the request buffer for each connection
-        constexpr int REQUEST_SIZE   = 512 * 1024; // How many bytes are allocated to stream data for each connection
-        constexpr int HEADER_SIZE    = 1024 * 8;   // How many bytes are dedicated to hold request and response headers
-        constexpr int EXTRA_SLICES   = 1;          // Extra write slice needed to write headers buffer
-        constexpr int NUM_FS_THREADS = 4;          // Number of threads for async file stream operations
+        const size_t     numClients = static_cast<size_t>(modelState.maxClients);
+        const StringView directory  = modelState.directory.view();
 
-        const size_t     maxConnections = static_cast<size_t>(modelState.maxClients);
-        const StringView directory      = modelState.directory.view();
+        SC_TRY(requestsMemory.resizeWithoutInitializing(numClients * REQUEST_SIZE));
+        SC_TRY(headersMemory.resizeWithoutInitializing(numClients * HEADER_SIZE));
+        SC_TRY(connections.resize(numClients));
+        SC_TRY(buffers.resize(numClients * WRITE_QUEUE));
+        SC_TRY(readQueue.resize(numClients * READ_QUEUE));
+        SC_TRY(writeQueue.resize(numClients * WRITE_QUEUE));
+        SC_TRY(fileStreams.resize(numClients));
 
-        // TODO: Show how to use VirtualMemory to handle dynamically increasing connection numbers avoiding start/stop
-        // 1. headersMemory: Memory for all http headers of all connections
-        // 2. readRequests: Memory to hold all sliced buffers used by the read queues
-        // 3. writeRequests: Memory to hold all sliced buffers used by the write queues
-        // 4. buffers: Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
-        // 5. clients: Memory to hold all http connections
-        // 6. fileStreams: Memory used by the async streams handled by the async file server
-        SC_TRY(headersMemory.resizeWithoutInitializing(HEADER_SIZE * maxConnections));
-        readRequests  = {new ReadableFileStream::Request[maxConnections * REQUEST_SLICES],
-                         maxConnections* REQUEST_SLICES};
-        writeRequests = {new WritableFileStream::Request[maxConnections * (REQUEST_SLICES + EXTRA_SLICES)],
-                         maxConnections*(REQUEST_SLICES + EXTRA_SLICES)};
-        buffers       = {new AsyncBufferView[maxConnections * (REQUEST_SLICES + EXTRA_SLICES)],
-                         maxConnections*(REQUEST_SLICES + EXTRA_SLICES)};
-        connections   = {new HttpConnection[maxConnections], maxConnections};
-        fileStreams   = {new HttpAsyncFileServerStream[maxConnections], maxConnections};
+        // Slice requests buffer in equal parts to create re-usable sub-buffers to stream files.
+        // It's not required to slice the buffer in equal parts, it's just an arbitrary choice.
+        SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory, numClients, READ_QUEUE,
+                                                                REQUEST_SIZE));
 
-        // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
-        // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
-        SC_TRY(requestsMemory.resize(maxConnections * REQUEST_SIZE));
-        SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), maxConnections,
-                                                                REQUEST_SLICES, REQUEST_SIZE));
-
-        // Create thread pool for file operations if needed
-        if (eventLoop->needsThreadPoolForFileOperations()) // no thread pool needed for io_uring
+        // Create thread pool for file operations if needed (i.e. when event loop backend != io_uring)
+        if (eventLoop->needsThreadPoolForFileOperations())
         {
             SC_TRY(threadPool.create(NUM_FS_THREADS));
         }
         // Initialize and start the http and the file server
-        fileServer.registerToServeFilesOn(httpServer);
-        SC_TRY(httpServer.init(connections, headersMemory.toSpan(), readRequests, writeRequests, buffers));
+        SC_TRY(httpServer.init(connections, headersMemory, readQueue, writeQueue, buffers));
         SC_TRY(fileServer.init(directory, fileStreams, httpServer.getBuffersPool(), *eventLoop, threadPool));
+        fileServer.registerToServeFilesOn(httpServer);
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
         return Result(true);
     }
@@ -133,16 +124,14 @@ struct SC::WebServerExampleModel
         SC_TRY(httpServer.waitForStopToFinish());
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
-        delete[] connections.data();
-        delete[] readRequests.data();
-        delete[] writeRequests.data();
-        delete[] buffers.data();
-        delete[] fileStreams.data();
-        connections   = {};
-        readRequests  = {};
-        writeRequests = {};
-        buffers       = {};
-        fileStreams   = {};
+
+        requestsMemory.release();      // Skips invoking destructors, just release virtual memory
+        headersMemory.release();       // Skips invoking destructors, just release virtual memory
+        connections.clearAndRelease(); // Invokes destructors and releases virtual memory
+        buffers.clearAndRelease();     // Invokes destructors and releases virtual memory
+        readQueue.clearAndRelease();   // Invokes destructors and releases virtual memory
+        writeQueue.clearAndRelease();  // Invokes destructors and releases virtual memory
+        fileStreams.clearAndRelease(); // Invokes destructors and releases virtual memory
         return Result(true);
     }
 
