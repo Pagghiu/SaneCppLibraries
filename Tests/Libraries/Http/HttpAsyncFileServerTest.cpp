@@ -58,7 +58,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     // EXTRA_BUFFERS is used to accommodate some empty slots for external bufs (Strings or other
     // pieces of memory allocated, owned and pushed by the user to the write queue)
-    AsyncBufferView buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
+    AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
+    AsyncBuffersPool buffersPool = {buffers};
 
     // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
     // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
@@ -82,9 +83,9 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     {
         SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
     }
-    SC_TEST_EXPECT(httpServer.init(connections, headersMemory.toSpan(), readQueue, writeQueue, buffers));
-    SC_TEST_EXPECT(fileServer.init(webServerFolder, streams, httpServer.getBuffersPool(), eventLoop, threadPool));
-    fileServer.registerToServeFilesOn(httpServer);
+    SC_TEST_EXPECT(httpServer.init(buffersPool, connections, headersMemory.toSpan(), readQueue, writeQueue));
+    SC_TEST_EXPECT(fileServer.init(buffersPool, threadPool, webServerFolder, streams));
+    SC_TEST_EXPECT(fileServer.start(httpServer));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
 
     //! [HttpFileServerSnippet]
@@ -106,7 +107,9 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         SC_TEST_EXPECT(context.httpServer.stop());
     };
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.waitForStopToFinish());
+    SC_TEST_EXPECT(fileServer.stop());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
 
     // Remove the test file
     SC_TEST_EXPECT(fs.removeFile("file.html"));

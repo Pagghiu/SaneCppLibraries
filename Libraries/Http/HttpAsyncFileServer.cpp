@@ -14,7 +14,9 @@
 #include <math.h>
 #endif
 
-struct SC::HttpAsyncFileServer::Internal
+namespace SC
+{
+struct HttpAsyncFileServer::Internal
 {
     static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response, int64_t millisecondsSinceEpoch);
     static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
@@ -24,12 +26,12 @@ struct SC::HttpAsyncFileServer::Internal
     static StringSpan getContentType(const StringSpan extension);
 };
 
-SC::Result SC::HttpAsyncFileServer::init(StringSpan directoryToServe, Span<HttpAsyncFileServerStream> streams,
-                                         AsyncBuffersPool& asyncPool, AsyncEventLoop& loop, ThreadPool& pool)
+Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, StringSpan directoryToServe,
+                                 Span<HttpAsyncFileServerStream> streams)
 {
     fileStreams = streams;
     buffersPool = &asyncPool;
-    eventLoop   = &loop;
+    asyncServer = nullptr;
     threadPool  = &pool;
 
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
@@ -37,7 +39,17 @@ SC::Result SC::HttpAsyncFileServer::init(StringSpan directoryToServe, Span<HttpA
     return Result(true);
 }
 
-SC::Result SC::HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response)
+Result HttpAsyncFileServer::close()
+{
+    fileStreams = {};
+    buffersPool = nullptr;
+    asyncServer = nullptr;
+    threadPool  = nullptr;
+    directory   = {};
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response)
 {
     if (not HttpStringIterator::startsWith(url, "/"))
     {
@@ -63,7 +75,7 @@ SC::Result SC::HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSp
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
         HttpAsyncFileServerStream& stream = fileStreams[index.getIndex()];
-        SC_TRY(stream.readableFileStream.init(*buffersPool, stream.requests, *eventLoop, fd));
+        SC_TRY(stream.readableFileStream.init(*buffersPool, stream.requests, *asyncServer->getEventLoop(), fd));
         SC_TRY(stream.readableFileStream.request.executeOn(stream.readStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);
@@ -97,13 +109,24 @@ SC::Result SC::HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSp
     return Result(true);
 }
 
-void SC::HttpAsyncFileServer::registerToServeFilesOn(HttpAsyncServer& server)
+Result HttpAsyncFileServer::start(HttpAsyncServer& server)
 {
+    SC_TRY_MSG(asyncServer == nullptr, "HttpAsyncFileServer must be stopped first");
+    asyncServer      = &server;
     server.onRequest = [this](HttpConnection& client)
     { SC_ASSERT_RELEASE(serveFile(client.getConnectionID(), client.request.getURL(), client.response)); };
+    return Result(true);
 }
 
-SC::StringSpan SC::HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)
+Result HttpAsyncFileServer::stop()
+{
+    SC_TRY_MSG(asyncServer != nullptr, "HttpAsyncFileServer was never started");
+    asyncServer->onRequest = {};
+    asyncServer            = nullptr;
+    return Result(true);
+}
+
+StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)
 {
     if (extension == "htm" or extension == "html")
     {
@@ -152,7 +175,7 @@ SC::StringSpan SC::HttpAsyncFileServer::Internal::getContentType(const StringSpa
     return "text/html";
 }
 
-SC::int64_t SC::HttpAsyncFileServer::Internal::getCurrentTimeMilliseconds()
+int64_t HttpAsyncFileServer::Internal::getCurrentTimeMilliseconds()
 {
 #if SC_PLATFORM_WINDOWS
     struct _timeb t;
@@ -165,8 +188,8 @@ SC::int64_t SC::HttpAsyncFileServer::Internal::getCurrentTimeMilliseconds()
 #endif
 }
 
-SC::Result SC::HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer,
-                                                             size_t bufferSize, size_t& outLength)
+Result HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize,
+                                                     size_t& outLength)
 {
     const time_t seconds = static_cast<time_t>(millisecondsSinceEpoch / 1000);
     struct tm    parsedTm;
@@ -198,8 +221,8 @@ SC::Result SC::HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecond
     return Result(true);
 }
 
-SC::Result SC::HttpAsyncFileServer::Internal::writeGMTHeaderTime(StringSpan headerName, HttpResponse& response,
-                                                                 int64_t millisecondsSinceEpoch)
+Result HttpAsyncFileServer::Internal::writeGMTHeaderTime(StringSpan headerName, HttpResponse& response,
+                                                         int64_t millisecondsSinceEpoch)
 {
     char   bufferData[128];
     size_t len;
@@ -208,3 +231,4 @@ SC::Result SC::HttpAsyncFileServer::Internal::writeGMTHeaderTime(StringSpan head
     SC_TRY(response.addHeader(headerName, {{bufferData, len}, true, StringEncoding::Ascii}));
     return Result(true);
 }
+} // namespace SC

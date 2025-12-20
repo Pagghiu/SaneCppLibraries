@@ -49,7 +49,8 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * REQUEST_SLICES];
 
     // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
-    AsyncBufferView buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
+    AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
+    AsyncBuffersPool buffersPool = {buffers};
 
     // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
     // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
@@ -62,7 +63,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
 
     // Initialize and start the http server
     HttpAsyncServer httpServer;
-    SC_TEST_EXPECT(httpServer.init(connections, headersMemory.toSpan(), readQueue, writeQueue, buffers));
+    SC_TEST_EXPECT(httpServer.init(buffersPool, connections, headersMemory.toSpan(), readQueue, writeQueue));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6152));
 
     struct ServerContext
@@ -145,7 +146,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));
     }
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(httpServer.waitForStopToFinish());
+    SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(serverContext.numRequests == clientContext.wantedNumRequests);
     SC_TEST_EXPECT(clientContext.numRequests == clientContext.wantedNumRequests);
     SC_TEST_EXPECT(eventLoop.close());

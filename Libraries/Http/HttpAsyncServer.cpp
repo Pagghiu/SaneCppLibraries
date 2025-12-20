@@ -24,16 +24,17 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     return Result(true);
 }
 
-Result HttpAsyncServer::init(Span<HttpConnection> clients, Span<char> headersMemory,
+Result HttpAsyncServer::init(AsyncBuffersPool& pool, Span<HttpConnection> clients, Span<char> headersMemory,
                              Span<AsyncReadableStream::Request> readQueue,
-                             Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers)
+                             Span<AsyncWritableStream::Request> writeQueue)
 {
+
     // TODO: Add some validation of minimum sizes for the queues and the buffers
     SC_TRY(connections.init(clients, headersMemory));
     readQueues  = readQueue;
     writeQueues = writeQueue;
 
-    buffersPool.buffers = buffers;
+    buffersPool = &pool;
 
     memory = true;
     return Result(true);
@@ -41,11 +42,11 @@ Result HttpAsyncServer::init(Span<HttpConnection> clients, Span<char> headersMem
 
 Result HttpAsyncServer::close()
 {
+    SC_TRY(waitForStopToFinish());
     SC_TRY(connections.close());
     readQueues  = {};
     writeQueues = {};
-
-    buffersPool.buffers = {};
+    buffersPool = nullptr;
 
     memory = false;
     return Result(true);
@@ -122,8 +123,8 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     Span<AsyncWritableStream::Request> writeQueue;
     SC_TRUST_RESULT(readQueues.sliceStartLength(idx.getIndex() * readQueueLen, readQueueLen, readQueue));
     SC_TRUST_RESULT(writeQueues.sliceStartLength(idx.getIndex() * writeQueueLen, writeQueueLen, writeQueue));
-    SC_TRUST_RESULT(client.readableSocketStream.init(buffersPool, readQueue, *eventLoop, client.socket));
-    SC_TRUST_RESULT(client.writableSocketStream.init(buffersPool, writeQueue, *eventLoop, client.socket));
+    SC_TRUST_RESULT(client.readableSocketStream.init(*buffersPool, readQueue, *eventLoop, client.socket));
+    SC_TRUST_RESULT(client.writableSocketStream.init(*buffersPool, writeQueue, *eventLoop, client.socket));
 
     auto onData = [this, idx](AsyncBufferView::ID bufferID)
     { onStreamReceive(connections.getConnection(idx), bufferID); };
@@ -139,7 +140,7 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID)
 {
     Span<char> readData;
-    SC_ASSERT_RELEASE(buffersPool.getWritableData(bufferID, readData));
+    SC_ASSERT_RELEASE(buffersPool->getWritableData(bufferID, readData));
 
     if (not client.request.writeHeaders(maxHeaderSize, readData))
     {

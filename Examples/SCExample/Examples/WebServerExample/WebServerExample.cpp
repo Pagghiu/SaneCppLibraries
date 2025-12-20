@@ -64,7 +64,8 @@ struct SC::WebServerExampleModel
 {
     WebServerExampleModelState modelState;
 
-    AsyncEventLoop* eventLoop = nullptr;
+    AsyncEventLoop*  eventLoop = nullptr;
+    AsyncBuffersPool buffersPool;
 
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
@@ -89,8 +90,7 @@ struct SC::WebServerExampleModel
 
     Result start()
     {
-        const size_t     numClients = static_cast<size_t>(modelState.maxClients);
-        const StringView directory  = modelState.directory.view();
+        const size_t numClients = static_cast<size_t>(modelState.maxClients);
 
         SC_TRY(requestsMemory.resizeWithoutInitializing(numClients * REQUEST_SIZE));
         SC_TRY(headersMemory.resizeWithoutInitializing(numClients * HEADER_SIZE));
@@ -104,24 +104,26 @@ struct SC::WebServerExampleModel
         // It's not required to slice the buffer in equal parts, it's just an arbitrary choice.
         SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory, numClients, READ_QUEUE,
                                                                 REQUEST_SIZE));
+        buffersPool.buffers = buffers;
 
-        // Create thread pool for file operations if needed (i.e. when event loop backend != io_uring)
+        // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
             SC_TRY(threadPool.create(NUM_FS_THREADS));
         }
         // Initialize and start the http and the file server
-        SC_TRY(httpServer.init(connections, headersMemory, readQueue, writeQueue, buffers));
-        SC_TRY(fileServer.init(directory, fileStreams, httpServer.getBuffersPool(), *eventLoop, threadPool));
-        fileServer.registerToServeFilesOn(httpServer);
+        SC_TRY(httpServer.init(buffersPool, connections, headersMemory, readQueue, writeQueue));
+        SC_TRY(fileServer.init(buffersPool, threadPool, modelState.directory.view(), fileStreams));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
+        SC_TRY(fileServer.start(httpServer));
         return Result(true);
     }
 
     Result stop()
     {
+        SC_TRY(fileServer.stop());
         SC_TRY(httpServer.stop());
-        SC_TRY(httpServer.waitForStopToFinish());
+        SC_TRY(fileServer.close());
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
 

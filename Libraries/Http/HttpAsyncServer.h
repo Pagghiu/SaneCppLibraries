@@ -19,12 +19,11 @@ namespace SC
 struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers
-    Result init(Span<HttpConnection> clients, Span<char> headersMemory, Span<AsyncReadableStream::Request> readQueue,
-                Span<AsyncWritableStream::Request> writeQueue, Span<AsyncBufferView> buffers);
+    Result init(AsyncBuffersPool& buffersPool, Span<HttpConnection> clients, Span<char> headersMemory,
+                Span<AsyncReadableStream::Request> readQueue, Span<AsyncWritableStream::Request> writeQueue);
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
-    /// @warning If server is started, you must call HttpAsyncServer::stop and HttpAsyncServer::waitForStopToFinish
-    /// before this class can be safely destroyed, because it needs to shutdown all in-flight async requests
+    /// @note This call will wait until all async operations will be finished before returning
     Result close();
 
     /// @brief Starts the http server on the given AsyncEventLoop, address and port
@@ -38,18 +37,14 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @warning Consider calling waitForStopToFinish before reclaiming memory used by this class
     Result stop();
 
-    /// @brief Blocks current thread waiting for the event loop to shutdown active async requests
-    /// @note HttpAsyncServer can be destroyed after this function returns
-    Result waitForStopToFinish();
-
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return started; }
 
-    /// @brief Access the underlying buffers pool used by the async streams
-    AsyncBuffersPool& getBuffersPool() { return buffersPool; }
-
     /// @brief Access the underlying http connections
     HttpConnectionsPool& getConnectionsPool() { return connections; }
+
+    /// @brief Access the underlying AsyncEventLoop
+    AsyncEventLoop* getEventLoop() const { return eventLoop; }
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
@@ -66,7 +61,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 
   private:
     HttpConnectionsPool connections;
-    AsyncBuffersPool    buffersPool;
+    AsyncBuffersPool*   buffersPool = nullptr;
 
     uint32_t maxHeaderSize = 8 * 1024;
 
@@ -80,6 +75,8 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     void onNewClient(AsyncSocketAccept::Result& result);
     void closeAsync(HttpConnection& requestClient);
     void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
+
+    Result waitForStopToFinish();
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

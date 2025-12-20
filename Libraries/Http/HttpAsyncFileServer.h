@@ -24,15 +24,21 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
     /// @brief Initialize the web server on the given file system directory to serve
-    Result init(StringSpan directoryToServe, Span<HttpAsyncFileServerStream> fileStreams, AsyncBuffersPool& buffersPool,
-                AsyncEventLoop& eventLoop, ThreadPool& threadPool);
+    Result init(AsyncBuffersPool& buffersPool, ThreadPool& threadPool, StringSpan directoryToServe,
+                Span<HttpAsyncFileServerStream> fileStreams);
+
+    /// @brief Removes any reference to the arguments passed during init
+    Result close();
 
     /// @brief Serve the file requested by this Http Client on its channel
     /// Call this method in response to HttpConnectionsPool::onRequest to serve a file
     Result serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response);
 
-    /// @brief Registers to HttpConnectionsPool::onRequest callback to serve files from this file server
-    void registerToServeFilesOn(HttpAsyncServer& server);
+    /// @brief Starts serving files on the given async server
+    Result start(HttpAsyncServer& server);
+
+    /// @brief Stops serving files on the async server passed in start
+    Result stop();
 
   private:
     StringPath directory;
@@ -40,8 +46,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     Span<HttpAsyncFileServerStream> fileStreams;
 
     AsyncBuffersPool* buffersPool = nullptr;
-    AsyncEventLoop*   eventLoop   = nullptr;
-    ThreadPool*       threadPool;
+    HttpAsyncServer*  asyncServer = nullptr;
+    ThreadPool*       threadPool  = nullptr;
     struct Internal;
 };
 } // namespace SC
