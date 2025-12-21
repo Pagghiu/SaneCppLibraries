@@ -191,8 +191,8 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 
     /// @brief Inits the readable stream with an AsyncBuffersPool instance that will provide memory for it
     /// @param buffersPool An instance of AsyncBuffersPool providing read buffers
-    /// @param requests User owned memory to hold a circular buffer for read requests
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests);
+    /// @note Remember to call AsyncReadableStream::setReadQueue before calling init
+    Result init(AsyncBuffersPool& buffersPool);
 
     /// @brief Starts the readable stream, that will emit eventData
     Result start();
@@ -212,6 +212,9 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 
     /// @brief Obtains the AsyncBuffersPool to request more buffers
     AsyncBuffersPool& getBuffersPool();
+
+    /// @brief Sets the read queue for this readable stream
+    void setReadQueue(Span<Request> requests) { readQueue = requests; }
 
     /// @brief Use push from inside AsyncReadableStream::asyncRead function to queue received data
     /// @return `true` if the caller can continue pushing
@@ -284,8 +287,11 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
 
     /// @brief Inits the writable stream
     /// @param buffersPool An instance of AsyncBuffersPool providing write buffers
-    /// @param requests User owned memory to hold a circular buffer for write requests
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests);
+    /// @note Remember to call AsyncWritableStream::setWriteQueue before calling init
+    Result init(AsyncBuffersPool& buffersPool);
+
+    /// @brief Sets the write queue for this writable stream
+    void setWriteQueue(Span<Request> requests) { writeQueue = requests; }
 
     /// @brief Writes a buffer (that must be allocated by the AsyncBuffersPool passed in AsyncWritableStream)
     /// When the buffer it will be actually written, AsyncWritableStream::eventWritten will be raised and

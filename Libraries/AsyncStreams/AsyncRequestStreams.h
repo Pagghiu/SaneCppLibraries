@@ -36,8 +36,7 @@ struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStrea
     AsyncRequestWritableStream();
 
     template <typename DescriptorType>
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                const DescriptorType& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const DescriptorType& descriptor);
 
     /// @brief Automatically closes descriptor during write stream finish event
     void setAutoCloseDescriptor(bool value) { autoCloseDescriptor = value; }
@@ -61,29 +60,25 @@ struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStrea
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
 struct SC_COMPILER_EXPORT ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                const FileDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
 struct SC_COMPILER_EXPORT WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                const FileDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const FileDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data from a socket
 struct SC_COMPILER_EXPORT ReadableSocketStream : public AsyncRequestReadableStream<AsyncSocketReceive>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                const SocketDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a socket
 struct SC_COMPILER_EXPORT WritableSocketStream : public AsyncRequestWritableStream<AsyncSocketSend>
 {
-    Result init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& eventLoop,
-                const SocketDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const SocketDescriptor& descriptor);
 };
 
 } // namespace SC

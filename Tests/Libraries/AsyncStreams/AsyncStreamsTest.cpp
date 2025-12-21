@@ -145,7 +145,8 @@ void SC::AsyncStreamsTest::readableSyncStream()
 
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
-    SC_TEST_EXPECT(readable.init(pool, requests));
+    readable.setReadQueue(requests);
+    SC_TEST_EXPECT(readable.init(pool));
     struct Context
     {
         AsyncReadableStream& readable;
@@ -220,7 +221,8 @@ void SC::AsyncStreamsTest::readableAsyncStream()
 
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
-    SC_TEST_EXPECT(readable.init(pool, requests));
+    readable.setReadQueue(requests);
+    SC_TEST_EXPECT(readable.init(pool));
     AsyncEventLoop loop;
     struct Context
     {
@@ -302,7 +304,8 @@ void SC::AsyncStreamsTest::writableStream()
 
     AsyncWritableStream          writable;
     AsyncWritableStream::Request writeRequestsQueue[numberOfBuffers + 1]; // Only N-1 slots will be used
-    SC_TEST_EXPECT(writable.init(pool, writeRequestsQueue));
+    writable.setWriteQueue(writeRequestsQueue);
+    SC_TEST_EXPECT(writable.init(pool));
     struct Context
     {
         AsyncWritableStream& writable;

@@ -13,6 +13,8 @@ struct SC_COMPILER_EXPORT CircularQueue
     CircularQueue() = default;
     CircularQueue(Span<T> buffer) : buffer(buffer) {}
 
+    [[nodiscard]] size_t size() const { return buffer.sizeInElements(); }
+
     [[nodiscard]] bool isEmpty() const { return readIndex == writeIndex; }
 
     [[nodiscard]] bool pushBack(T&& request) { return pushBack(request); }

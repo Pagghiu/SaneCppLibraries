@@ -75,7 +75,8 @@ Result HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, 
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
         HttpAsyncFileServerStream& stream = fileStreams[index.getIndex()];
-        SC_TRY(stream.readableFileStream.init(*buffersPool, stream.requests, *asyncServer->getEventLoop(), fd));
+        stream.readableFileStream.setReadQueue(stream.requests);
+        SC_TRY(stream.readableFileStream.init(*buffersPool, *asyncServer->getEventLoop(), fd));
         SC_TRY(stream.readableFileStream.request.executeOn(stream.readStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);

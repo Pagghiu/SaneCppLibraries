@@ -236,8 +236,10 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(writeDescriptor.open(writeablePath.view(), openModeWrite));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeDescriptor));
 
-    SC_TEST_EXPECT(readable.init(pool, readableRequests, eventLoop, readDescriptor));
-    SC_TEST_EXPECT(writable.init(pool, writableRequests, eventLoop, writeDescriptor));
+    readable.setReadQueue(readableRequests);
+    writable.setWriteQueue(writableRequests);
+    SC_TEST_EXPECT(readable.init(pool, eventLoop, readDescriptor));
+    SC_TEST_EXPECT(writable.init(pool, eventLoop, writeDescriptor));
 
     // Create Pipeline
 
@@ -339,7 +341,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     readFileStream.request.setDebugName("File Source");
     SC_TEST_EXPECT(readFileStream.request.executeOn(readFileTask, fileThreadPool));
     AsyncReadableStream::Request readFileRequests[numberOfBuffers1 + 1];
-    SC_TEST_EXPECT(readFileStream.init(buffersPool1, readFileRequests, eventLoop, readFd));
+    readFileStream.setReadQueue(readFileRequests);
+    SC_TEST_EXPECT(readFileStream.init(buffersPool1, eventLoop, readFd));
 
     // Create Writable File Stream
     WritableFileStream writeFileStream;
@@ -377,7 +380,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     // Create Writable Socket Stream
     WRITABLE_TYPE                writeSideStream;
     AsyncWritableStream::Request writeSideRequests[numberOfBuffers1 + 1];
-    SC_TEST_EXPECT(writeSideStream.init(buffersPool1, writeSideRequests, eventLoop, writeSide));
+    writeSideStream.setWriteQueue(writeSideRequests);
+    SC_TEST_EXPECT(writeSideStream.init(buffersPool1, eventLoop, writeSide));
     // Autoclose socket after write stream receives an ::end()
     writeSideStream.request.setDebugName("Writable Side");
     AsyncTaskSequence writeStreamTask;
@@ -391,7 +395,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     // Create Readable Socket Stream
     READABLE_TYPE                readSideStream;
     AsyncReadableStream::Request readSideRequests[numberOfBuffers2 + 1];
-    SC_TEST_EXPECT(readSideStream.init(buffersPool2, readSideRequests, eventLoop, readSide));
+    readSideStream.setReadQueue(readSideRequests);
+    SC_TEST_EXPECT(readSideStream.init(buffersPool2, eventLoop, readSide));
     // Autoclose socket when socket stream receives an end event signaling socket disconnected
     readSideStream.request.setDebugName("Readable Side");
     AsyncTaskSequence readStreamTask;
@@ -404,7 +409,8 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     (void)readSideStream.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
 
     AsyncWritableStream::Request writeFileRequests[numberOfBuffers2 + 1];
-    SC_TEST_EXPECT(writeFileStream.init(buffersPool2, writeFileRequests, eventLoop, writeFd));
+    writeFileStream.setWriteQueue(writeFileRequests);
+    SC_TEST_EXPECT(writeFileStream.init(buffersPool2, eventLoop, writeFd));
 
     // Create first transform stream (compression)
     ZLIB_STREAM_TYPE             compressStream;

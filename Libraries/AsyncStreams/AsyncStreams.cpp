@@ -179,14 +179,13 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
 //-------------------------------------------------------------------------------------------------------
 // AsyncReadableStream
 //-------------------------------------------------------------------------------------------------------
-
-Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
+Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool)
 {
     SC_TRY_MSG(state == State::Stopped or state == State::Destroyed or state == State::Ended,
                "AsyncReadableStream::init - Can be called only in Stopped / Destroyed / Ended state")
-    buffers   = &buffersPool;
-    readQueue = requests;
-    state     = State::CanRead;
+    SC_TRY_MSG(readQueue.size() > 0, "AsyncReadableStream::init - setReadQueue not called")
+    buffers = &buffersPool;
+    state   = State::CanRead;
     return Result(true);
 }
 
@@ -436,12 +435,12 @@ bool AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBuffe
 // AsyncWritableStream
 //-------------------------------------------------------------------------------------------------------
 
-Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests)
+Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool)
 {
     SC_TRY_MSG(state == State::Stopped or state == State::Ended,
                "AsyncWritableStream::init - Can be called only in Stopped or Ended states");
-    buffers    = &buffersPool;
-    writeQueue = requests;
+    SC_TRY_MSG(writeQueue.size() > 0, "AsyncWritableStream::init - setWriteQueue not called")
+    buffers = &buffersPool;
     if (state == State::Ended)
     {
         state = State::Stopped;
@@ -633,8 +632,10 @@ AsyncDuplexStream::AsyncDuplexStream()
 Result AsyncDuplexStream::init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
                                Span<AsyncWritableStream::Request> writableRequests)
 {
-    SC_TRY(AsyncReadableStream::init(buffersPool, readableRequests));
-    SC_TRY(AsyncWritableStream::init(buffersPool, writableRequests));
+    AsyncReadableStream::setReadQueue(readableRequests);
+    AsyncWritableStream::setWriteQueue(writableRequests);
+    SC_TRY(AsyncReadableStream::init(buffersPool));
+    SC_TRY(AsyncWritableStream::init(buffersPool));
     return Result(true);
 }
 

@@ -27,13 +27,13 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
     }
 
     template <typename DescriptorType>
-    static Result init(AsyncRequestReadableStream& self, AsyncBuffersPool& buffersPool, Span<Request> requests,
-                       AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
+    static Result init(AsyncRequestReadableStream& self, AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop,
+                       const DescriptorType& descriptor)
     {
         self.eventLoop = &eventLoop;
         self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
-        return self.AsyncReadableStream::init(buffersPool, requests);
+        return self.AsyncReadableStream::init(buffersPool);
     }
 };
 
@@ -157,13 +157,13 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
     }
 
     template <typename DescriptorType>
-    static Result init(AsyncRequestWritableStream& self, AsyncBuffersPool& buffersPool, Span<Request> requests,
-                       AsyncEventLoop& eventLoop, const DescriptorType& descriptor)
+    static Result init(AsyncRequestWritableStream& self, AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop,
+                       const DescriptorType& descriptor)
     {
         self.eventLoop = &eventLoop;
         self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
-        return self.AsyncWritableStream::init(buffersPool, requests);
+        return self.AsyncWritableStream::init(buffersPool);
     }
 };
 
@@ -231,25 +231,23 @@ SC_COMPILER_EXTERN template struct AsyncRequestReadableStream<AsyncFileRead>;
 SC_COMPILER_EXTERN template struct AsyncRequestWritableStream<AsyncFileWrite>;
 SC_COMPILER_EXTERN template struct AsyncRequestWritableStream<AsyncSocketSend>;
 
-Result ReadableSocketStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+Result ReadableSocketStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop,
                                   const SocketDescriptor& descriptor)
 {
-    return Internal::init(*this, buffersPool, requests, loop, descriptor);
+    return Internal::init(*this, buffersPool, loop, descriptor);
 }
-Result WritableSocketStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
+Result WritableSocketStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop,
                                   const SocketDescriptor& descriptor)
 {
-    return Internal::init(*this, buffersPool, requests, loop, descriptor);
+    return Internal::init(*this, buffersPool, loop, descriptor);
 }
-Result ReadableFileStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
-                                const FileDescriptor& descriptor)
+Result ReadableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop, const FileDescriptor& descriptor)
 {
-    return Internal::init(*this, buffersPool, requests, loop, descriptor);
+    return Internal::init(*this, buffersPool, loop, descriptor);
 }
-Result WritableFileStream::init(AsyncBuffersPool& buffersPool, Span<Request> requests, AsyncEventLoop& loop,
-                                const FileDescriptor& descriptor)
+Result WritableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop, const FileDescriptor& descriptor)
 {
-    return Internal::init(*this, buffersPool, requests, loop, descriptor);
+    return Internal::init(*this, buffersPool, loop, descriptor);
 }
 
 } // namespace SC
