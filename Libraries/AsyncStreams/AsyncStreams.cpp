@@ -176,6 +176,20 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
     return Result::Error("pushBuffer failed");
 }
 
+Result AsyncBuffersPool::sliceInEqualParts(Span<AsyncBufferView> buffers, Span<char> memory, size_t numSlices)
+{
+    SC_TRY_MSG(buffers.sizeInElements() > numSlices, "AsyncBuffersPool::sliceInEqualParts - insufficient buffers")
+    const size_t sliceSize = memory.sizeInBytes() / numSlices;
+    for (size_t sliceIdx = 0; sliceIdx < numSlices; ++sliceIdx)
+    {
+        Span<char> slice;
+        (void)memory.sliceStartLength(sliceIdx * sliceSize, sliceSize, slice);
+        buffers[sliceIdx] = slice;
+        buffers[sliceIdx].setReusable(true); // We want to recycle these buffers
+    }
+    return Result(true);
+}
+
 //-------------------------------------------------------------------------------------------------------
 // AsyncReadableStream
 //-------------------------------------------------------------------------------------------------------

@@ -102,8 +102,7 @@ struct SC::WebServerExampleModel
 
         // Slice requests buffer in equal parts to create re-usable sub-buffers to stream files.
         // It's not required to slice the buffer in equal parts, it's just an arbitrary choice.
-        SC_TRY(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory, numClients, READ_QUEUE,
-                                                                REQUEST_SIZE));
+        SC_TRY(AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory, numClients * READ_QUEUE));
         buffersPool.buffers = buffers;
 
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)

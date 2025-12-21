@@ -165,6 +165,9 @@ struct SC_COMPILER_EXPORT AsyncBuffersPool
 
     /// @brief Adds a buffer to the pool in any empty slot (found by scanning from start to end)
     Result pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::ID& bufferID);
+
+    /// @brief Splits a span of memory in equally sized slices, assigning them to buffers and marking them as reusable
+    static Result sliceInEqualParts(Span<AsyncBufferView> buffers, Span<char> memory, size_t numSlices);
 };
 
 /// @brief Async source abstraction emitting data events in caller provided byte buffers.

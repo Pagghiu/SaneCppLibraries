@@ -65,8 +65,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
     Buffer requestsMemory;
     SC_TEST_EXPECT(requestsMemory.resize(MAX_CONNECTIONS * REQUEST_SIZE));
-    SC_TEST_EXPECT(HttpAsyncServer::sliceReusableEqualMemoryBuffers(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS,
-                                                                    REQUEST_SLICES, REQUEST_SIZE));
+    SC_TEST_EXPECT(
+        AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS * REQUEST_SLICES));
 
     // 5. Memory to hold all http connections
     HttpConnection connections[MAX_CONNECTIONS];

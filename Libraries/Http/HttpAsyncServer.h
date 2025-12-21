@@ -49,16 +49,6 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
 
-    /// @brief Slices a span of memory used for request in equal parts for all buffers, marking them as re-usable
-    /// @param buffers The buffers to be sliced
-    /// @param memory The span of memory to be sliced into buffers
-    /// @param maxConnections The maximum number of connections / buffers to be sliced
-    /// @param numSlicesPerConnection The number of slices to be created for a single connection
-    /// @param sizeInBytesPerConnection The size of each slice for a single connection
-    [[nodiscard]] static bool sliceReusableEqualMemoryBuffers(Span<AsyncBufferView> buffers, Span<char> memory,
-                                                              size_t maxConnections, size_t numSlicesPerConnection,
-                                                              size_t sizeInBytesPerConnection);
-
   private:
     HttpConnectionsPool connections;
     AsyncBuffersPool*   buffersPool = nullptr;
