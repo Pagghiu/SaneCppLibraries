@@ -6,16 +6,6 @@
 
 namespace SC
 {
-/// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
-struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
-{
-    AsyncPipeline      pipeline;
-    ReadableFileStream readableFileStream;
-    AsyncTaskSequence  readStreamTask;
-
-    AsyncReadableStream::Request requests[3];
-};
-
 /// @brief Http file server statically serves files from a directory
 ///
 /// This class registers the onRequest callback provided by HttpAsyncServer to serves files from a given directory.
@@ -23,31 +13,39 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServerStream
 /// \snippet Tests/Libraries/Http/HttpAsyncFileServerTest.cpp HttpFileServerSnippet
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
+    /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
+    struct SC_COMPILER_EXPORT Stream
+    {
+        AsyncPipeline      pipeline;
+        ReadableFileStream readableFileStream;
+        AsyncTaskSequence  readStreamTask;
+    };
+
+    template <int RequestsSize>
+    struct SC_COMPILER_EXPORT StreamQueue : public Stream
+    {
+        StreamQueue() { readableFileStream.setReadQueue(requests); }
+        AsyncReadableStream::Request requests[RequestsSize];
+    };
+
     /// @brief Initialize the web server on the given file system directory to serve
-    Result init(AsyncBuffersPool& buffersPool, ThreadPool& threadPool, StringSpan directoryToServe,
-                Span<HttpAsyncFileServerStream> fileStreams);
+    Result init(AsyncBuffersPool& buffersPool, ThreadPool& threadPool, AsyncEventLoop& loop,
+                StringSpan directoryToServe);
 
     /// @brief Removes any reference to the arguments passed during init
     Result close();
 
     /// @brief Serve the file requested by this Http Client on its channel
     /// Call this method in response to HttpConnectionsPool::onRequest to serve a file
-    Result serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response);
-
-    /// @brief Starts serving files on the given async server
-    Result start(HttpAsyncServer& server);
-
-    /// @brief Stops serving files on the async server passed in start
-    Result stop();
+    Result serveFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
   private:
     StringPath directory;
 
-    Span<HttpAsyncFileServerStream> fileStreams;
-
+    AsyncEventLoop*   eventLoop   = nullptr;
     AsyncBuffersPool* buffersPool = nullptr;
-    HttpAsyncServer*  asyncServer = nullptr;
     ThreadPool*       threadPool  = nullptr;
     struct Internal;
 };
+
 } // namespace SC

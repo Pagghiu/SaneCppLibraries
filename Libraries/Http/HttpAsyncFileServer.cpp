@@ -26,12 +26,12 @@ struct HttpAsyncFileServer::Internal
     static StringSpan getContentType(const StringSpan extension);
 };
 
-Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, StringSpan directoryToServe,
-                                 Span<HttpAsyncFileServerStream> streams)
+Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, AsyncEventLoop& loop,
+                                 StringSpan directoryToServe)
 {
-    fileStreams = streams;
+    SC_TRY_MSG(eventLoop == nullptr, "HttpAsyncFileServer::init - already inited")
+    eventLoop   = &loop;
     buffersPool = &asyncPool;
-    asyncServer = nullptr;
     threadPool  = &pool;
 
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
@@ -41,16 +41,16 @@ Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, 
 
 Result HttpAsyncFileServer::close()
 {
-    fileStreams = {};
+    eventLoop   = nullptr;
     buffersPool = nullptr;
-    asyncServer = nullptr;
     threadPool  = nullptr;
     directory   = {};
     return Result(true);
 }
 
-Result HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, HttpResponse& response)
+Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
+    auto url = connection.request.getURL();
     if (not HttpStringIterator::startsWith(url, "/"))
     {
         return Result::Error("Wrong url");
@@ -74,56 +74,37 @@ Result HttpAsyncFileServer::serveFile(HttpConnection::ID index, StringSpan url, 
         SC_TRY(path.append(filePath));
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
-        HttpAsyncFileServerStream& stream = fileStreams[index.getIndex()];
-        stream.readableFileStream.setReadQueue(stream.requests);
-        SC_TRY(stream.readableFileStream.init(*buffersPool, *asyncServer->getEventLoop(), fd));
+        SC_TRY(stream.readableFileStream.init(*buffersPool, *eventLoop, fd));
         SC_TRY(stream.readableFileStream.request.executeOn(stream.readStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);
         stream.pipeline.source   = &stream.readableFileStream;
-        stream.pipeline.sinks[0] = &response.getWritableStream();
+        stream.pipeline.sinks[0] = &connection.response.getWritableStream();
 
-        SC_TRY(response.startResponse(200));
+        SC_TRY(connection.response.startResponse(200));
         char buffer[20];
         ::snprintf(buffer, sizeof(buffer), "%zu", fileStat.fileSize);
         StringSpan contentLength = {{buffer, ::strlen(buffer)}, true, StringEncoding::Ascii};
-        SC_TRY(response.addHeader("Content-Length", contentLength));
-        SC_TRY(response.addHeader("Content-Type", Internal::getContentType(extension)));
-        SC_TRY(Internal::writeGMTHeaderTime("Date", response, Internal::getCurrentTimeMilliseconds()));
-        SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", response, fileStat.modifiedTime.milliseconds));
-        SC_TRY(response.addHeader("Server", "SC"));
-        SC_TRY(response.addHeader("Connection", "Closed"));
+        SC_TRY(connection.response.addHeader("Content-Length", contentLength));
+        SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
+        SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
+        SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
+        SC_TRY(connection.response.addHeader("Server", "SC"));
+        SC_TRY(connection.response.addHeader("Connection", "Closed"));
 
-        SC_TRY(response.sendHeaders());
+        SC_TRY(connection.response.sendHeaders());
 
         SC_TRY(stream.pipeline.pipe());
         SC_TRY(stream.pipeline.start());
     }
     else
     {
-        SC_TRY(response.startResponse(404));
-        SC_TRY(response.addHeader("Server", "SC"));
-        SC_TRY(response.addHeader("Connection", "Closed"));
-        SC_TRY(response.sendHeaders());
-        SC_TRY(response.end());
+        SC_TRY(connection.response.startResponse(404));
+        SC_TRY(connection.response.addHeader("Server", "SC"));
+        SC_TRY(connection.response.addHeader("Connection", "Closed"));
+        SC_TRY(connection.response.sendHeaders());
+        SC_TRY(connection.response.end());
     }
-    return Result(true);
-}
-
-Result HttpAsyncFileServer::start(HttpAsyncServer& server)
-{
-    SC_TRY_MSG(asyncServer == nullptr, "HttpAsyncFileServer must be stopped first");
-    asyncServer      = &server;
-    server.onRequest = [this](HttpConnection& client)
-    { SC_ASSERT_RELEASE(serveFile(client.getConnectionID(), client.request.getURL(), client.response)); };
-    return Result(true);
-}
-
-Result HttpAsyncFileServer::stop()
-{
-    SC_TRY_MSG(asyncServer != nullptr, "HttpAsyncFileServer was never started");
-    asyncServer->onRequest = {};
-    asyncServer            = nullptr;
     return Result(true);
 }
 

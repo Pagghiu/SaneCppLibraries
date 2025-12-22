@@ -67,7 +67,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     // 4. Memory used by the async streams handled by the async file server
-    HttpAsyncFileServerStream streams[MAX_CONNECTIONS];
+    HttpAsyncFileServer::StreamQueue<REQUEST_SLICES> streams[MAX_CONNECTIONS];
 
     // Initialize and start the http and the file server
     HttpAsyncServer     httpServer;
@@ -79,9 +79,10 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
     }
     SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections), headersMemory.toSpan()));
-    SC_TEST_EXPECT(fileServer.init(buffersPool, threadPool, webServerFolder, streams));
-    SC_TEST_EXPECT(fileServer.start(httpServer));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
+    SC_TEST_EXPECT(fileServer.init(buffersPool, threadPool, eventLoop, webServerFolder));
+    httpServer.onRequest = [&](HttpConnection& connection)
+    { SC_ASSERT_RELEASE(fileServer.serveFile(streams[connection.getConnectionID().getIndex()], connection)); };
 
     //! [HttpFileServerSnippet]
 
@@ -102,7 +103,6 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         SC_TEST_EXPECT(context.httpServer.stop());
     };
     SC_TEST_EXPECT(eventLoop.run());
-    SC_TEST_EXPECT(fileServer.stop());
     SC_TEST_EXPECT(fileServer.close());
     SC_TEST_EXPECT(httpServer.close());
 

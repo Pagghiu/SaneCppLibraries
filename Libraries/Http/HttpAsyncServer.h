@@ -79,9 +79,6 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return started; }
 
-    /// @brief Access the underlying AsyncEventLoop
-    [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
-
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
 
