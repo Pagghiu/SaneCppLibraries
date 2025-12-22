@@ -150,7 +150,6 @@
     },
     "Http": {
         "direct_dependencies": [
-            "Async",
             "AsyncStreams",
             "FileSystem",
             "Foundation"

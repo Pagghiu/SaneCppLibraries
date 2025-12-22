@@ -172,7 +172,7 @@ void HttpResponse::reset() { headersSent = false; }
 //-------------------------------------------------------------------------------------------------------
 // HttpConnectionsPool
 //-------------------------------------------------------------------------------------------------------
-Result HttpConnectionsPool::init(Span<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage)
+Result HttpConnectionsPool::init(SpanWithStride<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage)
 {
     SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::init - numConnections != 0");
     connections   = connectionsStorage;

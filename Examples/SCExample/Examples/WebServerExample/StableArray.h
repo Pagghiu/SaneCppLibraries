@@ -112,6 +112,9 @@ struct StableArray
     [[nodiscard]] operator Span<T>() { return {data(), sizeElements}; }
     [[nodiscard]] operator Span<const T>() const { return {data(), sizeElements}; }
 
+    [[nodiscard]] Span<T>       toSpan() { return {data(), sizeElements}; }
+    [[nodiscard]] Span<const T> toSpan() const { return {data(), sizeElements}; }
+
   private:
     VirtualMemory virtualMemory;
 

@@ -49,13 +49,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     Buffer headersMemory;
     SC_TEST_EXPECT(headersMemory.resize(MAX_CONNECTIONS * HEADER_SIZE));
 
-    // 2. Memory to hold all sliced buffers used by the read queues
-    AsyncReadableStream::Request readQueue[MAX_CONNECTIONS * REQUEST_SLICES];
-
-    // 3. Memory to hold all sliced buffers used by the write queues
-    AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
-
-    // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
+    // 2. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     // EXTRA_BUFFERS is used to accommodate some empty slots for external bufs (Strings or other
     // pieces of memory allocated, owned and pushed by the user to the write queue)
     AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
@@ -68,10 +62,11 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     SC_TEST_EXPECT(
         AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS * REQUEST_SLICES));
 
-    // 5. Memory to hold all http connections
-    HttpConnection connections[MAX_CONNECTIONS];
+    // 3. Memory to hold all http connections
+    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES + EXTRA_BUFFERS>;
+    HttpConnectionType connections[MAX_CONNECTIONS];
 
-    // 6. Memory used by the async streams handled by the async file server
+    // 4. Memory used by the async streams handled by the async file server
     HttpAsyncFileServerStream streams[MAX_CONNECTIONS];
 
     // Initialize and start the http and the file server
@@ -83,7 +78,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     {
         SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
     }
-    SC_TEST_EXPECT(httpServer.init(buffersPool, connections, headersMemory.toSpan(), readQueue, writeQueue));
+    SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections), headersMemory.toSpan()));
     SC_TEST_EXPECT(fileServer.init(buffersPool, threadPool, webServerFolder, streams));
     SC_TEST_EXPECT(fileServer.start(httpServer));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));

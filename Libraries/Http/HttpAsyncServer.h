@@ -1,9 +1,44 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../AsyncStreams/AsyncRequestStreams.h"
 #include "HttpConnection.h"
+
 namespace SC
 {
+namespace TypeTraits
+{
+/// IsBaseOf evaluates to `true` if the type `Base` is a base class of `Derived`, `false` otherwise.
+template <typename Base, typename Derived>
+struct IsBaseOf
+{
+    static constexpr bool value = __is_base_of(Base, Derived);
+};
+
+} // namespace TypeTraits
+
+/// @brief Contains fields used by HttpAsyncServer for each connection
+struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
+{
+    ReadableSocketStream readableSocketStream;
+    WritableSocketStream writableSocketStream;
+    SocketDescriptor     socket;
+};
+
+/// @brief Adds compile-time configurable read and write queues to HttpAsyncConnectionBase
+template <int ReadQueue, int WriteQueue>
+struct SC_COMPILER_EXPORT HttpAsyncConnection : public HttpAsyncConnectionBase
+{
+    ReadableFileStream::Request readQueue[ReadQueue];
+    WritableFileStream::Request writeQueue[WriteQueue];
+
+    HttpAsyncConnection()
+    {
+        readableSocketStream.setReadQueue(readQueue);
+        writableSocketStream.setWriteQueue(writeQueue);
+    }
+};
+
 /// @brief Async Http Server
 ///
 /// This class handles a fully asynchronous http server staying inside 5 fixed memory regions passed during init.
@@ -19,8 +54,12 @@ namespace SC
 struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers
-    Result init(AsyncBuffersPool& buffersPool, Span<HttpConnection> clients, Span<char> headersMemory,
-                Span<AsyncReadableStream::Request> readQueue, Span<AsyncWritableStream::Request> writeQueue);
+    template <typename T,
+              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpAsyncConnectionBase, T>::value>::type>
+    Result init(AsyncBuffersPool& pool, Span<T> clients, Span<char> headersMemory)
+    {
+        return initInternal(pool, {clients.data(), clients.sizeInElements(), sizeof(T)}, headersMemory);
+    }
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
     /// @note This call will wait until all async operations will be finished before returning
@@ -40,11 +79,8 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return started; }
 
-    /// @brief Access the underlying http connections
-    HttpConnectionsPool& getConnectionsPool() { return connections; }
-
     /// @brief Access the underlying AsyncEventLoop
-    AsyncEventLoop* getEventLoop() const { return eventLoop; }
+    [[nodiscard]] AsyncEventLoop* getEventLoop() const { return eventLoop; }
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
@@ -55,18 +91,15 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 
     uint32_t maxHeaderSize = 8 * 1024;
 
-    Span<AsyncReadableStream::Request> readQueues;
-    Span<AsyncWritableStream::Request> writeQueues;
-
     bool started  = false;
     bool stopping = false;
-    bool memory   = false;
 
     void onNewClient(AsyncSocketAccept::Result& result);
-    void closeAsync(HttpConnection& requestClient);
-    void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
+    void closeAsync(HttpAsyncConnectionBase& requestClient);
+    void onStreamReceive(HttpAsyncConnectionBase& client, AsyncBufferView::ID bufferID);
 
     Result waitForStopToFinish();
+    Result initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpConnection> connections, Span<char> headersMemory);
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

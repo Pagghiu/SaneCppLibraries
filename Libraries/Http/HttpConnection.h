@@ -3,9 +3,7 @@
 #pragma once
 #include "HttpParser.h"
 
-#include "../Async/Async.h"
-#include "../AsyncStreams/AsyncRequestStreams.h"
-#include "../Foundation/Function.h"
+#include "../AsyncStreams/AsyncStreams.h"
 #include "../Foundation/StringSpan.h"
 
 namespace SC
@@ -120,7 +118,7 @@ struct SC_COMPILER_EXPORT HttpConnection
     HttpRequest  request;
     HttpResponse response;
 
-  private:
+  protected:
     enum class State
     {
         Inactive,
@@ -131,18 +129,47 @@ struct SC_COMPILER_EXPORT HttpConnection
 
     State state = State::Inactive;
     ID    connectionID;
+};
 
-    ReadableSocketStream readableSocketStream;
-    WritableSocketStream writableSocketStream;
+/// @brief View over a contiguous sequence of items with a custom stride between elements.
+template <typename Type>
+struct SC_COMPILER_EXPORT SpanWithStride
+{
+    /// @brief Builds an empty SpanWithStride
+    constexpr SpanWithStride() : data(nullptr), sizeElements(0), strideInBytes(0) {}
 
-    SocketDescriptor socket;
+    /// @brief Builds a SpanWithStride from data, size, and stride
+    /// @param data pointer to the first element
+    /// @param sizeInElements number of elements
+    /// @param strideInBytes stride between elements in bytes
+    constexpr SpanWithStride(void* data, size_t sizeInElements, size_t strideInBytes)
+        : data(data), sizeElements(sizeInElements), strideInBytes(strideInBytes)
+    {}
+
+    [[nodiscard]] constexpr size_t sizeInElements() const { return sizeElements; }
+    [[nodiscard]] constexpr bool   empty() const { return sizeElements == 0; }
+
+    [[nodiscard]] Type& operator[](size_t idx)
+    {
+        return *reinterpret_cast<Type*>(static_cast<char*>(data) + idx * strideInBytes);
+    }
+
+    [[nodiscard]] const Type& operator[](size_t idx) const
+    {
+        return *reinterpret_cast<const Type*>(static_cast<const char*>(data) + idx * strideInBytes);
+    }
+
+  private:
+    void*  data;
+    size_t sizeElements;
+    size_t strideInBytes;
 };
 
 /// @brief A pool of HttpConnection that can be active or inactive
 struct SC_COMPILER_EXPORT HttpConnectionsPool
 {
     /// @brief Initializes the server with memory buffers for connections and headers
-    Result init(Span<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage);
+    Result init(SpanWithStride<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage);
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
     Result close();
@@ -169,10 +196,10 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
     [[nodiscard]] bool deactivate(HttpConnection::ID connectionID);
 
   private:
-    Span<HttpConnection> connections;
-    Span<char>           headersMemory;
+    SpanWithStride<HttpConnection> connections;
 
-    size_t numConnections = 0;
+    Span<char> headersMemory;
+    size_t     numConnections = 0;
 };
 //! @}
 

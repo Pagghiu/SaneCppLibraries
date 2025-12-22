@@ -82,11 +82,11 @@ struct SC::WebServerExampleModel
     StableArray<char> requestsMemory = {MAX_CONNECTIONS * REQUEST_SIZE}; // Memory sliced into buffers for streaming
     StableArray<char> headersMemory  = {MAX_CONNECTIONS * HEADER_SIZE};  // Memory holding request / response headers
 
-    StableArray<HttpConnection>              connections = {MAX_CONNECTIONS};
-    StableArray<AsyncBufferView>             buffers     = {MAX_CONNECTIONS * WRITE_QUEUE}; // WRITE_QUEUE > READ_QUEUE
-    StableArray<ReadableFileStream::Request> readQueue   = {MAX_CONNECTIONS * READ_QUEUE};
-    StableArray<WritableFileStream::Request> writeQueue  = {MAX_CONNECTIONS * WRITE_QUEUE};
-    StableArray<HttpAsyncFileServerStream>   fileStreams = {MAX_CONNECTIONS};
+    using HttpCustomConnection = HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE>; // Connection with fixed read/write queue
+
+    StableArray<HttpCustomConnection>      connections = {MAX_CONNECTIONS};
+    StableArray<AsyncBufferView>           buffers     = {MAX_CONNECTIONS * (WRITE_QUEUE + READ_QUEUE)};
+    StableArray<HttpAsyncFileServerStream> fileStreams = {MAX_CONNECTIONS};
 
     Result start()
     {
@@ -96,8 +96,6 @@ struct SC::WebServerExampleModel
         SC_TRY(headersMemory.resizeWithoutInitializing(numClients * HEADER_SIZE));
         SC_TRY(connections.resize(numClients));
         SC_TRY(buffers.resize(numClients * WRITE_QUEUE));
-        SC_TRY(readQueue.resize(numClients * READ_QUEUE));
-        SC_TRY(writeQueue.resize(numClients * WRITE_QUEUE));
         SC_TRY(fileStreams.resize(numClients));
 
         // Slice requests buffer in equal parts to create re-usable sub-buffers to stream files.
@@ -111,7 +109,7 @@ struct SC::WebServerExampleModel
             SC_TRY(threadPool.create(NUM_FS_THREADS));
         }
         // Initialize and start the http and the file server
-        SC_TRY(httpServer.init(buffersPool, connections, headersMemory, readQueue, writeQueue));
+        SC_TRY(httpServer.init(buffersPool, connections.toSpan(), headersMemory));
         SC_TRY(fileServer.init(buffersPool, threadPool, modelState.directory.view(), fileStreams));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
         SC_TRY(fileServer.start(httpServer));
@@ -130,8 +128,6 @@ struct SC::WebServerExampleModel
         headersMemory.release();       // Skips invoking destructors, just release virtual memory
         connections.clearAndRelease(); // Invokes destructors and releases virtual memory
         buffers.clearAndRelease();     // Invokes destructors and releases virtual memory
-        readQueue.clearAndRelease();   // Invokes destructors and releases virtual memory
-        writeQueue.clearAndRelease();  // Invokes destructors and releases virtual memory
         fileStreams.clearAndRelease(); // Invokes destructors and releases virtual memory
         return Result(true);
     }

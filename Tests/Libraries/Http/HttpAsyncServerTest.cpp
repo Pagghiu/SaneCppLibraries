@@ -42,13 +42,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     Buffer headersMemory;
     SC_TEST_EXPECT(headersMemory.resize(MAX_CONNECTIONS * HEADER_SIZE));
 
-    // 2. Memory to hold all sliced buffers used by the read queues
-    AsyncReadableStream::Request readQueue[MAX_CONNECTIONS * REQUEST_SLICES];
-
-    // 3. Memory to hold all sliced buffers used by the write queues
-    AsyncWritableStream::Request writeQueue[MAX_CONNECTIONS * REQUEST_SLICES];
-
-    // 4. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
+    // 2. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
     AsyncBuffersPool buffersPool = {buffers};
 
@@ -59,12 +53,13 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     SC_TEST_EXPECT(
         AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS * REQUEST_SLICES));
 
-    // 5. Memory to hold all http connections
-    HttpConnection connections[MAX_CONNECTIONS];
+    // 3. Memory to hold all http connections
+    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES>;
+    HttpConnectionType connections[MAX_CONNECTIONS];
 
     // Initialize and start the http server
     HttpAsyncServer httpServer;
-    SC_TEST_EXPECT(httpServer.init(buffersPool, connections, headersMemory.toSpan(), readQueue, writeQueue));
+    SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections), headersMemory.toSpan()));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6152));
 
     struct ServerContext
