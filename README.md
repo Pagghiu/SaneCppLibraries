@@ -27,6 +27,11 @@ NEW: [Sane C++ Libraries - 2nd year blog post!](https://pagghiu.github.io/site/b
 
 Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal [dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html) between them and follow a strict **No Allocations** (*) policy.
 
+Each library is color-coded to signal its status:  
+🟥 Draft (incomplete, WIP, works on basic test cases)  
+🟨 MVP (a minimum set of features has been implemented)  
+🟩 Usable (a reasonable set of useful features has been implemented)  
+
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, tasks)        | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h)                   
@@ -52,11 +57,6 @@ Library                                                                         
 [Testing](https://pagghiu.github.io/SaneCppLibraries/library_testing.html)                                      | 🟨 Simple testing framework used by all of the other libraries            | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTesting.h)                 
 [Threading](https://pagghiu.github.io/SaneCppLibraries/library_threading.html)                                  | 🟩 Atomic, thread, mutex, semaphore, barrier, rw-lock, condition          | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppThreading.h)               
 [Time](https://pagghiu.github.io/SaneCppLibraries/library_time.html)                                            | 🟨 Time handling (relative, absolute, high resolution)                    | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTime.h)                    
-
-Each library is color-coded to signal its status:  
-🟥 Draft (incomplete, WIP, works on basic test cases)  
-🟨 MVP (a minimum set of features has been implemented)  
-🟩 Usable (a reasonable set of useful features has been implemented)  
 
 <picture>
   <img alt="Sane C++ Libraries dependencies" src="https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg">
