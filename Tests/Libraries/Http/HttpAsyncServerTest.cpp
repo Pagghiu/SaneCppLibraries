@@ -44,7 +44,8 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
 
     // 2. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
-    AsyncBuffersPool buffersPool = {buffers};
+    AsyncBuffersPool buffersPool;
+    buffersPool.setBuffers(buffers);
 
     // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
     // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.

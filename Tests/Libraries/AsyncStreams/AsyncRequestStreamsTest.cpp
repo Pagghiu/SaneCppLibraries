@@ -212,7 +212,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
         buffers[idx].setReusable(true);
     }
     AsyncBuffersPool pool;
-    pool.buffers = {buffers, numberOfBuffers};
+    pool.setBuffers(buffers);
 
     ReadableFileStream           readable;
     AsyncReadableStream::Request readableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
@@ -308,7 +308,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     constexpr size_t numberOfBuffers1 = 3; // Need at least 3
     constexpr size_t buffers1Size     = 512;
     AsyncBufferView  buffers1[numberOfBuffers1];
-    buffersPool1.buffers = {buffers1, numberOfBuffers1};
+    buffersPool1.setBuffers(buffers1);
     Buffer buffer1;
     SC_TEST_EXPECT(buffer1.resizeWithoutInitializing(buffers1Size * numberOfBuffers1));
     for (size_t idx = 0; idx < numberOfBuffers1; ++idx)
@@ -361,7 +361,7 @@ void SC::AsyncRequestStreamsTest::fileCompressRemote(AsyncEventLoop& eventLoop, 
     constexpr size_t numberOfBuffers2 = 3; // Need at least 3
     constexpr size_t buffers2Size     = 512;
     AsyncBufferView  buffers2[numberOfBuffers2 + 1];
-    buffersPool2.buffers = {buffers2, numberOfBuffers2};
+    buffersPool2.setBuffers(buffers2);
     Buffer buffer2;
     SC_TEST_EXPECT(buffer2.resizeWithoutInitializing(buffers2Size * numberOfBuffers2));
     for (size_t idx = 0; idx < numberOfBuffers2; ++idx)

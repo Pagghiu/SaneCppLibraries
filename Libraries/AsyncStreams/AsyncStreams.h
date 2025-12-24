@@ -138,9 +138,6 @@ struct SC_COMPILER_EXPORT AsyncBufferView
 /// @note User must fill the AsyncBuffersPool::buffers with a `Span` of AsyncBufferView
 struct SC_COMPILER_EXPORT AsyncBuffersPool
 {
-    /// @brief Span of buffers to be filled in by the user
-    Span<AsyncBufferView> buffers;
-
     /// @brief Increments a buffer reference count
     void refBuffer(AsyncBufferView::ID bufferID);
 
@@ -168,6 +165,16 @@ struct SC_COMPILER_EXPORT AsyncBuffersPool
 
     /// @brief Splits a span of memory in equally sized slices, assigning them to buffers and marking them as reusable
     static Result sliceInEqualParts(Span<AsyncBufferView> buffers, Span<char> memory, size_t numSlices);
+
+    /// @brief Sets memory for the new buffers
+    void setBuffers(Span<AsyncBufferView> newBuffers) { buffers = newBuffers; }
+
+    /// @brief Gets size of buffers held by the pool
+    [[nodiscard]] size_t getNumBuffers() const { return buffers.sizeInElements(); }
+
+  private:
+    /// @brief Span of buffers to be filled in by the user
+    Span<AsyncBufferView> buffers;
 };
 
 /// @brief Async source abstraction emitting data events in caller provided byte buffers.
@@ -217,7 +224,10 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     AsyncBuffersPool& getBuffersPool();
 
     /// @brief Sets the read queue for this readable stream
-    void setReadQueue(Span<Request> requests) { readQueue = requests; }
+    constexpr void setReadQueue(Span<Request> requests) { readQueue = requests; }
+
+    /// @brief Returns the size of read queue
+    [[nodiscard]] size_t getReadQueueSize() const { return readQueue.size(); }
 
     /// @brief Use push from inside AsyncReadableStream::asyncRead function to queue received data
     /// @return `true` if the caller can continue pushing
@@ -294,7 +304,10 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     Result init(AsyncBuffersPool& buffersPool);
 
     /// @brief Sets the write queue for this writable stream
-    void setWriteQueue(Span<Request> requests) { writeQueue = requests; }
+    constexpr void setWriteQueue(Span<Request> requests) { writeQueue = requests; }
+
+    /// @brief Returns the size of write queue
+    [[nodiscard]] size_t getWriteQueueSize() const { return writeQueue.size(); }
 
     /// @brief Writes a buffer (that must be allocated by the AsyncBuffersPool passed in AsyncWritableStream)
     /// When the buffer it will be actually written, AsyncWritableStream::eventWritten will be raised and

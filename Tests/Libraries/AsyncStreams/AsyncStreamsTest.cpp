@@ -141,7 +141,7 @@ void SC::AsyncStreamsTest::readableSyncStream()
         buffers[idx].setReusable(true);
     }
     AsyncBuffersPool pool;
-    pool.buffers = {buffers, numberOfBuffers};
+    pool.setBuffers(buffers);
 
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
@@ -217,7 +217,8 @@ void SC::AsyncStreamsTest::readableAsyncStream()
         buffers[idx] = writableData;
         buffers[idx].setReusable(true);
     }
-    AsyncBuffersPool pool = {buffers};
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
 
     AsyncReadableStream          readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
@@ -300,7 +301,8 @@ void SC::AsyncStreamsTest::writableStream()
 {
     constexpr size_t numberOfBuffers = 2;
     AsyncBufferView  bufferViews[numberOfBuffers]; // Empty BufferViews (to be filled with ReadOnly ones)
-    AsyncBuffersPool pool = {bufferViews};
+    AsyncBuffersPool pool;
+    pool.setBuffers(bufferViews);
 
     AsyncWritableStream          writable;
     AsyncWritableStream::Request writeRequestsQueue[numberOfBuffers + 1]; // Only N-1 slots will be used

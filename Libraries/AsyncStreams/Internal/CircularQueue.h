@@ -10,8 +10,8 @@ namespace SC
 template <typename T>
 struct SC_COMPILER_EXPORT CircularQueue
 {
-    CircularQueue() = default;
-    CircularQueue(Span<T> buffer) : buffer(buffer) {}
+    constexpr CircularQueue() = default;
+    constexpr CircularQueue(Span<T> buffer) : buffer(buffer) {}
 
     [[nodiscard]] size_t size() const { return buffer.sizeInElements(); }
 

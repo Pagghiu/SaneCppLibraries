@@ -53,7 +53,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     // EXTRA_BUFFERS is used to accommodate some empty slots for external bufs (Strings or other
     // pieces of memory allocated, owned and pushed by the user to the write queue)
     AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
-    AsyncBuffersPool buffersPool = {buffers};
+    AsyncBuffersPool buffersPool;
+    buffersPool.setBuffers(buffers);
 
     // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
     // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
