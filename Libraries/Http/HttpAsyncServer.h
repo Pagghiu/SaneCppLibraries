@@ -26,14 +26,17 @@ struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
 };
 
 /// @brief Adds compile-time configurable read and write queues to HttpAsyncConnectionBase
-template <int ReadQueue, int WriteQueue>
+template <int ReadQueue, int WriteQueue, int HeaderBytes>
 struct SC_COMPILER_EXPORT HttpAsyncConnection : public HttpAsyncConnectionBase
 {
-    ReadableFileStream::Request readQueue[ReadQueue];
-    WritableFileStream::Request writeQueue[WriteQueue];
+    AsyncReadableStream::Request readQueue[ReadQueue];
+    AsyncWritableStream::Request writeQueue[WriteQueue];
+
+    char headerStorage[HeaderBytes];
 
     HttpAsyncConnection()
     {
+        HttpAsyncConnectionBase::headerMemory = headerStorage;
         readableSocketStream.setReadQueue(readQueue);
         writableSocketStream.setWriteQueue(writeQueue);
     }
@@ -56,9 +59,9 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     /// @brief Initializes the async server with all needed memory buffers
     template <typename T,
               typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpAsyncConnectionBase, T>::value>::type>
-    Result init(AsyncBuffersPool& pool, Span<T> clients, Span<char> headersMemory)
+    Result init(AsyncBuffersPool& pool, Span<T> clients)
     {
-        return initInternal(pool, {clients.data(), clients.sizeInElements(), sizeof(T)}, headersMemory);
+        return initInternal(pool, {clients.data(), clients.sizeInElements(), sizeof(T)});
     }
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
@@ -96,7 +99,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     void onStreamReceive(HttpAsyncConnectionBase& client, AsyncBufferView::ID bufferID);
 
     Result waitForStopToFinish();
-    Result initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpConnection> connections, Span<char> headersMemory);
+    Result initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpAsyncConnectionBase> connections);
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

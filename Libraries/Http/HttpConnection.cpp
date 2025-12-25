@@ -172,19 +172,26 @@ void HttpResponse::reset() { headersSent = false; }
 //-------------------------------------------------------------------------------------------------------
 // HttpConnectionsPool
 //-------------------------------------------------------------------------------------------------------
-Result HttpConnectionsPool::init(SpanWithStride<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage)
+Result HttpConnectionsPool::init(SpanWithStride<HttpConnection> connectionsStorage)
 {
     SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::init - numConnections != 0");
-    connections   = connectionsStorage;
-    headersMemory = headersMemoryStorage;
+    for (size_t idx = 0; idx < connectionsStorage.sizeInElements(); ++idx)
+    {
+        HttpConnection& connection = connectionsStorage[idx];
+        if (connection.headerMemory.sizeInBytes() == 0)
+        {
+            return Result::Error("HttpConnection::headerMemory is empty");
+        }
+    }
+
+    connections = connectionsStorage;
     return Result(true);
 }
 
 Result HttpConnectionsPool::close()
 {
     SC_TRY_MSG(numConnections == 0, "HttpConnectionsPool::close - numConnections != 0");
-    connections   = {};
-    headersMemory = {};
+    connections = {};
     return Result(true);
 }
 
@@ -199,10 +206,8 @@ bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
             connectionID.index      = idx;
             connection.connectionID = connectionID;
 
-            const size_t headerBufferSize = headersMemory.sizeInBytes() / connections.sizeInElements();
-
-            connection.request.availableHeader = {headersMemory.data(), headerBufferSize};
-            connection.request.readHeaders     = {headersMemory.data(), 0};
+            connection.request.availableHeader = connection.headerMemory;
+            (void)connection.request.availableHeader.sliceStartLength(0, 0, connection.request.readHeaders);
             numConnections++;
             return true;
         }

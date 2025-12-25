@@ -7,11 +7,22 @@
 namespace SC
 {
 
-Result HttpAsyncServer::initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpConnection> connectionsSpan,
-                                     Span<char> headersMemory)
+Result HttpAsyncServer::initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
 {
-    // TODO: Add some validation of minimum sizes for the queues and the buffers
-    SC_TRY(connections.init(connectionsSpan, headersMemory));
+    for (size_t idx = 0; idx < connectionsSpan.sizeInElements(); ++idx)
+    {
+        HttpAsyncConnectionBase& connection = connectionsSpan[idx];
+        if (connection.readableSocketStream.getReadQueueSize() == 0)
+        {
+            return Result::Error("HttpAsyncConnectionBase::readableSocketStream::readQueue is empty");
+        }
+        if (connection.writableSocketStream.getWriteQueueSize() == 0)
+        {
+            return Result::Error("HttpAsyncConnectionBase::readableSocketStream::writeQueue is empty");
+        }
+    }
+    SC_TRY_MSG(pool.getNumBuffers() > 0, "HttpAsyncServer - AsyncBuffersPool is empty");
+    SC_TRY(connections.init(connectionsSpan.castTo<HttpConnection>()));
     buffersPool = &pool;
     return Result(true);
 }

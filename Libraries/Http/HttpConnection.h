@@ -129,6 +129,8 @@ struct SC_COMPILER_EXPORT HttpConnection
 
     State state = State::Inactive;
     ID    connectionID;
+
+    Span<char> headerMemory;
 };
 
 /// @brief View over a contiguous sequence of items with a custom stride between elements.
@@ -149,14 +151,20 @@ struct SC_COMPILER_EXPORT SpanWithStride
     [[nodiscard]] constexpr size_t sizeInElements() const { return sizeElements; }
     [[nodiscard]] constexpr bool   empty() const { return sizeElements == 0; }
 
+    template <typename U>
+    SpanWithStride<U> castTo()
+    {
+        return {static_cast<U*>(reinterpret_cast<Type*>(data)), sizeElements, strideInBytes};
+    }
+
     [[nodiscard]] Type& operator[](size_t idx)
     {
-        return *reinterpret_cast<Type*>(static_cast<char*>(data) + idx * strideInBytes);
+        return *reinterpret_cast<Type*>(reinterpret_cast<char*>(data) + idx * strideInBytes);
     }
 
     [[nodiscard]] const Type& operator[](size_t idx) const
     {
-        return *reinterpret_cast<const Type*>(static_cast<const char*>(data) + idx * strideInBytes);
+        return *reinterpret_cast<const Type*>(reinterpret_cast<const char*>(data) + idx * strideInBytes);
     }
 
   private:
@@ -169,7 +177,7 @@ struct SC_COMPILER_EXPORT SpanWithStride
 struct SC_COMPILER_EXPORT HttpConnectionsPool
 {
     /// @brief Initializes the server with memory buffers for connections and headers
-    Result init(SpanWithStride<HttpConnection> connectionsStorage, Span<char> headersMemoryStorage);
+    Result init(SpanWithStride<HttpConnection> connectionsStorage);
 
     /// @brief Closes the server, removing references to the memory buffers passed during init
     Result close();
@@ -198,8 +206,7 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
   private:
     SpanWithStride<HttpConnection> connections;
 
-    Span<char> headersMemory;
-    size_t     numConnections = 0;
+    size_t numConnections = 0;
 };
 //! @}
 

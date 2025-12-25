@@ -36,8 +36,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     //! [HttpFileServerSnippet]
     constexpr int MAX_CONNECTIONS = 16;       // Max number of concurrent http connections
     constexpr int REQUEST_SLICES  = 2;        // Number of slices of the request buffer for each connection
-    constexpr int REQUEST_SIZE    = 1024;     // How many bytes are allocated to stream data for each connection
-    constexpr int HEADER_SIZE     = 1024 * 8; // How many bytes are dedicated to hold request and response headers
+    constexpr int REQUEST_SIZE    = 1 * 1024; // How many bytes are allocated to stream data for each connection
+    constexpr int HEADER_SIZE     = 8 * 1024; // How many bytes are dedicated to hold request and response headers
     constexpr int EXTRA_BUFFERS   = 1;        // Extra write slice needed to write headers buffer
     constexpr int NUM_FS_THREADS  = 4;        // Number of threads in the thread pool for async file stream operations
 
@@ -45,11 +45,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     // Alternatively it's also possible to reserve memory for some insane large amount of clients (using VirtualMemory
     // class for example) and just dynamically commit as much memory as one needs to handle a given number of clients
 
-    // 1. Memory for all http headers of all connections
-    Buffer headersMemory;
-    SC_TEST_EXPECT(headersMemory.resize(MAX_CONNECTIONS * HEADER_SIZE));
-
-    // 2. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
+    // 1. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
     // EXTRA_BUFFERS is used to accommodate some empty slots for external bufs (Strings or other
     // pieces of memory allocated, owned and pushed by the user to the write queue)
     AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_BUFFERS)];
@@ -63,11 +59,11 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     SC_TEST_EXPECT(
         AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS * REQUEST_SLICES));
 
-    // 3. Memory to hold all http connections
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES + EXTRA_BUFFERS>;
+    // 2. Memory holding all http connections, with fixed read / write queues and request / response buffers
+    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES + EXTRA_BUFFERS, HEADER_SIZE>;
     HttpConnectionType connections[MAX_CONNECTIONS];
 
-    // 4. Memory used by the async streams handled by the async file server
+    // 3. Memory used by the async streams handled by the async file server
     HttpAsyncFileServer::StreamQueue<REQUEST_SLICES> streams[MAX_CONNECTIONS];
 
     // Initialize and start the http and the file server
@@ -79,7 +75,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     {
         SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
     }
-    SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections), headersMemory.toSpan()));
+    SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections)));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
     SC_TEST_EXPECT(fileServer.init(buffersPool, threadPool, eventLoop, webServerFolder));
     httpServer.onRequest = [&](HttpConnection& connection)

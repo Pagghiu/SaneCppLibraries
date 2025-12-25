@@ -76,33 +76,30 @@ struct SC::WebServerExampleModel
     static constexpr size_t READ_QUEUE      = 2;          // Number of read queue buffers for each connection
     static constexpr size_t WRITE_QUEUE     = 3;          // Number of write queue buffers for each connection
     static constexpr size_t REQUEST_SIZE    = 512 * 1024; // Number of bytes used to stream data for each connection
-    static constexpr size_t HEADER_SIZE     = 1024 * 8;   // Number of bytes used to hold request and response headers
+    static constexpr size_t HEADER_SIZE     = 8 * 1024;   // Number of bytes used to hold request and response headers
     static constexpr size_t NUM_FS_THREADS  = 4;          // Number of threads for async file stream operations
 
-    StableArray<char> requestsMemory = {MAX_CONNECTIONS * REQUEST_SIZE}; // Memory sliced into buffers for streaming
-    StableArray<char> headersMemory  = {MAX_CONNECTIONS * HEADER_SIZE};  // Memory holding request / response headers
-
-    // In this simple setup we just need a single file stream for each connection, with fixed read / write queues
-    struct HttpCustomClient : HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE>
+    // In this simple setup we have a single file stream, with fixed read / write queues and a fixed header buffer
+    struct HttpCustomClient : HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE, HEADER_SIZE>
     {
         HttpAsyncFileServer::StreamQueue<READ_QUEUE> fileStream; // Store a file stream inline with the client
     };
 
-    StableArray<HttpCustomClient> clients = {MAX_CONNECTIONS};
-    StableArray<AsyncBufferView>  buffers = {MAX_CONNECTIONS * (WRITE_QUEUE + READ_QUEUE)};
+    StableArray<HttpCustomClient> clients  = {MAX_CONNECTIONS};
+    StableArray<AsyncBufferView>  buffers  = {MAX_CONNECTIONS * (WRITE_QUEUE + READ_QUEUE)};
+    StableArray<char>             requests = {MAX_CONNECTIONS * REQUEST_SIZE};
 
     Result start()
     {
         const size_t numClients = static_cast<size_t>(modelState.maxClients);
 
-        SC_TRY(requestsMemory.resizeWithoutInitializing(numClients * REQUEST_SIZE));
-        SC_TRY(headersMemory.resizeWithoutInitializing(numClients * HEADER_SIZE));
+        SC_TRY(requests.resizeWithoutInitializing(numClients * REQUEST_SIZE));
         SC_TRY(clients.resize(numClients));
         SC_TRY(buffers.resize(numClients * WRITE_QUEUE));
 
         // Slice requests buffer in equal parts to create re-usable sub-buffers to stream files.
         // It's not required to slice the buffer in equal parts, it's just an arbitrary choice.
-        SC_TRY(AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory, numClients * READ_QUEUE));
+        SC_TRY(AsyncBuffersPool::sliceInEqualParts(buffers, requests, numClients * READ_QUEUE));
         buffersPool.setBuffers(buffers);
 
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
@@ -111,7 +108,7 @@ struct SC::WebServerExampleModel
             SC_TRY(threadPool.create(NUM_FS_THREADS));
         }
         // Initialize and start the http server
-        SC_TRY(httpServer.init(buffersPool, clients.toSpan(), headersMemory));
+        SC_TRY(httpServer.init(buffersPool, clients.toSpan()));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
 
         // Init the file server and setup the httpServer onRequest to serve files
@@ -131,8 +128,7 @@ struct SC::WebServerExampleModel
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
 
-        requestsMemory.release();  // Skips invoking destructors, just release virtual memory
-        headersMemory.release();   // Skips invoking destructors, just release virtual memory
+        requests.release();        // Skips invoking destructors, just release virtual memory
         clients.clearAndRelease(); // Invokes destructors and releases virtual memory
         buffers.clearAndRelease(); // Invokes destructors and releases virtual memory
         return Result(true);
