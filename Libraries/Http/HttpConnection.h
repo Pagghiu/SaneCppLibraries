@@ -112,11 +112,17 @@ struct SC_COMPILER_EXPORT HttpConnection
     /// @brief Prepare this client for re-use, marking it as Inactive
     void reset();
 
+    /// @brief Sets memory for the header
+    void setHeaderMemory(Span<char> memory) { headerMemory = memory; }
+
     /// @brief The ID used to find this client in HttpConnectionsPool
     ID getConnectionID() const { return connectionID; }
 
     HttpRequest  request;
     HttpResponse response;
+
+    AsyncBuffersPool buffersPool;
+    AsyncPipeline    pipeline;
 
   protected:
     enum class State
@@ -188,6 +194,9 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
     /// @brief Returns the total number of connections (active + inactive)
     [[nodiscard]] size_t getNumTotalConnections() const { return connections.sizeInElements(); }
 
+    /// @brief Returns only the number of active connections
+    [[nodiscard]] size_t getHighestActiveConnection() const { return highestActiveConnection; }
+
     /// @brief Returns a connection by ID
     [[nodiscard]] HttpConnection& getConnection(HttpConnection::ID connectionID)
     {
@@ -206,7 +215,8 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
   private:
     SpanWithStride<HttpConnection> connections;
 
-    size_t numConnections = 0;
+    size_t numConnections          = 0;
+    size_t highestActiveConnection = 0;
 };
 //! @}
 

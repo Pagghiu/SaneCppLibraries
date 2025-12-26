@@ -206,6 +206,10 @@ bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
             connectionID.index      = idx;
             connection.connectionID = connectionID;
 
+            if (idx > highestActiveConnection)
+            {
+                highestActiveConnection = idx;
+            }
             connection.request.availableHeader = connection.headerMemory;
             (void)connection.request.availableHeader.sliceStartLength(0, 0, connection.request.readHeaders);
             numConnections++;
@@ -225,6 +229,17 @@ bool HttpConnectionsPool::deactivate(HttpConnection::ID connectionID)
     {
         connections[connectionID.index].reset();
         numConnections--;
+        if (connectionID.index == highestActiveConnection)
+        {
+            while (highestActiveConnection > 0)
+            {
+                if (connections[highestActiveConnection].state == HttpConnection::State::Active)
+                {
+                    break;
+                }
+                highestActiveConnection--;
+            }
+        }
         return true;
     }
 }

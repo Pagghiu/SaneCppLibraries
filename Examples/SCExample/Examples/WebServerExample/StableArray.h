@@ -42,23 +42,19 @@ struct StableArray
     }
 
     /// @brief Clears the array calling destructors of each element and releases virtual memory.
-    void clearAndRelease()
+    [[nodiscard]] bool clearAndShrinkToFit()
     {
         clear();
-        release();
+        return shrinkToFit();
     }
+
+    /// @brief De-commits unused-memory, while still keeping the original virtual reservation
+    [[nodiscard]] bool shrinkToFit() { return virtualMemory.shrink(sizeElements * sizeof(T)); }
 
     /// @brief Resizes the stable array without initializing or calling destructors.
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
     {
-        if (newSize < sizeElements)
-        {
-            SC_TRY(virtualMemory.shrink(newSize * sizeof(T)));
-        }
-        else if (newSize > sizeElements)
-        {
-            SC_TRY(virtualMemory.commit(newSize * sizeof(T)));
-        }
+        SC_TRY(virtualMemory.commit(newSize * sizeof(T)));
         sizeElements = newSize;
         return true;
     }

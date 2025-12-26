@@ -75,11 +75,11 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
         SC_TRY(stream.readableFileStream.init(*buffersPool, *eventLoop, fd));
-        SC_TRY(stream.readableFileStream.request.executeOn(stream.readStreamTask, *threadPool));
+        SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);
-        stream.pipeline.source   = &stream.readableFileStream;
-        stream.pipeline.sinks[0] = &connection.response.getWritableStream();
+        connection.pipeline.source   = &stream.readableFileStream;
+        connection.pipeline.sinks[0] = &connection.response.getWritableStream();
 
         SC_TRY(connection.response.startResponse(200));
         char buffer[20];
@@ -94,8 +94,8 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
 
         SC_TRY(connection.response.sendHeaders());
 
-        SC_TRY(stream.pipeline.pipe());
-        SC_TRY(stream.pipeline.start());
+        SC_TRY(connection.pipeline.pipe());
+        SC_TRY(connection.pipeline.start());
     }
     else
     {

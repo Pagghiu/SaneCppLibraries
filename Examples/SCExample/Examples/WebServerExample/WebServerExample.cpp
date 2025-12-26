@@ -128,9 +128,9 @@ struct SC::WebServerExampleModel
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
 
-        requests.release();        // Skips invoking destructors, just release virtual memory
-        clients.clearAndRelease(); // Invokes destructors and releases virtual memory
-        buffers.clearAndRelease(); // Invokes destructors and releases virtual memory
+        SC_TRY(requests.shrinkToFit());        // Skips invoking destructors, just de-commits virtual memory
+        SC_TRY(clients.clearAndShrinkToFit()); // Invokes destructors and de-commits virtual memory
+        SC_TRY(buffers.clearAndShrinkToFit()); // Invokes destructors and de-commits virtual memory
         return Result(true);
     }
 
@@ -173,6 +173,9 @@ struct SC::WebServerExampleView
         SC_TRY(InputText("Interface", buffer, model.modelState.interface, viewState.needsRestart));
         SC_TRY(InputText("Directory", buffer, model.modelState.directory, viewState.needsRestart));
         viewState.needsRestart |= ImGui::InputInt("Port", &model.modelState.port);
+        ImGui::Text("Total Connections : %zu", model.httpServer.getConnections().getNumTotalConnections());
+        ImGui::Text("Active Connections: %zu", model.httpServer.getConnections().getNumActiveConnections());
+        ImGui::Text("Highest Active Idx: %zu", model.httpServer.getConnections().getHighestActiveConnection());
 
         if (not model.httpServer.isStarted())
         {

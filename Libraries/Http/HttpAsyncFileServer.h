@@ -16,9 +16,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
     struct SC_COMPILER_EXPORT Stream
     {
-        AsyncPipeline      pipeline;
         ReadableFileStream readableFileStream;
-        AsyncTaskSequence  readStreamTask;
+        AsyncTaskSequence  readableFileStreamTask;
     };
 
     template <int RequestsSize>
