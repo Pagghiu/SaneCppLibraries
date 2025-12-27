@@ -28,8 +28,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     };
 
     /// @brief Initialize the web server on the given file system directory to serve
-    Result init(AsyncBuffersPool& buffersPool, ThreadPool& threadPool, AsyncEventLoop& loop,
-                StringSpan directoryToServe);
+    Result init(ThreadPool& threadPool, AsyncEventLoop& loop, StringSpan directoryToServe);
 
     /// @brief Removes any reference to the arguments passed during init
     Result close();
@@ -41,9 +40,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
   private:
     StringPath directory;
 
-    AsyncEventLoop*   eventLoop   = nullptr;
-    AsyncBuffersPool* buffersPool = nullptr;
-    ThreadPool*       threadPool  = nullptr;
+    AsyncEventLoop* eventLoop  = nullptr;
+    ThreadPool*     threadPool = nullptr;
     struct Internal;
 };
 

@@ -64,8 +64,7 @@ struct SC::WebServerExampleModel
 {
     WebServerExampleModelState modelState;
 
-    AsyncEventLoop*  eventLoop = nullptr;
-    AsyncBuffersPool buffersPool;
+    AsyncEventLoop* eventLoop = nullptr;
 
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
@@ -80,39 +79,27 @@ struct SC::WebServerExampleModel
     static constexpr size_t NUM_FS_THREADS  = 4;          // Number of threads for async file stream operations
 
     // In this simple setup we have a single file stream, with fixed read / write queues and a fixed header buffer
-    struct HttpCustomClient : HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE, HEADER_SIZE>
+    struct HttpCustomClient : HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE, HEADER_SIZE, REQUEST_SIZE>
     {
         HttpAsyncFileServer::StreamQueue<READ_QUEUE> fileStream; // Store a file stream inline with the client
     };
 
-    StableArray<HttpCustomClient> clients  = {MAX_CONNECTIONS};
-    StableArray<AsyncBufferView>  buffers  = {MAX_CONNECTIONS * (WRITE_QUEUE + READ_QUEUE)};
-    StableArray<char>             requests = {MAX_CONNECTIONS * REQUEST_SIZE};
+    StableArray<HttpCustomClient> clients = {MAX_CONNECTIONS};
 
     Result start()
     {
-        const size_t numClients = static_cast<size_t>(modelState.maxClients);
-
-        SC_TRY(requests.resizeWithoutInitializing(numClients * REQUEST_SIZE));
-        SC_TRY(clients.resize(numClients));
-        SC_TRY(buffers.resize(numClients * WRITE_QUEUE));
-
-        // Slice requests buffer in equal parts to create re-usable sub-buffers to stream files.
-        // It's not required to slice the buffer in equal parts, it's just an arbitrary choice.
-        SC_TRY(AsyncBuffersPool::sliceInEqualParts(buffers, requests, numClients * READ_QUEUE));
-        buffersPool.setBuffers(buffers);
+        // This is the only only allocation of whole http web server (as all buffers have been fixed per connection)
+        SC_TRY(clients.resize(static_cast<size_t>(modelState.maxClients)));
 
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
             SC_TRY(threadPool.create(NUM_FS_THREADS));
         }
-        // Initialize and start the http server
-        SC_TRY(httpServer.init(buffersPool, clients.toSpan()));
+        // Initialize and start http and file servers, delegating requests to the latter in order to serve files
+        SC_TRY(httpServer.init(clients.toSpan()));
         SC_TRY(httpServer.start(*eventLoop, modelState.interface.view(), static_cast<uint16_t>(modelState.port)));
-
-        // Init the file server and setup the httpServer onRequest to serve files
-        SC_TRY(fileServer.init(buffersPool, threadPool, *eventLoop, modelState.directory.view()));
+        SC_TRY(fileServer.init(threadPool, *eventLoop, modelState.directory.view()));
         httpServer.onRequest = [&](HttpConnection& connection)
         {
             HttpAsyncFileServer::Stream& stream = clients.toSpan()[connection.getConnectionID().getIndex()].fileStream;
@@ -127,10 +114,7 @@ struct SC::WebServerExampleModel
         SC_TRY(fileServer.close());
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
-
-        SC_TRY(requests.shrinkToFit());        // Skips invoking destructors, just de-commits virtual memory
         SC_TRY(clients.clearAndShrinkToFit()); // Invokes destructors and de-commits virtual memory
-        SC_TRY(buffers.clearAndShrinkToFit()); // Invokes destructors and de-commits virtual memory
         return Result(true);
     }
 

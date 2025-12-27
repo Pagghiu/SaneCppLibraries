@@ -7,7 +7,7 @@
 namespace SC
 {
 
-Result HttpAsyncServer::initInternal(AsyncBuffersPool& pool, SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
+Result HttpAsyncServer::initInternal(SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
 {
     for (size_t idx = 0; idx < connectionsSpan.sizeInElements(); ++idx)
     {
@@ -20,16 +20,15 @@ Result HttpAsyncServer::initInternal(AsyncBuffersPool& pool, SpanWithStride<Http
         {
             return Result::Error("HttpAsyncConnectionBase::readableSocketStream::writeQueue is empty");
         }
+        SC_TRY_MSG(connection.buffersPool.getNumBuffers() > 0, "HttpAsyncServer - AsyncBuffersPool is empty");
     }
-    SC_TRY_MSG(pool.getNumBuffers() > 0, "HttpAsyncServer - AsyncBuffersPool is empty");
     SC_TRY(connections.init(connectionsSpan.castTo<HttpConnection>()));
-    buffersPool = &pool;
     return Result(true);
 }
 
 Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
-    SC_TRY_MSG(buffersPool != nullptr, "HttpAsyncServer::start - init not called");
+    SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::start - init not called");
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
     eventLoop = &loop;
@@ -49,7 +48,6 @@ Result HttpAsyncServer::close()
 {
     SC_TRY(waitForStopToFinish());
     SC_TRY(connections.close());
-    buffersPool = nullptr;
     return Result(true);
 }
 
@@ -96,6 +94,7 @@ Result HttpAsyncServer::waitForStopToFinish()
                 SC_TRY(eventLoop->runNoWait());
                 checkAgainAllClients = true;
             }
+            SC_ASSERT_RELEASE(client.pipeline.unpipe());
         }
     } while (checkAgainAllClients);
     started = false;
@@ -115,9 +114,10 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     SC_ASSERT_RELEASE(connections.activateNew(idx));
 
     HttpAsyncConnectionBase& client = static_cast<HttpAsyncConnectionBase&>(connections.getConnection(idx));
-    client.socket                   = move(acceptedClient);
-    SC_TRUST_RESULT(client.readableSocketStream.init(*buffersPool, *eventLoop, client.socket));
-    SC_TRUST_RESULT(client.writableSocketStream.init(*buffersPool, *eventLoop, client.socket));
+
+    client.socket = move(acceptedClient);
+    SC_TRUST_RESULT(client.readableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
+    SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
 
     auto onData = [this, idx](AsyncBufferView::ID bufferID)
     { onStreamReceive(static_cast<HttpAsyncConnectionBase&>(connections.getConnection(idx)), bufferID); };
@@ -133,7 +133,7 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBufferView::ID bufferID)
 {
     Span<char> readData;
-    SC_ASSERT_RELEASE(buffersPool->getWritableData(bufferID, readData));
+    SC_ASSERT_RELEASE(client.buffersPool.getWritableData(bufferID, readData));
 
     if (not client.request.writeHeaders(maxHeaderSize, readData))
     {

@@ -32,31 +32,17 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     constexpr int REQUEST_SLICES  = 2;        // Number of slices of the request buffer for each connection
     constexpr int REQUEST_SIZE    = 1 * 1024; // How many bytes are allocated to stream data for each connection
     constexpr int HEADER_SIZE     = 8 * 1024; // How many bytes are dedicated to hold request and response headers
-    constexpr int EXTRA_SLICES    = 2;        // Extra write slices needed to write headers buffer and user string
 
-    // Note: All fixed arrays could be created dynamically at startup time with new / malloc.
-    // Alternatively it's also possible to reserve memory for some insane large amount of clients (using VirtualMemory
-    // class for example) and just dynamically commit as much memory as one needs to handle a given number of clients
+    // The size of the header and request memory, and length of read/write queues are fixed here, but user can
+    // set any arbitrary size for such queues doing the same being done in HttpAsyncConnection constructor.
+    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
 
-    // 1. Memory to hold all pre-registered / re-usable buffers used by the read and write queues.
-    AsyncBufferView  buffers[MAX_CONNECTIONS * (REQUEST_SLICES + EXTRA_SLICES)];
-    AsyncBuffersPool buffersPool;
-    buffersPool.setBuffers(buffers);
-
-    // Slice a buffer in equal parts to create re-usable slices of memory when streaming files.
-    // It's not required to slice the buffer in equal parts, that's just an arbitrary choice.
-    Buffer requestsMemory;
-    SC_TEST_EXPECT(requestsMemory.resize(MAX_CONNECTIONS * REQUEST_SIZE));
-    SC_TEST_EXPECT(
-        AsyncBuffersPool::sliceInEqualParts(buffers, requestsMemory.toSpan(), MAX_CONNECTIONS * REQUEST_SLICES));
-
-    // 2. Memory to hold all http connections
-    using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE>;
+    // 1. Memory to hold all http connections (single array for simplicity).
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     // Initialize and start the http server
     HttpAsyncServer httpServer;
-    SC_TEST_EXPECT(httpServer.init(buffersPool, Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6152));
 
     struct ServerContext

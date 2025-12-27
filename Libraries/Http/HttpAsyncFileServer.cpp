@@ -26,13 +26,11 @@ struct HttpAsyncFileServer::Internal
     static StringSpan getContentType(const StringSpan extension);
 };
 
-Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, AsyncEventLoop& loop,
-                                 StringSpan directoryToServe)
+Result HttpAsyncFileServer::init(ThreadPool& pool, AsyncEventLoop& loop, StringSpan directoryToServe)
 {
     SC_TRY_MSG(eventLoop == nullptr, "HttpAsyncFileServer::init - already inited")
-    eventLoop   = &loop;
-    buffersPool = &asyncPool;
-    threadPool  = &pool;
+    eventLoop  = &loop;
+    threadPool = &pool;
 
     SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
     SC_TRY(directory.assign(directoryToServe));
@@ -41,10 +39,9 @@ Result HttpAsyncFileServer::init(AsyncBuffersPool& asyncPool, ThreadPool& pool, 
 
 Result HttpAsyncFileServer::close()
 {
-    eventLoop   = nullptr;
-    buffersPool = nullptr;
-    threadPool  = nullptr;
-    directory   = {};
+    eventLoop  = nullptr;
+    threadPool = nullptr;
+    directory  = {};
     return Result(true);
 }
 
@@ -74,7 +71,7 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
         SC_TRY(path.append(filePath));
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
-        SC_TRY(stream.readableFileStream.init(*buffersPool, *eventLoop, fd));
+        SC_TRY(stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd));
         SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);
