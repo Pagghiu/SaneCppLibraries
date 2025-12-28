@@ -55,6 +55,7 @@ struct SC::WebServerExampleViewState
     Buffer inputTextBuffer;
 
     bool needsRestart = false;
+    bool needsResize  = false;
 };
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleViewState)
 SC_REFLECT_STRUCT_FIELD(0, needsRestart)
@@ -108,6 +109,15 @@ struct SC::WebServerExampleModel
         return Result(true);
     }
 
+    Result resize()
+    {
+        const size_t minSize =
+            max(static_cast<size_t>(modelState.maxClients), httpServer.getConnections().getHighestActiveConnection());
+        SC_TRY(clients.resize(minSize));
+        SC_TRY(httpServer.resize(clients.toSpan()));
+        return Result(true);
+    }
+
     Result stop()
     {
         SC_TRY(httpServer.stop());
@@ -156,7 +166,10 @@ struct SC::WebServerExampleView
         auto& buffer = viewState.inputTextBuffer;
         SC_TRY(InputText("Interface", buffer, model.modelState.interface, viewState.needsRestart));
         SC_TRY(InputText("Directory", buffer, model.modelState.directory, viewState.needsRestart));
+        ImGui::PushItemWidth(100);
         viewState.needsRestart |= ImGui::InputInt("Port", &model.modelState.port);
+        viewState.needsResize |= ImGui::InputInt("Max Clients", &model.modelState.maxClients);
+        ImGui::PopItemWidth();
         ImGui::Text("Total Connections : %zu", model.httpServer.getConnections().getNumTotalConnections());
         ImGui::Text("Active Connections: %zu", model.httpServer.getConnections().getNumActiveConnections());
         ImGui::Text("Highest Active Idx: %zu", model.httpServer.getConnections().getHighestActiveConnection());
@@ -166,7 +179,17 @@ struct SC::WebServerExampleView
             viewState.needsRestart = false;
         }
 
-        if (viewState.needsRestart)
+        if (viewState.needsResize)
+        {
+            ImGui::BeginDisabled(not model.canBeStarted());
+            if (ImGui::Button("Resize"))
+            {
+                (void)model.resize();
+                viewState.needsResize = false;
+            }
+            ImGui::EndDisabled();
+        }
+        else if (viewState.needsRestart)
         {
             ImGui::BeginDisabled(not model.canBeStarted());
             if (ImGui::Button("Apply Changes"))

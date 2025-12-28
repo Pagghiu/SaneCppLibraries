@@ -26,6 +26,14 @@ Result HttpAsyncServer::initInternal(SpanWithStride<HttpAsyncConnectionBase> con
     return Result(true);
 }
 
+Result HttpAsyncServer::resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
+{
+    SC_TRY_MSG(&connectionsSpan[0] == &connections.getConnectionAt(0), "HttpAsyncServer::resize changed address");
+    SC_TRY_MSG(connectionsSpan.sizeInElements() > connections.getHighestActiveConnection(),
+               "HttpAsyncServer::resize connection in use");
+    return initInternal(connectionsSpan);
+}
+
 Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
     SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::start - init not called");

@@ -79,6 +79,13 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
         return initInternal({clients.data(), clients.sizeInElements(), sizeof(T)});
     }
 
+    template <typename T,
+              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpAsyncConnectionBase, T>::value>::type>
+    Result resize(Span<T> clients)
+    {
+        return resizeInternal({clients.data(), clients.sizeInElements(), sizeof(T)});
+    }
+
     /// @brief Closes the server, removing references to the memory buffers passed during init
     /// @note This call will wait until all async operations will be finished before returning
     Result close();
@@ -116,6 +123,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 
     Result waitForStopToFinish();
     Result initInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
+    Result resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

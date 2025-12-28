@@ -38,6 +38,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     using HttpConnectionType = HttpAsyncConnection<REQUEST_SLICES, REQUEST_SLICES, HEADER_SIZE, REQUEST_SIZE>;
 
     // 1. Memory to hold all http connections (single array for simplicity).
+    // WebServerExample (SCExample) shows how to leverage virtual memory, to handle dynamic number of clients
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     // Initialize and start the http server
