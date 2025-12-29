@@ -20,6 +20,26 @@ struct IsBaseOf
 /// @brief Contains fields used by HttpAsyncServer for each connection
 struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
 {
+    struct Configuration
+    {
+        size_t readQueueSize     = 3;
+        size_t writeQueueSize    = 3;
+        size_t buffersQueueSize  = 6;
+        size_t headerBytesLength = 8 * 1024;
+        size_t streamBytesLength = 512 * 1024;
+    };
+
+    struct Memory
+    {
+        Span<AsyncReadableStream::Request> allReadQueue;
+        Span<AsyncWritableStream::Request> allWriteQueue;
+        Span<AsyncBufferView>              allBuffers;
+        Span<char>                         allHeaders;
+        Span<char>                         allStreams;
+
+        Result assignTo(HttpAsyncConnectionBase::Configuration  conf,
+                        SpanWithStride<HttpAsyncConnectionBase> connections);
+    };
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
     SocketDescriptor     socket;
@@ -31,11 +51,10 @@ struct SC_COMPILER_EXPORT HttpAsyncConnection : public HttpAsyncConnectionBase
 {
     AsyncReadableStream::Request readQueue[ReadQueue];
     AsyncWritableStream::Request writeQueue[WriteQueue];
+    AsyncBufferView              buffers[ReadQueue + WriteQueue];
 
     char headerStorage[HeaderBytes];
     char streamStorage[StreamBytes];
-
-    AsyncBufferView buffers[ReadQueue + WriteQueue];
 
     constexpr HttpAsyncConnection()
     {

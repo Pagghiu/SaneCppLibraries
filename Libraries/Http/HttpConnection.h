@@ -154,6 +154,11 @@ struct SC_COMPILER_EXPORT SpanWithStride
         : data(data), sizeElements(sizeInElements), strideInBytes(strideInBytes)
     {}
 
+    template <typename U>
+    constexpr SpanWithStride(Span<U> span)
+        : data(span.data()), sizeElements(span.sizeInElements()), strideInBytes(sizeof(U))
+    {}
+
     [[nodiscard]] constexpr size_t sizeInElements() const { return sizeElements; }
     [[nodiscard]] constexpr bool   empty() const { return sizeElements == 0; }
 

@@ -189,4 +189,44 @@ void HttpAsyncServer::closeAsync(HttpAsyncConnectionBase& client)
     }
 }
 
+Result HttpAsyncConnectionBase::Memory::assignTo(HttpAsyncConnectionBase::Configuration  conf,
+                                                 SpanWithStride<HttpAsyncConnectionBase> connections)
+{
+    const size_t numClients = connections.sizeInElements();
+    SC_TRY_MSG(allReadQueue.sizeInElements() >= numClients * conf.readQueueSize, "Insufficient read queue");
+    SC_TRY_MSG(allWriteQueue.sizeInElements() >= numClients * conf.writeQueueSize, "Insufficient write queue");
+    SC_TRY_MSG(allBuffers.sizeInElements() >= numClients * conf.buffersQueueSize, "Insufficient buffers queue");
+    SC_TRY_MSG(allHeaders.sizeInElements() >= numClients * conf.headerBytesLength, "Insufficient headers storage");
+    SC_TRY_MSG(allStreams.sizeInElements() >= numClients * conf.streamBytesLength, "Insufficient streams storage");
+    for (size_t idx = 0; idx < numClients; ++idx)
+    {
+        HttpAsyncConnectionBase& connection = connections[idx];
+
+        const size_t NumSlices   = conf.readQueueSize;
+        const size_t SliceLength = conf.streamBytesLength / NumSlices;
+
+        Span<AsyncBufferView> buffers;
+        SC_TRY(allBuffers.sliceStartLength(idx * conf.buffersQueueSize, conf.buffersQueueSize, buffers));
+        Span<char> streamStorage;
+        SC_TRY(allStreams.sliceStartLength(idx * conf.streamBytesLength, conf.streamBytesLength, streamStorage));
+        for (size_t sliceIdx = 0; sliceIdx < NumSlices; ++sliceIdx)
+        {
+            Span<char> slice;
+            SC_TRY(streamStorage.sliceStartLength(sliceIdx * SliceLength, SliceLength, slice));
+            buffers[sliceIdx] = slice;
+            buffers[sliceIdx].setReusable(true);
+        }
+        connection.buffersPool.setBuffers(buffers);
+        Span<char> headerStorage;
+        SC_TRY(allHeaders.sliceStartLength(idx * conf.headerBytesLength, conf.headerBytesLength, headerStorage));
+        connection.setHeaderMemory(headerStorage);
+        Span<AsyncReadableStream::Request> readQueue;
+        SC_TRY(allReadQueue.sliceStartLength(idx * conf.readQueueSize, conf.readQueueSize, readQueue));
+        Span<AsyncWritableStream::Request> writeQueue;
+        SC_TRY(allWriteQueue.sliceStartLength(idx * conf.writeQueueSize, conf.writeQueueSize, writeQueue));
+        connection.readableSocketStream.setReadQueue(readQueue);
+        connection.writableSocketStream.setWriteQueue(writeQueue);
+    }
+    return Result(true);
+}
 } // namespace SC
