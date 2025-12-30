@@ -41,6 +41,8 @@ struct SC::WebServerExampleModelState
     String  interface  = "127.0.0.1";
     int32_t port       = 8090;
     int32_t maxClients = 32;
+
+    HttpAsyncConnectionBase::Configuration asyncConfiguration;
 };
 
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleModelState)
@@ -66,32 +68,35 @@ struct SC::WebServerExampleModel
     WebServerExampleModelState modelState;
 
     AsyncEventLoop* eventLoop = nullptr;
+    //! [WebServerExampleSnippet]
 
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
 
     ThreadPool threadPool;
 
-    static constexpr size_t MAX_CONNECTIONS = 1000000;    // Reserve space for max 1 million connections
-    static constexpr size_t READ_QUEUE      = 2;          // Number of read queue buffers for each connection
-    static constexpr size_t WRITE_QUEUE     = 3;          // Number of write queue buffers for each connection
-    static constexpr size_t REQUEST_SIZE    = 512 * 1024; // Number of bytes used to stream data for each connection
-    static constexpr size_t HEADER_SIZE     = 8 * 1024;   // Number of bytes used to hold request and response headers
-    static constexpr size_t NUM_FS_THREADS  = 4;          // Number of threads for async file stream operations
+    static constexpr size_t MAX_CONNECTIONS  = 1000000;     // Reserve space for max 1 million connections
+    static constexpr size_t MAX_READ_QUEUE   = 10;          // Max number of read queue buffers for each connection
+    static constexpr size_t MAX_WRITE_QUEUE  = 10;          // Max number of write queue buffers for each connection
+    static constexpr size_t MAX_BUFFERS      = 10;          // Max number of write queue buffers for each connection
+    static constexpr size_t MAX_REQUEST_SIZE = 1024 * 1024; // Max number of bytes to stream data for each connection
+    static constexpr size_t MAX_HEADER_SIZE  = 32 * 1024;   // Max number of bytes to hold request and response headers
+    static constexpr size_t NUM_FS_THREADS   = 4;           // Number of threads for async file stream operations
 
-    // In this simple setup we have a single file stream, with fixed read / write queues and a fixed header buffer
-    struct HttpCustomClient : HttpAsyncConnection<READ_QUEUE, WRITE_QUEUE, HEADER_SIZE, REQUEST_SIZE>
-    {
-        HttpAsyncFileServer::StreamQueue<READ_QUEUE> fileStream; // Store a file stream inline with the client
-    };
+    StableArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
 
-    StableArray<HttpCustomClient> clients = {MAX_CONNECTIONS};
+    // For simplicity just hardcode a read queue of 3 for file streams
+    StableArray<HttpAsyncFileServer::StreamQueue<3>> fileStreams = {MAX_CONNECTIONS};
+
+    StableArray<AsyncReadableStream::Request> allReadQueues  = {MAX_CONNECTIONS * MAX_READ_QUEUE};
+    StableArray<AsyncWritableStream::Request> allWriteQueues = {MAX_CONNECTIONS * MAX_WRITE_QUEUE};
+    StableArray<AsyncBufferView>              allBuffers     = {MAX_CONNECTIONS * MAX_BUFFERS};
+    StableArray<char>                         allHeaders     = {MAX_CONNECTIONS * MAX_HEADER_SIZE};
+    StableArray<char>                         allStreams     = {MAX_CONNECTIONS * MAX_REQUEST_SIZE};
 
     Result start()
     {
-        // This is the only only allocation of whole http web server (as all buffers have been fixed per connection)
-        SC_TRY(clients.resize(static_cast<size_t>(modelState.maxClients)));
-
+        SC_TRY(assignConnectionMemory(static_cast<size_t>(modelState.maxClients)));
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
@@ -103,20 +108,40 @@ struct SC::WebServerExampleModel
         SC_TRY(fileServer.init(threadPool, *eventLoop, modelState.directory.view()));
         httpServer.onRequest = [&](HttpConnection& connection)
         {
-            HttpAsyncFileServer::Stream& stream = clients.toSpan()[connection.getConnectionID().getIndex()].fileStream;
+            HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
             SC_ASSERT_RELEASE(fileServer.serveFile(stream, connection));
         };
         return Result(true);
     }
 
-    Result resize()
+    Result assignConnectionMemory(size_t numClients)
     {
-        const size_t minSize =
+        SC_TRY(clients.resize(numClients));
+        SC_TRY(fileStreams.resize(numClients));
+        SC_TRY(allReadQueues.resize(numClients * modelState.asyncConfiguration.readQueueSize));
+        SC_TRY(allWriteQueues.resize(numClients * modelState.asyncConfiguration.writeQueueSize));
+        SC_TRY(allBuffers.resize(numClients * modelState.asyncConfiguration.buffersQueueSize));
+        SC_TRY(allHeaders.resize(numClients * modelState.asyncConfiguration.headerBytesLength));
+        SC_TRY(allStreams.resize(numClients * modelState.asyncConfiguration.streamBytesLength));
+        HttpAsyncConnectionBase::Memory memory;
+        memory.allBuffers    = allBuffers;
+        memory.allReadQueue  = allReadQueues;
+        memory.allWriteQueue = allWriteQueues;
+        memory.allHeaders    = allHeaders;
+        memory.allStreams    = allStreams;
+        SC_TRY(memory.assignTo(modelState.asyncConfiguration, clients.toSpan()));
+        return Result(true);
+    }
+
+    Result runtimeResize()
+    {
+        const size_t numClients =
             max(static_cast<size_t>(modelState.maxClients), httpServer.getConnections().getHighestActiveConnection());
-        SC_TRY(clients.resize(minSize));
+        SC_TRY(assignConnectionMemory(numClients));
         SC_TRY(httpServer.resize(clients.toSpan()));
         return Result(true);
     }
+    //! [WebServerExampleSnippet]
 
     Result stop()
     {
@@ -161,14 +186,34 @@ struct SC::WebServerExampleView
         return Result(SC::SerializationBinary::loadVersionedWithSchema(viewState, viewStateSpan));
     }
 
+    bool InputSizeT(const char* name, size_t* num)
+    {
+        int intNum = static_cast<int>(*num);
+        if (ImGui::InputInt(name, &intNum))
+        {
+            if (intNum < 0)
+                intNum = 0;
+            *num = static_cast<size_t>(intNum);
+            return true;
+        }
+        return false;
+    }
+
     Result draw(WebServerExampleModel& model)
     {
         auto& buffer = viewState.inputTextBuffer;
         SC_TRY(InputText("Interface", buffer, model.modelState.interface, viewState.needsRestart));
         SC_TRY(InputText("Directory", buffer, model.modelState.directory, viewState.needsRestart));
-        ImGui::PushItemWidth(100);
+        ImGui::PushItemWidth(130);
         viewState.needsRestart |= ImGui::InputInt("Port", &model.modelState.port);
         viewState.needsResize |= ImGui::InputInt("Max Clients", &model.modelState.maxClients);
+        ImGui::Text("Per connection quantities (need restart)");
+        auto& configuration = model.modelState.asyncConfiguration;
+        viewState.needsRestart |= InputSizeT("Read Queue (items)", &configuration.readQueueSize);
+        viewState.needsRestart |= InputSizeT("Write Queue (items)", &configuration.writeQueueSize);
+        viewState.needsRestart |= InputSizeT("Buffers Queue (items)", &configuration.buffersQueueSize);
+        viewState.needsRestart |= InputSizeT("Header buffer (bytes)", &configuration.headerBytesLength);
+        viewState.needsRestart |= InputSizeT("Streams buffer (bytes)", &configuration.streamBytesLength);
         ImGui::PopItemWidth();
         ImGui::Text("Total Connections : %zu", model.httpServer.getConnections().getNumTotalConnections());
         ImGui::Text("Active Connections: %zu", model.httpServer.getConnections().getNumActiveConnections());
@@ -184,7 +229,7 @@ struct SC::WebServerExampleView
             ImGui::BeginDisabled(not model.canBeStarted());
             if (ImGui::Button("Resize"))
             {
-                (void)model.resize();
+                (void)model.runtimeResize();
                 viewState.needsResize = false;
             }
             ImGui::EndDisabled();

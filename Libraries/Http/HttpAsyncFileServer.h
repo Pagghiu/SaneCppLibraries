@@ -10,7 +10,11 @@ namespace SC
 ///
 /// This class registers the onRequest callback provided by HttpAsyncServer to serves files from a given directory.
 ///
+/// Example using compile time set buffers for connections:
 /// \snippet Tests/Libraries/Http/HttpAsyncFileServerTest.cpp HttpFileServerSnippet
+///
+/// Example using dynamically allocated buffers for connections:
+/// \snippet Examples/SCExample/Examples/WebServerExample/WebServerExample.cpp WebServerExampleSnippet
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
     /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
