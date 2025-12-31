@@ -63,6 +63,6 @@ It can also be used to read or write the standard input, output or error from cu
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 97			| 129		| 226	|
-| Sources   | 622			| 105		| 727	|
-| Sum       | 719			| 234		| 953	|
+| Headers   | 98			| 134		| 232	|
+| Sources   | 636			| 106		| 742	|
+| Sum       | 734			| 240		| 974	|

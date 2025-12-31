@@ -44,6 +44,7 @@ Some relevant blog posts are:
 - [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
 - [September 2025 Update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
 - [November 2025 Update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
+- [December 2025 Update](https://pagghiu.github.io/site/blog/2025-12-31-SaneCppLibrariesUpdate.html)
 
 ## HttpAsyncServer
 @copydoc SC::HttpAsyncServer
@@ -79,6 +80,6 @@ Some relevant blog posts are:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 282			| 216		| 498	|
-| Sources   | 1530			| 283		| 1813	|
-| Sum       | 1812			| 499		| 2311	|
+| Headers   | 344			| 243		| 587	|
+| Sources   | 1537			| 270		| 1807	|
+| Sum       | 1881			| 513		| 2394	|

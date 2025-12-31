@@ -75,6 +75,7 @@ Some relevant blog posts are:
 - [January 2025 Update](https://pagghiu.github.io/site/blog/2025-01-31-SaneCppLibrariesUpdate.html)
 - [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 - [November 2025 Update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
+- [December 2025 Update](https://pagghiu.github.io/site/blog/2025-12-31-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 
@@ -92,6 +93,6 @@ Some relevant blog posts are:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 502			| 339		| 841	|
-| Sources   | 1645			| 283		| 1928	|
-| Sum       | 2147			| 622		| 2769	|
+| Headers   | 507			| 364		| 871	|
+| Sources   | 1725			| 287		| 2012	|
+| Sum       | 2232			| 651		| 2883	|

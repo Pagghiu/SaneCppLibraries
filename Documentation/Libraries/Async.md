@@ -78,6 +78,7 @@ Some relevant blog posts are:
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
 - [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
 - [November 2025 Update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
+- [December 2025 Update](https://pagghiu.github.io/site/blog/2025-12-31-SaneCppLibrariesUpdate.html)
 
 # Description
 @copydetails SC::AsyncRequest
@@ -189,6 +190,6 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 758			| 723		| 1481	|
-| Sources   | 5017			| 1190		| 6207	|
-| Sum       | 5775			| 1913		| 7688	|
+| Headers   | 756			| 727		| 1483	|
+| Sources   | 5022			| 1191		| 6213	|
+| Sum       | 5778			| 1918		| 7696	|
