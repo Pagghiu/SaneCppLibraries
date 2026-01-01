@@ -87,7 +87,7 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Connection", "Closed"));
+        SC_TRY(connection.response.addHeader("Connection", "close"));
 
         SC_TRY(connection.response.sendHeaders());
 
@@ -98,7 +98,7 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
     {
         SC_TRY(connection.response.startResponse(404));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Connection", "Closed"));
+        SC_TRY(connection.response.addHeader("Connection", "close"));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }
