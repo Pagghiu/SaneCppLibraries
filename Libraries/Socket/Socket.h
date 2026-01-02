@@ -17,7 +17,7 @@ namespace detail
 /// @brief Definition for SocketDescriptor
 #if SC_PLATFORM_WINDOWS
 
-struct SocketDescriptorDefinition
+struct SC_COMPILER_EXPORT SocketDescriptorDefinition
 {
     using Handle = size_t; // SOCKET
     static Result releaseHandle(Handle& handle);
@@ -27,7 +27,7 @@ struct SocketDescriptorDefinition
 
 #else
 
-struct SocketDescriptorDefinition
+struct SC_COMPILER_EXPORT SocketDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -39,7 +39,7 @@ struct SocketDescriptorDefinition
 } // namespace detail
 
 /// @brief Flags for SocketDescriptor (Blocking / Inheritable, IPVx, SocketType)
-struct SocketFlags
+struct SC_COMPILER_EXPORT SocketFlags
 {
     /// @brief Sets the socket as blocking / nonblocking mode
     enum BlockingType
@@ -194,7 +194,7 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketServerSnippet
-struct SocketServer
+struct SC_COMPILER_EXPORT SocketServer
 {
     /// @brief Build a SocketServer from a SocketDescriptor (already created with SocketDescriptor::create)
     /// @param socket A socket descriptor created with SocketDescriptor::create to be used as server
@@ -235,7 +235,7 @@ struct SocketServer
 ///
 /// Example (connecting client to server, doing two synchronous writes):
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketClientConnectSnippet
-struct SocketClient
+struct SC_COMPILER_EXPORT SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)
     /// @param socket A socket descriptor created with SocketDescriptor::create to be used as client
@@ -279,7 +279,7 @@ struct SocketClient
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
-struct SocketDNS
+struct SC_COMPILER_EXPORT SocketDNS
 {
     /// @brief Resolve an host string to an ip address (blocking until DNS response arrives)
     /// @param[in] host The ASCII encoded host string (example.com)
@@ -292,7 +292,7 @@ struct SocketDNS
 };
 
 /// @brief Networking globals initialization (Winsock2 WSAStartup)
-struct SocketNetworking
+struct SC_COMPILER_EXPORT SocketNetworking
 {
     /// @brief Initializes Winsock2 on Windows (WSAStartup)
     /// @return Valid Result if Winsock2 has been successfully initialized

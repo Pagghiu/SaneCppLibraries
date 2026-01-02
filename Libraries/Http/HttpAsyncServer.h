@@ -29,7 +29,7 @@ struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
         size_t streamBytesLength = 512 * 1024;
     };
 
-    struct Memory
+    struct SC_COMPILER_EXPORT Memory
     {
         Span<AsyncReadableStream::Request> allReadQueue;
         Span<AsyncWritableStream::Request> allWriteQueue;

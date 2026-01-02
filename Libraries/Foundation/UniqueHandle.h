@@ -23,7 +23,7 @@ namespace SC
 /// ...usage
 /// @snippet Tests/Libraries/File/FileTest.cpp UniqueHandleExampleSnippet
 template <typename Definition>
-struct UniqueHandle
+struct SC_COMPILER_EXPORT UniqueHandle
 {
     using Handle = typename Definition::Handle;
 
