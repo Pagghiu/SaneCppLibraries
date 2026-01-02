@@ -111,6 +111,14 @@ StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extens
     {
         return "text/html";
     }
+    if (extension == "woff")
+    {
+        return "font/woff";
+    }
+    if (extension == "woff2")
+    {
+        return "font/woff2";
+    }
     if (extension == "css")
     {
         return "text/css";
