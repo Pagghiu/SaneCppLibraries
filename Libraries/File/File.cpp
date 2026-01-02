@@ -599,9 +599,10 @@ SC::Result SC::FileDescriptor::readUntilFullOrEOF(Span<char> data, Span<char>& a
         SC_TRY(read(availableData, readData));
         if (readData.empty())
             break;
-        availableData = {availableData.data(), availableData.sizeInBytes() - readData.sizeInBytes()};
+        SC_TRY(availableData.sliceStartLength(readData.sizeInBytes(),
+                                              availableData.sizeInBytes() - readData.sizeInBytes(), availableData));
     }
-    actuallyRead = {data.data(), data.sizeInBytes() - availableData.sizeInBytes()};
+    SC_TRY(data.sliceStartLength(0, data.sizeInBytes() - availableData.sizeInBytes(), actuallyRead));
     return Result(true);
 }
 
