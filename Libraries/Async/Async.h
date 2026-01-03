@@ -305,7 +305,8 @@ struct SC_COMPILER_EXPORT AsyncLoopTimeout : public AsyncRequest
     using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result              start(AsyncEventLoop& eventLoop, TimeMs relativeTimeout);
+    SC::Result start(AsyncEventLoop& eventLoop, TimeMs relativeTimeout);
+
     Function<void(Result&)> callback; ///< Called after given expiration time since AsyncLoopTimeout::start has passed
 
     TimeMs relativeTimeout; ///< First timer expiration (relative) time in milliseconds
