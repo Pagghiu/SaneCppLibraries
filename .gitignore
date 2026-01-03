@@ -1,11 +1,12 @@
 **/xcuserdata
 **/.DS_Store
 **/.sync
+**/compile_commands.json
 _*/
+.cache
 .vs
 x64
 *.vcxproj.user
-Dependencies/*/*.txt
 *.aps
 *.db
 *.o
