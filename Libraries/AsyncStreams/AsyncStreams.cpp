@@ -825,8 +825,8 @@ Result AsyncPipeline::pipe()
     bool res;
     res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
     SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventData");
-    res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
-    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventEnd");
+    res = readable->eventClose.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventClose");
     res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
     SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventError");
     for (AsyncWritableStream* sink : sinks)
@@ -855,7 +855,7 @@ bool AsyncPipeline::unpipe()
         {
             res = source->eventData.removeAllListenersBoundTo(*this);
             SC_TRY(res);
-            res = source->eventEnd.removeAllListenersBoundTo(*this);
+            res = source->eventClose.removeAllListenersBoundTo(*this);
             SC_TRY(res);
         }
         else
@@ -864,7 +864,7 @@ bool AsyncPipeline::unpipe()
 
             res = listenToEventData(*source, *transforms[0], false);
             SC_TRY(res);
-            res = source->eventEnd.removeAllListenersBoundTo(writable);
+            res = source->eventClose.removeAllListenersBoundTo(writable);
             SC_TRY(res);
         }
         res = source->eventError.removeAllListenersBoundTo(*this);
@@ -882,7 +882,7 @@ bool AsyncPipeline::unpipe()
         {
             res = transform->eventData.removeAllListenersBoundTo(*this);
             SC_TRY(res);
-            res = transform->eventEnd.removeAllListenersBoundTo(*this);
+            res = transform->eventClose.removeAllListenersBoundTo(*this);
             SC_TRY(res);
             break;
         }
@@ -893,7 +893,7 @@ bool AsyncPipeline::unpipe()
 
             res = listenToEventData(*transform, nextTransform, false);
             SC_TRY(res);
-            res = source->eventEnd.removeAllListenersBoundTo(nextWritable);
+            res = source->eventClose.removeAllListenersBoundTo(nextWritable);
             SC_TRY(res);
         }
         res = transform->AsyncReadableStream::eventError.removeAllListenersBoundTo(*this);
@@ -924,9 +924,9 @@ Result AsyncPipeline::start()
     {
         if (transform == nullptr)
             break;
-        SC_TRY(transform->start());
+        transform->resumeReading(); // not using start in case this is already reading
     }
-    SC_TRY(source->start());
+    source->resumeReading(); // not using start in case this is already reading
     return Result(true);
 }
 
@@ -989,8 +989,8 @@ Result AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
         res = listenToEventData(*readable, *transform, true);
         SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventData");
         AsyncWritableStream& writable = *transform;
-        res = readable->eventEnd.addListener<AsyncWritableStream, &AsyncWritableStream::end>(writable);
-        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventEnd");
+        res = readable->eventClose.addListener<AsyncWritableStream, &AsyncWritableStream::end>(writable);
+        SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventClose");
         res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
         SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventError");
 

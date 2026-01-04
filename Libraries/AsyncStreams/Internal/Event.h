@@ -25,10 +25,10 @@ struct SC_COMPILER_EXPORT Event
         }
     }
 
-    /// @brief Adds a listener to this event, optionally saving the index to use for its removal
+    /// @brief Adds a listener to this event
     /// @see Event::removeListener
     template <typename Class, void (Class::*MemberFunction)(T...)>
-    [[nodiscard]] bool addListener(Class& pself, int* idx = nullptr)
+    [[nodiscard]] bool addListener(Class& pself)
     {
         if (numListeners + 1 > MaxListeners)
         {
@@ -38,16 +38,12 @@ struct SC_COMPILER_EXPORT Event
         {
             Function<void(T...)> func;
             func.template bind<Class, MemberFunction>(pself);
-            if (idx)
-            {
-                *idx = numListeners;
-            }
             listeners[numListeners++] = move(func);
             return true;
         }
     }
 
-    /// @brief Adds a listener to this event, optionally saving the index to use for its removal
+    /// @brief Adds a listener to this event
     /// @see Event::removeListener
     template <typename Func>
     [[nodiscard]] bool addListener(Func&& func)
@@ -94,7 +90,7 @@ struct SC_COMPILER_EXPORT Event
 
     /// @brief Removes a listener where operator == evaluates to true for the passed in func
     template <typename Func>
-    [[nodiscard]] bool removeListener(Func& func)
+    [[nodiscard]] bool removeListener(Func&& func)
     {
         for (int idx = 0; idx < numListeners; ++idx)
         {
@@ -106,6 +102,7 @@ struct SC_COMPILER_EXPORT Event
         return false;
     }
 
+  private:
     /// @brief Removes a listener at a given index
     /// @see Event::addListener
     [[nodiscard]] bool removeListenerAt(int idx)
@@ -121,7 +118,6 @@ struct SC_COMPILER_EXPORT Event
         return true;
     }
 
-  private:
     // Avoid pulling Array<T, N> to reduce inter-dependencies
     Function<void(T...)> listeners[MaxListeners];
     int                  numListeners = 0;

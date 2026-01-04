@@ -88,21 +88,20 @@ void SC::AsyncStreamsTest::circularQueue()
 void SC::AsyncStreamsTest::event()
 {
     Event<2, int> event;
-    int           memberIndex = -1;
-    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
+    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
     event.emit(1);
     SC_TEST_EXPECT(memberCalls == 1); // +1
     SC_TEST_EXPECT((event.removeListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
     event.emit(1);
     SC_TEST_EXPECT(memberCalls == 1); // +0
     int value = 1;
-    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
+    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
     event.emit(value);
     SC_TEST_EXPECT(memberCalls == 2); // +1
     SC_TEST_EXPECT((event.removeAllListenersBoundTo(*this)));
     event.emit(value);
     SC_TEST_EXPECT(memberCalls == 2); // +0
-    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this, &memberIndex)));
+    SC_TEST_EXPECT((event.addListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
     event.emit(move(value));
     SC_TEST_EXPECT(memberCalls == 3); // +1
     int  lambdaCalls = 0;
@@ -115,7 +114,7 @@ void SC::AsyncStreamsTest::event()
     event.emit(1);
     SC_TEST_EXPECT(memberCalls == 4); // +1
     SC_TEST_EXPECT(lambdaCalls == 1); // +1
-    SC_TEST_EXPECT(event.removeListenerAt(memberIndex));
+    SC_TEST_EXPECT((event.removeListener<AsyncStreamsTest, &AsyncStreamsTest::funcCallback>(*this)));
     event.emit(1);
     SC_TEST_EXPECT(memberCalls == 4); // +0
     SC_TEST_EXPECT(lambdaCalls == 2); // +1

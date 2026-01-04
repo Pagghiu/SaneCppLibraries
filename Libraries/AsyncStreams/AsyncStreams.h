@@ -353,7 +353,7 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     void tryAsync(Result potentialError);
 
     /// @brief Returns true if this stream is writing something
-    bool isStillWriting() const { return state == State::Writing or state == State::Ending; }
+    [[nodiscard]] bool isStillWriting() const { return state == State::Writing or state == State::Ending; }
 
   protected:
     void stop() { state = State::Stopped; }
