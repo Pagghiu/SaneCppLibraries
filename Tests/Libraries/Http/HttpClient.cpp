@@ -3,6 +3,7 @@
 #include "HttpClient.h"
 #include "Libraries/Http/HttpURLParser.h"
 #include "Libraries/Http/Internal/HttpStringAppend.h"
+#include <stdio.h> // snprintf
 
 SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
 {
@@ -31,6 +32,48 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
         SC_TRY(sb.append(" HTTP/1.1\r\n"));
         SC_TRY(sb.append("User-agent: SC\r\n"));
         SC_TRY(sb.append("Host: 127.0.0.1\r\n\r\n"));
+    }
+
+    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
+    parser      = {};
+    parser.type = HttpParser::Type::Response;
+    return connectAsync.start(*eventLoop, clientSocket, localHost);
+}
+
+SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body)
+{
+    eventLoop = &loop;
+
+    uint16_t      port;
+    HttpURLParser urlParser;
+    SC_TRY(urlParser.parse(url));
+    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    // TODO: Make DNS Resolution asynchronous
+    char       buffer[256];
+    Span<char> ipAddress = {buffer};
+    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
+    port = urlParser.port;
+    SocketIPAddress localHost;
+    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
+    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+
+    {
+        GrowableBuffer<decltype(content)> gb = {content};
+
+        HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+        sb.clear();
+        SC_TRY(sb.append("PUT "));
+        SC_TRY(sb.append(urlParser.path));
+        SC_TRY(sb.append(" HTTP/1.1\r\n"));
+        SC_TRY(sb.append("User-agent: SC\r\n"));
+        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        char contentLengthBuffer[32];
+        ::snprintf(contentLengthBuffer, sizeof(contentLengthBuffer), "%zu", body.sizeInBytes());
+        StringSpan cl({contentLengthBuffer, ::strlen(contentLengthBuffer)}, false, StringEncoding::Ascii);
+        SC_TRY(sb.append("Content-Length: "));
+        SC_TRY(sb.append(cl));
+        SC_TRY(sb.append("\r\n\r\n"));
+        SC_TRY(sb.append(body));
     }
 
     connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);

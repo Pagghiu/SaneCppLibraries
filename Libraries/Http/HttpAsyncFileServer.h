@@ -21,14 +21,20 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     struct SC_COMPILER_EXPORT Stream
     {
         ReadableFileStream readableFileStream;
+        WritableFileStream writableFileStream;
         AsyncTaskSequence  readableFileStreamTask;
     };
 
     template <int RequestsSize>
     struct SC_COMPILER_EXPORT StreamQueue : public Stream
     {
-        StreamQueue() { readableFileStream.setReadQueue(requests); }
-        AsyncReadableStream::Request requests[RequestsSize];
+        StreamQueue()
+        {
+            readableFileStream.setReadQueue(readQueue);
+            writableFileStream.setWriteQueue(writeQueue);
+        }
+        AsyncReadableStream::Request readQueue[RequestsSize];
+        AsyncWritableStream::Request writeQueue[RequestsSize];
     };
 
     /// @brief Initialize the web server on the given file system directory to serve
@@ -37,11 +43,14 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     /// @brief Removes any reference to the arguments passed during init
     Result close();
 
-    /// @brief Serve the file requested by this Http Client on its channel
-    /// Call this method in response to HttpConnectionsPool::onRequest to serve a file
-    Result serveFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
+    /// @brief Handles the request, serving the requested file (GET) or creating a new one (PUT/POST)
+    /// Call this method in response to HttpConnectionsPool::onRequest.
+    Result handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
   private:
+    Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
+    Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
+
     StringPath directory;
 
     AsyncEventLoop* eventLoop  = nullptr;

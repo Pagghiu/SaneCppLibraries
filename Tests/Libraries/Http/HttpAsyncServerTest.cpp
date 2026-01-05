@@ -59,6 +59,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         if (request.getParser().method != HttpParser::Method::HttpGET)
         {
             SC_TEST_EXPECT(response.startResponse(405));
+            SC_TEST_EXPECT(response.addHeader("Allow", "GET"));
             SC_TEST_EXPECT(response.sendHeaders());
             SC_TEST_EXPECT(response.end());
             return;

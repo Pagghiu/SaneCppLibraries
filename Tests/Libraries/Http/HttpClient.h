@@ -23,6 +23,13 @@ struct HttpClient
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
     Result get(AsyncEventLoop& loop, StringSpan url);
 
+    /// @brief Setups this client to execute a `PUT` request on the given url with a body
+    /// @param loop The AsyncEventLoop to use for monitoring network packets
+    /// @param url The url to `PUT`
+    /// @param body The body content to send
+    /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
+    Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body);
+
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringSpan sent by the server

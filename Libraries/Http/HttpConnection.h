@@ -20,6 +20,9 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
 
+    /// @brief Gets the first part of the body that has arrived together with the headers
+    StringSpan getFirstBodySlice() const;
+
     /// @brief Resets this object for it to be re-usable
     void reset();
 
@@ -36,6 +39,9 @@ struct SC_COMPILER_EXPORT HttpRequest
 
     /// @brief Parses an incoming slice of data (must be slice of availableHeader)
     Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData);
+
+    /// @brief Gets the length of the headers in bytes
+    [[nodiscard]] size_t getHeadersLength() const;
 
     struct SC_COMPILER_EXPORT HttpHeaderOffset
     {

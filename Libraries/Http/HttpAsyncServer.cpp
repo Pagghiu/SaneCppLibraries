@@ -156,7 +156,12 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
     else if (client.request.headersEndReceived)
     {
         client.response.grabUnusedHeaderMemory(client.request);
-        client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
+        if (client.request.getParser().contentLength == 0)
+        {
+            // If there is no body, we destroy the stream to cancel pending reads
+            client.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
+        }
+        // Both with and without body we should stop listening to data events
         SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
         onRequest(client);
 

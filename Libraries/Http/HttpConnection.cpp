@@ -103,6 +103,32 @@ Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readDa
     return Result(parsedSuccessfully);
 }
 
+size_t HttpRequest::getHeadersLength() const
+{
+    if (numHeaders > 0)
+    {
+        const auto& last = headerOffsets[numHeaders - 1];
+        if (last.token == HttpParser::Token::HeadersEnd)
+            return static_cast<size_t>(last.start + last.length);
+    }
+    return 0;
+}
+
+StringSpan HttpRequest::getFirstBodySlice() const
+{
+    const size_t len  = getHeadersLength();
+    const size_t crlf = 2; // \r\n
+    if (len > 0 and len + crlf < readHeaders.sizeInBytes())
+    {
+        Span<char> body;
+        if (readHeaders.sliceStartLength(len + crlf, readHeaders.sizeInBytes() - len - crlf, body))
+        {
+            return StringSpan(body, false, StringEncoding::Ascii);
+        }
+    }
+    return {};
+}
+
 //-------------------------------------------------------------------------------------------------------
 // HttpResponse
 //-------------------------------------------------------------------------------------------------------
@@ -118,8 +144,9 @@ Result HttpResponse::startResponse(int code)
     switch (code)
     {
     case 200: SC_TRY(sb.append("200 OK\r\n")); break;
+    case 201: SC_TRY(sb.append("201 Created\r\n")); break;
     case 404: SC_TRY(sb.append("404 Not Found\r\n")); break;
-    case 405: SC_TRY(sb.append("405 Not Allowed\r\n")); break;
+    case 405: SC_TRY(sb.append("405 Method Not Allowed\r\n")); break;
     }
     return Result(true);
 }

@@ -4,8 +4,10 @@
 #include "HttpClient.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Http/HttpAsyncServer.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+
 namespace SC
 {
 struct HttpAsyncFileServerTest;
@@ -26,10 +28,7 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
 void SC::HttpAsyncFileServerTest::httpFileServerTest()
 {
     // Create a test file in the application root directory
-    StringView webServerFolder = report.applicationRootDirectory.view();
-    FileSystem fs;
-    SC_TEST_EXPECT(fs.init(webServerFolder));
-    SC_TEST_EXPECT(fs.write("file.html", "<html><body>Response from file</body></html>"));
+    StringView     webServerFolder = report.applicationRootDirectory.view();
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
@@ -65,31 +64,59 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
 
     // Forward all http requests to the file server in order to serve files
     httpServer.onRequest = [&](HttpConnection& connection)
-    { SC_ASSERT_RELEASE(fileServer.serveFile(streams[connection.getConnectionID().getIndex()], connection)); };
+    { SC_ASSERT_RELEASE(fileServer.handleRequest(streams[connection.getConnectionID().getIndex()], connection)); };
     //! [HttpFileServerSnippet]
 
     struct Context
     {
-        int              numRequests = 0;
         HttpAsyncServer& httpServer;
-    } context = {0, httpServer};
+        AsyncEventLoop*  loop = nullptr;
+
+        int        getCount  = 0;
+        int        putCount  = 0;
+        FileSystem fs        = {};
+        HttpClient getClient = {};
+        HttpClient putClient = {};
+    } context    = {httpServer};
+    context.loop = &eventLoop;
+
+    SC_TEST_EXPECT(context.fs.init(webServerFolder));
+    SC_TEST_EXPECT(context.fs.write("file.html", "<html><body>Response from file</body></html>"));
 
     // Create an Http Client request for that file
-    HttpClient client;
-    SC_TEST_EXPECT(client.get(eventLoop, "http://localhost:8090/file.html"));
-    client.callback = [this, &context](HttpClient& result)
+    SC_TEST_EXPECT(context.getClient.get(eventLoop, "http://localhost:8090/file.html"));
+    context.getClient.callback = [this, &context](HttpClient& result)
     {
-        context.numRequests++;
+        context.getCount++;
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Response from file"));
+
+        // Now test PUT
+        SC_TEST_EXPECT(context.putClient.put(*context.loop, "http://localhost:8090/pushed.html", "Uploaded Content"));
+    };
+
+    context.putClient.callback = [this, &context](HttpClient& result)
+    {
+        context.putCount++;
+        StringView str(result.getResponse());
+        // Expect 201 Created and Content-Length: 0
+        SC_TEST_EXPECT(str.containsString("201 Created"));
+
+        // Verify file content
+        String content;
+        SC_TEST_EXPECT(context.fs.read("pushed.html", content));
+        SC_TEST_EXPECT(content == "Uploaded Content");
+        SC_TEST_EXPECT(context.fs.removeFile("pushed.html"));
+
         SC_TEST_EXPECT(context.httpServer.stop());
     };
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(fileServer.close());
     SC_TEST_EXPECT(httpServer.close());
 
-    // Remove the test file
-    SC_TEST_EXPECT(fs.removeFile("file.html"));
+    SC_TEST_EXPECT(context.getCount == 1);
+    SC_TEST_EXPECT(context.putCount == 1);
+    SC_TEST_EXPECT(context.fs.removeFile("file.html"));
 }
 
 namespace SC

@@ -45,7 +45,7 @@ Result HttpAsyncFileServer::close()
     return Result(true);
 }
 
-Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
+Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
     auto url = connection.request.getURL();
     if (not HttpStringIterator::startsWith(url, "/"))
@@ -57,6 +57,31 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
     {
         filePath = "index.html";
     }
+    // TODO: Resolve and validate final path to check that is inside allowed folders for GET/PUT
+
+    FileSystem fileSystem;
+    SC_TRY(fileSystem.init(directory.view()));
+    switch (connection.request.getParser().method)
+    {
+    case HttpParser::Method::HttpPOST:
+    case HttpParser::Method::HttpPUT: return putFile(stream, connection, filePath);
+    case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath);
+    default: {
+        SC_TRY(connection.response.startResponse(405));
+        SC_TRY(connection.response.addHeader("Allow", "GET, PUT, POST"));
+        SC_TRY(connection.response.addHeader("Server", "SC"));
+        SC_TRY(connection.response.addHeader("Connection", "close"));
+        SC_TRY(connection.response.sendHeaders());
+        SC_TRY(connection.response.end());
+    }
+    break;
+    }
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection,
+                                    StringSpan filePath)
+{
     FileSystem fileSystem;
     SC_TRY(fileSystem.init(directory.view()));
     if (fileSystem.existsAndIsFile(filePath))
@@ -101,6 +126,62 @@ Result HttpAsyncFileServer::serveFile(HttpAsyncFileServer::Stream& stream, HttpC
         SC_TRY(connection.response.addHeader("Connection", "close"));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
+    }
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection,
+                                    StringSpan filePath)
+{
+    StringPath path;
+    SC_TRY(path.assign(directory.view()));
+    SC_TRY(path.append("/"));
+    SC_TRY(path.append(filePath));
+    FileDescriptor fd;
+    SC_TRY(fd.open(path.view(), FileOpen::Write));
+    SC_TRY(stream.writableFileStream.init(connection.buffersPool, *eventLoop, fd));
+    fd.detach();
+    stream.writableFileStream.setAutoCloseDescriptor(true);
+
+    StringSpan partialBody = connection.request.getFirstBodySlice();
+    if (not partialBody.isEmpty())
+    {
+        AsyncBufferView buffer = Span<const char>(partialBody.bytesWithoutTerminator(), partialBody.sizeInBytes());
+        SC_TRY(stream.writableFileStream.AsyncWritableStream::write(move(buffer)));
+    }
+
+    struct OnFileWritten
+    {
+        HttpConnection&              client;
+        HttpAsyncFileServer::Stream& stream;
+
+        void operator()()
+        {
+            SC_ASSERT_RELEASE(stream.writableFileStream.eventFinish.removeListener(*this));
+            (void)client.response.startResponse(201);
+            (void)client.response.addHeader("Content-Length", "0");
+            (void)client.response.sendHeaders();
+            (void)client.response.end();
+        }
+    };
+    SC_TRY(stream.writableFileStream.eventFinish.addListener(OnFileWritten{connection, stream}));
+
+    if (partialBody.sizeInBytes() == connection.request.getParser().contentLength)
+    {
+        //  Body fully received
+        stream.writableFileStream.end();
+    }
+    else
+    {
+        // Body partially received. Piping rest.
+        HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
+
+        // TODO: Only write up to ContentLength and then stop to avoid abuses and support Keep-Alive
+        // The easiest way could be a transform stream that counts all bytes, stopping and unshifting excess bytes
+        connection.pipeline.source   = &asyncConnection.readableSocketStream;
+        connection.pipeline.sinks[0] = &stream.writableFileStream;
+        SC_TRY(connection.pipeline.pipe());
+        SC_TRY(connection.pipeline.start());
     }
     return Result(true);
 }

@@ -109,7 +109,7 @@ struct SC::WebServerExampleModel
         httpServer.onRequest = [&](HttpConnection& connection)
         {
             HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
-            SC_ASSERT_RELEASE(fileServer.serveFile(stream, connection));
+            SC_ASSERT_RELEASE(fileServer.handleRequest(stream, connection));
         };
         return Result(true);
     }
