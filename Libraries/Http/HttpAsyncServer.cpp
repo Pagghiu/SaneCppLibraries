@@ -109,6 +109,14 @@ Result HttpAsyncServer::waitForStopToFinish()
     return Result(true);
 }
 
+struct HttpAsyncServer::EventDataListener
+{
+    HttpAsyncServer&         pself;
+    HttpAsyncConnectionBase& client;
+
+    void operator()(AsyncBufferView::ID bufferID) { pself.onStreamReceive(client, bufferID); }
+};
+
 void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
@@ -126,10 +134,7 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     client.socket = move(acceptedClient);
     SC_TRUST_RESULT(client.readableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
     SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
-
-    auto onData = [this, idx](AsyncBufferView::ID bufferID)
-    { onStreamReceive(static_cast<HttpAsyncConnectionBase&>(connections.getConnection(idx)), bufferID); };
-    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(onData));
+    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(EventDataListener{*this, client}));
     SC_TRUST_RESULT(client.readableSocketStream.start());
 
     client.response.writableStream = &client.writableSocketStream;
@@ -152,7 +157,7 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
     {
         client.response.grabUnusedHeaderMemory(client.request);
         client.readableSocketStream.destroy();      // emits 'eventClose' cancelling pending reads
-        client.readableSocketStream.eventData = {}; // De-register data event
+        SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
         onRequest(client);
 
         // Using a struct instead of a lambda so it can unregister itself

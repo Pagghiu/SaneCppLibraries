@@ -147,5 +147,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;
     AsyncSocketAccept asyncServerAccept;
+
+    struct EventDataListener;
 };
 } // namespace SC
