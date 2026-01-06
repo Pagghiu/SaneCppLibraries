@@ -27,8 +27,9 @@ struct HttpClient
     /// @param loop The AsyncEventLoop to use for monitoring network packets
     /// @param url The url to `PUT`
     /// @param body The body content to send
+    /// @param bodyDelay Artificial time delay before sending body
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
-    Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body);
+    Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs bodyDelay = {});
 
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
@@ -36,15 +37,19 @@ struct HttpClient
     [[nodiscard]] StringSpan getResponse() const;
 
   private:
-    void onConnected(AsyncSocketConnect::Result& result);
-    void onAfterSend(AsyncSocketSend::Result& result);
-    void onAfterRead(AsyncSocketReceive::Result& result);
+    void startWaiting(AsyncSocketSend::Result& result);
+    void startSendingHeaders(AsyncSocketConnect::Result& result);
+    void startSendingBody(AsyncLoopTimeout::Result& result);
+    void startReceiveResponse(AsyncSocketSend::Result& result);
+    void tryParseResponse(AsyncSocketReceive::Result& result);
 
     HttpParser parser;
     Buffer     content;
 
     bool headersReceived = false;
 
+    TimeMs bodyDelay;
+    size_t headerBytes   = 0;
     size_t receivedBytes = 0;
     size_t parsedBytes   = 0;
     size_t contentLen    = 0;
@@ -52,6 +57,7 @@ struct HttpClient
     AsyncSocketConnect connectAsync;
     AsyncSocketSend    sendAsync;
     AsyncSocketReceive receiveAsync;
+    AsyncLoopTimeout   timeoutAsync;
     SocketDescriptor   clientSocket;
     AsyncEventLoop*    eventLoop = nullptr;
 };

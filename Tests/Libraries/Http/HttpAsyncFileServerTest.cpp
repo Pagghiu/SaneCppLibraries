@@ -76,12 +76,13 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         int        putCount  = 0;
         FileSystem fs        = {};
         HttpClient getClient = {};
-        HttpClient putClient = {};
+        HttpClient putStream = {};
+        HttpClient putInline = {};
     } context    = {httpServer};
     context.loop = &eventLoop;
 
     SC_TEST_EXPECT(context.fs.init(webServerFolder));
-    SC_TEST_EXPECT(context.fs.write("file.html", "<html><body>Response from file</body></html>"));
+    SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
 
     // Create an Http Client request for that file
     SC_TEST_EXPECT(context.getClient.get(eventLoop, "http://localhost:8090/file.html"));
@@ -91,11 +92,12 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Response from file"));
 
-        // Now test PUT
-        SC_TEST_EXPECT(context.putClient.put(*context.loop, "http://localhost:8090/pushed.html", "Uploaded Content"));
+        // Test PUT with a 10 ms delay between headers and body to induce two separate reads on the receiving side
+        // one with the headers, and one with the body contents, that will trigger the pipeline streaming code path.
+        SC_TEST_EXPECT(context.putStream.put(*context.loop, "http://localhost:8090/stream.html", "StreamBody", {10}));
     };
 
-    context.putClient.callback = [this, &context](HttpClient& result)
+    context.putStream.callback = [this, &context](HttpClient& result)
     {
         context.putCount++;
         StringView str(result.getResponse());
@@ -104,9 +106,26 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
 
         // Verify file content
         String content;
-        SC_TEST_EXPECT(context.fs.read("pushed.html", content));
-        SC_TEST_EXPECT(content == "Uploaded Content");
-        SC_TEST_EXPECT(context.fs.removeFile("pushed.html"));
+        SC_TEST_EXPECT(context.fs.read("stream.html", content));
+        SC_TEST_EXPECT(content == "StreamBody");
+        SC_TEST_EXPECT(context.fs.removeFile("stream.html"));
+
+        // Test PUT writing headers and body content in a single write, that will avoid the pipeline streaming code path
+        // HttpRequest::getFirstBodySlice() will contain the entire body contents.
+        SC_TEST_EXPECT(context.putInline.put(*context.loop, "http://localhost:8090/inline.html", "InlineBody"));
+    };
+    context.putInline.callback = [this, &context](HttpClient& result)
+    {
+        context.putCount++;
+        StringView str(result.getResponse());
+        // Expect 201 Created and Content-Length: 0
+        SC_TEST_EXPECT(str.containsString("201 Created"));
+
+        // Verify file content
+        String content;
+        SC_TEST_EXPECT(context.fs.read("inline.html", content));
+        SC_TEST_EXPECT(content == "InlineBody");
+        SC_TEST_EXPECT(context.fs.removeFile("inline.html"));
 
         SC_TEST_EXPECT(context.httpServer.stop());
     };
@@ -115,7 +134,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     SC_TEST_EXPECT(httpServer.close());
 
     SC_TEST_EXPECT(context.getCount == 1);
-    SC_TEST_EXPECT(context.putCount == 1);
+    SC_TEST_EXPECT(context.putCount == 2);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
 }
 

@@ -32,16 +32,18 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
         SC_TRY(sb.append(" HTTP/1.1\r\n"));
         SC_TRY(sb.append("User-agent: SC\r\n"));
         SC_TRY(sb.append("Host: 127.0.0.1\r\n\r\n"));
+        headerBytes = content.size();
     }
 
-    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
+    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
     parser      = {};
     parser.type = HttpParser::Type::Response;
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
-SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body)
+SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs delay)
 {
+    bodyDelay = delay;
     eventLoop = &loop;
 
     uint16_t      port;
@@ -73,10 +75,11 @@ SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan 
         SC_TRY(sb.append("Content-Length: "));
         SC_TRY(sb.append(cl));
         SC_TRY(sb.append("\r\n\r\n"));
+        headerBytes = content.size();
         SC_TRY(sb.append(body));
     }
 
-    connectAsync.callback.bind<HttpClient, &HttpClient::onConnected>(*this);
+    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
     parser      = {};
     parser.type = HttpParser::Type::Response;
     return connectAsync.start(*eventLoop, clientSocket, localHost);
@@ -87,26 +90,51 @@ SC::StringSpan SC::HttpClient::getResponse() const
     return StringSpan(content.toSpanConst(), false, StringEncoding::Ascii);
 }
 
-void SC::HttpClient::onConnected(AsyncSocketConnect::Result& result)
+void SC::HttpClient::startSendingHeaders(AsyncSocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
 
-    sendAsync.callback.bind<HttpClient, &HttpClient::onAfterSend>(*this);
-    auto res = sendAsync.start(*eventLoop, clientSocket, content.toSpanConst());
-    if (not res)
+    Span<const char> toSend;
+    if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
     {
-        // TODO: raise error
+        // Sending out the body in a separate async send after delay just for testing purposes
+        SC_ASSERT_RELEASE(content.toSpanConst().sliceStartLength(0, headerBytes, toSend));
+        sendAsync.callback.bind<HttpClient, &HttpClient::startWaiting>(*this);
     }
+    else
+    {
+        // Send it all
+        toSend = content.toSpanConst();
+        sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+    }
+    auto res = sendAsync.start(*eventLoop, clientSocket, toSend);
+    SC_ASSERT_RELEASE(res);
 }
 
-void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
+void SC::HttpClient::startWaiting(AsyncSocketSend::Result&)
+{
+    timeoutAsync.callback.bind<HttpClient, &HttpClient::startSendingBody>(*this);
+    auto res = timeoutAsync.start(*eventLoop, bodyDelay); // 10 ms delay
+    SC_ASSERT_RELEASE(res);
+}
+
+void SC::HttpClient::startSendingBody(AsyncLoopTimeout::Result&)
+{
+    sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+    Span<const char> bodySpan;
+    SC_ASSERT_RELEASE(content.toSpanConst().sliceStart(headerBytes, bodySpan));
+    auto res = sendAsync.start(*eventLoop, clientSocket, bodySpan);
+    SC_ASSERT_RELEASE(res);
+}
+
+void SC::HttpClient::startReceiveResponse(AsyncSocketSend::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(content.resizeWithoutInitializing(1024));
 
     receivedBytes   = 0;
     headersReceived = false;
-    receiveAsync.callback.bind<HttpClient, &HttpClient::onAfterRead>(*this);
+    receiveAsync.callback.bind<HttpClient, &HttpClient::tryParseResponse>(*this);
     auto res = receiveAsync.start(*eventLoop, clientSocket, content.toSpan());
     if (not res)
     {
@@ -114,7 +142,7 @@ void SC::HttpClient::onAfterSend(AsyncSocketSend::Result& result)
     }
 }
 
-void SC::HttpClient::onAfterRead(AsyncSocketReceive::Result& result)
+void SC::HttpClient::tryParseResponse(AsyncSocketReceive::Result& result)
 {
     receivedBytes += result.completionData.numBytes;
     SC_ASSERT_RELEASE(content.resize(receivedBytes));

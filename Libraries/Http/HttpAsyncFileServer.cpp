@@ -166,9 +166,10 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     };
     SC_TRY(stream.writableFileStream.eventFinish.addListener(OnFileWritten{connection, stream}));
 
-    if (partialBody.sizeInBytes() == connection.request.getParser().contentLength)
+    const size_t totalFileUploadBytes = connection.request.getParser().contentLength;
+    if (partialBody.sizeInBytes() == totalFileUploadBytes)
     {
-        //  Body fully received
+        // Body fully received
         stream.writableFileStream.end();
     }
     else
@@ -176,12 +177,48 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
         // Body partially received. Piping rest.
         HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
 
-        // TODO: Only write up to ContentLength and then stop to avoid abuses and support Keep-Alive
-        // The easiest way could be a transform stream that counts all bytes, stopping and unshifting excess bytes
         connection.pipeline.source   = &asyncConnection.readableSocketStream;
         connection.pipeline.sinks[0] = &stream.writableFileStream;
         SC_TRY(connection.pipeline.pipe());
         SC_TRY(connection.pipeline.start());
+        // This listener could have been a transform stream but it would be less efficient as transform
+        // streams will request a new output buffer for the transformation.
+        // Once transforms streams will be revisited to allow declaring if and how many output buffers
+        // they need, it could make sense to make the following into a transform stream instead of a
+        // raw eventData listener.
+        struct EndStreamWhenAllBytesReceived
+        {
+            AsyncReadableStream& stream;
+            size_t               remainingBytes;
+
+            void operator()(AsyncBufferView::ID bufferID)
+            {
+                Span<const char> data;
+                SC_ASSERT_RELEASE(stream.getBuffersPool().getReadableData(bufferID, data));
+                if (remainingBytes == data.sizeInBytes())
+                {
+                    // Last chunk, we can remove this listener and terminate the readable stream
+                    SC_ASSERT_RELEASE(stream.eventData.removeListener(*this));
+                    stream.destroy();
+                }
+                else if (remainingBytes > data.sizeInBytes())
+                {
+                    // Intermediate chunk, we need to continue streaming data
+                    remainingBytes -= data.sizeInBytes();
+                }
+                else if (remainingBytes < data.sizeInBytes())
+                {
+                    // This is currently an unhandled case where request streams has more data than it's expected.
+                    // TODO: Logic will need to be expanded here for keep-alive and for bad clients
+                    SC_ASSERT_RELEASE(false);
+                }
+            }
+        };
+
+        // It's important for this data event to be added last, so that it will be invoked after data has already
+        // been dispatched through the pipeline, to avoid missing the last chunk.
+        EndStreamWhenAllBytesReceived listener{asyncConnection.readableSocketStream, totalFileUploadBytes};
+        SC_ASSERT_RELEASE(asyncConnection.readableSocketStream.eventData.addListener(listener));
     }
     return Result(true);
 }
