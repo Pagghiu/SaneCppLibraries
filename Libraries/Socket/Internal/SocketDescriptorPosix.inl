@@ -157,8 +157,7 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
     return Result(isValid());
 }
 
-Result SocketNetworking::initNetworking() { return Result(true); }
-
+void SocketNetworking::initNetworking() {}
 void SocketNetworking::shutdownNetworking() {}
 bool SocketNetworking::isNetworkingInited() { return Result(true); }
 } // namespace SC

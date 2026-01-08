@@ -295,8 +295,7 @@ struct SC_COMPILER_EXPORT SocketDNS
 struct SC_COMPILER_EXPORT SocketNetworking
 {
     /// @brief Initializes Winsock2 on Windows (WSAStartup)
-    /// @return Valid Result if Winsock2 has been successfully initialized
-    [[nodiscard]] static Result initNetworking();
+    static void initNetworking();
 
     /// @brief Shutdowns Winsock2 on Windows (WSAStartup)
     static void shutdownNetworking();

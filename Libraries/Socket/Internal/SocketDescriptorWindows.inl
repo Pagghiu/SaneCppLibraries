@@ -123,15 +123,12 @@ bool SC::SocketNetworking::isNetworkingInited()
 #endif
 }
 
-SC::Result SC::SocketNetworking::initNetworking()
+void SC::SocketNetworking::initNetworking()
 {
     if (isNetworkingInited() == false)
     {
         WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0)
-        {
-            return Result::Error("WSAStartup failed");
-        }
+        SC_ASSERT_RELEASE(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
 #if SC_COMPILER_MSVC
         InterlockedExchange(&Internal::get().networkingInited, 1);
 #elif SC_COMPILER_CLANG
@@ -140,7 +137,6 @@ SC::Result SC::SocketNetworking::initNetworking()
         Internal::get().store(true);
 #endif
     }
-    return Result(true);
 }
 
 void SC::SocketNetworking::shutdownNetworking()

@@ -46,7 +46,7 @@ struct ApplicationSystem
     {
         currentThreadID = Thread::CurrentThreadID();
         lastEventTime.snap();
-        SC_TRY(SocketNetworking::initNetworking());
+        SocketNetworking::initNetworking();
         AsyncEventLoop::Options options;
 #if SC_PLATFORM_LINUX && 0
         // Just for testing purposes, we can force using epoll instead of io_uring

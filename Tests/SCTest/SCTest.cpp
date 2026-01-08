@@ -126,8 +126,7 @@ int main(int argc, const char* argv[])
     using namespace SC;
     Globals::init(Globals::Global, {1024 * 1024}); // 1MB for ownership tracking
     Console::tryAttachingToParentConsole();
-    if (not SocketNetworking::initNetworking())
-        return -2;
+    SocketNetworking::initNetworking();
     Console console;
     globalConsole = &console;
 
