@@ -640,7 +640,11 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
     if (options.blocking == false)
     {
         char pipeName[64];
+#if SC_PLATFORM_64_BIT
         snprintf(pipeName, sizeof(pipeName), "\\\\.\\pipe\\SC-%lu-%llu", ::GetCurrentProcessId(), (intptr_t)this);
+#else
+        snprintf(pipeName, sizeof(pipeName), "\\\\.\\pipe\\SC-%lu-%lu", ::GetCurrentProcessId(), (intptr_t)this);
+#endif
 
         DWORD pipeFlags = PIPE_ACCESS_INBOUND | FILE_FLAG_FIRST_PIPE_INSTANCE | FILE_FLAG_OVERLAPPED;
         DWORD pipeMode  = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;

@@ -166,7 +166,9 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     };
     SC_TRY(stream.writableFileStream.eventFinish.addListener(OnFileWritten{connection, stream}));
 
-    const size_t totalFileUploadBytes = connection.request.getParser().contentLength;
+    HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
+
+    const size_t totalFileUploadBytes = static_cast<size_t>(connection.request.getParser().contentLength);
     if (partialBody.sizeInBytes() == totalFileUploadBytes)
     {
         // Body fully received
@@ -175,8 +177,6 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     else
     {
         // Body partially received. Piping rest.
-        HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
-
         connection.pipeline.source   = &asyncConnection.readableSocketStream;
         connection.pipeline.sinks[0] = &stream.writableFileStream;
         SC_TRY(connection.pipeline.pipe());

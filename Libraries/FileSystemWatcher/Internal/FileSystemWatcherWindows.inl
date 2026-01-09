@@ -177,7 +177,7 @@ struct SC::FileSystemWatcher::Internal
         }
         return Result(true);
     }
-    static DWORD threadDispatch(LPVOID arg)
+    static DWORD WINAPI threadDispatch(LPVOID arg)
     {
         Internal& self = *static_cast<Internal*>(arg);
         self.threadRun(self.threadingRunner->thread);

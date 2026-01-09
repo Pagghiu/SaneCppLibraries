@@ -110,7 +110,11 @@ struct SC_COMPILER_EXPORT AsyncBufferView
     Type getType() const { return type; }
 
   private:
-    static constexpr int TypeErasedCaptureSize  = sizeof(void*) * 3; // This is enough to hold String / Buffer by copy
+#if SC_PLATFORM_64_BIT
+    static constexpr int TypeErasedCaptureSize = sizeof(void*) * 3; // This is enough to hold String / Buffer by copy
+#else
+    static constexpr int TypeErasedCaptureSize = sizeof(void*) * 6; // This is enough to hold String / Buffer by copy
+#endif
     static constexpr int TypeErasedGrowableSize = sizeof(void*) * 6;
 
     using GrowableStorage = AlignedStorage<TypeErasedGrowableSize>;

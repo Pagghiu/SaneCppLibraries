@@ -21,7 +21,7 @@ struct FSWThread
 {
     HANDLE thread = nullptr;
 
-    Result start(DWORD (*func)(LPVOID arg), LPVOID param)
+    Result start(LPTHREAD_START_ROUTINE func, LPVOID param)
     {
         thread = ::CreateThread(nullptr, 0, func, param, 0, nullptr);
         return thread ? Result(true) : Result::Error("CreateThread failed");
