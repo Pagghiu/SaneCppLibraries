@@ -50,7 +50,7 @@ struct SC::VirtualMemory
     [[nodiscard]] bool commit(size_t sizeInBytes);
 
     /// @brief Reclaims all unused pages past sizeInBytes (previously committed with VirtualMemory::commit)
-    [[nodiscard]] bool shrink(size_t sizeInBytes);
+    [[nodiscard]] bool decommit(size_t sizeInBytes);
 
     /// @brief Returns how many bytes are currently committed / accessible
     [[nodiscard]] size_t size() const { return committedBytes; }

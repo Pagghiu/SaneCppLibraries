@@ -1,24 +1,20 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-
-#include "Libraries/Memory/VirtualMemory.h"
+#include "../Foundation/Span.h"
+#include "../Memory/VirtualMemory.h"
 
 namespace SC
 {
+//! @addtogroup group_containers
+//! @{
 
-/// @brief A stable array that does not move its elements in memory when resized.
+/// @brief An array using a large virtual memory reservation to keep stable addresses.
 template <typename T>
-struct StableArray
+struct VirtualArray
 {
-    StableArray() = default;
-    StableArray(size_t maxCapacity) { SC_ASSERT_RELEASE(reserve(maxCapacity)); }
-    ~StableArray() { clear(); }
-
-    /// @brief Get number of reserved bytes (consuming just virtual address space)
-    [[nodiscard]] size_t getVirtualBytesCapacity() const { return virtualMemory.capacity(); }
-
-    /// @brief Get number of committed bytes (consuming physical RAM)
-    [[nodiscard]] size_t getVirtualBytesSize() const { return virtualMemory.size(); }
+    VirtualArray() = default;
+    VirtualArray(size_t maxCapacity) { SC_ASSERT_RELEASE(reserve(maxCapacity)); }
+    ~VirtualArray() { clear(); }
 
     /// @brief Releases all reserved memory.
     /// @warning Does not call destructors of contained elements (use clear() for that).
@@ -42,19 +38,20 @@ struct StableArray
     }
 
     /// @brief Clears the array calling destructors of each element and releases virtual memory.
-    [[nodiscard]] bool clearAndShrinkToFit()
+    [[nodiscard]] bool clearAndDecommit()
     {
         clear();
-        return shrinkToFit();
+        return decommit();
     }
 
     /// @brief De-commits unused-memory, while still keeping the original virtual reservation
-    [[nodiscard]] bool shrinkToFit() { return virtualMemory.shrink(sizeElements * sizeof(T)); }
+    [[nodiscard]] bool decommit() { return virtualMemory.decommit(sizeElements * sizeof(T)); }
 
     /// @brief Resizes the stable array without initializing or calling destructors.
     [[nodiscard]] bool resizeWithoutInitializing(size_t newSize)
     {
-        SC_TRY(virtualMemory.commit(newSize * sizeof(T)));
+        if (not virtualMemory.commit(newSize * sizeof(T)))
+            return false;
         sizeElements = newSize;
         return true;
     }
@@ -72,7 +69,8 @@ struct StableArray
                 items[--idx].~T();
             } while (idx != newSize);
         }
-        SC_TRY(resizeWithoutInitializing(newSize));
+        if (not resizeWithoutInitializing(newSize))
+            return false;
         if (newSize > oldSize)
         {
             size_t idx = oldSize;
@@ -117,4 +115,6 @@ struct StableArray
     size_t sizeElements     = 0;
     size_t capacityElements = 0;
 };
+//! @}
+
 } // namespace SC

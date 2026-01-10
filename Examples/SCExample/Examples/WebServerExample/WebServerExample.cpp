@@ -15,6 +15,7 @@
 #include "../ImguiHelpers.h"
 #include "imgui.h"
 
+#include "Libraries/Containers/VirtualArray.h"
 #include "Libraries/ContainersReflection/ContainersReflection.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
 #include "Libraries/Http/HttpAsyncFileServer.h"
@@ -24,7 +25,6 @@
 #include "Libraries/Threading/ThreadPool.h"
 
 #include "../ISCExample.h"
-#include "StableArray.h"
 
 namespace SC
 {
@@ -83,16 +83,16 @@ struct SC::WebServerExampleModel
     static constexpr size_t MAX_HEADER_SIZE  = 32 * 1024;   // Max number of bytes to hold request and response headers
     static constexpr size_t NUM_FS_THREADS   = 4;           // Number of threads for async file stream operations
 
-    StableArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
+    VirtualArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
 
     // For simplicity just hardcode a read queue of 3 for file streams
-    StableArray<HttpAsyncFileServer::StreamQueue<3>> fileStreams = {MAX_CONNECTIONS};
+    VirtualArray<HttpAsyncFileServer::StreamQueue<3>> fileStreams = {MAX_CONNECTIONS};
 
-    StableArray<AsyncReadableStream::Request> allReadQueues  = {MAX_CONNECTIONS * MAX_READ_QUEUE};
-    StableArray<AsyncWritableStream::Request> allWriteQueues = {MAX_CONNECTIONS * MAX_WRITE_QUEUE};
-    StableArray<AsyncBufferView>              allBuffers     = {MAX_CONNECTIONS * MAX_BUFFERS};
-    StableArray<char>                         allHeaders     = {MAX_CONNECTIONS * MAX_HEADER_SIZE};
-    StableArray<char>                         allStreams     = {MAX_CONNECTIONS * MAX_REQUEST_SIZE};
+    VirtualArray<AsyncReadableStream::Request> allReadQueues  = {MAX_CONNECTIONS * MAX_READ_QUEUE};
+    VirtualArray<AsyncWritableStream::Request> allWriteQueues = {MAX_CONNECTIONS * MAX_WRITE_QUEUE};
+    VirtualArray<AsyncBufferView>              allBuffers     = {MAX_CONNECTIONS * MAX_BUFFERS};
+    VirtualArray<char>                         allHeaders     = {MAX_CONNECTIONS * MAX_HEADER_SIZE};
+    VirtualArray<char>                         allStreams     = {MAX_CONNECTIONS * MAX_REQUEST_SIZE};
 
     Result start()
     {
@@ -149,7 +149,7 @@ struct SC::WebServerExampleModel
         SC_TRY(fileServer.close());
         SC_TRY(httpServer.close());
         SC_TRY(threadPool.destroy());
-        SC_TRY(clients.clearAndShrinkToFit()); // Invokes destructors and de-commits virtual memory
+        SC_TRY(clients.clearAndDecommit()); // Invokes destructors and de-commits virtual memory
         return Result(true);
     }
 

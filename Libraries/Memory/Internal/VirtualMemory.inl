@@ -86,7 +86,7 @@ bool SC::VirtualMemory::commit(size_t sizeInBytes)
     return true;
 }
 
-bool SC::VirtualMemory::shrink(size_t sizeInBytes)
+bool SC::VirtualMemory::decommit(size_t sizeInBytes)
 {
     if (memory == nullptr)
         return false;

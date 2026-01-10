@@ -63,14 +63,14 @@ void SC::VirtualMemoryTest::virtualMemory()
     SC_TEST_EXPECT(memcmp(memory, reference, moreThanOnePageSize) == 0);
 
     // Now let's de-commit everything but the first page
-    SC_TEST_EXPECT(virtualMemory.shrink(lessThanOnePageSize));
+    SC_TEST_EXPECT(virtualMemory.decommit(lessThanOnePageSize));
 
     // Address should stay stable
     SC_TEST_EXPECT(memory == virtualMemory.data());
     SC_TEST_EXPECT(memcmp(memory, reference, lessThanOnePageSize) == 0);
 
     // Decommit everything (not really needed if we're going to release() soon)
-    SC_TEST_EXPECT(virtualMemory.shrink(0));
+    SC_TEST_EXPECT(virtualMemory.decommit(0));
     SC_TEST_EXPECT(memory == virtualMemory.data());
 
     // Finally release (don't forget, VirtualMemory has no destructor!)
