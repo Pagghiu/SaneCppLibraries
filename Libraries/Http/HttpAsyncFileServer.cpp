@@ -173,6 +173,7 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     {
         // Body fully received
         stream.writableFileStream.end();
+        asyncConnection.readableSocketStream.destroy();
     }
     else
     {

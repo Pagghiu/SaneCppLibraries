@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "HttpConnection.h"
 #include "Internal/HttpStringAppend.h"
-#include <stdio.h>
 
 namespace SC
 {
