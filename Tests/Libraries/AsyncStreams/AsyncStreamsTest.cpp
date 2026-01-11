@@ -48,6 +48,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             writableStream();
         }
+        if (test_section("createChildView"))
+        {
+            createChildView();
+        }
     }
 
     void event();
@@ -55,6 +59,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void readableSyncStream();
     void readableAsyncStream();
     void writableStream();
+    void createChildView();
 };
 
 void SC::AsyncStreamsTest::circularQueue()
@@ -374,6 +379,82 @@ void SC::AsyncStreamsTest::writableStream()
     SC_TEST_EXPECT(context.numAsyncWrites == 7);
     writable.end();
     SC_TEST_EXPECT(context.concatenated == "1234567");
+}
+
+void SC::AsyncStreamsTest::createChildView()
+{
+    constexpr size_t numberOfBuffers = 4;
+    AsyncBufferView  buffers[numberOfBuffers];
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(100));
+    // Create parent buffer
+    buffers[0] = Span<char>(buffer.toSpan().data(), 100);
+    buffers[0].setReusable(true);
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    // Get a buffer and fill it with data
+    AsyncBufferView::ID parentID;
+    Span<char>          parentData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(100, parentID, parentData));
+    const char* testData = "Hello World! This is a test buffer for child views.";
+    memcpy(parentData.data(), testData, strlen(testData));
+
+    // Create child view
+    AsyncBufferView::ID childID;
+    SC_TEST_EXPECT(pool.createChildView(parentID, 6, 11, childID)); // "World"
+
+    // Check child data
+    Span<const char> childData;
+    SC_TEST_EXPECT(pool.getReadableData(childID, childData));
+    SC_TEST_EXPECT(childData.sizeInBytes() == 11);
+    SC_TEST_EXPECT(memcmp(childData.data(), "World! This ", 11) == 0);
+
+    // Verify writable data on child (since parent is writable)
+    Span<char> childWritableData;
+    SC_TEST_EXPECT(pool.getWritableData(childID, childWritableData));
+    SC_TEST_EXPECT(childWritableData.sizeInBytes() == 11);
+    childWritableData[0] = 'W'; // "World"
+
+    // Create grandchild view (child of child)
+    AsyncBufferView::ID grandchildID;
+    SC_TEST_EXPECT(
+        pool.createChildView(childID, 7, 4, grandchildID)); // "This" (relative to child: 7+6=13 relative to parent)
+
+    Span<const char> grandchildData;
+    SC_TEST_EXPECT(pool.getReadableData(grandchildID, grandchildData));
+    SC_TEST_EXPECT(grandchildData.sizeInBytes() == 4);
+    SC_TEST_EXPECT(memcmp(grandchildData.data(), "This", 4) == 0);
+
+    // Test error cases
+    AsyncBufferView::ID invalidID;
+    SC_TEST_EXPECT(not pool.createChildView(AsyncBufferView::ID(999), 0, 10, invalidID)); // Invalid parent
+    SC_TEST_EXPECT(not pool.createChildView(parentID, 90, 20, invalidID));                // Out of bounds
+
+    // Verify resizing child view
+    pool.setNewBufferSize(childID, 5); // Resize to 5 ("World")
+    SC_TEST_EXPECT(pool.getReadableData(childID, childData));
+    SC_TEST_EXPECT(childData.sizeInBytes() == 5);
+    SC_TEST_EXPECT(memcmp(childData.data(), "World", 5) == 0);
+
+    pool.setNewBufferSize(childID, 10); // Try to expand back (should be ignored)
+    SC_TEST_EXPECT(pool.getReadableData(childID, childData));
+    SC_TEST_EXPECT(childData.sizeInBytes() == 5); // Still 5
+
+    // Test refcount: when we unref child, parent should still be ref'd
+    // Initially parent has 3 refs (1 from request + 1 from child + 1 from grandchild)
+    pool.unrefBuffer(childID); // Child deleted, parent refs = 2
+    SC_TEST_EXPECT(pool.getBuffer(childID) == nullptr);
+
+    Span<const char> stillValid;
+    SC_TEST_EXPECT(pool.getReadableData(parentID, stillValid)); // Parent still accessible
+
+    pool.unrefBuffer(grandchildID); // Grandchild deleted, parent refs = 1
+    SC_TEST_EXPECT(pool.getBuffer(grandchildID) == nullptr);
+
+    pool.unrefBuffer(parentID); // Now unref parent, parent refs = 0
+    // parentID is NOT nullptr because it was marked as reusable!
+    SC_TEST_EXPECT(pool.getBuffer(parentID) != nullptr);
 }
 
 namespace SC

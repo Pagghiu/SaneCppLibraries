@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncStreams.h"
 #include "../Foundation/Assert.h"
-#include "../Foundation/Deferred.h"
 
 namespace SC
 {
@@ -24,24 +23,23 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
     buffer->refs--;
     if (buffer->refs == 0)
     {
-        switch (buffer->type)
+        if (buffer->type == AsyncBufferView::Type::Child)
         {
-        case AsyncBufferView::Type::Writable:
-            if (buffer->reUse)
-            {
-                buffer->writableData = buffer->originalWritableData;
-            }
-            break;
-        case AsyncBufferView::Type::ReadOnly:
-            if (buffer->reUse)
-            {
-                buffer->readonlyData = buffer->originalReadonlyData;
-            }
-            break;
-        case AsyncBufferView::Type::Growable: break;
-        case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
+            unrefBuffer(buffer->parentID);
         }
-        if (not buffer->reUse)
+        if (buffer->reUse)
+        {
+            buffer->offset = 0;
+            switch (buffer->type)
+            {
+            case AsyncBufferView::Type::Writable: buffer->length = buffer->writableData.sizeInBytes(); break;
+            case AsyncBufferView::Type::ReadOnly: buffer->length = buffer->readonlyData.sizeInBytes(); break;
+            case AsyncBufferView::Type::Growable: break;
+            case AsyncBufferView::Type::Child: SC_ASSERT_RELEASE(false); break; // Child views are never reusable
+            case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+            }
+        }
+        else
         {
             *buffer = {};
         }
@@ -51,17 +49,43 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
 Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<const char>& data)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getData - Invalid bufferID");
+    SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getReadableData - Invalid bufferID");
     switch (buffer->type)
     {
-    case AsyncBufferView::Type::Writable: data = buffer->writableData; break;
-    case AsyncBufferView::Type::ReadOnly: data = buffer->readonlyData; break;
+    case AsyncBufferView::Type::Writable: {
+        Span<const char> constWritable = buffer->writableData;
+        SC_TRY(constWritable.sliceStartLength(buffer->offset, buffer->length, data));
+        break;
+    }
+    case AsyncBufferView::Type::ReadOnly:
+        SC_TRY(buffer->readonlyData.sliceStartLength(buffer->offset, buffer->length, data));
+        break;
     case AsyncBufferView::Type::Growable: {
         AsyncBufferView::GrowableStorage storage;
 
-        auto da = buffer->getGrowableBuffer(storage, true)->getDirectAccess();
-        data    = {static_cast<char*>(da.data), da.sizeInBytes};
+        auto             da       = buffer->getGrowableBuffer(storage, true)->getDirectAccess();
+        Span<const char> fullData = {static_cast<char*>(da.data), da.sizeInBytes};
+        SC_TRY(fullData.sliceStartLength(buffer->offset, buffer->length, data));
         (void)buffer->getGrowableBuffer(storage, false); // destruct
+        break;
+    }
+    case AsyncBufferView::Type::Child: {
+        AsyncBufferView* parent = getBuffer(buffer->parentID);
+        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::getReadableData - Invalid parentID");
+        if (parent->type == AsyncBufferView::Type::Growable)
+        {
+            AsyncBufferView::GrowableStorage storage;
+
+            auto             da           = parent->getGrowableBuffer(storage, true)->getDirectAccess();
+            Span<const char> rootFullData = {static_cast<const char*>(da.data), da.sizeInBytes};
+            SC_TRY(rootFullData.sliceStartLength(buffer->offset, buffer->length, data));
+            buffer->readonlyData = data;                     // Update for debugging visibility
+            (void)parent->getGrowableBuffer(storage, false); // destruct
+        }
+        else
+        {
+            data = buffer->readonlyData;
+        }
         break;
     }
     case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
@@ -73,8 +97,32 @@ Result AsyncBuffersPool::getWritableData(AsyncBufferView::ID bufferID, Span<char
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
     SC_TRY_MSG(buffer != nullptr, "AsyncBuffersPool::getWritableData - Invalid bufferID");
-    SC_TRY_MSG(buffer->type == AsyncBufferView::Type::Writable, "AsyncBuffersPool::getWritableData - Readonly buffer");
-    data = buffer->writableData;
+    switch (buffer->type)
+    {
+    case AsyncBufferView::Type::Writable:
+        SC_TRY(buffer->writableData.sliceStartLength(buffer->offset, buffer->length, data));
+        break;
+    case AsyncBufferView::Type::Child: {
+        AsyncBufferView* parent = getBuffer(buffer->parentID);
+        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::getWritableData - Invalid parentID");
+        if (parent->type == AsyncBufferView::Type::Growable)
+        {
+            AsyncBufferView::GrowableStorage storage;
+
+            auto       da           = parent->getGrowableBuffer(storage, true)->getDirectAccess();
+            Span<char> rootFullData = {static_cast<char*>(da.data), da.sizeInBytes};
+            SC_TRY(rootFullData.sliceStartLength(buffer->offset, buffer->length, data));
+            buffer->writableData = data;                     // Update for debugging visibility
+            (void)parent->getGrowableBuffer(storage, false); // destruct
+        }
+        else
+        {
+            data = buffer->writableData;
+        }
+        break;
+    }
+    default: return Result::Error("AsyncBuffersPool::getWritableData - Readonly or Growable buffer");
+    }
     return Result(true);
 }
 
@@ -94,28 +142,26 @@ Result AsyncBuffersPool::requestNewBuffer(size_t minimumSizeInBytes, AsyncBuffer
     {
         if (buffer.type == AsyncBufferView::Type::Empty)
             continue;
-        if (buffer.refs == 0 and buffer.writableData.sizeInBytes() >= minimumSizeInBytes)
+        if (buffer.refs == 0)
         {
-            buffer.refs = 1;
-
-            switch (buffer.type)
+            if (buffer.type == AsyncBufferView::Type::Growable)
             {
-            case AsyncBufferView::Type::Writable: buffer.originalWritableData = buffer.writableData; break;
-            case AsyncBufferView::Type::ReadOnly: buffer.originalReadonlyData = buffer.readonlyData; break;
-            case AsyncBufferView::Type::Growable: {
                 AsyncBufferView::GrowableStorage storage;
 
-                auto da = buffer.getGrowableBuffer(storage, true)->getDirectAccess();
-
-                buffer.writableData         = {static_cast<char*>(da.data), da.sizeInBytes};
-                buffer.originalWritableData = {static_cast<char*>(da.data), da.sizeInBytes};
+                auto da             = buffer.getGrowableBuffer(storage, true)->getDirectAccess();
+                buffer.writableData = {static_cast<char*>(da.data), da.sizeInBytes};
                 (void)buffer.getGrowableBuffer(storage, false); // destruct
-                break;
             }
-            case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+            if (buffer.writableData.sizeInBytes() >= minimumSizeInBytes)
+            {
+                buffer.refs   = 1;
+                buffer.offset = 0;
+                buffer.length = buffer.writableData.sizeInBytes();
+
+                bufferID =
+                    AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(&buffer - buffers.begin()));
+                return getWritableData(bufferID, data);
             }
-            bufferID = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(&buffer - buffers.begin()));
-            return getWritableData(bufferID, data);
         }
     }
     return Result::Error("AsyncBuffersPool::requestNewBuffer failed");
@@ -129,15 +175,25 @@ void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t new
         switch (buffer->type)
         {
         case AsyncBufferView::Type::Writable:
-            if ((newSizeInBytes < buffer->originalWritableData.sizeInBytes()))
+        case AsyncBufferView::Type::ReadOnly:
+            if (newSizeInBytes <= buffer->writableData.sizeInBytes() - buffer->offset)
             {
-                buffer->writableData = {buffer->writableData.data(), newSizeInBytes};
+                buffer->length = newSizeInBytes;
             }
             break;
-        case AsyncBufferView::Type::ReadOnly:
-            if ((newSizeInBytes < buffer->originalReadonlyData.sizeInBytes()))
+        case AsyncBufferView::Type::Child:
+            if (newSizeInBytes <= buffer->length)
             {
-                buffer->readonlyData = {buffer->readonlyData.data(), newSizeInBytes};
+                buffer->length = newSizeInBytes;
+                // Update internal spans for debugger visibility (Child views are disposable)
+                if (not buffer->writableData.empty())
+                {
+                    (void)buffer->writableData.sliceStartLength(0, newSizeInBytes, buffer->writableData);
+                }
+                if (not buffer->readonlyData.empty())
+                {
+                    (void)buffer->readonlyData.sliceStartLength(0, newSizeInBytes, buffer->readonlyData);
+                }
             }
             break;
         case AsyncBufferView::Type::Growable: {
@@ -148,14 +204,13 @@ void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t new
             {
                 auto da = growable->getDirectAccess();
 
-                buffer->writableData         = {static_cast<char*>(da.data), da.sizeInBytes};
-                buffer->originalWritableData = {static_cast<char*>(da.data), da.sizeInBytes};
+                buffer->writableData = {static_cast<char*>(da.data), da.sizeInBytes};
+                buffer->offset       = 0;
+                buffer->length       = da.sizeInBytes;
             }
             (void)buffer->getGrowableBuffer(storage, false); // destruct
             break;
         }
-
-        break;
         case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
         }
     }
@@ -167,8 +222,16 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
     {
         if (buffers[idx].getType() == AsyncBufferView::Type::Empty)
         {
+            if (buffer.type == AsyncBufferView::Type::Growable and buffer.length == 0)
+            {
+                AsyncBufferView::GrowableStorage storage;
+
+                auto da       = buffer.getGrowableBuffer(storage, true)->getDirectAccess();
+                buffer.length = da.sizeInBytes;
+                (void)buffer.getGrowableBuffer(storage, false); // destruct
+            }
             buffer.refs  = 0;
-            buffers[idx] = buffer;
+            buffers[idx] = move(buffer);
             bufferID     = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(idx));
             return Result(true);
         }
@@ -188,6 +251,72 @@ Result AsyncBuffersPool::sliceInEqualParts(Span<AsyncBufferView> buffers, Span<c
         buffers[sliceIdx].setReusable(true); // We want to recycle these buffers
     }
     return Result(true);
+}
+
+Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, size_t offset, size_t length,
+                                         AsyncBufferView::ID& outChildBufferID)
+{
+    AsyncBufferView* parent = getBuffer(parentBufferID);
+    SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::createChildView - Invalid parent bufferID");
+
+    AsyncBufferView::ID rootParentID = parentBufferID;
+    size_t              rootOffset   = parent->offset + offset;
+
+    // Flatten nested child views
+    while (parent->type == AsyncBufferView::Type::Child)
+    {
+        rootParentID = parent->parentID;
+        parent       = getBuffer(rootParentID);
+        SC_TRY_MSG(parent != nullptr, "AsyncBuffersPool::createChildView - Internal Error (Invalid parent ID)");
+    }
+
+    Span<const char> rootFullData;
+    // We need the full data of the root parent to check bounds
+    switch (parent->type)
+    {
+    case AsyncBufferView::Type::Writable: rootFullData = parent->writableData; break;
+    case AsyncBufferView::Type::ReadOnly: rootFullData = parent->readonlyData; break;
+    case AsyncBufferView::Type::Growable: {
+        AsyncBufferView::GrowableStorage storage;
+
+        auto da      = parent->getGrowableBuffer(storage, true)->getDirectAccess();
+        rootFullData = {static_cast<const char*>(da.data), da.sizeInBytes};
+        (void)parent->getGrowableBuffer(storage, false); // destruct
+        break;
+    }
+    default: return Result::Error("AsyncBuffersPool::createChildView - Invalid root parent type");
+    }
+
+    SC_TRY_MSG(rootOffset + length <= rootFullData.sizeInBytes(),
+               "AsyncBuffersPool::createChildView - Offset and length out of bounds");
+
+    for (size_t idx = 0; idx < buffers.sizeInElements(); ++idx)
+    {
+        if (buffers[idx].type == AsyncBufferView::Type::Empty)
+        {
+            AsyncBufferView& child = buffers[idx];
+            child.type             = AsyncBufferView::Type::Child;
+            child.parentID         = rootParentID;
+            child.offset           = rootOffset;
+            child.length           = length;
+            child.refs             = 1;
+            // Pre-calculate data span for debugging visibility
+            if (parent->type == AsyncBufferView::Type::ReadOnly)
+            {
+                (void)rootFullData.sliceStartLength(rootOffset, length, child.readonlyData);
+            }
+            else
+            {
+                // Root is Writable or Growable (treated as writable here)
+                Span<char> rootWritableData = {const_cast<char*>(rootFullData.data()), rootFullData.sizeInBytes()};
+                (void)rootWritableData.sliceStartLength(rootOffset, length, child.writableData);
+            }
+            refBuffer(rootParentID); // Increment parent's refcount
+            outChildBufferID = AsyncBufferView::ID(static_cast<AsyncBufferView::ID::NumericType>(idx));
+            return Result(true);
+        }
+    }
+    return Result::Error("AsyncBuffersPool::createChildView - No space in buffer pool");
 }
 
 //-------------------------------------------------------------------------------------------------------

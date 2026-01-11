@@ -65,11 +65,24 @@ struct SC_COMPILER_EXPORT AsyncBufferView
         Writable,
         ReadOnly,
         Growable,
+        Child,
     };
 
-    AsyncBufferView() { type = Type::Empty; }
-    AsyncBufferView(Span<char> data) : writableData(data) { type = Type::Writable; }
-    AsyncBufferView(Span<const char> data) : readonlyData(data) { type = Type::ReadOnly; }
+    AsyncBufferView() : writableData(), offset(0), length(0), refs(0), type(Type::Empty), reUse(false) {}
+    AsyncBufferView(Span<char> data) : writableData(data)
+    {
+        type     = Type::Writable;
+        offset   = 0;
+        length   = data.sizeInBytes();
+        parentID = ID();
+    }
+    AsyncBufferView(Span<const char> data) : readonlyData(data)
+    {
+        type     = Type::ReadOnly;
+        offset   = 0;
+        length   = data.sizeInBytes();
+        parentID = ID();
+    }
 
     /// @brief Tags this AsyncBufferView as reusable after its refCount goes to zero
     void setReusable(bool reusable) { reUse = reusable; }
@@ -80,7 +93,10 @@ struct SC_COMPILER_EXPORT AsyncBufferView
     template <typename T>
     AsyncBufferView(T&& t) // universal reference, it can capture both lvalue and rvalue
     {
-        type = Type::Growable;
+        type     = Type::Growable;
+        offset   = 0;
+        length   = 0;
+        parentID = ID();
         // Here we're type-erasing T in our own inline storage provided by a slightly oversized Function<>
         // that it will be able to construct (and destruct) the right GrowableBuffer<T> from just a piece of storage
         // and return a pointer to the corresponding IGrowableBuffer* interface
@@ -105,6 +121,8 @@ struct SC_COMPILER_EXPORT AsyncBufferView
     {
         readonlyData = {literal, N - 1};
         type         = Type::ReadOnly;
+        offset       = 0;
+        length       = N - 1;
     }
 
     Type getType() const { return type; }
@@ -122,20 +140,18 @@ struct SC_COMPILER_EXPORT AsyncBufferView
 
     union
     {
-        Span<char>       writableData = {};
+        Span<char>       writableData;
         Span<const char> readonlyData;
     };
+    AsyncBufferView::ID parentID;
 
-    union
-    {
-        Span<char>       originalWritableData = {};
-        Span<const char> originalReadonlyData;
-    };
     friend struct AsyncBuffersPool;
 
-    int32_t refs = 0;      // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
-    Type    type;          // If it's Empty, Writable, ReadOnly or Growable
-    bool    reUse = false; // If it can be re-used after refs == 0
+    size_t  offset = 0;
+    size_t  length = 0;
+    int32_t refs   = 0;           // Counts AsyncReadable (single) or AsyncWritable (multiple) using it
+    Type    type   = Type::Empty; // If it's Empty, Writable, ReadOnly, Growable or Child
+    bool    reUse  = false;       // If it can be re-used after refs == 0
 };
 
 /// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams
@@ -175,6 +191,10 @@ struct SC_COMPILER_EXPORT AsyncBuffersPool
 
     /// @brief Gets size of buffers held by the pool
     [[nodiscard]] size_t getNumBuffers() const { return buffers.sizeInElements(); }
+
+    /// @brief Creates a child view that references a slice of the parent buffer
+    Result createChildView(AsyncBufferView::ID parentBufferID, size_t offset, size_t length,
+                           AsyncBufferView::ID& outChildBufferID);
 
   private:
     /// @brief Span of buffers to be filled in by the user
