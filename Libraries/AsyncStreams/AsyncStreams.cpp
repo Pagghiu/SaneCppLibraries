@@ -398,6 +398,15 @@ bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
     return state == State::AsyncPushing or state == State::SyncPushing;
 }
 
+Result AsyncReadableStream::unshift(AsyncBufferView::ID bufferID)
+{
+    Request request;
+    request.bufferID = bufferID;
+    SC_TRY_MSG(readQueue.pushFront(request), "readable unshift failed");
+    buffers->refBuffer(bufferID); // 1. refBuffer
+    return Result(true);
+}
+
 void AsyncReadableStream::reactivate(bool doReactivate)
 {
     switch (state)
@@ -502,7 +511,11 @@ void AsyncReadableStream::destroy()
 void AsyncReadableStream::executeRead()
 {
     state = State::Reading;
-    while (true)
+    if (not readQueue.isEmpty())
+    {
+        emitOnData();
+    }
+    while (state == State::Reading)
     {
         const Result res = asyncRead();
         if (res)
@@ -652,7 +665,7 @@ Result AsyncWritableStream::unshift(AsyncBufferView::ID bufferID, Function<void(
     request.bufferID = bufferID;
     buffers->refBuffer(bufferID);
     // Let's push this request in front instead of to the back
-    SC_TRY_MSG(writeQueue.pushFront(request), "unshift failed");
+    SC_TRY_MSG(writeQueue.pushFront(request), "writable unshift failed");
     return Result(true);
 }
 

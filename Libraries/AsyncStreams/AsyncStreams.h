@@ -257,6 +257,9 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @return `true` if the caller can continue pushing
     [[nodiscard]] bool push(AsyncBufferView::ID bufferID, size_t newSize);
 
+    /// @brief Push back a buffer to the front of the read queue (e.g. for un-consumed data)
+    Result unshift(AsyncBufferView::ID bufferID);
+
     /// @brief Use pushEnd from inside AsyncReadableStream::asyncRead to signal production end
     void pushEnd();
 

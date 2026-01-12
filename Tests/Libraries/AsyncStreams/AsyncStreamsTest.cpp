@@ -52,6 +52,10 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             createChildView();
         }
+        if (test_section("unshift"))
+        {
+            unshift();
+        }
     }
 
     void event();
@@ -60,6 +64,7 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void readableAsyncStream();
     void writableStream();
     void createChildView();
+    void unshift();
 };
 
 void SC::AsyncStreamsTest::circularQueue()
@@ -455,6 +460,81 @@ void SC::AsyncStreamsTest::createChildView()
     pool.unrefBuffer(parentID); // Now unref parent, parent refs = 0
     // parentID is NOT nullptr because it was marked as reusable!
     SC_TEST_EXPECT(pool.getBuffer(parentID) != nullptr);
+}
+
+void SC::AsyncStreamsTest::unshift()
+{
+    AsyncBufferView::ID bufferID;
+    Span<char>          data;
+    AsyncBufferView     buffers[1];
+    Buffer              buffer;
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(123));
+    buffers[0] = buffer.toSpan();
+    buffers[0].setReusable(true);
+
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    AsyncReadableStream          readable;
+    AsyncReadableStream::Request requests[3];
+    readable.setReadQueue(requests); // Capacity 2
+    SC_TEST_EXPECT(readable.init(pool));
+
+    SC_TEST_EXPECT(readable.getBuffersPool().requestNewBuffer(123, bufferID, data));
+
+    // 1. Manually unshift a buffer
+    char content[] = "123";
+    memcpy(data.data(), content, 3);
+    readable.getBuffersPool().setNewBufferSize(bufferID, 3);
+    SC_TRUST_RESULT(readable.unshift(bufferID));
+    // Release our reference so that the stream is the only owner and can recycle it after emission
+    pool.unrefBuffer(bufferID);
+
+    struct TestContext
+    {
+        AsyncReadableStream& stream;
+        int                  step    = 0;
+        bool                 success = true;
+    } ctx{readable};
+
+    readable.asyncRead = [&ctx]() -> Result
+    {
+        ctx.step++;
+        // We do nothing here, just waiting for push
+        return Result(true);
+    };
+
+    // 2. Start reading, it should immediately receive the unshifted buffer
+    SC_TEST_EXPECT(readable.eventData.addListener(
+        [&ctx](AsyncBufferView::ID id)
+        {
+            Span<const char> readData;
+            SC_TRUST_RESULT(ctx.stream.getBuffersPool().getReadableData(id, readData));
+            StringView str = StringView(readData, false, StringEncoding::Ascii);
+            if (str != "123")
+                ctx.success = false;
+            // Should be received before asyncRead is even called or right at start
+            if (ctx.step != 0)
+                ctx.success = false;
+        }));
+
+    SC_TRUST_RESULT(readable.start());
+    SC_TEST_EXPECT(ctx.success);
+
+    // Cleanup to allow re-use of buffer for next check
+    // In this test we only have 1 buffer so we rely on unref happening in emitOnData (which calls unrefBuffer)
+    // But readableStream.emitOnData calls `buffers->unrefBuffer(request.bufferID)`
+
+    // We need to check if we can push again.
+    // Since we consumed the buffer in the listener (implied by just receiving it, we don't unref it ourselves if we
+    // don't hold it, but wait, readable stream unrefs it when emitting). So the buffer should indeed be free now if
+    // refs went to 0.
+
+    AsyncBufferView::ID bufferID2;
+    Span<char>          data2;
+    // Verify we can still push normally after unshift
+    SC_TRUST_RESULT(readable.getBuffersPool().requestNewBuffer(123, bufferID2, data2));
+    SC_TEST_EXPECT(readable.push(bufferID2, 10));
 }
 
 namespace SC
