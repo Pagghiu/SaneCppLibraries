@@ -148,7 +148,7 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
     Span<char> readData;
     SC_ASSERT_RELEASE(client.buffersPool.getWritableData(bufferID, readData));
 
-    if (not client.request.writeHeaders(maxHeaderSize, readData))
+    if (not client.request.writeHeaders(maxHeaderSize, readData, client.readableSocketStream, bufferID))
     {
         // TODO: Invoke on error
         return;

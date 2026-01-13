@@ -46,36 +46,39 @@ void HttpRequest::reset()
     parser             = {};
 }
 
-Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readData)
+Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readData, AsyncReadableStream& stream,
+                                 AsyncBufferView::ID bufferID)
 {
     // TODO: Handle error for available headers not big enough
     SC_TRY_MSG(readData.sizeInBytes() <= availableHeader.sizeInBytes(), "HttpRequest::parseHeaders - readData");
-    ::memcpy(availableHeader.data(), readData.data(), readData.sizeInBytes());
-
-    readHeaders = {readHeaders.data(), readHeaders.sizeInBytes() + readData.sizeInBytes()};
-
-    const bool hasHeaderSpace = availableHeader.sliceStart(readData.sizeInBytes(), availableHeader);
-
-    if (not hasHeaderSpace)
-    {
-        parsedSuccessfully = false;
-        return Result::Error("Header space is finished");
-    }
-
-    if (readHeaders.sizeInBytes() > maxSize)
-    {
-        parsedSuccessfully = false;
-        return Result::Error("Header size exceeded limit");
-    }
+    const Span<const char> initialReadData = readData;
 
     size_t readBytes;
     while (parsedSuccessfully and not readData.empty())
     {
         Span<const char> parsedData;
         parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
-        parsedSuccessfully &= readData.sliceStart(readBytes, readData);
+
+        const size_t bytesToCopy = readBytes;
+        ::memcpy(availableHeader.data(), readData.data(), bytesToCopy);
+        readHeaders = {readHeaders.data(), readHeaders.sizeInBytes() + bytesToCopy};
+
+        const bool hasHeaderSpace = availableHeader.sliceStart(bytesToCopy, availableHeader);
+        if (not hasHeaderSpace)
+        {
+            parsedSuccessfully = false;
+            return Result::Error("Header space is finished");
+        }
+
+        if (readHeaders.sizeInBytes() > maxSize)
+        {
+            parsedSuccessfully = false;
+            return Result::Error("Header size exceeded limit");
+        }
+
         if (parser.state == HttpParser::State::Finished)
             break;
+
         if (parser.state == HttpParser::State::Result)
         {
             HttpHeaderOffset header;
@@ -95,9 +98,20 @@ Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readDa
             {
                 headersEndReceived = true;
                 SC_TRY(findParserToken(HttpParser::Token::Url, url));
+                if (readBytes < readData.sizeInBytes())
+                {
+                    AsyncBufferView::ID childID;
+                    const char* const   bodyStartPtr = readData.data() + readBytes;
+                    const size_t        bodyOffset   = static_cast<size_t>(bodyStartPtr - initialReadData.data());
+                    const size_t        bodyLength   = initialReadData.sizeInBytes() - bodyOffset;
+
+                    SC_TRY(stream.getBuffersPool().createChildView(bufferID, bodyOffset, bodyLength, childID));
+                    SC_TRY(stream.unshift(childID));
+                }
                 break;
             }
         }
+        parsedSuccessfully &= readData.sliceStart(readBytes, readData);
     }
     return Result(parsedSuccessfully);
 }
@@ -111,21 +125,6 @@ size_t HttpRequest::getHeadersLength() const
             return static_cast<size_t>(last.start + last.length);
     }
     return 0;
-}
-
-StringSpan HttpRequest::getFirstBodySlice() const
-{
-    const size_t len  = getHeadersLength();
-    const size_t crlf = 2; // \r\n
-    if (len > 0 and len + crlf < readHeaders.sizeInBytes())
-    {
-        Span<char> body;
-        if (readHeaders.sliceStartLength(len + crlf, readHeaders.sizeInBytes() - len - crlf, body))
-        {
-            return StringSpan(body, false, StringEncoding::Ascii);
-        }
-    }
-    return {};
 }
 
 //-------------------------------------------------------------------------------------------------------
