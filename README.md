@@ -87,7 +87,7 @@ See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_u
 - [SCTest Suite](Tests/Libraries) showcases most functionalities of all libraries.
   Check [Building (contributor)](https://pagghiu.github.io/SaneCppLibraries/page_building_contributor.html) for details.
 - [Documentation](https://pagghiu.github.io/SaneCppLibraries/libraries.html) page of each library embeds some examples and / or code snippets.
-- [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) showcases the [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) event loop integration with a GUI and usage of [Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html).
+- [Examples](https://pagghiu.github.io/SaneCppLibraries/page_examples.html) showcases some basic examples like an `AsyncWebServer` and a more advanced `SCExample` an [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html) event loop integration with a GUI and usage of [Plugin](https://pagghiu.github.io/SaneCppLibraries/library_plugin.html).
 - [Tools](https://pagghiu.github.io/SaneCppLibraries/page_tools.html) is a collection of repository / code automation tools built using libraries themselves
   - Includes a fully self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/page_build.html) build system (generator) where builds are imperatively described using C++ code.
 

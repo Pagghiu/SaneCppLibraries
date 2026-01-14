@@ -88,9 +88,9 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
 
 static constexpr StringView TEST_PROJECT_NAME = "SCTest";
 
-Result buildTestProject(const Parameters& parameters, Project& project)
+Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
-    project = {TargetType::ConsoleExecutable, TEST_PROJECT_NAME};
+    Project project = {TargetType::ConsoleExecutable, TEST_PROJECT_NAME};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -157,12 +157,13 @@ Result buildTestProject(const Parameters& parameters, Project& project)
     specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"}); // Clang Only
     project.addSpecificFileFlags(specificFiles);
 
+    SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
 }
 
-Result buildInteropSTL(const Parameters& parameters, Project& project)
+Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspace)
 {
-    project = {TargetType::ConsoleExecutable, "InteropSTL"};
+    Project project = {TargetType::ConsoleExecutable, "InteropSTL"};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -179,20 +180,20 @@ Result buildInteropSTL(const Parameters& parameters, Project& project)
 
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
     project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
-    project.addIncludePaths({
-        ".", // Libraries path
-    });
+    project.addIncludePaths({"."}); // Libraries path
     addSaneCppLibraries(project, parameters);
     project.addFiles("Tests/InteropSTL", "*.cpp");
     project.addFiles("Tests/InteropSTL", "*.h");
+
+    workspace.projects.push_back(move(project));
     return Result(true);
 }
 
 static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
-Result buildExampleProject(const Parameters& parameters, Project& project)
+Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 {
-    project = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
+    Project project = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -250,10 +251,63 @@ Result buildExampleProject(const Parameters& parameters, Project& project)
     }
     project.addFiles("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
     project.addFiles("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
+
+    SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
 }
 
-Result buildSingleFileLibs(Definition& definition, const Parameters& parameters)
+Result configureExamplesConsole(const Parameters& parameters, Workspace& workspace)
+{
+    // Read all projects from Examples directory
+    FileSystemIterator::FolderState entries[2];
+
+    FileSystemIterator fsi;
+
+    String path;
+    SC_TRY(Path::join(path, {parameters.directories.libraryDirectory.view(), "Examples"}));
+
+    fsi.init(path.view(), entries);
+
+    // Create a project for folder containing a .cpp file
+    while (fsi.enumerateNext())
+    {
+        FileSystemIterator::Entry entry = fsi.get();
+        if (not entry.isDirectory() or entry.name == EXAMPLE_PROJECT_NAME)
+            continue;
+
+        StringView name, extension;
+        SC_TRY(Path::parseNameExtension(entry.name, name, extension));
+
+        Project project;
+        project.targetType = TargetType::ConsoleExecutable;
+        project.name       = name;
+        project.targetName = name;
+        // All relative paths are evaluated from this project root directory.
+        project.setRootDirectory(parameters.directories.libraryDirectory.view());
+        project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+        project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+#if 0 // Flip this ifdef to add all Sane C++ Libraries instead of using the SC.cpp unity build
+        addSaneCppLibraries(project, parameters);
+#else
+        project.addFile("SC.cpp"); // Unity build file including all Sane C++ Libraries
+        if (parameters.platform == Platform::Apple)
+        {
+            project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
+        }
+
+        if (parameters.platform != Platform::Windows)
+        {
+            project.addLinkLibraries({"dl", "pthread"});
+        }
+#endif
+        project.addFiles(entry.path, "**.cpp");
+        workspace.projects.push_back(move(project));
+    }
+    return Result(true);
+}
+
+Result configureSingleFileLibs(Definition& definition, const Parameters& parameters)
 {
     Workspace workspace = {"SCSingleFileLibs"};
 
@@ -309,23 +363,23 @@ Result buildSingleFileLibs(Definition& definition, const Parameters& parameters)
     definition.workspaces.push_back(move(workspace));
     return Result(true);
 }
-static constexpr StringView DEFAULT_WORKSPACE_NAME = "SCWorkspace";
+static constexpr StringView DEFAULT_WORKSPACE = "SCWorkspace";
 
 Result configure(Definition& definition, const Parameters& parameters)
 {
-    Workspace workspace = {DEFAULT_WORKSPACE_NAME};
-    SC_TRY(workspace.projects.resize(3));
-    SC_TRY(buildTestProject(parameters, workspace.projects[0]));
-    SC_TRY(buildExampleProject(parameters, workspace.projects[1]));
-    SC_TRY(buildInteropSTL(parameters, workspace.projects[2]))
-    definition.workspaces.push_back(move(workspace));
+    Workspace defaultWorkspace = {DEFAULT_WORKSPACE};
+    SC_TRY(configureTests(parameters, defaultWorkspace));
+    SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
+    SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
+    SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));
+    definition.workspaces.push_back(move(defaultWorkspace));
 
-    // Ignore errors from building single file libraries
-    (void)buildSingleFileLibs(definition, parameters);
+    // Ignore errors from configuring single file libraries
+    (void)configureSingleFileLibs(definition, parameters);
     return Result(true);
 }
 SC_COMPILER_WARNING_POP;
 
-Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE_NAME); }
+Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE); }
 } // namespace Build
 } // namespace SC

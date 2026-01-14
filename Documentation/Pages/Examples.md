@@ -16,7 +16,7 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 |:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
 | Location      | `Examples/SCExample`                                                                                                              |
 | Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs and I/O to save CPU time  |
-| Purposes      | Use [SC::Build](@ref page_build) to build on macOS, windows and linux and [SC::Async](@ref library_async) as I/O event Loop    |
+| Purposes      | Use [SC::Build](@ref page_build) to build on macOS, windows and linux and [SC::Async](@ref library_async) as I/O event Loop       |
 |               | Use [Plugin](@ref library_plugin) and [FileSystemWatcher](@ref library_file_system_watcher) libraries implementing hot-reload     |
 | Prerequisites | Linux - Fedora: `sudo dnf install mesa-libGL-devel mesa-libEGL-devel libX11-devel libXi-devel libXcursor-devel`                   |
 |               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
@@ -26,8 +26,26 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 | Run (Posix)   | `./SC.sh build run SCExample` (will also compile before running)                                                                  |
 | Run (Windows) | `SC.bat build run SCExample`  (will also compile before running)                                                                  |
 | Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
-| Debug (XCode) | Open `_Build/_Projects/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                                  |
-| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                                   |
+| Debug (XCode) | Open `_Build/_Projects/SCWorkspace/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                      |
+| Debug (VS2022)| Open `_Build/_Projects/SCWorkspace/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                       |
+
+## AsyncWebServerExample
+
+| Property      | Value                                                                                                                             |
+|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
+| Location      | `Examples/AsyncWebServer`                                                                                                         |
+| Description   | Simple Http server listening on port 8090 by default, serving a folder for a static website.                                      |
+| Purposes      | Show how to create an http server with a runtime configurable set of buffers                                                      |
+| Prerequisites | Linux: None                                                                                                                       |
+|               | Windows: None                                                                                                                     |
+|               | macOS: None                                                                                                                       |
+| Dependencies  | None                                                                                                                              |
+| Run (Posix)   | `Examples/AsyncWebServer/BuildAndRun.sh` (will also compile before running)                                                       |
+| Run (Windows) | `Examples/AsyncWebServer/BuildAndRun.bat` (will also compile before running)                                                      |
+| Parameters    | All parameters can be added after `BuildAndRun` for example `BuildAndRun.sh --directory /somedir`:                                |
+|               | `--directory /path/to/dir`: Serves the given folder                                                                               |
+| Debug (XCode) | Open `_Build/_Projects/SCWorkspace/XCode/AsyncWebServer.xcodeproj` and choose `Product` --> `Run`                                 |
+| Debug (VS2022)| Open `_Build/_Projects/SCWorkspace/VisualStudio2022/AsyncWebServer.sln` and start Debugging (F5)                                  |
 
 # Blog
 
