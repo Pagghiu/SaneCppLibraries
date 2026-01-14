@@ -1,27 +1,15 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../Threading/Atomic.h"
-
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
 #if _MSC_VER
 extern "C"
 {
-    long __stdcall _InterlockedExchangeAdd(long volatile* Addend, long Value);
-    long __stdcall _InterlockedExchange(long volatile* Target, long Value);
-    long __stdcall _InterlockedOr(long volatile* Destination, long Value);
-    long __stdcall _InterlockedCompareExchange(long volatile* Destination, long Exchange, long Comparand);
-    char __stdcall _InterlockedExchange8(char volatile* Target, char Value);
-    char __stdcall _InterlockedOr8(char volatile* Destination, char Value);
     char __stdcall _InterlockedCompareExchange8(char volatile* Destination, char Exchange, char Comparand);
 #if defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC)
-    long __stdcall _InterlockedExchangeAdd_acq(long volatile* Addend, long Value);
-    long __stdcall _InterlockedExchangeAdd_nf(long volatile* Addend, long Value);
-    long __stdcall _InterlockedExchangeAdd_rel(long volatile* Addend, long Value);
-    long __stdcall _InterlockedExchange_acq(long volatile* Target, long Value);
-    long __stdcall _InterlockedExchange_nf(long volatile* Target, long Value);
-    long __stdcall _InterlockedExchange_rel(long volatile* Target, long Value);
-    long __stdcall _InterlockedCompareExchange_acq(long volatile* Destination, long Exchange, long Comparand);
-    long __stdcall _InterlockedCompareExchange_nf(long volatile* Destination, long Exchange, long Comparand);
-    long __stdcall _InterlockedCompareExchange_rel(long volatile* Destination, long Exchange, long Comparand);
     char __stdcall _InterlockedExchange8_acq(char volatile* Target, char Value);
     char __stdcall _InterlockedExchange8_nf(char volatile* Target, char Value);
     char __stdcall _InterlockedExchange8_rel(char volatile* Target, char Value);
