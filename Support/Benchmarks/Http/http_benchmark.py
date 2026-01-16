@@ -186,8 +186,7 @@ def wait_for_server(url, timeout=10):
     while time.time() - start_time < timeout:
         try:
             response = requests.get(url, timeout=1)
-            if response.status_code == 200:
-                return True
+            return True
         except:
             pass
         time.sleep(0.5)
@@ -297,9 +296,13 @@ async def run_benchmark(server_name, server_url, directory_path, mode='directory
         median_rps = statistics.median(rps_values)
         median_throughput = statistics.median(throughput_values)
 
+        # Calculate means first
+        rps_mean = statistics.mean(rps_values)
+        throughput_mean = statistics.mean(throughput_values)
+
         # Calculate coefficient of variation (CV) for stability assessment
-        rps_cv = statistics.stdev(rps_values) / statistics.mean(rps_values) if len(rps_values) > 1 else 0
-        throughput_cv = statistics.stdev(throughput_values) / statistics.mean(throughput_values) if len(throughput_values) > 1 else 0
+        rps_cv = statistics.stdev(rps_values) / rps_mean if len(rps_values) > 1 and rps_mean != 0 else 0
+        throughput_cv = statistics.stdev(throughput_values) / throughput_mean if len(throughput_values) > 1 and throughput_mean != 0 else 0
 
         stats = {
             'server_name': server_name,
@@ -442,19 +445,41 @@ def main():
         print(f"AsyncWebServer: {async_rps:.2f} requests/sec, {async_throughput:.2f} MB/s")
         print(f"Python HTTP Server: {python_rps:.2f} requests/sec, {python_throughput:.2f} MB/s")
 
-        if async_rps > python_rps:
-            rps_diff = ((async_rps - python_rps) / python_rps) * 100
-            print(f"AsyncWebServer is {rps_diff:.1f}% faster in requests/sec")
+        if async_rps > 0 or python_rps > 0:
+            if async_rps > python_rps:
+                if python_rps > 0:
+                    rps_diff = ((async_rps - python_rps) / python_rps) * 100
+                    print(f"AsyncWebServer is {rps_diff:.1f}% faster in requests/sec")
+                else:
+                    print(f"AsyncWebServer is faster (Python RPS was 0)")
+            elif python_rps > async_rps:
+                if async_rps > 0:
+                    rps_diff = ((python_rps - async_rps) / async_rps) * 100
+                    print(f"Python HTTP Server is {rps_diff:.1f}% faster in requests/sec")
+                else:
+                    print(f"Python HTTP Server is faster (AsyncWebServer RPS was 0)")
+            else:
+                print("Both servers have equal requests/sec")
         else:
-            rps_diff = ((python_rps - async_rps) / async_rps) * 100
-            print(f"Python HTTP Server is {rps_diff:.1f}% faster in requests/sec")
+            print("RPS comparison not available (both servers reported 0 requests/sec)")
 
-        if async_throughput > python_throughput:
-            throughput_diff = ((async_throughput - python_throughput) / python_throughput) * 100
-            print(f"AsyncWebServer has {throughput_diff:.1f}% higher throughput")
+        if async_throughput > 0 or python_throughput > 0:
+            if async_throughput > python_throughput:
+                if python_throughput > 0:
+                    throughput_diff = ((async_throughput - python_throughput) / python_throughput) * 100
+                    print(f"AsyncWebServer has {throughput_diff:.1f}% higher throughput")
+                else:
+                    print(f"AsyncWebServer has higher throughput (Python throughput was 0)")
+            elif python_throughput > async_throughput:
+                if async_throughput > 0:
+                    throughput_diff = ((python_throughput - async_throughput) / async_throughput) * 100
+                    print(f"Python HTTP Server has {throughput_diff:.1f}% higher throughput")
+                else:
+                    print(f"Python HTTP Server has higher throughput (AsyncWebServer throughput was 0)")
+            else:
+                print("Both servers have equal throughput")
         else:
-            throughput_diff = ((python_throughput - async_throughput) / async_throughput) * 100
-            print(f"Python HTTP Server has {throughput_diff:.1f}% higher throughput")
+            print("Throughput comparison not available (both servers reported 0 MB/s)")
 
     # Save results to file if requested
     if args.output:
