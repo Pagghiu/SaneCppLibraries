@@ -43,6 +43,7 @@ struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
     SocketDescriptor     socket;
+    uint32_t             requestCount = 0; ///< Number of requests processed on this connection
 };
 
 /// @brief Adds compile-time configurable read and write queues to HttpAsyncConnectionBase
@@ -121,20 +122,44 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     Result stop();
 
     /// @brief Returns true if the server has been started
-    [[nodiscard]] bool isStarted() const { return started; }
+    [[nodiscard]] bool isStarted() const { return state == State::Started; }
 
     [[nodiscard]] const HttpConnectionsPool& getConnections() const { return connections; }
 
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
 
+    /// @brief Set default keep-alive behavior for all connections
+    /// @param enabled true to keep connections alive by default (HTTP/1.1 default)
+    /// @note Can be overridden per-response via HttpResponse::setKeepAlive()
+    void setDefaultKeepAlive(bool enabled) { defaultKeepAlive = enabled; }
+
+    /// @brief Get the default keep-alive setting
+    [[nodiscard]] bool getDefaultKeepAlive() const { return defaultKeepAlive; }
+
+    /// @brief Set maximum requests per keep-alive connection
+    /// @param maxRequests Maximum requests before closing connection (0 = unlimited)
+    void setMaxRequestsPerConnection(uint32_t maxRequests) { maxRequestsPerConnection = maxRequests; }
+
+    /// @brief Get the maximum requests per connection
+    [[nodiscard]] uint32_t getMaxRequestsPerConnection() const { return maxRequestsPerConnection; }
+
   private:
     HttpConnectionsPool connections;
 
     uint32_t maxHeaderSize = 8 * 1024;
 
-    bool started  = false;
-    bool stopping = false;
+    enum class State
+    {
+        Stopped,  // Server was not started at all, or it was stopped and wait(ed)ForStopToFinish
+        Started,  // Server has been started (successfully)
+        Stopping, // Server has stop() called and needs waitForStopToFinish() call
+    };
+
+    State state = State::Stopped;
+
+    bool     defaultKeepAlive         = true; ///< Server-wide keep-alive default
+    uint32_t maxRequestsPerConnection = 0;    ///< Max requests per connection (0 = unlimited)
 
     void onNewClient(AsyncSocketAccept::Result& result);
     void closeAsync(HttpAsyncConnectionBase& requestClient);

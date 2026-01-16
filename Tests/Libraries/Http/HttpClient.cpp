@@ -5,22 +5,23 @@
 #include "Libraries/Http/Internal/HttpStringAppend.h"
 #include <stdio.h> // snprintf
 
-SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
+SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOpen)
 {
-    eventLoop = &loop;
+    eventLoop          = &loop;
+    keepConnectionOpen = keepOpen;
 
-    uint16_t      port;
+    // Parse URL
     HttpURLParser urlParser;
     SC_TRY(urlParser.parse(url));
     SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
-    // TODO: Make DNS Resolution asynchronous
-    char       buffer[256];
-    Span<char> ipAddress = {buffer};
-    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
-    port = urlParser.port;
-    SocketIPAddress localHost;
-    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
-    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+
+    // Reset state for new request
+    parser          = {};
+    parser.type     = HttpParser::Type::Response;
+    receivedBytes   = 0;
+    parsedBytes     = 0;
+    contentLen      = 0;
+    headersReceived = false;
 
     {
         GrowableBuffer<decltype(content)> gb = {content};
@@ -31,14 +32,38 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url)
         SC_TRY(sb.append(urlParser.path));
         SC_TRY(sb.append(" HTTP/1.1\r\n"));
         SC_TRY(sb.append("User-agent: SC\r\n"));
-        SC_TRY(sb.append("Host: 127.0.0.1\r\n\r\n"));
+        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        if (keepConnectionOpen)
+        {
+            SC_TRY(sb.append("Connection: keep-alive\r\n"));
+        }
+        SC_TRY(sb.append("\r\n"));
         headerBytes = content.size();
     }
 
-    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
-    parser      = {};
-    parser.type = HttpParser::Type::Response;
-    return connectAsync.start(*eventLoop, clientSocket, localHost);
+    // If we don't have an active connection or we're not keeping connections open, create a new one
+    if (not hasActiveConnection or not keepConnectionOpen)
+    {
+        uint16_t port;
+        // TODO: Make DNS Resolution asynchronous
+        char       buffer[256];
+        Span<char> ipAddress = {buffer};
+        SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
+        port = urlParser.port;
+        SocketIPAddress localHost;
+        SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
+        SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+        hasActiveConnection = true;
+
+        connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
+        return connectAsync.start(*eventLoop, clientSocket, localHost);
+    }
+    else
+    {
+        // Reuse existing connection - go directly to sending headers
+        startSendingHeadersOnExistingConnection();
+        return Result(true);
+    }
 }
 
 SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs delay)
@@ -94,6 +119,25 @@ void SC::HttpClient::startSendingHeaders(AsyncSocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
 
+    Span<const char> toSend;
+    if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
+    {
+        // Sending out the body in a separate async send after delay just for testing purposes
+        SC_ASSERT_RELEASE(content.toSpanConst().sliceStartLength(0, headerBytes, toSend));
+        sendAsync.callback.bind<HttpClient, &HttpClient::startWaiting>(*this);
+    }
+    else
+    {
+        // Send it all
+        toSend = content.toSpanConst();
+        sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+    }
+    auto res = sendAsync.start(*eventLoop, clientSocket, toSend);
+    SC_ASSERT_RELEASE(res);
+}
+
+void SC::HttpClient::startSendingHeadersOnExistingConnection()
+{
     Span<const char> toSend;
     if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
     {
@@ -174,11 +218,14 @@ void SC::HttpClient::tryParseResponse(AsyncSocketReceive::Result& result)
     }
     if (content.size() == parsedBytes + contentLen)
     {
-        SC_ASSERT_RELEASE(clientSocket.close());
-        if (not result.completionData.disconnected)
+        // If we're not keeping the connection open, or if the server closed the connection, close it
+        if (not keepConnectionOpen or result.completionData.disconnected)
         {
-            callback(*this);
+            SC_ASSERT_RELEASE(clientSocket.close());
+            hasActiveConnection = false;
         }
+        // Call the callback regardless
+        callback(*this);
     }
     else
     {

@@ -36,6 +36,7 @@ Result HttpAsyncServer::resizeInternal(SpanWithStride<HttpAsyncConnectionBase> c
 
 Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
+    SC_TRY_MSG(state == State::Stopped, "Must be in stopped state");
     SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::start - init not called");
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
@@ -48,7 +49,7 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
     asyncServerAccept.setDebugName("HttpConnectionsPool");
     asyncServerAccept.callback.bind<HttpAsyncServer, &HttpAsyncServer::onNewClient>(*this);
     SC_TRY(asyncServerAccept.start(*eventLoop, serverSocket));
-    started = true;
+    state = State::Started;
     return Result(true);
 }
 
@@ -61,9 +62,9 @@ Result HttpAsyncServer::close()
 
 Result HttpAsyncServer::stop()
 {
-    stopping = true;
+    SC_TRY_MSG(state == State::Started, "Must be in started state");
 
-    auto deferStop = MakeDeferred([this]() { stopping = false; });
+    state = State::Stopping;
     if (not asyncServerAccept.isFree())
     {
         SC_TRY(asyncServerAccept.stop(*eventLoop));
@@ -82,6 +83,7 @@ Result HttpAsyncServer::stop()
 
 Result HttpAsyncServer::waitForStopToFinish()
 {
+    SC_TRY_MSG(state == State::Stopping, "Must be in stopping state");
     while (connections.getNumActiveConnections() > 0)
     {
         SC_TRY(eventLoop->runNoWait());
@@ -105,7 +107,7 @@ Result HttpAsyncServer::waitForStopToFinish()
             SC_ASSERT_RELEASE(client.pipeline.unpipe());
         }
     } while (checkAgainAllClients);
-    started = false;
+    state = State::Stopped;
     return Result(true);
 }
 
@@ -156,6 +158,15 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
     else if (client.request.headersEndReceived)
     {
         client.response.grabUnusedHeaderMemory(client.request);
+
+        // Set default keep-alive from server config if not explicitly set by user
+        // Also respect the client's Connection header
+        if (not client.response.isKeepAliveExplicitlySet())
+        {
+            // Use server default AND client's request header (both must want keep-alive)
+            client.response.setKeepAlive(defaultKeepAlive and client.request.getParser().connectionKeepAlive);
+        }
+
         if (client.request.getParser().contentLength == 0)
         {
             // If there is no body, we destroy the stream to cancel pending reads
@@ -174,7 +185,45 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
             void operator()()
             {
                 SC_ASSERT_RELEASE(client.response.writableStream->eventFinish.removeListener(*this));
-                pself.closeAsync(client);
+
+                // Determine if we should keep the connection alive
+                const bool underMaxRequests =
+                    (pself.maxRequestsPerConnection == 0) or (client.requestCount + 1 < pself.maxRequestsPerConnection);
+                const bool shouldKeepAlive = client.response.getKeepAlive() and underMaxRequests;
+
+                if (shouldKeepAlive and pself.state == State::Started) // We may get some after-writes after server stop
+                {
+                    // Increment request count
+                    client.requestCount++;
+
+                    // Reset request and response for next request
+                    client.request.reset();
+                    client.request.availableHeader = client.headerMemory;
+                    (void)client.request.availableHeader.sliceStartLength(0, 0, client.request.readHeaders);
+                    client.response.reset();
+                    client.response.writableStream = &client.writableSocketStream;
+                    client.response.grabUnusedHeaderMemory(client.request);
+
+                    // Re-initialize streams for next request
+                    // Both streams need to be reset for keep-alive reuse
+                    client.writableSocketStream.destroy(); // Reset writable stream after previous response
+                    SC_ASSERT_RELEASE(client.socket.isValid());
+                    Result writableRes =
+                        client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
+                    Result readableRes =
+                        client.readableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
+
+                    SC_TRUST_RESULT(writableRes);
+                    SC_TRUST_RESULT(readableRes);
+                    SC_TRUST_RESULT(client.readableSocketStream.start());
+                    // Re-register for next request headers
+                    SC_ASSERT_RELEASE(
+                        client.readableSocketStream.eventData.addListener(EventDataListener{pself, client}));
+                }
+                else
+                {
+                    pself.closeAsync(client);
+                }
             }
         };
         SC_ASSERT_RELEASE(client.response.writableStream->eventFinish.addListener(AfterWrite{*this, client}));
@@ -187,11 +236,13 @@ void HttpAsyncServer::closeAsync(HttpAsyncConnectionBase& client)
     {
         return;
     }
+    if (client.requestCount == 0)
+        client.requestCount = 0;
     SC_TRUST_RESULT(client.socket.close());
     const bool wasFull = connections.getNumActiveConnections() == connections.getNumTotalConnections();
 
     SC_TRUST_RESULT(connections.deactivate(client.getConnectionID()));
-    if (wasFull and not stopping)
+    if (wasFull and state == State::Started)
     {
         // onNewClient has paused asyncAccept (by avoiding reactivation) for lack of available clients.
         // Now a client has just been made available so it's possible to start accepting again.

@@ -20,8 +20,9 @@ struct HttpClient
     /// @brief Setups this client to execute a `GET` request on the given url
     /// @param loop The AsyncEventLoop to use for monitoring network packets
     /// @param url The url to `GET`
+    /// @param keepConnectionOpen If true, keeps the connection open for subsequent requests
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
-    Result get(AsyncEventLoop& loop, StringSpan url);
+    Result get(AsyncEventLoop& loop, StringSpan url, bool keepConnectionOpen = false);
 
     /// @brief Setups this client to execute a `PUT` request on the given url with a body
     /// @param loop The AsyncEventLoop to use for monitoring network packets
@@ -39,6 +40,7 @@ struct HttpClient
   private:
     void startWaiting(AsyncSocketSend::Result& result);
     void startSendingHeaders(AsyncSocketConnect::Result& result);
+    void startSendingHeadersOnExistingConnection();
     void startSendingBody(AsyncLoopTimeout::Result& result);
     void startReceiveResponse(AsyncSocketSend::Result& result);
     void tryParseResponse(AsyncSocketReceive::Result& result);
@@ -60,6 +62,9 @@ struct HttpClient
     AsyncLoopTimeout   timeoutAsync;
     SocketDescriptor   clientSocket;
     AsyncEventLoop*    eventLoop = nullptr;
+
+    bool hasActiveConnection = false; ///< Whether we have an active connection that can be reused
+    bool keepConnectionOpen  = false; ///< Whether to keep connections open for reuse
 };
 //! @}
 } // namespace SC

@@ -21,10 +21,11 @@ struct SC_COMPILER_EXPORT HttpParser
     };
     Method method = Method::HttpGET; ///< Http method
 
-    size_t   tokenStart    = 0; ///< Offset in bytes to start of parsed token
-    size_t   tokenLength   = 0; ///< Length in bytes of parsed token
-    uint32_t statusCode    = 0; ///< Parsed http status code
-    uint64_t contentLength = 0; ///< Content-Length of http request
+    size_t   tokenStart          = 0;    ///< Offset in bytes to start of parsed token
+    size_t   tokenLength         = 0;    ///< Length in bytes of parsed token
+    uint32_t statusCode          = 0;    ///< Parsed http status code
+    uint64_t contentLength       = 0;    ///< Content-Length of http request
+    bool     connectionKeepAlive = true; ///< Connection header: true=keep-alive (HTTP/1.1 default), false=close
 
     /// @brief State of the parser
     enum class State
@@ -69,7 +70,8 @@ struct SC_COMPILER_EXPORT HttpParser
     /// @brief Header types
     enum class HeaderType
     {
-        ContentLength = 0 ///< Content-Length header
+        ContentLength = 0, ///< Content-Length header
+        Connection    = 1  ///< Connection header (keep-alive or close)
     };
 
     /// @brief Check if current result matches this HeaderType
@@ -81,9 +83,10 @@ struct SC_COMPILER_EXPORT HttpParser
     int    topLevelCoroutine     = 0;
     int    nestedParserCoroutine = 0;
     bool   parsedContentLength   = false;
+    bool   parsedConnection      = false;
     size_t matchIndex            = 0;
 
-    static constexpr size_t numMatches = 1;
+    static constexpr size_t numMatches = 2;
 
     size_t   matchingHeader[numMatches]      = {0};
     bool     matchingHeaderValid[numMatches] = {false};
@@ -93,6 +96,7 @@ struct SC_COMPILER_EXPORT HttpParser
     [[nodiscard]] bool parseHeaderValue(char currentChar);
     [[nodiscard]] bool parseStatusCode(char currentChar);
     [[nodiscard]] bool parseNumberValue(char currentChar);
+    [[nodiscard]] bool parseConnectionValue(char currentChar);
     [[nodiscard]] bool parseHeadersEnd(char currentChar);
     [[nodiscard]] bool parseMethod(char currentChar);
     [[nodiscard]] bool parseUrl(char currentChar);

@@ -85,6 +85,17 @@ struct SC_COMPILER_EXPORT HttpResponse
     /// @brief Obtain writable stream for sending content back to connected client
     AsyncWritableStream& getWritableStream() { return *writableStream; }
 
+    /// @brief Sets whether to keep the connection alive after this response
+    /// @param keepAlive true to keep connection open for more requests, false to close after response
+    void setKeepAlive(bool keepAlive);
+
+    /// @brief Gets whether the connection should be kept alive after this response
+    /// @return true if connection should be kept alive
+    [[nodiscard]] bool getKeepAlive() const { return keepAlive; }
+
+    /// @brief Returns true if setKeepAlive was explicitly called
+    [[nodiscard]] bool isKeepAliveExplicitlySet() const { return keepAliveExplicitlySet; }
+
   private:
     friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;
@@ -96,6 +107,10 @@ struct SC_COMPILER_EXPORT HttpResponse
     size_t     responseHeadersCapacity = 0;
 
     bool headersSent = false;
+
+    bool keepAlive              = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
+    bool keepAliveExplicitlySet = false; ///< Whether setKeepAlive was explicitly called
+    bool connectionHeaderAdded  = false; ///< Whether Connection header was manually added
 
     AsyncWritableStream* writableStream = nullptr;
 };

@@ -195,9 +195,17 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
             }
             else if (remainingBytes < data.sizeInBytes())
             {
-                // This is currently an unhandled case where request streams has more data than it's expected.
-                // TODO: Logic will need to be expanded here for keep-alive and for bad clients
-                SC_ASSERT_RELEASE(false);
+                // HTTP Pipelining: excess data belongs to next request
+                // Create a child view for the excess bytes and unshift it back into the stream
+                const size_t        excessOffset = remainingBytes;
+                const size_t        excessLength = data.sizeInBytes() - remainingBytes;
+                AsyncBufferView::ID childID;
+                SC_ASSERT_RELEASE(
+                    readable.getBuffersPool().createChildView(bufferID, excessOffset, excessLength, childID));
+                SC_ASSERT_RELEASE(readable.unshift(childID));
+
+                SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
+                readable.destroy();
             }
         }
     };

@@ -240,6 +240,22 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                     SC_CO_RETURN(topLevelCoroutine, Result(true));
                 } while (state == State::Parsing);
             }
+            else if (matchesHeader(HeaderType::Connection) and not parsedConnection)
+            {
+                parsedConnection = true;
+
+                globalStart += globalLength;
+                tokenStart   = globalStart;
+                tokenLength  = 0;
+                globalLength = 0;
+                matchIndex   = 0;
+                do
+                {
+                    SC_TRY(
+                        (process<&HttpParser::parseConnectionValue, Token::HeaderValue>(data, readBytes, parsedData)));
+                    SC_CO_RETURN(topLevelCoroutine, Result(true));
+                } while (state == State::Parsing);
+            }
             else
             {
                 //------------------------
@@ -264,8 +280,8 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
 
 bool SC::HttpParser::matchesHeader(HeaderType headerName) const
 {
-    auto headerIndex = static_cast<int>(headerName);
-    if (headerIndex > 0)
+    auto headerIndex = static_cast<size_t>(headerName);
+    if (headerIndex >= numMatches)
         return false;
     return matchingHeaderValid[headerIndex];
 }
@@ -414,7 +430,7 @@ bool SC::HttpParser::parseVersion(char currentChar)
 
 bool SC::HttpParser::parseHeaderName(char currentChar)
 {
-    static constexpr StringSpan headers[] = {"Content-Length"};
+    static constexpr StringSpan headers[] = {"Content-Length", "Connection"};
 
     SC_CO_BEGIN(nestedParserCoroutine);
     matchIndex = 0;
@@ -554,6 +570,65 @@ bool SC::HttpParser::parseNumberValue(char currentChar)
         {
             return false;
         }
+    }
+    SC_CO_FINISH(nestedParserCoroutine);
+    return true;
+}
+
+bool SC::HttpParser::parseConnectionValue(char currentChar)
+{
+    // Matches "close" to set connectionKeepAlive = false
+    // Any other value (like "keep-alive") keeps the default true
+    static constexpr char closeStr[] = "close";
+
+    SC_CO_BEGIN(nestedParserCoroutine);
+    // Skip leading spaces
+    while (currentChar == ' ')
+    {
+        tokenLength--;
+        tokenStart++;
+        SC_CO_RETURN(nestedParserCoroutine, true);
+    }
+    // Reset matchIndex to track matching "close"
+    matchIndex = 0;
+    while (true)
+    {
+        if (currentChar == '\r')
+        {
+            tokenLength--;
+            SC_CO_RETURN(nestedParserCoroutine, true);
+            if (currentChar != '\n')
+            {
+                return false;
+            }
+            tokenLength--;
+            // Check if we matched "close" (5 characters)
+            if (matchIndex == 5)
+            {
+                connectionKeepAlive = false;
+            }
+            state = State::Result;
+            break;
+        }
+        // Track if current char matches "close"
+        if (matchIndex < 5)
+        {
+            char c = currentChar;
+            // Case insensitive comparison
+            if (c >= 'A' and c <= 'Z')
+            {
+                c = static_cast<char>(c + ('a' - 'A'));
+            }
+            if (c == closeStr[matchIndex])
+            {
+                matchIndex++;
+            }
+            else
+            {
+                matchIndex = 6; // Mismatch, mark as not matching
+            }
+        }
+        SC_CO_RETURN(nestedParserCoroutine, true);
     }
     SC_CO_FINISH(nestedParserCoroutine);
     return true;

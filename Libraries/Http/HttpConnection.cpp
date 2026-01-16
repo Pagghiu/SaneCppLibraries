@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpConnection.h"
 #include "Internal/HttpStringAppend.h"
+#include "Internal/HttpStringIterator.h"
 
 namespace SC
 {
@@ -153,6 +154,28 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
+
+    // Check if this is a Connection header and update keep-alive flags accordingly
+    if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Connection")))
+    {
+        connectionHeaderAdded = true;
+
+        // HTTP/1.1 defines "keep-alive" and "close" as valid Connection values
+        if (HttpStringIterator::equalsIgnoreCase(headerValue, StringSpan("keep-alive")))
+        {
+            keepAlive              = true;
+            keepAliveExplicitlySet = true;
+        }
+        else if (HttpStringIterator::equalsIgnoreCase(headerValue, StringSpan("close")) ||
+                 HttpStringIterator::equalsIgnoreCase(
+                     headerValue, StringSpan("Closed"))) // Handle non-standard "Closed" used in tests
+        {
+            keepAlive              = false;
+            keepAliveExplicitlySet = true;
+        }
+        // For any other value, we don't change the flags
+    }
+
     GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
     HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
@@ -172,6 +195,19 @@ Result HttpResponse::sendHeaders()
         GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
 
         HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+
+        // Auto-add Connection header only if not already added manually
+        if (not connectionHeaderAdded)
+        {
+            if (keepAlive)
+            {
+                SC_TRY(sb.append("Connection: keep-alive\r\n"));
+            }
+            else
+            {
+                SC_TRY(sb.append("Connection: close\r\n"));
+            }
+        }
         SC_TRY(sb.append("\r\n"));
     }
     SC_TRY(writableStream->write(responseHeaders, {})); // headers first
@@ -192,7 +228,21 @@ void HttpResponse::grabUnusedHeaderMemory(HttpRequest& request)
     responseHeadersCapacity = request.availableHeader.sizeInBytes();
 }
 
-void HttpResponse::reset() { headersSent = false; }
+void HttpResponse::reset()
+{
+    headersSent             = false;
+    keepAlive               = true;
+    keepAliveExplicitlySet  = false;
+    connectionHeaderAdded   = false;
+    responseHeaders         = {};
+    responseHeadersCapacity = 0;
+}
+
+void HttpResponse::setKeepAlive(bool value)
+{
+    keepAlive              = value;
+    keepAliveExplicitlySet = true;
+}
 
 //-------------------------------------------------------------------------------------------------------
 // HttpConnectionsPool
