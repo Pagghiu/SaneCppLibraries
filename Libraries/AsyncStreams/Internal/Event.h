@@ -109,10 +109,9 @@ struct SC_COMPILER_EXPORT Event
     {
         if (idx < 0 or idx >= numListeners)
             return false;
-        listeners[idx] = {};
-        if (idx + 1 != numListeners)
+        for (int curr = idx; curr < numListeners - 1; curr++)
         {
-            listeners[idx] = move(listeners[numListeners - 1]);
+            listeners[curr] = move(listeners[curr + 1]);
         }
         numListeners--;
         return true;
