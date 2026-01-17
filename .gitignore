@@ -1,6 +1,7 @@
 **/xcuserdata
 **/.DS_Store
 **/.sync
+**/.venv*
 **/compile_commands.json
 _*/
 .cache
