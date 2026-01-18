@@ -764,7 +764,7 @@ void AsyncWritableStream::end()
 
 void AsyncWritableStream::destroy()
 {
-    if (state != State::Ended or state != State::Ending)
+    if (state != State::Ended and state != State::Ending)
     {
         // Bypass canEndWritable when destroying
         decltype(canEndWritable) backupCanEnd = move(canEndWritable);
