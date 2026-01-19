@@ -174,5 +174,6 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     AsyncSocketAccept asyncServerAccept;
 
     struct EventDataListener;
+    struct EventEndListener;
 };
 } // namespace SC

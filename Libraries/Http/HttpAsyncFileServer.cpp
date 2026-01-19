@@ -112,7 +112,10 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Connection", "close"));
+        if (not connection.response.getKeepAlive())
+        {
+            SC_TRY(connection.response.addHeader("Connection", "close"));
+        }
 
         SC_TRY(connection.response.sendHeaders());
 
@@ -123,7 +126,10 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
     {
         SC_TRY(connection.response.startResponse(404));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Connection", "close"));
+        if (not connection.response.getKeepAlive())
+        {
+            SC_TRY(connection.response.addHeader("Connection", "close"));
+        }
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }
@@ -175,18 +181,23 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     // raw eventData listener.
     struct EndStreamWhenAllBytesReceived
     {
-        AsyncReadableStream& readable;
-        size_t               remainingBytes;
+        HttpAsyncConnectionBase& connection;
+
+        size_t remainingBytes = 0;
 
         void operator()(AsyncBufferView::ID bufferID)
         {
+            AsyncReadableStream& readable = *connection.pipeline.source;
+            AsyncWritableStream& writable = *connection.pipeline.sinks[0];
+            AsyncBuffersPool&    buffers  = readable.getBuffersPool();
+
             Span<const char> data;
-            SC_ASSERT_RELEASE(readable.getBuffersPool().getReadableData(bufferID, data));
+            SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
             if (remainingBytes == data.sizeInBytes())
             {
-                // Last chunk, we can remove this listener and terminate the readable stream
+                // Last chunk, we can remove this listener and terminate the writable stream
                 SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
-                readable.destroy();
+                writable.end();
             }
             else if (remainingBytes > data.sizeInBytes())
             {
@@ -197,22 +208,23 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
             {
                 // HTTP Pipelining: excess data belongs to next request
                 // Create a child view for the excess bytes and unshift it back into the stream
-                const size_t        excessOffset = remainingBytes;
-                const size_t        excessLength = data.sizeInBytes() - remainingBytes;
+                const size_t excessOffset = remainingBytes;
+                const size_t excessLength = data.sizeInBytes() - remainingBytes;
+
                 AsyncBufferView::ID childID;
-                SC_ASSERT_RELEASE(
-                    readable.getBuffersPool().createChildView(bufferID, excessOffset, excessLength, childID));
+                SC_ASSERT_RELEASE(buffers.createChildView(bufferID, excessOffset, excessLength, childID));
                 SC_ASSERT_RELEASE(readable.unshift(childID));
 
+                // Last chunk, we can remove this listener and terminate the writable stream
                 SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
-                readable.destroy();
+                writable.end();
             }
         }
     };
 
     // It's important for this data event to be added last, so that it will be invoked after data has already
     // been dispatched through the pipeline, to avoid missing the last chunk.
-    EndStreamWhenAllBytesReceived listener{asyncConnection.readableSocketStream, totalFileUploadBytes};
+    EndStreamWhenAllBytesReceived listener{asyncConnection, totalFileUploadBytes};
     SC_ASSERT_RELEASE(asyncConnection.readableSocketStream.eventData.addListener(listener));
     return Result(true);
 }

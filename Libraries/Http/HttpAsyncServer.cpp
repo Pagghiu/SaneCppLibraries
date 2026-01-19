@@ -28,7 +28,10 @@ Result HttpAsyncServer::initInternal(SpanWithStride<HttpAsyncConnectionBase> con
 
 Result HttpAsyncServer::resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
 {
-    SC_TRY_MSG(&connectionsSpan[0] == &connections.getConnectionAt(0), "HttpAsyncServer::resize changed address");
+    if (connections.getNumTotalConnections() > 0 and not connectionsSpan.empty())
+    {
+        SC_TRY_MSG(&connectionsSpan[0] == &connections.getConnectionAt(0), "HttpAsyncServer::resize changed address");
+    }
     SC_TRY_MSG(connectionsSpan.sizeInElements() > connections.getHighestActiveConnection(),
                "HttpAsyncServer::resize connection in use");
     return initInternal(connectionsSpan);
@@ -119,6 +122,18 @@ struct HttpAsyncServer::EventDataListener
     void operator()(AsyncBufferView::ID bufferID) { pself.onStreamReceive(client, bufferID); }
 };
 
+struct HttpAsyncServer::EventEndListener
+{
+    HttpAsyncServer&         pself;
+    HttpAsyncConnectionBase& client;
+
+    void operator()()
+    {
+        // other party disconnected
+        pself.closeAsync(client);
+    }
+};
+
 void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
@@ -136,7 +151,8 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     client.socket = move(acceptedClient);
     SC_TRUST_RESULT(client.readableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
     SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
-    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(EventDataListener{*this, client}));
+    EventDataListener dataListener{*this, client};
+    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(dataListener));
     SC_TRUST_RESULT(client.readableSocketStream.start());
 
     client.response.writableStream = &client.writableSocketStream;
@@ -159,6 +175,13 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
     {
         client.response.grabUnusedHeaderMemory(client.request);
 
+        // Both with and without body we should stop listening to data events
+        SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
+        if (client.requestCount > 0)
+        {
+            SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.removeListener(EventEndListener{*this, client}));
+        }
+        onRequest(client);
         // Set default keep-alive from server config if not explicitly set by user
         // Also respect the client's Connection header
         if (not client.response.isKeepAliveExplicitlySet())
@@ -167,14 +190,19 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
             client.response.setKeepAlive(defaultKeepAlive and client.request.getParser().connectionKeepAlive);
         }
 
-        if (client.request.getParser().contentLength == 0)
+        const size_t contentLength = client.request.getParser().contentLength;
+        if (contentLength == 0)
         {
-            // If there is no body, we destroy the stream to cancel pending reads
-            client.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
+            // If there is no body, we pause or destroy the stream to cancel pending reads
+            if (client.response.getKeepAlive())
+            {
+                client.readableSocketStream.pause();
+            }
+            else
+            {
+                client.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
+            }
         }
-        // Both with and without body we should stop listening to data events
-        SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
-        onRequest(client);
 
         // Using a struct instead of a lambda so it can unregister itself
         struct AfterWrite
@@ -189,36 +217,35 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
                 // Determine if we should keep the connection alive
                 const bool underMaxRequests =
                     (pself.maxRequestsPerConnection == 0) or (client.requestCount + 1 < pself.maxRequestsPerConnection);
-                const bool shouldKeepAlive = client.response.getKeepAlive() and underMaxRequests;
+                const bool shouldKeepAlive =
+                    client.response.getKeepAlive() and underMaxRequests and not client.readableSocketStream.isEnded();
 
                 if (shouldKeepAlive and pself.state == State::Started) // We may get some after-writes after server stop
                 {
+                    SC_ASSERT_RELEASE(client.socket.isValid());
                     // Increment request count
                     client.requestCount++;
 
                     // Reset request and response for next request
                     client.request.reset();
+                    client.response.reset();
                     client.request.availableHeader = client.headerMemory;
                     (void)client.request.availableHeader.sliceStartLength(0, 0, client.request.readHeaders);
-                    client.response.reset();
-                    client.response.writableStream = &client.writableSocketStream;
-                    client.response.grabUnusedHeaderMemory(client.request);
 
-                    // Re-initialize streams for next request
-                    // Both streams need to be reset for keep-alive reuse
-                    client.writableSocketStream.destroy(); // Reset writable stream after previous response
-                    SC_ASSERT_RELEASE(client.socket.isValid());
+                    client.writableSocketStream.destroy();
                     Result writableRes =
                         client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
-                    Result readableRes =
-                        client.readableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
-
                     SC_TRUST_RESULT(writableRes);
-                    SC_TRUST_RESULT(readableRes);
-                    SC_TRUST_RESULT(client.readableSocketStream.start());
                     // Re-register for next request headers
-                    SC_ASSERT_RELEASE(
-                        client.readableSocketStream.eventData.addListener(EventDataListener{pself, client}));
+                    const size_t contentLength = client.request.getParser().contentLength;
+                    if (contentLength == 0)
+                    {
+                        client.readableSocketStream.resumeReading();
+                    }
+                    EventDataListener dataListener{pself, client};
+                    SC_ASSERT_RELEASE(client.readableSocketStream.eventData.addListener(dataListener));
+                    EventEndListener endListener{pself, client};
+                    SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.addListener(endListener));
                 }
                 else
                 {
@@ -236,8 +263,14 @@ void HttpAsyncServer::closeAsync(HttpAsyncConnectionBase& client)
     {
         return;
     }
-    if (client.requestCount == 0)
-        client.requestCount = 0;
+    client.requestCount = 0;
+
+    // These events may or may not be registered depending on when the close request arrives
+    EventDataListener dataListener{*this, client};
+    (void)client.readableSocketStream.eventData.removeListener(dataListener);
+    EventEndListener endListener{*this, client};
+    (void)client.readableSocketStream.eventEnd.removeListener(endListener);
+
     SC_TRUST_RESULT(client.socket.close());
     const bool wasFull = connections.getNumActiveConnections() == connections.getNumTotalConnections();
 

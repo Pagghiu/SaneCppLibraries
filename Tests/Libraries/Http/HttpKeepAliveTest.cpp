@@ -44,7 +44,7 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
-    constexpr int MAX_CONNECTIONS = 2;
+    constexpr int MAX_CONNECTIONS = 1;
     constexpr int REQUEST_SLICES  = 2;
     constexpr int REQUEST_SIZE    = 1 * 1024;
     constexpr int HEADER_SIZE     = 8 * 1024;
@@ -178,7 +178,7 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
-    constexpr int MAX_CONNECTIONS = 2;
+    constexpr int MAX_CONNECTIONS = 1;
     constexpr int REQUEST_SLICES  = 2;
     constexpr int REQUEST_SIZE    = 1 * 1024;
     constexpr int HEADER_SIZE     = 8 * 1024;
