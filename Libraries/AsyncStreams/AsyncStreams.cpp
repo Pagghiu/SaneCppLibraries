@@ -492,13 +492,13 @@ void AsyncReadableStream::destroy()
     case State::Reading:
     case State::AsyncPushing:
     case State::AsyncReading: {
-        state = State::Destroyed;
         Request request;
         while (readQueue.popFront(request))
         {
             buffers->unrefBuffer(request.bufferID); // 1b. refBuffer in push
         }
         eventClose.emit();
+        state = State::Destroyed;
         break;
     }
     case State::Destroyed:

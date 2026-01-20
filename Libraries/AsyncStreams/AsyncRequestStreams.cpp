@@ -30,6 +30,7 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
     static Result init(AsyncRequestReadableStream& self, AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop,
                        const DescriptorType& descriptor)
     {
+        SC_TRY_MSG(not self.request.isCancelling(), "AsyncRequestReadableStream - Destroy in progress");
         self.eventLoop = &eventLoop;
         self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
@@ -56,7 +57,10 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
 
         justUnrefBuffer = true;
         request.callback(result); // will free bufferID
-        SC_ASSERT_RELEASE(request.stop(*eventLoop));
+        if (not request.isCancelling())
+        {
+            SC_ASSERT_RELEASE(request.stop(*eventLoop));
+        }
         justUnrefBuffer = false;
         if (not res)
         {
@@ -186,7 +190,10 @@ void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
 
         justUnrefBuffer = true;
         request.callback(result); // will free bufferID
-        SC_ASSERT_RELEASE(request.stop(*eventLoop));
+        if (not request.isCancelling())
+        {
+            SC_ASSERT_RELEASE(request.stop(*eventLoop));
+        }
         justUnrefBuffer = false;
     }
     if (autoCloseDescriptor)
