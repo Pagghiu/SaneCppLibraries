@@ -33,7 +33,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     SC_TEST_EXPECT(eventLoop.create());
 
     //! [HttpFileServerSnippet]
-    constexpr int MAX_CONNECTIONS = 1;        // Max number of concurrent http connections
+    constexpr int MAX_CONNECTIONS = 1;        // Max number of concurrent http connections (1 disables keep-alive)
     constexpr int REQUEST_SLICES  = 2;        // Number of slices of the request buffer for each connection
     constexpr int REQUEST_SIZE    = 1 * 1024; // How many bytes are allocated to stream data for each connection
     constexpr int HEADER_SIZE     = 8 * 1024; // How many bytes are dedicated to hold request and response headers

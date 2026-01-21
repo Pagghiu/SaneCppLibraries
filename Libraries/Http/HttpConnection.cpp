@@ -158,22 +158,23 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
     // Check if this is a Connection header and update keep-alive flags accordingly
     if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Connection")))
     {
-        connectionHeaderAdded = true;
-
         // HTTP/1.1 defines "keep-alive" and "close" as valid Connection values
         if (HttpStringIterator::equalsIgnoreCase(headerValue, StringSpan("keep-alive")))
         {
-            keepAlive              = true;
-            keepAliveExplicitlySet = true;
+            if (forceDisableKeepAlive)
+            {
+                return Result::Error("HttpResponse::addHeader - keep-alive forcefully disabled");
+            }
+            keepAlive = true;
         }
         else if (HttpStringIterator::equalsIgnoreCase(headerValue, StringSpan("close")) ||
                  HttpStringIterator::equalsIgnoreCase(
                      headerValue, StringSpan("Closed"))) // Handle non-standard "Closed" used in tests
         {
-            keepAlive              = false;
-            keepAliveExplicitlySet = true;
+            keepAlive = false;
         }
         // For any other value, we don't change the flags
+        connectionHeaderAdded = true;
     }
 
     GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
@@ -232,17 +233,13 @@ void HttpResponse::reset()
 {
     headersSent             = false;
     keepAlive               = true;
-    keepAliveExplicitlySet  = false;
     connectionHeaderAdded   = false;
+    forceDisableKeepAlive   = false;
     responseHeaders         = {};
     responseHeadersCapacity = 0;
 }
 
-void HttpResponse::setKeepAlive(bool value)
-{
-    keepAlive              = value;
-    keepAliveExplicitlySet = true;
-}
+void HttpResponse::setKeepAlive(bool value) { keepAlive = value; }
 
 //-------------------------------------------------------------------------------------------------------
 // HttpConnectionsPool
@@ -288,6 +285,12 @@ bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
             connection.request.availableHeader = connection.headerMemory;
             (void)connection.request.availableHeader.sliceStartLength(0, 0, connection.request.readHeaders);
             numConnections++;
+            if (numConnections == connections.sizeInElements())
+            {
+                // avoid deadlock by force disabling keep-alive if this is the last connection
+                // TODO: Consider some criteria that will disable keep alive after a threshold of active connections
+                connection.response.forceDisableKeepAlive = true;
+            }
             return true;
         }
     }

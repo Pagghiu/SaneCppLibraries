@@ -70,7 +70,6 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
         SC_TRY(connection.response.startResponse(405));
         SC_TRY(connection.response.addHeader("Allow", "GET, PUT, POST"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Connection", "close"));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }
@@ -112,13 +111,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        if (not connection.response.getKeepAlive())
-        {
-            SC_TRY(connection.response.addHeader("Connection", "close"));
-        }
-
         SC_TRY(connection.response.sendHeaders());
-
         SC_TRY(connection.pipeline.pipe());
         SC_TRY(connection.pipeline.start());
     }
@@ -126,10 +119,6 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
     {
         SC_TRY(connection.response.startResponse(404));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        if (not connection.response.getKeepAlive())
-        {
-            SC_TRY(connection.response.addHeader("Connection", "close"));
-        }
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }

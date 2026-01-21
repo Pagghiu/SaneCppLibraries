@@ -71,6 +71,8 @@ struct SC_COMPILER_EXPORT HttpResponse
     Result startResponse(int httpCode);
 
     /// @brief Writes an http header to this response
+    /// @return Valid Result if header was added successfully.
+    /// @warning Adding a "Connection" header can fail if keep-alive has been force disabled
     Result addHeader(StringSpan headerName, StringSpan headerValue);
 
     /// @brief Start sending response headers, before sending any data
@@ -87,14 +89,12 @@ struct SC_COMPILER_EXPORT HttpResponse
 
     /// @brief Sets whether to keep the connection alive after this response
     /// @param keepAlive true to keep connection open for more requests, false to close after response
+    /// @warning  HttpConnection can force disable keep-alive when running out of connections to prevent server deadlock
     void setKeepAlive(bool keepAlive);
 
     /// @brief Gets whether the connection should be kept alive after this response
     /// @return true if connection should be kept alive
-    [[nodiscard]] bool getKeepAlive() const { return keepAlive; }
-
-    /// @brief Returns true if setKeepAlive was explicitly called
-    [[nodiscard]] bool isKeepAliveExplicitlySet() const { return keepAliveExplicitlySet; }
+    [[nodiscard]] bool getKeepAlive() const { return forceDisableKeepAlive ? false : keepAlive; }
 
   private:
     friend struct HttpConnectionsPool;
@@ -108,9 +108,9 @@ struct SC_COMPILER_EXPORT HttpResponse
 
     bool headersSent = false;
 
-    bool keepAlive              = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
-    bool keepAliveExplicitlySet = false; ///< Whether setKeepAlive was explicitly called
-    bool connectionHeaderAdded  = false; ///< Whether Connection header was manually added
+    bool forceDisableKeepAlive = false; ///< Whether keep alive has been force disabled permanently
+    bool keepAlive             = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
+    bool connectionHeaderAdded = false; ///< Whether Connection header was manually added
 
     AsyncWritableStream* writableStream = nullptr;
 };

@@ -181,15 +181,6 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
         {
             SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.removeListener(EventEndListener{*this, client}));
         }
-        onRequest(client);
-        // Set default keep-alive from server config if not explicitly set by user
-        // Also respect the client's Connection header
-        if (not client.response.isKeepAliveExplicitlySet())
-        {
-            // Use server default AND client's request header (both must want keep-alive)
-            client.response.setKeepAlive(defaultKeepAlive and client.request.getParser().connectionKeepAlive);
-        }
-
         const size_t contentLength = client.request.getParser().contentLength;
         if (contentLength == 0)
         {
@@ -203,6 +194,8 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
                 client.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
             }
         }
+
+        onRequest(client);
 
         // Using a struct instead of a lambda so it can unregister itself
         struct AfterWrite
@@ -271,6 +264,7 @@ void HttpAsyncServer::closeAsync(HttpAsyncConnectionBase& client)
     EventEndListener endListener{*this, client};
     (void)client.readableSocketStream.eventEnd.removeListener(endListener);
 
+    client.readableSocketStream.destroy();
     SC_TRUST_RESULT(client.socket.close());
     const bool wasFull = connections.getNumActiveConnections() == connections.getNumTotalConnections();
 
