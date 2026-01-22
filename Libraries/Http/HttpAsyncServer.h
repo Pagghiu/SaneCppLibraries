@@ -163,11 +163,16 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 
     void onNewClient(AsyncSocketAccept::Result& result);
     void closeAsync(HttpAsyncConnectionBase& requestClient);
+    void deactivateConnection(HttpAsyncConnectionBase& requestClient);
     void onStreamReceive(HttpAsyncConnectionBase& client, AsyncBufferView::ID bufferID);
 
     Result waitForStopToFinish();
     Result initInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
     Result resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
+
+    void onAsyncRequestStopped(AsyncResult& result);
+
+    Function<void(AsyncResult&)> onAsyncRequestStoppedFunc;
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;
