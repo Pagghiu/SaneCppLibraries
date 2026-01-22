@@ -14,8 +14,8 @@ struct SyncZLibTransformStream : public AsyncDuplexStream
   private:
     size_t consumedInputBytes = 0;
 
-    Result transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
-    bool   canEndTransform();
+    virtual Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb) override;
+    virtual bool   canEndWritable() override;
 };
 
 struct AsyncZLibTransformStream : public AsyncTransformStream
@@ -30,8 +30,9 @@ struct AsyncZLibTransformStream : public AsyncTransformStream
   private:
     AsyncEventLoop* eventLoop = nullptr;
 
-    Result compressExecute(Span<const char> input, Span<char> output);
-    Result compressFinalize(Span<char> output);
+    virtual Result onProcess(Span<const char> input, Span<char> output) override;
+    virtual Result onFinalize(Span<char> output) override;
+
     void   afterWork(AsyncLoopWork::Result& result);
     Result work();
 

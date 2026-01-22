@@ -51,12 +51,15 @@ struct SC_COMPILER_EXPORT AsyncBufferView
     struct SC_COMPILER_EXPORT ID
     {
         using NumericType = int32_t;
-        NumericType                  identifier;
+
         static constexpr NumericType InvalidValue = -1;
+
+        NumericType identifier;
 
         constexpr ID() : identifier(InvalidValue) {}
         explicit constexpr ID(int32_t value) : identifier(value) {}
 
+        [[nodiscard]] constexpr bool isValid() const { return identifier != InvalidValue; }
         [[nodiscard]] constexpr bool operator==(ID other) const { return identifier == other.identifier; }
     };
     enum class Type : uint8_t
@@ -213,8 +216,6 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     {
         AsyncBufferView::ID bufferID;
     };
-    /// @brief Function that every stream must define to implement its custom read operation
-    Function<Result()> asyncRead;
 
     static constexpr int MaxListeners = 8;
 
@@ -273,6 +274,15 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @brief Returns an unused buffer from pool or pauses the stream if none is available
     [[nodiscard]] bool getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data);
 
+  protected:
+    virtual ~AsyncReadableStream();
+
+    /// @brief Function that every stream must define to implement its custom read operation
+    virtual Result asyncRead() = 0;
+
+    /// @brief Reimplement asyncDestroy to stop async requests and once done call finishedDestroying to signal it.
+    virtual Result asyncDestroy();
+
   private:
     void emitOnData();
     void executeRead();
@@ -309,9 +319,6 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 /// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
 struct SC_COMPILER_EXPORT AsyncWritableStream
 {
-    /// @brief Function that every stream must define to implement its custom write operation
-    Function<Result(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)>)> asyncWrite;
-
     struct Request
     {
         AsyncBufferView::ID bufferID;
@@ -371,11 +378,6 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     /// @brief Signals an async error received
     void emitError(Result error);
 
-    /// @brief Allows keeping a writable in ENDING state until it has finished flushing all pending data.
-    /// If a writable stream redefines this function it should return true to allow transitioning to ENDED
-    /// state and return false to keep staying in ENDING state.
-    Function<bool()> canEndWritable;
-
     /// @brief Will emit error if the passed in Result is false
     void tryAsync(Result potentialError);
 
@@ -383,6 +385,16 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     [[nodiscard]] bool isStillWriting() const { return state == State::Writing or state == State::Ending; }
 
   protected:
+    virtual ~AsyncWritableStream();
+
+    /// @brief Function that every stream must define to implement its custom write operation
+    virtual Result asyncWrite(AsyncBufferView::ID, Function<void(AsyncBufferView::ID)> func) = 0;
+
+    /// @brief Allows keeping a writable in ENDING state until it has finished flushing all pending data.
+    /// If a writable stream redefines this function it should return true to allow transitioning to ENDED
+    /// state and return false to keep staying in ENDING state.
+    virtual bool canEndWritable();
+
     void stop() { state = State::Stopped; }
 
   private:
@@ -407,6 +419,8 @@ struct SC_COMPILER_EXPORT AsyncDuplexStream : public AsyncReadableStream, public
 
     Result init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
                 Span<AsyncWritableStream::Request> writableRequests);
+
+    virtual Result asyncRead() override;
 };
 
 /// @brief A duplex stream that produces new buffers transforming received buffers
@@ -417,10 +431,13 @@ struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
     void afterProcess(Span<const char> inputAfter, Span<char> outputAfter);
     void afterFinalize(Span<char> outputAfter, bool streamEnded);
 
-    Function<Result(Span<const char>, Span<char>)> onProcess;
-    Function<Result(Span<char>)>                   onFinalize;
+    virtual Result onProcess(Span<const char>, Span<char>) = 0;
+    virtual Result onFinalize(Span<char>)                  = 0;
 
   private:
+    virtual Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb) override;
+    virtual bool   canEndWritable() override;
+
     Function<void(AsyncBufferView::ID)> inputCallback;
 
     Span<const char> inputData;
@@ -429,10 +446,8 @@ struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
     AsyncBufferView::ID inputBufferID;
     AsyncBufferView::ID outputBufferID;
 
-    Result transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
     Result prepare(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
 
-    bool canEndTransform();
     void tryFinalize();
 
     enum class State

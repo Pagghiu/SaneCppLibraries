@@ -41,7 +41,6 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
 template <typename AsyncReadRequest>
 SC::AsyncRequestReadableStream<AsyncReadRequest>::AsyncRequestReadableStream()
 {
-    AsyncReadableStream::asyncRead.bind<AsyncRequestReadableStream, &AsyncRequestReadableStream::read>(*this);
     (void)AsyncReadableStream::eventClose
         .addListener<AsyncRequestReadableStream, &AsyncRequestReadableStream::onCloseStopRequest>(*this);
 }
@@ -62,10 +61,6 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
             SC_ASSERT_RELEASE(request.stop(*eventLoop));
         }
         justUnrefBuffer = false;
-        if (not res)
-        {
-            // TODO: Should an error be emitted here?
-        }
     }
     if (autoCloseDescriptor)
     {
@@ -78,7 +73,7 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
 }
 
 template <typename AsyncReadRequest>
-SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::read()
+SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::asyncRead()
 {
     SC_ASSERT_RELEASE(request.isFree());
     AsyncBufferView::ID bufferID;
@@ -174,7 +169,6 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
 template <typename AsyncWriteRequest>
 SC::AsyncRequestWritableStream<AsyncWriteRequest>::AsyncRequestWritableStream()
 {
-    AsyncWritableStream::asyncWrite.bind<AsyncRequestWritableStream, &AsyncRequestWritableStream::write>(*this);
     (void)AsyncWritableStream::eventFinish
         .addListener<AsyncRequestWritableStream, &AsyncRequestWritableStream::onFinishStopRequest>(*this);
 }
@@ -207,8 +201,8 @@ void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
 }
 
 template <typename AsyncWriteRequest>
-SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::write(AsyncBufferView::ID                 bufferID,
-                                                                    Function<void(AsyncBufferView::ID)> cb)
+SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::asyncWrite(AsyncBufferView::ID                 bufferID,
+                                                                         Function<void(AsyncBufferView::ID)> cb)
 {
     SC_ASSERT_RELEASE(not callback.isValid());
     callback = move(cb);

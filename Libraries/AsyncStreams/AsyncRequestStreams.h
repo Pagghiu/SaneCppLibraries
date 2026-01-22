@@ -17,6 +17,7 @@ struct SC_COMPILER_EXPORT AsyncRequestReadableStream : public AsyncReadableStrea
     void setAutoCloseDescriptor(bool value) { autoCloseDescriptor = value; }
 
     AsyncRequestType request; /// AsyncFileRead / AsyncFileWrite / AsyncSocketReceive / AsyncSocketSend
+
   protected:
     struct Internal;
     AsyncEventLoop* eventLoop = nullptr;
@@ -24,7 +25,7 @@ struct SC_COMPILER_EXPORT AsyncRequestReadableStream : public AsyncReadableStrea
     bool autoCloseDescriptor = false;
     bool justUnrefBuffer     = false;
 
-    Result read();
+    virtual Result asyncRead() override;
 
     void afterRead(typename AsyncRequestType::Result& result, AsyncBufferView::ID bufferID);
     void onCloseStopRequest();
@@ -52,7 +53,7 @@ struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStrea
 
     Function<void(AsyncBufferView::ID)> callback;
 
-    Result write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
+    Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
 
     void onFinishStopRequest();
 };

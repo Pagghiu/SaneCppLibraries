@@ -332,6 +332,8 @@ Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool)
     return Result(true);
 }
 
+AsyncReadableStream::~AsyncReadableStream() {}
+
 Result AsyncReadableStream::start()
 {
     SC_TRY_MSG(state == State::CanRead, "Can start only in CanRead state")
@@ -604,6 +606,10 @@ Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool)
     return Result(true);
 }
 
+bool AsyncWritableStream::canEndWritable() { return true; }
+
+AsyncWritableStream::~AsyncWritableStream() {}
+
 Result AsyncWritableStream::write(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     if (state == State::Ended or state == State::Ending)
@@ -648,7 +654,7 @@ void AsyncWritableStream::resumeWriting()
     }
     break;
     case State::Ending:
-        if (not canEndWritable.isValid() or canEndWritable())
+        if (canEndWritable())
         {
             eventFinish.emit();
             state = State::Ended;
@@ -699,7 +705,7 @@ void AsyncWritableStream::finishedWriting(AsyncBufferView::ID bufferID, Function
         // Queue is empty
         if (state == State::Ending)
         {
-            if (not canEndWritable.isValid() or canEndWritable())
+            if (canEndWritable())
             {
                 state = State::Ended;
             }
@@ -730,23 +736,14 @@ void AsyncWritableStream::end()
     switch (state)
     {
     case State::Stopped:
-        if (canEndWritable.isValid())
+        if (canEndWritable())
         {
-            if (canEndWritable())
-            {
-                state = State::Ended;
-                eventFinish.emit();
-            }
-            else
-            {
-                state = State::Ending;
-            }
+            state = State::Ended;
+            eventFinish.emit();
         }
         else
         {
-            // Can just jump to ended state
-            state = State::Ended;
-            eventFinish.emit();
+            state = State::Ending;
         }
         break;
     case State::Writing:
@@ -766,10 +763,16 @@ void AsyncWritableStream::destroy()
 {
     if (state != State::Ended and state != State::Ending)
     {
-        // Bypass canEndWritable when destroying
-        decltype(canEndWritable) backupCanEnd = move(canEndWritable);
-        end();
-        canEndWritable = move(backupCanEnd);
+        if (state == State::Stopped)
+        {
+            // Bypass canEndWritable check swhen destroying
+            state = State::Ended;
+            eventFinish.emit();
+        }
+        else
+        {
+            end();
+        }
     }
 }
 
@@ -780,10 +783,9 @@ void AsyncWritableStream::emitError(Result error) { eventError.emit(error); }
 // AsyncDuplexStream
 //-------------------------------------------------------------------------------------------------------
 
-AsyncDuplexStream::AsyncDuplexStream()
-{
-    asyncRead.bind([] { return Result(true); });
-}
+AsyncDuplexStream::AsyncDuplexStream() {}
+
+Result AsyncDuplexStream::asyncRead() { return Result(true); }
 
 Result AsyncDuplexStream::init(AsyncBuffersPool& buffersPool, Span<AsyncReadableStream::Request> readableRequests,
                                Span<AsyncWritableStream::Request> writableRequests)
@@ -798,14 +800,9 @@ Result AsyncDuplexStream::init(AsyncBuffersPool& buffersPool, Span<AsyncReadable
 //-------------------------------------------------------------------------------------------------------
 // AsyncTransformStream
 //-------------------------------------------------------------------------------------------------------
-AsyncTransformStream::AsyncTransformStream()
-{
-    using Self = AsyncTransformStream;
-    AsyncWritableStream::asyncWrite.bind<Self, &Self::transform>(*this);
-    AsyncWritableStream::canEndWritable.bind<Self, &Self::canEndTransform>(*this);
-}
+AsyncTransformStream::AsyncTransformStream() {}
 
-Result AsyncTransformStream::transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+Result AsyncTransformStream::asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     switch (state)
     {
@@ -874,7 +871,7 @@ void AsyncTransformStream::afterProcess(Span<const char> inputAfter, Span<char> 
         inputData = inputAfter;
 
         state = State::Paused;
-        tryAsync(transform(inputBufferID, inputCallback));
+        tryAsync(asyncWrite(inputBufferID, inputCallback));
     }
 }
 
@@ -917,7 +914,7 @@ void AsyncTransformStream::tryFinalize()
     }
 }
 
-bool AsyncTransformStream::canEndTransform()
+bool AsyncTransformStream::canEndWritable()
 {
     switch (state)
     {

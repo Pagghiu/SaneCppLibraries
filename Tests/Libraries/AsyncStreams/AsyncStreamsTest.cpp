@@ -152,61 +152,63 @@ void SC::AsyncStreamsTest::readableSyncStream()
     AsyncBuffersPool pool;
     pool.setBuffers(buffers);
 
-    AsyncReadableStream          readable;
+    struct TestReadableStream : public AsyncReadableStream
+    {
+        size_t         idx = 0;
+        size_t         max = 100;
+        Vector<size_t> indices;
+
+        virtual Result asyncRead() override
+        {
+
+            if (idx < max)
+            {
+                AsyncBufferView::ID bufferID;
+                Span<char>          data;
+                if (getBufferOrPause(sizeof(idx), bufferID, data))
+                {
+                    memcpy(data.data(), &idx, sizeof(idx));
+                    SC_TRY(push(bufferID, sizeof(idx)));
+                    getBuffersPool().unrefBuffer(bufferID);
+                    idx += 1;
+                    reactivate(true);
+                }
+            }
+            else
+            {
+                pushEnd();
+            }
+            return Result(true);
+        }
+    };
+    TestReadableStream           readable;
     AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
     readable.setReadQueue(requests);
     SC_TEST_EXPECT(readable.init(pool));
-    struct Context
-    {
-        AsyncReadableStream& readable;
-        size_t               idx;
-        size_t               max;
-        Vector<size_t>       indices;
-    } context = {readable, 0, 100, {}};
 
     (void)readable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    readable.asyncRead = [this, &context]() -> Result
-    {
-        if (context.idx < context.max)
-        {
-            AsyncBufferView::ID bufferID;
-            Span<char>          data;
-            if (context.readable.getBufferOrPause(sizeof(context.idx), bufferID, data))
-            {
-                memcpy(data.data(), &context.idx, sizeof(context.idx));
-                SC_TEST_EXPECT(context.readable.push(bufferID, sizeof(context.idx)));
-                context.readable.getBuffersPool().unrefBuffer(bufferID);
-                context.idx += 1;
-                context.readable.reactivate(true);
-            }
-        }
-        else
-        {
-            context.readable.pushEnd();
-        }
-        return Result(true);
-    };
+
     // Listen to data events and put all data back into indices array
     (void)readable.eventData.addListener(
-        [this, &context](AsyncBufferView::ID bufferID)
+        [this, &readable](AsyncBufferView::ID bufferID)
         {
             Span<char> data;
-            SC_TEST_EXPECT(context.readable.getBuffersPool().getWritableData(bufferID, data));
+            SC_TEST_EXPECT(readable.getBuffersPool().getWritableData(bufferID, data));
 
             if (not data.empty())
             {
                 size_t idx = 0;
                 memcpy(&idx, data.data(), data.sizeInBytes());
-                (void)context.indices.push_back(idx);
+                (void)readable.indices.push_back(idx);
             }
         });
     SC_TEST_EXPECT(readable.start());
     SC_TEST_EXPECT(readable.isEnded());
-    SC_TEST_EXPECT(context.indices.size() == 100);
+    SC_TEST_EXPECT(readable.indices.size() == 100);
     bool valuesAreOk = true;
-    for (size_t idx = 0; idx < context.max; ++idx)
+    for (size_t idx = 0; idx < readable.max; ++idx)
     {
-        valuesAreOk &= context.indices[idx] == idx;
+        valuesAreOk &= readable.indices[idx] == idx;
     }
     SC_TEST_EXPECT(valuesAreOk);
 }
@@ -229,65 +231,69 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     AsyncBuffersPool pool;
     pool.setBuffers(buffers);
 
-    AsyncReadableStream          readable;
-    AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
-    readable.setReadQueue(requests);
-    SC_TEST_EXPECT(readable.init(pool));
-    AsyncEventLoop loop;
-    struct Context
-    {
-        AsyncEventLoop&      eventLoop;
-        AsyncReadableStream& readable;
-        size_t               idx;
-        size_t               max;
-        Vector<size_t>       indices;
-    } context = {loop, readable, 0, 100, {}};
-
-    SC_TEST_EXPECT(loop.create());
+    AsyncEventLoop   loop;
     AsyncLoopTimeout timeout;
-    timeout.callback = [this, &context](AsyncLoopTimeout::Result&)
+
+    struct TestReadableStream : public AsyncReadableStream
     {
-        AsyncBufferView::ID bufferID;
-        Span<char>          data;
-        if (context.readable.getBufferOrPause(sizeof(context.idx), bufferID, data))
+        AsyncEventLoop*   eventLoop;
+        AsyncLoopTimeout* timeout;
+        size_t            idx = 0;
+        size_t            max = 100;
+        Vector<size_t>    indices;
+
+        virtual Result asyncRead() override
         {
-            memcpy(data.data(), &context.idx, sizeof(context.idx));
-            SC_TEST_EXPECT(context.readable.push(bufferID, sizeof(context.idx)));
-            context.readable.getBuffersPool().unrefBuffer(bufferID);
-            context.idx += 1;
-            context.readable.reactivate(true);
+            if (idx < max)
+            {
+                Result res = timeout->start(*eventLoop, Time::Milliseconds(1));
+                if (not res)
+                {
+                    emitError(res);
+                }
+            }
+            else
+            {
+                pushEnd();
+            }
+            return Result(true);
         }
     };
 
-    readable.asyncRead = [&context, &timeout]() -> Result
+    TestReadableStream           readable;
+    AsyncReadableStream::Request requests[numberOfBuffers + 1]; // Only N-1 slots will be used
+    readable.setReadQueue(requests);
+    readable.eventLoop = &loop;
+    readable.timeout   = &timeout;
+    SC_TEST_EXPECT(readable.init(pool));
+
+    SC_TEST_EXPECT(loop.create());
+    timeout.callback = [this, &readable](AsyncLoopTimeout::Result&)
     {
-        if (context.idx < context.max)
+        AsyncBufferView::ID bufferID;
+        Span<char>          data;
+        if (readable.getBufferOrPause(sizeof(readable.idx), bufferID, data))
         {
-            Result res = timeout.start(context.eventLoop, Time::Milliseconds(1));
-            if (not res)
-            {
-                context.readable.emitError(res);
-            }
+            memcpy(data.data(), &readable.idx, sizeof(readable.idx));
+            SC_TEST_EXPECT(readable.push(bufferID, sizeof(readable.idx)));
+            readable.getBuffersPool().unrefBuffer(bufferID);
+            readable.idx += 1;
+            readable.reactivate(true);
         }
-        else
-        {
-            context.readable.pushEnd();
-        }
-        return Result(true);
     };
 
     // Listen to data events and put all data back into indices array
     (void)readable.eventData.addListener(
-        [this, &context](AsyncBufferView::ID bufferID)
+        [this, &readable](AsyncBufferView::ID bufferID)
         {
             Span<char> data;
-            SC_TEST_EXPECT(context.readable.getBuffersPool().getWritableData(bufferID, data));
+            SC_TEST_EXPECT(readable.getBuffersPool().getWritableData(bufferID, data));
 
             if (not data.empty())
             {
                 size_t idx = 0;
                 memcpy(&idx, data.data(), data.sizeInBytes());
-                (void)context.indices.push_back(idx);
+                (void)readable.indices.push_back(idx);
             }
         });
 
@@ -297,11 +303,11 @@ void SC::AsyncStreamsTest::readableAsyncStream()
     SC_TEST_EXPECT(readable.isEnded());
 
     // Check that indices array contains what we expect
-    SC_TEST_EXPECT(context.indices.size() == 100);
+    SC_TEST_EXPECT(readable.indices.size() == 100);
     bool valuesAreOk = true;
-    for (size_t idx = 0; idx < context.max; ++idx)
+    for (size_t idx = 0; idx < readable.max; ++idx)
     {
-        valuesAreOk &= context.indices[idx] == idx;
+        valuesAreOk &= readable.indices[idx] == idx;
     }
     SC_TEST_EXPECT(valuesAreOk);
 }
@@ -313,77 +319,78 @@ void SC::AsyncStreamsTest::writableStream()
     AsyncBuffersPool pool;
     pool.setBuffers(bufferViews);
 
-    AsyncWritableStream          writable;
+    struct TestWritableStream : public AsyncWritableStream
+    {
+        size_t numAsyncWrites = 0;
+        String concatenated;
+
+        AsyncBufferView::ID bufferID;
+
+        virtual Result asyncWrite(AsyncBufferView::ID incomingBufferID, Function<void(AsyncBufferView::ID)> cb) override
+        {
+            (void)cb;
+            numAsyncWrites++;
+            Span<const char> data;
+            SC_TRY(getBuffersPool().getReadableData(incomingBufferID, data));
+            StringView sv(data, false, StringEncoding::Ascii);
+            SC_TRY(StringBuilder::createForAppendingTo(concatenated).append(sv));
+            bufferID = incomingBufferID;
+            return Result(true);
+        }
+    };
+    TestWritableStream           writable;
     AsyncWritableStream::Request writeRequestsQueue[numberOfBuffers + 1]; // Only N-1 slots will be used
     writable.setWriteQueue(writeRequestsQueue);
     SC_TEST_EXPECT(writable.init(pool));
-    struct Context
-    {
-        AsyncWritableStream& writable;
-        size_t               numAsyncWrites;
-        String               concatenated;
-        AsyncBufferView::ID  bufferID;
-    } context = {writable, 0, {}, {}};
     (void)writable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
-    writable.asyncWrite = [&context, this](AsyncBufferView::ID                 bufferID,
-                                           Function<void(AsyncBufferView::ID)> cb) -> Result
-    {
-        (void)cb;
-        context.numAsyncWrites++;
-        Span<const char> data;
-        SC_TEST_EXPECT(context.writable.getBuffersPool().getReadableData(bufferID, data));
-        StringView sv(data, false, StringEncoding::Ascii);
-        SC_TEST_EXPECT(StringBuilder::createForAppendingTo(context.concatenated).append(sv));
-        context.bufferID = bufferID;
-        return Result(true);
-    };
+
     int numDrain = 0;
     (void)writable.eventDrain.addListener([&numDrain] { numDrain++; });
 
     // When passing String(...) the writable takes ownership of the String destroying it after the write
     SC_TEST_EXPECT(writable.write(String("1"))); // Executes asyncWrites and queue slot is freed immediately
-    SC_TEST_EXPECT(context.numAsyncWrites == 1);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 1);
     SC_TEST_EXPECT(writable.write("2"));         // queued, uses first write slot
     SC_TEST_EXPECT(writable.write(String("3"))); // queued, uses second write slot
     SC_TEST_EXPECT(not writable.write("4"));     // no more write queue slots
-    SC_TEST_EXPECT(context.numAsyncWrites == 1);
-    writable.finishedWriting(context.bufferID, {}, Result(true)); // writes 2
-    SC_TEST_EXPECT(context.concatenated == "12");
+    SC_TEST_EXPECT(writable.numAsyncWrites == 1);
+    writable.finishedWriting(writable.bufferID, {}, Result(true)); // writes 2
+    SC_TEST_EXPECT(writable.concatenated == "12");
     SC_TEST_EXPECT(numDrain == 0);
-    SC_TEST_EXPECT(context.numAsyncWrites == 2);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 2);
     SC_TEST_EXPECT(writable.write("4"));
-    SC_TEST_EXPECT(context.numAsyncWrites == 2);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 2);
     SC_TEST_EXPECT(not writable.write(String("5")));
-    writable.finishedWriting(context.bufferID, {}, Result(true)); // writes 3
-    SC_TEST_EXPECT(context.concatenated == "123");
+    writable.finishedWriting(writable.bufferID, {}, Result(true)); // writes 3
+    SC_TEST_EXPECT(writable.concatenated == "123");
     SC_TEST_EXPECT(numDrain == 0);
-    writable.finishedWriting(context.bufferID, {}, Result(true)); // writes 4
-    SC_TEST_EXPECT(context.concatenated == "1234");
+    writable.finishedWriting(writable.bufferID, {}, Result(true)); // writes 4
+    SC_TEST_EXPECT(writable.concatenated == "1234");
     SC_TEST_EXPECT(numDrain == 0);
-    writable.finishedWriting(context.bufferID, {}, Result(true)); // writes nothing
-    SC_TEST_EXPECT(context.concatenated == "1234");
+    writable.finishedWriting(writable.bufferID, {}, Result(true)); // writes nothing
+    SC_TEST_EXPECT(writable.concatenated == "1234");
     SC_TEST_EXPECT(numDrain == 1);
-    SC_TEST_EXPECT(context.numAsyncWrites == 4);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 4);
     SC_TEST_EXPECT(writable.write("5"));
-    SC_TEST_EXPECT(context.numAsyncWrites == 5);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 5);
     SC_TEST_EXPECT(writable.write(String("6")));
-    SC_TEST_EXPECT(context.numAsyncWrites == 5);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 5);
     SC_TEST_EXPECT(writable.write("7"));
     SC_TEST_EXPECT(not writable.write(String("8")));
-    writable.finishedWriting(context.bufferID, {}, Result(true));
-    SC_TEST_EXPECT(context.concatenated == "123456");
-    SC_TEST_EXPECT(context.numAsyncWrites == 6);
+    writable.finishedWriting(writable.bufferID, {}, Result(true));
+    SC_TEST_EXPECT(writable.concatenated == "123456");
+    SC_TEST_EXPECT(writable.numAsyncWrites == 6);
     SC_TEST_EXPECT(numDrain == 1);
-    writable.finishedWriting(context.bufferID, {}, Result(true));
-    SC_TEST_EXPECT(context.concatenated == "1234567");
+    writable.finishedWriting(writable.bufferID, {}, Result(true));
+    SC_TEST_EXPECT(writable.concatenated == "1234567");
     SC_TEST_EXPECT(numDrain == 1);
-    SC_TEST_EXPECT(context.numAsyncWrites == 7);
-    writable.finishedWriting(context.bufferID, {}, Result(true));
-    SC_TEST_EXPECT(context.concatenated == "1234567");
+    SC_TEST_EXPECT(writable.numAsyncWrites == 7);
+    writable.finishedWriting(writable.bufferID, {}, Result(true));
+    SC_TEST_EXPECT(writable.concatenated == "1234567");
     SC_TEST_EXPECT(numDrain == 2);
-    SC_TEST_EXPECT(context.numAsyncWrites == 7);
+    SC_TEST_EXPECT(writable.numAsyncWrites == 7);
     writable.end();
-    SC_TEST_EXPECT(context.concatenated == "1234567");
+    SC_TEST_EXPECT(writable.concatenated == "1234567");
 }
 
 void SC::AsyncStreamsTest::createChildView()
@@ -475,7 +482,19 @@ void SC::AsyncStreamsTest::unshift()
     AsyncBuffersPool pool;
     pool.setBuffers(buffers);
 
-    AsyncReadableStream          readable;
+    struct TestReadableStream : public AsyncReadableStream
+    {
+        int  step    = 0;
+        bool success = true;
+
+        virtual Result asyncRead() override
+        {
+            step++;
+            // We do nothing here, just waiting for push
+            return Result(true);
+        }
+    };
+    TestReadableStream           readable;
     AsyncReadableStream::Request requests[3];
     readable.setReadQueue(requests); // Capacity 2
     SC_TEST_EXPECT(readable.init(pool));
@@ -490,36 +509,22 @@ void SC::AsyncStreamsTest::unshift()
     // Release our reference so that the stream is the only owner and can recycle it after emission
     pool.unrefBuffer(bufferID);
 
-    struct TestContext
-    {
-        AsyncReadableStream& stream;
-        int                  step    = 0;
-        bool                 success = true;
-    } ctx{readable};
-
-    readable.asyncRead = [&ctx]() -> Result
-    {
-        ctx.step++;
-        // We do nothing here, just waiting for push
-        return Result(true);
-    };
-
     // 2. Start reading, it should immediately receive the unshifted buffer
     SC_TEST_EXPECT(readable.eventData.addListener(
-        [&ctx](AsyncBufferView::ID id)
+        [&readable](AsyncBufferView::ID id)
         {
             Span<const char> readData;
-            SC_TRUST_RESULT(ctx.stream.getBuffersPool().getReadableData(id, readData));
+            SC_TRUST_RESULT(readable.getBuffersPool().getReadableData(id, readData));
             StringView str = StringView(readData, false, StringEncoding::Ascii);
             if (str != "123")
-                ctx.success = false;
+                readable.success = false;
             // Should be received before asyncRead is even called or right at start
-            if (ctx.step != 0)
-                ctx.success = false;
+            if (readable.step != 0)
+                readable.success = false;
         }));
 
     SC_TRUST_RESULT(readable.start());
-    SC_TEST_EXPECT(ctx.success);
+    SC_TEST_EXPECT(readable.success);
 
     // Cleanup to allow re-use of buffer for next check
     // In this test we only have 1 buffer so we rely on unref happening in emitOnData (which calls unrefBuffer)

@@ -6,14 +6,9 @@
 //-------------------------------------------------------------------------------------------------------
 // SyncZLibTransformStream
 //-------------------------------------------------------------------------------------------------------
-SC::SyncZLibTransformStream::SyncZLibTransformStream()
-{
-    using Self = SyncZLibTransformStream;
-    AsyncWritableStream::asyncWrite.bind<Self, &Self::transform>(*this);
-    AsyncWritableStream::canEndWritable.bind<Self, &Self::canEndTransform>(*this);
-}
+SC::SyncZLibTransformStream::SyncZLibTransformStream() {}
 
-SC::Result SC::SyncZLibTransformStream::transform(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
+SC::Result SC::SyncZLibTransformStream::asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb)
 {
     // This function will either process the bufferID fully OR it will unshift the buffer, that means placing it
     // again on top of the AsyncWritableStream write queue
@@ -60,7 +55,7 @@ SC::Result SC::SyncZLibTransformStream::transform(AsyncBufferView::ID bufferID, 
     return Result(true);
 }
 
-bool SC::SyncZLibTransformStream::canEndTransform()
+bool SC::SyncZLibTransformStream::canEndWritable()
 {
     // Loop to get buffers in order to finish finalizing the stream
     // If there are no buffers, return true to signal AsyncWritableStream
@@ -102,13 +97,11 @@ bool SC::SyncZLibTransformStream::canEndTransform()
 
 SC::AsyncZLibTransformStream::AsyncZLibTransformStream()
 {
-    AsyncTransformStream::onProcess.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::compressExecute>(*this);
-    AsyncTransformStream::onFinalize.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::compressFinalize>(*this);
     asyncWork.work.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::work>(*this);
     asyncWork.callback.bind<AsyncZLibTransformStream, &AsyncZLibTransformStream::afterWork>(*this);
 }
 
-SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input, Span<char> output)
+SC::Result SC::AsyncZLibTransformStream::onProcess(Span<const char> input, Span<char> output)
 {
     SC_ASSERT_RELEASE(not finalizing);
     savedInput  = input;
@@ -118,7 +111,7 @@ SC::Result SC::AsyncZLibTransformStream::compressExecute(Span<const char> input,
     return asyncWork.start(*eventLoop);
 }
 
-SC::Result SC::AsyncZLibTransformStream::compressFinalize(Span<char> output)
+SC::Result SC::AsyncZLibTransformStream::onFinalize(Span<char> output)
 {
     // Intentionally not resetting savedInput, that can contain leftover data to process
     savedOutput = output;
