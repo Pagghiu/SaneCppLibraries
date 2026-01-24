@@ -16,9 +16,11 @@
 #include <stdio.h>  // fwrite (posix), snprintf (windows)
 #include <stdlib.h> // free (posix), _exit (windows)
 
-void SC::Assert::exit(int code) { ::_exit(code); }
+namespace SC
+{
+void Assert::exit(int code) { ::_exit(code); }
 
-struct SC::Assert::Internal
+struct Assert::Internal
 {
     static void printAscii(const char* str)
     {
@@ -94,17 +96,29 @@ struct SC::Assert::Internal
     }
 };
 
-void SC::Assert::printBacktrace(const char* expression, const native_char_t* filename, const char* function, int line)
+void Assert::printBacktrace(const char* expression, bool result, const native_char_t* filename, const char* function,
+                            int line)
+{
+    return printBacktrace(expression, Result(result), filename, function, line);
+}
+
+void Assert::printBacktrace(const char* expression, Result result, const native_char_t* filename, const char* function,
+                            int line)
 {
     char buffer[2048];
 #if SC_PLATFORM_WINDOWS
-    ::snprintf(buffer, sizeof(buffer), "Assertion failed: (%s)\nFile: %ws\nFunction: %s\nLine: %d\n", expression,
-               filename, function, line);
+#define NATIVE_PRINT_SPECIFIER "%ws"
 #else
-    ::snprintf(buffer, sizeof(buffer), "Assertion failed: (%s)\nFile: %s\nFunction: %s\nLine: %d\n", expression,
-               filename, function, line);
+#define NATIVE_PRINT_SPECIFIER "%s"
 #endif
+    ::snprintf(buffer, sizeof(buffer),
+               "Assertion failed: (%s)\n"
+               "Reason: %s\n"
+               "File: " NATIVE_PRINT_SPECIFIER "\n"
+               "Function: %s\nLine: %d\n",
+               expression, result.message, filename, function, line);
     Internal::printAscii(buffer);
     void* backtraceBuffer[256];
     Internal::printBacktrace(backtraceBuffer, sizeof(backtraceBuffer));
 }
+} // namespace SC

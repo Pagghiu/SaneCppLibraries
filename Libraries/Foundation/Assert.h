@@ -4,16 +4,15 @@
 #include "../Foundation/Compiler.h" // SC_COMPILER_DEBUG_BREAK
 #include "../Foundation/LibC.h"     // exit
 #include "../Foundation/Platform.h" // SC_CONFIGURATION_DEBUG
+#include "../Foundation/Result.h"   // exit
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT Assert;
-}
 //! @addtogroup group_foundation_utility
 //! @{
 
 /// @brief Functions and macros to assert, exit() or abort() and capture backtraces.
-struct SC::Assert
+struct SC_COMPILER_EXPORT Assert
 {
     [[noreturn]] SC_COMPILER_FORCE_INLINE static void unreachable()
     {
@@ -27,7 +26,10 @@ struct SC::Assert
     [[noreturn]] static void exit(int code);
 
     /// @brief Prints an assertion to standard output
-    static void printBacktrace(const char* expression, const native_char_t* filename, const char* function, int line);
+    static void printBacktrace(const char* expression, Result result, const native_char_t* filename,
+                               const char* function, int line);
+    static void printBacktrace(const char* expression, bool result, const native_char_t* filename, const char* function,
+                               int line);
 
   private:
     struct Internal;
@@ -47,7 +49,7 @@ struct SC::Assert
     if (!(e))                                                                                                          \
         SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
-            SC::Assert::printBacktrace(#e, WFILE, __func__, __LINE__);                                                 \
+            SC::Assert::printBacktrace(#e, e, WFILE, __func__, __LINE__);                                              \
             SC_COMPILER_DEBUG_BREAK;                                                                                   \
             SC::Assert::exit(-1);                                                                                      \
         }                                                                                                              \
@@ -65,3 +67,4 @@ struct SC::Assert
 #define SC_TRUST_RESULT(expression) SC_ASSERT_RELEASE(expression)
 
 //! @}
+} // namespace SC
