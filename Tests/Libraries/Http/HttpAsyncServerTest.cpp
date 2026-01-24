@@ -126,6 +126,14 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         };
         SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));
     }
+
+    // Safety timout against hangs
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(serverContext.numRequests == clientContext.wantedNumRequests);
