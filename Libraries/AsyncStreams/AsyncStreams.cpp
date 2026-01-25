@@ -324,15 +324,18 @@ Result AsyncBuffersPool::createChildView(AsyncBufferView::ID parentBufferID, siz
 //-------------------------------------------------------------------------------------------------------
 Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool)
 {
-    SC_TRY_MSG(state == State::Stopped or state == State::Destroyed or state == State::Ended,
+    SC_TRY_MSG(state == State::Stopped or state == State::Ended,
                "AsyncReadableStream::init - Can be called only in Stopped / Destroyed / Ended state")
     SC_TRY_MSG(readQueue.size() > 0, "AsyncReadableStream::init - setReadQueue not called")
-    buffers = &buffersPool;
-    state   = State::CanRead;
+    buffers   = &buffersPool;
+    state     = State::CanRead;
+    destroyed = false;
     return Result(true);
 }
 
 AsyncReadableStream::~AsyncReadableStream() {}
+
+Result AsyncReadableStream::asyncDestroyReadable() { return finishedDestroyingReadable(); }
 
 Result AsyncReadableStream::start()
 {
@@ -484,6 +487,12 @@ void AsyncReadableStream::resumeReading()
 
 void AsyncReadableStream::destroy()
 {
+    // Empty all queued buffers
+    Request request;
+    while (readQueue.popFront(request))
+    {
+        buffers->unrefBuffer(request.bufferID); // 1b. refBuffer in push
+    }
     switch (state)
     {
     case State::CanRead:
@@ -493,21 +502,30 @@ void AsyncReadableStream::destroy()
     case State::Pausing:
     case State::Reading:
     case State::AsyncPushing:
-    case State::AsyncReading: {
-        Request request;
-        while (readQueue.popFront(request))
+    case State::AsyncReading:
+    case State::Stopped:
+    case State::Ended: {
+        state      = State::Destroying;
+        Result res = asyncDestroyReadable();
+        if (not res)
         {
-            buffers->unrefBuffer(request.bufferID); // 1b. refBuffer in push
+            state = State::Errored;
+            eventError.emit(res);
         }
-        eventClose.emit();
-        state = State::Destroyed;
         break;
     }
-    case State::Destroyed:
-    case State::Ended:
-    case State::Stopped:
+    case State::Destroying:
     case State::Errored: break;
     }
+}
+
+Result AsyncReadableStream::finishedDestroyingReadable()
+{
+    SC_TRY_MSG(state == State::Destroying, "finishedDestroying only callable in State::Destroying");
+    state     = State::Ended;
+    destroyed = true;
+    eventClose.emit();
+    return Result(true);
 }
 
 void AsyncReadableStream::executeRead()
@@ -563,9 +581,12 @@ void AsyncReadableStream::pushEnd()
         // In all these state we can just end directly
         state = State::Ended;
         eventEnd.emit();
-        eventClose.emit();
+        if (autoDestroy)
+        {
+            destroy();
+        }
         break;
-    case State::Destroyed: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is destroyed")); break;
+    case State::Destroying: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is destroying")); break;
     case State::Ended: emitError(Result::Error("AsyncReadableStream::pushEnd - stream already ended")); break;
     case State::Stopped: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is not even inited")); break;
     case State::Errored: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is in error state")); break;
@@ -603,10 +624,24 @@ Result AsyncWritableStream::init(AsyncBuffersPool& buffersPool)
     {
         state = State::Stopped;
     }
+    destroyed = false;
     return Result(true);
 }
 
 bool AsyncWritableStream::canEndWritable() { return true; }
+
+Result AsyncWritableStream::asyncDestroyWritable()
+{
+    finishedDestroyingWritable();
+    return Result(true);
+}
+
+void AsyncWritableStream::finishedDestroyingWritable()
+{
+    state     = State::Ended;
+    destroyed = true;
+    eventClose.emit();
+}
 
 AsyncWritableStream::~AsyncWritableStream() {}
 
@@ -656,10 +691,19 @@ void AsyncWritableStream::resumeWriting()
     case State::Ending:
         if (canEndWritable())
         {
-            eventFinish.emit();
             state = State::Ended;
+            if (autoDestroy)
+            {
+                destroy();
+            }
         }
         break;
+    case State::Destroying: {
+        // Invalid state, already destroyed or already destroying
+        eventError.emit(Result::Error("AsyncWritableStream::resumeWriting - destroy already called"));
+    }
+    break;
+    case State::Errored:
     case State::Ended: break;
     }
 }
@@ -724,6 +768,10 @@ void AsyncWritableStream::finishedWriting(AsyncBufferView::ID bufferID, Function
     if (state == State::Ended)
     {
         eventFinish.emit();
+        if (autoDestroy)
+        {
+            destroy();
+        }
     }
     else if (emitDrain)
     {
@@ -740,6 +788,10 @@ void AsyncWritableStream::end()
         {
             state = State::Ended;
             eventFinish.emit();
+            if (autoDestroy)
+            {
+                destroy();
+            }
         }
         else
         {
@@ -750,29 +802,46 @@ void AsyncWritableStream::end()
         // We need to wait for current in-flight write to end
         state = State::Ending;
         break;
+    case State::Destroying: {
+        // Invalid state, already destroyed or already destroying
+        eventError.emit(Result::Error("AsyncWritableStream::end - destroy already called"));
+    }
+    break;
     case State::Ending:
     case State::Ended: {
         // Invalid state, already ended or already ending
         eventError.emit(Result::Error("AsyncWritableStream::end - already called"));
     }
     break;
+    case State::Errored: break;
     }
 }
 
 void AsyncWritableStream::destroy()
 {
-    if (state != State::Ended and state != State::Ending)
+    // Empty all queued buffers
+    Request request;
+    while (writeQueue.popFront(request))
     {
-        if (state == State::Stopped)
+        buffers->unrefBuffer(request.bufferID); // 2a. refBuffer in write
+    }
+    switch (state)
+    {
+    case State::Ending:
+    case State::Ended:
+    case State::Stopped:
+    case State::Writing: {
+        state      = State::Destroying;
+        Result res = asyncDestroyWritable();
+        if (not res)
         {
-            // Bypass canEndWritable check swhen destroying
-            state = State::Ended;
-            eventFinish.emit();
+            state = State::Errored;
+            eventError.emit(res);
         }
-        else
-        {
-            end();
-        }
+    }
+    break;
+    case State::Destroying:
+    case State::Errored: break;
     }
 }
 
@@ -1021,7 +1090,7 @@ bool AsyncPipeline::unpipe()
         {
             res = transform->eventData.removeAllListenersBoundTo(*this);
             SC_TRY(res);
-            res = transform->eventClose.removeAllListenersBoundTo(*this);
+            res = transform->AsyncReadableStream::eventClose.removeAllListenersBoundTo(*this);
             SC_TRY(res);
             break;
         }
@@ -1159,7 +1228,9 @@ void AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritab
 
 void AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 {
+    // Decrement reference count of the buffer that was just written
     source->getBuffersPool().unrefBuffer(bufferID);
+
     // Try resume in reverse
     for (size_t idx = 0; idx < MaxTransforms; ++idx)
     {

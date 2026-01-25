@@ -4,6 +4,7 @@
 #include "../FileSystem/FileSystem.h"
 #include "../Foundation/Assert.h"
 #include "Internal/HttpStringIterator.h"
+
 #include <stdio.h>
 #include <time.h>
 #if SC_PLATFORM_WINDOWS
@@ -95,7 +96,9 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(path.append(filePath));
         FileDescriptor fd;
         SC_TRY(fd.open(path.view(), FileOpen::Read));
-        SC_TRY(stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd));
+        Result initRes = stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd);
+        SC_ASSERT_RELEASE(initRes);
+        SC_TRY(initRes);
         SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
         fd.detach();
         stream.readableFileStream.setAutoCloseDescriptor(true);

@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: MIT
 #include "AsyncRequestStreams.h"
 #include "../Foundation/Assert.h"
+
+namespace SC
+{
 //-------------------------------------------------------------------------------------------------------
 // AsyncRequestReadableStream
 //-------------------------------------------------------------------------------------------------------
 template <typename AsyncReadRequest>
-struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
+struct AsyncRequestReadableStream<AsyncReadRequest>::Internal
 {
     static bool isEnded(AsyncFileRead::Result& result) { return result.completionData.endOfFile; }
     static bool isEnded(AsyncSocketReceive::Result& result) { return result.completionData.disconnected; }
@@ -32,59 +35,72 @@ struct SC::AsyncRequestReadableStream<AsyncReadRequest>::Internal
     {
         SC_TRY_MSG(not self.request.isCancelling(), "AsyncRequestReadableStream - Destroy in progress");
         self.eventLoop = &eventLoop;
-        self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncReadableStream::init(buffersPool);
     }
 };
 
 template <typename AsyncReadRequest>
-SC::AsyncRequestReadableStream<AsyncReadRequest>::AsyncRequestReadableStream()
+AsyncRequestReadableStream<AsyncReadRequest>::AsyncRequestReadableStream()
+{}
+
+template <typename AsyncReadRequest>
+Result AsyncRequestReadableStream<AsyncReadRequest>::asyncDestroyReadable()
 {
-    (void)AsyncReadableStream::eventClose
-        .addListener<AsyncRequestReadableStream, &AsyncRequestReadableStream::onCloseStopRequest>(*this);
+    if (request.isFree())
+    {
+        finalizeReadableDestruction();
+        return Result(true);
+    }
+    else
+    {
+        return request.stop(*eventLoop, &onStopCallback);
+    }
 }
 
 template <typename AsyncReadRequest>
-void SC::AsyncRequestReadableStream<AsyncReadRequest>::onCloseStopRequest()
+Function<void(AsyncResult&)> AsyncRequestReadableStream<AsyncReadRequest>::onStopCallback =
+    &AsyncRequestReadableStream<AsyncReadRequest>::stopRedableCallback;
+
+template <typename AsyncReadRequest>
+void AsyncRequestReadableStream<AsyncReadRequest>::stopRedableCallback(AsyncResult& result)
 {
-    if (not request.isFree())
+    SC_COMPILER_WARNING_PUSH_OFFSETOF;
+    AsyncReadRequest&           asyncRequest = static_cast<AsyncReadRequest&>(result.async);
+    AsyncRequestReadableStream& stream = SC_COMPILER_FIELD_OFFSET(AsyncRequestReadableStream, request, asyncRequest);
+    stream.finalizeReadableDestruction();
+    SC_COMPILER_WARNING_POP;
+}
+
+template <typename AsyncReadRequest>
+void AsyncRequestReadableStream<AsyncReadRequest>::finalizeReadableDestruction()
+{
+    if (bufferID.isValid())
     {
-        SC::Result res = SC::Result::Error("Fake error to unref bufferID");
-
-        typename AsyncReadRequest::Result result(*eventLoop, request, res, nullptr);
-
-        justUnrefBuffer = true;
-        request.callback(result); // will free bufferID
-        if (not request.isCancelling())
-        {
-            SC_ASSERT_RELEASE(request.stop(*eventLoop));
-        }
-        justUnrefBuffer = false;
+        getBuffersPool().unrefBuffer(bufferID);
+        bufferID = {};
     }
     if (autoCloseDescriptor)
     {
-        Result res = Internal::closeDescriptor(request);
-        if (not res)
-        {
-            emitError(res);
-        }
+        SC_ASSERT_RELEASE(Internal::closeDescriptor(request));
     }
+    SC_ASSERT_RELEASE(AsyncReadableStream::finishedDestroyingReadable());
+    request = {};
 }
 
 template <typename AsyncReadRequest>
-SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::asyncRead()
+Result AsyncRequestReadableStream<AsyncReadRequest>::asyncRead()
 {
     SC_ASSERT_RELEASE(request.isFree());
-    AsyncBufferView::ID bufferID;
     if (getBufferOrPause(0, bufferID, request.buffer))
     {
-        request.callback = [this, bufferID](typename AsyncReadRequest::Result& result) { afterRead(result, bufferID); };
+        request.callback.template bind<AsyncRequestReadableStream, &AsyncRequestReadableStream::afterRead>(*this);
         SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestReadableStream eventLoop == nullptr");
         const Result startResult = request.start(*eventLoop);
         if (not startResult)
         {
             getBuffersPool().unrefBuffer(bufferID);
+            bufferID = {};
             return startResult; // Error occurred during request start
         }
     }
@@ -92,8 +108,7 @@ SC::Result SC::AsyncRequestReadableStream<AsyncReadRequest>::asyncRead()
 }
 
 template <typename AsyncReadRequest>
-void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncReadRequest::Result& result,
-                                                                 AsyncBufferView::ID                bufferID)
+void AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncReadRequest::Result& result)
 {
     Span<char> data;
     if (result.get(data))
@@ -102,22 +117,28 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
         if (Internal::isEnded(result))
         {
             getBuffersPool().unrefBuffer(bufferID);
+            bufferID = {};
             AsyncReadableStream::pushEnd();
         }
         else
         {
             const bool continuePushing = AsyncReadableStream::push(bufferID, data.sizeInBytes());
             SC_ASSERT_RELEASE(result.getAsync().isFree());
-            getBuffersPool().unrefBuffer(bufferID);
+            // Only unref if destroy() wasn't called during push callback (which would have already unref'd)
+            if (not AsyncReadableStream::hasBeenDestroyed())
+            {
+                getBuffersPool().unrefBuffer(bufferID);
+                bufferID = {};
+            }
             // Check if we're still pushing (so not, paused, destroyed or errored etc.)
             if (continuePushing)
             {
                 if (getBufferOrPause(0, bufferID, result.getAsync().buffer))
                 {
-                    request.callback = [this, bufferID](typename AsyncReadRequest::Result& result)
-                    { afterRead(result, bufferID); };
+                    request.callback.template bind<AsyncRequestReadableStream, &AsyncRequestReadableStream::afterRead>(
+                        *this);
                     result.reactivateRequest(true);
-                    // Stream is in AsyncPushing mode and SC::AsyncResult::reactivateRequest(true) will cause more
+                    // Stream is in AsyncPushing mode and AsyncResult::reactivateRequest(true) will cause more
                     // data to be delivered here, so it's not necessary calling AsyncReadableStream::reactivate(true).
                 }
             }
@@ -126,8 +147,7 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
     else
     {
         getBuffersPool().unrefBuffer(bufferID);
-        if (justUnrefBuffer)
-            return;
+        bufferID = {};
         AsyncReadableStream::emitError(result.isValid());
     }
 }
@@ -137,7 +157,7 @@ void SC::AsyncRequestReadableStream<AsyncReadRequest>::afterRead(typename AsyncR
 //-------------------------------------------------------------------------------------------------------
 
 template <typename AsyncWriteRequest>
-struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
+struct AsyncRequestWritableStream<AsyncWriteRequest>::Internal
 {
     template <typename T>
     static auto& getDescriptor(T& async)
@@ -160,36 +180,52 @@ struct SC::AsyncRequestWritableStream<AsyncWriteRequest>::Internal
                        const DescriptorType& descriptor)
     {
         self.eventLoop = &eventLoop;
-        self.request   = {};
         SC_TRY(descriptor.get(Internal::getDescriptor(self.request), Result::Error("Missing descriptor")));
         return self.AsyncWritableStream::init(buffersPool);
     }
 };
 
 template <typename AsyncWriteRequest>
-SC::AsyncRequestWritableStream<AsyncWriteRequest>::AsyncRequestWritableStream()
+AsyncRequestWritableStream<AsyncWriteRequest>::AsyncRequestWritableStream()
+{}
+
+template <typename AsyncWriteRequest>
+Result AsyncRequestWritableStream<AsyncWriteRequest>::asyncDestroyWritable()
 {
-    (void)AsyncWritableStream::eventFinish
-        .addListener<AsyncRequestWritableStream, &AsyncRequestWritableStream::onFinishStopRequest>(*this);
+    if (request.isFree())
+    {
+        finalizeWritableDestruction();
+        return Result(true);
+    }
+    else
+    {
+        return request.stop(*eventLoop, &onStopCallback);
+    }
 }
 
 template <typename AsyncWriteRequest>
-void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
+bool AsyncRequestWritableStream<AsyncWriteRequest>::canEndWritable()
 {
-    if (not request.isFree())
-    {
-        SC::Result res = SC::Result::Error("Fake error to unref bufferID");
+    return request.isFree();
+}
 
-        typename AsyncWriteRequest::Result result(*eventLoop, request, res, nullptr);
+template <typename AsyncWriteRequest>
+Function<void(AsyncResult&)> AsyncRequestWritableStream<AsyncWriteRequest>::onStopCallback =
+    &AsyncRequestWritableStream<AsyncWriteRequest>::stopWritableCallback;
 
-        justUnrefBuffer = true;
-        request.callback(result); // will free bufferID
-        if (not request.isCancelling())
-        {
-            SC_ASSERT_RELEASE(request.stop(*eventLoop));
-        }
-        justUnrefBuffer = false;
-    }
+template <typename AsyncWriteRequest>
+void AsyncRequestWritableStream<AsyncWriteRequest>::stopWritableCallback(AsyncResult& result)
+{
+    SC_COMPILER_WARNING_PUSH_OFFSETOF;
+    AsyncWriteRequest&          asyncRequest = static_cast<AsyncWriteRequest&>(result.async);
+    AsyncRequestWritableStream& stream = SC_COMPILER_FIELD_OFFSET(AsyncRequestWritableStream, request, asyncRequest);
+    stream.finalizeWritableDestruction();
+    SC_COMPILER_WARNING_POP;
+}
+
+template <typename AsyncWriteRequest>
+void AsyncRequestWritableStream<AsyncWriteRequest>::finalizeWritableDestruction()
+{
     if (autoCloseDescriptor)
     {
         Result res = Internal::closeDescriptor(request);
@@ -198,24 +234,19 @@ void SC::AsyncRequestWritableStream<AsyncWriteRequest>::onFinishStopRequest()
             emitError(res);
         }
     }
+    request = {};
+    AsyncWritableStream::finishedDestroyingWritable();
 }
 
 template <typename AsyncWriteRequest>
-SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::asyncWrite(AsyncBufferView::ID                 bufferID,
-                                                                         Function<void(AsyncBufferView::ID)> cb)
+Result AsyncRequestWritableStream<AsyncWriteRequest>::asyncWrite(AsyncBufferView::ID                 newBufferID,
+                                                                 Function<void(AsyncBufferView::ID)> cb)
 {
+    bufferID = newBufferID;
     SC_ASSERT_RELEASE(not callback.isValid());
     callback = move(cb);
     SC_TRY(getBuffersPool().getReadableData(bufferID, request.buffer));
-    request.callback = [this, bufferID](typename AsyncWriteRequest::Result& result)
-    {
-        getBuffersPool().unrefBuffer(bufferID);
-        if (justUnrefBuffer)
-            return;
-        auto callbackCopy = move(callback);
-        callback          = {};
-        AsyncWritableStream::finishedWriting(bufferID, move(callbackCopy), result.isValid());
-    };
+    request.callback.template bind<AsyncRequestWritableStream, &AsyncRequestWritableStream::afterWrite>(*this);
     SC_TRY_MSG(eventLoop != nullptr, "AsyncRequestReadableStream eventLoop == nullptr");
     const Result res = request.start(*eventLoop);
     if (res)
@@ -225,8 +256,17 @@ SC::Result SC::AsyncRequestWritableStream<AsyncWriteRequest>::asyncWrite(AsyncBu
     return res;
 }
 
-namespace SC
+template <typename AsyncWriteRequest>
+void AsyncRequestWritableStream<AsyncWriteRequest>::afterWrite(typename AsyncWriteRequest::Result& result)
 {
+    AsyncBufferView::ID savedBufferID = bufferID;
+    getBuffersPool().unrefBuffer(bufferID);
+    bufferID = {};
+    auto cb  = move(callback);
+    callback = {};
+    AsyncWritableStream::finishedWriting(savedBufferID, move(cb), result.isValid());
+}
+
 SC_COMPILER_EXTERN template struct AsyncRequestReadableStream<AsyncSocketReceive>;
 SC_COMPILER_EXTERN template struct AsyncRequestReadableStream<AsyncFileRead>;
 SC_COMPILER_EXTERN template struct AsyncRequestWritableStream<AsyncFileWrite>;

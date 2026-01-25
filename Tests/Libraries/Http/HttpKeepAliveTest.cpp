@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
 #include "Libraries/Http/HttpAsyncServer.h"
-#include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 

@@ -9,7 +9,6 @@ namespace SC
 
 Result HttpAsyncServer::initInternal(SpanWithStride<HttpAsyncConnectionBase> connectionsSpan)
 {
-    onAsyncRequestStoppedFunc.bind<HttpAsyncServer, &HttpAsyncServer::onAsyncRequestStopped>(*this);
     for (size_t idx = 0; idx < connectionsSpan.sizeInElements(); ++idx)
     {
         HttpAsyncConnectionBase& connection = connectionsSpan[idx];
@@ -155,6 +154,9 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     client.socket = move(acceptedClient);
     SC_TRUST_RESULT(client.readableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
     SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
+    client.readableSocketStream.setAutoDestroy(true);
+    client.writableSocketStream.setAutoDestroy(false); // needed for keep-alive logic
+
     EventDataListener dataListener{*this, client};
     SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(dataListener));
     SC_TRUST_RESULT(client.readableSocketStream.start());
@@ -188,15 +190,8 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
         const size_t contentLength = client.request.getParser().contentLength;
         if (contentLength == 0)
         {
-            // If there is no body, we pause or destroy the stream to cancel pending reads
-            if (client.response.getKeepAlive())
-            {
-                client.readableSocketStream.pause();
-            }
-            else
-            {
-                client.readableSocketStream.destroy(); // emits 'eventClose' cancelling pending reads
-            }
+            // If there is no body, we pause the stream
+            client.readableSocketStream.pause();
         }
 
         onRequest(client);
@@ -229,16 +224,14 @@ void HttpAsyncServer::onStreamReceive(HttpAsyncConnectionBase& client, AsyncBuff
                     client.request.availableHeader = client.headerMemory;
                     (void)client.request.availableHeader.sliceStartLength(0, 0, client.request.readHeaders);
 
-                    client.writableSocketStream.destroy();
                     Result writableRes =
                         client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
                     SC_TRUST_RESULT(writableRes);
+
+                    // Resume reading in any case to avoid deadlocking
+                    client.readableSocketStream.resumeReading();
+
                     // Re-register for next request headers
-                    const size_t contentLength = client.request.getParser().contentLength;
-                    if (contentLength == 0)
-                    {
-                        client.readableSocketStream.resumeReading();
-                    }
                     EventDataListener dataListener{pself, client};
                     SC_ASSERT_RELEASE(client.readableSocketStream.eventData.addListener(dataListener));
                     EventEndListener endListener{pself, client};
@@ -268,57 +261,57 @@ void HttpAsyncServer::closeAsync(HttpAsyncConnectionBase& client)
     EventEndListener endListener{*this, client};
     (void)client.readableSocketStream.eventEnd.removeListener(endListener);
 
-    bool delayedDeactivation = false;
-    // Manually stop requests so we can get notification about when they will actually be stopped
-    if (not client.readableSocketStream.request.isFree())
+    const bool readWasDestroyed  = client.readableSocketStream.hasBeenDestroyed();
+    const bool writeWasDestroyed = client.writableSocketStream.hasBeenDestroyed();
+    struct OnCloseDeactivateReadable
     {
-        SC_TRUST_RESULT(client.readableSocketStream.request.stop(*eventLoop, &onAsyncRequestStoppedFunc));
-        delayedDeactivation = true;
-    }
-    if (not client.writableSocketStream.request.isFree())
+        HttpAsyncServer&         pself;
+        HttpAsyncConnectionBase& client;
+
+        void operator()()
+        {
+            SC_ASSERT_RELEASE(client.readableSocketStream.eventClose.removeListener(*this));
+            if (client.writableSocketStream.hasBeenDestroyed())
+            {
+                if (client.state != HttpConnection::State::Inactive)
+                {
+                    pself.deactivateConnection(client);
+                }
+            }
+        }
+    };
+    if (not readWasDestroyed)
     {
-        SC_TRUST_RESULT(client.writableSocketStream.request.stop(*eventLoop, &onAsyncRequestStoppedFunc));
-        delayedDeactivation = true;
+        SC_ASSERT_RELEASE(client.readableSocketStream.eventClose.addListener(OnCloseDeactivateReadable{*this, client}));
+        client.readableSocketStream.destroy();
     }
-    client.readableSocketStream.destroy();
-    client.writableSocketStream.destroy();
-    if (not delayedDeactivation)
+
+    struct OnCloseDeactivateWritable
+    {
+        HttpAsyncServer&         pself;
+        HttpAsyncConnectionBase& client;
+
+        void operator()()
+        {
+            SC_ASSERT_RELEASE(client.writableSocketStream.eventClose.removeListener(*this));
+            if (client.readableSocketStream.hasBeenDestroyed())
+            {
+                if (client.state != HttpConnection::State::Inactive)
+                {
+                    pself.deactivateConnection(client);
+                }
+            }
+        }
+    };
+    if (not writeWasDestroyed)
+    {
+        SC_ASSERT_RELEASE(client.writableSocketStream.eventClose.addListener(OnCloseDeactivateWritable{*this, client}));
+        client.writableSocketStream.destroy();
+    }
+
+    if (readWasDestroyed and writeWasDestroyed)
     {
         deactivateConnection(client);
-    }
-}
-
-void HttpAsyncServer::onAsyncRequestStopped(AsyncResult& result)
-{
-    // The field offset tricks below allow to keep a single event handler for all stopped requests in the server object
-    // avoiding the need to store a Function<> object in every connection.
-    // By inspecting the type of async we know if it's a readable or writable socket and we can find the associate
-    // client. Once we have the client, if all requests have been fully cancelled, we can proceed to deactivate the
-    // connection that will eventually unblock accepting new connection if it was previously paused for lack of
-    // available ones.
-    HttpAsyncConnectionBase* client = nullptr;
-    SC_COMPILER_WARNING_PUSH_OFFSETOF;
-    switch (result.async.getType())
-    {
-    case AsyncRequest::Type::SocketReceive: {
-        AsyncSocketReceive&   async  = static_cast<AsyncSocketReceive&>(result.async);
-        ReadableSocketStream& stream = SC_COMPILER_FIELD_OFFSET(ReadableSocketStream, request, async);
-        client                       = &SC_COMPILER_FIELD_OFFSET(HttpAsyncConnectionBase, readableSocketStream, stream);
-        break;
-    }
-    case AsyncRequest::Type::SocketSend: {
-        AsyncSocketSend&      async  = static_cast<AsyncSocketSend&>(result.async);
-        WritableSocketStream& stream = SC_COMPILER_FIELD_OFFSET(WritableSocketStream, request, async);
-        client                       = &SC_COMPILER_FIELD_OFFSET(HttpAsyncConnectionBase, writableSocketStream, stream);
-        break;
-    }
-    default: SC_ASSERT_RELEASE(false); break;
-    }
-    SC_COMPILER_WARNING_POP;
-    SC_ASSERT_RELEASE(client);
-    if (client->readableSocketStream.request.isFree() and client->writableSocketStream.request.isFree())
-    {
-        deactivateConnection(*client);
     }
 }
 

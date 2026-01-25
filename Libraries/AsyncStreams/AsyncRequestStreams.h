@@ -22,13 +22,19 @@ struct SC_COMPILER_EXPORT AsyncRequestReadableStream : public AsyncReadableStrea
     struct Internal;
     AsyncEventLoop* eventLoop = nullptr;
 
+    AsyncBufferView::ID bufferID;
+
     bool autoCloseDescriptor = false;
-    bool justUnrefBuffer     = false;
 
     virtual Result asyncRead() override;
+    virtual Result asyncDestroyReadable() override;
 
-    void afterRead(typename AsyncRequestType::Result& result, AsyncBufferView::ID bufferID);
-    void onCloseStopRequest();
+    void afterRead(typename AsyncRequestType::Result& result);
+    void finalizeReadableDestruction();
+
+    static void stopRedableCallback(AsyncResult&);
+
+    static Function<void(AsyncResult&)> onStopCallback;
 };
 
 template <typename AsyncRequestType>
@@ -48,14 +54,22 @@ struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStrea
     struct Internal;
     AsyncEventLoop* eventLoop = nullptr;
 
+    AsyncBufferView::ID bufferID;
+
     bool autoCloseDescriptor = false;
-    bool justUnrefBuffer     = false;
 
     Function<void(AsyncBufferView::ID)> callback;
 
-    Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb);
+    virtual Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb) override;
+    virtual Result asyncDestroyWritable() override;
+    virtual bool   canEndWritable() override;
 
-    void onFinishStopRequest();
+    void afterWrite(typename AsyncRequestType::Result& result);
+    void finalizeWritableDestruction();
+
+    static void stopWritableCallback(AsyncResult&);
+
+    static Function<void(AsyncResult&)> onStopCallback;
 };
 
 /// @brief Uses an SC::AsyncFileRead to stream data from a file

@@ -170,10 +170,6 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     Result initInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
     Result resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
 
-    void onAsyncRequestStopped(AsyncResult& result);
-
-    Function<void(AsyncResult&)> onAsyncRequestStoppedFunc;
-
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;
     AsyncSocketAccept asyncServerAccept;

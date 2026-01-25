@@ -245,6 +245,9 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @brief Returns true if the stream is ended (AsyncReadableStream::end has been called)
     [[nodiscard]] bool isEnded() const { return state == State::Ended; }
 
+    /// @brief Returns true if the stream has been already destroyed (asynchronously through destroy())
+    [[nodiscard]] bool hasBeenDestroyed() const { return destroyed; }
+
     /// @brief Obtains the AsyncBuffersPool to request more buffers
     AsyncBuffersPool& getBuffersPool();
 
@@ -274,20 +277,30 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @brief Returns an unused buffer from pool or pauses the stream if none is available
     [[nodiscard]] bool getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data);
 
+    /// @brief If set to true will automatically call .destroy() when Ended state is reached
+    void setAutoDestroy(bool value) { autoDestroy = value; }
+
+    /// @brief Returns true if stream will automatically call .destroy() when Ended state is reached
+    [[nodiscard]] bool getAutoDestroy() const { return autoDestroy; }
+
   protected:
     virtual ~AsyncReadableStream();
 
     /// @brief Function that every stream must define to implement its custom read operation
     virtual Result asyncRead() = 0;
 
-    /// @brief Reimplement asyncDestroy to stop async requests and once done call finishedDestroying to signal it.
-    virtual Result asyncDestroy();
+    /// @brief Function that a readable stream can re-implement to release its internal resources
+    /// @note The re-implementation MUST call finishedDestroyingReadable once it has finished stopping.
+    virtual Result asyncDestroyReadable();
+
+    /// @brief Called from inside asyncDestroy to transition from Destroying to Destroyed state (emitting eventClose)
+    Result finishedDestroyingReadable();
 
   private:
     void emitOnData();
     void executeRead();
 
-    enum class State
+    enum class State : uint8_t
     {
         Stopped,      // Stream must be inited
         CanRead,      // Stream is ready to issue a read ( AsyncReadableStream::start / AsyncReadableStream::resume)
@@ -299,10 +312,13 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
         Pausing,      // Pause requested while read in flight
         Paused,       // Actually paused with no read in flight
         Ended,        // Emitted all data, no more data will be emitted
-        Destroyed,    // Readable has been destroyed before emitting all data
+        Destroying,   // Destroy has been requested and it's in progress
         Errored,      // Error occurred
     };
     State state = State::Stopped;
+
+    bool destroyed   = false;
+    bool autoDestroy = true;
 
     AsyncBuffersPool* buffers = nullptr;
 
@@ -331,6 +347,7 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
 
     Event<MaxListeners> eventDrain;  /// Emitted when write queue is empty
     Event<MaxListeners> eventFinish; /// Emitted when no more data can be written
+    Event<MaxListeners> eventClose;  /// Emitted when the underlying resource has been closed
 
     /// @brief Inits the writable stream
     /// @param buffersPool An instance of AsyncBuffersPool providing write buffers
@@ -384,6 +401,15 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     /// @brief Returns true if this stream is writing something
     [[nodiscard]] bool isStillWriting() const { return state == State::Writing or state == State::Ending; }
 
+    /// @brief Returns true if the stream has been already destroyed (asynchronously through destroy())
+    [[nodiscard]] bool hasBeenDestroyed() const { return destroyed; }
+
+    /// @brief If set to true will automatically call .destroy() when Ended state is reached
+    void setAutoDestroy(bool value) { autoDestroy = value; }
+
+    /// @brief Returns true if stream will automatically call .destroy() when Ended state is reached
+    [[nodiscard]] bool getAutoDestroy() const { return autoDestroy; }
+
   protected:
     virtual ~AsyncWritableStream();
 
@@ -395,17 +421,29 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     /// state and return false to keep staying in ENDING state.
     virtual bool canEndWritable();
 
+    /// @brief Function that a writable stream can re-implement to release its internal resources
+    /// @note The re-implementation MUST call finishedDestroyingWritable once it has finished destroying
+    virtual Result asyncDestroyWritable();
+
+    /// @brief Function that MUST be called by re-implementations of asyncDestroyWritable once they're done
+    void finishedDestroyingWritable();
+
     void stop() { state = State::Stopped; }
 
   private:
-    enum class State
+    enum class State : uint8_t
     {
         Stopped,
         Writing,
         Ending,
-        Ended
+        Ended,
+        Destroying,
+        Errored,
     };
     State state = State::Stopped;
+
+    bool destroyed   = false;
+    bool autoDestroy = true;
 
     AsyncBuffersPool* buffers = nullptr;
 

@@ -200,13 +200,13 @@ Result HttpResponse::sendHeaders()
         // Auto-add Connection header only if not already added manually
         if (not connectionHeaderAdded)
         {
-            if (keepAlive)
+            if (forceDisableKeepAlive or not keepAlive)
             {
-                SC_TRY(sb.append("Connection: keep-alive\r\n"));
+                SC_TRY(sb.append("Connection: close\r\n"));
             }
             else
             {
-                SC_TRY(sb.append("Connection: close\r\n"));
+                SC_TRY(sb.append("Connection: keep-alive\r\n"));
             }
         }
         SC_TRY(sb.append("\r\n"));
