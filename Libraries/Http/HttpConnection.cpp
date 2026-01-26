@@ -108,6 +108,7 @@ Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readDa
 
                     SC_TRY(stream.getBuffersPool().createChildView(bufferID, bodyOffset, bodyLength, childID));
                     SC_TRY(stream.unshift(childID));
+                    stream.getBuffersPool().unrefBuffer(childID);
                 }
                 break;
             }

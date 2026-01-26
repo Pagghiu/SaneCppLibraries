@@ -206,6 +206,7 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
                 AsyncBufferView::ID childID;
                 SC_ASSERT_RELEASE(buffers.createChildView(bufferID, excessOffset, excessLength, childID));
                 SC_ASSERT_RELEASE(readable.unshift(childID));
+                buffers.unrefBuffer(childID);
 
                 // Last chunk, we can remove this listener and terminate the writable stream
                 SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
