@@ -110,6 +110,94 @@ SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan 
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
+SC::Result SC::HttpClient::postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName,
+                                         StringSpan fileName, StringSpan fileContent, TimeMs delay)
+{
+    bodyDelay = delay;
+    eventLoop = &loop;
+
+    uint16_t      port;
+    HttpURLParser urlParser;
+    SC_TRY(urlParser.parse(url));
+    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    // TODO: Make DNS Resolution asynchronous
+    char       buffer[256];
+    Span<char> ipAddress = {buffer};
+    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
+    port = urlParser.port;
+    SocketIPAddress localHost;
+    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
+    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+
+    // Generate a unique boundary
+    StringSpan boundary    = "----SCFormBoundary7MA4YWxkTrZu0gW";
+    size_t     boundaryLen = boundary.sizeInBytes();
+
+    {
+        GrowableBuffer<decltype(content)> gb = {content};
+
+        HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+        sb.clear();
+
+        // Build the multipart body first to know content length
+        // Body format:
+        // --boundary\r\n
+        // Content-Disposition: form-data; name="fieldName"; filename="fileName"\r\n
+        // Content-Type: application/octet-stream\r\n
+        // \r\n
+        // fileContent
+        // \r\n--boundary--\r\n
+
+        // Calculate body size
+        size_t bodySize = 0;
+        bodySize += 2 + boundaryLen + 2;                                            // --boundary\r\n
+        bodySize += 38 + fieldName.sizeInBytes() + 13 + fileName.sizeInBytes() + 3; // Content-Disposition: ...\r\n
+        bodySize += 40;                        // Content-Type: application/octet-stream\r\n
+        bodySize += 2;                         // \r\n
+        bodySize += fileContent.sizeInBytes(); // file content
+        bodySize += 4 + boundaryLen + 4;       // \r\n--boundary--\r\n
+
+        // Build HTTP headers
+        SC_TRY(sb.append("POST "));
+        SC_TRY(sb.append(urlParser.path));
+        SC_TRY(sb.append(" HTTP/1.1\r\n"));
+        SC_TRY(sb.append("User-agent: SC\r\n"));
+        SC_TRY(sb.append("Host: 127.0.0.1\r\n"));
+        SC_TRY(sb.append("Content-Type: multipart/form-data; boundary="));
+        SC_TRY(sb.append(boundary));
+        SC_TRY(sb.append("\r\n"));
+
+        char contentLengthBuffer[32];
+        ::snprintf(contentLengthBuffer, sizeof(contentLengthBuffer), "%zu", bodySize);
+        StringSpan cl({contentLengthBuffer, ::strlen(contentLengthBuffer)}, false, StringEncoding::Ascii);
+        SC_TRY(sb.append("Content-Length: "));
+        SC_TRY(sb.append(cl));
+        SC_TRY(sb.append("\r\n\r\n"));
+
+        // Build multipart body
+        SC_TRY(sb.append("--"));
+        SC_TRY(sb.append(boundary));
+        SC_TRY(sb.append("\r\n"));
+        SC_TRY(sb.append("Content-Disposition: form-data; name=\""));
+        SC_TRY(sb.append(fieldName));
+        headerBytes = content.size(); // break it in the middle
+        SC_TRY(sb.append("\"; filename=\""));
+        SC_TRY(sb.append(fileName));
+        SC_TRY(sb.append("\"\r\n"));
+        SC_TRY(sb.append("Content-Type: application/octet-stream\r\n"));
+        SC_TRY(sb.append("\r\n"));
+        SC_TRY(sb.append(fileContent));
+        SC_TRY(sb.append("\r\n--"));
+        SC_TRY(sb.append(boundary));
+        SC_TRY(sb.append("--\r\n"));
+    }
+
+    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
+    parser      = {};
+    parser.type = HttpParser::Type::Response;
+    return connectAsync.start(*eventLoop, clientSocket, localHost);
+}
+
 SC::StringSpan SC::HttpClient::getResponse() const
 {
     return StringSpan(content.toSpanConst(), false, StringEncoding::Ascii);

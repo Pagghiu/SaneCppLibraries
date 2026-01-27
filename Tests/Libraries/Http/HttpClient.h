@@ -32,6 +32,17 @@ struct HttpClient
     /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
     Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs bodyDelay = {});
 
+    /// @brief Setups this client to execute a multipart `POST` request with file upload
+    /// @param loop The AsyncEventLoop to use for monitoring network packets
+    /// @param url The url to `POST`
+    /// @param fieldName Form field name
+    /// @param fileName File name for the upload
+    /// @param fileContent Content of the file to upload
+    /// @param bodyDelay Artificial time delay before sending body
+    /// @return Valid Result if dns resolution and creation of underlying client tcp socket succeeded
+    Result postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName, StringSpan fileName,
+                         StringSpan fileContent, TimeMs bodyDelay = {});
+
     Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringSpan sent by the server
