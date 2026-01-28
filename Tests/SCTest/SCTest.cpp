@@ -58,6 +58,7 @@ void runHttpAsyncServerTest(TestReport& report);
 void runHttpAsyncFileServerTest(TestReport& report);
 void runHttpURLParserTest(TestReport& report);
 void runHttpKeepAliveTest(TestReport& report);
+void runHttpMultipartParserTest(TestReport& report);
 
 // Plugin
 void runPluginTest(TestReport& report);
@@ -196,6 +197,7 @@ int main(int argc, const char* argv[])
     runHttpAsyncFileServerTest(report);
     runHttpURLParserTest(report);
     runHttpKeepAliveTest(report);
+    runHttpMultipartParserTest(report);
 
     // Plugin tests
 #if SC_XCTEST

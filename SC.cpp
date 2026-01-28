@@ -14,6 +14,7 @@
 #include "Libraries/Http/HttpAsyncFileServer.cpp"
 #include "Libraries/Http/HttpAsyncServer.cpp"
 #include "Libraries/Http/HttpConnection.cpp"
+#include "Libraries/Http/HttpMultipartParser.cpp"
 #include "Libraries/Http/HttpParser.cpp"
 #include "Libraries/Http/HttpURLParser.cpp"
 #include "Libraries/Memory/Memory.cpp"
