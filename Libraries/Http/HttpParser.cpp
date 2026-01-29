@@ -430,7 +430,7 @@ bool SC::HttpParser::parseVersion(char currentChar)
 
 bool SC::HttpParser::parseHeaderName(char currentChar)
 {
-    static constexpr StringSpan headers[] = {"Content-Length", "Connection"};
+    static constexpr StringSpan headers[] = {"Content-Length", "Connection", "Content-Type"};
 
     SC_CO_BEGIN(nestedParserCoroutine);
     matchIndex = 0;

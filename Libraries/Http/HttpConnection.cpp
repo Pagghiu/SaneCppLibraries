@@ -39,6 +39,29 @@ bool HttpRequest::findParserToken(HttpParser::Token token, StringSpan& res) cons
     return false;
 }
 
+bool HttpRequest::getHeader(StringSpan headerName, StringSpan& value) const
+{
+    for (size_t idx = 0; idx < numHeaders; ++idx)
+    {
+        const HttpHeaderOffset& header = headerOffsets[idx];
+        if (header.token == HttpParser::Token::HeaderName)
+        {
+            StringSpan name({readHeaders.data() + header.start, header.length}, false, StringEncoding::Ascii);
+            if (idx + 1 < numHeaders && headerOffsets[idx + 1].token == HttpParser::Token::HeaderValue)
+            {
+                if (HttpStringIterator::equalsIgnoreCase(name, headerName))
+                {
+                    const HttpHeaderOffset& valueHeader = headerOffsets[idx + 1];
+                    value = StringSpan({readHeaders.data() + valueHeader.start, valueHeader.length}, false,
+                                       StringEncoding::Ascii);
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 void HttpRequest::reset()
 {
     headersEndReceived = false;
@@ -127,6 +150,50 @@ size_t HttpRequest::getHeadersLength() const
             return static_cast<size_t>(last.start + last.length);
     }
     return 0;
+}
+
+bool HttpRequest::isMultipart() const
+{
+    StringSpan contentType;
+    if (getHeader("Content-Type", contentType))
+    {
+        return HttpStringIterator::startsWithIgnoreCase(contentType, "multipart/form-data");
+    }
+    return false;
+}
+
+StringSpan HttpRequest::getBoundary() const
+{
+    StringSpan contentType;
+    if (getHeader("Content-Type", contentType))
+    {
+        HttpStringIterator it(contentType);
+        if (it.advanceUntilMatchesIgnoreCase("boundary="))
+        {
+            // Skip "boundary="
+            for (size_t i = 0; i < 9; ++i)
+                (void)it.stepForward();
+
+            // Check for opening quote
+            if (it.advanceIfMatches('"'))
+            {
+                // Quoted boundary: find closing quote
+                auto start = it;
+                while (!it.isAtEnd() && !it.match('"'))
+                    (void)it.stepForward();
+                return HttpStringIterator::fromIterators(start, it, contentType.getEncoding());
+            }
+            else
+            {
+                // Unquoted boundary: advance until delimiter
+                auto start = it;
+                char matched;
+                (void)it.advanceUntilMatchesAny({';', ' ', '\r', '\0'}, matched);
+                return HttpStringIterator::fromIterators(start, it, contentType.getEncoding());
+            }
+        }
+    }
+    return {};
 }
 
 //-------------------------------------------------------------------------------------------------------

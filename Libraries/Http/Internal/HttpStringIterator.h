@@ -51,6 +51,22 @@ struct HttpStringIterator
         return false;
     }
 
+    [[nodiscard]] bool advanceUntilMatchesIgnoreCase(const char* needle)
+    {
+        size_t needleLen = ::strlen(needle);
+        while (it + needleLen <= end)
+        {
+            StringSpan substr({it, needleLen}, false, StringEncoding::Ascii);
+            if (HttpStringIterator::startsWithIgnoreCase(substr, needle))
+            {
+                return true;
+            }
+            ++it;
+        }
+        it = end;
+        return false;
+    }
+
     [[nodiscard]] bool advanceIfMatches(char c)
     {
         if (it == end)
@@ -204,6 +220,24 @@ struct HttpStringIterator
         if (str.sizeInBytes() < prefixLen)
             return false;
         return ::strncmp(str.bytesWithoutTerminator(), prefix, prefixLen) == 0;
+    }
+
+    static bool startsWithIgnoreCase(StringSpan str, const char* prefix)
+    {
+        size_t prefixLen = ::strlen(prefix);
+        if (str.sizeInBytes() < prefixLen)
+            return false;
+        StringSpan         prefixSpan({prefix, prefixLen}, false, StringEncoding::Ascii);
+        HttpStringIterator it1 = str;
+        HttpStringIterator it2 = prefixSpan;
+
+        char c1, c2;
+        while (it1.advanceRead(c1) && it2.advanceRead(c2))
+        {
+            if (::tolower(static_cast<int>(c1)) != ::tolower(static_cast<int>(c2)))
+                return false;
+        }
+        return true;
     }
 
     static bool endsWith(StringSpan str, const char* suffix)

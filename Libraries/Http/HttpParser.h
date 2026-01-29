@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/StringSpan.h"
 
 namespace SC
 {
@@ -71,8 +72,12 @@ struct SC_COMPILER_EXPORT HttpParser
     enum class HeaderType
     {
         ContentLength = 0, ///< Content-Length header
-        Connection    = 1  ///< Connection header (keep-alive or close)
+        Connection    = 1, ///< Connection header (keep-alive or close)
+        ContentType   = 2, ///< Content-Type header
     };
+
+    StringSpan contentTypeValue;  ///< Value of Content-Type header
+    StringSpan multipartBoundary; ///< Extracted multipart boundary (if Content-Type is multipart/form-data)
 
     /// @brief Check if current result matches this HeaderType
     [[nodiscard]] bool matchesHeader(HeaderType headerName) const;

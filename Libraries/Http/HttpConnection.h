@@ -20,6 +20,18 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
 
+    /// @brief Checks if the request is a multipart/form-data request
+    [[nodiscard]] bool isMultipart() const;
+
+    /// @brief Gets the multipart boundary string (if isMultipart() returns true)
+    [[nodiscard]] StringSpan getBoundary() const;
+
+    /// @brief Gets the value of a specific header (case-insensitive name matching)
+    /// @param headerName The name of the header to find
+    /// @param value Output parameter that receives the header value if found
+    /// @return `true` if the header was found
+    [[nodiscard]] bool getHeader(StringSpan headerName, StringSpan& value) const;
+
     /// @brief Resets this object for it to be re-usable
     void reset();
 
