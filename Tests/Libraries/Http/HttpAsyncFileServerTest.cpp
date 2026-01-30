@@ -72,12 +72,14 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         HttpAsyncServer& httpServer;
         AsyncEventLoop*  loop = nullptr;
 
-        int        getCount  = 0;
-        int        putCount  = 0;
-        FileSystem fs        = {};
-        HttpClient getClient = {};
-        HttpClient putStream = {};
-        HttpClient putInline = {};
+        int        getCount       = 0;
+        int        putCount       = 0;
+        int        multipartCount = 0;
+        FileSystem fs             = {};
+        HttpClient getClient      = {};
+        HttpClient putStream      = {};
+        HttpClient putInline      = {};
+        HttpClient postMultipart  = {};
     } context    = {httpServer};
     context.loop = &eventLoop;
 
@@ -127,6 +129,24 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
         SC_TEST_EXPECT(content == "InlineBody");
         SC_TEST_EXPECT(context.fs.removeFile("inline.html"));
 
+        // Test multipart POST with file upload
+        SC_TEST_EXPECT(context.postMultipart.postMultipart(*context.loop, "http://localhost:8090/upload", "file",
+                                                           "multipart.txt", "MultipartContent"));
+    };
+
+    context.postMultipart.callback = [this, &context](HttpClient& result)
+    {
+        context.multipartCount++;
+        StringView str(result.getResponse());
+        // Expect 201 Created
+        SC_TEST_EXPECT(str.containsString("201 Created"));
+
+        // Verify file content
+        String content;
+        SC_TEST_EXPECT(context.fs.read("multipart.txt", content));
+        SC_TEST_EXPECT(content == "MultipartContent");
+        SC_TEST_EXPECT(context.fs.removeFile("multipart.txt"));
+
         SC_TEST_EXPECT(context.httpServer.stop());
     };
 
@@ -143,6 +163,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
 
     SC_TEST_EXPECT(context.getCount == 1);
     SC_TEST_EXPECT(context.putCount == 2);
+    SC_TEST_EXPECT(context.multipartCount == 1);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
 }
 

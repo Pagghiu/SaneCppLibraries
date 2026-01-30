@@ -3,6 +3,7 @@
 #pragma once
 #include "../AsyncStreams/AsyncRequestStreams.h"
 #include "HttpAsyncServer.h"
+#include "HttpMultipartParser.h"
 
 namespace SC
 {
@@ -20,9 +21,25 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
     struct SC_COMPILER_EXPORT Stream
     {
-        ReadableFileStream readableFileStream;
-        WritableFileStream writableFileStream;
-        AsyncTaskSequence  readableFileStreamTask;
+        ReadableFileStream  readableFileStream;
+        WritableFileStream  writableFileStream;
+        AsyncTaskSequence   readableFileStreamTask;
+        HttpMultipartParser multipartParser;
+
+        struct MultipartListener
+        {
+            HttpAsyncFileServer*     server     = nullptr;
+            Stream*                  stream     = nullptr;
+            HttpAsyncConnectionBase* connection = nullptr;
+
+            FileDescriptor currentFd;
+            StringPath     currentFilePath;
+            StringSpan     currentFileName;
+            StringSpan     currentHeaderName;
+            bool           isContentDisposition = false;
+
+            void onData(AsyncBufferView::ID bufferID);
+        } multipartListener;
     };
 
     template <int RequestsSize>
@@ -50,6 +67,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
   private:
     Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
     Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
+    Result postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
     StringPath directory;
 

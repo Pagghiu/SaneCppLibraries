@@ -58,6 +58,11 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
     {
         filePath = "index.html";
     }
+
+    if (connection.request.isMultipart())
+    {
+        return postMultipart(stream, connection);
+    }
     // TODO: Resolve and validate final path to check that is inside allowed folders for GET/PUT
 
     FileSystem fileSystem;
@@ -335,4 +340,125 @@ Result HttpAsyncFileServer::Internal::writeGMTHeaderTime(StringSpan headerName, 
     SC_TRY(response.addHeader(headerName, {{bufferData, len}, true, StringEncoding::Ascii}));
     return Result(true);
 }
+
+Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
+{
+    SC_TRY(stream.multipartParser.initWithBoundary(connection.request.getBoundary()));
+
+    HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
+
+    stream.multipartListener.server     = this;
+    stream.multipartListener.stream     = &stream;
+    stream.multipartListener.connection = &asyncConnection;
+
+    SC_ASSERT_RELEASE(
+        (asyncConnection.readableSocketStream.eventData.addListener<
+            HttpAsyncFileServer::Stream::MultipartListener, &HttpAsyncFileServer::Stream::MultipartListener::onData>(
+            stream.multipartListener)));
+
+    (void)asyncConnection.readableSocketStream.start();
+
+    return Result(true);
+}
+
+void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID bufferID)
+{
+    AsyncReadableStream& readable = connection->readableSocketStream;
+    AsyncBuffersPool&    buffers  = readable.getBuffersPool();
+
+    Span<const char> data;
+    SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
+
+    size_t           readBytes;
+    Span<const char> parsedData;
+
+    while (not data.empty() and stream->multipartParser.state != HttpMultipartParser::State::Finished)
+    {
+        SC_ASSERT_RELEASE(stream->multipartParser.parse(data, readBytes, parsedData));
+
+        bool tokenProcessed = false;
+        if (stream->multipartParser.state != HttpMultipartParser::State::Parsing)
+        {
+            tokenProcessed = true;
+            switch (stream->multipartParser.token)
+            {
+            case HttpMultipartParser::Token::Boundary: break;
+
+            case HttpMultipartParser::Token::HeaderName: {
+                currentHeaderName    = {parsedData, false, StringEncoding::Ascii};
+                isContentDisposition = HttpStringIterator::equalsIgnoreCase(currentHeaderName, "Content-Disposition");
+            }
+            break;
+
+            case HttpMultipartParser::Token::HeaderValue: {
+                if (isContentDisposition)
+                {
+                    HttpStringIterator it = {{parsedData, false, StringEncoding::Ascii}};
+                    if (it.advanceUntilMatchesIgnoreCase("filename="))
+                    {
+                        for (int i = 0; i < 9; ++i)
+                            (void)it.stepForward();
+                        if (it.advanceIfMatches('"'))
+                        {
+                            auto start = it;
+                            while (!it.isAtEnd() && !it.match('"'))
+                                (void)it.stepForward();
+                            currentFileName = HttpStringIterator::fromIterators(start, it, StringEncoding::Ascii);
+                        }
+                    }
+                }
+            }
+            break;
+
+            case HttpMultipartParser::Token::PartHeaderEnd: {
+                if (!currentFileName.isEmpty())
+                {
+                    (void)currentFilePath.assign(server->directory.view());
+                    (void)currentFilePath.append("/");
+                    (void)currentFilePath.append(currentFileName);
+                    (void)currentFd.open(currentFilePath.view(), FileOpen::Write);
+                }
+            }
+            break;
+
+            case HttpMultipartParser::Token::PartBody: {
+                if (currentFd.isValid())
+                {
+                    SC_ASSERT_RELEASE(currentFd.write(parsedData));
+                }
+            }
+            break;
+
+            case HttpMultipartParser::Token::Finished: {
+                if (currentFd.isValid())
+                {
+                    (void)currentFd.close();
+                }
+                SC_ASSERT_RELEASE((
+                    readable.eventData.removeListener<HttpAsyncFileServer::Stream::MultipartListener,
+                                                      &HttpAsyncFileServer::Stream::MultipartListener::onData>(*this)));
+
+                SC_ASSERT_RELEASE(connection->response.startResponse(201));
+                (void)connection->response.addHeader("Content-Length", "0");
+                SC_ASSERT_RELEASE(connection->response.sendHeaders());
+                SC_ASSERT_RELEASE(connection->response.end());
+            }
+            break;
+            default: break;
+            }
+        }
+        if (readBytes > 0)
+        {
+            SC_ASSERT_RELEASE(data.sliceStart(readBytes, data));
+        }
+        else if (not tokenProcessed)
+        {
+            break; // Stall
+        }
+
+        if (stream->multipartParser.state == HttpMultipartParser::State::Finished)
+            break;
+    }
+}
+
 } // namespace SC
