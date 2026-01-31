@@ -80,5 +80,5 @@ This is the list of videos that have been recorded showing some of the internal 
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 399			| 248		| 647	|
-| Sources   | 917			| 168		| 1085	|
-| Sum       | 1316			| 416		| 1732	|
+| Sources   | 906			| 167		| 1073	|
+| Sum       | 1305			| 415		| 1720	|
