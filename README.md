@@ -11,10 +11,6 @@
 
 **Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
 
-![Sane Cpp](https://pagghiu.github.io/images/2025-12-23-SaneCpp2Year/article.svg)
-
-NEW: [Sane C++ Libraries - 2nd year blog post!](https://pagghiu.github.io/site/blog/2025-12-23-SaneCpp2Year.html) (published in December 2025)
-
 [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
 ✅ Fast compile times  
 ✅ Bloat free  
