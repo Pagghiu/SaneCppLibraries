@@ -146,6 +146,7 @@ struct SC_COMPILER_EXPORT AsyncRequest
         SocketReceiveFrom,   ///< Request is an SocketReceiveFrom object
         FileRead,            ///< Request is an AsyncFileRead object
         FileWrite,           ///< Request is an AsyncFileWrite object
+        FileSend,            ///< Request is an AsyncFileSend object
         FilePoll,            ///< Request is an AsyncFilePoll object
         FileSystemOperation, ///< Request is an AsyncFileSystemOperation object
     };
@@ -846,6 +847,92 @@ struct SC_COMPILER_EXPORT AsyncFilePoll : public AsyncRequest
 #endif
 };
 
+/// @brief Sends file contents to a socket using zero-copy when available (sendfile, TransmitFile).
+/// Falls back to read/write loop on platforms or configurations where zero-copy is unavailable.
+/// Callback will be called when the file has been sent or an error occurred.
+///
+/// @note On epoll/macOS/Windows this runs synchronously when scheduled and can optionally
+///       use a thread pool for better concurrency.
+/// @note On io_uring this uses native async sendfile (IORING_OP_SEND_ZC when available).
+///
+/// ## File Opening Requirements
+///
+/// **Windows:**
+/// Files **must** be opened with `FileOpen::blocking = true` because the Windows implementation
+/// uses synchronous `ReadFile`/`WSASend` internally. Opening files with `blocking = false`
+/// (which adds `FILE_FLAG_OVERLAPPED`) will cause `ReadFile` to fail or return 0 bytes.
+/// The async aspect comes from being scheduled within the event loop, not from overlapped I/O.
+///
+/// **Posix (macOS/Linux with epoll):**
+/// Files should be opened with `FileOpen::blocking = false` to enable non-blocking `sendfile`.
+/// If opened with `blocking = true`, `sendfile` will block the event loop thread until completion.
+///
+/// **Linux with io_uring:**
+/// Files can be opened with any mode (blocking or non-blocking).
+/// The implementation uses `IORING_OP_SPLICE` for efficient zero-copy transfer.
+/// Pipe used for splice is automatically created as non-blocking.
+struct SC_COMPILER_EXPORT AsyncFileSend : public AsyncRequest
+{
+    AsyncFileSend() : AsyncRequest(Type::FileSend) {}
+
+    struct CompletionData : public AsyncCompletionData
+    {
+        size_t bytesTransferred = 0;     ///< Number of bytes successfully sent
+        bool   usedZeroCopy     = false; ///< True if zero-copy mechanism was used
+    };
+
+    struct Result : public AsyncResultOf<AsyncFileSend, CompletionData>
+    {
+        using AsyncResultOf<AsyncFileSend, CompletionData>::AsyncResultOf;
+
+        /// @brief Get the number of bytes transferred
+        [[nodiscard]] size_t getBytesTransferred() const { return completionData.bytesTransferred; }
+
+        /// @brief Check if zero-copy was used for this transfer
+        [[nodiscard]] bool usedZeroCopy() const { return completionData.usedZeroCopy; }
+
+        /// @brief Check if the entire requested range was sent
+        [[nodiscard]] bool isComplete() const
+        {
+            return returnCode && completionData.bytesTransferred == getAsync().length;
+        }
+    };
+
+    using AsyncRequest::start;
+
+    /// @brief Start the file send operation
+    /// @param eventLoop The event loop to use
+    /// @param file The file descriptor (must be open for reading).
+    ///             For true async I/O (without thread pool), open with `FileOpen::blocking = false`.
+    ///             When using thread pool, either blocking mode works.
+    /// @param socket The socket descriptor (must be connected)
+    /// @param offset File offset to start reading from (0 for beginning)
+    /// @param length Number of bytes to send (0 means send until EOF)
+    /// @param pipeSize Optional size of the splice pipe (0 means default)
+    SC::Result start(AsyncEventLoop& eventLoop, const FileDescriptor& file, const SocketDescriptor& socket,
+                     int64_t offset = 0, size_t length = 0, size_t pipeSize = 0);
+
+    Function<void(Result&)> callback; ///< Called when send completes or fails
+
+    // Internal handles (set by start())
+    FileDescriptor::Handle   fileHandle   = FileDescriptor::Invalid;
+    SocketDescriptor::Handle socketHandle = SocketDescriptor::Invalid;
+
+    int64_t offset    = 0;
+    size_t  length    = 0;
+    size_t  bytesSent = 0; ///< Internal progress tracking
+  private:
+    friend struct AsyncEventLoop;
+    SC::Result validate(AsyncEventLoop&);
+
+#if SC_PLATFORM_WINDOWS
+    detail::WinOverlappedOpaque overlapped;
+#elif SC_PLATFORM_LINUX
+    size_t         pipeBufferSize = 0; ///< Optional size of the splice pipe (0 = default)
+    PipeDescriptor splicePipe;         ///< Pipe used for splice operations
+#endif
+};
+
 // forward declared because it must be defined after AsyncTaskSequence
 struct AsyncLoopWork;
 struct AsyncFileSystemOperation;
@@ -888,6 +975,7 @@ struct SC_COMPILER_EXPORT AsyncCompletionVariant
         AsyncSocketReceiveFrom::CompletionData completionDataSocketReceiveFrom;
         AsyncFileRead::CompletionData          completionDataFileRead;
         AsyncFileWrite::CompletionData         completionDataFileWrite;
+        AsyncFileSend::CompletionData          completionDataFileSend;
         AsyncFilePoll::CompletionData          completionDataFilePoll;
 
         AsyncFileSystemOperationCompletionData completionDataFileSystemOperation;
@@ -903,6 +991,7 @@ struct SC_COMPILER_EXPORT AsyncCompletionVariant
     auto& getCompletion(AsyncSocketReceive&) { return completionDataSocketReceive; }
     auto& getCompletion(AsyncFileRead&) { return completionDataFileRead; }
     auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
+    auto& getCompletion(AsyncFileSend&) { return completionDataFileSend; }
     auto& getCompletion(AsyncFilePoll&) { return completionDataFilePoll; }
     auto& getCompletion(AsyncFileSystemOperation&) { return completionDataFileSystemOperation; }
 
@@ -1361,9 +1450,9 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
   public:
     struct SC_COMPILER_EXPORT InternalDefinition
     {
-        static constexpr int Windows = 520;
-        static constexpr int Apple   = 512;
-        static constexpr int Linux   = 720;
+        static constexpr int Windows = 536;
+        static constexpr int Apple   = 528;
+        static constexpr int Linux   = 744;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

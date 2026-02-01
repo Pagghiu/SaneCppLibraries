@@ -55,6 +55,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::SocketReceiveFrom: return "SocketReceiveFrom";
     case Type::FileRead: return "FileRead";
     case Type::FileWrite: return "FileWrite";
+    case Type::FileSend: return "FileSend";
     case Type::FilePoll: return "FilePoll";
     case Type::FileSystemOperation: return "FileSystemOperation";
     }
@@ -427,6 +428,35 @@ SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& eventLoop, FileDescriptor::H
 SC::Result SC::AsyncFilePoll::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFilePoll - Invalid file descriptor");
+    return SC::Result(true);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// AsyncFileSend
+//-------------------------------------------------------------------------------------------------------
+SC::Result SC::AsyncFileSend::start(AsyncEventLoop& eventLoop, const FileDescriptor& file,
+                                    const SocketDescriptor& socket, int64_t fileOffset, size_t bytesToSend,
+                                    size_t pipeSize)
+{
+    SC_TRY(checkState());
+    SC_TRY(file.get(fileHandle, SC::Result::Error("AsyncFileSend - Invalid file descriptor")));
+    SC_TRY(socket.get(socketHandle, SC::Result::Error("AsyncFileSend - Invalid socket descriptor")));
+#if SC_PLATFORM_LINUX
+    pipeBufferSize = pipeSize;
+#else
+    SC_COMPILER_UNUSED(pipeSize);
+#endif
+    offset    = fileOffset;
+    length    = bytesToSend;
+    bytesSent = 0;
+    return eventLoop.start(*this);
+}
+
+SC::Result SC::AsyncFileSend::validate(AsyncEventLoop&)
+{
+    SC_TRY_MSG(fileHandle != FileDescriptor::Invalid, "AsyncFileSend - Invalid file descriptor");
+    SC_TRY_MSG(socketHandle != SocketDescriptor::Invalid, "AsyncFileSend - Invalid socket descriptor");
+    SC_TRY_MSG(length > 0, "AsyncFileSend - Zero length");
     return SC::Result(true);
 }
 
@@ -885,6 +915,7 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     internal.enumerateRequests(internal.activeSocketReceivesFrom, enumerationCallback);
     internal.enumerateRequests(internal.activeFileReads, enumerationCallback);
     internal.enumerateRequests(internal.activeFileWrites, enumerationCallback);
+    internal.enumerateRequests(internal.activeFileSends, enumerationCallback);
     internal.enumerateRequests(internal.activeFilePolls, enumerationCallback);
     internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
 }
@@ -1196,6 +1227,7 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     stopRequests(eventLoop, activeSocketReceivesFrom);
     stopRequests(eventLoop, activeFileReads);
     stopRequests(eventLoop, activeFileWrites);
+    stopRequests(eventLoop, activeFileSends);
     stopRequests(eventLoop, activeFilePolls);
 
     stopRequests(eventLoop, manualCompletions);
@@ -1683,6 +1715,7 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     // File
     case AsyncRequest::Type::FileRead:      teardown.fileHandle = static_cast<AsyncFileRead&>(async).handle; break;
     case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).handle; break;
+    case AsyncRequest::Type::FileSend:      teardown.fileHandle = static_cast<AsyncFileSend&>(async).fileHandle; break;
     case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).handle; break;
 
     // FileSystemOperation
@@ -1751,6 +1784,9 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
         break;
     case AsyncRequest::Type::FileWrite:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileWrite*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::FileSend:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileSend*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FilePoll:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
@@ -1958,6 +1994,7 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
         case AsyncRequest::Type::SocketReceiveFrom: activeSocketReceivesFrom.remove(*static_cast<AsyncSocketReceiveFrom*>(&async)); break;
         case AsyncRequest::Type::FileRead:      activeFileReads.remove(*static_cast<AsyncFileRead*>(&async));           break;
         case AsyncRequest::Type::FileWrite:     activeFileWrites.remove(*static_cast<AsyncFileWrite*>(&async));         break;
+        case AsyncRequest::Type::FileSend:      activeFileSends.remove(*static_cast<AsyncFileSend*>(&async));           break;
         case AsyncRequest::Type::FilePoll:      activeFilePolls.remove(*static_cast<AsyncFilePoll*>(&async));           break;
 
         // FileSystemOperation
@@ -2038,7 +2075,8 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     case AsyncRequest::Type::SocketReceiveFrom: activeSocketReceivesFrom.queueBack(*static_cast<AsyncSocketReceiveFrom*>(&async));  break;
     case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
     case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
-    case AsyncRequest::Type::FilePoll: 	    activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
+    case AsyncRequest::Type::FileSend:      activeFileSends.queueBack(*static_cast<AsyncFileSend*>(&async));            break;
+    case AsyncRequest::Type::FilePoll:      activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
 
     // FileSystemOperation
     case AsyncRequest::Type::FileSystemOperation: activeFileSystemOperations.queueBack(*static_cast<AsyncFileSystemOperation*>(&async)); break;
@@ -2069,6 +2107,7 @@ SC::Result SC::AsyncEventLoop::Internal::applyOnAsync(AsyncRequest& async, Lambd
     case AsyncRequest::Type::SocketReceiveFrom: SC_TRY(lambda(*static_cast<AsyncSocketReceiveFrom*>(&async))); break;
     case AsyncRequest::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
     case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
+    case AsyncRequest::Type::FileSend: SC_TRY(lambda(*static_cast<AsyncFileSend*>(&async))); break;
     case AsyncRequest::Type::FilePoll: SC_TRY(lambda(*static_cast<AsyncFilePoll*>(&async))); break;
     case AsyncRequest::Type::FileSystemOperation:
         SC_TRY(lambda(*static_cast<AsyncFileSystemOperation*>(&async)));
@@ -2120,6 +2159,7 @@ void SC::detail::AsyncCompletionVariant::destroy()
     case AsyncRequest::Type::SocketReceiveFrom: dtor(completionDataSocketReceiveFrom); break;
     case AsyncRequest::Type::FileRead: dtor(completionDataFileRead); break;
     case AsyncRequest::Type::FileWrite: dtor(completionDataFileWrite); break;
+    case AsyncRequest::Type::FileSend: dtor(completionDataFileSend); break;
     case AsyncRequest::Type::FilePoll: dtor(completionDataFilePoll); break;
 
     // FileSystemOperation

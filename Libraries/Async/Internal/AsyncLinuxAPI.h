@@ -123,6 +123,7 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     void (*io_uring_prep_poll_remove)(struct io_uring_sqe* sqe, __u64 user_data) = nullptr;
     void (*io_uring_prep_cancel)(struct io_uring_sqe* sqe, void* user_data, int flags) = nullptr;
     void (*io_uring_prep_openat)(struct io_uring_sqe* sqe, int fd, const char* pathname, int flags, mode_t mode) = nullptr;
+    void (*io_uring_prep_splice)(struct io_uring_sqe* sqe, int fd_in, int64_t off_in, int fd_out, int64_t off_out, unsigned nbytes, unsigned int splice_flags) = nullptr;
 
     // clang-format on
     AsyncLinuxLibURingLoader()
@@ -151,6 +152,7 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
         this->io_uring_prep_renameat       = &::io_uring_prep_renameat;
         this->io_uring_prep_unlink         = &::io_uring_prep_unlink;
         this->io_uring_prep_unlinkat       = &::io_uring_prep_unlinkat;
+        this->io_uring_prep_splice         = &::io_uring_prep_splice;
     }
 };
 
@@ -389,6 +391,15 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
     {
         io_uring_prep_rw(IORING_OP_RECVMSG, sqe, sockfd, msg, 1, 0);
         sqe->msg_flags = (__u32)flags;
+    }
+
+    static inline void io_uring_prep_splice(struct io_uring_sqe* sqe, int fd_in, int64_t off_in, int fd_out,
+                                            int64_t off_out, unsigned nbytes, unsigned int splice_flags)
+    {
+        io_uring_prep_rw(IORING_OP_SPLICE, sqe, fd_out, NULL, nbytes, (__u64)off_out);
+        sqe->splice_off_in = (__u64)off_in;
+        sqe->splice_fd_in  = fd_in;
+        sqe->splice_flags  = splice_flags;
     }
 };
 

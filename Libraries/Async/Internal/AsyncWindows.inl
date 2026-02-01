@@ -3,11 +3,13 @@
 
 #include <WinSock2.h>
 // Order is important
-#include <MSWSock.h> // AcceptEx, LPFN_CONNECTEX
+#include <MSWSock.h> // AcceptEx, LPFN_CONNECTEX, TransmitFile
 //
 #include <Ws2tcpip.h> // sockadd_in6
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+
+#pragma comment(lib, "Mswsock.lib") // TransmitFile
 
 #include <stddef.h> // offsetof
 
@@ -381,8 +383,16 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     {
         SC_TRY(SocketNetworking::isNetworkingInited());
 
-        SOCKET clientSocket = ::WSASocketW(AF_INET, SOCK_STREAM, IPPROTO_TCP, nullptr, 0,
-                                           WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT);
+        // Create client socket with matching address family of the listening socket
+        constexpr DWORD flags = WSA_FLAG_OVERLAPPED | WSA_FLAG_NO_HANDLE_INHERIT;
+
+        int af = AF_INET;
+        switch (async.addressFamily)
+        {
+        case SocketFlags::AddressFamilyIPV4: af = AF_INET; break;
+        case SocketFlags::AddressFamilyIPV6: af = AF_INET6; break;
+        }
+        SOCKET clientSocket = ::WSASocketW(af, SOCK_STREAM, IPPROTO_TCP, nullptr, 0, flags);
         SC_TRY_MSG(clientSocket != INVALID_SOCKET, "WSASocketW failed");
         auto deferDeleteSocket = MakeDeferred([&] { closesocket(clientSocket); });
         static_assert(sizeof(detail::AsyncSocketAcceptData::acceptBuffer) == sizeof(struct sockaddr_storage) * 2 + 32,
@@ -944,6 +954,152 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
             return Result(true);
         }
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // File SEND (TransmitFile)
+    //-------------------------------------------------------------------------------------------------------
+
+    // Synchronous fallback used only when executeOn thread pool is used
+    static Result executeOperation(AsyncFileSend& async, AsyncFileSend::CompletionData& completionData)
+    {
+        // This is the synchronous fallback for thread pool mode.
+        // Files used here should be opened with blocking = true.
+
+        size_t totalBytesToSend = async.length;
+        size_t bytesSent        = 0;
+        bool   usedZeroCopy     = false;
+
+        // Seek to offset if needed
+        LARGE_INTEGER offset;
+        offset.QuadPart = async.offset;
+        if (not::SetFilePointerEx(async.fileHandle, offset, nullptr, FILE_BEGIN))
+        {
+            return Result::Error("SetFilePointerEx failed");
+        }
+
+        constexpr size_t BUFFER_SIZE = 64 * 1024; // 64KB buffer
+        char             buffer[BUFFER_SIZE];
+
+        while (bytesSent < totalBytesToSend)
+        {
+            DWORD toRead    = static_cast<DWORD>(min(totalBytesToSend - bytesSent, BUFFER_SIZE));
+            DWORD bytesRead = 0;
+            BOOL  readRes   = ::ReadFile(async.fileHandle, buffer, toRead, &bytesRead, nullptr);
+            if (not readRes)
+            {
+                return Result::Error("ReadFile failed");
+            }
+            if (bytesRead == 0)
+            {
+                break; // EOF
+            }
+
+            // Write to socket
+            size_t written = 0;
+            while (written < bytesRead)
+            {
+                WSABUF wsabuf;
+                wsabuf.buf    = buffer + written;
+                wsabuf.len    = static_cast<ULONG>(bytesRead - written);
+                DWORD sent    = 0;
+                int   sendRes = ::WSASend(async.socketHandle, &wsabuf, 1, &sent, 0, nullptr, nullptr);
+                if (sendRes == SOCKET_ERROR)
+                {
+                    return Result::Error("WSASend failed");
+                }
+                written += sent;
+            }
+
+            bytesSent += written;
+        }
+
+        completionData.bytesTransferred = bytesSent;
+        completionData.usedZeroCopy     = usedZeroCopy;
+        return Result(true);
+    }
+
+    static Result setupAsync(AsyncEventLoop&, AsyncFileSend& async)
+    {
+        // Check if we're using thread pool (ManualCompletion)
+        if (async.flags & Internal::Flag_AsyncTaskSequence)
+        {
+            // Using thread pool - use synchronous fallback (executeOperation)
+            async.flags |= Internal::Flag_ManualCompletion;
+        }
+        // Otherwise: true async via TransmitFile + IOCP
+        return Result(true);
+    }
+
+    [[nodiscard]] static Result activateAsync(AsyncEventLoop&, AsyncFileSend& async)
+    {
+        if (async.flags & Internal::Flag_ManualCompletion)
+        {
+            // Thread pool mode - handled by executeOperation
+            return Result(true);
+        }
+
+        // True async mode using TransmitFile with IOCP
+        auto& overlapped          = async.overlapped.get();
+        overlapped.userData       = &async;
+        OVERLAPPED& winOverlapped = overlapped.overlapped;
+        ZeroMemory(&winOverlapped, sizeof(winOverlapped));
+
+        // Set file offset in OVERLAPPED structure
+        winOverlapped.Offset     = static_cast<DWORD>(async.offset & 0xFFFFFFFF);
+        winOverlapped.OffsetHigh = static_cast<DWORD>(async.offset >> 32);
+
+        // TransmitFile sends file contents to socket with zero-copy when possible
+        BOOL result = ::TransmitFile(async.socketHandle, async.fileHandle,
+                                     static_cast<DWORD>(async.length), // number of bytes to send (0 = entire file)
+                                     0,                                // bytes per send (0 = use default)
+                                     &winOverlapped,                   // OVERLAPPED for async completion
+                                     nullptr,                          // TRANSMIT_FILE_BUFFERS (no header/trailer)
+                                     0                                 // flags
+        );
+
+        if (not result)
+        {
+            DWORD error = ::WSAGetLastError();
+            if (error != WSA_IO_PENDING)
+            {
+                return Result::Error("TransmitFile failed");
+            }
+            // WSA_IO_PENDING is expected - completion will arrive via IOCP
+        }
+        // If result is TRUE, it completed synchronously but completion packet is still posted to IOCP
+        return Result(true);
+    }
+
+    static Result completeAsync(AsyncFileSend::Result& result)
+    {
+        AsyncFileSend& async = result.getAsync();
+
+        if (async.flags & Internal::Flag_ManualCompletion)
+        {
+            // Thread pool mode - execute synchronously
+            return executeOperation(async, result.completionData);
+        }
+
+        // True async mode - get results from IOCP
+        // The number of bytes transferred is available in the OVERLAPPED_ENTRY
+        // which was already processed by the event loop dispatcher
+
+        // Check for errors in the overlapped result
+        OVERLAPPED& winOverlapped = async.overlapped.get().overlapped;
+
+        DWORD transferred = 0;
+        DWORD flags       = 0;
+        BOOL  success     = ::WSAGetOverlappedResult(async.socketHandle, &winOverlapped, &transferred, FALSE, &flags);
+
+        if (not success)
+        {
+            return Result::Error("TransmitFile completion failed");
+        }
+
+        result.completionData.bytesTransferred = transferred;
+        result.completionData.usedZeroCopy     = true; // TransmitFile uses zero-copy when possible
+        return Result(true);
     }
 
     //-------------------------------------------------------------------------------------------------------

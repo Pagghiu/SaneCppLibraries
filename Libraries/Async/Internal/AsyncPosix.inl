@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Async/Internal/AsyncInternal.h"
+#include <poll.h>
 
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
@@ -17,6 +18,7 @@
 #include <fcntl.h>        // For fcntl function (used for setting non-blocking mode)
 #include <signal.h>       // For signal-related functions
 #include <sys/epoll.h>    // For epoll functions
+#include <sys/sendfile.h> // For sendfile
 #include <sys/signalfd.h> // For signalfd functions
 #include <sys/socket.h>   // For socket-related functions
 #include <sys/stat.h>     // fstat
@@ -647,30 +649,81 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     // Posix Write (Shared between Socket Send and File Write)
     //-------------------------------------------------------------------------------------------------------
 
-    template <typename HandleType, typename T>
-    static Result posixWriteCancel(AsyncEventLoop& eventLoop, HandleType handle, decltype(AsyncRequest::flags)& flags,
-                                   T* current)
+    /// @brief Stops the write watcher for the given socket handle if no other async is monitoring it.
+    /// Otherwise updates the watcher to point to a valid async.
+    static Result posixUpdateSocketWriteWatcher(AsyncEventLoop& eventLoop, SocketDescriptor::Handle handle,
+                                                decltype(AsyncRequest::flags)& flags)
     {
-        if (flags & Internal::Flag_WatcherSet)
+        if ((flags & Internal::Flag_WatcherSet) == 0)
         {
-            // Loop all socket send to find if one of them is monitoring watch events.
-            // If that's the case write event watcher must be updated to avoid kevent or epoll to report
-            // current async at a later time when it could have been deallocated.
-            // If no socket is monitoring this file descriptor then the watcher can be stopped entirely.
-            // TODO: This linear search is not great
+            return Result(true);
+        }
+        // Check activeSocketSends
+        {
+            AsyncSocketSend* current = eventLoop.internal.activeSocketSends.front;
             while (current)
             {
                 if (handle == current->handle and (current->flags & Internal::Flag_WatcherSet))
                 {
-                    return Result(
-                        KernelQueuePosix::startSingleWatcherImmediate(eventLoop, current->handle, OUTPUT_EVENTS_MASK));
+                    return KernelQueuePosix::startSingleWatcherImmediate(eventLoop, current->handle,
+                                                                         OUTPUT_EVENTS_MASK);
                 }
-                current = static_cast<T*>(current->next);
+                current = static_cast<AsyncSocketSend*>(current->next);
             }
-            flags &= ~Internal::Flag_WatcherSet;
-            return KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, handle, OUTPUT_EVENTS_MASK);
         }
-        return Result(true);
+        // Check activeSocketSendsTo
+        {
+            AsyncSocketSendTo* current = eventLoop.internal.activeSocketSendsTo.front;
+            while (current)
+            {
+                if (handle == current->handle and (current->flags & Internal::Flag_WatcherSet))
+                {
+                    return KernelQueuePosix::startSingleWatcherImmediate(eventLoop, current->handle,
+                                                                         OUTPUT_EVENTS_MASK);
+                }
+                current = static_cast<AsyncSocketSendTo*>(current->next);
+            }
+        }
+        // Check activeFileSends
+        {
+            AsyncFileSend* current = eventLoop.internal.activeFileSends.front;
+            while (current)
+            {
+                if (handle == current->socketHandle and (current->flags & Internal::Flag_WatcherSet))
+                {
+                    return KernelQueuePosix::startSingleWatcherImmediate(eventLoop, current->socketHandle,
+                                                                         OUTPUT_EVENTS_MASK);
+                }
+                current = static_cast<AsyncFileSend*>(current->next);
+            }
+        }
+        // No other async is monitoring this handle, we can stop the watcher
+        flags &= ~Internal::Flag_WatcherSet;
+        return KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, handle, OUTPUT_EVENTS_MASK);
+    }
+
+    /// @brief Stops the write watcher for the given file handle if no other async is monitoring it.
+    static Result posixUpdateFileWriteWatcher(AsyncEventLoop& eventLoop, FileDescriptor::Handle handle,
+                                              decltype(AsyncRequest::flags)& flags)
+    {
+
+        if ((flags & Internal::Flag_WatcherSet) == 0)
+        {
+            return Result(true);
+        }
+        AsyncFileWrite* current = eventLoop.internal.activeFileWrites.front;
+        while (current)
+        {
+            if (handle == current->handle && (current->flags & Internal::Flag_WatcherSet))
+            {
+                // Another async is monitoring the same handle, update the watcher to point to it
+                return KernelQueuePosix::startSingleWatcherImmediate(eventLoop, current->handle, OUTPUT_EVENTS_MASK);
+            }
+            current = static_cast<AsyncFileWrite*>(current->next);
+        }
+        // No other async is monitoring this handle, we can stop the watcher
+        flags &= ~Internal::Flag_WatcherSet;
+        return KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, handle, OUTPUT_EVENTS_MASK);
     }
 
     struct WriteApiPosixWrite
@@ -884,8 +937,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result teardownAsync(AsyncSocketSend*, AsyncTeardown& teardown)
     {
-        return posixWriteCancel(*teardown.eventLoop, teardown.socketHandle, teardown.flags,
-                                teardown.eventLoop->internal.activeSocketSends.front);
+        return posixUpdateSocketWriteWatcher(*teardown.eventLoop, teardown.socketHandle, teardown.flags);
     }
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
@@ -895,7 +947,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSend& async)
     {
-        return posixWriteCancel(eventLoop, async.handle, async.flags, eventLoop.internal.activeSocketSends.front);
+        return posixUpdateSocketWriteWatcher(eventLoop, async.handle, async.flags);
     }
 
     static Result completeAsync(AsyncSocketSend::Result& result)
@@ -919,8 +971,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     static Result teardownAsync(AsyncSocketSendTo*, AsyncTeardown& teardown)
     {
-        return posixWriteCancel(*teardown.eventLoop, teardown.socketHandle, teardown.flags,
-                                teardown.eventLoop->internal.activeSocketSendsTo.front);
+        return posixUpdateSocketWriteWatcher(*teardown.eventLoop, teardown.socketHandle, teardown.flags);
     }
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
@@ -930,7 +981,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketSendTo& async)
     {
-        return posixWriteCancel(eventLoop, async.handle, async.flags, eventLoop.internal.activeSocketSendsTo.front);
+        return posixUpdateSocketWriteWatcher(eventLoop, async.handle, async.flags);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -967,6 +1018,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         SC_TRY_MSG(res >= 0, "error in recv");
         result.completionData.numBytes = static_cast<size_t>(res);
+
         if (res == 0)
         {
             result.completionData.disconnected = true;
@@ -1069,8 +1121,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result teardownAsync(AsyncFileWrite*, AsyncTeardown& teardown)
     {
-        return posixWriteCancel(*teardown.eventLoop, teardown.fileHandle, teardown.flags,
-                                teardown.eventLoop->internal.activeFileWrites.front);
+        return posixUpdateFileWriteWatcher(*teardown.eventLoop, teardown.fileHandle, teardown.flags);
     }
 
     Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
@@ -1081,7 +1132,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
     static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFileWrite& async)
     {
-        return posixWriteCancel(eventLoop, async.handle, async.flags, eventLoop.internal.activeFileWrites.front);
+        return posixUpdateFileWriteWatcher(eventLoop, async.handle, async.flags);
     }
 
     static Result completeAsync(AsyncFileWrite::Result& result)
@@ -1100,6 +1151,179 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         SC_TRY(posixTryWrite(async, totalBytesToSend, WriteApiPosixWrite{offset}));
         completionData.numBytes = async.totalBytesWritten;
         SC_TRY_MSG(completionData.numBytes == totalBytesToSend, "Partial write (disk full or RLIMIT_FSIZE reached)");
+        return Result(true);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // File SEND (sendfile on Linux/macOS)
+    //-------------------------------------------------------------------------------------------------------
+    struct PosixSendFile
+    {
+        static ssize_t sendFile(int out_fd, int in_fd, off_t& offset, size_t count, bool& notImplemented)
+        {
+            if (count == 0)
+                return 0;
+#if SC_PLATFORM_LINUX
+            notImplemented = false;
+            ssize_t res;
+            do
+            {
+                res = ::sendfile(out_fd, in_fd, &offset, count);
+            } while (res == -1 && errno == EINTR);
+            return res;
+#elif SC_PLATFORM_APPLE
+            notImplemented = false;
+            off_t len      = static_cast<off_t>(count);
+            int   res;
+            do
+            {
+                // On macOS, the fourth argument is a value-result parameter:
+                // - On entry, it specifies the number of bytes to send. (= 0 means send all)
+                // - On return, it contains the number of bytes sent.
+                //
+                // The third argument is the offset
+                res = ::sendfile(in_fd, out_fd, offset, &len, nullptr, 0);
+            } while (res == -1 && errno == EINTR);
+
+            if (res == 0)
+            {
+                offset += len;
+                return static_cast<ssize_t>(len);
+            }
+            if (len > 0)
+            {
+                // If some bytes were sent but the call returned -1 (because of EAGAIN for example),
+                // we should still consider it a "success" in terms of bytes transferred.
+                // However, the standard behavior for sendfile on macOS returning -1 is setting errno.
+                // So if we have partial write, we return partial write.
+                offset += len;
+                return static_cast<ssize_t>(len);
+            }
+            return -1;
+#else
+            notImplemented = true;
+            return -1;
+#endif
+        }
+    };
+
+    static Result teardownAsync(AsyncFileSend*, AsyncTeardown& teardown)
+    {
+        return posixUpdateSocketWriteWatcher(*teardown.eventLoop, teardown.socketHandle, teardown.flags);
+    }
+
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileSend& async)
+    {
+        bool notImplemented = false;
+        // on macOS and Linux we use sendfile
+        ssize_t res =
+            PosixSendFile::sendFile(async.socketHandle, async.fileHandle, async.offset, async.length, notImplemented);
+
+        if (notImplemented)
+
+        {
+            return Result::Error("sendfile not implemented on this platform");
+        }
+
+        if (res >= 0)
+        {
+            async.bytesSent += static_cast<size_t>(res);
+            // Check if we are done
+            if (async.bytesSent == async.length)
+            {
+                async.flags |= Internal::Flag_ManualCompletion; // Ended synchronously
+                return Result(true);
+            }
+
+            // If we are not done, it means we probably hit the socket buffer limit, so we treat it as blocking (EAGAIN)
+        }
+        else
+        {
+            if (errno != EAGAIN && errno != EWOULDBLOCK)
+            {
+                return Result::Error("sendfile failed");
+            }
+        }
+
+        // Needs to wait for socket to accept more data
+        async.flags |= Internal::Flag_WatcherSet;
+        SC_TRY(setEventWatcher(eventLoop, async, async.socketHandle, OUTPUT_EVENTS_MASK));
+        return Result(true);
+    }
+
+    static Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFileSend& async)
+    {
+        return posixUpdateSocketWriteWatcher(eventLoop, async.socketHandle, async.flags);
+    }
+
+    static Result completeAsync(AsyncFileSend::Result& result)
+    {
+        AsyncFileSend& async = result.getAsync();
+
+        if (async.bytesSent < async.length)
+        {
+            bool    notImplemented;
+            ssize_t res = PosixSendFile::sendFile(async.socketHandle, async.fileHandle, async.offset,
+                                                  async.length - async.bytesSent, notImplemented);
+
+            if (res >= 0)
+
+            {
+                async.bytesSent += static_cast<size_t>(res);
+            }
+            else
+            {
+                if (errno != EAGAIN && errno != EWOULDBLOCK)
+                {
+                    return Result::Error("sendfile failed");
+                }
+            }
+        }
+
+        if (async.bytesSent == async.length)
+        {
+            result.completionData.bytesTransferred = async.bytesSent;
+            // We are done, we can remove the watcher from this socket (if no one else needs it)
+            SC_TRY(posixUpdateSocketWriteWatcher(result.eventLoop, async.socketHandle, async.flags));
+        }
+        else
+        {
+            // Not done yet, keep watching
+            result.shouldCallCallback = false;
+            result.reactivateRequest(true);
+        }
+
+        return Result(true);
+    }
+
+    static Result executeOperation(AsyncFileSend& async, AsyncFileSend::CompletionData& completionData)
+    {
+        while (async.bytesSent < async.length)
+        {
+            bool    notImplemented;
+            ssize_t res = PosixSendFile::sendFile(async.socketHandle, async.fileHandle, async.offset,
+                                                  async.length - async.bytesSent, notImplemented);
+
+            if (res >= 0)
+            {
+                async.bytesSent += static_cast<size_t>(res);
+            }
+            else
+            {
+                if (errno == EAGAIN || errno == EWOULDBLOCK)
+                {
+                    // Wait for writeability
+                    struct pollfd pfd;
+                    pfd.fd      = async.socketHandle;
+                    pfd.events  = POLLOUT;
+                    pfd.revents = 0;
+                    ::poll(&pfd, 1, -1); // Block indefinitely until writable
+                    continue;
+                }
+                return Result::Error("sendfile failed");
+            }
+        }
+        completionData.bytesTransferred = async.bytesSent;
         return Result(true);
     }
 

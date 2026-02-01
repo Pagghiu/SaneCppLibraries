@@ -3,6 +3,7 @@
 #include "AsyncTest.h"
 
 #include "AsyncTestFile.inl"
+#include "AsyncTestFileSend.inl"
 #include "AsyncTestFileSystemOperation.inl"
 #include "AsyncTestLoop.inl"
 #include "AsyncTestLoopTimeout.inl"
@@ -117,6 +118,11 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             fileWriteMultiple(false); // do not use thread-pool
             fileWriteMultiple(true);  // use thread-pool
+        }
+        if (test_section("file send"))
+        {
+            fileSend(false); // do not use thread-pool
+            fileSend(true);  // use thread-pool
         }
         fileSystemOperations();
         if (numTestsToRun == 2)

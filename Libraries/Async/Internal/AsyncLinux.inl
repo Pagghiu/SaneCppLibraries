@@ -6,13 +6,14 @@
 #include "../../Async/Internal/AsyncPosix.inl" // This is only to provide clangd completion (guarded by #pragma once)
 #include "../../Foundation/Assert.h"
 
-#include <arpa/inet.h>   // sockaddr_in
-#include <errno.h>       // errno
-#include <stdint.h>      // uint32_t
-#include <sys/eventfd.h> // eventfd
-#include <sys/poll.h>    // POLLIN
-#include <sys/syscall.h> // SYS_pidfd_open
-#include <sys/wait.h>    // waitpid
+#include <arpa/inet.h>    // sockaddr_in
+#include <errno.h>        // errno
+#include <stdint.h>       // uint32_t
+#include <sys/eventfd.h>  // eventfd
+#include <sys/poll.h>     // POLLIN
+#include <sys/sendfile.h> // sendfile
+#include <sys/syscall.h>  // SYS_pidfd_open
+#include <sys/wait.h>     // waitpid
 
 // TODO: Protect it with a mutex or force passing it during creation
 static AsyncLinuxLibURingLoader globalLibURing;
@@ -524,6 +525,74 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
         return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // File SEND (sendfile)
+    //-------------------------------------------------------------------------------------------------------
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileSend& async)
+    {
+        if (async.splicePipe.readPipe.isValid() == false)
+        {
+            PipeOptions options;
+            options.blocking = false; // We need non-blocking for splice
+            SC_TRY(async.splicePipe.createPipe(options));
+            if (async.pipeBufferSize != 0)
+            {
+                // We likely don't need to resize as default is large enough (16 buffers (64KB))
+                // fcntl(async.splicePipe.readPipe.handle, F_SETPIPE_SZ, async.pipeBufferSize);
+            }
+        }
+
+        io_uring_sqe* submission1;
+        io_uring_sqe* submission2;
+        SC_TRY(getNewSubmission(eventLoop, submission1));
+        SC_TRY(getNewSubmission(eventLoop, submission2));
+        // Splice from file to pipe
+        const int fdIn = async.fileHandle;
+        int       fdPipeW;
+        SC_TRY(async.splicePipe.writePipe.get(fdPipeW, Result::Error("Invalid write pipe")));
+        globalLibURing.io_uring_prep_splice(submission1, fdIn, async.offset, fdPipeW, -1,
+                                            static_cast<unsigned int>(async.length - async.bytesSent), 0);
+        globalLibURing.io_uring_sqe_set_data(submission1, nullptr); // Ignore completion of the first part
+
+        submission1->flags |= IOSQE_IO_LINK;
+
+        // Splice from pipe to socket
+        int fdPipeR;
+        SC_TRY(async.splicePipe.readPipe.get(fdPipeR, Result::Error("Invalid read pipe")));
+        const int fdOut = async.socketHandle;
+        globalLibURing.io_uring_prep_splice(submission2, fdPipeR, -1, fdOut, -1,
+                                            static_cast<unsigned int>(async.length - async.bytesSent), 0);
+        globalLibURing.io_uring_sqe_set_data(submission2, &async);
+
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncFileSend::Result& result)
+    {
+        AsyncFileSend& async = result.getAsync();
+
+        // Check for error in the second completion (the one we care about)
+        int32_t res = events[result.eventIndex].res;
+        if (res < 0)
+        {
+            return Result::Error("Splice failed");
+        }
+
+        const size_t bytesTransferred = static_cast<size_t>(res);
+        async.bytesSent += bytesTransferred;
+        async.offset += bytesTransferred;
+
+        if (async.bytesSent == async.length)
+        {
+            result.completionData.bytesTransferred = async.bytesSent;
+            return Result(true);
+        }
+        else
+        {
+            return Result::Error("Not all data sent in splice");
+        }
     }
 
     //-------------------------------------------------------------------------------------------------------

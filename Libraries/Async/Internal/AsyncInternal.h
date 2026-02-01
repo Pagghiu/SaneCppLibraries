@@ -55,7 +55,7 @@ struct SC::AsyncEventLoop::Internal
     {
         static constexpr int Windows = 136;
         static constexpr int Apple   = 104;
-        static constexpr int Linux   = 328;
+        static constexpr int Linux   = 336;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
@@ -104,6 +104,7 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncSocketReceiveFrom> activeSocketReceivesFrom;
     IntrusiveDoubleLinkedList<AsyncFileRead>          activeFileReads;
     IntrusiveDoubleLinkedList<AsyncFileWrite>         activeFileWrites;
+    IntrusiveDoubleLinkedList<AsyncFileSend>          activeFileSends;
     IntrusiveDoubleLinkedList<AsyncFilePoll>          activeFilePolls;
 
     IntrusiveDoubleLinkedList<AsyncFileSystemOperation> activeFileSystemOperations;
