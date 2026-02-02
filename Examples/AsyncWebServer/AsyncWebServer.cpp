@@ -24,6 +24,7 @@ struct AsyncWebServerExample
     int32_t port        = 8090;
     int32_t maxClients  = 32;
     bool    useSendFile = true;
+    bool    useEpoll    = false;
 
     HttpAsyncConnectionBase::Configuration asyncConfiguration;
 
@@ -67,6 +68,9 @@ struct AsyncWebServerExample
         fileServer.setUseAsyncFileSend(useSendFile);
         globalConsole->print("Serving files from folder: {}\n", directory);
         globalConsole->print("AsyncFileSend optimization: {}\n", useSendFile);
+#if SC_PLATFORM_LINUX
+        globalConsole->print("Using {}\n", useEpoll ? "epoll" : "io_uring");
+#endif
         httpServer.onRequest = [&](HttpConnection& connection)
         {
             HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
@@ -129,14 +133,27 @@ Result saneMain(Span<StringSpan> args)
         {
             sample.useSendFile = false;
         }
+        else if (args[i] == "--epoll")
+        {
+            sample.useEpoll = true;
+        }
+        else if (args[i] == "--uring")
+        {
+            sample.useEpoll = false;
+        }
     }
     if (sample.directory.isEmpty())
     {
         sample.directory = FileSystem::Operations::getCurrentWorkingDirectory(currentDirPath);
     }
 
+    AsyncEventLoop::Options options;
+    if (sample.useEpoll)
+    {
+        options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
+    }
     AsyncEventLoop eventLoop;
-    SC_TRY(eventLoop.create());
+    SC_TRY(eventLoop.create(options));
     sample.eventLoop = &eventLoop;
     console.print("Address: {}:{}\nFolder : {}\n", sample.interface, sample.port, sample.directory);
     SC_TRY(sample.start());
