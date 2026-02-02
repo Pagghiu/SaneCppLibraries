@@ -88,7 +88,7 @@ struct SC_COMPILER_EXPORT HttpResponse
     Result addHeader(StringSpan headerName, StringSpan headerValue);
 
     /// @brief Start sending response headers, before sending any data
-    Result sendHeaders();
+    Result sendHeaders(Function<void(AsyncBufferView::ID)> callback = {});
 
     /// @brief Resets this object for it to be re-usable
     void reset();

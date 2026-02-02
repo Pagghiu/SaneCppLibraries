@@ -46,6 +46,8 @@ Result HttpAsyncFileServer::close()
     return Result(true);
 }
 
+void HttpAsyncFileServer::setUseAsyncFileSend(bool value) { useAsyncFileSend = value; }
+
 Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
     auto url = connection.request.getURL();
@@ -99,17 +101,8 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(path.assign(directory.view()));
         SC_TRY(path.append("/"));
         SC_TRY(path.append(filePath));
-        FileDescriptor fd;
-        SC_TRY(fd.open(path.view(), FileOpen::Read));
-        Result initRes = stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd);
-        SC_ASSERT_RELEASE(initRes);
-        SC_TRY(initRes);
-        SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
-        fd.detach();
-        stream.readableFileStream.setAutoCloseDescriptor(true);
-        connection.pipeline.source   = &stream.readableFileStream;
-        connection.pipeline.sinks[0] = &connection.response.getWritableStream();
 
+        // Send HTTP headers first
         SC_TRY(connection.response.startResponse(200));
         char buffer[20];
         ::snprintf(buffer, sizeof(buffer), "%zu", fileStat.fileSize);
@@ -119,9 +112,74 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.sendHeaders());
-        SC_TRY(connection.pipeline.pipe());
-        SC_TRY(connection.pipeline.start());
+
+        if (useAsyncFileSend)
+        {
+            // Context for the callback
+            stream.multipartListener.server     = this;
+            stream.multipartListener.stream     = &stream;
+            stream.multipartListener.connection = &static_cast<HttpAsyncConnectionBase&>(connection);
+            SC_TRY(stream.sourceFileDescriptor.open(path.view(), FileOpen::Read));
+
+            auto onHeadersSent = [&stream, fileSize = fileStat.fileSize](AsyncBufferView::ID)
+            {
+                HttpAsyncConnectionBase& connection = *stream.multipartListener.connection;
+                HttpAsyncFileServer*     server     = stream.multipartListener.server;
+
+                // Use AsyncFileSend for zero-copy file serving
+                stream.asyncFileSend.callback = [&connection, &stream](AsyncFileSend::Result& result)
+                {
+                    if (not result.isValid())
+                    {
+                        SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                        // Error occurred during send, close the response
+                        (void)connection.response.end();
+                        return;
+                    }
+
+                    // Check if the entire file was sent
+                    if (result.isComplete())
+                    {
+                        SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                        // File send complete, close the response
+                        (void)connection.response.end();
+                    }
+                    else
+                    {
+                        // Partial send, reactivate to continue
+                        result.reactivateRequest(true);
+                    }
+                };
+
+                Result res = stream.asyncFileSend.start(*server->eventLoop, stream.sourceFileDescriptor,
+                                                        connection.socket, 0, fileSize);
+                if (not res)
+                {
+                    // Failed to start sending file
+                    SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                    (void)connection.response.end();
+                }
+            };
+
+            SC_TRY(connection.response.sendHeaders(onHeadersSent));
+        }
+        else
+        {
+            // Use legacy AsyncStreams approach
+            FileDescriptor fd;
+            SC_TRY(fd.open(path.view(), FileOpen::Read));
+            Result initRes = stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd);
+            SC_ASSERT_RELEASE(initRes);
+            SC_TRY(initRes);
+            SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
+            fd.detach();
+            stream.readableFileStream.setAutoCloseDescriptor(true);
+            connection.pipeline.source   = &stream.readableFileStream;
+            connection.pipeline.sinks[0] = &connection.response.getWritableStream();
+            SC_TRY(connection.response.sendHeaders());
+            SC_TRY(connection.pipeline.pipe());
+            SC_TRY(connection.pipeline.start());
+        }
     }
     else
     {

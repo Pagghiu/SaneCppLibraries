@@ -256,7 +256,7 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
     return Result(true);
 }
 
-Result HttpResponse::sendHeaders()
+Result HttpResponse::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
@@ -279,7 +279,7 @@ Result HttpResponse::sendHeaders()
         }
         SC_TRY(sb.append("\r\n"));
     }
-    SC_TRY(writableStream->write(responseHeaders, {})); // headers first
+    SC_TRY(writableStream->write(responseHeaders, move(callback))); // headers first
     headersSent = true;
     return Result(true);
 }

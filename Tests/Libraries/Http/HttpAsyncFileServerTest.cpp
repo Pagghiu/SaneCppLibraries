@@ -17,15 +17,19 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
 {
     HttpAsyncFileServerTest(SC::TestReport& report) : TestCase(report, "HttpAsyncFileServerTest")
     {
-        if (test_section("HttpAsyncFileServer"))
+        if (test_section("AsyncFileSend=true"))
         {
-            httpFileServerTest();
+            httpFileServerTest(true);
+        }
+        if (test_section("AsyncFileSend=false"))
+        {
+            httpFileServerTest(false);
         }
     }
-    void httpFileServerTest();
+    void httpFileServerTest(bool useAsyncFileSend);
 };
 
-void SC::HttpAsyncFileServerTest::httpFileServerTest()
+void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 {
     // Create a test file in the application root directory
     StringView     webServerFolder = report.applicationRootDirectory.view();
@@ -61,6 +65,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest()
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
     SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
     SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, webServerFolder));
+    fileServer.setUseAsyncFileSend(useAsyncFileSend);
 
     // Forward all http requests to the file server in order to serve files
     httpServer.onRequest = [&](HttpConnection& connection)

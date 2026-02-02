@@ -13,14 +13,17 @@
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/Console.h"
 
+SC::Console* globalConsole;
+
 namespace SC
 {
 struct AsyncWebServerExample
 {
     String  directory;
-    String  interface  = "127.0.0.1";
-    int32_t port       = 8090;
-    int32_t maxClients = 32;
+    String  interface   = "127.0.0.1";
+    int32_t port        = 8090;
+    int32_t maxClients  = 32;
+    bool    useSendFile = true;
 
     HttpAsyncConnectionBase::Configuration asyncConfiguration;
 
@@ -61,6 +64,9 @@ struct AsyncWebServerExample
         SC_TRY(httpServer.init(clients.toSpan()));
         SC_TRY(httpServer.start(*eventLoop, interface.view(), static_cast<uint16_t>(port)));
         SC_TRY(fileServer.init(threadPool, *eventLoop, directory.view()));
+        fileServer.setUseAsyncFileSend(useSendFile);
+        globalConsole->print("Serving files from folder: {}\n", directory);
+        globalConsole->print("AsyncFileSend optimization: {}\n", useSendFile);
         httpServer.onRequest = [&](HttpConnection& connection)
         {
             HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
@@ -105,10 +111,29 @@ Result saneMain(Span<StringSpan> args)
     Console::tryAttachingToParentConsole();
     Console    console;
     StringPath currentDirPath;
-    if (args.sizeInElements() >= 2 and args[0] == "--directory")
-        sample.directory = args[1];
-    else
+
+    globalConsole = &console;
+    // Parse command line arguments
+    for (size_t i = 0; i < args.sizeInElements(); ++i)
+    {
+        if (args[i] == "--directory" and i + 1 < args.sizeInElements())
+        {
+            sample.directory = args[i + 1];
+            ++i;
+        }
+        else if (args[i] == "--sendfile")
+        {
+            sample.useSendFile = true;
+        }
+        else if (args[i] == "--no-sendfile")
+        {
+            sample.useSendFile = false;
+        }
+    }
+    if (sample.directory.isEmpty())
+    {
         sample.directory = FileSystem::Operations::getCurrentWorkingDirectory(currentDirPath);
+    }
 
     AsyncEventLoop eventLoop;
     SC_TRY(eventLoop.create());

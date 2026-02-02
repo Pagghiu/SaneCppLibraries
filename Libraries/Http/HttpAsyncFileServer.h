@@ -25,6 +25,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
         WritableFileStream  writableFileStream;
         AsyncTaskSequence   readableFileStreamTask;
         HttpMultipartParser multipartParser;
+        AsyncFileSend       asyncFileSend;
+        FileDescriptor      sourceFileDescriptor;
 
         struct MultipartListener
         {
@@ -32,7 +34,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
             Stream*                  stream     = nullptr;
             HttpAsyncConnectionBase* connection = nullptr;
 
-            FileDescriptor currentFd;
+            FileDescriptor currentFd; // TODO: Reuse the above sourceFileDescriptor
             StringPath     currentFilePath;
             StringSpan     currentFileName;
             StringSpan     currentHeaderName;
@@ -60,11 +62,18 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     /// @brief Removes any reference to the arguments passed during init
     Result close();
 
+    /// @brief Controls whether to use AsyncFileSend optimization for GET requests (default: true)
+    void setUseAsyncFileSend(bool value);
+
+    /// @brief Gets whether AsyncFileSend optimization is used for GET requests
+    [[nodiscard]] bool getUseAsyncFileSend() const { return useAsyncFileSend; }
+
     /// @brief Handles the request, serving the requested file (GET) or creating a new one (PUT/POST)
     /// Call this method in response to HttpConnectionsPool::onRequest.
     Result handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
   private:
+    bool   useAsyncFileSend = true;
     Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
     Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
     Result postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
