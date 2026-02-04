@@ -12,6 +12,7 @@
 #include "../../Libraries/Http/HttpAsyncFileServer.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringView.h"
 
 SC::Console* globalConsole;
 
@@ -22,7 +23,8 @@ struct AsyncWebServerExample
     String  directory;
     String  interface   = "127.0.0.1";
     int32_t port        = 8090;
-    int32_t maxClients  = 32;
+    int32_t maxClients  = 400; // Max number of concurrent connections
+    int32_t numThreads  = 4;   // Number of threads for async file stream operations
     bool    useSendFile = true;
     bool    useEpoll    = false;
 
@@ -40,7 +42,6 @@ struct AsyncWebServerExample
     static constexpr size_t MAX_BUFFERS      = 10;          // Max number of write queue buffers for each connection
     static constexpr size_t MAX_REQUEST_SIZE = 1024 * 1024; // Max number of bytes to stream data for each connection
     static constexpr size_t MAX_HEADER_SIZE  = 32 * 1024;   // Max number of bytes to hold request and response headers
-    static constexpr size_t NUM_FS_THREADS   = 4;           // Number of threads for async file stream operations
 
     VirtualArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
 
@@ -59,7 +60,11 @@ struct AsyncWebServerExample
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
-            SC_TRY(threadPool.create(NUM_FS_THREADS));
+            SC_TRY(threadPool.create(numThreads));
+            if (not useSendFile)
+            {
+                globalConsole->print("IO/Threads: {}\n", numThreads);
+            }
         }
         // Initialize and start http and file servers, delegating requests to the latter in order to serve files
         SC_TRY(httpServer.init(clients.toSpan()));
@@ -68,6 +73,7 @@ struct AsyncWebServerExample
         fileServer.setUseAsyncFileSend(useSendFile);
         globalConsole->print("Serving files from folder: {}\n", directory);
         globalConsole->print("AsyncFileSend optimization: {}\n", useSendFile);
+        globalConsole->print("Max clients: {}\n", maxClients);
 #if SC_PLATFORM_LINUX
         globalConsole->print("Using {}\n", useEpoll ? "epoll" : "io_uring");
 #endif
@@ -140,6 +146,22 @@ Result saneMain(Span<StringSpan> args)
         else if (args[i] == "--uring")
         {
             sample.useEpoll = false;
+        }
+        else if (args[i] == "--clients" and i + 1 < args.sizeInElements())
+        {
+            if (not StringView(args[i + 1]).parseInt32(sample.maxClients))
+            {
+                globalConsole->print("Invalid max clients value: {}", args[i + 1]);
+            }
+            ++i;
+        }
+        else if (args[i] == "--threads" and i + 1 < args.sizeInElements())
+        {
+            if (not StringView(args[i + 1]).parseInt32(sample.numThreads))
+            {
+                globalConsole->print("Invalid number of threads value: {}", args[i + 1]);
+            }
+            ++i;
         }
     }
     if (sample.directory.isEmpty())
