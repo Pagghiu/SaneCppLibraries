@@ -1301,7 +1301,10 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
     bool hasBeenReactivated = false;
     async.flags |= Flag_NeedsTeardown;
     SC_TRY(completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode, &hasBeenReactivated));
-    async.flags &= ~Flag_NeedsTeardown;
+    if (hasBeenReactivated)
+    {
+        async.flags &= ~Flag_NeedsTeardown;
+    }
     // hasBeenReactivated is required to avoid accessing async when it has been not reactivated (and maybe deallocated)
     if (hasBeenReactivated and async.state == AsyncRequest::State::Reactivate)
     {
@@ -1728,7 +1731,7 @@ SC::Result SC::AsyncEventLoop::Internal::setupAsync(AsyncEventLoop& eventLoop, K
 {
     SC_LOG_MESSAGE("{} {} SETUP\n", async.debugName, AsyncRequest::TypeToString(async.type));
     // Reset flags that may have been left by previous activations
-    async.flags &= ~Flag_ManualCompletion;
+    async.flags &= ~(Flag_ManualCompletion | Flag_NeedsTeardown);
     // Note that we're preserving the Flag_ExcludeFromActiveCount
     return Internal::applyOnAsync(async, SetupAsyncPhase{eventLoop, kernelEvents});
 }
