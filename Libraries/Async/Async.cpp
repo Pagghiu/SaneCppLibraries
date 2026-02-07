@@ -1978,9 +1978,12 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles -= 1;
 
-    if (async.sequence)
+    if (async.sequence and async.type != AsyncRequest::Type::LoopTimeout)
     {
-        return; // Async flagged to be manually completed for thread pool, are not added to active handles
+        // Sequenced non-timeout requests complete through sequence/manual-completion paths and are not
+        // tracked in typed active lists. LoopTimeout is the exception: invokeExpiredTimers() scans
+        // activeLoopTimeouts, so sequenced timers must still be tracked there.
+        return;
     }
     // clang-format off
     switch (async.type)
@@ -2019,9 +2022,12 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
 
     numberOfActiveHandles += 1;
 
-    if (async.sequence)
+    if (async.sequence and async.type != AsyncRequest::Type::LoopTimeout)
     {
-        return; // Async flagged to be manually completed for thread pool, are not added to active handles
+        // Sequenced non-timeout requests complete through sequence/manual-completion paths and are not
+        // tracked in typed active lists. LoopTimeout is the exception: invokeExpiredTimers() scans
+        // activeLoopTimeouts, so sequenced timers must still be tracked there.
+        return;
     }
     switch (async.type)
     {
