@@ -163,6 +163,19 @@ Result saneMain(Span<StringSpan> args)
             }
             ++i;
         }
+        else if (args[i] == "--port" and i + 1 < args.sizeInElements())
+        {
+            int32_t parsedPort = 0;
+            if (not StringView(args[i + 1]).parseInt32(parsedPort) or parsedPort <= 0 or parsedPort > 65535)
+            {
+                globalConsole->print("Invalid port value: {}\n", args[i + 1]);
+            }
+            else
+            {
+                sample.port = parsedPort;
+            }
+            ++i;
+        }
     }
     if (sample.directory.isEmpty())
     {
