@@ -4,6 +4,7 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
+#include "Libraries/Foundation/Deferred.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
@@ -20,7 +21,7 @@ struct PluginTest;
 
 struct SC::PluginTest : public SC::TestCase
 {
-    SmallString<255> testPluginsPath;
+    StringPath testPluginsPath;
 
     PluginTest(SC::TestReport& report) : TestCase(report, "PluginTest")
     {
@@ -53,8 +54,23 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
-            SC_TEST_EXPECT(Path::join(testPluginsPath, {report.libraryRootDirectory.view(), "Tests", "Libraries",
-                                                        "Plugin", "PluginTestDirectory"}));
+            StringPath sourcePluginsPath;
+            SC_TEST_EXPECT(Path::join(sourcePluginsPath, {report.libraryRootDirectory.view(), "Tests", "Libraries",
+                                                          "Plugin", "PluginTestDirectory"}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+            StringPath pluginSandboxRoot;
+            SC_TEST_EXPECT(Path::join(pluginSandboxRoot, {report.applicationRootDirectory.view(), "PluginTest"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(pluginSandboxRoot.view()));
+
+            StringPath pluginSandboxName;
+            SC_TEST_EXPECT(StringBuilder::format(pluginSandboxName, "PluginTestDirectory-{}-{}",
+                                                 Time::Realtime::now().milliseconds, reinterpret_cast<size_t>(this)));
+            SC_TEST_EXPECT(Path::join(testPluginsPath, {pluginSandboxRoot.view(), pluginSandboxName.view()}));
+            SC_TEST_EXPECT(fs.copyDirectory(sourcePluginsPath.view(), testPluginsPath.view()));
+            auto removeSandbox = MakeDeferred([&]() { (void)fs.removeDirectoryRecursive(testPluginsPath.view()); });
 
             // Scan for definitions
             {
@@ -123,11 +139,8 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(isPluginOriginal());
 
             // Modify child plugin to change return value of the exported function
-            String     sourceContent = StringEncoding::Ascii;
-            FileSystem fs;
+            String sourceContent = StringEncoding::Ascii;
             SC_TEST_EXPECT(fs.read(pluginScriptPath.view(), sourceContent));
-            FileSystem::FileStat scriptFileStat;
-            SC_TEST_EXPECT(fs.getFileStat(pluginScriptPath.view(), scriptFileStat));
             String sourceMod1;
             SC_TEST_EXPECT(StringBuilder::create(sourceMod1)
                                .appendReplaceAll(sourceContent.view(), //
@@ -155,12 +168,8 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(not pluginParent->dynamicLibrary.isValid());
 
             // Cleanup
-            SC_TEST_EXPECT(fs.writeString(pluginScriptPath.view(), sourceContent.view()));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
-
-            // Restore last modified time to avoid triggering a rebuild as the file is included in the test project
-            SC_TEST_EXPECT(fs.setLastModifiedTime(pluginScriptPath.view(), scriptFileStat.modifiedTime));
         }
     }
 };
