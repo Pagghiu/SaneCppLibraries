@@ -69,6 +69,11 @@ struct TestReport
     /// @return `-1` if tests are failed, `0` if tests are successful
     [[nodiscard]] int getTestReturnCode() const;
 
+    /// @brief Applies an optional port offset configured through command line or environment
+    /// @param basePort The default test port
+    /// @return The mapped port (basePort + portOffset if representable as uint16_t)
+    [[nodiscard]] uint16_t mapPort(uint16_t basePort) const;
+
     template <typename Statistics>
     void runGlobalMemoryReport(Statistics stats, bool reportFailure = true)
     {
@@ -99,6 +104,7 @@ struct TestReport
     friend struct TestCase;
     uint32_t   numTestsSucceeded = 0;
     uint32_t   numTestsFailed    = 0;
+    uint16_t   portOffset        = 0;
     StringSpan currentSection;
     StringSpan firstFailedTest;
     StringSpan testToRun;

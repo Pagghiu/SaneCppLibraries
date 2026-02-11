@@ -7,8 +7,8 @@ void SC::AsyncTest::socketUDPSendReceive()
 {
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
-    SocketIPAddress    serverAddress;
-    constexpr uint16_t port = 5051;
+    SocketIPAddress serverAddress;
+    const uint16_t  port = report.mapPort(5051);
     SC_TEST_EXPECT(serverAddress.fromAddressPort("0.0.0.0", port)); // Bind to all interfaces on port
     SocketIPAddress clientAddress;
     SC_TEST_EXPECT(clientAddress.fromAddressPort("127.0.0.1", port)); // Connect to localhost on port

@@ -115,7 +115,7 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
     SocketFlags::AddressFamily invalidFamily;
     SC_TEST_EXPECT(not serverSocket.getAddressFamily(invalidFamily));
     // Look for an available port
-    static constexpr uint16_t   tcpPort       = 5050;
+    const uint16_t              tcpPort       = report.mapPort(5050);
     static constexpr StringView serverAddress = "::1"; //"127.0.0.1"
 
     SocketIPAddress nativeAddress;
@@ -133,14 +133,16 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
         Result      writeRes   = Result(false);
         Result      closeRes   = Result(false);
         EventObject eventObject;
+        uint16_t    port = 0;
     } params;
+    params.port = tcpPort;
     SocketDescriptor clientSocket;
     SC_TEST_EXPECT(clientSocket.create(nativeAddress.getAddressFamily(), socketType, protocol));
     auto func = [&clientSocket, &params](Thread& thread)
     {
         thread.setThreadName(SC_NATIVE_STR("func"));
         SocketClient client(clientSocket);
-        params.connectRes = client.connect(serverAddress, tcpPort);
+        params.connectRes = client.connect(serverAddress, params.port);
         char buf[1]       = {testValue};
         params.writeRes   = client.write({buf, sizeof(buf)});
         params.eventObject.wait();

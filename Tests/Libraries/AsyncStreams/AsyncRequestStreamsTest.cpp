@@ -131,7 +131,7 @@ void SC::AsyncRequestStreamsTest::createAsyncConnectedSockets(AsyncEventLoop& ev
                                                               SocketDescriptor& readSide)
 {
     SocketDescriptor serverSocket;
-    uint16_t         tcpPort        = 5050;
+    uint16_t         tcpPort        = report.mapPort(5050);
     StringView       connectAddress = "::1";
     SocketIPAddress  nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));

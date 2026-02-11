@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
 #include "../Foundation/Assert.h"
+#include <stdint.h> // uint16_t, uint32_t
 #include <stdlib.h> // exit
 #include <string.h> // strlen
 
@@ -10,9 +11,43 @@ namespace SC
 static const StringSpan redEMOJI   = StringSpan({"\xf0\x9f\x9f\xa5", 4}, true, StringEncoding::Utf8);
 static const StringSpan greenEMOJI = StringSpan({"\xf0\x9f\x9f\xa9", 4}, true, StringEncoding::Utf8);
 
+static bool parsePortOffset(const char* value, uint16_t& parsedOffset)
+{
+    if (value == nullptr or *value == '\0')
+    {
+        return false;
+    }
+
+    uint32_t parsed = 0;
+    for (const char* ch = value; *ch != '\0'; ++ch)
+    {
+        if (*ch < '0' or *ch > '9')
+        {
+            return false;
+        }
+        parsed = parsed * 10 + static_cast<uint32_t>(*ch - '0');
+        if (parsed > 65535)
+        {
+            return false;
+        }
+    }
+    parsedOffset = static_cast<uint16_t>(parsed);
+    return true;
+}
+
 } // namespace SC
 SC::TestReport::TestReport(IOutput& console, int argc, const char** argv) : console(console)
 {
+#if SC_COMPILER_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996) // getenv
+#endif
+    const char* envPortOffset = ::getenv("SC_TEST_PORT_OFFSET");
+#if SC_COMPILER_MSVC
+#pragma warning(pop)
+#endif
+    (void)parsePortOffset(envPortOffset, portOffset);
+
     for (int idx = 1; idx < argc; ++idx)
     {
         const auto param = StringSpan::fromNullTerminated(argv[idx], StringEncoding::Ascii);
@@ -43,8 +78,23 @@ SC::TestReport::TestReport(IOutput& console, int argc, const char** argv) : cons
                 }
             }
         }
+        if (param == "--port-offset")
+        {
+            if (idx + 1 < argc)
+            {
+                uint16_t parsedOffset = portOffset;
+                if (parsePortOffset(argv[idx + 1], parsedOffset))
+                {
+                    portOffset = parsedOffset;
+                }
+            }
+        }
     }
 
+    if (not quietMode and portOffset > 0)
+    {
+        console.print("TestReport::Using port offset {}\n", static_cast<size_t>(portOffset));
+    }
     if (not quietMode and (not testToRun.isEmpty() or not sectionToRun.isEmpty()))
     {
         console.print("\n");
@@ -249,3 +299,10 @@ bool SC::TestReport::isSectionEnabled(StringSpan sectionName) const
 }
 
 int SC::TestReport::getTestReturnCode() const { return numTestsFailed > 0 ? -1 : 0; }
+
+uint16_t SC::TestReport::mapPort(uint16_t basePort) const
+{
+    const uint32_t mappedPort = static_cast<uint32_t>(basePort) + static_cast<uint32_t>(portOffset);
+    SC_ASSERT_RELEASE(mappedPort <= 65535);
+    return static_cast<uint16_t>(mappedPort <= 65535 ? mappedPort : basePort);
+}

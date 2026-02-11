@@ -5,6 +5,7 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -56,6 +57,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     // Initialize and start the http and the file server
     HttpAsyncServer     httpServer;
     HttpAsyncFileServer fileServer;
+    const uint16_t      serverPort = report.mapPort(8090);
 
     ThreadPool threadPool;
     if (eventLoop.needsThreadPoolForFileOperations()) // no thread pool needed for io_uring
@@ -63,7 +65,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(threadPool.create(NUM_FS_THREADS));
     }
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 8090));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
     SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, webServerFolder));
     fileServer.setUseAsyncFileSend(useAsyncFileSend);
 
@@ -85,14 +87,23 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpClient putStream      = {};
         HttpClient putInline      = {};
         HttpClient postMultipart  = {};
+        String     fileURL        = StringEncoding::Ascii;
+        String     streamURL      = StringEncoding::Ascii;
+        String     inlineURL      = StringEncoding::Ascii;
+        String     uploadURL      = StringEncoding::Ascii;
     } context    = {httpServer};
     context.loop = &eventLoop;
 
     SC_TEST_EXPECT(context.fs.init(webServerFolder));
     SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
 
+    SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://localhost:{}/file.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://localhost:{}/stream.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://localhost:{}/inline.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.uploadURL, "http://localhost:{}/upload", serverPort));
+
     // Create an Http Client request for that file
-    SC_TEST_EXPECT(context.getClient.get(eventLoop, "http://localhost:8090/file.html"));
+    SC_TEST_EXPECT(context.getClient.get(eventLoop, context.fileURL.view()));
     context.getClient.callback = [this, &context](HttpClient& result)
     {
         context.getCount++;
@@ -101,7 +112,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 
         // Test PUT with a 10 ms delay between headers and body to induce two separate reads on the receiving side
         // one with the headers, and one with the body contents, that will trigger the pipeline streaming code path.
-        SC_TEST_EXPECT(context.putStream.put(*context.loop, "http://localhost:8090/stream.html", "StreamBody", {10}));
+        SC_TEST_EXPECT(context.putStream.put(*context.loop, context.streamURL.view(), "StreamBody", {10}));
     };
 
     context.putStream.callback = [this, &context](HttpClient& result)
@@ -119,7 +130,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 
         // Test PUT writing headers and body content in a single write, that will avoid the pipeline streaming code path
         // HttpRequest::getFirstBodySlice() will contain the entire body contents.
-        SC_TEST_EXPECT(context.putInline.put(*context.loop, "http://localhost:8090/inline.html", "InlineBody"));
+        SC_TEST_EXPECT(context.putInline.put(*context.loop, context.inlineURL.view(), "InlineBody"));
     };
     context.putInline.callback = [this, &context](HttpClient& result)
     {
@@ -135,7 +146,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(context.fs.removeFile("inline.html"));
 
         // Test multipart POST with file upload
-        SC_TEST_EXPECT(context.postMultipart.postMultipart(*context.loop, "http://localhost:8090/upload", "file",
+        SC_TEST_EXPECT(context.postMultipart.postMultipart(*context.loop, context.uploadURL.view(), "file",
                                                            "multipart.txt", "MultipartContent"));
     };
 

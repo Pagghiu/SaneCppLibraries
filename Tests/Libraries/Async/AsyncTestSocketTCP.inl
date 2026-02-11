@@ -8,7 +8,7 @@ void SC::AsyncTest::createTCPSocketPair(AsyncEventLoop& eventLoop, SocketDescrip
                                         SocketDescriptor& serverSideClient)
 {
     SocketDescriptor serverSocket;
-    uint16_t         tcpPort        = 5050;
+    uint16_t         tcpPort        = report.mapPort(5050);
     StringView       connectAddress = "::1";
     SocketIPAddress  nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));
@@ -42,7 +42,7 @@ void SC::AsyncTest::socketTCPAccept()
 
     constexpr uint32_t numWaitingConnections = 2;
     SocketDescriptor   serverSocket;
-    uint16_t           tcpPort = 5050;
+    uint16_t           tcpPort = report.mapPort(5050);
     SocketIPAddress    nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
     SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(nativeAddress.getAddressFamily(), serverSocket));
@@ -107,7 +107,7 @@ void SC::AsyncTest::socketTCPConnect()
     SC_TEST_EXPECT(eventLoop.create(options));
 
     SocketDescriptor serverSocket;
-    uint16_t         tcpPort        = 5050;
+    uint16_t         tcpPort        = report.mapPort(5050);
     StringView       connectAddress = "::1";
     SocketIPAddress  nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort(connectAddress, tcpPort));

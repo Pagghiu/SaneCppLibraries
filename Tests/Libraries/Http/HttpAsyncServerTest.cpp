@@ -43,8 +43,9 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
 
     // Initialize and start the http server
     HttpAsyncServer httpServer;
+    const uint16_t  serverPort = report.mapPort(6152);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6152));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
 
     struct ServerContext
     {
@@ -112,6 +113,8 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
 
         HttpAsyncServer& httpServer;
     } clientContext = {0, 3, httpServer};
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://localhost:{}/index.html", serverPort));
     for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
     {
         client[idx].callback = [this, &clientContext](HttpClient& client)
@@ -124,7 +127,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
                 SC_TEST_EXPECT(clientContext.httpServer.stop());
             }
         };
-        SC_TEST_EXPECT(client[idx].get(eventLoop, "http://localhost:6152/index.html"));
+        SC_TEST_EXPECT(client[idx].get(eventLoop, endpoint.view()));
     }
 
     // Safety timout against hangs

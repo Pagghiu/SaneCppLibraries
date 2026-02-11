@@ -52,6 +52,8 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 - Always run all tests in **both Debug and Release** before completing
 - Run tests on Linux, macOS and Windows if you can access the required VM or it's the local host OS
 - Never invoke executables like AsyncWebServer directly, always use ./SC.sh build run ... (unless you need to debug directly in lldb / gdb)
+- `SCTest` can run in parallel across worktrees/configurations; isolate network ports per process when doing so.
+- Use `--port-offset <N>` (for example `./SC.sh build run SCTest Debug -- --port-offset 200`) or `SC_TEST_PORT_OFFSET=<N>`.
 - When debugging async workflows add printf (from <stdio.h>) to reconstruct the sequence of calls
 - Remove debug log after user confirmation that everything is correct
 

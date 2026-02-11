@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "HttpClient.h"
 #include "Libraries/Http/HttpAsyncServer.h"
+#include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -52,8 +54,9 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     HttpAsyncServer httpServer;
+    const uint16_t  serverPort = report.mapPort(6160);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6160));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
 
     struct Context
     {
@@ -62,6 +65,7 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
         int                numClientResponses = 0;
         AsyncEventLoop*    eventLoop;
         HttpAsyncServer*   httpServer;
+        String             requestURL = StringEncoding::Ascii;
     } ctx = {this, 0, 0, &eventLoop, &httpServer};
 
     httpServer.onRequest = [&ctx, this](HttpConnection& client)
@@ -77,6 +81,7 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
 
     // Make 3 sequential requests on the same connection
     HttpClient client;
+    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://localhost:{}/test", serverPort));
 
     client.callback = [&ctx, this](HttpClient& c)
     {
@@ -87,7 +92,7 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
         if (ctx.numClientResponses < 3)
         {
             // Make another request (reusing same client)
-            SC_TEST_EXPECT(c.get(*ctx.eventLoop, "http://localhost:6160/test", true));
+            SC_TEST_EXPECT(c.get(*ctx.eventLoop, ctx.requestURL.view(), true));
         }
         else
         {
@@ -95,7 +100,7 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
         }
     };
 
-    SC_TEST_EXPECT(client.get(eventLoop, "http://localhost:6160/test"));
+    SC_TEST_EXPECT(client.get(eventLoop, ctx.requestURL.view()));
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
@@ -124,8 +129,9 @@ void SC::HttpKeepAliveTest::keepAliveDisabledByResponse()
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     HttpAsyncServer httpServer;
+    const uint16_t  serverPort = report.mapPort(6161);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6161));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
 
     struct Context
     {
@@ -148,6 +154,8 @@ void SC::HttpKeepAliveTest::keepAliveDisabledByResponse()
     };
 
     HttpClient client;
+    String     requestURL = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://localhost:{}/test", serverPort));
 
     client.callback = [&ctx, this](HttpClient& c)
     {
@@ -157,7 +165,7 @@ void SC::HttpKeepAliveTest::keepAliveDisabledByResponse()
         SC_TEST_EXPECT(ctx.httpServer->stop());
     };
 
-    SC_TEST_EXPECT(client.get(eventLoop, "http://localhost:6161/test"));
+    SC_TEST_EXPECT(client.get(eventLoop, requestURL.view()));
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
@@ -186,9 +194,10 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     HttpAsyncServer httpServer;
+    const uint16_t  serverPort = report.mapPort(6162);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
     httpServer.setMaxRequestsPerConnection(2); // Max 2 requests per connection
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6162));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
 
     struct Context
     {
@@ -197,6 +206,7 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
         int                numClientResponses = 0;
         AsyncEventLoop*    eventLoop;
         HttpAsyncServer*   httpServer;
+        String             requestURL = StringEncoding::Ascii;
     } ctx = {this, 0, 0, &eventLoop, &httpServer};
 
     httpServer.onRequest = [&ctx, this](HttpConnection& client)
@@ -211,6 +221,7 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
     };
 
     HttpClient client;
+    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://localhost:{}/test", serverPort));
 
     client.callback = [&ctx, this](HttpClient& c)
     {
@@ -221,7 +232,7 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
         if (ctx.numClientResponses < 2)
         {
             // Make another request
-            SC_TEST_EXPECT(c.get(*ctx.eventLoop, "http://localhost:6162/test", true));
+            SC_TEST_EXPECT(c.get(*ctx.eventLoop, ctx.requestURL.view(), true));
         }
         else
         {
@@ -229,7 +240,7 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
         }
     };
 
-    SC_TEST_EXPECT(client.get(eventLoop, "http://localhost:6162/test"));
+    SC_TEST_EXPECT(client.get(eventLoop, ctx.requestURL.view()));
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
@@ -258,9 +269,10 @@ void SC::HttpKeepAliveTest::keepAliveServerDefaultDisabled()
     HttpConnectionType connections[MAX_CONNECTIONS];
 
     HttpAsyncServer httpServer;
+    const uint16_t  serverPort = report.mapPort(6163);
     SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
     httpServer.setDefaultKeepAlive(false); // Disable keep-alive server-wide
-    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", 6163));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
 
     struct Context
     {
@@ -282,6 +294,8 @@ void SC::HttpKeepAliveTest::keepAliveServerDefaultDisabled()
     };
 
     HttpClient client;
+    String     requestURL = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://localhost:{}/test", serverPort));
 
     client.callback = [&ctx, this](HttpClient& c)
     {
@@ -291,7 +305,7 @@ void SC::HttpKeepAliveTest::keepAliveServerDefaultDisabled()
         SC_TEST_EXPECT(ctx.httpServer->stop());
     };
 
-    SC_TEST_EXPECT(client.get(eventLoop, "http://localhost:6163/test"));
+    SC_TEST_EXPECT(client.get(eventLoop, requestURL.view()));
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };

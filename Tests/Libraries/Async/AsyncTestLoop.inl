@@ -20,7 +20,9 @@ void SC::AsyncTest::loopFreeSubmittingOnClose()
     constexpr uint32_t numWaitingConnections = 2;
     SocketDescriptor   serverSocket[2];
     SocketIPAddress    serverAddress[2];
-    SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
+    const uint16_t     firstPort  = report.mapPort(5052);
+    const uint16_t     secondPort = report.mapPort(5053);
+    SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", firstPort));
     SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
     {
         SocketServer server(serverSocket[0]);
@@ -28,7 +30,7 @@ void SC::AsyncTest::loopFreeSubmittingOnClose()
         SC_TEST_EXPECT(server.listen(numWaitingConnections));
     }
 
-    SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
+    SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", secondPort));
     SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
     {
         SocketServer server(serverSocket[1]);
@@ -64,7 +66,9 @@ void SC::AsyncTest::loopFreeActiveOnClose()
     constexpr uint32_t numWaitingConnections = 2;
     SocketDescriptor   serverSocket[2];
     SocketIPAddress    serverAddress[2];
-    SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", 5052));
+    const uint16_t     firstPort  = report.mapPort(5052);
+    const uint16_t     secondPort = report.mapPort(5053);
+    SC_TEST_EXPECT(serverAddress[0].fromAddressPort("127.0.0.1", firstPort));
     SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[0].getAddressFamily(), serverSocket[0]));
     {
         SocketServer server(serverSocket[0]);
@@ -72,7 +76,7 @@ void SC::AsyncTest::loopFreeActiveOnClose()
         SC_TEST_EXPECT(server.listen(numWaitingConnections));
     }
 
-    SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", 5053));
+    SC_TEST_EXPECT(serverAddress[1].fromAddressPort("127.0.0.1", secondPort));
     SC_TEST_EXPECT(eventLoop.createAsyncTCPSocket(serverAddress[1].getAddressFamily(), serverSocket[1]));
 
     {

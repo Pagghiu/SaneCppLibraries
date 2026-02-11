@@ -52,7 +52,7 @@ void SC::AsyncTest::fileSend(bool useThreadPool)
 
     // 4. Create a TCP socket pair for testing
     SocketDescriptor serverSocket, clientSocket;
-    uint16_t         tcpPort = 5050;
+    uint16_t         tcpPort = report.mapPort(5050);
     SocketIPAddress  nativeAddress;
     SC_TEST_EXPECT(nativeAddress.fromAddressPort("127.0.0.1", tcpPort));
 
