@@ -93,7 +93,11 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
 
             SmallStringNative<1024> path;
             SC_TEST_EXPECT(path.assign(appDirectory));
-            FileSystemWatcher::FolderWatcher watcher;
+            // Coverage and package caches can create deep folder trees under appDirectory.
+            // Provide a larger Linux sub-folder relative paths buffer to avoid spurious overflows.
+            char subFolderRelativePathsBuffer[32 * 1024];
+
+            FileSystemWatcher::FolderWatcher watcher(subFolderRelativePathsBuffer);
             // We save the results and expect them after the wait to avoid Thread Sanitizer issues
             // due to the SC_TEST_EXPECT calls inside the lambda that runs in the thread
             watcher.notifyCallback  = lambda;
