@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "Tools/SC-build/Build.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Time/Time.h"
 
 namespace SC
 {
@@ -17,6 +19,10 @@ struct SC::BuildTest : public SC::TestCase
         {
             String targetDirectory = report.applicationRootDirectory.view();
             SC_TRUST_RESULT(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
+            SmallString<128> runDirectory;
+            SC_TRUST_RESULT(StringBuilder::format(runDirectory, "run-{}-{}", Time::Realtime::now().milliseconds,
+                                                  reinterpret_cast<size_t>(this)));
+            SC_TRUST_RESULT(Path::append(targetDirectory, {runDirectory.view()}, Path::AsNative));
             // Normalizing is not strictly necessary but it helps when debugging the test
             SC_TRUST_RESULT(Path::normalize(buildDir, targetDirectory.view(), Path::AsNative));
         }
