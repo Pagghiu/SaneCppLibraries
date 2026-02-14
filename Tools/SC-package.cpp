@@ -126,11 +126,11 @@ Result install7ZipR(StringView packagesCacheDirectory, StringView packagesInstal
     download.packagesInstallDirectory = packagesInstallDirectory;
 
     download.packageName    = "7zip";
-    download.packageVersion = "25.01";
+    download.packageVersion = "26.00";
 
     download.packagePlatform = "windows";
     download.url             = "https://www.7-zip.org/a/7zr.exe";
-    download.fileMD5         = "890595b9f1fcbd6b627386335e96251b";
+    download.fileMD5         = "63cdadb8047e200ef81d63dbcfac7bbb";
     download.createLink      = false;
 
     CustomFunctions functions;
