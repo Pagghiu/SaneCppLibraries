@@ -57,6 +57,7 @@ struct TestReport
     bool abortOnFirstFailedTest = true;  ///< If `true` will abort after first failed test
     bool debugBreakOnFailedTest = true;  ///< If `true` will issue a debugger halt when a test fails
     bool quietMode              = false; ///< If `true` will not print recaps at start or end of the test
+    bool runAllTests            = false; ///< If `true` will run optional/slow tests that are skipped by default
 
     /// @brief Build from a console and executable arguments
     /// @param console A Console object where to print test results
@@ -73,6 +74,10 @@ struct TestReport
     /// @param basePort The default test port
     /// @return The mapped port (basePort + portOffset if representable as uint16_t)
     [[nodiscard]] uint16_t mapPort(uint16_t basePort) const;
+
+    /// @brief Returns true only when `--test` explicitly matches @p testName
+    /// @param testName Name of test case to evaluate
+    [[nodiscard]] bool isTestExplicitlySelected(StringSpan testName) const;
 
     template <typename Statistics>
     void runGlobalMemoryReport(Statistics stats, bool reportFailure = true)

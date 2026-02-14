@@ -89,11 +89,19 @@ SC::TestReport::TestReport(IOutput& console, int argc, const char** argv) : cons
                 }
             }
         }
+        if (param == "--all-tests")
+        {
+            runAllTests = true;
+        }
     }
 
     if (not quietMode and portOffset > 0)
     {
         console.print("TestReport::Using port offset {}\n", static_cast<size_t>(portOffset));
+    }
+    if (not quietMode and runAllTests)
+    {
+        console.print("TestReport::Running optional tests enabled by --all-tests\n");
     }
     if (not quietMode and (not testToRun.isEmpty() or not sectionToRun.isEmpty()))
     {
@@ -305,4 +313,9 @@ uint16_t SC::TestReport::mapPort(uint16_t basePort) const
     const uint32_t mappedPort = static_cast<uint32_t>(basePort) + static_cast<uint32_t>(portOffset);
     SC_ASSERT_RELEASE(mappedPort <= 65535);
     return static_cast<uint16_t>(mappedPort <= 65535 ? mappedPort : basePort);
+}
+
+bool SC::TestReport::isTestExplicitlySelected(StringSpan testName) const
+{
+    return not testToRun.isEmpty() and testToRun == testName;
 }

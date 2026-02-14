@@ -55,6 +55,8 @@ jobs:
       run: ./SC.sh build configure SCTest
     - name: compile
       run: ./SC.sh build compile SCTest DebugCoverage
+    - name: test SCTest
+      run: ./SC.sh build run SCTest DebugCoverage -- --all-tests
     - name: coverage
       run: ./SC.sh build coverage SCTest DebugCoverage
     - name: move coverage to documentation

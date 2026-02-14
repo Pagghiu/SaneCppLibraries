@@ -41,7 +41,7 @@ jobs:
     - name: compile InteropSTL
       run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
     - name: test SCTest
-      run: ./SC.sh build run SCTest ${{ matrix.config }}
+      run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
     - name: test InteropSTL
       run: ./SC.sh build run InteropSTL ${{ matrix.config }}
@@ -49,7 +49,7 @@ jobs:
       run: ./SC.sh build compile SCTest ${{ matrix.config }} xcode
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: test SCTest xcode
-      run: ./SC.sh build run SCTest ${{ matrix.config }} xcode
+      run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     # - name: install gdb
     #   run: sudo apt install -y gdb

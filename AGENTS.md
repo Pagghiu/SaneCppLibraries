@@ -19,8 +19,14 @@
 # Build all tests
 ./SC.sh build compile SCTest Debug
 
+# Verify SingleFileLibs still compile (catches forbidden inter-library dependencies)
+./SC.sh build compile "SCSingleFileLibs:" Release
+
 # Run all tests (ALWAYS "build compile" before running tests!!)
 ./SC.sh build run SCTest Debug
+
+# Run full suite including BuildTest (downloads package repos if cache is empty)
+./SC.sh build run SCTest Debug -- --all-tests
 
 # Run specific test (saves context)
 ./SC.sh build run SCTest Debug -- --test "TestName"
@@ -54,6 +60,8 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 - Never invoke executables like AsyncWebServer directly, always use ./SC.sh build run ... (unless you need to debug directly in lldb / gdb)
 - `SCTest` can run in parallel across worktrees/configurations; isolate network ports per process when doing so.
 - Use `--port-offset <N>` (for example `./SC.sh build run SCTest Debug -- --port-offset 200`) or `SC_TEST_PORT_OFFSET=<N>`.
+- `BuildTest` is skipped by default for local runs; enable it with `--all-tests` (CI already runs SCTest with `--all-tests`).
+- When changing library includes/dependencies, run `./SC.sh build compile "SCSingleFileLibs:" Release` to catch invalid cross-library dependencies.
 - When debugging async workflows add printf (from <stdio.h>) to reconstruct the sequence of calls
 - Remove debug log after user confirmation that everything is correct
 

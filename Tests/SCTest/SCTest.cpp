@@ -248,8 +248,12 @@ int main(int argc, const char* argv[])
     runDebugVisualizersTest(report);
     // runSupportToolsTest(report);
 
-    // Build tests
-    runBuildTest(report);
+    // Build tests (opt-in locally with --all-tests, still runnable with --test BuildTest)
+    if (report.runAllTests or
+        report.isTestExplicitlySelected(StringSpan::fromNullTerminated("BuildTest", StringEncoding::Ascii)))
+    {
+        runBuildTest(report);
+    }
     SocketNetworking::shutdownNetworking();
     report.runGlobalMemoryReport(Globals::get(Globals::Global).allocator.statistics);
     return report.getTestReturnCode();
