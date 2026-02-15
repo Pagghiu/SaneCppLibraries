@@ -5,6 +5,10 @@
 #include "SocketInternal.h"
 
 #if !SC_PLATFORM_WINDOWS
+#include <errno.h> // errno
+#endif
+
+#if !SC_PLATFORM_WINDOWS
 #include <sys/socket.h> // bind
 #endif
 
@@ -12,15 +16,19 @@ SC::Result SC::SocketServer::close() { return socket.close(); }
 
 // TODO: Add EINTR checks for all SocketServer/SocketClient os calls.
 
-SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress)
+SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress, BindStatus* outStatus)
 {
+    if (outStatus != nullptr)
+    {
+        *outStatus = BindStatus::None;
+    }
+
     SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
     SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
 
-    // TODO: Expose SO_REUSEADDR as an option?
-    int value = 1;
+    const int value = reuseAddress == BindReuseAddress::Enabled ? 1 : 0;
 #if SC_PLATFORM_WINDOWS
     ::setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, reinterpret_cast<const char*>(&value), sizeof(value));
 #elif !SC_PLATFORM_EMSCRIPTEN
@@ -30,7 +38,21 @@ SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress)
 #endif
     const struct sockaddr* sa     = &nativeAddress.handle.reinterpret_as<const struct sockaddr>();
     const socklen_t        saSize = nativeAddress.sizeOfHandle();
-    SC_TRY_MSG(::bind(listenSocket, sa, saSize) != SOCKET_ERROR, "Could not bind socket to port");
+    if (::bind(listenSocket, sa, saSize) == SOCKET_ERROR)
+    {
+#if SC_PLATFORM_WINDOWS
+        if (outStatus != nullptr and WSAGetLastError() == WSAEADDRINUSE)
+        {
+            *outStatus = BindStatus::AddressInUse;
+        }
+#elif !SC_PLATFORM_EMSCRIPTEN
+        if (outStatus != nullptr and errno == EADDRINUSE)
+        {
+            *outStatus = BindStatus::AddressInUse;
+        }
+#endif
+        return Result::Error("Could not bind socket to port");
+    }
     return Result(true);
 }
 

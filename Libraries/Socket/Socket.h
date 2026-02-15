@@ -196,6 +196,18 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketServerSnippet
 struct SC_COMPILER_EXPORT SocketServer
 {
+    enum class BindReuseAddress : uint8_t
+    {
+        Disabled,
+        Enabled,
+    };
+
+    enum class BindStatus : uint8_t
+    {
+        None,
+        AddressInUse,
+    };
+
     /// @brief Build a SocketServer from a SocketDescriptor (already created with SocketDescriptor::create)
     /// @param socket A socket descriptor created with SocketDescriptor::create to be used as server
     SocketServer(SocketDescriptor& socket) : socket(socket) {}
@@ -206,8 +218,11 @@ struct SC_COMPILER_EXPORT SocketServer
 
     /// @brief Binds this socket to a given address / port combination
     /// @param nativeAddress The interface ip address and port to start listening to
+    /// @param reuseAddress Whether SO_REUSEADDR should be set before binding
+    /// @param outStatus Optional detailed status for bind failures
     /// @return Valid Result if this socket has successfully been bound
-    Result bind(SocketIPAddress nativeAddress);
+    Result bind(SocketIPAddress nativeAddress, BindReuseAddress reuseAddress = BindReuseAddress::Enabled,
+                BindStatus* outStatus = nullptr);
 
     /// @brief Start listening for incoming connections at a specific address / port combination (after bind)
     /// @param numberOfWaitingConnections How many connections can be queued before `accept`
