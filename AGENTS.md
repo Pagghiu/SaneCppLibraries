@@ -61,9 +61,12 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 - `SCTest` can run in parallel across worktrees/configurations; isolate network ports per process when doing so.
 - Use `--port-offset <N>` (for example `./SC.sh build run SCTest Debug -- --port-offset 200`) or `SC_TEST_PORT_OFFSET=<N>`.
 - `BuildTest` is skipped by default for local runs; enable it with `--all-tests` (CI already runs SCTest with `--all-tests`).
-- When changing library includes/dependencies, run `./SC.sh build compile "SCSingleFileLibs:" Release` to catch invalid cross-library dependencies.
-- When debugging async workflows add printf (from <stdio.h>) to reconstruct the sequence of calls
+- Make sure not to break amalgamated single file libs:
+    - amalgamate: `python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py`
+    - compile: `./SC.sh build compile "SCSingleFileLibs:" Release`
+- When debugging async workflows add printf to reconstruct the sequence of calls
 - Remove debug log after user confirmation that everything is correct
+- Tests use --nostdinc so including <new>, <cstdio> or anything similar will fail
 
 ## Common Pitfalls
 
