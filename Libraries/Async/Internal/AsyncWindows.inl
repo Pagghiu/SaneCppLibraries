@@ -336,6 +336,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         AsyncRequest* async = getAsyncRequest(idx);
         if (async != nullptr and async->state == AsyncRequest::State::Cancelling)
         {
+            async->flags &= ~Internal::Flag_WaitingKernelCancel;
             continueProcessing = false; // Don't process cancellations
             switch (async->type)
             {
@@ -448,9 +449,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
                 return Result::Error("AsyncSocketAccept: CancelEx failed");
+            // The request may have just completed; poll once to drain a potential queued completion.
+            eventLoop.internal.hasPendingKernelCancellations = true;
         }
-        // CancelIoEx queues a cancellation packet on the async queue
-        eventLoop.internal.hasPendingKernelCancellations = true;
+        if (res == TRUE)
+        {
+            // Keep request in cancelling state until IOCP cancellation completion is drained.
+            asyncAccept.flags |= Internal::Flag_WaitingKernelCancel;
+            eventLoop.internal.hasPendingKernelCancellations = true;
+        }
         return Result(true);
     }
 
@@ -644,9 +651,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
                 return Result::Error("AsyncSocketSendTo: CancelEx failed");
+            // The request may have just completed; poll once to drain a potential queued completion.
+            eventLoop.internal.hasPendingKernelCancellations = true;
         }
-        // CancelIoEx queues a cancellation packet on the async queue
-        eventLoop.internal.hasPendingKernelCancellations = true;
+        if (res == TRUE)
+        {
+            // Keep request in cancelling state until IOCP cancellation completion is drained.
+            async.flags |= Internal::Flag_WaitingKernelCancel;
+            eventLoop.internal.hasPendingKernelCancellations = true;
+        }
         return Result(true);
     }
 
@@ -683,9 +696,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
                 return Result::Error("AsyncSocketReceiveFrom: CancelEx failed");
+            // The request may have just completed; poll once to drain a potential queued completion.
+            eventLoop.internal.hasPendingKernelCancellations = true;
         }
-        // CancelIoEx queues a cancellation packet on the async queue
-        eventLoop.internal.hasPendingKernelCancellations = true;
+        if (res == TRUE)
+        {
+            // Keep request in cancelling state until IOCP cancellation completion is drained.
+            async.flags |= Internal::Flag_WaitingKernelCancel;
+            eventLoop.internal.hasPendingKernelCancellations = true;
+        }
         return Result(true);
     }
 
@@ -718,9 +737,15 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             // CancelIOEx will return ERROR_NOT_FOUND if no operation to cancel has been found
             if (lastError != ERROR_NOT_FOUND)
                 return Result::Error("AsyncSocketReceive: CancelEx failed");
+            // The request may have just completed; poll once to drain a potential queued completion.
+            eventLoop.internal.hasPendingKernelCancellations = true;
         }
-        // CancelIoEx queues a cancellation packet on the async queue
-        eventLoop.internal.hasPendingKernelCancellations = true;
+        if (res == TRUE)
+        {
+            // Keep request in cancelling state until IOCP cancellation completion is drained.
+            async.flags |= Internal::Flag_WaitingKernelCancel;
+            eventLoop.internal.hasPendingKernelCancellations = true;
+        }
         return Result(true);
     }
 

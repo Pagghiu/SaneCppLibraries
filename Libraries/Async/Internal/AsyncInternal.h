@@ -126,6 +126,7 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_AsyncTaskSequence      = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
     static constexpr int16_t Flag_AsyncTaskSequenceInUse = 1 << 5; // AsyncTaskSequence must still be waited
     static constexpr int16_t Flag_NeedsTeardown          = 1 << 6; // Request being processed waiting for teardown
+    static constexpr int16_t Flag_WaitingKernelCancel    = 1 << 7; // Close callback must wait for kernel cancellation
 
     Result close(AsyncEventLoop& eventLoop);
 

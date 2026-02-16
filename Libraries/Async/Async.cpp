@@ -1444,6 +1444,13 @@ void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& 
     {
         AsyncRequest* next = async->next;
         SC_ASSERT_RELEASE(async->state == AsyncRequest::State::Cancelling);
+        if (async->flags & Flag_WaitingKernelCancel)
+        {
+            // Keep polling until kernel cancellation packet is drained.
+            hasPendingKernelCancellations = true;
+            async                         = next;
+            continue;
+        }
         async->markAsFree();
         cancellations.remove(*async);
         if (async->closeCallback)
