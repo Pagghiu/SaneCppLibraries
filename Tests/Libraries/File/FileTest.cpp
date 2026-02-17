@@ -4,7 +4,9 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Threading.h"
 
 namespace SC
 {
@@ -24,11 +26,17 @@ struct SC::FileTest : public SC::TestCase
         {
             testOpenStdHandles();
         }
+        if (test_section("named pipe create/connect/accept"))
+        {
+            testNamedPipeCreateConnectAccept();
+        }
     }
     inline void testOpen();
     inline void testOpenStdHandles();
+    inline void testNamedPipeCreateConnectAccept();
 
     Result snippetForUniqueHandle();
+    Result snippetForNamedPipeServer();
 };
 
 void SC::FileTest::testOpen()
@@ -89,6 +97,137 @@ void SC::FileTest::testOpenStdHandles()
     SC_TEST_EXPECT(fd[1].openStdOutDuplicate());
     SC_TEST_EXPECT(fd[2].openStdErrDuplicate());
 }
+
+void SC::FileTest::testNamedPipeCreateConnectAccept()
+{
+    SmallString<64> logicalName;
+    SC_TEST_EXPECT(StringBuilder::format(logicalName, "sc-file-test-{}", report.mapPort(5420)));
+
+    StringPath pipePath;
+    SC_TEST_EXPECT(NamedPipeName::build(logicalName.view(), pipePath));
+
+    StringPath outputPath;
+    SC_TEST_EXPECT(not NamedPipeName::build("", outputPath));
+    SC_TEST_EXPECT(not NamedPipeName::build("invalid/name", outputPath));
+    SC_TEST_EXPECT(not NamedPipeName::build("invalid\\name", outputPath));
+
+#if !SC_PLATFORM_WINDOWS
+    NamedPipeNameOptions nameOptions;
+    nameOptions.posixDirectory = "/tmp";
+    SC_TEST_EXPECT(NamedPipeName::build("sc-file-test-custom", outputPath, nameOptions));
+    nameOptions.posixDirectory = "relative";
+    SC_TEST_EXPECT(not NamedPipeName::build("sc-file-test-custom", outputPath, nameOptions));
+#endif
+
+    NamedPipeServer        server;
+    NamedPipeServerOptions options;
+    options.posix.removeEndpointBeforeCreate = true;
+    SC_TEST_EXPECT(server.create(pipePath.view(), options));
+
+    NamedPipeServer duplicateServer;
+    SC_TEST_EXPECT(not duplicateServer.create(pipePath.view()));
+
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(not duplicateServer.create("invalid"));
+#else
+    SC_TEST_EXPECT(not duplicateServer.create("relative/path.sock"));
+#endif
+
+    auto acceptAndConnect =
+        [&](NamedPipeServer& namedPipeServer, StringSpan namedPipePath, StringSpan payload, StringSpan expected)
+    {
+        PipeDescriptor accepted;
+        EventObject    acceptedEvent;
+        Result         acceptResult = Result::Error("accept not completed");
+        struct AcceptContext
+        {
+            NamedPipeServer* server;
+            PipeDescriptor*  accepted;
+            Result*          result;
+            EventObject*     event;
+        } acceptContext = {&namedPipeServer, &accepted, &acceptResult, &acceptedEvent};
+        Thread acceptThread;
+        SC_TEST_EXPECT(acceptThread.start(
+            [&acceptContext](Thread&)
+            {
+                *acceptContext.result = acceptContext.server->accept(*acceptContext.accepted);
+                acceptContext.event->signal();
+            }));
+
+        PipeDescriptor client;
+        SC_TEST_EXPECT(NamedPipeClient::connect(namedPipePath, client));
+
+        acceptedEvent.wait();
+        SC_TEST_EXPECT(acceptThread.join());
+        SC_TEST_EXPECT(acceptResult);
+
+        SC_TEST_EXPECT(client.writePipe.writeString(payload));
+
+        char       buffer[64] = {0};
+        Span<char> readData;
+        SC_TEST_EXPECT(accepted.readPipe.read({buffer, payload.sizeInBytes()}, readData));
+        StringSpan received(readData, false, StringEncoding::Ascii);
+        SC_TEST_EXPECT(received == expected);
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(accepted.close());
+    };
+
+    acceptAndConnect(server, pipePath.view(), "first", "first");
+    acceptAndConnect(server, pipePath.view(), "second", "second");
+
+    SC_TEST_EXPECT(server.close());
+
+    PipeDescriptor shouldFail;
+    SC_TEST_EXPECT(not NamedPipeClient::connect(pipePath.view(), shouldFail));
+
+#if SC_PLATFORM_WINDOWS
+    SmallString<128> alternatePathASCII;
+    SC_TEST_EXPECT(StringBuilder::format(alternatePathASCII, "\\\\?\\pipe\\sc-file-test-alt-{}", report.mapPort(5421)));
+    StringPath alternatePath;
+    SC_TEST_EXPECT(alternatePath.assign(alternatePathASCII.view()));
+
+    NamedPipeServer        alternateServer;
+    NamedPipeServerOptions alternateOptions;
+    SC_TEST_EXPECT(alternateServer.create(alternatePath.view(), alternateOptions));
+    acceptAndConnect(alternateServer, alternatePath.view(), "alt!", "alt!");
+    SC_TEST_EXPECT(alternateServer.close());
+#endif
+}
+
+//! [NamedPipeServerSnippet]
+SC::Result SC::FileTest::snippetForNamedPipeServer()
+{
+    StringPath pipePath;
+    SC_TRY(NamedPipeName::build("sc-doc-example", pipePath));
+
+    NamedPipeServer        server;
+    NamedPipeServerOptions serverOptions;
+    serverOptions.connectionOptions.blocking       = true;
+    serverOptions.posix.removeEndpointBeforeCreate = true;
+    SC_TRY(server.create(pipePath.view(), serverOptions));
+
+    PipeDescriptor clientConnection;
+    SC_TRY(NamedPipeClient::connect(pipePath.view(), clientConnection));
+
+    PipeDescriptor serverConnection;
+    SC_TRY(server.accept(serverConnection));
+
+    SC_TRY(clientConnection.writePipe.writeString("ping"));
+
+    char       readBuffer[4] = {0};
+    Span<char> readData;
+    SC_TRY(serverConnection.readPipe.read({readBuffer, sizeof(readBuffer)}, readData));
+
+    StringSpan received(readData, false, StringEncoding::Ascii);
+    SC_TRY_MSG(received == "ping", "Unexpected payload");
+
+    SC_TRY(clientConnection.close());
+    SC_TRY(serverConnection.close());
+    SC_TRY(server.close());
+    return Result(true);
+}
+//! [NamedPipeServerSnippet]
 
 #if !SC_PLATFORM_WINDOWS
 //! [UniqueHandleExampleSnippet]

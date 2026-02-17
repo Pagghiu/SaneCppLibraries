@@ -30,6 +30,19 @@
 | SC::PipeDescriptor::readPipe      | @copybrief SC::PipeDescriptor::readPipe       |
 | SC::PipeDescriptor::writePipe     | @copybrief SC::PipeDescriptor::writePipe      |
 
+| SC::NamedPipeServer                       | @copybrief SC::NamedPipeServer                        |
+|:------------------------------------------|:------------------------------------------------------|
+| SC::NamedPipeServer::create               | @copybrief SC::NamedPipeServer::create                |
+| SC::NamedPipeServer::accept               | @copybrief SC::NamedPipeServer::accept                |
+| SC::NamedPipeServer::close                | @copybrief SC::NamedPipeServer::close                 |
+| SC::NamedPipeServerOptions                | @copybrief SC::NamedPipeServerOptions                 |
+| SC::NamedPipeClient                       | @copybrief SC::NamedPipeClient                        |
+| SC::NamedPipeClient::connect              | @copybrief SC::NamedPipeClient::connect               |
+| SC::NamedPipeClientOptions                | @copybrief SC::NamedPipeClientOptions                 |
+| SC::NamedPipeName                         | @copybrief SC::NamedPipeName                          |
+| SC::NamedPipeName::build                  | @copybrief SC::NamedPipeName::build                   |
+| SC::NamedPipeNameOptions                  | @copybrief SC::NamedPipeNameOptions                   |
+
 # Status
 🟩 Usable  
 This library has a relatively limited scope and it should not need many additional features compared to now.   
@@ -49,6 +62,10 @@ A file can be marked as inheritable with SC::FileDescriptor::setInheritable so t
 SC::PipeDescriptor creates a pipe for InterProcess communication.  
 A pipe has read and write SC::FileDescriptor endpoints and it's used by [Process](@ref library_process) library to redirect standard input, output or error to other processes.  
 It can also be used to read or write the standard input, output or error from current process into a binary buffer or a string (as done by SC::ProcessChain::readStdOutUntilEOFSync or other similar methods).
+
+SC::NamedPipeServer and SC::NamedPipeClient provide named endpoint creation and connection.
+Accepted/connected named pipe endpoints are exposed as SC::PipeDescriptor, so they can be used with the same read/write APIs and with [Async](@ref library_async) / [Async Streams](@ref library_async_streams) compositions.
+SC::NamedPipeName::build can be used to compose platform-native endpoint names from a logical pipe name, avoiding platform-specific `#if` path conventions at call sites.
 
 @copydetails SC::FileDescriptor
 

@@ -240,10 +240,12 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 
 #else
 //! [UniqueHandleDefinitionSnippet]
-#include <errno.h>    // errno
-#include <fcntl.h>    // fcntl
-#include <sys/stat.h> // fstat
-#include <unistd.h>   // close
+#include <errno.h>      // errno
+#include <fcntl.h>      // fcntl
+#include <sys/socket.h> // socket/connect/accept
+#include <sys/stat.h>   // fstat
+#include <sys/un.h>     // sockaddr_un
+#include <unistd.h>     // close
 
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptorDefinition
@@ -743,3 +745,451 @@ SC::Result SC::PipeDescriptor::close()
     SC_TRY(readPipe.close());
     return writePipe.close();
 }
+
+namespace
+{
+static SC::Result validateNamedPipeLogicalName(SC::StringSpan logicalName)
+{
+    SC_TRY_MSG(logicalName.getEncoding() != SC::StringEncoding::Utf16,
+               "NamedPipeName::build logicalName only ASCII/UTF8");
+    SC_TRY_MSG(not logicalName.isEmpty(), "NamedPipeName::build logicalName cannot be empty");
+
+    const char*  bytes = logicalName.bytesWithoutTerminator();
+    const size_t size  = logicalName.sizeInBytes();
+    for (size_t i = 0; i < size; ++i)
+    {
+        SC_TRY_MSG(bytes[i] != '\0', "NamedPipeName::build logicalName contains null bytes");
+        SC_TRY_MSG(bytes[i] != '/', "NamedPipeName::build logicalName cannot contain path separators");
+        SC_TRY_MSG(bytes[i] != '\\', "NamedPipeName::build logicalName cannot contain path separators");
+    }
+    return SC::Result(true);
+}
+} // namespace
+
+SC::Result SC::NamedPipeName::build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options)
+{
+    SC_TRY(validateNamedPipeLogicalName(logicalName));
+
+    StringPath nativeName;
+#if SC_PLATFORM_WINDOWS
+    (void)options;
+    SC_TRY_MSG(nativeName.assign("\\\\.\\pipe\\"), "NamedPipeName::build failed to initialize windows prefix");
+    SC_TRY_MSG(nativeName.append(logicalName), "NamedPipeName::build failed to append logicalName");
+#else
+    SC_TRY_MSG(options.posixDirectory.getEncoding() != StringEncoding::Utf16,
+               "NamedPipeName::build posixDirectory only ASCII/UTF8");
+    SC_TRY_MSG(not options.posixDirectory.isEmpty(), "NamedPipeName::build posixDirectory cannot be empty");
+    const char* posixDirectoryBytes = options.posixDirectory.bytesWithoutTerminator();
+    SC_TRY_MSG(posixDirectoryBytes[0] == '/', "NamedPipeName::build posixDirectory must be absolute");
+
+    SC_TRY_MSG(nativeName.assign(options.posixDirectory), "NamedPipeName::build failed to copy posixDirectory");
+    if (posixDirectoryBytes[options.posixDirectory.sizeInBytes() - 1] != '/')
+    {
+        SC_TRY_MSG(nativeName.append("/"), "NamedPipeName::build failed to append separator");
+    }
+    SC_TRY_MSG(nativeName.append(logicalName), "NamedPipeName::build failed to append logicalName");
+#endif
+    outName = move(nativeName);
+    return Result(true);
+}
+
+//-------------------------------------------------------------------------------------------------------
+// NamedPipe
+//-------------------------------------------------------------------------------------------------------
+
+#if SC_PLATFORM_WINDOWS
+namespace
+{
+using SC::FileDescriptor;
+using SC::NamedPipeServerOptions;
+using SC::PipeDescriptor;
+using SC::PipeOptions;
+using SC::Result;
+using SC::StringSpan;
+
+static bool hasWindowsNamedPipePrefix(const wchar_t* fullName)
+{
+    constexpr auto dotPrefix      = L"\\\\.\\pipe\\";
+    constexpr auto questionPrefix = L"\\\\?\\pipe\\";
+    return ::wcsncmp(fullName, dotPrefix, 9) == 0 or ::wcsncmp(fullName, questionPrefix, 9) == 0;
+}
+
+static Result duplicateConnectedPipeHandle(HANDLE connectedHandle, PipeOptions options, PipeDescriptor& outConnection)
+{
+    HANDLE readHandle  = INVALID_HANDLE_VALUE;
+    HANDLE writeHandle = INVALID_HANDLE_VALUE;
+    if (::DuplicateHandle(::GetCurrentProcess(), connectedHandle, ::GetCurrentProcess(), &readHandle, 0,
+                          options.readInheritable ? TRUE : FALSE, DUPLICATE_SAME_ACCESS) == FALSE)
+    {
+        return Result::Error("NamedPipe duplicate read handle failed");
+    }
+    if (::DuplicateHandle(::GetCurrentProcess(), connectedHandle, ::GetCurrentProcess(), &writeHandle, 0,
+                          options.writeInheritable ? TRUE : FALSE, DUPLICATE_SAME_ACCESS) == FALSE)
+    {
+        ::CloseHandle(readHandle);
+        return Result::Error("NamedPipe duplicate write handle failed");
+    }
+    PipeDescriptor duplicated;
+    SC_TRY(duplicated.readPipe.assign(readHandle));
+    SC_TRY(duplicated.writePipe.assign(writeHandle));
+    outConnection = move(duplicated);
+    return Result(true);
+}
+
+static Result createPendingServerInstance(StringSpan pipeName, const NamedPipeServerOptions& options,
+                                          bool firstInstance, FileDescriptor& pendingConnection)
+{
+    const wchar_t* nullTerminatedName = pipeName.getNullTerminatedNative();
+
+    DWORD openMode = PIPE_ACCESS_DUPLEX;
+    if (not options.connectionOptions.blocking)
+    {
+        openMode |= FILE_FLAG_OVERLAPPED;
+    }
+    if (firstInstance)
+    {
+        openMode |= FILE_FLAG_FIRST_PIPE_INSTANCE;
+    }
+
+    DWORD maxPendingConnections = options.maxPendingConnections;
+    if (maxPendingConnections == 0)
+    {
+        maxPendingConnections = 1;
+    }
+    if (maxPendingConnections > PIPE_UNLIMITED_INSTANCES)
+    {
+        maxPendingConnections = PIPE_UNLIMITED_INSTANCES;
+    }
+
+    const DWORD pipeMode = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;
+
+    HANDLE handle =
+        ::CreateNamedPipeW(nullTerminatedName, openMode, pipeMode, maxPendingConnections, 65536, 65536, 0, nullptr);
+    SC_TRY_MSG(handle != INVALID_HANDLE_VALUE, "NamedPipeServer::create CreateNamedPipeW failed");
+
+    return pendingConnection.assign(handle);
+}
+} // namespace
+
+SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
+{
+    SC_TRY_MSG(not created, "NamedPipeServer::create already created");
+    SC_TRY_MSG(name.assign(pipeName), "NamedPipeServer::create invalid pipe name");
+
+    const wchar_t* fullName = name.view().getNullTerminatedNative();
+    SC_TRY_MSG(hasWindowsNamedPipePrefix(fullName),
+               "NamedPipeServer::create path must start with \\\\.\\pipe\\ or \\\\?\\pipe\\");
+
+    options       = pipeOptions;
+    firstInstance = true;
+    SC_TRY(createPendingServerInstance(name.view(), options, firstInstance, pendingConnection));
+    firstInstance = false;
+    created       = true;
+    return Result(true);
+}
+
+SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
+{
+    SC_TRY_MSG(created and pendingConnection.isValid(), "NamedPipeServer::accept called before create");
+    HANDLE pendingHandle;
+    SC_TRY(pendingConnection.get(pendingHandle, Result::Error("NamedPipeServer::accept invalid pending handle")));
+
+    if (::ConnectNamedPipe(pendingHandle, nullptr) == FALSE and ::GetLastError() != ERROR_PIPE_CONNECTED)
+    {
+        return Result::Error("NamedPipeServer::accept ConnectNamedPipe failed");
+    }
+
+    PipeDescriptor connected;
+    SC_TRY(duplicateConnectedPipeHandle(pendingHandle, options.connectionOptions, connected));
+
+    SC_TRY(pendingConnection.close());
+    SC_TRY(createPendingServerInstance(name.view(), options, false, pendingConnection));
+
+    outConnection = move(connected);
+    return Result(true);
+}
+
+SC::Result SC::NamedPipeServer::close()
+{
+    if (not created)
+    {
+        return Result(true);
+    }
+    created       = false;
+    firstInstance = true;
+    return pendingConnection.close();
+}
+
+SC::Result SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
+                                        NamedPipeClientOptions options)
+{
+    StringPath nullTerminatedPath;
+    SC_TRY_MSG(nullTerminatedPath.assign(pipeName), "NamedPipeClient::connect invalid pipe name");
+
+    const wchar_t* fullName = nullTerminatedPath.view().getNullTerminatedNative();
+    SC_TRY_MSG(hasWindowsNamedPipePrefix(fullName),
+               "NamedPipeClient::connect path must start with \\\\.\\pipe\\ or \\\\?\\pipe\\");
+
+    const DWORD fileFlags = options.connectionOptions.blocking ? 0 : FILE_FLAG_OVERLAPPED;
+
+    HANDLE clientHandle =
+        ::CreateFileW(fullName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, fileFlags, nullptr);
+    if (clientHandle == INVALID_HANDLE_VALUE and ::GetLastError() == ERROR_PIPE_BUSY)
+    {
+        SC_TRY_MSG(::WaitNamedPipeW(fullName, options.windows.connectTimeoutMilliseconds) != FALSE,
+                   "NamedPipeClient::connect timed out waiting for server");
+        clientHandle =
+            ::CreateFileW(fullName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, fileFlags, nullptr);
+    }
+    SC_TRY_MSG(clientHandle != INVALID_HANDLE_VALUE, "NamedPipeClient::connect CreateFileW failed");
+
+    FileDescriptor connected;
+    SC_TRY(connected.assign(clientHandle));
+
+    HANDLE connectedHandle;
+    SC_TRY(connected.get(connectedHandle, Result::Error("NamedPipeClient::connect invalid handle")));
+    PipeDescriptor duplicated;
+    SC_TRY(duplicateConnectedPipeHandle(connectedHandle, options.connectionOptions, duplicated));
+    outConnection = move(duplicated);
+    return Result(true);
+}
+
+#else
+
+namespace
+{
+using SC::PipeDescriptor;
+using SC::PipeOptions;
+using SC::Result;
+
+static Result setPosixDescriptorInheritable(int descriptor, bool inheritable)
+{
+    int flags;
+    do
+    {
+        flags = ::fcntl(descriptor, F_GETFD);
+    } while (flags == -1 and errno == EINTR);
+    SC_TRY_MSG(flags != -1, "NamedPipe fcntl(F_GETFD) failed");
+
+    const int wantedFlags = inheritable ? (flags & (~FD_CLOEXEC)) : (flags | FD_CLOEXEC);
+    if (wantedFlags != flags)
+    {
+        int res;
+        do
+        {
+            res = ::fcntl(descriptor, F_SETFD, wantedFlags);
+        } while (res == -1 and errno == EINTR);
+        SC_TRY_MSG(res == 0, "NamedPipe fcntl(F_SETFD) failed");
+    }
+    return Result(true);
+}
+
+static Result setPosixDescriptorBlocking(int descriptor, bool blocking)
+{
+    int flags;
+    do
+    {
+        flags = ::fcntl(descriptor, F_GETFL);
+    } while (flags == -1 and errno == EINTR);
+    SC_TRY_MSG(flags != -1, "NamedPipe fcntl(F_GETFL) failed");
+
+    const int wantedFlags = blocking ? (flags & (~O_NONBLOCK)) : (flags | O_NONBLOCK);
+    if (wantedFlags != flags)
+    {
+        int res;
+        do
+        {
+            res = ::fcntl(descriptor, F_SETFL, wantedFlags);
+        } while (res == -1 and errno == EINTR);
+        SC_TRY_MSG(res == 0, "NamedPipe fcntl(F_SETFL) failed");
+    }
+    return Result(true);
+}
+
+static Result duplicateConnectedSocket(int connectedDescriptor, PipeOptions options, PipeDescriptor& outConnection)
+{
+    int readDescriptor;
+    do
+    {
+        readDescriptor = ::dup(connectedDescriptor);
+    } while (readDescriptor == -1 and errno == EINTR);
+    SC_TRY_MSG(readDescriptor != -1, "NamedPipe dup(read) failed");
+
+    int writeDescriptor;
+    do
+    {
+        writeDescriptor = ::dup(connectedDescriptor);
+    } while (writeDescriptor == -1 and errno == EINTR);
+    if (writeDescriptor == -1)
+    {
+        ::close(readDescriptor);
+        return Result::Error("NamedPipe dup(write) failed");
+    }
+
+    PipeDescriptor duplicated;
+    SC_TRY(duplicated.readPipe.assign(readDescriptor));
+    SC_TRY(duplicated.writePipe.assign(writeDescriptor));
+
+    int rawDescriptor = -1;
+    SC_TRY(duplicated.readPipe.get(rawDescriptor, Result::Error("NamedPipe invalid read descriptor")));
+    SC_TRY(setPosixDescriptorInheritable(rawDescriptor, options.readInheritable));
+    SC_TRY(setPosixDescriptorBlocking(rawDescriptor, options.blocking));
+
+    SC_TRY(duplicated.writePipe.get(rawDescriptor, Result::Error("NamedPipe invalid write descriptor")));
+    SC_TRY(setPosixDescriptorInheritable(rawDescriptor, options.writeInheritable));
+    SC_TRY(setPosixDescriptorBlocking(rawDescriptor, options.blocking));
+
+    outConnection = move(duplicated);
+    return Result(true);
+}
+} // namespace
+
+SC::Result SC::NamedPipeServer::create(StringSpan pipeName, NamedPipeServerOptions pipeOptions)
+{
+    SC_TRY_MSG(not created, "NamedPipeServer::create already created");
+    SC_TRY_MSG(pipeName.getEncoding() != StringEncoding::Utf16, "NamedPipeServer::create only ASCII/UTF8 paths");
+    SC_TRY_MSG(name.assign(pipeName), "NamedPipeServer::create invalid pipe name");
+
+    const char* fullPath = name.view().bytesIncludingTerminator();
+    SC_TRY_MSG(fullPath[0] == '/', "NamedPipeServer::create path must be absolute");
+    sockaddr_un sizeCheck;
+    SC_TRY_MSG(::strlen(fullPath) < sizeof(sizeCheck.sun_path), "NamedPipeServer::create path too long");
+
+    options = pipeOptions;
+    if (options.posix.removeEndpointBeforeCreate)
+    {
+        int res;
+        do
+        {
+            res = ::unlink(fullPath);
+        } while (res == -1 and errno == EINTR);
+        SC_TRY_MSG(res == 0 or errno == ENOENT, "NamedPipeServer::create cannot remove previous endpoint");
+    }
+
+    int listeningDescriptor;
+    do
+    {
+        listeningDescriptor = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    } while (listeningDescriptor == -1 and errno == EINTR);
+    SC_TRY_MSG(listeningDescriptor != -1, "NamedPipeServer::create socket failed");
+
+    SC_TRY(listeningSocket.assign(listeningDescriptor));
+
+    sockaddr_un address;
+    ::memset(&address, 0, sizeof(address));
+    address.sun_family = AF_UNIX;
+    ::memcpy(address.sun_path, fullPath, ::strlen(fullPath) + 1);
+
+    int bindResult;
+    do
+    {
+        bindResult = ::bind(listeningDescriptor, reinterpret_cast<const sockaddr*>(&address), sizeof(address));
+    } while (bindResult == -1 and errno == EINTR);
+    SC_TRY_MSG(bindResult == 0, "NamedPipeServer::create bind failed");
+
+    int backlog = static_cast<int>(options.maxPendingConnections);
+    if (backlog <= 0)
+    {
+        backlog = 1;
+    }
+    int listenResult;
+    do
+    {
+        listenResult = ::listen(listeningDescriptor, backlog);
+    } while (listenResult == -1 and errno == EINTR);
+    SC_TRY_MSG(listenResult == 0, "NamedPipeServer::create listen failed");
+
+    created = true;
+    return Result(true);
+}
+
+SC::Result SC::NamedPipeServer::accept(PipeDescriptor& outConnection)
+{
+    SC_TRY_MSG(created and listeningSocket.isValid(), "NamedPipeServer::accept called before create");
+    int listeningDescriptor;
+    SC_TRY(listeningSocket.get(listeningDescriptor, Result::Error("NamedPipeServer::accept invalid listening socket")));
+
+    int acceptedDescriptor;
+    do
+    {
+        acceptedDescriptor = ::accept(listeningDescriptor, nullptr, nullptr);
+    } while (acceptedDescriptor == -1 and errno == EINTR);
+    SC_TRY_MSG(acceptedDescriptor != -1, "NamedPipeServer::accept accept failed");
+
+    FileDescriptor acceptedSocket;
+    SC_TRY(acceptedSocket.assign(acceptedDescriptor));
+
+    int rawAcceptedDescriptor;
+    SC_TRY(acceptedSocket.get(rawAcceptedDescriptor, Result::Error("NamedPipeServer::accept invalid accepted socket")));
+    PipeDescriptor duplicated;
+    SC_TRY(duplicateConnectedSocket(rawAcceptedDescriptor, options.connectionOptions, duplicated));
+    outConnection = move(duplicated);
+    return Result(true);
+}
+
+SC::Result SC::NamedPipeServer::close()
+{
+    if (not created)
+    {
+        return Result(true);
+    }
+    created = false;
+
+    const Result closeResult = listeningSocket.close();
+
+    if (options.posix.removeEndpointOnClose and not name.isEmpty())
+    {
+        int unlinkResult;
+        do
+        {
+            unlinkResult = ::unlink(name.view().bytesIncludingTerminator());
+        } while (unlinkResult == -1 and errno == EINTR);
+        SC_TRY_MSG(unlinkResult == 0 or errno == ENOENT, "NamedPipeServer::close unlink failed");
+    }
+    return closeResult;
+}
+
+SC::Result SC::NamedPipeClient::connect(StringSpan pipeName, PipeDescriptor& outConnection,
+                                        NamedPipeClientOptions options)
+{
+    SC_TRY_MSG(pipeName.getEncoding() != StringEncoding::Utf16, "NamedPipeClient::connect only ASCII/UTF8 paths");
+
+    StringPath nullTerminatedPath;
+    SC_TRY_MSG(nullTerminatedPath.assign(pipeName), "NamedPipeClient::connect invalid pipe name");
+    const char* fullPath = nullTerminatedPath.view().bytesIncludingTerminator();
+    SC_TRY_MSG(fullPath[0] == '/', "NamedPipeClient::connect path must be absolute");
+    sockaddr_un sizeCheck;
+    SC_TRY_MSG(::strlen(fullPath) < sizeof(sizeCheck.sun_path), "NamedPipeClient::connect path too long");
+
+    int socketDescriptor;
+    do
+    {
+        socketDescriptor = ::socket(AF_UNIX, SOCK_STREAM, 0);
+    } while (socketDescriptor == -1 and errno == EINTR);
+    SC_TRY_MSG(socketDescriptor != -1, "NamedPipeClient::connect socket failed");
+
+    FileDescriptor connectedSocket;
+    SC_TRY(connectedSocket.assign(socketDescriptor));
+
+    sockaddr_un address;
+    ::memset(&address, 0, sizeof(address));
+    address.sun_family = AF_UNIX;
+    ::memcpy(address.sun_path, fullPath, ::strlen(fullPath) + 1);
+
+    int connectResult;
+    do
+    {
+        connectResult = ::connect(socketDescriptor, reinterpret_cast<const sockaddr*>(&address), sizeof(address));
+    } while (connectResult == -1 and errno == EINTR);
+    SC_TRY_MSG(connectResult == 0, "NamedPipeClient::connect connect failed");
+
+    int rawConnectedDescriptor;
+    SC_TRY(connectedSocket.get(rawConnectedDescriptor, Result::Error("NamedPipeClient::connect invalid socket")));
+
+    PipeDescriptor duplicated;
+    SC_TRY(duplicateConnectedSocket(rawConnectedDescriptor, options.connectionOptions, duplicated));
+    outConnection = move(duplicated);
+    return Result(true);
+}
+
+#endif

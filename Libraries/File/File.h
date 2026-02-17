@@ -4,6 +4,7 @@
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
+#include "../Foundation/StringPath.h"
 #include "../Foundation/StringSpan.h"
 #include "../Foundation/UniqueHandle.h"
 
@@ -229,6 +230,90 @@ struct SC_COMPILER_EXPORT PipeDescriptor
     /// @brief Closes the pipe
     /// @return Valid Result if pipe destruction succeeded
     Result close();
+};
+
+struct SC_COMPILER_EXPORT NamedPipeNameOptions
+{
+    StringSpan posixDirectory = "/tmp"; ///< Posix only. Must be an absolute directory path.
+};
+
+/// @brief Utility for building platform-native named pipe endpoint names from logical names.
+struct SC_COMPILER_EXPORT NamedPipeName
+{
+    /// @brief Builds a platform-native named pipe endpoint path.
+    /// @param logicalName A logical pipe name token (must not contain `/` or `\`).
+    /// @param outName Destination receiving native endpoint path.
+    /// @param options Optional path generation options.
+    /// @return Valid Result on success.
+    static Result build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options = {});
+};
+
+struct SC_COMPILER_EXPORT NamedPipeServerOptions
+{
+    PipeOptions connectionOptions     = {}; ///< Accepted connection options (blocking + inheritability)
+    uint32_t    maxPendingConnections = 16; ///< Max number of pending connections to queue
+
+    struct Posix
+    {
+        bool removeEndpointOnClose      = true;  ///< Remove the named pipe endpoint when the server is closed
+        bool removeEndpointBeforeCreate = false; ///< Remove the named pipe endpoint before creating a new one
+    } posix;
+};
+
+struct SC_COMPILER_EXPORT NamedPipeClientOptions
+{
+    PipeOptions connectionOptions = {}; ///< Connection options (blocking + inheritability)
+    struct Windows
+    {
+        uint32_t connectTimeoutMilliseconds = 0xffffffff; ///< Client connection timeout in ms. (default: no timeout)
+    } windows;
+};
+
+/// @brief Named pipe server endpoint. Use create + accept to obtain connected PipeDescriptor pairs.
+/// @note See @ref SC::NamedPipeClient for client-side connection.
+/// @note Example:
+/// \snippet Tests/Libraries/File/FileTest.cpp NamedPipeServerSnippet
+struct SC_COMPILER_EXPORT NamedPipeServer
+{
+    /// @brief Creates a named pipe server endpoint.
+    /// @param name Platform-native absolute endpoint name.
+    ///             Use filesystem absolute paths on POSIX and `\\.\pipe\...` or `\\?\pipe\...` on Windows.
+    ///             See SC::NamedPipeName::build for a cross-platform helper.
+    /// @param options Server creation options.
+    /// @return Valid Result if create succeeds.
+    Result create(StringSpan name, NamedPipeServerOptions options = {});
+    /// @brief Accept one client connection and return it as a connected PipeDescriptor.
+    /// @param[out] outConnection Connected read/write pipe handles.
+    /// @return Valid Result on success.
+    Result accept(PipeDescriptor& outConnection);
+    /// @brief Closes the listening endpoint.
+    /// @note Safe to call multiple times.
+    /// @return Valid Result on success.
+    Result close();
+
+  private:
+    NamedPipeServerOptions options;
+    StringPath             name;
+#if SC_PLATFORM_WINDOWS
+    FileDescriptor pendingConnection;
+    bool           firstInstance = true;
+#else
+    FileDescriptor listeningSocket;
+#endif
+    bool created = false;
+};
+
+/// @brief Named pipe client endpoint creator.
+struct SC_COMPILER_EXPORT NamedPipeClient
+{
+    /// @brief Connects to an existing named pipe server endpoint.
+    /// @param name Platform-native absolute endpoint name.
+    ///             Use filesystem absolute paths on POSIX and `\\.\pipe\...` or `\\?\pipe\...` on Windows.
+    ///             See SC::NamedPipeName::build for a cross-platform helper.
+    /// @param[out] outConnection Connected read/write pipe handles.
+    /// @param options Client connection options.
+    /// @return Valid Result on success.
+    static Result connect(StringSpan name, PipeDescriptor& outConnection, NamedPipeClientOptions options = {});
 };
 //! @}
 } // namespace SC
