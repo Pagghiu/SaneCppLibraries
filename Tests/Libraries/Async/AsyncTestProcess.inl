@@ -1,7 +1,20 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncTest.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
+#include "Libraries/Strings/StringBuilder.h"
+
+namespace
+{
+static bool formatNamedPipePath(SC::TestReport& report, bool useThreadPool, SC::StringPath& pipePath)
+{
+    SC::SmallString<128> logicalName;
+    return SC::StringBuilder::format(logicalName, "sc-async-test-{}-{}", report.mapPort(5400),
+                                     useThreadPool ? 1 : 0) and
+           SC::NamedPipeName::build(logicalName.view(), pipePath);
+}
+} // namespace
 
 void SC::AsyncTest::processExit()
 {
@@ -56,7 +69,7 @@ void SC::AsyncTest::processInputOutput(bool useThreadPool)
     ThreadPool threadPool;
     if (useThreadPool)
     {
-        SC_TEST_EXPECT(threadPool.create(1));
+        SC_TEST_EXPECT(threadPool.create(2));
     }
     PipeDescriptor processStdOut;
     PipeOptions    pipeOptions;
@@ -112,4 +125,124 @@ void SC::AsyncTest::processInputOutputChild()
         Thread::Sleep(1); // just to simulate some delay
     }
     Thread::Sleep(10); // wait before closing
+}
+
+void SC::AsyncTest::namedPipeInputOutput(bool useThreadPool)
+{
+    ThreadPool threadPool;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+
+    StringPath pipePath;
+    SC_TEST_EXPECT(formatNamedPipePath(report, useThreadPool, pipePath));
+
+    NamedPipeServer        server;
+    NamedPipeServerOptions serverOptions;
+    serverOptions.connectionOptions.blocking       = false;
+    serverOptions.posix.removeEndpointBeforeCreate = true;
+    SC_TEST_EXPECT(server.create(pipePath.view(), serverOptions));
+
+    PipeDescriptor serverConnection;
+    EventObject    acceptedEvent;
+    Result         acceptResult = Result::Error("NamedPipe accept not completed");
+
+    struct AcceptContext
+    {
+        NamedPipeServer* server;
+        PipeDescriptor*  connection;
+        Result*          result;
+        EventObject*     event;
+    } acceptContext = {&server, &serverConnection, &acceptResult, &acceptedEvent};
+
+    Thread acceptThread;
+    SC_TEST_EXPECT(acceptThread.start(
+        [&acceptContext](Thread&)
+        {
+            *acceptContext.result = acceptContext.server->accept(*acceptContext.connection);
+            acceptContext.event->signal();
+        }));
+
+    NamedPipeClientOptions clientOptions;
+    clientOptions.connectionOptions.blocking = false;
+
+    PipeDescriptor clientConnection;
+    SC_TEST_EXPECT(NamedPipeClient::connect(pipePath.view(), clientConnection, clientOptions));
+
+    acceptedEvent.wait();
+    SC_TEST_EXPECT(acceptThread.join());
+    SC_TEST_EXPECT(acceptResult);
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(serverConnection.readPipe));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(clientConnection.writePipe));
+    }
+
+    SC_TEST_EXPECT(serverConnection.writePipe.close());
+    SC_TEST_EXPECT(clientConnection.readPipe.close());
+
+    AsyncFileRead  asyncRead;
+    AsyncFileWrite asyncWrite;
+
+    AsyncTaskSequence writeTask;
+    if (useThreadPool)
+    {
+        SC_TEST_EXPECT(asyncWrite.executeOn(writeTask, threadPool));
+    }
+
+    SC_TEST_EXPECT(serverConnection.readPipe.get(asyncRead.handle, Result::Error("server read handle")));
+    SC_TEST_EXPECT(clientConnection.writePipe.get(asyncWrite.handle, Result::Error("client write handle")));
+
+    char readBuffer[4];
+    asyncRead.buffer = {readBuffer, sizeof(readBuffer)};
+
+    struct IOContext
+    {
+        int  numChunks     = 0;
+        bool writeFinished = false;
+    } ioContext = {0, false};
+
+    asyncRead.callback = [this, &ioContext](AsyncFileRead::Result& res)
+    {
+        Span<char> data;
+        SC_TEST_EXPECT(res.get(data));
+        if (res.completionData.endOfFile)
+        {
+            return;
+        }
+        StringSpan span(data, false, StringEncoding::Ascii);
+        SC_TEST_EXPECT(span == "asdf");
+        ioContext.numChunks++;
+        if (ioContext.numChunks < 4)
+        {
+            res.reactivateRequest(true);
+        }
+    };
+
+    constexpr char payload[] = "asdfasdfasdfasdf";
+    asyncWrite.buffer        = {payload, sizeof(payload) - 1};
+    asyncWrite.callback      = [this, &ioContext](AsyncFileWrite::Result& res)
+    {
+        size_t writtenSize = 0;
+        SC_TEST_EXPECT(res.get(writtenSize));
+        SC_TEST_EXPECT(writtenSize == (sizeof(payload) - 1));
+        ioContext.writeFinished = true;
+    };
+
+    SC_TEST_EXPECT(asyncRead.start(eventLoop));
+    SC_TEST_EXPECT(asyncWrite.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.run());
+
+    SC_TEST_EXPECT(clientConnection.writePipe.close());
+    SC_TEST_EXPECT(ioContext.writeFinished);
+    SC_TEST_EXPECT(ioContext.numChunks == 4);
+
+    SC_TEST_EXPECT(serverConnection.readPipe.close());
+    SC_TEST_EXPECT(serverConnection.writePipe.close());
+    SC_TEST_EXPECT(clientConnection.readPipe.close());
+    SC_TEST_EXPECT(server.close());
 }

@@ -172,6 +172,7 @@ It currently tries to dynamically load `io_uring` on Linux doing an `epoll` back
 There is not need to link `liburing` because the library loads it dynamically and embeds the minimal set of `static` `inline` functions needed to interface with it.
 
 The api works on file and socket descriptors, that can be obtained from the [File](@ref library_file) and [Socket](@ref library_socket) libraries.
+This includes named pipe endpoints accepted/connected through SC::NamedPipeServer and SC::NamedPipeClient, exposed as SC::PipeDescriptor.
 
 ## Memory allocation
 The entire library is free of allocations, as it uses a double linked list inside SC::AsyncRequest.  
