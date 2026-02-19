@@ -51,6 +51,9 @@ Such event can be used to resume the readable streams that may have been paused.
 AsyncPipeline doesn't use the `drain` event but it just resumes readable streams after every successful write.
 This works because the Readable will pause when running out of buffers, allowing them to resume when a new one is made available.
 
+ReadableFileStream and WritableFileStream now also support initialization directly from SC::PipeDescriptor (in addition to SC::FileDescriptor).
+This makes named pipes (see [File](@ref library_file)) compose directly with Async Streams without manual extraction of `readPipe` / `writePipe`.
+
 ## Memory allocation
 Async streams do not allocate any memory, but use caller provided buffers for handling data and request queues.
 

@@ -76,12 +76,14 @@ struct SC_COMPILER_EXPORT AsyncRequestWritableStream : public AsyncWritableStrea
 struct SC_COMPILER_EXPORT ReadableFileStream : public AsyncRequestReadableStream<AsyncFileRead>
 {
     Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const FileDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const PipeDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
 struct SC_COMPILER_EXPORT WritableFileStream : public AsyncRequestWritableStream<AsyncFileWrite>
 {
     Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const FileDescriptor& descriptor);
+    Result init(AsyncBuffersPool& buffersPool, AsyncEventLoop& eventLoop, const PipeDescriptor& descriptor);
 };
 
 /// @brief Uses an SC::AsyncFileWrite to stream data from a socket

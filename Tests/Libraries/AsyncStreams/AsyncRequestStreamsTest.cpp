@@ -12,7 +12,9 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Threading.h"
 
 namespace SC
 {
@@ -97,6 +99,32 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
                                                                                                     readable, blocking);
             }
 
+            if (test_section("file to named pipe to file (async)"))
+            {
+                constexpr bool blocking = false;
+                AsyncEventLoop eventLoop;
+                SC_TEST_EXPECT(eventLoop.create(options));
+
+                FileDescriptor writable, readable;
+                createAsyncConnectedNamedPipes(eventLoop, writable, readable, blocking);
+
+                fileCompressRemote<ReadableFileStream, WritableFileStream, AsyncZLibTransformStream>(
+                    eventLoop, writable, readable, blocking);
+            }
+
+            if (test_section("file to named pipe to file (sync)"))
+            {
+                constexpr bool blocking = true;
+                AsyncEventLoop eventLoop;
+                SC_TEST_EXPECT(eventLoop.create(options));
+
+                FileDescriptor writable, readable;
+                createAsyncConnectedNamedPipes(eventLoop, writable, readable, blocking);
+
+                fileCompressRemote<ReadableFileStream, WritableFileStream, SyncZLibTransformStream>(eventLoop, writable,
+                                                                                                    readable, blocking);
+            }
+
             if (numTestsToRun == 2)
             {
                 // If on Linux next run will test io_uring backend (if it's installed)
@@ -109,6 +137,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
                                      SocketDescriptor& readSide);
     void createAsyncConnectedPipes(AsyncEventLoop& eventLoop, FileDescriptor& writeSide, FileDescriptor& readSide,
                                    bool blocking);
+    void createAsyncConnectedNamedPipes(AsyncEventLoop& eventLoop, FileDescriptor& writeSide, FileDescriptor& readSide,
+                                        bool blocking);
 
     void fileToFile();
 
@@ -166,6 +196,63 @@ void SC::AsyncRequestStreamsTest::createAsyncConnectedPipes(AsyncEventLoop& even
     }
     writeSide = move(pipe.writePipe);
     readSide  = move(pipe.readPipe);
+}
+
+void SC::AsyncRequestStreamsTest::createAsyncConnectedNamedPipes(AsyncEventLoop& eventLoop, FileDescriptor& writeSide,
+                                                                 FileDescriptor& readSide, bool blocking)
+{
+    SmallString<128> logicalName;
+    SC_TEST_EXPECT(StringBuilder::format(logicalName, "sc-stream-test-{}-{}", report.mapPort(5410), blocking ? 1 : 0));
+    StringPath pipePath;
+    SC_TEST_EXPECT(NamedPipeName::build(logicalName.view(), pipePath));
+
+    NamedPipeServer        server;
+    NamedPipeServerOptions serverOptions;
+    serverOptions.connectionOptions.blocking       = blocking;
+    serverOptions.posix.removeEndpointBeforeCreate = true;
+    SC_TEST_EXPECT(server.create(pipePath.view(), serverOptions));
+
+    PipeDescriptor acceptedConnection;
+    EventObject    acceptedEvent;
+    Result         acceptResult = Result::Error("NamedPipe accept failed");
+
+    struct AcceptContext
+    {
+        NamedPipeServer* server;
+        PipeDescriptor*  connection;
+        Result*          result;
+        EventObject*     event;
+    } acceptContext = {&server, &acceptedConnection, &acceptResult, &acceptedEvent};
+
+    Thread acceptThread;
+    SC_TEST_EXPECT(acceptThread.start(
+        [&acceptContext](Thread&)
+        {
+            *acceptContext.result = acceptContext.server->accept(*acceptContext.connection);
+            acceptContext.event->signal();
+        }));
+
+    PipeDescriptor         clientConnection;
+    NamedPipeClientOptions clientOptions;
+    clientOptions.connectionOptions.blocking = blocking;
+    SC_TEST_EXPECT(NamedPipeClient::connect(pipePath.view(), clientConnection, clientOptions));
+
+    acceptedEvent.wait();
+    SC_TEST_EXPECT(acceptThread.join());
+    SC_TEST_EXPECT(acceptResult);
+    SC_TEST_EXPECT(server.close());
+
+    SC_TEST_EXPECT(clientConnection.readPipe.close());
+    SC_TEST_EXPECT(acceptedConnection.writePipe.close());
+
+    if (not blocking)
+    {
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(clientConnection.writePipe));
+        SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(acceptedConnection.readPipe));
+    }
+
+    writeSide = move(clientConnection.writePipe);
+    readSide  = move(acceptedConnection.readPipe);
 }
 
 void SC::AsyncRequestStreamsTest::fileToFile()

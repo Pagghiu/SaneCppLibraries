@@ -286,9 +286,17 @@ Result ReadableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& l
 {
     return Internal::init(*this, buffersPool, loop, descriptor);
 }
+Result ReadableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop, const PipeDescriptor& descriptor)
+{
+    return Internal::init(*this, buffersPool, loop, descriptor.readPipe);
+}
 Result WritableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop, const FileDescriptor& descriptor)
 {
     return Internal::init(*this, buffersPool, loop, descriptor);
+}
+Result WritableFileStream::init(AsyncBuffersPool& buffersPool, AsyncEventLoop& loop, const PipeDescriptor& descriptor)
+{
+    return Internal::init(*this, buffersPool, loop, descriptor.writePipe);
 }
 
 } // namespace SC
