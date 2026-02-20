@@ -34,6 +34,7 @@ void runGlobalsContainerTest(TestReport& report);
 
 // File
 void runFileTest(TestReport& report);
+void runSerialPortTest(TestReport& report);
 
 // FileSystem
 void runFileSystemTest(TestReport& report);
@@ -175,6 +176,7 @@ int main(int argc, const char* argv[])
 
     // File tests
     runFileTest(report);
+    runSerialPortTest(report);
 
     // FileSystem tests
     runFileSystemTest(report);

@@ -20,6 +20,7 @@ Library                                     | Description                       
 @subpage library_plugin                     | @copybrief library_plugin                     |   1841
 @subpage library_process                    | @copybrief library_process                    |   1338
 @subpage library_reflection                 | @copybrief library_reflection                 |   601
+@subpage library_serial_port                | @copybrief library_serial_port                |   0
 @subpage library_serialization_binary       | @copybrief library_serialization_binary       |   552
 @subpage library_serialization_text         | @copybrief library_serialization_text         |   628
 @subpage library_socket                     | @copybrief library_socket                     |   729

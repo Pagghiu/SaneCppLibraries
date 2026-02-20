@@ -20,6 +20,7 @@
 #include "Libraries/Memory/Memory.cpp"
 #include "Libraries/Plugin/Plugin.cpp"
 #include "Libraries/Process/Process.cpp"
+#include "Libraries/SerialPort/SerialPort.cpp"
 #include "Libraries/SerializationText/SerializationJson.cpp"
 #include "Libraries/Socket/Socket.cpp"
 #include "Libraries/Strings/Strings.cpp"

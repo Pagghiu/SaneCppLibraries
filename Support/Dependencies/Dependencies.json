@@ -219,6 +219,19 @@
             "Foundation"
         ]
     },
+    "SerialPort": {
+        "direct_dependencies": [
+            "File",
+            "Foundation"
+        ],
+        "minimal_dependencies": [
+            "File"
+        ],
+        "all_dependencies": [
+            "File",
+            "Foundation"
+        ]
+    },
     "SerializationBinary": {
         "direct_dependencies": [
             "Foundation",
