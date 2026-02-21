@@ -704,6 +704,9 @@ struct SC_COMPILER_EXPORT AsyncFileRead : public AsyncRequest
     };
     using AsyncRequest::start;
 
+    /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<char> data);
+
     Function<void(Result&)> callback; /// Callback called when some data has been read from the file into the buffer
     Span<char>              buffer;   /// The writeable span of memory where to data will be written
     FileDescriptor::Handle  handle;   /// The file/pipe descriptor handle to read data from.
@@ -774,7 +777,13 @@ struct SC_COMPILER_EXPORT AsyncFileWrite : public AsyncRequest
     using AsyncRequest::start;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<Span<const char>> data);
+
+    /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, Span<Span<const char>> data);
+
+    /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<const char> data);
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
     SC::Result start(AsyncEventLoop& eventLoop, Span<const char> data);

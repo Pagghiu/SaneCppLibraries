@@ -382,11 +382,31 @@ SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
     return SC::Result(true);
 }
 
+SC::Result SC::AsyncFileRead::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<char> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    buffer = data;
+    return eventLoop.start(*this);
+}
+
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor,
+                                     Span<Span<const char>> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    return start(eventLoop, data);
+}
+
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, Span<Span<const char>> data)
 {
     buffers      = data;
     singleBuffer = false;
     return eventLoop.start(*this);
+}
+
+SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, const FileDescriptor& descriptor, Span<const char> data)
+{
+    SC_TRY(descriptor.get(handle, SC::Result::Error("Invalid handle")));
+    return start(eventLoop, data);
 }
 
 SC::Result SC::AsyncFileWrite::start(AsyncEventLoop& eventLoop, Span<const char> data)

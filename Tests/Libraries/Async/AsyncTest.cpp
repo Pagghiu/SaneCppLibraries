@@ -10,6 +10,7 @@
 #include "AsyncTestLoopWakeUp.inl"
 #include "AsyncTestLoopWork.inl"
 #include "AsyncTestProcess.inl"
+#include "AsyncTestSerialPort.inl"
 #include "AsyncTestSocketTCP.inl"
 #include "AsyncTestSocketUDP.inl"
 
@@ -131,6 +132,18 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             fileSend(false); // do not use thread-pool
             fileSend(true);  // use thread-pool
+        }
+        if (test_section("serial read/write"))
+        {
+            serialReadWrite();
+        }
+        if (test_section("serial stop"))
+        {
+            serialStop();
+        }
+        if (test_section("serial sequence ordering"))
+        {
+            serialSequenceOrdering();
         }
         fileSystemOperations();
         if (numTestsToRun == 2)

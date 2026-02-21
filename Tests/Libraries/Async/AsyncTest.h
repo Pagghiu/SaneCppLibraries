@@ -45,6 +45,9 @@ struct SC::AsyncTest : public SC::TestCase
     void fileWriteMultiple(bool useThreadPool);
     void fileSend(bool useThreadPool);
     void fileClose();
+    void serialReadWrite();
+    void serialStop();
+    void serialSequenceOrdering();
 
     struct FileSendContext;
 
