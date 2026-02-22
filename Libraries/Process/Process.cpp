@@ -274,7 +274,7 @@ SC::Result SC::Process::setEnvironment(StringSpan name, StringSpan value)
 // ProcessEnvironment
 //-------------------------------------------------------------------------------------------------------
 
-bool SC::ProcessEnvironment::contains(StringSpan variableName, size_t* index)
+bool SC::ProcessEnvironment::contains(StringSpan variableName, size_t* index) const
 {
     for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
     {
@@ -286,6 +286,21 @@ bool SC::ProcessEnvironment::contains(StringSpan variableName, size_t* index)
             {
                 *index = idx;
             }
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SC::ProcessEnvironment::get(StringSpan variableName, StringSpan& value) const
+{
+    for (size_t idx = 0; idx < numberOfEnvironment; ++idx)
+    {
+        StringSpan name, variableValue;
+        SC_TRY(get(idx, name, variableValue));
+        if (name == variableName)
+        {
+            value = variableValue;
             return true;
         }
     }

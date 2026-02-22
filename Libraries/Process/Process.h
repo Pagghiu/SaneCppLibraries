@@ -398,7 +398,13 @@ struct ProcessEnvironment
     /// @param variableName Name of the variable to check
     /// @param index Optional pointer to a variable that will receive the index of the variable (only if found)
     /// @returns true if variableName has been found in list of the variable
-    [[nodiscard]] bool contains(StringSpan variableName, size_t* index = nullptr);
+    [[nodiscard]] bool contains(StringSpan variableName, size_t* index = nullptr) const;
+
+    /// @brief Gets the value of an environment variable from current process
+    /// @param variableName Name of the variable to retrieve
+    /// @param value Value of the variable when found
+    /// @returns true if variableName has been found
+    [[nodiscard]] bool get(StringSpan variableName, StringSpan& value) const;
 
   private:
     size_t numberOfEnvironment = 0;
