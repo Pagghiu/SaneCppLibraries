@@ -48,6 +48,7 @@ struct SC::AsyncTest : public SC::TestCase
     void serialReadWrite();
     void serialStop();
     void serialSequenceOrdering();
+    void serialCom0ComReadWrite();
 
     struct FileSendContext;
 

@@ -5,15 +5,13 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Foundation/StringPath.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Process/Process.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
 
 #include <string.h>
 
-#if SC_PLATFORM_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#else
+#if !SC_PLATFORM_WINDOWS
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -27,7 +25,6 @@ struct SerialPortTest;
 
 namespace
 {
-#if !SC_PLATFORM_WINDOWS
 static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<char> destination)
 {
     size_t totalRead = 0;
@@ -41,6 +38,114 @@ static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<c
     return SC::Result(true);
 }
 
+#if SC_PLATFORM_WINDOWS
+struct WindowsCom0ComPorts
+{
+    enum class Status
+    {
+        NotConfigured,
+        ConfiguredAndReady,
+        ConfiguredButInvalid
+    };
+
+    Status              status  = Status::NotConfigured;
+    const char*         message = nullptr;
+    SC::SmallString<32> portA;
+    SC::SmallString<32> portB;
+
+    WindowsCom0ComPorts() : portA(SC::StringEncoding::Ascii), portB(SC::StringEncoding::Ascii) {}
+};
+
+static bool isComPortPath(SC::StringSpan path)
+{
+    SC::SmallString<32> asciiPath(SC::StringEncoding::Ascii);
+    if (not asciiPath.assign(path))
+    {
+        return false;
+    }
+    SC::StringSpan asciiView = asciiPath.view();
+    const char*    parsed    = asciiView.bytesWithoutTerminator();
+    size_t         length    = asciiView.sizeInBytes();
+
+    if (length == 0)
+    {
+        return false;
+    }
+
+    if (length >= 4 and parsed[0] == '\\' and parsed[1] == '\\' and parsed[2] == '.' and parsed[3] == '\\')
+    {
+        parsed += 4;
+        length -= 4;
+    }
+
+    if (length < 4 or not((parsed[0] == 'C' or parsed[0] == 'c') and (parsed[1] == 'O' or parsed[1] == 'o') and
+                          (parsed[2] == 'M' or parsed[2] == 'm')))
+    {
+        return false;
+    }
+    parsed += 3;
+    length -= 3;
+    if (length == 0)
+    {
+        return false;
+    }
+
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        const char c = parsed[idx];
+        if (c < '0' or c > '9')
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static WindowsCom0ComPorts resolveWindowsCom0ComPorts()
+{
+    WindowsCom0ComPorts    ports;
+    SC::ProcessEnvironment environment;
+    SC::StringSpan         portAEnv;
+    SC::StringSpan         portBEnv;
+    const bool             hasPortA = environment.get("SC_TEST_COM0COM_PORT_A", portAEnv) and not portAEnv.isEmpty();
+    const bool             hasPortB = environment.get("SC_TEST_COM0COM_PORT_B", portBEnv) and not portBEnv.isEmpty();
+
+    if (not hasPortA and not hasPortB)
+    {
+        ports.status = WindowsCom0ComPorts::Status::NotConfigured;
+        ports.message =
+            "SerialPortTest - Skipping real COM loopback: set SC_TEST_COM0COM_PORT_A and SC_TEST_COM0COM_PORT_B";
+        return ports;
+    }
+
+    if (hasPortA != hasPortB)
+    {
+        ports.status  = WindowsCom0ComPorts::Status::ConfiguredButInvalid;
+        ports.message = "SerialPortTest - Both SC_TEST_COM0COM_PORT_A and SC_TEST_COM0COM_PORT_B must be set";
+        return ports;
+    }
+
+    if (not isComPortPath(portAEnv) or not isComPortPath(portBEnv))
+    {
+        ports.status  = WindowsCom0ComPorts::Status::ConfiguredButInvalid;
+        ports.message = "SerialPortTest - COM ports must be COMx or \\\\.\\COMx";
+        return ports;
+    }
+
+    if (not ports.portA.assign(portAEnv) or not ports.portB.assign(portBEnv))
+    {
+        ports.status  = WindowsCom0ComPorts::Status::ConfiguredButInvalid;
+        ports.message = "SerialPortTest - Invalid COM port path length";
+        return ports;
+    }
+
+    ports.status  = WindowsCom0ComPorts::Status::ConfiguredAndReady;
+    ports.message = "SerialPortTest - Running real COM loopback";
+    return ports;
+}
+#endif
+
+#if !SC_PLATFORM_WINDOWS
 struct PosixPTYPair
 {
     SC::FileDescriptor master;
@@ -95,6 +200,11 @@ struct SC::SerialPortTest : public SC::TestCase
         {
             posixPTYOpenConfigureReadback();
         }
+#else
+        if (test_section("windows com0com open/config/readback"))
+        {
+            windowsCom0ComOpenConfigureReadback();
+        }
 #endif
     }
 
@@ -102,6 +212,8 @@ struct SC::SerialPortTest : public SC::TestCase
     void nonSerialHandleContract();
 #if !SC_PLATFORM_WINDOWS
     void posixPTYOpenConfigureReadback();
+#else
+    void windowsCom0ComOpenConfigureReadback();
 #endif
 };
 
@@ -221,6 +333,60 @@ void SC::SerialPortTest::posixPTYOpenConfigureReadback()
     char receivedByPeer[4] = {0};
     SC_TEST_EXPECT(readExactDescriptor(pair.master, {receivedByPeer, sizeof(receivedByPeer)}));
     SC_TEST_EXPECT(::memcmp(receivedByPeer, fromSerial, sizeof(fromSerial)) == 0);
+}
+#else
+void SC::SerialPortTest::windowsCom0ComOpenConfigureReadback()
+{
+    const WindowsCom0ComPorts ports   = resolveWindowsCom0ComPorts();
+    const StringSpan          message = StringSpan::fromNullTerminated(ports.message, StringEncoding::Ascii);
+    switch (ports.status)
+    {
+    case WindowsCom0ComPorts::Status::NotConfigured: report.console.printLine(message); return;
+    case WindowsCom0ComPorts::Status::ConfiguredButInvalid:
+        SC_TEST_EXPECT(recordExpectation("windows com0com configuration", false, message));
+        return;
+    case WindowsCom0ComPorts::Status::ConfiguredAndReady: break;
+    }
+    report.console.printLine(message);
+
+    SerialOpenOptions options;
+    options.blocking             = true;
+    options.settings.baudRate    = 115200;
+    options.settings.dataBits    = SerialSettings::DataBits::Bits8;
+    options.settings.parity      = SerialSettings::Parity::None;
+    options.settings.stopBits    = SerialSettings::StopBits::One;
+    options.settings.flowControl = SerialSettings::FlowControl::None;
+
+    SerialDescriptor serialA;
+    SerialDescriptor serialB;
+    SC_TEST_EXPECT(serialA.open(ports.portA.view(), options));
+    SC_TEST_EXPECT(serialB.open(ports.portB.view(), options));
+
+    SerialSettings readback;
+    SC_TEST_EXPECT(serialA.getSettings(readback));
+    SC_TEST_EXPECT(readback.baudRate == options.settings.baudRate);
+    SC_TEST_EXPECT(readback.dataBits == options.settings.dataBits);
+    SC_TEST_EXPECT(readback.parity == options.settings.parity);
+    SC_TEST_EXPECT(readback.stopBits == options.settings.stopBits);
+    SC_TEST_EXPECT(readback.flowControl == options.settings.flowControl);
+
+    SerialSettings updated = options.settings;
+    updated.baudRate       = 57600;
+    SC_TEST_EXPECT(serialA.setSettings(updated));
+    SC_TEST_EXPECT(serialA.getSettings(readback));
+    SC_TEST_EXPECT(readback.baudRate == updated.baudRate);
+
+    const char fromA[] = {'P', 'I', 'N', 'G'};
+    SC_TEST_EXPECT(serialA.write({fromA, sizeof(fromA)}));
+    char receivedByB[4] = {};
+    SC_TEST_EXPECT(readExactDescriptor(serialB, {receivedByB, sizeof(receivedByB)}));
+    SC_TEST_EXPECT(::memcmp(receivedByB, fromA, sizeof(fromA)) == 0);
+
+    const char fromB[] = {'P', 'O', 'N', 'G'};
+    SC_TEST_EXPECT(serialB.write({fromB, sizeof(fromB)}));
+    char receivedByA[4] = {};
+    SC_TEST_EXPECT(readExactDescriptor(serialA, {receivedByA, sizeof(receivedByA)}));
+    SC_TEST_EXPECT(::memcmp(receivedByA, fromB, sizeof(fromB)) == 0);
 }
 #endif
 

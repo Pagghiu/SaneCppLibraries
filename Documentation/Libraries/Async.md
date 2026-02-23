@@ -176,6 +176,10 @@ It also works with serial descriptors from [SerialPort](@ref library_serial_port
 and [AsyncFileWrite](@ref SC::AsyncFileWrite) on an opened SC::SerialDescriptor.
 Pipe endpoints accepted/connected through SC::NamedPipeServer and SC::NamedPipeClient, exposed as SC::PipeDescriptor are also supported.
 
+On Windows, `AsyncTest` includes an optional real COM section named `serial com0com read/write`.
+Set `SC_TEST_COM0COM_PORT_A` and `SC_TEST_COM0COM_PORT_B` (values can be `COMx` or `\\.\COMx`) to enable it.
+When variables are unset, this section prints a skip message and succeeds.
+
 ## Memory allocation
 The entire library is free of allocations, as it uses a double linked list inside SC::AsyncRequest.  
 Caller is responsible for keeping AsyncRequest-derived objects memory stable until async callback is called.  

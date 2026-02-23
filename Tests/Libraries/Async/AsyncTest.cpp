@@ -145,6 +145,12 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             serialSequenceOrdering();
         }
+#if SC_PLATFORM_WINDOWS
+        if (test_section("serial com0com read/write"))
+        {
+            serialCom0ComReadWrite();
+        }
+#endif
         fileSystemOperations();
         if (numTestsToRun == 2)
         {

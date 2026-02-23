@@ -31,6 +31,17 @@ The v1 scope focuses on byte-stream descriptors and core serial settings.
 # Example
 @snippet Tests/Libraries/SerialPort/SerialPortTest.cpp SerialDescriptorSnippet
 
+# Optional Windows Real COM Test (com0com)
+`SerialPortTest` includes an optional section named `windows com0com open/config/readback`.
+
+- Set `SC_TEST_COM0COM_PORT_A` and `SC_TEST_COM0COM_PORT_B` to enable it.
+- Accepted values are both `COMx` and `\\.\COMx`.
+- If both variables are unset, the section prints a skip message and succeeds.
+- If only one variable is set (or values are malformed), the section fails with a configuration error.
+
+Example command:
+`SC.bat build run SCTest Debug vs2022 -- --test "SerialPortTest" --test-section "windows com0com open/config/readback"`
+
 # Roadmap
 
 🟩 Usable
