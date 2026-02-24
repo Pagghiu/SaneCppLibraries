@@ -706,30 +706,48 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 #else
 SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 {
-    int pipes[2];
-    // TODO: Use pipe2 to set cloexec flags immediately
-    int res;
+    int  pipes[2];
+    int  res                     = -1;
+    bool usedPipeCreationFlags   = false;
+    bool usedNonBlockingAtCreate = false;
+#if SC_PLATFORM_LINUX
+    int pipeFlags = O_CLOEXEC;
+    if (options.blocking == false)
+    {
+        pipeFlags |= O_NONBLOCK;
+    }
     do
     {
-        res = ::pipe(pipes);
+        res = ::pipe2(pipes, pipeFlags);
     } while (res == -1 and errno == EINTR);
+    if (res == 0)
+    {
+        usedPipeCreationFlags   = true;
+        usedNonBlockingAtCreate = options.blocking == false;
+    }
+    else if (errno != ENOSYS and errno != EINVAL)
+    {
+        return Result::Error("PipeDescriptor::createPipe - pipe2 failed");
+    }
+#endif
+    if (not usedPipeCreationFlags)
+    {
+        do
+        {
+            res = ::pipe(pipes);
+        } while (res == -1 and errno == EINTR);
+    }
 
     SC_TRY_MSG(res == 0, "PipeDescriptor::createPipe - pipe failed");
     SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe");
     SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
-    // On Posix by default descriptors are inheritable
-    // https://devblogs.microsoft.com/oldnewthing/20111216-00/?p=8873
-    if (options.readInheritable == false)
-    {
-        const Result pipeRes1 = FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[0], true);
-        SC_TRY_MSG(pipeRes1, "Cannot set close on exec on read pipe");
-    }
-    if (options.writeInheritable == false)
-    {
-        const Result pipeRes2 = FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[1], true);
-        SC_TRY_MSG(pipeRes2, "Cannot set close on exec on write pipe");
-    }
-    if (options.blocking == false)
+    const Result setReadCloExec =
+        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[0], not options.readInheritable);
+    SC_TRY_MSG(setReadCloExec, "Cannot set close on exec on read pipe");
+    const Result setWriteCloExec =
+        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[1], not options.writeInheritable);
+    SC_TRY_MSG(setWriteCloExec, "Cannot set close on exec on write pipe");
+    if (options.blocking == false and not usedNonBlockingAtCreate)
     {
         const Result pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(pipes[0], true);
         SC_TRY_MSG(pipeRes1, "Cannot set non-blocking flag on read");
