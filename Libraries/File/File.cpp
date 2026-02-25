@@ -33,12 +33,31 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
+    static Result translateReadError(DWORD errorCode)
+    {
+        switch (errorCode)
+        {
+        case ERROR_ACCESS_DENIED: return Result::Error("ERROR_ACCESS_DENIED");
+        case ERROR_BROKEN_PIPE: return Result::Error("ERROR_BROKEN_PIPE");
+        case ERROR_HANDLE_EOF: return Result::Error("ERROR_HANDLE_EOF");
+        case ERROR_INVALID_HANDLE: return Result::Error("ERROR_INVALID_HANDLE");
+        case ERROR_INVALID_PARAMETER: return Result::Error("ERROR_INVALID_PARAMETER");
+        case ERROR_MORE_DATA: return Result::Error("ERROR_MORE_DATA");
+        case ERROR_NO_DATA: return Result::Error("ERROR_NO_DATA");
+        case ERROR_NOT_ENOUGH_MEMORY: return Result::Error("ERROR_NOT_ENOUGH_MEMORY");
+        case ERROR_OPERATION_ABORTED: return Result::Error("ERROR_OPERATION_ABORTED");
+        case ERROR_IO_PENDING: return Result::Error("ERROR_IO_PENDING");
+        }
+        return Result::Error("Unknown");
+    }
+
     static Result readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer, Span<char> fallbackBuffer,
                              bool& isEOF)
     {
         auto  bufferData   = buffer.getDirectAccess();
         DWORD numReadBytes = 0xffffffff;
-        BOOL  success;
+        BOOL  success      = FALSE;
+        DWORD lastError    = ERROR_SUCCESS;
 
         const bool useVector = bufferData.capacityInBytes > bufferData.sizeInBytes;
         if (useVector)
@@ -46,6 +65,10 @@ struct SC::FileDescriptor::Internal
             success = ::ReadFile(fileDescriptor, static_cast<char*>(bufferData.data) + bufferData.sizeInBytes,
                                  static_cast<DWORD>(bufferData.capacityInBytes - bufferData.sizeInBytes), &numReadBytes,
                                  nullptr);
+            if (success == FALSE)
+            {
+                lastError = ::GetLastError();
+            }
         }
         else
         {
@@ -53,11 +76,14 @@ struct SC::FileDescriptor::Internal
                        "FileDescriptor::readAppend - buffer must be bigger than zero");
             success = ::ReadFile(fileDescriptor, fallbackBuffer.data(),
                                  static_cast<DWORD>(fallbackBuffer.sizeInBytes()), &numReadBytes, nullptr);
+            if (success == FALSE)
+            {
+                lastError = ::GetLastError();
+            }
         }
-        if (Internal::isActualError(success, numReadBytes, fileDescriptor))
+        if (Internal::isActualError(success, numReadBytes, fileDescriptor, lastError))
         {
-            // TODO: Parse read result ERROR
-            return Result::Error("FileDescriptor::readAppend ReadFile failed");
+            return Internal::translateReadError(lastError);
         }
         else if (numReadBytes > 0)
         {
@@ -80,10 +106,11 @@ struct SC::FileDescriptor::Internal
         }
     }
 
-    [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptor::Handle fileDescriptor)
+    [[nodiscard]] static bool isActualError(BOOL success, DWORD numReadBytes, FileDescriptor::Handle fileDescriptor,
+                                            DWORD lastError)
     {
-        if (success == FALSE && numReadBytes == 0 && GetFileType(fileDescriptor) == FILE_TYPE_PIPE &&
-            GetLastError() == ERROR_BROKEN_PIPE)
+        if (success == FALSE and numReadBytes == 0 and GetFileType(fileDescriptor) == FILE_TYPE_PIPE and
+            lastError == ERROR_BROKEN_PIPE)
         {
             // https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile
             // Pipes
@@ -265,6 +292,25 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 //-------------------------------------------------------------------------------------------------------
 struct SC::FileDescriptor::Internal
 {
+    static Result translateReadError(int errorCode)
+    {
+        switch (errorCode)
+        {
+        case EAGAIN: return Result::Error("EAGAIN");
+#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
+        case EWOULDBLOCK: return Result::Error("EWOULDBLOCK");
+#endif
+        case EBADF: return Result::Error("EBADF");
+        case EFAULT: return Result::Error("EFAULT");
+        case EINTR: return Result::Error("EINTR");
+        case EINVAL: return Result::Error("EINVAL");
+        case EIO: return Result::Error("EIO");
+        case EISDIR: return Result::Error("EISDIR");
+        case ENOMEM: return Result::Error("ENOMEM");
+        }
+        return Result::Error("Unknown");
+    }
+
     static Result readAppend(FileDescriptor::Handle fileDescriptor, IGrowableBuffer& buffer, Span<char> fallbackBuffer,
                              bool& isEOF)
     {
@@ -310,8 +356,7 @@ struct SC::FileDescriptor::Internal
         }
         else
         {
-            // TODO: Parse read result errno
-            return Result::Error("read failed");
+            return Internal::translateReadError(errno);
         }
     }
 
