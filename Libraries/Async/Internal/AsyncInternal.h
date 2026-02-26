@@ -119,14 +119,15 @@ struct SC::AsyncEventLoop::Internal
     AsyncEventLoopListeners* listeners = nullptr;
 
     // AsyncRequest flags
-    static constexpr int16_t Flag_ManualCompletion       = 1 << 0; // Completion is ready
-    static constexpr int16_t Flag_ExcludeFromActiveCount = 1 << 1; // Does not contribute to active count
-    static constexpr int16_t Flag_Internal               = 1 << 2; // Doesn't get listed by AsyncEventLoop::enumerate
-    static constexpr int16_t Flag_WatcherSet             = 1 << 3; // An event watcher has been set
-    static constexpr int16_t Flag_AsyncTaskSequence      = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
-    static constexpr int16_t Flag_AsyncTaskSequenceInUse = 1 << 5; // AsyncTaskSequence must still be waited
-    static constexpr int16_t Flag_NeedsTeardown          = 1 << 6; // Request being processed waiting for teardown
-    static constexpr int16_t Flag_WaitingKernelCancel    = 1 << 7; // Close callback must wait for kernel cancellation
+    static constexpr int16_t Flag_ManualCompletion        = 1 << 0; // Completion is ready
+    static constexpr int16_t Flag_ExcludeFromActiveCount  = 1 << 1; // Does not contribute to active count
+    static constexpr int16_t Flag_Internal                = 1 << 2; // Doesn't get listed by AsyncEventLoop::enumerate
+    static constexpr int16_t Flag_WatcherSet              = 1 << 3; // An event watcher has been set
+    static constexpr int16_t Flag_AsyncTaskSequence       = 1 << 4; // AsyncRequest::sequence is an AsyncTaskSequence
+    static constexpr int16_t Flag_AsyncTaskSequenceInUse  = 1 << 5; // AsyncTaskSequence must still be waited
+    static constexpr int16_t Flag_NeedsTeardown           = 1 << 6; // Request being processed waiting for teardown
+    static constexpr int16_t Flag_WaitingKernelCancel     = 1 << 7; // Close callback must wait for kernel cancellation
+    static constexpr int16_t Flag_InternalWakeUpUserEvent = 1 << 8; // kqueue wake-up watcher uses EVFILT_USER
 
     Result close(AsyncEventLoop& eventLoop);
 

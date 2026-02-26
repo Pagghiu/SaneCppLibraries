@@ -18,6 +18,7 @@
 #include <fcntl.h>        // For fcntl function (used for setting non-blocking mode)
 #include <signal.h>       // For signal-related functions
 #include <sys/epoll.h>    // For epoll functions
+#include <sys/eventfd.h>  // For eventfd functions
 #include <sys/sendfile.h> // For sendfile
 #include <sys/signalfd.h> // For signalfd functions
 #include <sys/socket.h>   // For socket-related functions
@@ -41,11 +42,13 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 {
     FileDescriptor loopFd;
 
-    AsyncFilePoll  wakeUpPoll;
-    PipeDescriptor wakeupPipe;
+    AsyncFilePoll wakeUpPoll;
 #if SC_ASYNC_USE_EPOLL
+    FileDescriptor wakeUpEventFd;
     FileDescriptor signalProcessExitDescriptor;
     AsyncFilePoll  signalProcessExit;
+#else
+    static constexpr FileDescriptor::Handle wakeUpUserEventIdent = 0x1e7e7711;
 #endif
     KernelQueuePosix() {}
     ~KernelQueuePosix() { SC_TRUST_RESULT(close()); }
@@ -57,10 +60,9 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     Result close()
     {
 #if SC_ASYNC_USE_EPOLL
+        SC_TRY(wakeUpEventFd.close());
         SC_TRY(signalProcessExitDescriptor.close());
 #endif
-        SC_TRY(wakeupPipe.readPipe.close());
-        SC_TRY(wakeupPipe.writePipe.close());
         return loopFd.close();
     }
 
@@ -106,46 +108,34 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 
     Result createWakeup(AsyncEventLoop& eventLoop)
     {
-        // Create
-        PipeOptions options;
-        options.blocking = false;
-        SC_TRY(wakeupPipe.createPipe(options));
-
-        // Register
-        FileDescriptor::Handle wakeUpPipeDescriptor;
-        SC_TRY(wakeupPipe.readPipe.get(
-            wakeUpPipeDescriptor,
-            Result::Error(
-                "AsyncEventLoop::KernelQueuePosix::createSharedWatchers() - AsyncRequest read handle invalid")));
         wakeUpPoll.callback.bind<&KernelQueuePosix::completeWakeUp>();
         wakeUpPoll.setDebugName("SharedWakeUpPoll");
-        SC_TRY(wakeUpPoll.start(eventLoop, wakeUpPipeDescriptor));
+#if SC_ASYNC_USE_EPOLL
+        const int eventFd = ::eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+        if (eventFd == -1)
+        {
+            return Result::Error("eventfd");
+        }
+        SC_TRY(wakeUpEventFd.assign(eventFd));
+        SC_TRY(wakeUpPoll.start(eventLoop, eventFd));
+#else
+        wakeUpPoll.flags |= Internal::Flag_InternalWakeUpUserEvent;
+        SC_TRY(wakeUpPoll.start(eventLoop, wakeUpUserEventIdent));
+#endif
         return Result(true);
     }
 
     static void completeWakeUp(AsyncFilePoll::Result& result)
     {
+#if SC_ASYNC_USE_EPOLL
         AsyncFilePoll& async = result.getAsync();
-        // TODO: Investigate MACHPORT (kqueue) and eventfd (epoll) to avoid the additional read syscall
-
-        char fakeBuffer[10];
-        for (;;)
+        eventfd_t      value;
+        int            readResult;
+        do
         {
-            ssize_t res;
-            do
-            {
-                res = ::read(async.handle, fakeBuffer, sizeof(fakeBuffer));
-            } while (res < 0 and errno == EINTR);
-
-            if (res >= 0 and (static_cast<size_t>(res) == sizeof(fakeBuffer)))
-                continue;
-
-            if (res != -1)
-                break;
-
-            if (errno == EWOULDBLOCK or errno == EAGAIN)
-                break;
-        }
+            readResult = ::eventfd_read(async.handle, &value);
+        } while (readResult == -1 and errno == EINTR);
+#endif
         result.eventLoop.internal.executeWakeUps(result.eventLoop);
         result.reactivateRequest(true);
     }
@@ -153,18 +143,33 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     Result wakeUpFromExternalThread()
     {
         // TODO: We need an atomic bool swap to wait until next run
-        int asyncFd;
-        SC_TRY(wakeupPipe.writePipe.get(asyncFd, Result::Error("writePipe handle")));
-        ssize_t writtenBytes;
+#if SC_ASYNC_USE_EPOLL
+        int eventFd;
+        SC_TRY(wakeUpEventFd.get(eventFd, Result::Error("eventfd handle")));
+        int writeResult;
         do
         {
-            writtenBytes = ::write(asyncFd, "", 1);
-        } while (writtenBytes == -1 && errno == EINTR);
-
-        if (writtenBytes != 1)
+            writeResult = ::eventfd_write(eventFd, 1);
+        } while (writeResult == -1 and errno == EINTR);
+        if (writeResult == -1)
         {
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in write");
         }
+#else
+        FileDescriptor::Handle handle;
+        SC_TRY(loopFd.get(handle, Result::Error("Invalid loop handle")));
+        struct kevent event;
+        EV_SET(&event, static_cast<uintptr_t>(wakeUpUserEventIdent), EVFILT_USER, 0, NOTE_TRIGGER, 0, &wakeUpPoll);
+        int triggerResult;
+        do
+        {
+            triggerResult = ::kevent(handle, &event, 1, nullptr, 0, nullptr);
+        } while (triggerResult == -1 and errno == EINTR);
+        if (triggerResult == -1)
+        {
+            return Result::Error("AsyncEventLoop::wakeUpFromExternalThread - Error in kevent NOTE_TRIGGER");
+        }
+#endif
         return Result(true);
     }
 
@@ -410,9 +415,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     static constexpr short SOCKET_OUTPUT_EVENTS_MASK = EVFILT_WRITE;
 
     Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, short filter,
-                           unsigned int options = 0)
+                           unsigned int options = 0, unsigned int flags = EV_ADD)
     {
-        EV_SET(events + newEvents, fileDescriptor, filter, EV_ADD, options, 0, &async);
+        EV_SET(events + newEvents, fileDescriptor, filter, flags, options, 0, &async);
         newEvents += 1;
         if (newEvents >= totalNumEvents)
         {
@@ -1332,13 +1337,34 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     //-------------------------------------------------------------------------------------------------------
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
     {
+#if SC_ASYNC_USE_EPOLL
         return setEventWatcher(eventLoop, async, async.handle, INPUT_EVENTS_MASK);
+#else
+        if ((async.flags & Internal::Flag_InternalWakeUpUserEvent) != 0)
+        {
+            return setEventWatcher(eventLoop, async, async.handle, EVFILT_USER, 0, EV_ADD | EV_CLEAR);
+        }
+        return setEventWatcher(eventLoop, async, async.handle, INPUT_EVENTS_MASK);
+#endif
     }
 
-    static Result teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
+    static Result teardownAsync(AsyncFilePoll* async, AsyncTeardown& teardown)
     {
+#if SC_ASYNC_USE_EPOLL
+        (void)async;
         return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
                                                             INPUT_EVENTS_MASK);
+#else
+        const bool isInternalWakeupUserEvent = (teardown.flags & Internal::Flag_InternalWakeUpUserEvent) != 0 or
+                                               (async and (async->flags & Internal::Flag_InternalWakeUpUserEvent) != 0);
+        if (isInternalWakeupUserEvent)
+        {
+            return KernelQueuePosix::stopSingleWatcherImmediate(
+                *teardown.eventLoop, static_cast<SocketDescriptor::Handle>(teardown.fileHandle), EVFILT_USER);
+        }
+        return KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle,
+                                                            INPUT_EVENTS_MASK);
+#endif
     }
 
     static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
