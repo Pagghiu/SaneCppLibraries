@@ -16,7 +16,7 @@ struct SC::AsyncEventLoop::Internal
 
     struct KernelQueue
     {
-        AlignedStorage<320> storage;
+        AlignedStorage<304> storage;
 
         bool isEpoll = true;
 
@@ -54,8 +54,8 @@ struct SC::AsyncEventLoop::Internal
     struct KernelQueueDefinition
     {
         static constexpr int Windows = 136;
-        static constexpr int Apple   = 104;
-        static constexpr int Linux   = 336;
+        static constexpr int Apple   = 80;
+        static constexpr int Linux   = 312;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

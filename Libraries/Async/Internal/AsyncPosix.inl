@@ -16,15 +16,15 @@
 
 #include <errno.h>        // For error handling
 #include <fcntl.h>        // For fcntl function (used for setting non-blocking mode)
-#include <signal.h>       // For signal-related functions
 #include <sys/epoll.h>    // For epoll functions
 #include <sys/eventfd.h>  // For eventfd functions
 #include <sys/sendfile.h> // For sendfile
-#include <sys/signalfd.h> // For signalfd functions
 #include <sys/socket.h>   // For socket-related functions
 #include <sys/stat.h>     // fstat
+#include <sys/syscall.h>  // SYS_pidfd_open
 #include <sys/uio.h>      // writev, pwritev
 #include <sys/wait.h>     // waitpid / WIFEXITED / WEXITSTATUS
+#include <unistd.h>       // close
 
 #else
 
@@ -45,8 +45,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     AsyncFilePoll wakeUpPoll;
 #if SC_ASYNC_USE_EPOLL
     FileDescriptor wakeUpEventFd;
-    FileDescriptor signalProcessExitDescriptor;
-    AsyncFilePoll  signalProcessExit;
 #else
     static constexpr FileDescriptor::Handle wakeUpUserEventIdent = 0x1e7e7711;
 #endif
@@ -61,7 +59,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     {
 #if SC_ASYNC_USE_EPOLL
         SC_TRY(wakeUpEventFd.close());
-        SC_TRY(signalProcessExitDescriptor.close());
 #endif
         return loopFd.close();
     }
@@ -88,9 +85,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 
     Result createSharedWatchers(AsyncEventLoop& eventLoop)
     {
-#if SC_ASYNC_USE_EPOLL
-        SC_TRY(createProcessSignalWatcher(eventLoop));
-#endif
         SC_TRY(createWakeup(eventLoop));
         SC_TRY(eventLoop.runNoWait()); // Register the read handle before everything else
         // Calls to excludeFromActiveCount must be after runNoWait()
@@ -98,11 +92,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         // WakeUp (poll) doesn't keep the kernelEvents active
         eventLoop.excludeFromActiveCount(wakeUpPoll);
         wakeUpPoll.flags |= Flag_Internal;
-#if SC_ASYNC_USE_EPOLL
-        // Process watcher doesn't keep the kernelEvents active
-        eventLoop.excludeFromActiveCount(signalProcessExit);
-        signalProcessExit.flags |= Flag_Internal;
-#endif
         return Result(true);
     }
 
@@ -174,89 +163,6 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     }
 
 #if SC_ASYNC_USE_EPOLL
-    // TODO: This should be lazily created on demand
-    // TODO: Or it's probably even better migrate this one to pidfd
-    Result createProcessSignalWatcher(AsyncEventLoop& eventLoop)
-    {
-        sigset_t mask;
-        sigemptyset(&mask);
-        sigaddset(&mask, SIGCHLD);
-
-        if (sigprocmask(SIG_BLOCK, &mask, nullptr) == -1)
-        {
-            return Result::Error("Failed to set signal mask");
-        }
-
-        const int signalFd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
-        if (signalFd == -1)
-        {
-            return Result::Error("Failed to create signalfd");
-        }
-
-        SC_TRY(signalProcessExitDescriptor.assign(signalFd));
-        signalProcessExit.callback.bind<KernelQueuePosix, &KernelQueuePosix::onSIGCHLD>(*this);
-        return signalProcessExit.start(eventLoop, signalFd);
-    }
-
-    void onSIGCHLD(AsyncFilePoll::Result& result)
-    {
-        struct signalfd_siginfo siginfo;
-        FileDescriptor::Handle  sigHandle;
-
-        Result res = signalProcessExitDescriptor.get(sigHandle, Result::Error("Invalid signal handle"));
-        if (not res)
-        {
-            return;
-        }
-        const ssize_t size = ::read(sigHandle, &siginfo, sizeof(siginfo));
-
-        // TODO: Handle lazy deactivation for signals when no more processes exist
-        result.reactivateRequest(true);
-
-        if (size != sizeof(siginfo))
-        {
-            return;
-        }
-
-        // Check if the received signal is related to process exit
-        if (siginfo.ssi_signo != SIGCHLD)
-        {
-            return;
-        }
-        while (true)
-        {
-            // Multiple SIGCHLD may have been merged together, we must check all of them with waitpid(-1)
-            // https://stackoverflow.com/questions/8398298/handling-multiple-sigchld
-            int   status = -1;
-            pid_t pid;
-            do
-            {
-                pid = ::waitpid(-1, &status, 0);
-            } while (pid == -1 and errno == EINTR);
-            if (pid == -1)
-            {
-                return; // no more queued child processes
-            }
-
-            // Loop all process handles to find if one of our interest has exited
-            AsyncProcessExit* current = result.eventLoop.internal.activeProcessExits.front;
-
-            while (current)
-            {
-                if (pid == current->handle)
-                {
-                    Result                   res(true);
-                    AsyncProcessExit::Result processResult(result.eventLoop, *current, res);
-                    processResult.completionData.exitStatus = WEXITSTATUS(status);
-                    result.eventLoop.internal.removeActiveHandle(*current);
-                    current->callback(processResult);
-                    break;
-                }
-                current = static_cast<AsyncProcessExit*>(current->next);
-            }
-        }
-    }
-
     static Result setEventWatcher(AsyncEventLoop& eventLoop, AsyncRequest& async, int fileDescriptor, int32_t filter)
     {
         struct epoll_event event = {0};
@@ -1393,7 +1299,30 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
 #if SC_ASYNC_USE_EPOLL
-    // On epoll AsyncProcessExit is handled inside KernelQueuePosix (using a signalfd).
+    // On epoll AsyncProcessExit uses a per-request pidfd watcher.
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
+    {
+        const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
+        if (pidFd < 0)
+        {
+            return Result::Error("pidfd_open failed");
+        }
+        SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
+        return setEventWatcher(eventLoop, async, pidFd, INPUT_EVENTS_MASK);
+    }
+
+    static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
+    {
+        if (teardown.fileHandle == FileDescriptor::Invalid)
+        {
+            return Result(true);
+        }
+        SC_TRY(
+            KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle, INPUT_EVENTS_MASK));
+        return Result(::close(teardown.fileHandle) == 0);
+    }
+
+    Result completeAsync(AsyncProcessExit::Result& result) { return completeProcessExitWaitPid(result); }
 #else
 
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)

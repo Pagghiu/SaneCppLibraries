@@ -62,6 +62,73 @@ void SC::AsyncTest::processExit()
     SC_TEST_EXPECT(outParams2.exitStatus != 0); // Status == Not OK
 }
 
+void SC::AsyncTest::processExitStopBeforeCompletion()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+#if SC_PLATFORM_WINDOWS
+    // TODO: Add an equivalent cancellation test for Windows.
+    SC_TEST_EXPECT(eventLoop.close());
+#else
+    Process process;
+    SC_TEST_EXPECT(process.launch({"sleep", "0.3"}));
+    AsyncProcessExit asyncExit;
+    struct CallbackState
+    {
+        int numCallbackCalled = 0;
+    } state;
+    asyncExit.callback = [callbackState = &state](AsyncProcessExit::Result& result)
+    {
+        SC_COMPILER_UNUSED(result);
+        callbackState->numCallbackCalled++;
+    };
+    SC_TEST_EXPECT(asyncExit.start(eventLoop, process.handle));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(asyncExit.stop(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(state.numCallbackCalled == 0);
+    SC_TEST_EXPECT(process.waitForExitSync());
+    SC_TEST_EXPECT(process.getExitStatus() == 0);
+#endif
+}
+
+void SC::AsyncTest::processExitTrackedAndUntracked()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    Process trackedProcess;
+    Process untrackedProcess;
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(trackedProcess.launch({"where", "where.exe"}));
+    SC_TEST_EXPECT(untrackedProcess.launch({"where", "where.exe"}));
+#else
+    SC_TEST_EXPECT(trackedProcess.launch({"sleep", "0.3"}));
+    SC_TEST_EXPECT(untrackedProcess.launch({"sleep", "0.6"}));
+#endif
+
+    AsyncProcessExit trackedExit;
+    struct CallbackState
+    {
+        int numCallbackCalled = 0;
+        int trackedExitStatus = -1;
+    } state;
+    trackedExit.callback = [this, callbackState = &state](AsyncProcessExit::Result& result)
+    {
+        SC_TEST_EXPECT(result.get(callbackState->trackedExitStatus));
+        callbackState->numCallbackCalled++;
+    };
+
+    SC_TEST_EXPECT(trackedExit.start(eventLoop, trackedProcess.handle));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(state.numCallbackCalled == 1);
+    SC_TEST_EXPECT(state.trackedExitStatus == 0);
+
+    SC_TEST_EXPECT(untrackedProcess.waitForExitSync());
+    SC_TEST_EXPECT(untrackedProcess.getExitStatus() == 0);
+}
+
 void SC::AsyncTest::processInputOutput(bool useThreadPool)
 {
     StringSpan params[] = {report.executableFile.view(), "--quiet", "--test", "AsyncTest", "--test-section",

@@ -35,6 +35,8 @@ struct SC::AsyncTest : public SC::TestCase
 
     // Processes
     void processExit();
+    void processExitStopBeforeCompletion();
+    void processExitTrackedAndUntracked();
     void processInputOutput(bool useThreadPool);
     void processInputOutputChild();
     void namedPipeInputOutput(bool useThreadPool);

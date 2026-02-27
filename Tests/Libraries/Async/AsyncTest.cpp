@@ -70,6 +70,14 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             processExit();
         }
+        if (test_section("process exit stop before completion"))
+        {
+            processExitStopBeforeCompletion();
+        }
+        if (test_section("process exit tracked and untracked"))
+        {
+            processExitTrackedAndUntracked();
+        }
 #if SC_XCTEST
 #else
         if (test_section("process input output"))

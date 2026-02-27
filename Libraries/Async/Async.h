@@ -1460,8 +1460,8 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
     struct SC_COMPILER_EXPORT InternalDefinition
     {
         static constexpr int Windows = 536;
-        static constexpr int Apple   = 528;
-        static constexpr int Linux   = 744;
+        static constexpr int Apple   = 504;
+        static constexpr int Linux   = 720;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;
