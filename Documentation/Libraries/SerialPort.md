@@ -52,3 +52,10 @@ Example command:
 
 💡 Unplanned Features:
 - Port enumeration and hotplug monitoring
+
+# Statistics
+| Type      | Lines Of Code | Comments  | Sum   |
+|-----------|---------------|-----------|-------|
+| Headers   | 48			| 40		| 88	|
+| Sources   | 591			| 76		| 667	|
+| Sum       | 639			| 116		| 755	|
