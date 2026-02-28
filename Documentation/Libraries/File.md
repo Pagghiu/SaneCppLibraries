@@ -54,6 +54,7 @@ Some relevant blog posts are:
 
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
 - [August 2025 Update](https://pagghiu.github.io/site/blog/2025-08-31-SaneCppLibrariesUpdate.html)
+- [February 2026 Update](https://pagghiu.github.io/site/blog/2026-02-28-SaneCppLibrariesUpdate.html)
 
 # Description
 SC::FileDescriptor object can be created by SC::FileDescriptor::open-ing a path on file system and it can be SC::FileDescriptor::read or SC::FileDescriptor::write.  

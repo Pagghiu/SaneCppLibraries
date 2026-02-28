@@ -24,6 +24,12 @@
 🟨 MVP  
 The v1 scope focuses on byte-stream descriptors and core serial settings.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [February 2026 Update](https://pagghiu.github.io/site/blog/2026-02-28-SaneCppLibrariesUpdate.html)
+
 # Details
 
 @copydetails group_serial_port
