@@ -5,11 +5,12 @@
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
 
-#include <arpa/inet.h> // inet_pton
-#include <errno.h>     // errno
-#include <fcntl.h>     // fcntl
-#include <netdb.h>     // AF_INET / IPPROTO_TCP / AF_UNSPEC
-#include <unistd.h>    // close
+#include <arpa/inet.h>   // inet_pton
+#include <errno.h>       // errno
+#include <fcntl.h>       // fcntl
+#include <netdb.h>       // AF_INET / IPPROTO_TCP / AF_UNSPEC
+#include <netinet/tcp.h> // TCP_NODELAY
+#include <unistd.h>      // close
 
 namespace SC
 {
@@ -93,6 +94,14 @@ Result SocketDescriptor::setBlocking(bool blocking)
 {
     // On POSIX, blocking = false means set O_NONBLOCK
     return setFileStatusFlags<O_NONBLOCK>(handle, !blocking);
+}
+
+Result SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
+{
+    int active = tcpNoDelay ? 1 : 0;
+    SC_TRY_MSG(::setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, &active, sizeof(active)) == 0,
+               "setsockopt TCP_NODELAY failed");
+    return Result(true);
 }
 
 Result SocketDescriptor::isInheritable(bool& hasValue) const

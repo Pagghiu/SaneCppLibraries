@@ -42,6 +42,17 @@ SC::Result SC::SocketDescriptor::setBlocking(bool blocking)
     return Result(true);
 }
 
+SC::Result SC::SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
+{
+    int active = tcpNoDelay ? 1 : 0;
+    if (::setsockopt(handle, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&active), sizeof(active)) ==
+        SOCKET_ERROR)
+    {
+        return Result::Error("setsockopt TCP_NODELAY failed");
+    }
+    return Result(true);
+}
+
 SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
 {
     DWORD flags;

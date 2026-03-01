@@ -188,6 +188,11 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
     /// @param shutdownType The type of shutdown to perform
     /// @return Valid Result if the socket has been successfully shut down
     Result shutdown(SocketFlags::ShutdownType shutdownType);
+
+    /// @brief Disables Nagle's algorithm for low-latency communication
+    /// @param tcpNoDelay `true` to disable Nagle's algorithm (set TCP_NODELAY), `false` to enable it
+    /// @return Valid Result if the TCP_NODELAY option has been set successfully
+    Result setTcpNoDelay(bool tcpNoDelay);
 };
 
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).

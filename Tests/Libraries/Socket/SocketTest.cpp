@@ -104,6 +104,11 @@ void SC::SocketTest::socketCreate()
     isInheritable = false;
     SC_TEST_EXPECT(socket.isInheritable(isInheritable));
     SC_TEST_EXPECT(isInheritable);
+
+    // Test TCP_NODELAY
+    SC_TEST_EXPECT(socket.setTcpNoDelay(true));
+    SC_TEST_EXPECT(socket.setTcpNoDelay(false));
+
     SC_TEST_EXPECT(socket.close());
     //! [socketCreateSnippet]
 }
