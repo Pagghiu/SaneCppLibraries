@@ -16,6 +16,7 @@ struct SC::SocketTest : public SC::TestCase
     inline void resolveDNS();
     inline void socketCreate();
     inline void socketClientServer(SocketFlags::SocketType socketType, SocketFlags::ProtocolType protocol);
+    inline void socketMulticast();
 
     inline Result socketServerSnippet();
     inline Result socketClientAcceptSnippet();
@@ -43,6 +44,10 @@ struct SC::SocketTest : public SC::TestCase
         if (test_section("udp client server (connected)"))
         {
             socketClientServer(SocketFlags::SocketDgram, SocketFlags::ProtocolUdp);
+        }
+        if (test_section("udp multicast"))
+        {
+            socketMulticast();
         }
     }
 };
@@ -187,6 +192,72 @@ void SC::SocketTest::socketClientServer(SocketFlags::SocketType socketType, Sock
     params.eventObject.signal();
     SC_TEST_EXPECT(thread.join());
     SC_TEST_EXPECT(params.connectRes and params.writeRes and params.closeRes);
+}
+
+void SC::SocketTest::socketMulticast()
+{
+    const uint16_t multicastPort = report.mapPort(5051);
+
+    SocketIPAddress defaultInterfaceAddress;
+#if SC_PLATFORM_WINDOWS
+    static constexpr StringView interfaceAddressString = "0.0.0.0";
+#else
+    static constexpr StringView interfaceAddressString = "127.0.0.1";
+#endif
+    SC_TEST_EXPECT(defaultInterfaceAddress.fromAddressPort(interfaceAddressString, 0));
+
+    SocketIPAddress anyAddress;
+    SC_TEST_EXPECT(anyAddress.fromAddressPort("0.0.0.0", multicastPort));
+
+    SocketIPAddress multicastAddress;
+    SC_TEST_EXPECT(multicastAddress.fromAddressPort("239.255.0.1", multicastPort));
+
+    SocketIPAddress mismatchedInterfaceAddress;
+    SC_TEST_EXPECT(mismatchedInterfaceAddress.fromAddressPort("::1", 0));
+
+    SocketDescriptor receiverSocket;
+    SC_TEST_EXPECT(
+        receiverSocket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+    SocketServer receiverServer(receiverSocket);
+    SC_TEST_EXPECT(receiverServer.bind(anyAddress, SocketServer::BindReuseAddress::Enabled));
+
+    SocketDescriptor senderSocket;
+    SC_TEST_EXPECT(
+        senderSocket.create(SocketFlags::AddressFamilyIPV4, SocketFlags::SocketDgram, SocketFlags::ProtocolUdp));
+
+    SC_TEST_EXPECT(senderSocket.setBroadcast(true));
+    SC_TEST_EXPECT(senderSocket.setBroadcast(false));
+    SC_TEST_EXPECT(senderSocket.setMulticastLoopback(SocketFlags::AddressFamilyIPV4, true));
+    SC_TEST_EXPECT(senderSocket.setMulticastHops(SocketFlags::AddressFamilyIPV4, 2));
+    SC_TEST_EXPECT(senderSocket.setMulticastOutboundInterface(defaultInterfaceAddress));
+
+    SocketClient senderClient(senderSocket);
+    SC_TEST_EXPECT(senderClient.connect(multicastAddress));
+
+    SocketClient receiverClient(receiverSocket);
+    Span<char>   readData;
+    char         readBuffer[1] = {0};
+
+    // Before joining the multicast group, no datagram should be received.
+    char preJoinValue = 11;
+    SC_TEST_EXPECT(senderClient.write({&preJoinValue, 1}));
+    SC_TEST_EXPECT(not receiverClient.readWithTimeout({readBuffer, sizeof(readBuffer)}, readData, 200));
+
+    SC_TEST_EXPECT(not receiverSocket.joinMulticastGroup(multicastAddress, mismatchedInterfaceAddress));
+    SC_TEST_EXPECT(not receiverSocket.leaveMulticastGroup(multicastAddress, mismatchedInterfaceAddress));
+
+    SC_TEST_EXPECT(receiverSocket.joinMulticastGroup(multicastAddress, defaultInterfaceAddress));
+
+    // After joining the multicast group, the receiver should obtain datagrams.
+    const char joinedValue = 22;
+    SC_TEST_EXPECT(senderClient.write({&joinedValue, 1}));
+    SC_TEST_EXPECT(receiverClient.readWithTimeout({readBuffer, sizeof(readBuffer)}, readData, 2000));
+    SC_TEST_EXPECT(readData.sizeInBytes() == 1 and readBuffer[0] == joinedValue);
+
+    SC_TEST_EXPECT(receiverSocket.leaveMulticastGroup(multicastAddress, defaultInterfaceAddress));
+
+    SC_TEST_EXPECT(senderSocket.close());
+    SC_TEST_EXPECT(receiverSocket.close());
 }
 
 SC::Result SC::SocketTest::socketServerSnippet()

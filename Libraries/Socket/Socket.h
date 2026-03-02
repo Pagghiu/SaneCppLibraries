@@ -193,6 +193,40 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
     /// @param tcpNoDelay `true` to disable Nagle's algorithm (set TCP_NODELAY), `false` to enable it
     /// @return Valid Result if the TCP_NODELAY option has been set successfully
     Result setTcpNoDelay(bool tcpNoDelay);
+
+    /// @brief Enables or disables broadcast on this socket (for UDP)
+    /// @param enableBroadcast `true` to enable broadcast (set SO_BROADCAST), `false` to disable
+    /// @return Valid Result if the SO_BROADCAST option has been set successfully
+    Result setBroadcast(bool enableBroadcast);
+
+    /// @brief Joins an IPv4 or IPv6 multicast group on a specific interface
+    /// @param multicastAddress The multicast group address to join
+    /// @param interfaceAddress The local interface address to join on
+    /// @return Valid Result if the socket has successfully joined the multicast group
+    Result joinMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
+
+    /// @brief Leaves a previously joined IPv4 or IPv6 multicast group on a specific interface
+    /// @param multicastAddress The multicast group address to leave
+    /// @param interfaceAddress The local interface address to leave from
+    /// @return Valid Result if the socket has successfully left the multicast group
+    Result leaveMulticastGroup(const SocketIPAddress& multicastAddress, const SocketIPAddress& interfaceAddress);
+
+    /// @brief Controls whether multicast traffic is sent back to the local host
+    /// @param addressFamily Address family of the socket
+    /// @param enableLoopback `true` to enable multicast loopback, `false` to disable
+    /// @return Valid Result if the multicast loopback option has been set successfully
+    Result setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback);
+
+    /// @brief Specifies the default TTL or hop limit for outgoing multicast datagrams
+    /// @param addressFamily Address family of the socket
+    /// @param hops The hop limit (0-255)
+    /// @return Valid Result if the multicast hop limit has been set successfully
+    Result setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops);
+
+    /// @brief Specifies the default local network interface for outgoing multicast datagrams
+    /// @param interfaceAddress The local interface address
+    /// @return Valid Result if the multicast outgoing interface has been set successfully
+    Result setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress);
 };
 
 /// @brief Use a SocketDescriptor as a Server (example TCP or UDP Socket Server).

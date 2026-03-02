@@ -53,6 +53,154 @@ SC::Result SC::SocketDescriptor::setTcpNoDelay(bool tcpNoDelay)
     return Result(true);
 }
 
+SC::Result SC::SocketDescriptor::setBroadcast(bool enableBroadcast)
+{
+    int active = enableBroadcast ? 1 : 0;
+    if (::setsockopt(handle, SOL_SOCKET, SO_BROADCAST, reinterpret_cast<const char*>(&active), sizeof(active)) ==
+        SOCKET_ERROR)
+    {
+        return Result::Error("setsockopt SO_BROADCAST failed");
+    }
+    return Result(true);
+}
+
+SC::Result SC::SocketDescriptor::joinMulticastGroup(const SocketIPAddress& multicastAddress,
+                                                    const SocketIPAddress& interfaceAddress)
+{
+    if (multicastAddress.getAddressFamily() != interfaceAddress.getAddressFamily())
+    {
+        return Result::Error("multicast and interface address families do not match");
+    }
+    if (multicastAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
+    {
+        struct ip_mreq mreq;
+        mreq.imr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
+        mreq.imr_interface = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
+        if (::setsockopt(handle, IPPROTO_IP, IP_ADD_MEMBERSHIP, reinterpret_cast<const char*>(&mreq), sizeof(mreq)) ==
+            SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IP_ADD_MEMBERSHIP failed");
+        }
+        return Result(true);
+    }
+    else
+    {
+        struct ipv6_mreq mreq;
+        mreq.ipv6mr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_addr;
+        mreq.ipv6mr_interface = 0;
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, reinterpret_cast<const char*>(&mreq),
+                         sizeof(mreq)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IPV6_ADD_MEMBERSHIP failed");
+        }
+        return Result(true);
+    }
+}
+
+SC::Result SC::SocketDescriptor::leaveMulticastGroup(const SocketIPAddress& multicastAddress,
+                                                     const SocketIPAddress& interfaceAddress)
+{
+    if (multicastAddress.getAddressFamily() != interfaceAddress.getAddressFamily())
+    {
+        return Result::Error("multicast and interface address families do not match");
+    }
+    if (multicastAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
+    {
+        struct ip_mreq mreq;
+        mreq.imr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
+        mreq.imr_interface = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
+        if (::setsockopt(handle, IPPROTO_IP, IP_DROP_MEMBERSHIP, reinterpret_cast<const char*>(&mreq), sizeof(mreq)) ==
+            SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IP_DROP_MEMBERSHIP failed");
+        }
+        return Result(true);
+    }
+    else
+    {
+        struct ipv6_mreq mreq;
+        mreq.ipv6mr_multiaddr = multicastAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_addr;
+        mreq.ipv6mr_interface = 0;
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_DROP_MEMBERSHIP, reinterpret_cast<const char*>(&mreq),
+                         sizeof(mreq)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IPV6_DROP_MEMBERSHIP failed");
+        }
+        return Result(true);
+    }
+}
+
+SC::Result SC::SocketDescriptor::setMulticastLoopback(SocketFlags::AddressFamily addressFamily, bool enableLoopback)
+{
+    int active = enableLoopback ? 1 : 0;
+    if (addressFamily == SocketFlags::AddressFamilyIPV4)
+    {
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_LOOP, reinterpret_cast<const char*>(&active),
+                         sizeof(active)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IP_MULTICAST_LOOP failed");
+        }
+        return Result(true);
+    }
+    else
+    {
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, reinterpret_cast<const char*>(&active),
+                         sizeof(active)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IPV6_MULTICAST_LOOP failed");
+        }
+        return Result(true);
+    }
+}
+
+SC::Result SC::SocketDescriptor::setMulticastHops(SocketFlags::AddressFamily addressFamily, int hops)
+{
+    if (addressFamily == SocketFlags::AddressFamilyIPV4)
+    {
+        DWORD dhops = hops;
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_TTL, reinterpret_cast<const char*>(&dhops), sizeof(dhops)) ==
+            SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IP_MULTICAST_TTL failed");
+        }
+        return Result(true);
+    }
+    else
+    {
+        DWORD dhops = hops;
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, reinterpret_cast<const char*>(&dhops),
+                         sizeof(dhops)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IPV6_MULTICAST_HOPS failed");
+        }
+        return Result(true);
+    }
+}
+
+SC::Result SC::SocketDescriptor::setMulticastOutboundInterface(const SocketIPAddress& interfaceAddress)
+{
+    if (interfaceAddress.getAddressFamily() == SocketFlags::AddressFamilyIPV4)
+    {
+        struct in_addr addr = interfaceAddress.handle.reinterpret_as<struct sockaddr_in>().sin_addr;
+        if (::setsockopt(handle, IPPROTO_IP, IP_MULTICAST_IF, reinterpret_cast<const char*>(&addr), sizeof(addr)) ==
+            SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IP_MULTICAST_IF failed");
+        }
+        return Result(true);
+    }
+    else
+    {
+        const DWORD interfaceIndex = interfaceAddress.handle.reinterpret_as<struct sockaddr_in6>().sin6_scope_id;
+        if (::setsockopt(handle, IPPROTO_IPV6, IPV6_MULTICAST_IF, reinterpret_cast<const char*>(&interfaceIndex),
+                         sizeof(interfaceIndex)) == SOCKET_ERROR)
+        {
+            return Result::Error("setsockopt IPV6_MULTICAST_IF failed");
+        }
+        return Result(true);
+    }
+}
+
 SC::Result SC::SocketDescriptor::isInheritable(bool& hasValue) const
 {
     DWORD flags;
