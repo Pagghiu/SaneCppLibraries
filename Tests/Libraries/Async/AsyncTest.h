@@ -41,6 +41,9 @@ struct SC::AsyncTest : public SC::TestCase
     void processInputOutputChild();
     void namedPipeInputOutput(bool useThreadPool);
 
+    // Signals
+    void signal();
+
     // Files
     void fileReadWrite(bool useThreadPool);
     void fileEndOfFile(bool useThreadPool);

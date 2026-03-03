@@ -138,6 +138,7 @@ struct SC_COMPILER_EXPORT AsyncRequest
         LoopWakeUp,          ///< Request is an AsyncLoopWakeUp object
         LoopWork,            ///< Request is an AsyncLoopWork object
         ProcessExit,         ///< Request is an AsyncProcessExit object
+        Signal,              ///< Request is an AsyncSignal object
         SocketAccept,        ///< Request is an AsyncSocketAccept object
         SocketConnect,       ///< Request is an AsyncSocketConnect object
         SocketSend,          ///< Request is an AsyncSocketSend object
@@ -400,6 +401,62 @@ struct SC_COMPILER_EXPORT AsyncProcessExit : public AsyncRequest
     AsyncEventLoop*             eventLoop = nullptr;
 #elif SC_PLATFORM_LINUX
     FileDescriptor pidFd;
+#endif
+};
+
+/// @brief Options for AsyncSignal request configuration
+struct AsyncSignalOptions
+{
+    /// @brief Mode of signal watching
+    enum class Mode : uint8_t
+    {
+        Persistent, ///< Callback runs on every delivery until stopped (default)
+        OneShot     ///< Request auto-stops after first successful callback dispatch
+    };
+    Mode mode     = Mode::Persistent; ///< Default mode is Persistent
+    bool coalesce = true;             ///< Merge repeated pending deliveries (default true)
+};
+
+/// @brief Starts monitoring a signal, notifying about its reception.
+/// Multiple watchers can be registered for the same signal on the same or different loops (fanout).
+/// On POSIX systems, signals like `SIGINT`, `SIGTERM`, `SIGHUP` are supported.
+/// On Windows, console control signals `CTRL_C_EVENT`, `CTRL_BREAK_EVENT`, and `CTRL_CLOSE_EVENT`
+/// are mapped to `SIGINT` (2), signal 21, and `SIGTERM` (15) respectively.
+///
+/// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSignalSnippet
+struct SC_COMPILER_EXPORT AsyncSignal : public AsyncRequest
+{
+    AsyncSignal() : AsyncRequest(Type::Signal) {}
+
+    struct CompletionData : public AsyncCompletionData
+    {
+        int      signalNumber  = 0; ///< The signal number that was delivered
+        uint32_t deliveryCount = 1; ///< Number of coalesced deliveries (always >= 1)
+    };
+
+    struct Result : public AsyncResultOf<AsyncSignal, CompletionData>
+    {
+        using AsyncResultOf<AsyncSignal, CompletionData>::AsyncResultOf;
+    };
+    using AsyncRequest::start;
+
+    /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, int num, AsyncSignalOptions options = {});
+
+    Function<void(Result&)> callback; ///< Called when the signal is raised
+
+  private:
+    friend struct AsyncEventLoop;
+    SC::Result validate(AsyncEventLoop&);
+
+    int                signalNumber = 0;
+    AsyncSignalOptions signalOptions;
+#if SC_PLATFORM_WINDOWS
+    detail::WinOverlappedOpaque overlapped;
+    AsyncEventLoop*             eventLoop = nullptr;
+#elif SC_PLATFORM_LINUX
+    FileDescriptor         signalFd;
+    FileDescriptor::Handle signalFdHandle = FileDescriptor::Invalid;
 #endif
 };
 
@@ -976,6 +1033,7 @@ struct SC_COMPILER_EXPORT AsyncCompletionVariant
         AsyncLoopTimeout::CompletionData       completionDataLoopTimeout;
         AsyncLoopWakeUp::CompletionData        completionDataLoopWakeUp;
         AsyncProcessExit::CompletionData       completionDataProcessExit;
+        AsyncSignal::CompletionData            completionDataSignal;
         AsyncSocketAccept::CompletionData      completionDataSocketAccept;
         AsyncSocketConnect::CompletionData     completionDataSocketConnect;
         AsyncSocketSend::CompletionData        completionDataSocketSend;
@@ -994,6 +1052,7 @@ struct SC_COMPILER_EXPORT AsyncCompletionVariant
     auto& getCompletion(AsyncLoopTimeout&) { return completionDataLoopTimeout; }
     auto& getCompletion(AsyncLoopWakeUp&) { return completionDataLoopWakeUp; }
     auto& getCompletion(AsyncProcessExit&) { return completionDataProcessExit; }
+    auto& getCompletion(AsyncSignal&) { return completionDataSignal; }
     auto& getCompletion(AsyncSocketAccept&) { return completionDataSocketAccept; }
     auto& getCompletion(AsyncSocketConnect&) { return completionDataSocketConnect; }
     auto& getCompletion(AsyncSocketSend&) { return completionDataSocketSend; }
@@ -1459,9 +1518,9 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
   public:
     struct SC_COMPILER_EXPORT InternalDefinition
     {
-        static constexpr int Windows = 536;
-        static constexpr int Apple   = 504;
-        static constexpr int Linux   = 720;
+        static constexpr int Windows = 552;
+        static constexpr int Apple   = 520;
+        static constexpr int Linux   = 736;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

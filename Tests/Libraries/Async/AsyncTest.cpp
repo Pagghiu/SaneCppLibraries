@@ -11,6 +11,7 @@
 #include "AsyncTestLoopWork.inl"
 #include "AsyncTestProcess.inl"
 #include "AsyncTestSerialPort.inl"
+#include "AsyncTestSignal.inl"
 #include "AsyncTestSocketTCP.inl"
 #include "AsyncTestSocketUDP.inl"
 
@@ -18,6 +19,7 @@
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Time/Time.h"
+#include <signal.h>
 
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {
@@ -77,6 +79,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         if (test_section("process exit tracked and untracked"))
         {
             processExitTrackedAndUntracked();
+        }
+        if (test_section("signal"))
+        {
+            signal();
         }
 #if SC_XCTEST
 #else
@@ -275,6 +281,22 @@ processExit.callback = [&](AsyncProcessExit::Result& res)
 SC_TRY(processExit.start(eventLoop, process.handle));
 //! [AsyncProcessSnippet]
 SC_TRY(eventLoop.run());
+return Result(true);
+}
+
+SC::Result snippetForSignal(AsyncEventLoop& eventLoop, Console& console)
+{
+//! [AsyncSignalSnippet]
+// Assuming an already created (and running) AsyncEventLoop named eventLoop
+// ...
+AsyncSignal asyncSignal;
+asyncSignal.callback = [&](AsyncSignal::Result& res)
+{
+    console.print("Signal {} received {} times", res.completionData.signalNumber, res.completionData.deliveryCount);
+};
+// On Windows, SIGINT (2) -> CTRL_C_EVENT, 21 -> CTRL_BREAK_EVENT, SIGTERM (15) -> CTRL_CLOSE_EVENT
+SC_TRY(asyncSignal.start(eventLoop, SIGINT));
+//! [AsyncSignalSnippet]
 return Result(true);
 }
 

@@ -1237,6 +1237,321 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncFileSystemOperation&) { return true; }
 
     //-------------------------------------------------------------------------------------------------------
+    // Signal
+    //-------------------------------------------------------------------------------------------------------
+
+    // Process-global registry for Windows console control signals.
+    // Maps console events (CTRL_C_EVENT etc.) to subscribed AsyncSignal watchers.
+    // The console handler callback runs on an OS thread and uses PostQueuedCompletionStatus
+    // to wake the event loop(s).
+    struct AsyncSignalRegistryWindows
+    {
+        // We support 3 console events mapped to signal numbers:
+        // Index 0: SIGINT  (2)  -> CTRL_C_EVENT
+        // Index 1: signal  (21) -> CTRL_BREAK_EVENT
+        // Index 2: SIGTERM (15) -> CTRL_CLOSE_EVENT
+        static constexpr int kMaxSlots = 3;
+
+        struct Subscriber
+        {
+            AsyncSignal* signal     = nullptr;
+            HANDLE       iocpHandle = INVALID_HANDLE_VALUE;
+            Subscriber*  next       = nullptr;
+        };
+
+        struct Slot
+        {
+            uint32_t    refCount = 0;
+            Subscriber* head     = nullptr;
+        };
+
+        Slot             slots[kMaxSlots];
+        CRITICAL_SECTION cs;
+        bool             handlerInstalled = false;
+
+        // Fixed pool of subscribers - no dynamic allocation.
+        // We support up to 32 concurrent signal watchers across all loops.
+        static constexpr int kMaxSubscribers = 32;
+        Subscriber           subscriberPool[kMaxSubscribers];
+        bool                 subscriberInUse[kMaxSubscribers] = {};
+
+        AsyncSignalRegistryWindows() { ::InitializeCriticalSection(&cs); }
+
+        ~AsyncSignalRegistryWindows()
+        {
+            if (handlerInstalled)
+            {
+                ::SetConsoleCtrlHandler(consoleCtrlHandler, FALSE);
+                handlerInstalled = false;
+            }
+            ::DeleteCriticalSection(&cs);
+        }
+
+        static AsyncSignalRegistryWindows& get()
+        {
+            static AsyncSignalRegistryWindows instance;
+            return instance;
+        }
+
+        static int signalToIndex(int signalNumber)
+        {
+            switch (signalNumber)
+            {
+            case 2: return 0;  // SIGINT  -> CTRL_C_EVENT
+            case 21: return 1; // SIGBREAK -> CTRL_BREAK_EVENT
+            case 15: return 2; // SIGTERM -> CTRL_CLOSE_EVENT
+            }
+            return -1;
+        }
+
+        static int ctrlTypeToIndex(DWORD ctrlType)
+        {
+            switch (ctrlType)
+            {
+            case CTRL_C_EVENT: return 0;
+            case CTRL_BREAK_EVENT: return 1;
+            case CTRL_CLOSE_EVENT: return 2;
+            }
+            return -1;
+        }
+
+        static int indexToSignalNumber(int index)
+        {
+            switch (index)
+            {
+            case 0: return 2;  // SIGINT
+            case 1: return 21; // SIGBREAK
+            case 2: return 15; // SIGTERM
+            }
+            return 0;
+        }
+
+        Subscriber* allocateSubscriber()
+        {
+            for (int i = 0; i < kMaxSubscribers; ++i)
+            {
+                if (not subscriberInUse[i])
+                {
+                    subscriberInUse[i] = true;
+                    subscriberPool[i]  = Subscriber();
+                    return &subscriberPool[i];
+                }
+            }
+            return nullptr;
+        }
+
+        void freeSubscriber(Subscriber* sub)
+        {
+            for (int i = 0; i < kMaxSubscribers; ++i)
+            {
+                if (&subscriberPool[i] == sub)
+                {
+                    subscriberInUse[i] = false;
+                    return;
+                }
+            }
+        }
+
+        Result add(AsyncSignal& async, HANDLE iocpHandle)
+        {
+            const int index = signalToIndex(async.signalNumber);
+            SC_TRY_MSG(index >= 0, "AsyncSignal - Invalid signal index");
+
+            ::EnterCriticalSection(&cs);
+
+            Subscriber* sub = allocateSubscriber();
+            if (sub == nullptr)
+            {
+                ::LeaveCriticalSection(&cs);
+                return Result::Error("AsyncSignal - Too many signal subscribers");
+            }
+            sub->signal     = &async;
+            sub->iocpHandle = iocpHandle;
+
+            // Add to linked list
+            sub->next         = slots[index].head;
+            slots[index].head = sub;
+            slots[index].refCount += 1;
+
+            if (not handlerInstalled)
+            {
+                ::SetConsoleCtrlHandler(consoleCtrlHandler, TRUE);
+                handlerInstalled = true;
+            }
+
+            ::LeaveCriticalSection(&cs);
+            return Result(true);
+        }
+
+        Result remove(AsyncSignal& async)
+        {
+            const int index = signalToIndex(async.signalNumber);
+            if (index < 0)
+            {
+                return Result(true);
+            }
+
+            ::EnterCriticalSection(&cs);
+
+            Subscriber** pp = &slots[index].head;
+            while (*pp)
+            {
+                if ((*pp)->signal == &async)
+                {
+                    Subscriber* toFree = *pp;
+                    *pp                = toFree->next;
+                    freeSubscriber(toFree);
+                    slots[index].refCount -= 1;
+                    break;
+                }
+                pp = &(*pp)->next;
+            }
+
+            // Check if we can uninstall the handler
+            bool anyActive = false;
+            for (int i = 0; i < kMaxSlots; ++i)
+            {
+                if (slots[i].refCount > 0)
+                {
+                    anyActive = true;
+                    break;
+                }
+            }
+            if (not anyActive and handlerInstalled)
+            {
+                ::SetConsoleCtrlHandler(consoleCtrlHandler, FALSE);
+                handlerInstalled = false;
+            }
+
+            ::LeaveCriticalSection(&cs);
+            return Result(true);
+        }
+
+        static BOOL WINAPI consoleCtrlHandler(DWORD ctrlType)
+        {
+            AsyncSignalRegistryWindows& reg   = get();
+            const int                   index = ctrlTypeToIndex(ctrlType);
+            if (index < 0)
+            {
+                return FALSE;
+            }
+
+            ::EnterCriticalSection(&reg.cs);
+
+            Subscriber* sub = reg.slots[index].head;
+            while (sub)
+            {
+                if (sub->signal and sub->iocpHandle != INVALID_HANDLE_VALUE)
+                {
+                    OVERLAPPED* overlapped = &sub->signal->overlapped.get().overlapped;
+                    // Post to the signal's event loop IOCP with the signal number in dwNumberOfBytesTransferred
+                    ::PostQueuedCompletionStatus(sub->iocpHandle, static_cast<DWORD>(indexToSignalNumber(index)), 0,
+                                                 overlapped);
+                }
+                sub = sub->next;
+            }
+
+            ::LeaveCriticalSection(&reg.cs);
+            return TRUE;
+        }
+    };
+
+    static Result setupAsync(AsyncEventLoop& eventLoop, AsyncSignal& async)
+    {
+        // Store reference to event loop and set up overlapped for IOCP dispatch
+        async.eventLoop                 = &eventLoop;
+        async.overlapped.get().userData = &async;
+
+        // Get the IOCP handle for this loop
+        FileDescriptor::Handle loopHandle;
+        SC_TRY(eventLoop.internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loop handle")));
+
+        // Register in the global signal registry
+        return AsyncSignalRegistryWindows::get().add(async, loopHandle);
+    }
+
+    static Result completeAsync(AsyncSignal::Result& result)
+    {
+        // The signal number is passed via dwNumberOfBytesTransferred in PostQueuedCompletionStatus
+        // Extract it from the OVERLAPPED_ENTRY
+        result.completionData.signalNumber  = result.getAsync().signalNumber;
+        result.completionData.deliveryCount = 1;
+
+        // For OneShot mode, do not reactivate
+        if (result.getAsync().signalOptions.mode == AsyncSignalOptions::Mode::OneShot)
+        {
+            // The framework will teardown since we don't call reactivateRequest
+        }
+        return Result(true);
+    }
+
+    static Result cancelAsync(AsyncEventLoop&, AsyncSignal&)
+    {
+        // Nothing to cancel in the kernel - the global handler just stops posting
+        return Result(true);
+    }
+
+    static Result teardownAsync(AsyncSignal*, AsyncTeardown& teardown)
+    {
+        // Deregister from the global registry using just the signal number
+        // We need to find the actual AsyncSignal pointer from the teardown.
+        // Since teardownAsync receives a nullptr for the first arg (type-erased dispatch),
+        // we use a different approach: remove by signal number from all subscribers
+        // that belong to this event loop.
+        AsyncSignalRegistryWindows& reg   = AsyncSignalRegistryWindows::get();
+        const int                   index = AsyncSignalRegistryWindows::signalToIndex(teardown.signalNumber);
+        if (index < 0)
+        {
+            return Result(true);
+        }
+
+        ::EnterCriticalSection(&reg.cs);
+
+        // Find and remove subscriber matching this loop's IOCP handle and signal number
+        FileDescriptor::Handle loopHandle = FileDescriptor::Invalid;
+        if (teardown.eventLoop)
+        {
+            (void)teardown.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error(""));
+        }
+
+        Subscriber** pp = &reg.slots[index].head;
+        while (*pp)
+        {
+            if ((*pp)->iocpHandle == loopHandle)
+            {
+                Subscriber* toFree = *pp;
+                *pp                = toFree->next;
+                reg.freeSubscriber(toFree);
+                reg.slots[index].refCount -= 1;
+                // Don't break - there may be multiple subscribers on same loop for same signal
+                continue;
+            }
+            pp = &(*pp)->next;
+        }
+
+        // Check if we can uninstall the handler
+        bool anyActive = false;
+        for (int i = 0; i < AsyncSignalRegistryWindows::kMaxSlots; ++i)
+        {
+            if (reg.slots[i].refCount > 0)
+            {
+                anyActive = true;
+                break;
+            }
+        }
+        if (not anyActive and reg.handlerInstalled)
+        {
+            ::SetConsoleCtrlHandler(AsyncSignalRegistryWindows::consoleCtrlHandler, FALSE);
+            reg.handlerInstalled = false;
+        }
+
+        ::LeaveCriticalSection(&reg.cs);
+        return Result(true);
+    }
+
+    using Subscriber = AsyncSignalRegistryWindows::Subscriber;
+
+    //-------------------------------------------------------------------------------------------------------
     // Template
     //-------------------------------------------------------------------------------------------------------
     template <typename T>

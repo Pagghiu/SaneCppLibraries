@@ -8,10 +8,12 @@
 
 #include <arpa/inet.h>    // sockaddr_in
 #include <errno.h>        // errno
+#include <signal.h>       // sigset_t
 #include <stdint.h>       // uint32_t
 #include <sys/eventfd.h>  // eventfd
 #include <sys/poll.h>     // POLLIN
 #include <sys/sendfile.h> // sendfile
+#include <sys/signalfd.h> // signalfd
 #include <sys/syscall.h>  // SYS_pidfd_open
 #include <sys/wait.h>     // waitpid
 
@@ -646,6 +648,47 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)
     {
         // pidfd is copied to fileHandle inside prepareTeardown
+        return Result(::close(teardown.fileHandle) == 0);
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    // Signal
+    //-------------------------------------------------------------------------------------------------------
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncSignal& async)
+    {
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, async.signalNumber);
+
+        // We must block the signal from the default handler, otherwise the default handler might catch it
+        // before signalfd does.
+        ::sigprocmask(SIG_BLOCK, &mask, nullptr);
+
+        const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
+        SC_TRY_MSG(sigFd >= 0, "signalfd failed");
+        SC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
+        async.signalFdHandle = sigFd;
+
+        io_uring_sqe* submission;
+        SC_TRY(getNewSubmission(eventLoop, submission));
+        globalLibURing.io_uring_prep_poll_add(submission, sigFd, POLLIN);
+        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncSignal::Result& result)
+    {
+        struct signalfd_siginfo fdsi;
+        ssize_t                 s = ::read(result.getAsync().signalFdHandle, &fdsi, sizeof(struct signalfd_siginfo));
+        SC_TRY_MSG(s == sizeof(struct signalfd_siginfo), "signalfd read failed");
+        result.completionData.signalNumber  = static_cast<int>(fdsi.ssi_signo);
+        result.completionData.deliveryCount = 1;
+        return Result(true);
+    }
+
+    static Result teardownAsync(AsyncSignal*, AsyncTeardown& teardown)
+    {
+        // signalFd is copied to fileHandle inside prepareTeardown
         return Result(::close(teardown.fileHandle) == 0);
     }
 

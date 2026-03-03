@@ -5,6 +5,7 @@
 #include "Internal/AsyncInternal.h"
 #include "Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
+#include <signal.h> // SIGKILL / SIGSTOP
 #include <string.h> // strncpy
 
 #if SC_PLATFORM_WINDOWS
@@ -47,6 +48,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::LoopWakeUp: return "LoopWakeUp";
     case Type::LoopWork: return "LoopWork";
     case Type::ProcessExit: return "ProcessExit";
+    case Type::Signal: return "Signal";
     case Type::SocketAccept: return "SocketAccept";
     case Type::SocketConnect: return "SocketConnect";
     case Type::SocketSend: return "SocketSend";
@@ -248,6 +250,32 @@ SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, FileDescriptor::Han
 SC::Result SC::AsyncProcessExit::validate(AsyncEventLoop&)
 {
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncProcessExit - Invalid handle");
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncSignal::start(AsyncEventLoop& loop, int num, AsyncSignalOptions opts)
+{
+    signalNumber  = num;
+    signalOptions = opts;
+    return loop.start(*this);
+}
+
+SC::Result SC::AsyncSignal::validate(AsyncEventLoop&)
+{
+    SC_TRY_MSG(signalNumber > 0, "AsyncSignal - Invalid signal number");
+#if SC_PLATFORM_WINDOWS
+    // Only console control signals are supported on Windows:
+    // SIGINT (2) -> CTRL_C_EVENT, 21 -> CTRL_BREAK_EVENT, SIGTERM (15) -> CTRL_CLOSE_EVENT
+    SC_TRY_MSG(signalNumber == 2 or signalNumber == 21 or signalNumber == 15,
+               "AsyncSignal - Unsupported signal on Windows (only SIGINT=2, SIGBREAK=21, SIGTERM=15)");
+#else
+#if defined(SIGKILL)
+    SC_TRY_MSG(signalNumber != SIGKILL, "AsyncSignal - SIGKILL cannot be handled");
+#endif
+#if defined(SIGSTOP)
+    SC_TRY_MSG(signalNumber != SIGSTOP, "AsyncSignal - SIGSTOP cannot be handled");
+#endif
+#endif
     return SC::Result(true);
 }
 
@@ -927,6 +955,7 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     internal.enumerateRequests(internal.activeLoopTimeouts, enumerationCallback);
     internal.enumerateRequests(internal.activeLoopWakeUps, enumerationCallback);
     internal.enumerateRequests(internal.activeProcessExits, enumerationCallback);
+    internal.enumerateRequests(internal.activeSignals, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketAccepts, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketConnects, enumerationCallback);
     internal.enumerateRequests(internal.activeSocketSends, enumerationCallback);
@@ -1239,6 +1268,7 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     stopRequests(eventLoop, activeLoopTimeouts);
     stopRequests(eventLoop, activeLoopWakeUps);
     stopRequests(eventLoop, activeProcessExits);
+    stopRequests(eventLoop, activeSignals);
     stopRequests(eventLoop, activeSocketAccepts);
     stopRequests(eventLoop, activeSocketConnects);
     stopRequests(eventLoop, activeSocketSends);
@@ -1734,6 +1764,17 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
         teardown.processHandle = static_cast<AsyncProcessExit&>(async).handle;
         break;
 
+    case AsyncRequest::Type::Signal:
+#if SC_PLATFORM_WINDOWS
+        teardown.signalNumber = static_cast<AsyncSignal&>(async).signalNumber;
+#elif SC_PLATFORM_LINUX
+        (void)static_cast<AsyncSignal&>(async).signalFd.get(teardown.fileHandle, Result::Error("missing signalfd"));
+        static_cast<AsyncSignal&>(async).signalFd.detach();
+#elif SC_PLATFORM_APPLE
+        teardown.signalNumber = static_cast<AsyncSignal&>(async).signalNumber;
+#endif
+        break;
+
     // Socket
     case AsyncRequest::Type::SocketAccept:  teardown.socketHandle = static_cast<AsyncSocketAccept&>(async).handle; break;
     case AsyncRequest::Type::SocketConnect: teardown.socketHandle = static_cast<AsyncSocketConnect&>(async).handle; break;
@@ -1790,6 +1831,9 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
         break;
     case AsyncRequest::Type::ProcessExit:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncProcessExit*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::Signal:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSignal*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::SocketAccept:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncSocketAccept*>(nullptr), teardown));
@@ -2019,6 +2063,7 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
         case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.remove(*static_cast<AsyncLoopWakeUp*>(&async));       break;
         case AsyncRequest::Type::LoopWork:      activeLoopWork.remove(*static_cast<AsyncLoopWork*>(&async));            break;
         case AsyncRequest::Type::ProcessExit:   activeProcessExits.remove(*static_cast<AsyncProcessExit*>(&async));     break;
+        case AsyncRequest::Type::Signal:        activeSignals.remove(*static_cast<AsyncSignal*>(&async));               break;
         case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.remove(*static_cast<AsyncSocketAccept*>(&async));   break;
         case AsyncRequest::Type::SocketConnect: activeSocketConnects.remove(*static_cast<AsyncSocketConnect*>(&async)); break;
         case AsyncRequest::Type::SocketSend:    activeSocketSends.remove(*static_cast<AsyncSocketSend*>(&async));       break;
@@ -2103,6 +2148,7 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     case AsyncRequest::Type::LoopWakeUp:    activeLoopWakeUps.queueBack(*static_cast<AsyncLoopWakeUp*>(&async));        break;
     case AsyncRequest::Type::LoopWork:      activeLoopWork.queueBack(*static_cast<AsyncLoopWork*>(&async));             break;
     case AsyncRequest::Type::ProcessExit:   activeProcessExits.queueBack(*static_cast<AsyncProcessExit*>(&async));      break;
+    case AsyncRequest::Type::Signal:        activeSignals.queueBack(*static_cast<AsyncSignal*>(&async));                break;
     case AsyncRequest::Type::SocketAccept:  activeSocketAccepts.queueBack(*static_cast<AsyncSocketAccept*>(&async));    break;
     case AsyncRequest::Type::SocketConnect: activeSocketConnects.queueBack(*static_cast<AsyncSocketConnect*>(&async));  break;
     case AsyncRequest::Type::SocketSend:    activeSocketSends.queueBack(*static_cast<AsyncSocketSend*>(&async));        break;
@@ -2135,6 +2181,7 @@ SC::Result SC::AsyncEventLoop::Internal::applyOnAsync(AsyncRequest& async, Lambd
     case AsyncRequest::Type::LoopWakeUp: SC_TRY(lambda(*static_cast<AsyncLoopWakeUp*>(&async))); break;
     case AsyncRequest::Type::LoopWork: SC_TRY(lambda(*static_cast<AsyncLoopWork*>(&async))); break;
     case AsyncRequest::Type::ProcessExit: SC_TRY(lambda(*static_cast<AsyncProcessExit*>(&async))); break;
+    case AsyncRequest::Type::Signal: SC_TRY(lambda(*static_cast<AsyncSignal*>(&async))); break;
     case AsyncRequest::Type::SocketAccept: SC_TRY(lambda(*static_cast<AsyncSocketAccept*>(&async))); break;
     case AsyncRequest::Type::SocketConnect: SC_TRY(lambda(*static_cast<AsyncSocketConnect*>(&async))); break;
     case AsyncRequest::Type::SocketSend: SC_TRY(lambda(*static_cast<AsyncSocketSend*>(&async))); break;
@@ -2187,6 +2234,7 @@ void SC::detail::AsyncCompletionVariant::destroy()
     case AsyncRequest::Type::LoopTimeout: dtor(completionDataLoopTimeout); break;
     case AsyncRequest::Type::LoopWakeUp: dtor(completionDataLoopWakeUp); break;
     case AsyncRequest::Type::ProcessExit: dtor(completionDataProcessExit); break;
+    case AsyncRequest::Type::Signal: dtor(completionDataSignal); break;
     case AsyncRequest::Type::SocketAccept: dtor(completionDataSocketAccept); break;
     case AsyncRequest::Type::SocketConnect: dtor(completionDataSocketConnect); break;
     case AsyncRequest::Type::SocketSend: dtor(completionDataSocketSend); break;

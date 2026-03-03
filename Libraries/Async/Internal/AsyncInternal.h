@@ -96,6 +96,7 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncLoopWakeUp>        activeLoopWakeUps;
     IntrusiveDoubleLinkedList<AsyncLoopWork>          activeLoopWork;
     IntrusiveDoubleLinkedList<AsyncProcessExit>       activeProcessExits;
+    IntrusiveDoubleLinkedList<AsyncSignal>            activeSignals;
     IntrusiveDoubleLinkedList<AsyncSocketAccept>      activeSocketAccepts;
     IntrusiveDoubleLinkedList<AsyncSocketConnect>     activeSocketConnects;
     IntrusiveDoubleLinkedList<AsyncSocketSend>        activeSocketSends;
@@ -213,6 +214,7 @@ struct SC::AsyncEventLoop::Internal
         FileDescriptor::Handle   fileHandle    = FileDescriptor::Invalid;
         SocketDescriptor::Handle socketHandle  = SocketDescriptor::Invalid;
         FileDescriptor::Handle   processHandle = FileDescriptor::Invalid;
+        int32_t                  signalNumber  = 0;
 #if SC_CONFIGURATION_DEBUG
         char debugName[128] = "None";
 #endif

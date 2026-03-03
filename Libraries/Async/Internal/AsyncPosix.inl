@@ -7,6 +7,7 @@
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Deferred.h"
 #include "../../Socket/Socket.h"
+#include <stdint.h> // uint32_t
 
 #if SC_PLATFORM_LINUX
 #define SC_ASYNC_USE_EPOLL 1 // uses epoll
@@ -16,9 +17,11 @@
 
 #include <errno.h>        // For error handling
 #include <fcntl.h>        // For fcntl function (used for setting non-blocking mode)
+#include <signal.h>       // sigset_t
 #include <sys/epoll.h>    // For epoll functions
 #include <sys/eventfd.h>  // For eventfd functions
 #include <sys/sendfile.h> // For sendfile
+#include <sys/signalfd.h> // signalfd
 #include <sys/socket.h>   // For socket-related functions
 #include <sys/stat.h>     // fstat
 #include <sys/syscall.h>  // SYS_pidfd_open
@@ -30,12 +33,76 @@
 
 #include <errno.h>     // For error handling
 #include <netdb.h>     // socklen_t/getsockopt/recv
+#include <signal.h>    // signal / sigset_t
 #include <sys/event.h> // kqueue
 #include <sys/stat.h>  // fstat
 #include <sys/time.h>  // timespec
 #include <sys/uio.h>   // writev, pwritev
 #include <sys/wait.h>  // WIFEXITED / WEXITSTATUS
 #include <unistd.h>    // read/write/pread/pwrite
+#endif
+
+#if not SC_ASYNC_USE_EPOLL
+namespace SC
+{
+namespace
+{
+struct AsyncSignalDispositionRegistry
+{
+    struct Entry
+    {
+        uint32_t refCount       = 0;
+        void (*oldHandler)(int) = SIG_DFL;
+        bool hasSavedHandler    = false;
+    };
+
+    Entry entries[NSIG];
+
+    static AsyncSignalDispositionRegistry& get()
+    {
+        static AsyncSignalDispositionRegistry registry;
+        return registry;
+    }
+
+    Result add(int signalNumber)
+    {
+        SC_TRY_MSG(signalNumber > 0 and signalNumber < NSIG, "AsyncSignal - Invalid signal number");
+        Entry& entry = entries[signalNumber];
+        if (entry.refCount == 0)
+        {
+            void (*oldHandler)(int) = ::signal(signalNumber, SIG_IGN);
+            SC_TRY_MSG(oldHandler != SIG_ERR, "AsyncSignal - signal(SIG_IGN) failed");
+            entry.oldHandler      = oldHandler;
+            entry.hasSavedHandler = true;
+        }
+        entry.refCount += 1;
+        return Result(true);
+    }
+
+    Result remove(int signalNumber)
+    {
+        if (signalNumber <= 0 or signalNumber >= NSIG)
+        {
+            return Result(true);
+        }
+        Entry& entry = entries[signalNumber];
+        if (entry.refCount == 0)
+        {
+            return Result(true);
+        }
+        entry.refCount -= 1;
+        if (entry.refCount == 0 and entry.hasSavedHandler)
+        {
+            void (*oldHandler)(int) = ::signal(signalNumber, entry.oldHandler);
+            SC_TRY_MSG(oldHandler != SIG_ERR, "AsyncSignal - restoring signal handler failed");
+            entry.oldHandler      = SIG_DFL;
+            entry.hasSavedHandler = false;
+        }
+        return Result(true);
+    }
+};
+} // namespace
+} // namespace SC
 #endif
 
 struct SC::AsyncEventLoop::Internal::KernelQueuePosix
@@ -1355,6 +1422,73 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             return Result(true);
         }
         return Result(false);
+    }
+#endif
+
+    //-------------------------------------------------------------------------------------------------------
+    // Signal
+    //-------------------------------------------------------------------------------------------------------
+#if SC_ASYNC_USE_EPOLL
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncSignal& async)
+    {
+        sigset_t mask;
+        sigemptyset(&mask);
+        sigaddset(&mask, async.signalNumber);
+
+        // We must block the signal from the default handler, otherwise the default handler might catch it
+        // before signalfd does. Usually, this should be done globally, but we do it here for convenience.
+        ::sigprocmask(SIG_BLOCK, &mask, nullptr);
+
+        const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
+        SC_TRY_MSG(sigFd >= 0, "signalfd failed");
+        SC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
+        async.signalFdHandle = sigFd;
+        return setEventWatcher(eventLoop, async, sigFd, INPUT_EVENTS_MASK);
+    }
+
+    static Result teardownAsync(AsyncSignal*, AsyncTeardown& teardown)
+    {
+        if (teardown.fileHandle == FileDescriptor::Invalid)
+        {
+            return Result(true);
+        }
+        SC_TRY(
+            KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.fileHandle, INPUT_EVENTS_MASK));
+        return Result(::close(teardown.fileHandle) == 0);
+    }
+
+    Result completeAsync(AsyncSignal::Result& result)
+    {
+        struct signalfd_siginfo fdsi;
+        ssize_t                 s = ::read(result.getAsync().signalFdHandle, &fdsi, sizeof(struct signalfd_siginfo));
+        SC_TRY_MSG(s == sizeof(struct signalfd_siginfo), "signalfd read failed");
+        result.completionData.signalNumber  = static_cast<int>(fdsi.ssi_signo);
+        result.completionData.deliveryCount = 1;
+        return Result(true);
+    }
+#else
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncSignal& async)
+    {
+        SC_TRY(AsyncSignalDispositionRegistry::get().add(async.signalNumber));
+        return setEventWatcher(eventLoop, async, async.signalNumber, EVFILT_SIGNAL, 0);
+    }
+
+    static Result teardownAsync(AsyncSignal*, AsyncTeardown& teardown)
+    {
+        SC_TRY(KernelQueuePosix::stopSingleWatcherImmediate(*teardown.eventLoop, teardown.signalNumber, EVFILT_SIGNAL));
+        SC_TRY(AsyncSignalDispositionRegistry::get().remove(teardown.signalNumber));
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncSignal::Result& result)
+    {
+        SC_TRY_MSG(result.eventIndex >= 0, "Invalid event Index");
+        const struct kevent event = events[result.eventIndex];
+        // ident contains the signal number
+        result.completionData.signalNumber = static_cast<int>(event.ident);
+        // data field contains the number of times the signal was generated since last delivery
+        result.completionData.deliveryCount = event.data > 0 ? static_cast<uint32_t>(event.data) : 1;
+        return Result(true);
     }
 #endif
 

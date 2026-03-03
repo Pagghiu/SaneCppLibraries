@@ -37,6 +37,7 @@ This is the list of supported async operations:
 | [AsyncFilePoll](@ref SC::AsyncFilePoll)                       | @copybrief SC::AsyncFilePoll              |
 | [AsyncSequence](@ref SC::AsyncSequence)                       | @copybrief SC::AsyncSequence              |
 | [AsyncFileSystemOperation](@ref SC::AsyncFileSystemOperation) | @copybrief SC::AsyncFileSystemOperation   |
+| [AsyncSignal](@ref SC::AsyncSignal)                           | @copybrief SC::AsyncSignal                |
 
 # Details
 
@@ -128,6 +129,9 @@ This is very useful to integrate the event loop into applications with other eve
 ## AsyncProcessExit
 @copydoc SC::AsyncProcessExit
 
+## AsyncSignal
+@copydoc SC::AsyncSignal
+
 ## AsyncSocketAccept
 @copydoc SC::AsyncSocketAccept
 
@@ -194,7 +198,7 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 
 🟦 Complete Features:
 - TTY with ANSI Escape Codes
-- Signal handling
+- Signal handling (multi-watcher, cross-platform)
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
