@@ -289,20 +289,79 @@ bool SC::HttpParser::matchesHeader(HeaderType headerName) const
 template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Token currentResult>
 SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData)
 {
+    static constexpr StringSpan headers[] = {"Content-Length", "Connection"};
+
     const auto initialStart  = tokenStart;
     const auto initialLength = tokenLength;
+    const auto bytes         = data.data();
 
     token     = currentResult;
     state     = State::Parsing;
     readBytes = 0;
-    for (auto c : data)
+
+    bool fastPath = false;
+
+    const size_t dataSize = data.sizeInBytes();
+    if (nestedParserCoroutine == 0 and tokenLength == 0 and dataSize > 0)
     {
-        tokenLength++;
-        SC_TRY((this->*Func)(c)); // can modify start or length with spaces
-        readBytes++;
-        if (state == State::Result)
+        if (Func == &HttpParser::parseHeaderName)
         {
-            break;
+            const auto found = ::memchr(bytes, ':', dataSize);
+            if (found != nullptr)
+            {
+                const size_t headerLen = static_cast<size_t>(static_cast<const char*>(found) - bytes);
+                for (size_t idx = 0; idx < numMatches; ++idx)
+                {
+                    matchingHeaderValid[idx] = false;
+                    if (headers[idx].sizeInBytes() == headerLen and
+                        ::memcmp(headers[idx].bytesWithoutTerminator(), bytes, headerLen) == 0)
+                    {
+                        matchingHeaderValid[idx] = true;
+                    }
+                }
+                tokenLength = headerLen;
+                readBytes   = headerLen + 1;
+                state       = State::Result;
+                fastPath    = true;
+            }
+        }
+        else if (Func == &HttpParser::parseHeaderValue)
+        {
+            size_t startIndex = 0;
+            while (startIndex < dataSize and bytes[startIndex] == ' ')
+            {
+                startIndex++;
+            }
+            const void* const found =
+                startIndex < dataSize ? ::memchr(bytes + startIndex, '\r', dataSize - startIndex) : nullptr;
+            if (found != nullptr)
+            {
+                const size_t crIndex = static_cast<size_t>(static_cast<const char*>(found) - bytes);
+                if (crIndex + 1 < dataSize and bytes[crIndex + 1] == '\n')
+                {
+                    tokenStart += startIndex;
+                    tokenLength = crIndex - startIndex;
+                    readBytes   = crIndex + 2;
+                    state       = State::Result;
+                    fastPath    = true;
+                }
+            }
+        }
+    }
+    if (not fastPath)
+    {
+        const char* it  = data.data();
+        const char* end = it + data.sizeInBytes();
+        while (it != end)
+        {
+            tokenLength++;
+            SC_TRY((this->*Func)(*it)); // can modify start or length with spaces
+            readBytes++;
+            if (state == State::Result)
+            {
+                break;
+            }
+            ++it;
         }
     }
     globalLength += readBytes;
