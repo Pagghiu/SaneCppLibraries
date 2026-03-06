@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpConnection.h"
-#include "Internal/HttpStringAppend.h"
 #include "Internal/HttpStringIterator.h"
 
 namespace SC
@@ -66,6 +65,7 @@ void HttpRequest::reset()
 {
     headersEndReceived = false;
     parsedSuccessfully = true;
+    headersEndMatch    = 0;
     numHeaders         = 0;
     parser             = {};
 }
@@ -73,34 +73,86 @@ void HttpRequest::reset()
 Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readData, AsyncReadableStream& stream,
                                  AsyncBufferView::ID bufferID)
 {
-    // TODO: Handle error for available headers not big enough
-    SC_TRY_MSG(readData.sizeInBytes() <= availableHeader.sizeInBytes(), "HttpRequest::parseHeaders - readData");
-    const Span<const char> initialReadData = readData;
-
-    const size_t initialReadSize = readHeaders.sizeInBytes();
-    size_t       totalReadBytes  = 0;
-
-    size_t readBytes;
-    while (parsedSuccessfully and not readData.empty())
+    if (headersEndReceived)
     {
-        Span<const char> parsedData;
-        parsedSuccessfully &= parser.parse(readData, readBytes, parsedData);
-        totalReadBytes += readBytes;
+        return Result(true);
+    }
 
-        if (totalReadBytes > availableHeader.sizeInBytes())
+    size_t bytesToCopy     = readData.sizeInBytes();
+    bool   foundHeadersEnd = false;
+
+    for (size_t idx = 0; idx < readData.sizeInBytes(); ++idx)
+    {
+        const char current = readData.data()[idx];
+        switch (headersEndMatch)
+        {
+        case 0: headersEndMatch = static_cast<uint8_t>(current == '\r' ? 1 : 0); break;
+        case 1:
+            if (current == '\n')
+                headersEndMatch = 2;
+            else if (current == '\r')
+                headersEndMatch = 1;
+            else
+                headersEndMatch = 0;
+            break;
+        case 2: headersEndMatch = static_cast<uint8_t>(current == '\r' ? 3 : 0); break;
+        case 3:
+            if (current == '\n')
+            {
+                headersEndMatch = 4;
+            }
+            else if (current == '\r')
+            {
+                headersEndMatch = 1;
+            }
+            else
+            {
+                headersEndMatch = 0;
+            }
+            break;
+        default: headersEndMatch = 0; break;
+        }
+
+        if (headersEndMatch == 4)
+        {
+            foundHeadersEnd = true;
+            bytesToCopy     = idx + 1;
+            headersEndMatch = 0;
+            break;
+        }
+    }
+
+    if (bytesToCopy > 0)
+    {
+        SC_TRY_MSG(bytesToCopy <= availableHeader.sizeInBytes(), "Header space is finished");
+        SC_TRY_MSG(readHeaders.sizeInBytes() + bytesToCopy <= maxSize, "Header size exceeded limit");
+
+        const size_t previousHeaderSize = readHeaders.sizeInBytes();
+        ::memcpy(availableHeader.data(), readData.data(), bytesToCopy);
+        readHeaders = {readHeaders.data(), previousHeaderSize + bytesToCopy};
+
+        if (not availableHeader.sliceStart(bytesToCopy, availableHeader))
         {
             parsedSuccessfully = false;
             return Result::Error("Header space is finished");
         }
+    }
 
-        if (initialReadSize + totalReadBytes > maxSize)
+    if (not foundHeadersEnd)
+    {
+        return Result(true);
+    }
+
+    Span<const char> headerData = {readHeaders.data(), readHeaders.sizeInBytes()};
+    size_t           readBytes;
+    while (parsedSuccessfully and parser.state != HttpParser::State::Finished)
+    {
+        Span<const char> parsedData;
+        parsedSuccessfully &= parser.parse(headerData, readBytes, parsedData);
+        if (not parsedSuccessfully)
         {
-            parsedSuccessfully = false;
-            return Result::Error("Header size exceeded limit");
-        }
-
-        if (parser.state == HttpParser::State::Finished)
             break;
+        }
 
         if (parser.state == HttpParser::State::Result)
         {
@@ -116,38 +168,36 @@ Result HttpRequest::writeHeaders(const uint32_t maxSize, Span<const char> readDa
             else
             {
                 parsedSuccessfully = false;
-            }
-            if (parser.token == HttpParser::Token::HeadersEnd)
-            {
-                headersEndReceived = true;
-                SC_TRY(findParserToken(HttpParser::Token::Url, url));
-                if (readBytes < readData.sizeInBytes())
-                {
-                    const size_t bodyOffset = totalReadBytes;
-                    const size_t bodyLength = initialReadData.sizeInBytes() - bodyOffset;
-
-                    AsyncBufferView::ID childID;
-                    SC_TRY(stream.getBuffersPool().createChildView(bufferID, bodyOffset, bodyLength, childID));
-                    SC_TRY(stream.unshift(childID));
-                    stream.getBuffersPool().unrefBuffer(childID);
-                }
                 break;
             }
         }
-        parsedSuccessfully &= readData.sliceStart(readBytes, readData);
-    }
 
-    if (totalReadBytes > 0)
-    {
-        ::memcpy(availableHeader.data(), initialReadData.data(), totalReadBytes);
-        readHeaders = {readHeaders.data(), initialReadSize + totalReadBytes};
-        if (not availableHeader.sliceStart(totalReadBytes, availableHeader))
+        if (readBytes > 0)
+        {
+            parsedSuccessfully &= headerData.sliceStart(readBytes, headerData);
+        }
+        else if (parser.state != HttpParser::State::Finished)
         {
             parsedSuccessfully = false;
-            return Result::Error("Header space is finished");
+            break;
         }
     }
-    return Result(parsedSuccessfully);
+
+    SC_TRY(parsedSuccessfully);
+    headersEndReceived = true;
+    SC_TRY(findParserToken(HttpParser::Token::Url, url));
+
+    if (bytesToCopy < readData.sizeInBytes())
+    {
+        const size_t        bodyOffset = bytesToCopy;
+        const size_t        bodyLength = readData.sizeInBytes() - bodyOffset;
+        AsyncBufferView::ID childID;
+        SC_TRY(stream.getBuffersPool().createChildView(bufferID, bodyOffset, bodyLength, childID));
+        SC_TRY(stream.unshift(childID));
+        stream.getBuffersPool().unrefBuffer(childID);
+    }
+
+    return Result(true);
 }
 
 size_t HttpRequest::getHeadersLength() const
@@ -212,17 +262,13 @@ Result HttpResponse::startResponse(int code)
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() == 0, "startResponse must be the first call");
-    GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
-
-    HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
-
-    SC_TRY(sb.append("HTTP/1.1 "));
+    SC_TRY(appendAsciiLiteral("HTTP/1.1 "));
     switch (code)
     {
-    case 200: SC_TRY(sb.append("200 OK\r\n")); break;
-    case 201: SC_TRY(sb.append("201 Created\r\n")); break;
-    case 404: SC_TRY(sb.append("404 Not Found\r\n")); break;
-    case 405: SC_TRY(sb.append("405 Method Not Allowed\r\n")); break;
+    case 200: SC_TRY(appendAsciiLiteral("200 OK\r\n")); break;
+    case 201: SC_TRY(appendAsciiLiteral("201 Created\r\n")); break;
+    case 404: SC_TRY(appendAsciiLiteral("404 Not Found\r\n")); break;
+    case 405: SC_TRY(appendAsciiLiteral("405 Method Not Allowed\r\n")); break;
     }
     return Result(true);
 }
@@ -254,14 +300,10 @@ Result HttpResponse::addHeader(StringSpan headerName, StringSpan headerValue)
         connectionHeaderAdded = true;
     }
 
-    GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
-
-    HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
-
-    SC_TRY(sb.append(headerName));
-    SC_TRY(sb.append(": "));
-    SC_TRY(sb.append(headerValue));
-    SC_TRY(sb.append("\r\n"));
+    SC_TRY(appendAscii(headerName.toCharSpan()));
+    SC_TRY(appendAsciiLiteral(": "));
+    SC_TRY(appendAscii(headerValue.toCharSpan()));
+    SC_TRY(appendAsciiLiteral("\r\n"));
     return Result(true);
 }
 
@@ -269,25 +311,19 @@ Result HttpResponse::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.sizeInBytes() != 0, "startResponse must be the first call");
+    // Auto-add Connection header only if not already added manually
+    if (not connectionHeaderAdded)
     {
-        GrowableBuffer<Span<char>> gb = {responseHeaders, responseHeadersCapacity};
-
-        HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
-
-        // Auto-add Connection header only if not already added manually
-        if (not connectionHeaderAdded)
+        if (forceDisableKeepAlive or not keepAlive)
         {
-            if (forceDisableKeepAlive or not keepAlive)
-            {
-                SC_TRY(sb.append("Connection: close\r\n"));
-            }
-            else
-            {
-                SC_TRY(sb.append("Connection: keep-alive\r\n"));
-            }
+            SC_TRY(appendAsciiLiteral("Connection: close\r\n"));
         }
-        SC_TRY(sb.append("\r\n"));
+        else
+        {
+            SC_TRY(appendAsciiLiteral("Connection: keep-alive\r\n"));
+        }
     }
+    SC_TRY(appendAsciiLiteral("\r\n"));
     SC_TRY(writableStream->write(responseHeaders, move(callback))); // headers first
     headersSent = true;
     return Result(true);
@@ -317,6 +353,15 @@ void HttpResponse::reset()
 }
 
 void HttpResponse::setKeepAlive(bool value) { keepAlive = value; }
+
+Result HttpResponse::appendAscii(Span<const char> ascii)
+{
+    SC_TRY_MSG(responseHeaders.sizeInBytes() + ascii.sizeInBytes() <= responseHeadersCapacity,
+               "HttpResponse::appendAscii - header space is finished");
+    ::memcpy(responseHeaders.data() + responseHeaders.sizeInBytes(), ascii.data(), ascii.sizeInBytes());
+    responseHeaders = {responseHeaders.data(), responseHeaders.sizeInBytes() + ascii.sizeInBytes()};
+    return Result(true);
+}
 
 //-------------------------------------------------------------------------------------------------------
 // HttpConnectionsPool

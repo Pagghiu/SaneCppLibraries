@@ -64,8 +64,9 @@ struct SC_COMPILER_EXPORT HttpRequest
     Span<char> readHeaders;     ///< Headers read so far
     Span<char> availableHeader; ///< Space to save headers to
 
-    bool headersEndReceived = false; ///< All headers have been received
-    bool parsedSuccessfully = true;  ///< Request headers have been parsed successfully
+    bool    headersEndReceived = false; ///< All headers have been received
+    bool    parsedSuccessfully = true;  ///< Request headers have been parsed successfully
+    uint8_t headersEndMatch    = 0;     ///< Number of matched chars for "\r\n\r\n" while accumulating headers
 
     HttpParser parser; ///< The parser used to parse headers
     StringSpan url;    ///< The url extracted from parsed headers
@@ -111,6 +112,14 @@ struct SC_COMPILER_EXPORT HttpResponse
   private:
     friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;
+
+    template <size_t N>
+    Result appendAsciiLiteral(const char (&ascii)[N])
+    {
+        return appendAscii({ascii, N - 1});
+    }
+
+    Result appendAscii(Span<const char> ascii);
 
     /// @brief Uses unused header memory data from the HttpRequest for the response
     void grabUnusedHeaderMemory(HttpRequest& request);
