@@ -712,7 +712,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
         {
-            if (offset <= 0)
+            if (offset < 0)
             {
                 return ::write(fd, data, bytes);
             }
@@ -724,7 +724,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
         {
-            if (offset <= 0)
+            if (offset < 0)
             {
                 return ::writev(fd, vec, remainingVectors);
             }
