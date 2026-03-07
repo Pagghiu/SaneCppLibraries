@@ -17,6 +17,12 @@ struct SC_COMPILER_EXPORT CircularQueue
 
     [[nodiscard]] bool isEmpty() const { return readIndex == writeIndex; }
 
+    [[nodiscard]] bool isFull() const
+    {
+        const uint32_t nextWriteIndex = (writeIndex + 1) % buffer.sizeInElements();
+        return nextWriteIndex == readIndex;
+    }
+
     [[nodiscard]] bool pushBack(T&& request) { return pushBack(request); }
 
     [[nodiscard]] bool pushBack(T& request)

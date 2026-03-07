@@ -351,7 +351,12 @@ void AsyncReadableStream::emitOnData()
     {
         eventData.emit(request.bufferID);
         buffers->unrefBuffer(request.bufferID); // 1b. refBuffer in push
+        if (state == State::Pausing or state == State::Paused or (state == State::Ended and not readQueue.isEmpty()))
+        {
+            break;
+        }
     }
+    maybeDestroyEndedReadable();
 }
 
 bool AsyncReadableStream::push(AsyncBufferView::ID bufferID, size_t newSize)
@@ -455,6 +460,9 @@ void AsyncReadableStream::pause()
         state = State::Pausing;
     }
     break;
+    case State::Pausing:
+    case State::Ended:
+    case State::Paused: break;
     default: {
         emitError(Result::Error("AsyncReadableStream::pause - called in wrong state"));
     }
@@ -468,7 +476,17 @@ void AsyncReadableStream::resumeReading()
     case State::Pausing:
     case State::Paused: {
         executeRead(); // -> State::Reading
-        emitOnData();
+    }
+    break;
+    case State::Ended: {
+        if (not readQueue.isEmpty())
+        {
+            emitOnData();
+        }
+        else
+        {
+            maybeDestroyEndedReadable();
+        }
     }
     break;
     case State::CanRead: {
@@ -480,7 +498,6 @@ void AsyncReadableStream::resumeReading()
         emitError(Result::Error("AsyncReadableStream::resume - called in wrong state"));
     }
     break;
-    case State::Ended: break;
     default: break; // Ignore resume requests while reading
     }
 }
@@ -581,10 +598,7 @@ void AsyncReadableStream::pushEnd()
         // In all these state we can just end directly
         state = State::Ended;
         eventEnd.emit();
-        if (autoDestroy)
-        {
-            destroy();
-        }
+        maybeDestroyEndedReadable();
         break;
     case State::Destroying: emitError(Result::Error("AsyncReadableStream::pushEnd - stream is destroying")); break;
     case State::Ended: emitError(Result::Error("AsyncReadableStream::pushEnd - stream already ended")); break;
@@ -596,6 +610,14 @@ void AsyncReadableStream::pushEnd()
 AsyncBuffersPool& AsyncReadableStream::getBuffersPool() { return *buffers; }
 
 void AsyncReadableStream::emitError(Result error) { eventError.emit(error); }
+
+void AsyncReadableStream::maybeDestroyEndedReadable()
+{
+    if (state == State::Ended and autoDestroy and not destroyed and readQueue.isEmpty())
+    {
+        destroy();
+    }
+}
 
 bool AsyncReadableStream::getBufferOrPause(size_t minumumSizeInBytes, AsyncBufferView::ID& bufferID, Span<char>& data)
 {
@@ -1029,6 +1051,7 @@ Result AsyncPipeline::pipe()
 
     AsyncReadableStream* readable = source;
     SC_TRY(chainTransforms(readable));
+    dispatchReadable = readable;
 
     bool res;
     res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
@@ -1050,6 +1073,9 @@ Result AsyncPipeline::pipe()
 bool AsyncPipeline::unpipe()
 {
     bool res = true;
+    releasePendingWrites();
+    shouldEndWhenDrained = false;
+
     // Deregister all source events
     if (source)
     {
@@ -1079,6 +1105,7 @@ bool AsyncPipeline::unpipe()
         SC_TRY(res);
         source = nullptr;
     }
+    dispatchReadable = nullptr;
 
     // Deregister all transforms events
     for (size_t idx = 0; idx < MaxTransforms; ++idx)
@@ -1110,7 +1137,10 @@ bool AsyncPipeline::unpipe()
         SC_TRY(res);
     }
     for (size_t idx = 0; idx < MaxTransforms; ++idx)
-        transforms[idx] = nullptr;
+    {
+        transforms[idx]      = nullptr;
+        transformInputs[idx] = nullptr;
+    }
 
     // Deregister all sinks events
     for (AsyncWritableStream* sink : sinks)
@@ -1140,6 +1170,74 @@ Result AsyncPipeline::start()
 
 void AsyncPipeline::emitError(Result res) { eventError.emit(res); }
 
+bool AsyncPipeline::hasPendingWrites() const
+{
+    for (const PendingWrite& pendingWrite : pendingWrites)
+    {
+        if (pendingWrite.bufferID.isValid())
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AsyncPipeline::hasPendingWritesForReadable(const AsyncReadableStream& readable) const
+{
+    for (const PendingWrite& pendingWrite : pendingWrites)
+    {
+        if (pendingWrite.bufferID.isValid() and pendingWrite.readable == &readable)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AsyncPipeline::releasePendingWrites()
+{
+    if (source == nullptr)
+    {
+        for (PendingWrite& pendingWrite : pendingWrites)
+        {
+            pendingWrite.readable = nullptr;
+            pendingWrite.writable = nullptr;
+            pendingWrite.bufferID = {};
+        }
+        return;
+    }
+
+    AsyncBuffersPool& buffers = source->getBuffersPool();
+    for (PendingWrite& pendingWrite : pendingWrites)
+    {
+        if (pendingWrite.bufferID.isValid())
+        {
+            buffers.unrefBuffer(pendingWrite.bufferID);
+            pendingWrite.readable = nullptr;
+            pendingWrite.writable = nullptr;
+            pendingWrite.bufferID = {};
+        }
+    }
+}
+
+AsyncPipeline::PendingWrite* AsyncPipeline::findPendingWrite(AsyncReadableStream& readable,
+                                                             AsyncWritableStream& writable)
+{
+    PendingWrite* emptySlot = nullptr;
+    for (PendingWrite& pendingWrite : pendingWrites)
+    {
+        if (pendingWrite.readable == &readable and pendingWrite.writable == &writable)
+        {
+            return &pendingWrite;
+        }
+        if (emptySlot == nullptr and not pendingWrite.bufferID.isValid())
+        {
+            emptySlot = &pendingWrite;
+        }
+    }
+    return emptySlot;
+}
+
 Result AsyncPipeline::checkBuffersPool()
 {
     AsyncBuffersPool& buffers = source->getBuffersPool();
@@ -1168,13 +1266,20 @@ Result AsyncPipeline::checkBuffersPool()
 
 bool AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen)
 {
-    AsyncDuplexStream* pTransform = &transform;
-
-    auto lambda = [this, pTransform](AsyncBufferView::ID bufferID)
+    size_t transformIndex = MaxTransforms;
+    for (size_t idx = 0; idx < MaxTransforms; ++idx)
     {
-        // Write readable to transform
-        asyncWriteWritable(bufferID, *pTransform);
-    };
+        if (transforms[idx] == &transform)
+        {
+            transformIndex = idx;
+            break;
+        }
+    }
+    SC_ASSERT_RELEASE(transformIndex < MaxTransforms);
+
+    AsyncPipeline* pipeline = this;
+    auto           lambda   = [pipeline, transformIndex](AsyncBufferView::ID bufferID)
+    { pipeline->dispatchToTransform(bufferID, transformIndex); };
     if (listen)
     {
         return readable.eventData.addListener(lambda);
@@ -1185,14 +1290,37 @@ bool AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplex
     }
 }
 
+void AsyncPipeline::dispatchToTransform(AsyncBufferView::ID bufferID, size_t transformIndex)
+{
+    SC_ASSERT_RELEASE(transformIndex < MaxTransforms);
+    AsyncReadableStream* readable  = transformInputs[transformIndex];
+    AsyncDuplexStream*   transform = transforms[transformIndex];
+    SC_ASSERT_RELEASE(readable != nullptr);
+    SC_ASSERT_RELEASE(transform != nullptr);
+
+    if (hasPendingWritesForReadable(*readable))
+    {
+        readable->pause();
+        const Result res = readable->unshift(bufferID);
+        if (not res)
+        {
+            eventError.emit(res);
+        }
+        return;
+    }
+    asyncWriteWritable(bufferID, *readable, *transform);
+}
+
 Result AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
 {
-    for (AsyncDuplexStream* transform : transforms)
+    for (size_t idx = 0; idx < MaxTransforms; ++idx)
     {
+        AsyncDuplexStream* transform = transforms[idx];
         if (transform == nullptr)
         {
             break;
         }
+        transformInputs[idx] = readable;
         bool res;
         res = listenToEventData(*readable, *transform, true);
         SC_TRY_MSG(res, "AsyncPipeline::chainTransforms run out of eventData");
@@ -1213,23 +1341,88 @@ Result AsyncPipeline::chainTransforms(AsyncReadableStream*& readable)
     return Result(true);
 }
 
-void AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable)
+void AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncReadableStream& readable,
+                                       AsyncWritableStream& writable)
 {
     source->getBuffersPool().refBuffer(bufferID);
+    if (not writable.canAcceptWrite())
+    {
+        PendingWrite* pendingWrite = findPendingWrite(readable, writable);
+        SC_ASSERT_RELEASE(pendingWrite != nullptr);
+        SC_ASSERT_RELEASE(not pendingWrite->bufferID.isValid());
+        const bool wasAlreadyBackpressured = hasPendingWritesForReadable(readable);
+        pendingWrite->readable             = &readable;
+        pendingWrite->writable             = &writable;
+        pendingWrite->bufferID             = bufferID;
+        if (not wasAlreadyBackpressured)
+        {
+            readable.pause();
+        }
+        return;
+    }
+
     Function<void(AsyncBufferView::ID)> func;
     func.template bind<AsyncPipeline, &AsyncPipeline::afterWrite>(*this);
     // TODO: We should probably block when closing for in-flight writes
     Result res = writable.write(bufferID, func);
     if (not res)
     {
+        source->getBuffersPool().unrefBuffer(bufferID);
         eventError.emit(res);
     }
+}
+
+bool AsyncPipeline::retryPendingWrites()
+{
+    for (PendingWrite& pendingWrite : pendingWrites)
+    {
+        if (not pendingWrite.bufferID.isValid())
+            continue;
+
+        SC_ASSERT_RELEASE(pendingWrite.writable != nullptr);
+        if (not pendingWrite.writable->canAcceptWrite())
+        {
+            continue;
+        }
+
+        Function<void(AsyncBufferView::ID)> func;
+        func.template bind<AsyncPipeline, &AsyncPipeline::afterWrite>(*this);
+        const Result res = pendingWrite.writable->write(pendingWrite.bufferID, func);
+        if (res)
+        {
+            pendingWrite.readable = nullptr;
+            pendingWrite.writable = nullptr;
+            pendingWrite.bufferID = {};
+        }
+        else
+        {
+            source->getBuffersPool().unrefBuffer(pendingWrite.bufferID);
+            pendingWrite.readable = nullptr;
+            pendingWrite.writable = nullptr;
+            pendingWrite.bufferID = {};
+            eventError.emit(res);
+        }
+    }
+    return not hasPendingWrites();
 }
 
 void AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 {
     // Decrement reference count of the buffer that was just written
     source->getBuffersPool().unrefBuffer(bufferID);
+
+    const bool drainedPendingWrites = retryPendingWrites();
+    if (not drainedPendingWrites)
+    {
+        return;
+    }
+
+    if (shouldEndWhenDrained)
+    {
+        shouldEndWhenDrained = false;
+        endPipes();
+        return;
+    }
 
     // Try resume in reverse
     for (size_t idx = 0; idx < MaxTransforms; ++idx)
@@ -1246,16 +1439,35 @@ void AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 
 void AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
 {
-    for (AsyncWritableStream* sink : sinks)
+    if (dispatchReadable != nullptr and hasPendingWritesForReadable(*dispatchReadable))
     {
+        dispatchReadable->pause();
+        const Result res = dispatchReadable != nullptr ? dispatchReadable->unshift(bufferID)
+                                                       : Result::Error("AsyncPipeline dispatchReadable == nullptr");
+        if (not res)
+        {
+            eventError.emit(res);
+        }
+        return;
+    }
+
+    for (size_t idx = 0; idx < MaxSinks; ++idx)
+    {
+        AsyncWritableStream* sink = sinks[idx];
         if (sink == nullptr)
             break;
-        asyncWriteWritable(bufferID, *sink);
+        asyncWriteWritable(bufferID, *dispatchReadable, *sink);
     }
 }
 
 void AsyncPipeline::endPipes()
 {
+    if (hasPendingWrites())
+    {
+        shouldEndWhenDrained = true;
+        return;
+    }
+
     bool allEnded = true;
     for (AsyncWritableStream* sink : sinks)
     {

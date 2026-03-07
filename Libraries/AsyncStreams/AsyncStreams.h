@@ -297,6 +297,7 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     Result finishedDestroyingReadable();
 
   private:
+    void maybeDestroyEndedReadable();
     void emitOnData();
     void executeRead();
 
@@ -335,6 +336,8 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 /// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
 struct SC_COMPILER_EXPORT AsyncWritableStream
 {
+    friend struct AsyncPipeline;
+
     struct Request
     {
         AsyncBufferView::ID bufferID;
@@ -431,6 +434,11 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
     void stop() { state = State::Stopped; }
 
   private:
+    [[nodiscard]] bool canAcceptWrite() const
+    {
+        return (state == State::Stopped or state == State::Writing) and not writeQueue.isFull();
+    }
+
     enum class State : uint8_t
     {
         Stopped,
@@ -535,6 +543,19 @@ struct SC_COMPILER_EXPORT AsyncPipeline
     /// @note Both source and sinks must have been already setup by the caller
     Result start();
 
+    // Internal state used by the pipeline implementation.
+    AsyncReadableStream* dispatchReadable               = nullptr;
+    AsyncReadableStream* transformInputs[MaxTransforms] = {nullptr};
+
+    struct PendingWrite
+    {
+        AsyncReadableStream* readable = nullptr;
+        AsyncWritableStream* writable = nullptr;
+        AsyncBufferView::ID  bufferID;
+    };
+    PendingWrite pendingWrites[MaxTransforms + MaxSinks] = {};
+    bool         shouldEndWhenDrained                    = false;
+
     // TODO: Add a pause and cancel/step
   private:
     void   emitError(Result res);
@@ -542,12 +563,19 @@ struct SC_COMPILER_EXPORT AsyncPipeline
     Result chainTransforms(AsyncReadableStream*& readable);
     Result validate();
 
-    void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncWritableStream& writable);
+    void asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncReadableStream& readable, AsyncWritableStream& writable);
     void dispatchToPipes(AsyncBufferView::ID bufferID);
     void endPipes();
     void afterSinkEnd();
     void afterWrite(AsyncBufferView::ID bufferID);
+    void dispatchToTransform(AsyncBufferView::ID bufferID, size_t transformIndex);
+    bool retryPendingWrites();
+    bool hasPendingWrites() const;
+    bool hasPendingWritesForReadable(const AsyncReadableStream& readable) const;
+    void releasePendingWrites();
     bool listenToEventData(AsyncReadableStream& readable, AsyncDuplexStream& transform, bool listen);
+
+    PendingWrite* findPendingWrite(AsyncReadableStream& readable, AsyncWritableStream& writable);
 };
 } // namespace SC
 //! @}

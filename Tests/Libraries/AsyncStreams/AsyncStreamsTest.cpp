@@ -56,6 +56,14 @@ struct SC::AsyncStreamsTest : public SC::TestCase
         {
             unshift();
         }
+        if (test_section("pipeline backpressure sync source"))
+        {
+            pipelineBackpressureSyncSource();
+        }
+        if (test_section("pipeline backpressure async source"))
+        {
+            pipelineBackpressureAsyncSource();
+        }
     }
 
     void event();
@@ -65,6 +73,8 @@ struct SC::AsyncStreamsTest : public SC::TestCase
     void writableStream();
     void createChildView();
     void unshift();
+    void pipelineBackpressureSyncSource();
+    void pipelineBackpressureAsyncSource();
 };
 
 void SC::AsyncStreamsTest::circularQueue()
@@ -540,6 +550,224 @@ void SC::AsyncStreamsTest::unshift()
     // Verify we can still push normally after unshift
     SC_TRUST_RESULT(readable.getBuffersPool().requestNewBuffer(123, bufferID2, data2));
     SC_TEST_EXPECT(readable.push(bufferID2, 10));
+}
+
+void SC::AsyncStreamsTest::pipelineBackpressureSyncSource()
+{
+    static constexpr char payload[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    constexpr size_t numberOfBuffers = 4;
+    AsyncBufferView  buffers[numberOfBuffers];
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(numberOfBuffers));
+    for (size_t idx = 0; idx < numberOfBuffers; ++idx)
+    {
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx, 1, writableData));
+        buffers[idx] = writableData;
+        buffers[idx].setReusable(true);
+    }
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    struct ManualWritableStream : public AsyncWritableStream
+    {
+        Function<void(AsyncBufferView::ID)> callback;
+        AsyncBufferView::ID                 bufferID;
+        String                              concatenated = StringEncoding::Ascii;
+
+        virtual Result asyncWrite(AsyncBufferView::ID incomingBufferID, Function<void(AsyncBufferView::ID)> cb) override
+        {
+            Span<const char> data;
+            SC_TRY(getBuffersPool().getReadableData(incomingBufferID, data));
+            bufferID = incomingBufferID;
+            callback = move(cb);
+            SC_TRY(StringBuilder::createForAppendingTo(concatenated)
+                       .append(StringView(StringSpan(data, false, StringEncoding::Ascii))));
+            return Result(true);
+        }
+
+        void finishOneWrite()
+        {
+            auto savedCallback = move(callback);
+            callback           = {};
+            finishedWriting(bufferID, move(savedCallback), Result(true));
+        }
+    };
+
+    struct SyncReadableStream : public AsyncReadableStream
+    {
+        Span<const char> payload;
+        size_t           index = 0;
+
+        virtual Result asyncRead() override
+        {
+            if (index < payload.sizeInBytes())
+            {
+                AsyncBufferView::ID bufferID;
+                Span<char>          writableData;
+                if (getBufferOrPause(1, bufferID, writableData))
+                {
+                    writableData[0]           = payload[index];
+                    const bool shouldContinue = push(bufferID, 1);
+                    getBuffersPool().unrefBuffer(bufferID);
+                    index += 1;
+                    if (shouldContinue)
+                    {
+                        reactivate(true);
+                    }
+                }
+            }
+            else
+            {
+                pushEnd();
+            }
+            return Result(true);
+        }
+    };
+
+    SyncReadableStream           readable;
+    AsyncReadableStream::Request readRequests[3];
+    readable.setReadQueue(readRequests);
+    readable.payload = {payload, sizeof(payload) - 1};
+    SC_TEST_EXPECT(readable.init(pool));
+
+    ManualWritableStream         writable;
+    AsyncWritableStream::Request writeRequests[2]; // N-1 usable slots => 1
+    writable.setWriteQueue(writeRequests);
+    SC_TEST_EXPECT(writable.init(pool));
+
+    AsyncPipeline pipeline = {&readable, {}, {&writable}};
+    (void)readable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    (void)writable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    (void)pipeline.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+
+    SC_TEST_EXPECT(pipeline.pipe());
+    SC_TEST_EXPECT(pipeline.start());
+
+    size_t maxIterations = 1024;
+    while (writable.callback.isValid() and maxIterations > 0)
+    {
+        writable.finishOneWrite();
+        maxIterations -= 1;
+    }
+
+    SC_TEST_EXPECT(maxIterations > 0);
+    SC_TEST_EXPECT(readable.isEnded());
+    SC_TEST_EXPECT(not writable.callback.isValid());
+    SC_TEST_EXPECT(writable.concatenated == payload);
+}
+
+void SC::AsyncStreamsTest::pipelineBackpressureAsyncSource()
+{
+    static constexpr char payload[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    constexpr size_t numberOfBuffers = 4;
+    AsyncBufferView  buffers[numberOfBuffers];
+    Buffer           buffer;
+    SC_TEST_EXPECT(buffer.resizeWithoutInitializing(numberOfBuffers));
+    for (size_t idx = 0; idx < numberOfBuffers; ++idx)
+    {
+        Span<char> writableData;
+        SC_TEST_EXPECT(buffer.toSpan().sliceStartLength(idx, 1, writableData));
+        buffers[idx] = writableData;
+        buffers[idx].setReusable(true);
+    }
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    struct DelayedWritableStream : public AsyncWritableStream
+    {
+        AsyncEventLoop*                     eventLoop = nullptr;
+        AsyncLoopTimeout                    timeout;
+        Function<void(AsyncBufferView::ID)> callback;
+        AsyncBufferView::ID                 bufferID;
+        String                              concatenated = StringEncoding::Ascii;
+
+        virtual Result asyncWrite(AsyncBufferView::ID incomingBufferID, Function<void(AsyncBufferView::ID)> cb) override
+        {
+            Span<const char> data;
+            SC_TRY(getBuffersPool().getReadableData(incomingBufferID, data));
+            bufferID = incomingBufferID;
+            callback = move(cb);
+            SC_TRY(StringBuilder::createForAppendingTo(concatenated)
+                       .append(StringView(StringSpan(data, false, StringEncoding::Ascii))));
+            timeout.callback = [this](AsyncLoopTimeout::Result&)
+            {
+                auto savedCallback = move(callback);
+                callback           = {};
+                finishedWriting(bufferID, move(savedCallback), Result(true));
+            };
+            return timeout.start(*eventLoop, TimeMs{1});
+        }
+    };
+
+    struct AsyncReadableStreamWithTimeout : public AsyncReadableStream
+    {
+        AsyncEventLoop*  eventLoop = nullptr;
+        AsyncLoopTimeout timeout;
+        Span<const char> payload;
+        size_t           index = 0;
+
+        virtual Result asyncRead() override
+        {
+            if (index >= payload.sizeInBytes())
+            {
+                pushEnd();
+                return Result(true);
+            }
+
+            timeout.callback = [this](AsyncLoopTimeout::Result&)
+            {
+                AsyncBufferView::ID bufferID;
+                Span<char>          writableData;
+                if (getBufferOrPause(1, bufferID, writableData))
+                {
+                    writableData[0]           = payload[index];
+                    const bool shouldContinue = push(bufferID, 1);
+                    getBuffersPool().unrefBuffer(bufferID);
+                    index += 1;
+                    if (shouldContinue)
+                    {
+                        reactivate(true);
+                    }
+                }
+            };
+            return timeout.start(*eventLoop, TimeMs{1});
+        }
+    };
+
+    AsyncReadableStreamWithTimeout readable;
+    AsyncReadableStream::Request   readRequests[3];
+    readable.setReadQueue(readRequests);
+    readable.eventLoop = &loop;
+    readable.payload   = {payload, sizeof(payload) - 1};
+    SC_TEST_EXPECT(readable.init(pool));
+
+    DelayedWritableStream        writable;
+    AsyncWritableStream::Request writeRequests[2]; // N-1 usable slots => 1
+    writable.setWriteQueue(writeRequests);
+    writable.eventLoop = &loop;
+    SC_TEST_EXPECT(writable.init(pool));
+
+    AsyncPipeline pipeline = {&readable, {}, {&writable}};
+    (void)readable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    (void)writable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+    (void)pipeline.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    loop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(pipeline.pipe());
+    SC_TEST_EXPECT(pipeline.start());
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(writable.concatenated == payload);
 }
 
 namespace SC
