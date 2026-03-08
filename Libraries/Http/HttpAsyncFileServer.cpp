@@ -198,9 +198,21 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     SC_TRY(path.assign(directory.view()));
     SC_TRY(path.append("/"));
     SC_TRY(path.append(filePath));
+    const size_t   totalFileUploadBytes = static_cast<size_t>(connection.request.getParser().contentLength);
     FileDescriptor fd;
     SC_TRY(fd.open(path.view(), FileOpen::Write));
+    if (totalFileUploadBytes == 0)
+    {
+        SC_TRY(fd.close());
+        SC_TRY(connection.response.startResponse(201));
+        SC_TRY(connection.response.addHeader("Content-Length", "0"));
+        SC_TRY(connection.response.sendHeaders());
+        SC_TRY(connection.response.end());
+        return Result(true);
+    }
+
     SC_TRY(stream.writableFileStream.init(connection.buffersPool, *eventLoop, fd));
+    SC_TRY(stream.writableFileStream.request.executeOn(stream.writableFileStreamTask, *threadPool));
     fd.detach();
     stream.writableFileStream.setAutoCloseDescriptor(true);
 
@@ -222,67 +234,94 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
 
     HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
 
-    const size_t totalFileUploadBytes = static_cast<size_t>(connection.request.getParser().contentLength);
-    // Body will be piped from asyncConnection.readableSocketStream
     connection.pipeline.source   = &asyncConnection.readableSocketStream;
     connection.pipeline.sinks[0] = &stream.writableFileStream;
     SC_TRY(connection.pipeline.pipe());
     SC_TRY(connection.pipeline.start());
 
-    // This listener could have been a transform stream but it would be less efficient as transform
-    // streams will request a new output buffer for the transformation.
-    // Once transforms streams will be revisited to allow declaring if and how many output buffers
-    // they need, it could make sense to make the following into a transform stream instead of a
-    // raw eventData listener.
-    struct EndStreamWhenAllBytesReceived
-    {
-        HttpAsyncConnectionBase& connection;
-
-        size_t remainingBytes = 0;
-
-        void operator()(AsyncBufferView::ID bufferID)
-        {
-            AsyncReadableStream& readable = *connection.pipeline.source;
-            AsyncWritableStream& writable = *connection.pipeline.sinks[0];
-            AsyncBuffersPool&    buffers  = readable.getBuffersPool();
-
-            Span<const char> data;
-            SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
-            if (remainingBytes == data.sizeInBytes())
-            {
-                // Last chunk, we can remove this listener and terminate the writable stream
-                SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
-                writable.end();
-            }
-            else if (remainingBytes > data.sizeInBytes())
-            {
-                // Intermediate chunk, we need to continue streaming data
-                remainingBytes -= data.sizeInBytes();
-            }
-            else if (remainingBytes < data.sizeInBytes())
-            {
-                // HTTP Pipelining: excess data belongs to next request
-                // Create a child view for the excess bytes and unshift it back into the stream
-                const size_t excessOffset = remainingBytes;
-                const size_t excessLength = data.sizeInBytes() - remainingBytes;
-
-                AsyncBufferView::ID childID;
-                SC_ASSERT_RELEASE(buffers.createChildView(bufferID, excessOffset, excessLength, childID));
-                SC_ASSERT_RELEASE(readable.unshift(childID));
-                buffers.unrefBuffer(childID);
-
-                // Last chunk, we can remove this listener and terminate the writable stream
-                SC_ASSERT_RELEASE(readable.eventData.removeListener(*this));
-                writable.end();
-            }
-        }
-    };
-
-    // It's important for this data event to be added last, so that it will be invoked after data has already
-    // been dispatched through the pipeline, to avoid missing the last chunk.
-    EndStreamWhenAllBytesReceived listener{asyncConnection, totalFileUploadBytes};
-    SC_ASSERT_RELEASE(asyncConnection.readableSocketStream.eventData.addListener(listener));
+    stream.putFileListener.connection     = &asyncConnection;
+    stream.putFileListener.remainingBytes = totalFileUploadBytes;
+    // Add this listener after the pipeline one, so the body has already been dispatched to the writable stream.
+    const bool addedBodyListener = asyncConnection.readableSocketStream.eventData.addListener<
+        HttpAsyncFileServer::Stream::PutFileListener, &HttpAsyncFileServer::Stream::PutFileListener::onData>(
+        stream.putFileListener);
+    SC_ASSERT_RELEASE(addedBodyListener);
     return Result(true);
+}
+
+void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bufferID)
+{
+    SC_ASSERT_RELEASE(connection != nullptr);
+    AsyncReadableStream& readable = *connection->pipeline.source;
+    AsyncWritableStream& writable = *connection->pipeline.sinks[0];
+    AsyncBuffersPool&    buffers  = readable.getBuffersPool();
+
+    Span<const char> data;
+    SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
+    if (remainingBytes == data.sizeInBytes())
+    {
+        // Last chunk, we can remove this listener and terminate the writable stream
+        const bool removedBodyListener =
+            readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                              &HttpAsyncFileServer::Stream::PutFileListener::onData>(*this);
+        SC_ASSERT_RELEASE(removedBodyListener);
+        if (writable.isStillWriting())
+        {
+            const bool addedDrainListener =
+                writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                                &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
+            SC_ASSERT_RELEASE(addedDrainListener);
+        }
+        else
+        {
+            writable.end();
+        }
+    }
+    else if (remainingBytes > data.sizeInBytes())
+    {
+        // Intermediate chunk, we need to continue streaming data
+        remainingBytes -= data.sizeInBytes();
+    }
+    else if (remainingBytes < data.sizeInBytes())
+    {
+        // HTTP Pipelining: excess data belongs to next request
+        // Create a child view for the excess bytes and unshift it back into the stream
+        const size_t excessOffset = remainingBytes;
+        const size_t excessLength = data.sizeInBytes() - remainingBytes;
+
+        AsyncBufferView::ID childID;
+        SC_ASSERT_RELEASE(buffers.createChildView(bufferID, excessOffset, excessLength, childID));
+        SC_ASSERT_RELEASE(readable.unshift(childID));
+        buffers.unrefBuffer(childID);
+
+        // Last chunk, we can remove this listener and terminate the writable stream
+        const bool removedBodyListener =
+            readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                              &HttpAsyncFileServer::Stream::PutFileListener::onData>(*this);
+        SC_ASSERT_RELEASE(removedBodyListener);
+        if (writable.isStillWriting())
+        {
+            const bool addedDrainListener =
+                writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                                &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
+            SC_ASSERT_RELEASE(addedDrainListener);
+        }
+        else
+        {
+            writable.end();
+        }
+    }
+}
+
+void HttpAsyncFileServer::Stream::PutFileListener::onDrain()
+{
+    SC_ASSERT_RELEASE(connection != nullptr);
+    AsyncWritableStream& writable = *connection->pipeline.sinks[0];
+    const bool           removedDrainListener =
+        writable.eventDrain.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                           &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
+    SC_ASSERT_RELEASE(removedDrainListener);
+    writable.end();
 }
 
 StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)

@@ -24,6 +24,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
         ReadableFileStream  readableFileStream;
         WritableFileStream  writableFileStream;
         AsyncTaskSequence   readableFileStreamTask;
+        AsyncTaskSequence   writableFileStreamTask;
         HttpMultipartParser multipartParser;
         AsyncFileSend       asyncFileSend;
         FileDescriptor      sourceFileDescriptor;
@@ -42,11 +43,22 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
 
             void onData(AsyncBufferView::ID bufferID);
         } multipartListener;
+
+        struct PutFileListener
+        {
+            HttpAsyncConnectionBase* connection     = nullptr;
+            size_t                   remainingBytes = 0;
+
+            void onData(AsyncBufferView::ID bufferID);
+            void onDrain();
+        } putFileListener;
     };
 
     template <int RequestsSize>
     struct SC_COMPILER_EXPORT StreamQueue : public Stream
     {
+        static_assert(RequestsSize >= 2, "HttpAsyncFileServer::StreamQueue requires RequestsSize >= 2");
+
         StreamQueue()
         {
             readableFileStream.setReadQueue(readQueue);
