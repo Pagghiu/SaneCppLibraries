@@ -49,6 +49,7 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 
 **Key points:**
 - Use `and`/`or`/`not` instead of `&&`/`||`/`!`
+- When clang-format would introduce very wide alignment padding between adjacent declarations, add a blank line to split them into smaller groups instead of keeping columns aligned with large runs of spaces.
 - Format with: `./SC.sh format execute`
 
 ## Testing
