@@ -1593,6 +1593,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
         {
             // Cancellations are not delivered on epoll / kqueue backends and they're filtered by
             // KernelEvents::validateEvent on Windows IOCP and Linux io_uring.
+            // ASSERTING HERE IS BREAKING A FUNDAMENTAL INVARIANT OF THE LIBRARY, INVESTIGATE AND FIX THE ROOT CAUSE.
             SC_ASSERT_RELEASE(false);
         }
     }
@@ -1934,6 +1935,16 @@ SC::Result SC::AsyncEventLoop::Internal::stop(AsyncEventLoop& eventLoop, AsyncRe
     {
     case AsyncRequest::State::Active: {
         // Request is active so it needs cancelAsync and teardown before pushing it to cancellation queue
+        bool needsTeardownFlag = false;
+#if SC_PLATFORM_APPLE
+        needsTeardownFlag = true;
+#elif SC_PLATFORM_LINUX
+        needsTeardownFlag = kernelQueue.get().isEpoll;
+#endif
+        if (needsTeardownFlag)
+        {
+            async.flags |= Flag_NeedsTeardown;
+        }
         removeActiveHandle(async);
         async.state = AsyncRequest::State::Cancelling;
         if (async.flags & Internal::Flag_ManualCompletion)
