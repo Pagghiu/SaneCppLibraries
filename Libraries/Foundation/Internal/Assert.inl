@@ -25,10 +25,20 @@ struct Assert::Internal
     static void printAscii(const char* str)
     {
 #if SC_PLATFORM_WINDOWS
-        ::WriteConsoleA(GetStdHandle(STD_OUTPUT_HANDLE), str, static_cast<DWORD>(::strlen(str)), nullptr, nullptr);
+        HANDLE      handle       = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD       numWritten   = 0;
+        const DWORD numBytes     = static_cast<DWORD>(::strlen(str));
+        const bool  wroteConsole = handle != nullptr && handle != INVALID_HANDLE_VALUE &&
+                                  ::WriteConsoleA(handle, str, numBytes, &numWritten, nullptr);
+        if (not wroteConsole)
+        {
+            ::fwrite(str, sizeof(char), numBytes, stdout);
+            ::fflush(stdout);
+        }
         ::OutputDebugStringA(str);
 #else
         ::fwrite(str, sizeof(char), ::strlen(str), stdout);
+        ::fflush(stdout);
 #endif
     }
     static bool printBacktrace(void** backtraceBuffer, size_t backtraceBufferSizeInBytes)
