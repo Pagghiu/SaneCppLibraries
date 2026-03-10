@@ -241,7 +241,7 @@ Result AsyncBuffersPool::pushBuffer(AsyncBufferView&& buffer, AsyncBufferView::I
 
 Result AsyncBuffersPool::sliceInEqualParts(Span<AsyncBufferView> buffers, Span<char> memory, size_t numSlices)
 {
-    SC_TRY_MSG(buffers.sizeInElements() > numSlices, "AsyncBuffersPool::sliceInEqualParts - insufficient buffers")
+    SC_TRY_MSG(buffers.sizeInElements() >= numSlices, "AsyncBuffersPool::sliceInEqualParts - insufficient buffers")
     const size_t sliceSize = memory.sizeInBytes() / numSlices;
     for (size_t sliceIdx = 0; sliceIdx < numSlices; ++sliceIdx)
     {
