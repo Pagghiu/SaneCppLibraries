@@ -92,10 +92,6 @@ Some relevant blog posts are:
 
 - [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
 
-# Alternative implementation
-The binary serializer has an additional parallel implementation, see [SerializationBinaryTypeErased](@ref library_serialization_binary_type_erased) in Libraries Extra.  
-This is just an experiment to check if with some more runtime-code and less compile-time-code we can further bring down compile times, but we still need to build a proper benchmark for it.
-
 # Roadmap
 The binary serializer is not a streaming one, so loading a large data structure will at some point need double of the required space in memory.  
 This can be solved implementing streaming binary serializer or experimenting with memory mapped files to support really large binary data structures.

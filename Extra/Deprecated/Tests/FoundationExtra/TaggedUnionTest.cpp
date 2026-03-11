@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "LibrariesExtra/FoundationExtra/TaggedUnion.h"
+#include "Extra/Deprecated/Libraries/FoundationExtra/TaggedUnion.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Testing/Testing.h"

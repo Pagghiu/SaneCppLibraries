@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../../Libraries/Reflection/Reflection.h"
-#include "../../../Libraries/Reflection/ReflectionSchemaCompiler.h"
+#include "../../../../../Libraries/Reflection/Reflection.h"
+#include "../../../../../Libraries/Reflection/ReflectionSchemaCompiler.h"
 namespace SC
 {
 namespace detail

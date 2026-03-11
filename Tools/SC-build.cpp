@@ -58,11 +58,9 @@ SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ig
 void addSaneCppLibraries(Project& project, const Parameters& parameters)
 {
     // Files
-    project.addFiles("Libraries", "**.cpp");      // recursively add all cpp files
-    project.addFiles("Libraries", "**.h");        // recursively add all header files
-    project.addFiles("Libraries", "**.inl");      // recursively add all inline files
-    project.addFiles("LibrariesExtra", "**.h");   // recursively add all header files
-    project.addFiles("LibrariesExtra", "**.cpp"); // recursively add all cpp files
+    project.addFiles("Libraries", "**.cpp"); // recursively add all cpp files
+    project.addFiles("Libraries", "**.h");   // recursively add all header files
+    project.addFiles("Libraries", "**.inl"); // recursively add all inline files
 
     // Libraries to link
     if (parameters.platform == Platform::Apple)
@@ -113,7 +111,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
         ".*\\/Reflection/.*\\.*|"           // constexpr and templates
         ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
         ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
-        ".*\\/LibrariesExtra/.*\\.*";
+        ".*\\/Extra/Deprecated/.*\\.*";
     if (parameters.platform == Platform::Linux)
     {
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters, "DebugValgrind");
@@ -132,15 +130,19 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     });
 
     addSaneCppLibraries(project, parameters);
-    project.addFiles("Tests/SCTest", "*.cpp");          // add all .cpp from SCTest directory
-    project.addFiles("Tests/SCTest", "*.h");            // add all .h from SCTest directory
-    project.addFiles("Tests/Libraries", "**.c*");       // add all tests from Libraries directory
-    project.addFiles("Tests/Libraries", "**.inl");      // add all tests from Libraries directory
-    project.addFiles("Tests/LibrariesExtra", "**.cpp"); // add all tests from LibrariesExtra directory
-    project.addFiles("Tests/Support", "**.cpp");        // add all tests from Support directory
-    project.addFiles("Tests/Tools", "**.cpp");          // add all tests from Tools directory
-    project.addFiles("Tools", "SC-*.cpp");              // add all tools
-    project.addFiles("Tools", "*.h");                   // add tools headers
+    project.addFiles("Tests/SCTest", "*.cpp");     // add all .cpp from SCTest directory
+    project.addFiles("Tests/SCTest", "*.h");       // add all .h from SCTest directory
+    project.addFiles("Tests/Libraries", "**.c*");  // add all tests from Libraries directory
+    project.addFiles("Tests/Libraries", "**.inl"); // add all tests from Libraries directory
+    project.addFiles("Tests/Support", "**.cpp");   // add all tests from Support directory
+    project.addFiles("Tests/Tools", "**.cpp");     // add all tests from Tools directory
+    project.addFiles("Tools", "SC-*.cpp");         // add all tools
+    project.addFiles("Tools", "*.h");              // add tools headers
+
+    // Deprecated code tests and libraries (to be removed when deprecated code will be removed)
+    project.addFiles("Extra/Deprecated/Tests", "**.cpp");     // add all deprecated tests
+    project.addFiles("Extra/Deprecated/Libraries", "**.h");   // add all deprecated libraries header files
+    project.addFiles("Extra/Deprecated/Libraries", "**.cpp"); // add all deprecated libraries cpp files
 
     // This is a totally useless per-file define to test "per-file" flags SC::Build feature.
     SourceFiles specificFiles;

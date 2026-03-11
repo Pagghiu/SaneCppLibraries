@@ -29,5 +29,3 @@
 #include "Libraries/Threading/ThreadPool.cpp"
 #include "Libraries/Threading/Threading.cpp"
 #include "Libraries/Time/Time.cpp"
-
-#include "LibrariesExtra/SerializationBinaryTypeErased/SerializationBinaryTypeErased.cpp"

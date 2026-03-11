@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "LibrariesExtra/FoundationExtra/TaggedMap.h"
+#include "Extra/Deprecated/Libraries/FoundationExtra/TaggedMap.h"
+#include "Extra/Deprecated/Libraries/FoundationExtra/TaggedUnion.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
-#include "LibrariesExtra/FoundationExtra/TaggedUnion.h"
 
 namespace SC
 {

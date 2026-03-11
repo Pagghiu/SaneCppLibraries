@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../../Libraries/SerializationBinary/Internal/SerializationBinarySchema.h"
+#include "../../../../../Libraries/SerializationBinary/Internal/SerializationBinarySchema.h"
 #include "SerializationBinaryTypeErasedCompiler.h"
 namespace SC
 {

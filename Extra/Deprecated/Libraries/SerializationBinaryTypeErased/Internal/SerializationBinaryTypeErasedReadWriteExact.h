@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../../Libraries/Memory/Buffer.h"
+#include "../../../../../Libraries/Memory/Buffer.h"
 #include "SerializationBinaryTypeErasedCompiler.h"
 
 namespace SC

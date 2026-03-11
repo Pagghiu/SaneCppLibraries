@@ -32,7 +32,7 @@ struct SC::TaggedType
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/// \snippet Tests/LibrariesExtra/FoundationExtra/TaggedUnionTest.cpp TaggedUnionTestSnippet
+/// \snippet Extra/Deprecated/Libraries/FoundationExtra/FoundationExtra/TaggedUnionTest.cpp TaggedUnionTestSnippet
 template <typename Union>
 struct SC::TaggedUnion
 {

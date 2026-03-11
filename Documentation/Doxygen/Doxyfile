@@ -16,7 +16,6 @@ INPUT                  = ../../_Build/_Dependencies/Dependencies.md \
                          ../../_Build/_Dependencies/Dependencies.svg \
                          ../../Documentation/Pages \
                          ../../Documentation/Libraries \
-                         ../../Documentation/LibrariesExtra \
                          ../../Libraries/Async \
                          ../../Libraries/AsyncStreams \
                          ../../Libraries/Containers \
@@ -34,8 +33,6 @@ INPUT                  = ../../_Build/_Dependencies/Dependencies.md \
                          ../../Libraries/Reflection \
                          ../../Libraries/SerialPort \
                          ../../Libraries/SerializationBinary \
-                         ../../LibrariesExtra/FoundationExtra \
-                         ../../LibrariesExtra/SerializationBinaryTypeErased \
                          ../../Libraries/SerializationText \
                          ../../Libraries/Socket \
                          ../../Libraries/Strings \

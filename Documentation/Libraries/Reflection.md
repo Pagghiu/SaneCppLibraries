@@ -262,9 +262,6 @@ It also has an additional nice property that it's trivially serializable by dump
 It's possible associating a `string` literal with each type or member, so that text based serializer can refer to it, as used by the JSON [Serialization Text](@ref library_serialization_text).  
 Lastly it's also possible associating to a field an `MemberTag` integer field, that can be leveraged by by binary serializers to keep track of the field position in binary formats. This allows binary formats to avoid using strings at all for format versioning/evolution, allowing some executable size benefits. This makes also possible not breaking binary file formats just because a field / member was renamed. This is leveraged by the [Serialization Binary](@ref library_serialization_binary).
 
-@note It's possible also trying the experimental `SC_REFLECT_AUTOMATIC` mode by using [Reflection Auto](@ref library_reflection_auto) library that automatically lists struct members. This makes sense only if used with [Serialization Binary](@ref library_serialization_binary), as `SC_REFLECT_AUTOMATIC` cannot obtain field names as strings, so any text based serialization format like [Serialization Text](@ref library_serialization_text) cannot work.  
-[Reflection Auto](@ref library_reflection_auto) library is an experimental library, unfortunately using some more obscure C++ meta-programming techniques, part of [Libraries Extra](@ref libraries_extra).
-
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|

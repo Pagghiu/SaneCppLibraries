@@ -15,7 +15,7 @@ struct TaggedMap;
 /// @tparam Union with `FieldTypes` = `TypeList<TaggedType<EnumType, EnumValue, Type>, ...>`
 ///
 /// Example:
-/// \snippet Tests/LibrariesExtra/FoundationExtra/TaggedMapTest.cpp TaggedMapTestSnippet
+/// \snippet Extra/Deprecated/Libraries/FoundationExtra/FoundationExtra/TaggedMapTest.cpp TaggedMapTestSnippet
 template <typename Type, typename Union>
 struct SC::TaggedMap
 {
