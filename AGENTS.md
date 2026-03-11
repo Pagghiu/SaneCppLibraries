@@ -69,6 +69,13 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 - Remove debug log after user confirmation that everything is correct
 - Tests use --nostdinc so including <new>, <cstdio> or anything similar will fail
 
+## Developing
+
+- **Naming**: Check existing type names before defining new ones — the `SC::` namespace is flat, so collisions with other libraries cause redefinition errors
+- **Obj-C/C++ files (`.m`,`.mm`)**: Inside libraries use `objc_msgSend` to enable compiling everything as single C++ unit. Using `.mm` in examples or tests is acceptable.
+- **Test registration**: New tests must be declared and invoked in `Tests/SCTest/SCTest.cpp` — both a forward declaration and a call in `main()`
+- **Port allocation in tests**: Use `report.mapPort(basePort)` to avoid port conflicts between parallel test runs
+
 ## Common Pitfalls
 
 | Error | Cause | Fix |
@@ -77,6 +84,10 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 | Test hangs | Async resources not closed | Check refcount; add printf to trace callbacks |
 | Port already in use | Previous hung test | Kill the stuck process first |
 | Error including <cstdio> | Tests are run with --nostdinc | use <stdio.h> |
+| Redefinition of type | Name collision across libraries | Use unique prefixes per library (e.g. `NewLibrary*`) |
+| Duplicate symbols at link | `.mm` + `.cpp` both define same functions | Guard `.cpp` with `#if !SC_PLATFORM_APPLE` |
+| `offsetof` on non-standard-layout | Compiler `-Werror` rejects it | Access `storage` member directly instead |
+| `no matching operator new` | Raw placement new needs `<new>` | Do NOT use raw `new (ptr) T()` which requires `<new>` header (forbidden by `--nostdinc`) - Use `SC::placementNew()` instead |
 
 ## Memory & APIs
 
