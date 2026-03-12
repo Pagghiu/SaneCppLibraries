@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpAsyncServer.h"
-#include "HttpClient.h"
+#include "HttpTestClient.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -105,7 +105,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
 
     //! [HttpAsyncServerSnippet]
 
-    HttpClient client[3];
+    HttpTestClient client[3];
     struct ClientContext
     {
         int numRequests;
@@ -114,10 +114,10 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         HttpAsyncServer& httpServer;
     } clientContext = {0, 3, httpServer};
     String endpoint = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://localhost:{}/index.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/index.html", serverPort));
     for (int idx = 0; idx < clientContext.wantedNumRequests; ++idx)
     {
-        client[idx].callback = [this, &clientContext](HttpClient& client)
+        client[idx].callback = [this, &clientContext](HttpTestClient& client)
         {
             StringView response(client.getResponse());
             SC_TEST_EXPECT(response.containsString("This is a title"));
@@ -130,7 +130,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
         SC_TEST_EXPECT(client[idx].get(eventLoop, endpoint.view()));
     }
 
-    // Safety timout against hangs
+    // Safety timeout against hangs
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };

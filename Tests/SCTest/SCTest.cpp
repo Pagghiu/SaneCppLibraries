@@ -53,7 +53,6 @@ void runFileSystemWatcherAsyncTest(TestReport& report);
 void runHashingTest(TestReport& report);
 
 // Http
-void runHttpClientTest(TestReport& report);
 void runHttpParserTest(TestReport& report);
 void runHttpAsyncServerTest(TestReport& report);
 void runHttpAsyncFileServerTest(TestReport& report);
@@ -194,7 +193,6 @@ int main(int argc, const char* argv[])
 
     // Http tests
     runHttpParserTest(report);
-    runHttpClientTest(report);
     runHttpAsyncServerTest(report);
     runHttpAsyncFileServerTest(report);
     runHttpURLParserTest(report);

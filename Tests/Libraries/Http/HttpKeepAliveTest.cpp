@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "HttpClient.h"
+#include "HttpTestClient.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/StringBuilder.h"
@@ -80,10 +80,10 @@ void SC::HttpKeepAliveTest::keepAliveMultipleRequests()
     };
 
     // Make 3 sequential requests on the same connection
-    HttpClient client;
-    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://localhost:{}/test", serverPort));
+    HttpTestClient client;
+    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://127.0.0.1:{}/test", serverPort));
 
-    client.callback = [&ctx, this](HttpClient& c)
+    client.callback = [&ctx, this](HttpTestClient& c)
     {
         ctx.numClientResponses++;
         StringView response(c.getResponse());
@@ -153,11 +153,11 @@ void SC::HttpKeepAliveTest::keepAliveDisabledByResponse()
         SC_TEST_EXPECT(response.end());
     };
 
-    HttpClient client;
-    String     requestURL = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://localhost:{}/test", serverPort));
+    HttpTestClient client;
+    String         requestURL = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://127.0.0.1:{}/test", serverPort));
 
-    client.callback = [&ctx, this](HttpClient& c)
+    client.callback = [&ctx, this](HttpTestClient& c)
     {
         ctx.numClientResponses++;
         StringView response(c.getResponse());
@@ -220,10 +220,10 @@ void SC::HttpKeepAliveTest::keepAliveMaxRequests()
         SC_TEST_EXPECT(response.end());
     };
 
-    HttpClient client;
-    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://localhost:{}/test", serverPort));
+    HttpTestClient client;
+    SC_TEST_EXPECT(StringBuilder::format(ctx.requestURL, "http://127.0.0.1:{}/test", serverPort));
 
-    client.callback = [&ctx, this](HttpClient& c)
+    client.callback = [&ctx, this](HttpTestClient& c)
     {
         ctx.numClientResponses++;
         StringView response(c.getResponse());
@@ -293,11 +293,11 @@ void SC::HttpKeepAliveTest::keepAliveServerDefaultDisabled()
         SC_TEST_EXPECT(response.end());
     };
 
-    HttpClient client;
-    String     requestURL = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://localhost:{}/test", serverPort));
+    HttpTestClient client;
+    String         requestURL = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(requestURL, "http://127.0.0.1:{}/test", serverPort));
 
-    client.callback = [&ctx, this](HttpClient& c)
+    client.callback = [&ctx, this](HttpTestClient& c)
     {
         ctx.numClientResponses++;
         StringView response(c.getResponse());

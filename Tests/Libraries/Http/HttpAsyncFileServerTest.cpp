@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpAsyncFileServer.h"
-#include "HttpClient.h"
+#include "HttpTestClient.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Memory/String.h"
@@ -78,33 +78,35 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     {
         HttpAsyncServer& httpServer;
         AsyncEventLoop*  loop = nullptr;
+        FileSystem       fs   = {};
 
-        int        getCount       = 0;
-        int        putCount       = 0;
-        int        multipartCount = 0;
-        FileSystem fs             = {};
-        HttpClient getClient      = {};
-        HttpClient putStream      = {};
-        HttpClient putInline      = {};
-        HttpClient postMultipart  = {};
-        String     fileURL        = StringEncoding::Ascii;
-        String     streamURL      = StringEncoding::Ascii;
-        String     inlineURL      = StringEncoding::Ascii;
-        String     uploadURL      = StringEncoding::Ascii;
+        int getCount       = 0;
+        int putCount       = 0;
+        int multipartCount = 0;
+
+        HttpTestClient getClient     = {};
+        HttpTestClient putStream     = {};
+        HttpTestClient putInline     = {};
+        HttpTestClient postMultipart = {};
+
+        String fileURL   = StringEncoding::Ascii;
+        String streamURL = StringEncoding::Ascii;
+        String inlineURL = StringEncoding::Ascii;
+        String uploadURL = StringEncoding::Ascii;
     } context    = {httpServer};
     context.loop = &eventLoop;
 
     SC_TEST_EXPECT(context.fs.init(webServerFolder));
     SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
 
-    SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://localhost:{}/file.html", serverPort));
-    SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://localhost:{}/stream.html", serverPort));
-    SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://localhost:{}/inline.html", serverPort));
-    SC_TEST_EXPECT(StringBuilder::format(context.uploadURL, "http://localhost:{}/upload", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://127.0.0.1:{}/file.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://127.0.0.1:{}/stream.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://127.0.0.1:{}/inline.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.uploadURL, "http://127.0.0.1:{}/upload", serverPort));
 
     // Create an Http Client request for that file
     SC_TEST_EXPECT(context.getClient.get(eventLoop, context.fileURL.view()));
-    context.getClient.callback = [this, &context](HttpClient& result)
+    context.getClient.callback = [this, &context](HttpTestClient& result)
     {
         context.getCount++;
         StringView str(result.getResponse());
@@ -115,7 +117,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(context.putStream.put(*context.loop, context.streamURL.view(), "StreamBody", {10}));
     };
 
-    context.putStream.callback = [this, &context](HttpClient& result)
+    context.putStream.callback = [this, &context](HttpTestClient& result)
     {
         context.putCount++;
         StringView str(result.getResponse());
@@ -132,7 +134,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         // HttpRequest::getFirstBodySlice() will contain the entire body contents.
         SC_TEST_EXPECT(context.putInline.put(*context.loop, context.inlineURL.view(), "InlineBody"));
     };
-    context.putInline.callback = [this, &context](HttpClient& result)
+    context.putInline.callback = [this, &context](HttpTestClient& result)
     {
         context.putCount++;
         StringView str(result.getResponse());
@@ -150,7 +152,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
                                                            "multipart.txt", "MultipartContent"));
     };
 
-    context.postMultipart.callback = [this, &context](HttpClient& result)
+    context.postMultipart.callback = [this, &context](HttpTestClient& result)
     {
         context.multipartCount++;
         StringView str(result.getResponse());

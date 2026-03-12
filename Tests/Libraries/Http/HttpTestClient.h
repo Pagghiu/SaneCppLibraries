@@ -15,7 +15,7 @@ namespace SC
 //! @{
 
 /// @brief Http async client
-struct HttpClient
+struct HttpTestClient
 {
     /// @brief Setups this client to execute a `GET` request on the given url
     /// @param loop The AsyncEventLoop to use for monitoring network packets
@@ -43,7 +43,7 @@ struct HttpClient
     Result postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName, StringSpan fileName,
                          StringSpan fileContent, TimeMs bodyDelay = {});
 
-    Delegate<HttpClient&> callback; ///< The callback that is called after `GET` operation succeeded
+    Delegate<HttpTestClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringSpan sent by the server
     [[nodiscard]] StringSpan getResponse() const;

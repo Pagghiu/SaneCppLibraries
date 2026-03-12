@@ -118,13 +118,13 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             // Context for the callback
             stream.multipartListener.server     = this;
             stream.multipartListener.stream     = &stream;
-            stream.multipartListener.connection = &static_cast<HttpAsyncConnectionBase&>(connection);
+            stream.multipartListener.connection = &static_cast<HttpConnection&>(connection);
             SC_TRY(stream.sourceFileDescriptor.open(path.view(), FileOpen::Read));
 
             auto onHeadersSent = [&stream, fileSize = fileStat.fileSize](AsyncBufferView::ID)
             {
-                HttpAsyncConnectionBase& connection = *stream.multipartListener.connection;
-                HttpAsyncFileServer*     server     = stream.multipartListener.server;
+                HttpConnection&      connection = *stream.multipartListener.connection;
+                HttpAsyncFileServer* server     = stream.multipartListener.server;
 
                 // Use AsyncFileSend for zero-copy file serving
                 stream.asyncFileSend.callback = [&connection, &stream](AsyncFileSend::Result& result)
@@ -198,7 +198,7 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     SC_TRY(path.assign(directory.view()));
     SC_TRY(path.append("/"));
     SC_TRY(path.append(filePath));
-    const size_t   totalFileUploadBytes = static_cast<size_t>(connection.request.getParser().contentLength);
+    const size_t   totalFileUploadBytes = static_cast<size_t>(connection.request.getBodyBytesRemaining());
     FileDescriptor fd;
     SC_TRY(fd.open(path.view(), FileOpen::Write));
     if (totalFileUploadBytes == 0)
@@ -232,9 +232,9 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     };
     SC_TRY(stream.writableFileStream.eventFinish.addListener(OnFileWritten{connection, stream}));
 
-    HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
+    HttpConnection& asyncConnection = static_cast<HttpConnection&>(connection);
 
-    connection.pipeline.source   = &asyncConnection.readableSocketStream;
+    connection.pipeline.source   = &connection.request.getReadableStream();
     connection.pipeline.sinks[0] = &stream.writableFileStream;
     SC_TRY(connection.pipeline.pipe());
     SC_TRY(connection.pipeline.start());
@@ -242,9 +242,10 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     stream.putFileListener.connection     = &asyncConnection;
     stream.putFileListener.remainingBytes = totalFileUploadBytes;
     // Add this listener after the pipeline one, so the body has already been dispatched to the writable stream.
-    const bool addedBodyListener = asyncConnection.readableSocketStream.eventData.addListener<
-        HttpAsyncFileServer::Stream::PutFileListener, &HttpAsyncFileServer::Stream::PutFileListener::onData>(
-        stream.putFileListener);
+    const bool addedBodyListener =
+        connection.request.getReadableStream()
+            .eventData.addListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                   &HttpAsyncFileServer::Stream::PutFileListener::onData>(stream.putFileListener);
     SC_ASSERT_RELEASE(addedBodyListener);
     return Result(true);
 }
@@ -260,6 +261,7 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
     SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
     if (remainingBytes == data.sizeInBytes())
     {
+        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
         // Last chunk, we can remove this listener and terminate the writable stream
         const bool removedBodyListener =
             readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
@@ -280,10 +282,12 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
     else if (remainingBytes > data.sizeInBytes())
     {
         // Intermediate chunk, we need to continue streaming data
+        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
         remainingBytes -= data.sizeInBytes();
     }
     else if (remainingBytes < data.sizeInBytes())
     {
+        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(remainingBytes));
         // HTTP Pipelining: excess data belongs to next request
         // Create a child view for the excess bytes and unshift it back into the stream
         const size_t excessOffset = remainingBytes;
@@ -442,25 +446,23 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
 {
     SC_TRY(stream.multipartParser.initWithBoundary(connection.request.getBoundary()));
 
-    HttpAsyncConnectionBase& asyncConnection = static_cast<HttpAsyncConnectionBase&>(connection);
-
     stream.multipartListener.server     = this;
     stream.multipartListener.stream     = &stream;
-    stream.multipartListener.connection = &asyncConnection;
+    stream.multipartListener.connection = &connection;
 
-    SC_ASSERT_RELEASE(
-        (asyncConnection.readableSocketStream.eventData.addListener<
-            HttpAsyncFileServer::Stream::MultipartListener, &HttpAsyncFileServer::Stream::MultipartListener::onData>(
-            stream.multipartListener)));
+    SC_ASSERT_RELEASE((
+        connection.request.getReadableStream()
+            .eventData.addListener<HttpAsyncFileServer::Stream::MultipartListener,
+                                   &HttpAsyncFileServer::Stream::MultipartListener::onData>(stream.multipartListener)));
 
-    (void)asyncConnection.readableSocketStream.start();
+    (void)connection.request.getReadableStream().start();
 
     return Result(true);
 }
 
 void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID bufferID)
 {
-    AsyncReadableStream& readable = connection->readableSocketStream;
+    AsyncReadableStream& readable = connection->request.getReadableStream();
     AsyncBuffersPool&    buffers  = readable.getBuffersPool();
 
     Span<const char> data;

@@ -3,22 +3,78 @@
 #pragma once
 #include "HttpParser.h"
 
-#include "../AsyncStreams/AsyncStreams.h"
+#include "../AsyncStreams/AsyncRequestStreams.h"
 #include "../Foundation/StringSpan.h"
+#include "Internal/HttpFixedBufferWriter.h"
+#include "Internal/HttpParsedHeaders.h"
 
 namespace SC
 {
 //! @addtogroup group_http
 //! @{
 
+struct SC_COMPILER_EXPORT HttpMultipartWriter
+{
+    struct Part
+    {
+        StringSpan partName;
+        StringSpan fileName;
+        StringSpan contentType;
+
+        Span<const char> body;
+    };
+
+    static constexpr size_t MaxParts = 8;
+
+    void reset();
+
+    Result setBoundary(StringSpan boundaryValue);
+    Result addField(StringSpan fieldName, StringSpan value);
+    Result addFile(StringSpan fieldName, StringSpan fileName, Span<const char> body,
+                   StringSpan contentType = "application/octet-stream");
+
+    [[nodiscard]] StringSpan  getBoundary() const { return boundary; }
+    [[nodiscard]] size_t      getNumParts() const { return numParts; }
+    [[nodiscard]] const Part& getPart(size_t idx) const { return parts[idx]; }
+    [[nodiscard]] size_t      getContentLength() const;
+
+  private:
+    Part       parts[MaxParts];
+    size_t     numParts            = 0;
+    char       boundaryStorage[71] = {0};
+    StringSpan boundary;
+};
+
+/// @brief Shared async transport storage for HTTP client and server endpoints
+struct SC_COMPILER_EXPORT HttpConnectionBase
+{
+    ReadableSocketStream readableSocketStream;
+    WritableSocketStream writableSocketStream;
+    AsyncBuffersPool     buffersPool;
+    AsyncPipeline        pipeline;
+    SocketDescriptor     socket;
+
+    void setHeaderMemory(Span<char> memory) { headerMemory = memory; }
+
+    [[nodiscard]] Span<char> getHeaderMemory() const { return headerMemory; }
+
+    void reset();
+
+  protected:
+    Span<char> headerMemory;
+};
+
 /// @brief Incoming message from the perspective of the participants of an HTTP transaction
-struct SC_COMPILER_EXPORT HttpRequest
+struct SC_COMPILER_EXPORT HttpIncomingMessage
 {
     /// @brief Gets the associated HttpParser
-    const HttpParser& getParser() const { return parser; }
+    const HttpParser& getParser() const { return parsedHeaders.parser; }
 
-    /// @brief Gets the request URL
-    StringSpan getURL() const { return url; }
+    /// @brief Gets whether the other party requested the connection to stay alive
+    [[nodiscard]] bool getKeepAlive() const { return parsedHeaders.parser.connectionKeepAlive; }
+
+    /// @brief Returns how many body bytes are still expected for this message
+    [[nodiscard]] uint64_t getBodyBytesRemaining() const { return bodyBytesRemaining; }
 
     /// @brief Checks if the request is a multipart/form-data request
     [[nodiscard]] bool isMultipart() const;
@@ -32,13 +88,23 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @return `true` if the header was found
     [[nodiscard]] bool getHeader(StringSpan headerName, StringSpan& value) const;
 
-    /// @brief Resets this object for it to be re-usable
-    void reset();
+    /// @brief Obtains the readable stream for the message body
+    AsyncReadableStream& getReadableStream();
 
-  private:
-    friend struct HttpConnectionsPool;
-    friend struct HttpResponse;
-    friend struct HttpAsyncServer;
+    /// @brief Obtains the readable stream for the message body
+    const AsyncReadableStream& getReadableStream() const;
+
+    /// @brief Decrements the remaining body bytes after consuming data
+    Result consumeBodyBytes(size_t bytes);
+
+  protected:
+    void resetIncoming(HttpParser::Type type, Span<char> memory);
+
+    [[nodiscard]] bool       hasReceivedHeaders() const { return parsedHeaders.headersEndReceived; }
+    [[nodiscard]] Span<char> getUnusedHeaderMemory() const { return parsedHeaders.availableHeader; }
+
+    void attachReadableStream(AsyncReadableStream& stream) { readableStream = &stream; }
+    void setBodyBytesRemaining(uint64_t value) { bodyBytesRemaining = value; }
 
     /// @brief Finds a specific HttpParser::Result in the list of parsed header
     /// @param token The result to look for (Method, Url etc.)
@@ -49,40 +115,56 @@ struct SC_COMPILER_EXPORT HttpRequest
     /// @brief Parses an incoming slice of data eventually copying it to the availableHeader.
     /// If it encounters body data, it will create a child view and unshift it to the stream.
     Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
-                        AsyncBufferView::ID bufferID);
+                        AsyncBufferView::ID bufferID, const char* outOfSpaceError, const char* sizeExceededError,
+                        bool stopAtHeadersEnd);
 
     /// @brief Gets the length of the headers in bytes
     [[nodiscard]] size_t getHeadersLength() const;
 
-    struct SC_COMPILER_EXPORT HttpHeaderOffset
-    {
-        HttpParser::Token token = HttpParser::Token::Method;
+    HttpParsedHeaders    parsedHeaders;
+    Span<char>           headerMemory;
+    AsyncReadableStream* readableStream     = nullptr;
+    uint64_t             bodyBytesRemaining = 0;
+};
 
-        uint32_t start  = 0;
-        uint32_t length = 0;
-    };
-    Span<char> readHeaders;     ///< Headers read so far
-    Span<char> availableHeader; ///< Space to save headers to
+/// @brief Incoming HTTP request received by the server
+struct SC_COMPILER_EXPORT HttpRequest : public HttpIncomingMessage
+{
+    /// @brief Gets the request URL
+    StringSpan getURL() const { return url; }
 
-    bool    headersEndReceived = false; ///< All headers have been received
-    bool    parsedSuccessfully = true;  ///< Request headers have been parsed successfully
-    uint8_t headersEndMatch    = 0;     ///< Number of matched chars for "\r\n\r\n" while accumulating headers
+    /// @brief Resets this object for it to be re-usable
+    void reset();
 
-    HttpParser parser; ///< The parser used to parse headers
-    StringSpan url;    ///< The url extracted from parsed headers
+  private:
+    friend struct HttpConnectionsPool;
+    friend struct HttpResponse;
+    friend struct HttpAsyncServer;
 
-    static constexpr size_t MaxNumHeaders = 64;
+    void setHeaderMemory(Span<char> memory);
 
-    HttpHeaderOffset headerOffsets[MaxNumHeaders]; ///< Headers, defined as offsets in headerBuffer
-    size_t           numHeaders = 0;
+    /// @brief Parses request headers and extracts the request URL
+    Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
+                        AsyncBufferView::ID bufferID);
+
+    StringSpan url;
+};
+
+/// @brief Incoming HTTP response received by the client
+struct SC_COMPILER_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
+{
+  private:
+    friend struct HttpAsyncClient;
+
+    void reset(Span<char> memory);
+
+    Result writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
+                        AsyncBufferView::ID bufferID);
 };
 
 /// @brief Outgoing message from the perspective of the participants of an HTTP transaction
-struct SC_COMPILER_EXPORT HttpResponse
+struct SC_COMPILER_EXPORT HttpOutgoingMessage
 {
-    /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
-    Result startResponse(int httpCode);
-
     /// @brief Writes an http header to this response
     /// @return Valid Result if header was added successfully.
     /// @warning Adding a "Connection" header can fail if keep-alive has been force disabled
@@ -109,35 +191,110 @@ struct SC_COMPILER_EXPORT HttpResponse
     /// @return true if connection should be kept alive
     [[nodiscard]] bool getKeepAlive() const { return forceDisableKeepAlive ? false : keepAlive; }
 
-  private:
-    friend struct HttpConnectionsPool;
-    friend struct HttpAsyncServer;
-
-    template <size_t N>
-    Result appendAsciiLiteral(const char (&ascii)[N])
+  protected:
+    enum class KnownHeader : uint8_t
     {
-        return appendAscii({ascii, N - 1});
-    }
+        Connection,
+        Host,
+        UserAgent,
+        ContentLength,
+        ContentType,
+        TransferEncoding,
+    };
 
-    Result appendAscii(Span<const char> ascii);
+    void setHeaderMemory(Span<char> memory);
+    void setWritableStream(AsyncWritableStream& stream) { writableStream = &stream; }
 
-    /// @brief Uses unused header memory data from the HttpRequest for the response
-    void grabUnusedHeaderMemory(HttpRequest& request);
+    [[nodiscard]] bool hasHeader(KnownHeader header) const;
+    [[nodiscard]] bool hasSentHeaders() const { return headersSent; }
+    [[nodiscard]] bool hasEnded() const { return endCalled; }
 
-    Span<char> responseHeaders;
-    size_t     responseHeadersCapacity = 0;
+    HttpFixedBufferWriter responseHeaders;
+    Span<char>            headerMemory;
 
     bool headersSent = false;
+    bool endCalled   = false;
 
     bool forceDisableKeepAlive = false; ///< Whether keep alive has been force disabled permanently
     bool keepAlive             = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
     bool connectionHeaderAdded = false; ///< Whether Connection header was manually added
+    bool hostHeaderAdded       = false;
+    bool userAgentHeaderAdded  = false;
+    bool contentLengthAdded    = false;
+    bool contentTypeAdded      = false;
+    bool transferEncodingAdded = false;
 
     AsyncWritableStream* writableStream = nullptr;
 };
 
+/// @brief Outgoing HTTP response sent by the server
+struct SC_COMPILER_EXPORT HttpResponse : public HttpOutgoingMessage
+{
+    /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
+    Result startResponse(int httpCode);
+
+  private:
+    friend struct HttpConnectionsPool;
+    friend struct HttpAsyncServer;
+
+    /// @brief Uses unused header memory data from the HttpRequest for the response
+    void grabUnusedHeaderMemory(HttpRequest& request);
+};
+
+/// @brief Outgoing HTTP request sent by the client
+struct SC_COMPILER_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
+{
+    enum class BodyType : uint8_t
+    {
+        None,
+        Manual,
+        Span,
+        Stream,
+        Multipart,
+    };
+
+    void reset();
+
+    Result startRequest(HttpParser::Method method, StringSpan url);
+    Result setExpectedBodyLength(uint64_t value);
+    Result setBody(Span<const char> value);
+    Result setBody(StringSpan value) { return setBody(value.toCharSpan()); }
+    void   setBody(AsyncReadableStream& stream, uint64_t contentLengthValue);
+    void   setMultipart(HttpMultipartWriter& value);
+    Result sendHeaders(Function<void(AsyncBufferView::ID)> callback = {});
+
+    [[nodiscard]] HttpParser::Method getMethod() const { return method; }
+
+    [[nodiscard]] StringSpan getURL() const { return url; }
+    [[nodiscard]] BodyType   getBodyType() const { return bodyType; }
+    [[nodiscard]] uint64_t   getContentLength() const { return contentLength; }
+
+  private:
+    friend struct HttpAsyncClient;
+
+    void setDefaultHost(StringSpan value) { defaultHost = value; }
+
+    [[nodiscard]] bool hasTransferEncodingHeader() const { return hasHeader(KnownHeader::TransferEncoding); }
+
+    [[nodiscard]] AsyncReadableStream*       getBodyStream() const { return bodyStream; }
+    [[nodiscard]] const HttpMultipartWriter* getMultipartWriter() const { return multipartWriter; }
+    [[nodiscard]] Span<const char>           getBodySpan() const { return bodySpan; }
+
+    HttpParser::Method   method = HttpParser::Method::HttpGET;
+    StringSpan           url;
+    AsyncReadableStream* bodyStream = nullptr;
+    BodyType             bodyType   = BodyType::None;
+    Span<const char>     bodySpan;
+    uint64_t             contentLength   = 0;
+    HttpMultipartWriter* multipartWriter = nullptr;
+    StringSpan           defaultHost;
+
+    Function<void(AsyncBufferView::ID)> userHeadersSentCallback;
+    Function<void(AsyncBufferView::ID)> internalHeadersSentCallback;
+};
+
 /// @brief Http connection abstraction holding both the incoming and outgoing messages in an HTTP transaction
-struct SC_COMPILER_EXPORT HttpConnection
+struct SC_COMPILER_EXPORT HttpConnection : public HttpConnectionBase
 {
     HttpConnection();
 
@@ -153,17 +310,13 @@ struct SC_COMPILER_EXPORT HttpConnection
     /// @brief Prepare this client for re-use, marking it as Inactive
     void reset();
 
-    /// @brief Sets memory for the header
-    void setHeaderMemory(Span<char> memory) { headerMemory = memory; }
-
     /// @brief The ID used to find this client in HttpConnectionsPool
     ID getConnectionID() const { return connectionID; }
 
     HttpRequest  request;
     HttpResponse response;
 
-    AsyncBuffersPool buffersPool;
-    AsyncPipeline    pipeline;
+    uint32_t requestCount = 0; ///< Number of requests processed on this connection
 
   protected:
     enum class State
@@ -176,8 +329,6 @@ struct SC_COMPILER_EXPORT HttpConnection
 
     State state = State::Inactive;
     ID    connectionID;
-
-    Span<char> headerMemory;
 };
 
 /// @brief View over a contiguous sequence of items with a custom stride between elements.
@@ -228,6 +379,28 @@ struct SC_COMPILER_EXPORT SpanWithStride
 /// @brief A pool of HttpConnection that can be active or inactive
 struct SC_COMPILER_EXPORT HttpConnectionsPool
 {
+    struct Configuration
+    {
+        size_t readQueueSize     = 3;
+        size_t writeQueueSize    = 3;
+        size_t buffersQueueSize  = 6;
+        size_t headerBytesLength = 8 * 1024;
+        size_t streamBytesLength = 512 * 1024;
+    };
+
+    struct SC_COMPILER_EXPORT Memory
+    {
+        Span<AsyncReadableStream::Request> allReadQueue;
+        Span<AsyncWritableStream::Request> allWriteQueue;
+
+        Span<AsyncBufferView> allBuffers;
+
+        Span<char> allHeaders;
+        Span<char> allStreams;
+
+        Result assignTo(HttpConnectionsPool::Configuration conf, SpanWithStride<HttpConnection> connections);
+    };
+
     /// @brief Initializes the server with memory buffers for connections and headers
     Result init(SpanWithStride<HttpConnection> connectionsStorage);
 
@@ -259,11 +432,45 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
     [[nodiscard]] bool deactivate(HttpConnection::ID connectionID);
 
   private:
-    SpanWithStride<HttpConnection> connections;
+    SpanWithStride<HttpConnection> connections; ///< The connection storages
 
-    size_t numConnections          = 0;
+    size_t numConnections = 0; ///< Number of active connections only
+
+    // Optimization for HttpAsyncServer::resize to avoid having to scan all connections
     size_t highestActiveConnection = 0;
 };
-//! @}
 
+/// @brief Adds compile-time configurable read and write queues to any class subclassing HttpConnectionBase
+template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes, int ExtraBuffers, typename BaseClass>
+struct SC_COMPILER_EXPORT HttpStaticConnection : public BaseClass
+{
+    AsyncReadableStream::Request readQueue[ReadQueue];
+    AsyncWritableStream::Request writeQueue[WriteQueue];
+
+    AsyncBufferView buffers[ReadQueue + WriteQueue + ExtraBuffers];
+
+    char headerStorage[HeaderBytes];
+    char streamStorage[StreamBytes];
+
+    constexpr HttpStaticConnection()
+    {
+        constexpr const size_t NumSlices   = ReadQueue;
+        constexpr const size_t SliceLength = StreamBytes / NumSlices;
+
+        Span<char> memory = streamStorage;
+        for (size_t idx = 0; idx < NumSlices; ++idx)
+        {
+            Span<char> slice;
+            (void)memory.sliceStartLength(idx * SliceLength, SliceLength, slice);
+            buffers[idx] = slice;
+            buffers[idx].setReusable(true);
+        }
+        this->setHeaderMemory(headerStorage);
+        this->buffersPool.setBuffers(buffers);
+        this->readableSocketStream.setReadQueue(readQueue);
+        this->writableSocketStream.setWriteQueue(writeQueue);
+    }
+};
+
+//! @}
 } // namespace SC

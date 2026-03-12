@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../AsyncStreams/AsyncRequestStreams.h"
-#include "HttpAsyncServer.h"
+#include "HttpConnection.h"
 #include "HttpMultipartParser.h"
 
 namespace SC
@@ -31,9 +31,9 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
 
         struct MultipartListener
         {
-            HttpAsyncFileServer*     server     = nullptr;
-            Stream*                  stream     = nullptr;
-            HttpAsyncConnectionBase* connection = nullptr;
+            HttpAsyncFileServer* server     = nullptr;
+            Stream*              stream     = nullptr;
+            HttpConnection*      connection = nullptr;
 
             FileDescriptor currentFd; // TODO: Reuse the above sourceFileDescriptor
             StringPath     currentFilePath;
@@ -46,8 +46,8 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
 
         struct PutFileListener
         {
-            HttpAsyncConnectionBase* connection     = nullptr;
-            size_t                   remainingBytes = 0;
+            HttpConnection* connection     = nullptr;
+            size_t          remainingBytes = 0;
 
             void onData(AsyncBufferView::ID bufferID);
             void onDrain();

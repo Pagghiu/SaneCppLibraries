@@ -10,6 +10,7 @@
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Containers/VirtualArray.h"
 #include "../../Libraries/Http/HttpAsyncFileServer.h"
+#include "../../Libraries/Http/HttpAsyncServer.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
@@ -28,7 +29,7 @@ struct AsyncWebServerExample
     bool    useSendFile = true;
     bool    useEpoll    = false;
 
-    HttpAsyncConnectionBase::Configuration asyncConfiguration;
+    HttpConnectionsPool::Configuration asyncConfiguration;
 
     AsyncEventLoop*     eventLoop = nullptr;
     HttpAsyncServer     httpServer;
@@ -43,7 +44,7 @@ struct AsyncWebServerExample
     static constexpr size_t MAX_REQUEST_SIZE = 1024 * 1024; // Max number of bytes to stream data for each connection
     static constexpr size_t MAX_HEADER_SIZE  = 32 * 1024;   // Max number of bytes to hold request and response headers
 
-    VirtualArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
+    VirtualArray<HttpConnection> clients = {MAX_CONNECTIONS};
 
     // For simplicity just hardcode a read queue of 3 for file streams
     VirtualArray<HttpAsyncFileServer::StreamQueue<3>> fileStreams = {MAX_CONNECTIONS};
@@ -94,7 +95,7 @@ struct AsyncWebServerExample
         SC_TRY(allBuffers.resize(numClients * asyncConfiguration.buffersQueueSize));
         SC_TRY(allHeaders.resizeWithoutInitializing(numClients * asyncConfiguration.headerBytesLength));
         SC_TRY(allStreams.resizeWithoutInitializing(numClients * asyncConfiguration.streamBytesLength));
-        HttpAsyncConnectionBase::Memory memory;
+        HttpConnectionsPool::Memory memory;
         memory.allBuffers    = allBuffers;
         memory.allReadQueue  = allReadQueues;
         memory.allWriteQueue = allWriteQueues;

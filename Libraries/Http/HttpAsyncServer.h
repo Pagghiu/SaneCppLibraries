@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../AsyncStreams/AsyncRequestStreams.h"
 #include "HttpConnection.h"
 
 namespace SC
@@ -17,64 +16,11 @@ struct IsBaseOf
 
 } // namespace TypeTraits
 
-/// @brief Contains fields used by HttpAsyncServer for each connection
-struct SC_COMPILER_EXPORT HttpAsyncConnectionBase : public HttpConnection
-{
-    struct Configuration
-    {
-        size_t readQueueSize     = 3;
-        size_t writeQueueSize    = 3;
-        size_t buffersQueueSize  = 6;
-        size_t headerBytesLength = 8 * 1024;
-        size_t streamBytesLength = 512 * 1024;
-    };
-
-    struct SC_COMPILER_EXPORT Memory
-    {
-        Span<AsyncReadableStream::Request> allReadQueue;
-        Span<AsyncWritableStream::Request> allWriteQueue;
-        Span<AsyncBufferView>              allBuffers;
-        Span<char>                         allHeaders;
-        Span<char>                         allStreams;
-
-        Result assignTo(HttpAsyncConnectionBase::Configuration  conf,
-                        SpanWithStride<HttpAsyncConnectionBase> connections);
-    };
-    ReadableSocketStream readableSocketStream;
-    WritableSocketStream writableSocketStream;
-    SocketDescriptor     socket;
-    uint32_t             requestCount = 0; ///< Number of requests processed on this connection
-};
-
-/// @brief Adds compile-time configurable read and write queues to HttpAsyncConnectionBase
+/// @brief Adds compile-time configurable read and write queues to HttpConnection
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
-struct SC_COMPILER_EXPORT HttpAsyncConnection : public HttpAsyncConnectionBase
+struct SC_COMPILER_EXPORT HttpAsyncConnection
+    : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 0, HttpConnection>
 {
-    AsyncReadableStream::Request readQueue[ReadQueue];
-    AsyncWritableStream::Request writeQueue[WriteQueue];
-    AsyncBufferView              buffers[ReadQueue + WriteQueue];
-
-    char headerStorage[HeaderBytes];
-    char streamStorage[StreamBytes];
-
-    constexpr HttpAsyncConnection()
-    {
-        constexpr const size_t NumSlices   = ReadQueue;
-        constexpr const size_t SliceLength = StreamBytes / NumSlices;
-
-        Span<char> memory = streamStorage;
-        for (size_t idx = 0; idx < NumSlices; ++idx)
-        {
-            Span<char> slice;
-            (void)memory.sliceStartLength(idx * SliceLength, SliceLength, slice);
-            buffers[idx] = slice;
-            buffers[idx].setReusable(true);
-        }
-        HttpConnection::setHeaderMemory(headerStorage);
-        HttpConnection::buffersPool.setBuffers(buffers);
-        readableSocketStream.setReadQueue(readQueue);
-        writableSocketStream.setWriteQueue(writeQueue);
-    }
 };
 
 /// @brief Async Http Server
@@ -93,14 +39,14 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers
     template <typename T,
-              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpAsyncConnectionBase, T>::value>::type>
+              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpConnection, T>::value>::type>
     Result init(Span<T> clients)
     {
         return initInternal({clients.data(), clients.sizeInElements(), sizeof(T)});
     }
 
     template <typename T,
-              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpAsyncConnectionBase, T>::value>::type>
+              typename = typename TypeTraits::EnableIf<TypeTraits::IsBaseOf<HttpConnection, T>::value>::type>
     Result resize(Span<T> clients)
     {
         return resizeInternal({clients.data(), clients.sizeInElements(), sizeof(T)});
@@ -162,13 +108,13 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     uint32_t maxRequestsPerConnection = 0;    ///< Max requests per connection (0 = unlimited)
 
     void onNewClient(AsyncSocketAccept::Result& result);
-    void closeAsync(HttpAsyncConnectionBase& requestClient);
-    void deactivateConnection(HttpAsyncConnectionBase& requestClient);
-    void onStreamReceive(HttpAsyncConnectionBase& client, AsyncBufferView::ID bufferID);
+    void closeAsync(HttpConnection& requestClient);
+    void deactivateConnection(HttpConnection& requestClient);
+    void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
 
     Result waitForStopToFinish();
-    Result initInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
-    Result resizeInternal(SpanWithStride<HttpAsyncConnectionBase> connections);
+    Result initInternal(SpanWithStride<HttpConnection> connections);
+    Result resizeInternal(SpanWithStride<HttpConnection> connections);
 
     AsyncEventLoop*   eventLoop = nullptr;
     SocketDescriptor  serverSocket;

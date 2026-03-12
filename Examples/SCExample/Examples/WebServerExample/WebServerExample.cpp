@@ -42,7 +42,7 @@ struct SC::WebServerExampleModelState
     int32_t port       = 8090;
     int32_t maxClients = 32;
 
-    HttpAsyncConnectionBase::Configuration asyncConfiguration;
+    HttpConnectionsPool::Configuration asyncConfiguration;
 };
 
 SC_REFLECT_STRUCT_VISIT(SC::WebServerExampleModelState)
@@ -83,7 +83,7 @@ struct SC::WebServerExampleModel
     static constexpr size_t MAX_HEADER_SIZE  = 32 * 1024;   // Max number of bytes to hold request and response headers
     static constexpr size_t NUM_FS_THREADS   = 4;           // Number of threads for async file stream operations
 
-    VirtualArray<HttpAsyncConnectionBase> clients = {MAX_CONNECTIONS};
+    VirtualArray<HttpConnection> clients = {MAX_CONNECTIONS};
 
     // For simplicity just hardcode a read queue of 3 for file streams
     VirtualArray<HttpAsyncFileServer::StreamQueue<3>> fileStreams = {MAX_CONNECTIONS};
@@ -123,7 +123,7 @@ struct SC::WebServerExampleModel
         SC_TRY(allBuffers.resize(numClients * modelState.asyncConfiguration.buffersQueueSize));
         SC_TRY(allHeaders.resize(numClients * modelState.asyncConfiguration.headerBytesLength));
         SC_TRY(allStreams.resize(numClients * modelState.asyncConfiguration.streamBytesLength));
-        HttpAsyncConnectionBase::Memory memory;
+        HttpConnectionsPool::Memory memory;
         memory.allBuffers    = allBuffers;
         memory.allReadQueue  = allReadQueues;
         memory.allWriteQueue = allWriteQueues;

@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "HttpClient.h"
+#include "HttpTestClient.h"
+#include "HttpStringAppend.h"
 #include "Libraries/Http/HttpURLParser.h"
-#include "Libraries/Http/Internal/HttpStringAppend.h"
 #include <stdio.h> // snprintf
 
-SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOpen)
+SC::Result SC::HttpTestClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOpen)
 {
     eventLoop          = &loop;
     keepConnectionOpen = keepOpen;
@@ -55,7 +55,7 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOp
         SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
         hasActiveConnection = true;
 
-        connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
+        connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
         return connectAsync.start(*eventLoop, clientSocket, localHost);
     }
     else
@@ -66,7 +66,7 @@ SC::Result SC::HttpClient::get(AsyncEventLoop& loop, StringSpan url, bool keepOp
     }
 }
 
-SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs delay)
+SC::Result SC::HttpTestClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs delay)
 {
     bodyDelay = delay;
     eventLoop = &loop;
@@ -104,14 +104,14 @@ SC::Result SC::HttpClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan 
         SC_TRY(sb.append(body));
     }
 
-    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
+    connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
     parser      = {};
     parser.type = HttpParser::Type::Response;
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
-SC::Result SC::HttpClient::postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName,
-                                         StringSpan fileName, StringSpan fileContent, TimeMs delay)
+SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName,
+                                             StringSpan fileName, StringSpan fileContent, TimeMs delay)
 {
     bodyDelay = delay;
     eventLoop = &loop;
@@ -192,18 +192,18 @@ SC::Result SC::HttpClient::postMultipart(AsyncEventLoop& loop, StringSpan url, S
         SC_TRY(sb.append("--\r\n"));
     }
 
-    connectAsync.callback.bind<HttpClient, &HttpClient::startSendingHeaders>(*this);
+    connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
     parser      = {};
     parser.type = HttpParser::Type::Response;
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
-SC::StringSpan SC::HttpClient::getResponse() const
+SC::StringSpan SC::HttpTestClient::getResponse() const
 {
     return StringSpan(content.toSpanConst(), false, StringEncoding::Ascii);
 }
 
-void SC::HttpClient::startSendingHeaders(AsyncSocketConnect::Result& result)
+void SC::HttpTestClient::startSendingHeaders(AsyncSocketConnect::Result& result)
 {
     SC_COMPILER_UNUSED(result);
 
@@ -212,61 +212,61 @@ void SC::HttpClient::startSendingHeaders(AsyncSocketConnect::Result& result)
     {
         // Sending out the body in a separate async send after delay just for testing purposes
         SC_ASSERT_RELEASE(content.toSpanConst().sliceStartLength(0, headerBytes, toSend));
-        sendAsync.callback.bind<HttpClient, &HttpClient::startWaiting>(*this);
+        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startWaiting>(*this);
     }
     else
     {
         // Send it all
         toSend = content.toSpanConst();
-        sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startReceiveResponse>(*this);
     }
     auto res = sendAsync.start(*eventLoop, clientSocket, toSend);
     SC_ASSERT_RELEASE(res);
 }
 
-void SC::HttpClient::startSendingHeadersOnExistingConnection()
+void SC::HttpTestClient::startSendingHeadersOnExistingConnection()
 {
     Span<const char> toSend;
     if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
     {
         // Sending out the body in a separate async send after delay just for testing purposes
         SC_ASSERT_RELEASE(content.toSpanConst().sliceStartLength(0, headerBytes, toSend));
-        sendAsync.callback.bind<HttpClient, &HttpClient::startWaiting>(*this);
+        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startWaiting>(*this);
     }
     else
     {
         // Send it all
         toSend = content.toSpanConst();
-        sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+        sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startReceiveResponse>(*this);
     }
     auto res = sendAsync.start(*eventLoop, clientSocket, toSend);
     SC_ASSERT_RELEASE(res);
 }
 
-void SC::HttpClient::startWaiting(AsyncSocketSend::Result&)
+void SC::HttpTestClient::startWaiting(AsyncSocketSend::Result&)
 {
-    timeoutAsync.callback.bind<HttpClient, &HttpClient::startSendingBody>(*this);
+    timeoutAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingBody>(*this);
     auto res = timeoutAsync.start(*eventLoop, bodyDelay); // 10 ms delay
     SC_ASSERT_RELEASE(res);
 }
 
-void SC::HttpClient::startSendingBody(AsyncLoopTimeout::Result&)
+void SC::HttpTestClient::startSendingBody(AsyncLoopTimeout::Result&)
 {
-    sendAsync.callback.bind<HttpClient, &HttpClient::startReceiveResponse>(*this);
+    sendAsync.callback.bind<HttpTestClient, &HttpTestClient::startReceiveResponse>(*this);
     Span<const char> bodySpan;
     SC_ASSERT_RELEASE(content.toSpanConst().sliceStart(headerBytes, bodySpan));
     auto res = sendAsync.start(*eventLoop, clientSocket, bodySpan);
     SC_ASSERT_RELEASE(res);
 }
 
-void SC::HttpClient::startReceiveResponse(AsyncSocketSend::Result& result)
+void SC::HttpTestClient::startReceiveResponse(AsyncSocketSend::Result& result)
 {
     SC_COMPILER_UNUSED(result);
     SC_ASSERT_RELEASE(content.resizeWithoutInitializing(1024));
 
     receivedBytes   = 0;
     headersReceived = false;
-    receiveAsync.callback.bind<HttpClient, &HttpClient::tryParseResponse>(*this);
+    receiveAsync.callback.bind<HttpTestClient, &HttpTestClient::tryParseResponse>(*this);
     auto res = receiveAsync.start(*eventLoop, clientSocket, content.toSpan());
     if (not res)
     {
@@ -274,7 +274,7 @@ void SC::HttpClient::startReceiveResponse(AsyncSocketSend::Result& result)
     }
 }
 
-void SC::HttpClient::tryParseResponse(AsyncSocketReceive::Result& result)
+void SC::HttpTestClient::tryParseResponse(AsyncSocketReceive::Result& result)
 {
     receivedBytes += result.completionData.numBytes;
     SC_ASSERT_RELEASE(content.resize(receivedBytes));
