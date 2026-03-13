@@ -35,15 +35,21 @@
 | SC::FileSystem::makeDirectory                 | @copybrief SC::FileSystem::makeDirectory                  |
 | SC::FileSystem::makeDirectoryIfNotExists      | @copybrief SC::FileSystem::makeDirectoryIfNotExists       |
 | SC::FileSystem::makeDirectoryRecursive        | @copybrief SC::FileSystem::makeDirectoryRecursive         |
+| **Create Links**                              |                                                           |
+| SC::FileSystem::createSymbolicLink            | @copybrief SC::FileSystem::createSymbolicLink             |
+| SC::FileSystem::createHardLink                | @copybrief SC::FileSystem::createHardLink                 |
 | **Check Existence**                           |                                                           |
 | SC::FileSystem::exists                        | @copybrief SC::FileSystem::exists                         |
 | SC::FileSystem::existsAndIsFile               | @copybrief SC::FileSystem::existsAndIsFile                |
 | SC::FileSystem::existsAndIsDirectory          | @copybrief SC::FileSystem::existsAndIsDirectory           |
+| SC::FileSystem::existsAndIsLink               | @copybrief SC::FileSystem::existsAndIsLink                |
+| SC::FileSystem::canAccess                     | @copybrief SC::FileSystem::canAccess                      |
 | **Rename files or directories**               |                                                           |
 | SC::FileSystem::rename                        | @copybrief SC::FileSystem::rename                         |
 | **Read / Change modification time**           |                                                           |
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
+| SC::FileSystem::readSymbolicLink              | @copybrief SC::FileSystem::readSymbolicLink               |
 
 | Miscellaneous Classes                                     |                                                                       |
 |:----------------------------------------------------------|:----------------------------------------------------------------------|
@@ -54,7 +60,8 @@
 
 # Status
 🟩 Usable  
-The library contains commonly used function but it's missing some notable ones like `stat`.
+The library contains commonly used function including links, access checks and basic file metadata,
+but it's still missing some notable lower level ones like a richer `stat` API.
 SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
 # Blog
@@ -67,6 +74,7 @@ Some relevant blog posts are:
 
 SC::FileSystem allows all typical file operations ( exists | copy | delete | make files or directory).
 Some less used functions are  SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime .
+The library also supports symlink and hardlink creation, reading symlink targets and checking path accessibility.
 The library doesn't allow reading or writing seeking inside a file, as that is domain of the [File](@ref library_file) library.
 SC::FileSystem::init needs an absolute path to a directory and makes it a the *base directory*.
 All paths passed later on as arguments to all methods can be either absolute paths or relative.
@@ -98,6 +106,21 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 ## rename
 @copydoc SC::FileSystem::rename
 
+## createSymbolicLink
+@copydoc SC::FileSystem::createSymbolicLink
+
+## createHardLink
+@copydoc SC::FileSystem::createHardLink
+
+## existsAndIsLink
+@copydoc SC::FileSystem::existsAndIsLink
+
+## canAccess
+@copydoc SC::FileSystem::canAccess
+
+## readSymbolicLink
+@copydoc SC::FileSystem::readSymbolicLink
+
 ## write
 @copydoc SC::FileSystem::write
 
@@ -118,9 +141,7 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 - `ftruncate`
 - `ftruncate`
 - `lchown`
-- `link` (hardlink)
 - `lstat`
-- `readlink`
 - `sendfile`
 - `stat`
 - `statfs`

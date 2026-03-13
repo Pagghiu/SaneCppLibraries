@@ -4,6 +4,10 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#endif
 
 namespace SC
 {
@@ -51,6 +55,22 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             renameDirectory();
         }
+        if (test_section("Symbolic Link"))
+        {
+            symbolicLink();
+        }
+        if (test_section("Hard Link"))
+        {
+            hardLink();
+        }
+        if (test_section("Access"))
+        {
+            access();
+        }
+        if (test_section("Move Directory"))
+        {
+            moveDirectory();
+        }
         if (test_section("executableFile / applicationRootDirectory"))
         {
             StringPath stringPath;
@@ -64,7 +84,6 @@ struct SC::FileSystemTest : public SC::TestCase
             report.console.print("currentWorkingDirectory=\"{}\"\n",
                                  FileSystem::Operations::getCurrentWorkingDirectory(stringPath));
         }
-        // TODO: Add tests for createSymbolicLink, existsAndIsLink, removeLinkIfExists and moveDirectory
     }
 
     void formatError();
@@ -76,6 +95,10 @@ struct SC::FileSystemTest : public SC::TestCase
     void removeDirectoryRecursive();
     void renameFile();
     void renameDirectory();
+    void symbolicLink();
+    void hardLink();
+    void access();
+    void moveDirectory();
     void snippet();
 };
 
@@ -337,6 +360,130 @@ void SC::FileSystemTest::renameDirectory()
     // Remove all directories created by the test
     SC_TEST_EXPECT(fs.removeDirectoryRecursive("renameDirectoryTest2"));
     //! [renameDirectorySnippet]
+}
+
+void SC::FileSystemTest::symbolicLink()
+{
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+    SC_TEST_EXPECT(fs.writeString("symlinkSource.txt", "symlink-content"));
+    Result createLinkResult = fs.createSymbolicLink("symlinkSource.txt", "symlinkTarget.txt");
+#if SC_PLATFORM_WINDOWS
+    if (not createLinkResult)
+    {
+        report.console.print("Skipping symbolic link assertions because symlink creation is not available\n");
+        SC_TEST_EXPECT(fs.removeFile("symlinkSource.txt"));
+        return;
+    }
+#else
+    SC_TEST_EXPECT(createLinkResult);
+#endif
+    SC_TEST_EXPECT(fs.existsAndIsLink("symlinkTarget.txt"));
+
+    StringPath linkTarget;
+    SC_TEST_EXPECT(fs.readSymbolicLink("symlinkTarget.txt", linkTarget));
+
+    StringPath expectedTarget;
+    SC_TEST_EXPECT(expectedTarget.assign(report.applicationRootDirectory.view()));
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(expectedTarget.append("\\symlinkSource.txt"));
+#else
+    SC_TEST_EXPECT(expectedTarget.append("/symlinkSource.txt"));
+#endif
+    SC_TEST_EXPECT(linkTarget.view() == expectedTarget.view());
+
+    String content = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("symlinkTarget.txt", content));
+    SC_TEST_EXPECT(content.view() == "symlink-content");
+
+    SC_TEST_EXPECT(fs.removeLinkIfExists("symlinkTarget.txt"));
+    SC_TEST_EXPECT(not fs.exists("symlinkTarget.txt"));
+    SC_TEST_EXPECT(fs.removeFile("symlinkSource.txt"));
+}
+
+void SC::FileSystemTest::hardLink()
+{
+    FileSystem fs;
+    StringPath tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    const DWORD tempLength =
+        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+    size_t trimmedLength = static_cast<size_t>(tempLength);
+    if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
+    {
+        trimmedLength -= 1;
+    }
+    SC_TEST_EXPECT(tempDirectory.resize(trimmedLength));
+#else
+    SC_TEST_EXPECT(tempDirectory.assign("/tmp"));
+#endif
+
+    StringPath hardLinkDirectory = tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(hardLinkDirectory.append("\\FileSystemHardLinkTest"));
+#else
+    SC_TEST_EXPECT(hardLinkDirectory.append("/FileSystemHardLinkTest"));
+#endif
+
+    SC_TEST_EXPECT(fs.init(tempDirectory.view()));
+    if (fs.existsAndIsDirectory(hardLinkDirectory.view()))
+    {
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(hardLinkDirectory.view()));
+    }
+    SC_TEST_EXPECT(fs.makeDirectory(hardLinkDirectory.view()));
+    SC_TEST_EXPECT(fs.changeDirectory(hardLinkDirectory.view()));
+
+    SC_TEST_EXPECT(fs.writeString("hardLinkSource.txt", "first"));
+    SC_TEST_EXPECT(fs.createHardLink("hardLinkSource.txt", "hardLinkTarget.txt"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("hardLinkTarget.txt"));
+
+    SC_TEST_EXPECT(fs.writeString("hardLinkSource.txt", "second"));
+
+    String content = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read("hardLinkTarget.txt", content));
+    SC_TEST_EXPECT(content.view() == "second");
+
+    SC_TEST_EXPECT(fs.removeFiles({"hardLinkSource.txt", "hardLinkTarget.txt"}));
+    SC_TEST_EXPECT(fs.changeDirectory(tempDirectory.view()));
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive(hardLinkDirectory.view()));
+}
+
+void SC::FileSystemTest::access()
+{
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+    SC_TEST_EXPECT(fs.writeString("accessTest.txt", "asdf"));
+
+    SC_TEST_EXPECT(fs.canAccess("accessTest.txt"));
+    SC_TEST_EXPECT(fs.canAccess("accessTest.txt", FileSystem::AccessMode::Read));
+    SC_TEST_EXPECT(fs.canAccess("accessTest.txt", FileSystem::AccessMode::Write));
+    SC_TEST_EXPECT(not fs.canAccess("accessMissing.txt"));
+    SC_TEST_EXPECT(not fs.canAccess("accessMissing.txt", FileSystem::AccessMode::Read));
+
+    SC_TEST_EXPECT(fs.removeFile("accessTest.txt"));
+}
+
+void SC::FileSystemTest::moveDirectory()
+{
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+    SC_TEST_EXPECT(fs.makeDirectory("moveDirectorySource"));
+    SC_TEST_EXPECT(fs.writeString("moveDirectorySource/file.txt", "asdf"));
+    SC_TEST_EXPECT(fs.makeDirectory("moveDirectorySource/subdir"));
+    SC_TEST_EXPECT(fs.writeString("moveDirectorySource/subdir/child.txt", "qwer"));
+
+    SC_TEST_EXPECT(fs.moveDirectory("moveDirectorySource", "moveDirectoryDestination"));
+
+    SC_TEST_EXPECT(not fs.existsAndIsDirectory("moveDirectorySource"));
+    SC_TEST_EXPECT(fs.existsAndIsDirectory("moveDirectoryDestination"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("moveDirectoryDestination/file.txt"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("moveDirectoryDestination/subdir/child.txt"));
+
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive("moveDirectoryDestination"));
 }
 
 void SC::FileSystemTest::snippet()

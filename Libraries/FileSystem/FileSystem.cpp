@@ -5,6 +5,7 @@
 
 #if _WIN32
 #include "../Foundation/Deferred.h"
+#include <io.h>
 #include <stdio.h>
 #include <wchar.h>
 #define WIN32_LEAN_AND_MEAN
@@ -556,6 +557,15 @@ SC::Result SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, 
     return Result(true);
 }
 
+SC::Result SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+{
+    StringSpan sourceFileNative, linkFileNative;
+    SC_TRY(convert(sourceFile, fileFormatBuffer1, &sourceFileNative));
+    SC_TRY(convert(linkFile, fileFormatBuffer2, &linkFileNative));
+    SC_TRY(FileSystem::Operations::createHardLink(sourceFileNative, linkFileNative));
+    return Result(true);
+}
+
 bool SC::FileSystem::exists(StringSpan fileOrDirectory)
 {
     StringSpan encodedPath;
@@ -584,6 +594,13 @@ bool SC::FileSystem::existsAndIsLink(StringSpan file)
     return FileSystem::Operations::existsAndIsLink(encodedPath);
 }
 
+bool SC::FileSystem::canAccess(StringSpan fileOrDirectory, AccessMode accessMode)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, &encodedPath));
+    return FileSystem::Operations::access(encodedPath, accessMode);
+}
+
 bool SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destinationDirectory)
 {
     StringSpan encodedPath1;
@@ -598,6 +615,14 @@ SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat)
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
     SC_TRY(FileSystem::Operations::getFileStat(encodedPath, fileStat));
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& destination)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(linkFile, fileFormatBuffer1, &encodedPath));
+    SC_TRY(FileSystem::Operations::readSymbolicLink(encodedPath, destination));
     return Result(true);
 }
 
@@ -649,6 +674,30 @@ SC::Result SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileO
                                        sourceFileOrDirectory.getNullTerminatedNative(), dwFlags),
                  "createSymbolicLink: Failed to create symbolic link");
     return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+{
+    SC_TRY_MSG(Internal::validatePath(sourceFile), "createHardLink: Invalid source path");
+    SC_TRY_MSG(Internal::validatePath(linkFile), "createHardLink: Invalid link path");
+    SC_TRY_WIN32(::CreateHardLinkW(linkFile.getNullTerminatedNative(), sourceFile.getNullTerminatedNative(), nullptr),
+                 "createHardLink: Failed to create hard link");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "access: Invalid path");
+
+    int mode = 0;
+    switch (accessMode)
+    {
+    case AccessMode::Exists: mode = 0; break;
+    case AccessMode::Read: mode = 4; break;
+    case AccessMode::Write: mode = 2; break;
+    case AccessMode::Execute: mode = 0; break;
+    }
+    return Result(::_waccess(path.getNullTerminatedNative(), mode) == 0);
 }
 
 SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
@@ -755,6 +804,42 @@ SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
     if (res == INVALID_FILE_ATTRIBUTES)
         return Result(false);
     return Result((res & FILE_ATTRIBUTE_REPARSE_POINT) != 0);
+}
+
+SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "readSymbolicLink: Invalid path");
+
+    HANDLE hFile =
+        ::CreateFileW(path.getNullTerminatedNative(), 0, FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                      nullptr, OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT | FILE_FLAG_BACKUP_SEMANTICS, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return Result::Error("readSymbolicLink: Failed to open link");
+    }
+    auto deferClose = MakeDeferred([&]() { ::CloseHandle(hFile); });
+
+    DWORD length = ::GetFinalPathNameByHandleW(hFile, destination.writableSpan().data(),
+                                               static_cast<DWORD>(StringPath::MaxPath), FILE_NAME_NORMALIZED);
+    if (length == 0 or length >= StringPath::MaxPath)
+    {
+        return Result::Error("readSymbolicLink: Failed to read link target");
+    }
+
+    wchar_t* buffer = destination.writableSpan().data();
+    if (length >= 4 and buffer[0] == L'\\' and buffer[1] == L'\\' and buffer[2] == L'?' and buffer[3] == L'\\')
+    {
+        size_t prefix = 4;
+        if (length >= 8 and buffer[4] == L'U' and buffer[5] == L'N' and buffer[6] == L'C' and buffer[7] == L'\\')
+        {
+            buffer[0] = L'\\';
+            prefix    = 7;
+        }
+        ::memmove(buffer + 1, buffer + prefix, (length - prefix + 1) * sizeof(wchar_t));
+        length -= static_cast<DWORD>(prefix - 1);
+    }
+    (void)destination.resize(length);
+    return Result(true);
 }
 
 SC::Result SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
@@ -1130,6 +1215,33 @@ SC::Result SC::FileSystem::Operations::createSymbolicLink(StringSpan sourceFileO
     return Result(true);
 }
 
+static int posixAccessMode(SC::FileSystemAccessMode accessMode)
+{
+    switch (accessMode)
+    {
+    case SC::FileSystemAccessMode::Exists: return F_OK;
+    case SC::FileSystemAccessMode::Read: return R_OK;
+    case SC::FileSystemAccessMode::Write: return W_OK;
+    case SC::FileSystemAccessMode::Execute: return X_OK;
+    }
+    return F_OK;
+}
+
+SC::Result SC::FileSystem::Operations::createHardLink(StringSpan sourceFile, StringSpan linkFile)
+{
+    SC_TRY_MSG(Internal::validatePath(sourceFile), "createHardLink: Invalid source path");
+    SC_TRY_MSG(Internal::validatePath(linkFile), "createHardLink: Invalid link path");
+    SC_TRY_POSIX(::link(sourceFile.getNullTerminatedNative(), linkFile.getNullTerminatedNative()),
+                 "createHardLink: Failed to create hard link");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::access(StringSpan path, AccessMode accessMode)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "access: Invalid path");
+    return Result(::access(path.getNullTerminatedNative(), posixAccessMode(accessMode)) == 0);
+}
+
 SC::Result SC::FileSystem::Operations::makeDirectory(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "makeDirectory: Invalid path");
@@ -1204,7 +1316,7 @@ SC::Result SC::FileSystem::Operations::existsAndIsLink(StringSpan path)
 {
     SC_TRY_MSG(Internal::validatePath(path), "existsAndIsLink: Invalid path");
     struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "existsAndIsLink: Failed to get file stats");
+    SC_TRY_POSIX(::lstat(path.getNullTerminatedNative(), &path_stat), "existsAndIsLink: Failed to get file stats");
     return Result(S_ISLNK(path_stat.st_mode));
 }
 
@@ -1243,6 +1355,25 @@ SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemSt
     auto ts = path_stat.st_mtim;
 #endif
     fileStat.modifiedTime = TimeMs{static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "readSymbolicLink: Invalid path");
+
+    const ssize_t length =
+        ::readlink(path.getNullTerminatedNative(), destination.writableSpan().data(), StringPath::MaxPath - 1);
+    if (length < 0)
+    {
+        return Result::Error("readSymbolicLink: Failed to read link target");
+    }
+
+    destination.writableSpan().data()[length] = 0;
+    if (not destination.resize(static_cast<size_t>(length)))
+    {
+        return Result::Error("readSymbolicLink: Failed to store link target");
+    }
     return Result(true);
 }
 

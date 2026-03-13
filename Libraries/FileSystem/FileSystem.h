@@ -20,6 +20,15 @@ struct FileSystemStat
     TimeMs modifiedTime; ///< Time when file was last modified
 };
 
+/// @brief Access mode for path checks
+enum class FileSystemAccessMode : uint8_t
+{
+    Exists,  ///< Check if path exists
+    Read,    ///< Check if path is readable
+    Write,   ///< Check if path is writable
+    Execute, ///< Check if path is executable / traversable
+};
+
 /// @brief A structure to describe copy flags
 struct FileSystemCopyFlags
 {
@@ -60,6 +69,9 @@ struct FileSystemCopyFlags
 struct SC_COMPILER_EXPORT FileSystem
 {
     bool preciseErrorMessages = false; ///< Formats errors in an internal buffer when returning failed Result
+
+    /// @brief Access mode for path checks
+    using AccessMode = FileSystemAccessMode;
 
     /// @brief Call init function when instantiating the class to set directory for all operations using relative paths.
     /// @param initialDirectory The wanted directory
@@ -219,6 +231,12 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @return Invalid result if it's not possible creating the requested symbolic link
     Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
 
+    /// @brief Creates a hard link at location linkFile pointing at sourceFile
+    /// @param sourceFile The target file of the hard link
+    /// @param linkFile The location where the hard link will be created
+    /// @return Invalid result if it's not possible creating the requested hard link
+    Result createHardLink(StringSpan sourceFile, StringSpan linkFile);
+
     /// @brief Check if a file or directory exists at a given path
     /// @param fileOrDirectory Path to check
     /// @return `true` if a file or directory exists at the given path
@@ -242,6 +260,12 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @param file Link path to check
     /// @return `true` if a file exists at the given path
     [[nodiscard]] bool existsAndIsLink(StringSpan file);
+
+    /// @brief Check whether the current process can access a path with the requested mode
+    /// @param fileOrDirectory Path to check
+    /// @param accessMode Requested access mode
+    /// @return `true` if the requested access is allowed
+    [[nodiscard]] bool canAccess(StringSpan fileOrDirectory, AccessMode accessMode = AccessMode::Exists);
 
     /// @brief Moves a directory from source to destination
     /// @param sourceDirectory The source directory that will be moved to destination
@@ -298,6 +322,12 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @return Valid Result if file stats for the given file was successfully read
     Result getFileStat(StringSpan file, FileStat& fileStat);
 
+    /// @brief Reads the target path stored by a symbolic link
+    /// @param linkFile Path to the symbolic link
+    /// @param[out] destination Destination receiving the native-encoded target path
+    /// @return Valid Result if link target was successfully read
+    Result readSymbolicLink(StringSpan linkFile, StringPath& destination);
+
     /// @brief Change last modified time of a given file
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
@@ -308,7 +338,9 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
     struct SC_COMPILER_EXPORT Operations
     {
+        static Result access(StringSpan path, AccessMode accessMode);
         static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);
+        static Result createHardLink(StringSpan sourceFile, StringSpan linkFile);
         static Result makeDirectory(StringSpan dir);
         static Result exists(StringSpan path);
         static Result existsAndIsDirectory(StringSpan path);
@@ -323,6 +355,7 @@ struct SC_COMPILER_EXPORT FileSystem
         static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
         static Result removeDirectoryRecursive(StringSpan directory);
         static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
+        static Result readSymbolicLink(StringSpan path, StringPath& destination);
         static Result setLastModifiedTime(StringSpan path, TimeMs time);
 
         static StringSpan getExecutablePath(StringPath& executablePath);
