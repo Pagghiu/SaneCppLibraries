@@ -7,6 +7,9 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#else
+#include <sys/stat.h>
+#include <unistd.h>
 #endif
 
 namespace SC
@@ -71,6 +74,10 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             moveDirectory();
         }
+        if (test_section("stat / lstat"))
+        {
+            statAndLStat();
+        }
         if (test_section("executableFile / applicationRootDirectory"))
         {
             StringPath stringPath;
@@ -99,6 +106,7 @@ struct SC::FileSystemTest : public SC::TestCase
     void hardLink();
     void access();
     void moveDirectory();
+    void statAndLStat();
     void snippet();
 };
 
@@ -436,8 +444,17 @@ void SC::FileSystemTest::hardLink()
     SC_TEST_EXPECT(fs.changeDirectory(hardLinkDirectory.view()));
 
     SC_TEST_EXPECT(fs.writeString("hardLinkSource.txt", "first"));
+    FileSystem::FileStat sourceStat;
+    SC_TEST_EXPECT(fs.stat("hardLinkSource.txt", sourceStat));
+    SC_TEST_EXPECT(sourceStat.entryType == FileSystemEntryType::File);
+    SC_TEST_EXPECT(sourceStat.hardLinkCount >= 1);
     SC_TEST_EXPECT(fs.createHardLink("hardLinkSource.txt", "hardLinkTarget.txt"));
     SC_TEST_EXPECT(fs.existsAndIsFile("hardLinkTarget.txt"));
+
+    FileSystem::FileStat linkedStat;
+    SC_TEST_EXPECT(fs.stat("hardLinkTarget.txt", linkedStat));
+    SC_TEST_EXPECT(linkedStat.entryType == FileSystemEntryType::File);
+    SC_TEST_EXPECT(linkedStat.hardLinkCount >= 2);
 
     SC_TEST_EXPECT(fs.writeString("hardLinkSource.txt", "second"));
 
@@ -484,6 +501,101 @@ void SC::FileSystemTest::moveDirectory()
     SC_TEST_EXPECT(fs.existsAndIsFile("moveDirectoryDestination/subdir/child.txt"));
 
     SC_TEST_EXPECT(fs.removeDirectoryRecursive("moveDirectoryDestination"));
+}
+
+void SC::FileSystemTest::statAndLStat()
+{
+    FileSystem fs;
+    StringPath tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    const DWORD tempLength =
+        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+    size_t trimmedLength = static_cast<size_t>(tempLength);
+    if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
+    {
+        trimmedLength -= 1;
+    }
+    SC_TEST_EXPECT(tempDirectory.resize(trimmedLength));
+#else
+    SC_TEST_EXPECT(tempDirectory.assign("/tmp"));
+#endif
+
+    StringPath statDirectoryRoot = tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(statDirectoryRoot.append("\\FileSystemStatTest"));
+#else
+    SC_TEST_EXPECT(statDirectoryRoot.append("/FileSystemStatTest"));
+#endif
+
+    SC_TEST_EXPECT(fs.init(tempDirectory.view()));
+    if (fs.existsAndIsDirectory(statDirectoryRoot.view()))
+    {
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(statDirectoryRoot.view()));
+    }
+    SC_TEST_EXPECT(fs.makeDirectory(statDirectoryRoot.view()));
+    SC_TEST_EXPECT(fs.changeDirectory(statDirectoryRoot.view()));
+
+    SC_TEST_EXPECT(fs.writeString("statFile.txt", "stat-content"));
+    SC_TEST_EXPECT(fs.makeDirectory("statDirectory"));
+
+    FileSystem::FileStat statInfo;
+    SC_TEST_EXPECT(fs.stat("statFile.txt", statInfo));
+    SC_TEST_EXPECT(statInfo.entryType == FileSystemEntryType::File);
+    SC_TEST_EXPECT(statInfo.fileSize == StringView("stat-content").sizeInBytes());
+    SC_TEST_EXPECT(statInfo.modifiedTime.milliseconds > 0);
+    SC_TEST_EXPECT(statInfo.accessedTime.milliseconds > 0);
+    SC_TEST_EXPECT(statInfo.hardLinkCount >= 1);
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(statInfo.windows.attributes != 0);
+    SC_TEST_EXPECT(statInfo.creationTime.milliseconds > 0);
+#else
+    StringPath statFilePath = statDirectoryRoot;
+    SC_TEST_EXPECT(statFilePath.append("/statFile.txt"));
+    struct stat nativeStat;
+    SC_TEST_EXPECT(::stat(statFilePath.view().getNullTerminatedNative(), &nativeStat) == 0);
+    SC_TEST_EXPECT(statInfo.posix.mode != 0);
+    SC_TEST_EXPECT(statInfo.posix.uid == static_cast<SC::uint32_t>(nativeStat.st_uid));
+    SC_TEST_EXPECT(statInfo.posix.gid == static_cast<SC::uint32_t>(nativeStat.st_gid));
+    SC_TEST_EXPECT(statInfo.posix.inode == static_cast<SC::uint64_t>(nativeStat.st_ino));
+#endif
+
+    FileSystem::FileStat compatibilityInfo;
+    SC_TEST_EXPECT(fs.getFileStat("statFile.txt", compatibilityInfo));
+    SC_TEST_EXPECT(compatibilityInfo.fileSize == statInfo.fileSize);
+    SC_TEST_EXPECT(compatibilityInfo.modifiedTime.milliseconds == statInfo.modifiedTime.milliseconds);
+
+    FileSystem::FileStat directoryStat;
+    SC_TEST_EXPECT(fs.stat("statDirectory", directoryStat));
+    SC_TEST_EXPECT(directoryStat.entryType == FileSystemEntryType::Directory);
+
+    Result createLinkResult = fs.createSymbolicLink("statFile.txt", "statLink.txt");
+#if SC_PLATFORM_WINDOWS
+    if (createLinkResult)
+    {
+#else
+    SC_TEST_EXPECT(createLinkResult);
+    {
+#endif
+        FileSystem::FileStat followedStat;
+        FileSystem::FileStat linkStat;
+        SC_TEST_EXPECT(fs.stat("statLink.txt", followedStat));
+        SC_TEST_EXPECT(fs.lstat("statLink.txt", linkStat));
+        SC_TEST_EXPECT(followedStat.entryType == FileSystemEntryType::File);
+        SC_TEST_EXPECT(linkStat.entryType == FileSystemEntryType::SymbolicLink);
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(linkStat.windows.attributes != 0);
+#else
+        SC_TEST_EXPECT(linkStat.posix.mode != 0);
+        SC_TEST_EXPECT(linkStat.posix.inode != 0);
+#endif
+        SC_TEST_EXPECT(fs.removeLinkIfExists("statLink.txt"));
+    }
+
+    SC_TEST_EXPECT(fs.removeFile("statFile.txt"));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory("statDirectory"));
+    SC_TEST_EXPECT(fs.changeDirectory(tempDirectory.view()));
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive(statDirectoryRoot.view()));
 }
 
 void SC::FileSystemTest::snippet()

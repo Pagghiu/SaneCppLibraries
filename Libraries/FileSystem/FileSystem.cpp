@@ -610,11 +610,21 @@ bool SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destin
     return FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2);
 }
 
-SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat)
+SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat) { return stat(file, fileStat); }
+
+SC::Result SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
 {
     StringSpan encodedPath;
     SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
-    SC_TRY(FileSystem::Operations::getFileStat(encodedPath, fileStat));
+    SC_TRY(FileSystem::Operations::stat(encodedPath, fileStat));
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(FileSystem::Operations::lstat(encodedPath, fileStat));
     return Result(true);
 }
 
@@ -654,6 +664,88 @@ struct SC::FileSystem::Operations::Internal
 
     static Result removeDirectoryRecursiveInternal(const wchar_t* path);
 };
+
+static SC::TimeMs windowsFileTimeToTimeMs(const FILETIME& fileTime)
+{
+    ULARGE_INTEGER fileTimeValue;
+    fileTimeValue.LowPart  = fileTime.dwLowDateTime;
+    fileTimeValue.HighPart = fileTime.dwHighDateTime;
+    if (fileTimeValue.QuadPart == 0)
+    {
+        return {};
+    }
+    fileTimeValue.QuadPart -= 116444736000000000ULL;
+    return SC::TimeMs{static_cast<SC::int64_t>(fileTimeValue.QuadPart / 10000ULL)};
+}
+
+static SC::FileSystemEntryType windowsEntryTypeFromAttributes(DWORD attributes, DWORD reparseTag)
+{
+    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+    {
+        if (reparseTag == IO_REPARSE_TAG_SYMLINK or reparseTag == 0)
+        {
+            return SC::FileSystemEntryType::SymbolicLink;
+        }
+        return SC::FileSystemEntryType::Other;
+    }
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY)
+    {
+        return SC::FileSystemEntryType::Directory;
+    }
+    return SC::FileSystemEntryType::File;
+}
+
+static SC::Result fillWindowsFileStat(HANDLE hFile, SC::FileSystemStat& fileStat)
+{
+    fileStat = {};
+
+    BY_HANDLE_FILE_INFORMATION handleInfo;
+    SC_TRY_MSG(::GetFileInformationByHandle(hFile, &handleInfo) != FALSE, "stat: Failed to get file information");
+    FILE_STANDARD_INFO standardInfo = {};
+    const bool         hasStandardInfo =
+        ::GetFileInformationByHandleEx(hFile, FileStandardInfo, &standardInfo, sizeof(standardInfo)) != FALSE;
+
+    FILE_ATTRIBUTE_TAG_INFO tagInfo = {};
+    if (::GetFileInformationByHandleEx(hFile, FileAttributeTagInfo, &tagInfo, sizeof(tagInfo)) == FALSE)
+    {
+        tagInfo.FileAttributes = handleInfo.dwFileAttributes;
+        tagInfo.ReparseTag     = 0;
+    }
+
+    fileStat.entryType    = windowsEntryTypeFromAttributes(handleInfo.dwFileAttributes, tagInfo.ReparseTag);
+    fileStat.creationTime = windowsFileTimeToTimeMs(handleInfo.ftCreationTime);
+    fileStat.accessedTime = windowsFileTimeToTimeMs(handleInfo.ftLastAccessTime);
+    fileStat.modifiedTime = windowsFileTimeToTimeMs(handleInfo.ftLastWriteTime);
+    fileStat.fileSize =
+        static_cast<SC::size_t>((static_cast<SC::uint64_t>(handleInfo.nFileSizeHigh) << 32) | handleInfo.nFileSizeLow);
+    fileStat.hardLinkCount              = hasStandardInfo ? static_cast<SC::size_t>(standardInfo.NumberOfLinks)
+                                                          : static_cast<SC::size_t>(handleInfo.nNumberOfLinks);
+    fileStat.windows.attributes         = handleInfo.dwFileAttributes;
+    fileStat.windows.reparseTag         = tagInfo.ReparseTag;
+    fileStat.windows.volumeSerialNumber = handleInfo.dwVolumeSerialNumber;
+    fileStat.windows.fileIndex =
+        (static_cast<SC::uint64_t>(handleInfo.nFileIndexHigh) << 32) | handleInfo.nFileIndexLow;
+    return SC::Result(true);
+}
+
+static SC::Result windowsStat(SC::StringSpan path, bool followLinks, SC::FileSystemStat& fileStat)
+{
+    DWORD flags = FILE_FLAG_BACKUP_SEMANTICS;
+    if (not followLinks)
+    {
+        flags |= FILE_FLAG_OPEN_REPARSE_POINT;
+    }
+
+    HANDLE hFile =
+        ::CreateFileW(path.getNullTerminatedNative(), FILE_READ_ATTRIBUTES,
+                      FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, OPEN_EXISTING, flags, nullptr);
+    if (hFile == INVALID_HANDLE_VALUE)
+    {
+        return SC::Result::Error("stat: Failed to open file");
+    }
+    auto deferClose = SC::MakeDeferred([&]() { CloseHandle(hFile); });
+    return fillWindowsFileStat(hFile, fileStat);
+}
 
 #define SC_TRY_WIN32(func, msg)                                                                                        \
     {                                                                                                                  \
@@ -867,37 +959,21 @@ SC::Result SC::FileSystem::Operations::removeFile(StringSpan path)
     return Result(true);
 }
 
+SC::Result SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "stat: Invalid path");
+    return windowsStat(path, true, fileStat);
+}
+
+SC::Result SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "lstat: Invalid path");
+    return windowsStat(path, false, fileStat);
+}
+
 SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "getFileStat: Invalid path");
-
-    HANDLE hFile = ::CreateFileW(path.getNullTerminatedNative(), FILE_READ_ATTRIBUTES, FILE_SHARE_READ, nullptr,
-                                 OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-    if (hFile == INVALID_HANDLE_VALUE)
-    {
-        return Result::Error("getFileStat: Failed to open file");
-    }
-    auto deferClose = MakeDeferred([&]() { CloseHandle(hFile); });
-
-    FILETIME creationTime, lastAccessTime, modifiedTime;
-    if (!::GetFileTime(hFile, &creationTime, &lastAccessTime, &modifiedTime))
-    {
-        return Result::Error("getFileStat: Failed to get file times");
-    }
-
-    ULARGE_INTEGER fileTimeValue;
-    fileTimeValue.LowPart  = modifiedTime.dwLowDateTime;
-    fileTimeValue.HighPart = modifiedTime.dwHighDateTime;
-    fileTimeValue.QuadPart -= 116444736000000000ULL;
-    fileStat.modifiedTime = TimeMs{static_cast<int64_t>(fileTimeValue.QuadPart / 10000ULL)};
-
-    LARGE_INTEGER fileSize;
-    if (!::GetFileSizeEx(hFile, &fileSize))
-    {
-        return Result::Error("getFileStat: Failed to get file size");
-    }
-    fileStat.fileSize = static_cast<size_t>(fileSize.QuadPart);
-    return Result(true);
+    return stat(path, fileStat);
 }
 
 SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)
@@ -1196,6 +1272,56 @@ struct SC::FileSystem::Operations::Internal
                            bool isDirectory = false);
 };
 
+static SC::TimeMs posixTimespecToTimeMs(const struct timespec& ts)
+{
+    return SC::TimeMs{static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
+}
+
+static SC::FileSystemEntryType posixEntryTypeFromMode(mode_t mode)
+{
+    if (S_ISREG(mode))
+        return SC::FileSystemEntryType::File;
+    if (S_ISDIR(mode))
+        return SC::FileSystemEntryType::Directory;
+    if (S_ISLNK(mode))
+        return SC::FileSystemEntryType::SymbolicLink;
+    return SC::FileSystemEntryType::Other;
+}
+
+static SC::Result fillPosixFileStat(const struct stat& pathStat, SC::FileSystemStat& fileStat)
+{
+    fileStat               = {};
+    fileStat.entryType     = posixEntryTypeFromMode(pathStat.st_mode);
+    fileStat.fileSize      = static_cast<size_t>(pathStat.st_size);
+    fileStat.hardLinkCount = static_cast<size_t>(pathStat.st_nlink);
+    fileStat.accessedTime  = posixTimespecToTimeMs(
+#if __APPLE__
+        pathStat.st_atimespec
+#else
+        pathStat.st_atim
+#endif
+    );
+    fileStat.modifiedTime = posixTimespecToTimeMs(
+#if __APPLE__
+        pathStat.st_mtimespec
+#else
+        pathStat.st_mtim
+#endif
+    );
+#if __APPLE__
+    fileStat.creationTime = posixTimespecToTimeMs(pathStat.st_birthtimespec);
+#endif
+    fileStat.posix.mode          = static_cast<SC::uint32_t>(pathStat.st_mode);
+    fileStat.posix.uid           = static_cast<SC::uint32_t>(pathStat.st_uid);
+    fileStat.posix.gid           = static_cast<SC::uint32_t>(pathStat.st_gid);
+    fileStat.posix.inode         = static_cast<SC::uint64_t>(pathStat.st_ino);
+    fileStat.posix.device        = static_cast<SC::uint64_t>(pathStat.st_dev);
+    fileStat.posix.specialDevice = static_cast<SC::uint64_t>(pathStat.st_rdev);
+    fileStat.posix.blocks        = static_cast<SC::uint64_t>(pathStat.st_blocks);
+    fileStat.posix.blockSize     = static_cast<SC::uint64_t>(pathStat.st_blksize);
+    return SC::Result(true);
+}
+
 #define SC_TRY_POSIX(func, msg)                                                                                        \
     {                                                                                                                  \
                                                                                                                        \
@@ -1343,19 +1469,25 @@ SC::Result SC::FileSystem::Operations::removeFile(StringSpan path)
     return Result(true);
 }
 
+SC::Result SC::FileSystem::Operations::stat(StringSpan path, FileSystemStat& fileStat)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "stat: Invalid path");
+    struct stat path_stat;
+    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "stat: Failed to get file stats");
+    return fillPosixFileStat(path_stat, fileStat);
+}
+
+SC::Result SC::FileSystem::Operations::lstat(StringSpan path, FileSystemStat& fileStat)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "lstat: Invalid path");
+    struct stat path_stat;
+    SC_TRY_POSIX(::lstat(path.getNullTerminatedNative(), &path_stat), "lstat: Failed to get file stats");
+    return fillPosixFileStat(path_stat, fileStat);
+}
+
 SC::Result SC::FileSystem::Operations::getFileStat(StringSpan path, FileSystemStat& fileStat)
 {
-    SC_TRY_MSG(Internal::validatePath(path), "getFileStat: Invalid path");
-    struct stat path_stat;
-    SC_TRY_POSIX(::stat(path.getNullTerminatedNative(), &path_stat), "getFileStat: Failed to get file stats");
-    fileStat.fileSize = static_cast<size_t>(path_stat.st_size);
-#if __APPLE__
-    auto ts = path_stat.st_mtimespec;
-#else
-    auto ts = path_stat.st_mtim;
-#endif
-    fileStat.modifiedTime = TimeMs{static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
-    return Result(true);
+    return stat(path, fileStat);
 }
 
 SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringPath& destination)

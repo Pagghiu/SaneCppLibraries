@@ -47,6 +47,8 @@
 | **Rename files or directories**               |                                                           |
 | SC::FileSystem::rename                        | @copybrief SC::FileSystem::rename                         |
 | **Read / Change modification time**           |                                                           |
+| SC::FileSystem::stat                          | @copybrief SC::FileSystem::stat                           |
+| SC::FileSystem::lstat                         | @copybrief SC::FileSystem::lstat                          |
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
 | SC::FileSystem::readSymbolicLink              | @copybrief SC::FileSystem::readSymbolicLink               |
@@ -60,8 +62,8 @@
 
 # Status
 🟩 Usable  
-The library contains commonly used function including links, access checks and basic file metadata,
-but it's still missing some notable lower level ones like a richer `stat` API.
+The library contains commonly used function including links, access checks and richer path metadata.
+Some lower level filesystem features are still missing, especially descriptor-oriented and ownership-changing APIs.
 SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
 # Blog
@@ -118,6 +120,12 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 ## canAccess
 @copydoc SC::FileSystem::canAccess
 
+## stat
+@copydoc SC::FileSystem::stat
+
+## lstat
+@copydoc SC::FileSystem::lstat
+
 ## readSymbolicLink
 @copydoc SC::FileSystem::readSymbolicLink
 
@@ -141,9 +149,7 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 - `ftruncate`
 - `ftruncate`
 - `lchown`
-- `lstat`
 - `sendfile`
-- `stat`
 - `statfs`
 
 # Statistics

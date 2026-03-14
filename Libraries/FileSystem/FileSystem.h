@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Internal/IGrowableBuffer.h"
+#include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
 
@@ -14,10 +15,45 @@ namespace SC
 //! @{
 
 /// @brief A structure to describe file stats
+enum class FileSystemEntryType : uint8_t
+{
+    Unknown,
+    File,
+    Directory,
+    SymbolicLink,
+    Other,
+};
+
+/// @brief A structure to describe file stats
 struct FileSystemStat
 {
-    size_t fileSize = 0; ///< Size of the file in bytes
-    TimeMs modifiedTime; ///< Time when file was last modified
+    FileSystemEntryType entryType = FileSystemEntryType::Unknown; ///< Type of entry stored at path
+
+    size_t fileSize      = 0; ///< Size of the file in bytes
+    size_t hardLinkCount = 0; ///< Number of hard links to the entry
+    TimeMs creationTime;      ///< Time when file was created when available
+    TimeMs accessedTime;      ///< Time when file was last accessed when available
+    TimeMs modifiedTime;      ///< Time when file was last modified
+
+    struct
+    {
+        uint32_t mode          = 0; ///< POSIX st_mode
+        uint32_t uid           = 0; ///< POSIX st_uid
+        uint32_t gid           = 0; ///< POSIX st_gid
+        uint64_t inode         = 0; ///< POSIX st_ino
+        uint64_t device        = 0; ///< POSIX st_dev
+        uint64_t specialDevice = 0; ///< POSIX st_rdev
+        uint64_t blocks        = 0; ///< POSIX st_blocks
+        uint64_t blockSize     = 0; ///< POSIX st_blksize
+    } posix;
+
+    struct
+    {
+        uint32_t attributes         = 0; ///< Windows file attributes
+        uint32_t reparseTag         = 0; ///< Windows reparse tag
+        uint32_t volumeSerialNumber = 0; ///< Windows volume serial number
+        uint64_t fileIndex          = 0; ///< Windows file index
+    } windows;
 };
 
 /// @brief Access mode for path checks
@@ -316,7 +352,19 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @brief A structure to describe modified time
     using FileStat = FileSystemStat;
 
-    /// @brief Obtains stats (size, modified time) about a file
+    /// @brief Obtains richer metadata about a path, following symbolic links
+    /// @param file Path to the file of interest
+    /// @param[out] fileStat Destination structure that will receive statistics about the file
+    /// @return Valid Result if file stats for the given file was successfully read
+    Result stat(StringSpan file, FileStat& fileStat);
+
+    /// @brief Obtains richer metadata about a path without following symbolic links
+    /// @param file Path to the file of interest
+    /// @param[out] fileStat Destination structure that will receive statistics about the file
+    /// @return Valid Result if file stats for the given file was successfully read
+    Result lstat(StringSpan file, FileStat& fileStat);
+
+    /// @brief Legacy convenience alias for stat(StringSpan, FileStat&)
     /// @param file Path to the file of interest
     /// @param[out] fileStat Destination structure that will receive statistics about the file
     /// @return Valid Result if file stats for the given file was successfully read
@@ -354,6 +402,8 @@ struct SC_COMPILER_EXPORT FileSystem
         static Result rename(StringSpan path, StringSpan newPath);
         static Result copyDirectory(StringSpan srcPath, StringSpan destPath, FileSystemCopyFlags flags);
         static Result removeDirectoryRecursive(StringSpan directory);
+        static Result stat(StringSpan path, FileSystemStat& fileStat);
+        static Result lstat(StringSpan path, FileSystemStat& fileStat);
         static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
         static Result readSymbolicLink(StringSpan path, StringPath& destination);
         static Result setLastModifiedTime(StringSpan path, TimeMs time);
