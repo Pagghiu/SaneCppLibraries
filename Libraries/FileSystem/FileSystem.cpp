@@ -636,6 +636,34 @@ SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& des
     return Result(true);
 }
 
+SC::Result SC::FileSystem::chmod(StringSpan path, uint32_t mode)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    return FileSystem::Operations::chmod(encodedPath, mode);
+}
+
+SC::Result SC::FileSystem::chown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    return FileSystem::Operations::chown(encodedPath, uid, gid);
+}
+
+SC::Result SC::FileSystem::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    return FileSystem::Operations::lchown(encodedPath, uid, gid);
+}
+
+SC::Result SC::FileSystem::lchmod(StringSpan path, uint32_t mode)
+{
+    StringSpan encodedPath;
+    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    return FileSystem::Operations::lchmod(encodedPath, mode);
+}
+
 SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
 {
     StringSpan encodedPath;
@@ -746,6 +774,8 @@ static SC::Result windowsStat(SC::StringSpan path, bool followLinks, SC::FileSys
     auto deferClose = SC::MakeDeferred([&]() { CloseHandle(hFile); });
     return fillWindowsFileStat(hFile, fileStat);
 }
+
+static constexpr SC::uint32_t windowsWriteModeBit = 0200u;
 
 #define SC_TRY_WIN32(func, msg)                                                                                        \
     {                                                                                                                  \
@@ -932,6 +962,53 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
     }
     (void)destination.resize(length);
     return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "chmod: Invalid path");
+    DWORD attributes = ::GetFileAttributesW(path.getNullTerminatedNative());
+    if (attributes == INVALID_FILE_ATTRIBUTES)
+    {
+        return Result::Error("chmod: Failed to read file attributes");
+    }
+    if (mode & windowsWriteModeBit)
+    {
+        attributes &= ~FILE_ATTRIBUTE_READONLY;
+    }
+    else
+    {
+        attributes |= FILE_ATTRIBUTE_READONLY;
+    }
+    SC_TRY_WIN32(::SetFileAttributesW(path.getNullTerminatedNative(), attributes), "chmod: Failed to set attributes");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    (void)uid;
+    (void)gid;
+    SC_TRY_MSG(Internal::validatePath(path), "chown: Invalid path");
+    FileSystemStat ignored;
+    SC_TRY(windowsStat(path, true, ignored));
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    (void)uid;
+    (void)gid;
+    SC_TRY_MSG(Internal::validatePath(path), "lchown: Invalid path");
+    FileSystemStat ignored;
+    SC_TRY(windowsStat(path, false, ignored));
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
+{
+    (void)path;
+    (void)mode;
+    return Result::Error("ENOTSUP");
 }
 
 SC::Result SC::FileSystem::Operations::removeEmptyDirectory(StringSpan path)
@@ -1507,6 +1584,41 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
         return Result::Error("readSymbolicLink: Failed to store link target");
     }
     return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "chmod: Invalid path");
+    SC_TRY_POSIX(::chmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)), "chmod: Failed to change mode");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::chown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "chown: Invalid path");
+    SC_TRY_POSIX(::chown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
+                 "chown: Failed to change owner");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::lchown(StringSpan path, uint32_t uid, uint32_t gid)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "lchown: Invalid path");
+    SC_TRY_POSIX(::lchown(path.getNullTerminatedNative(), static_cast<uid_t>(uid), static_cast<gid_t>(gid)),
+                 "lchown: Failed to change owner");
+    return Result(true);
+}
+
+SC::Result SC::FileSystem::Operations::lchmod(StringSpan path, uint32_t mode)
+{
+    SC_TRY_MSG(Internal::validatePath(path), "lchmod: Invalid path");
+#if SC_PLATFORM_APPLE
+    SC_TRY_POSIX(::lchmod(path.getNullTerminatedNative(), static_cast<mode_t>(mode)), "lchmod: Failed to change mode");
+    return Result(true);
+#else
+    (void)mode;
+    return Result::Error("ENOTSUP");
+#endif
 }
 
 SC::Result SC::FileSystem::Operations::setLastModifiedTime(StringSpan path, TimeMs time)

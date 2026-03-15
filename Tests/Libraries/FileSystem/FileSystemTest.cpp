@@ -78,6 +78,10 @@ struct SC::FileSystemTest : public SC::TestCase
         {
             statAndLStat();
         }
+        if (test_section("permissions"))
+        {
+            permissions();
+        }
         if (test_section("executableFile / applicationRootDirectory"))
         {
             StringPath stringPath;
@@ -107,6 +111,7 @@ struct SC::FileSystemTest : public SC::TestCase
     void access();
     void moveDirectory();
     void statAndLStat();
+    void permissions();
     void snippet();
 };
 
@@ -596,6 +601,116 @@ void SC::FileSystemTest::statAndLStat()
     SC_TEST_EXPECT(fs.removeEmptyDirectory("statDirectory"));
     SC_TEST_EXPECT(fs.changeDirectory(tempDirectory.view()));
     SC_TEST_EXPECT(fs.removeDirectoryRecursive(statDirectoryRoot.view()));
+}
+
+void SC::FileSystemTest::permissions()
+{
+    FileSystem fs;
+    StringPath tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    const DWORD tempLength =
+        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+    size_t trimmedLength = static_cast<size_t>(tempLength);
+    if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
+    {
+        trimmedLength -= 1;
+    }
+    SC_TEST_EXPECT(tempDirectory.resize(trimmedLength));
+#else
+    SC_TEST_EXPECT(tempDirectory.assign("/tmp"));
+#endif
+
+    StringPath permissionsDirectoryRoot = tempDirectory;
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(permissionsDirectoryRoot.append("\\FileSystemPermissionsTest"));
+#else
+    SC_TEST_EXPECT(permissionsDirectoryRoot.append("/FileSystemPermissionsTest"));
+#endif
+
+    SC_TEST_EXPECT(fs.init(tempDirectory.view()));
+    if (fs.existsAndIsDirectory(permissionsDirectoryRoot.view()))
+    {
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(permissionsDirectoryRoot.view()));
+    }
+    SC_TEST_EXPECT(fs.makeDirectory(permissionsDirectoryRoot.view()));
+    SC_TEST_EXPECT(fs.changeDirectory(permissionsDirectoryRoot.view()));
+
+    SC_TEST_EXPECT(fs.writeString("permissionsFile.txt", "permissions"));
+
+    FileSystem::FileStat fileStatBefore;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", fileStatBefore));
+
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(fs.chmod("permissionsFile.txt", 0));
+    FileSystem::FileStat readOnlyStat;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", readOnlyStat));
+    SC_TEST_EXPECT((readOnlyStat.windows.attributes & FILE_ATTRIBUTE_READONLY) != 0);
+
+    SC_TEST_EXPECT(fs.chmod("permissionsFile.txt", 0200u));
+    FileSystem::FileStat writableStat;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", writableStat));
+    SC_TEST_EXPECT((writableStat.windows.attributes & FILE_ATTRIBUTE_READONLY) == 0);
+
+    SC_TEST_EXPECT(fs.chown("permissionsFile.txt", 123, 456));
+    FileSystem::FileStat afterChownStat;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", afterChownStat));
+    SC_TEST_EXPECT(afterChownStat.windows.attributes == writableStat.windows.attributes);
+
+    Result createLinkResult = fs.createSymbolicLink("permissionsFile.txt", "permissionsLink.txt");
+    if (createLinkResult)
+    {
+        SC_TEST_EXPECT(fs.lchown("permissionsLink.txt", 123, 456));
+        FileSystem::FileStat linkStat;
+        SC_TEST_EXPECT(fs.lstat("permissionsLink.txt", linkStat));
+        SC_TEST_EXPECT(linkStat.entryType == FileSystemEntryType::SymbolicLink);
+        SC_TEST_EXPECT(not fs.lchmod("permissionsLink.txt", 0200u));
+        SC_TEST_EXPECT(fs.removeLinkIfExists("permissionsLink.txt"));
+    }
+    else
+    {
+        report.console.print(
+            "Skipping Windows lchown/lchmod symlink assertions because symlink creation is not available\n");
+    }
+#else
+    SC_TEST_EXPECT(fs.chmod("permissionsFile.txt", 0640u));
+    FileSystem::FileStat chmodStat;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", chmodStat));
+    SC_TEST_EXPECT((chmodStat.posix.mode & 0777u) == 0640u);
+
+    SC_TEST_EXPECT(fs.chown("permissionsFile.txt", chmodStat.posix.uid, chmodStat.posix.gid));
+    FileSystem::FileStat afterChownStat;
+    SC_TEST_EXPECT(fs.stat("permissionsFile.txt", afterChownStat));
+    SC_TEST_EXPECT(afterChownStat.posix.uid == chmodStat.posix.uid);
+    SC_TEST_EXPECT(afterChownStat.posix.gid == chmodStat.posix.gid);
+
+    SC_TEST_EXPECT(fs.createSymbolicLink("permissionsFile.txt", "permissionsLink.txt"));
+    FileSystem::FileStat linkStatBefore;
+    SC_TEST_EXPECT(fs.lstat("permissionsLink.txt", linkStatBefore));
+    SC_TEST_EXPECT(fs.lchown("permissionsLink.txt", linkStatBefore.posix.uid, linkStatBefore.posix.gid));
+    FileSystem::FileStat linkStatAfter;
+    SC_TEST_EXPECT(fs.lstat("permissionsLink.txt", linkStatAfter));
+    SC_TEST_EXPECT(linkStatAfter.entryType == FileSystemEntryType::SymbolicLink);
+    SC_TEST_EXPECT(linkStatAfter.posix.uid == linkStatBefore.posix.uid);
+    SC_TEST_EXPECT(linkStatAfter.posix.gid == linkStatBefore.posix.gid);
+
+#if SC_PLATFORM_APPLE
+    const uint32_t oldLinkMode = linkStatAfter.posix.mode & 0777u;
+    const uint32_t newLinkMode = oldLinkMode == 0700u ? 0755u : 0700u;
+    SC_TEST_EXPECT(fs.lchmod("permissionsLink.txt", newLinkMode));
+    FileSystem::FileStat linkStatAfterLChmod;
+    SC_TEST_EXPECT(fs.lstat("permissionsLink.txt", linkStatAfterLChmod));
+    SC_TEST_EXPECT(linkStatAfterLChmod.entryType == FileSystemEntryType::SymbolicLink);
+    SC_TEST_EXPECT((linkStatAfterLChmod.posix.mode & 0777u) == newLinkMode);
+#else
+    SC_TEST_EXPECT(not fs.lchmod("permissionsLink.txt", 0700u));
+#endif
+    SC_TEST_EXPECT(fs.removeLinkIfExists("permissionsLink.txt"));
+#endif
+
+    SC_TEST_EXPECT(fs.removeFile("permissionsFile.txt"));
+    SC_TEST_EXPECT(fs.changeDirectory(tempDirectory.view()));
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive(permissionsDirectoryRoot.view()));
 }
 
 void SC::FileSystemTest::snippet()

@@ -52,6 +52,10 @@
 | SC::FileSystem::getFileStat                   | @copybrief SC::FileSystem::getFileStat                    |
 | SC::FileSystem::setLastModifiedTime           | @copybrief SC::FileSystem::setLastModifiedTime            |
 | SC::FileSystem::readSymbolicLink              | @copybrief SC::FileSystem::readSymbolicLink               |
+| SC::FileSystem::chmod                         | @copybrief SC::FileSystem::chmod                          |
+| SC::FileSystem::chown                         | @copybrief SC::FileSystem::chown                          |
+| SC::FileSystem::lchown                        | @copybrief SC::FileSystem::lchown                         |
+| SC::FileSystem::lchmod                        | @copybrief SC::FileSystem::lchmod                         |
 
 | Miscellaneous Classes                                     |                                                                       |
 |:----------------------------------------------------------|:----------------------------------------------------------------------|
@@ -63,7 +67,7 @@
 # Status
 🟩 Usable  
 The library contains commonly used function including links, access checks and richer path metadata.
-Some lower level filesystem features are still missing, especially descriptor-oriented and ownership-changing APIs.
+Some lower level filesystem features are still missing, especially descriptor-oriented APIs and filesystem-level queries.
 SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
 # Blog
@@ -129,6 +133,18 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 ## readSymbolicLink
 @copydoc SC::FileSystem::readSymbolicLink
 
+## chmod
+@copydoc SC::FileSystem::chmod
+
+## chown
+@copydoc SC::FileSystem::chown
+
+## lchown
+@copydoc SC::FileSystem::lchown
+
+## lchmod
+@copydoc SC::FileSystem::lchmod
+
 ## write
 @copydoc SC::FileSystem::write
 
@@ -139,8 +155,6 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 
 🟦 Complete Features:
 - `access`
-- `chmod`
-- `chown`
 - `fchmod`
 - `fchown`
 - `fdatasync`
@@ -148,7 +162,6 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 - `fsync`
 - `ftruncate`
 - `ftruncate`
-- `lchown`
 - `sendfile`
 - `statfs`
 

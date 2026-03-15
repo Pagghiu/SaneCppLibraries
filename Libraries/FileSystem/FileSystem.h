@@ -376,6 +376,32 @@ struct SC_COMPILER_EXPORT FileSystem
     /// @return Valid Result if link target was successfully read
     Result readSymbolicLink(StringSpan linkFile, StringPath& destination);
 
+    /// @brief Change file permission bits for a path, following symbolic links
+    /// @param path Path to the file or directory of interest
+    /// @param mode Platform-native numeric mode bits
+    /// @return Valid Result if permissions were updated successfully
+    Result chmod(StringSpan path, uint32_t mode);
+
+    /// @brief Change owner and group for a path, following symbolic links
+    /// @param path Path to the file or directory of interest
+    /// @param uid Platform-native numeric owner identifier
+    /// @param gid Platform-native numeric group identifier
+    /// @return Valid Result if ownership was updated successfully
+    Result chown(StringSpan path, uint32_t uid, uint32_t gid);
+
+    /// @brief Change owner and group for a path without following symbolic links
+    /// @param path Path to the file or directory of interest
+    /// @param uid Platform-native numeric owner identifier
+    /// @param gid Platform-native numeric group identifier
+    /// @return Valid Result if ownership was updated successfully
+    Result lchown(StringSpan path, uint32_t uid, uint32_t gid);
+
+    /// @brief Change file permission bits for a symbolic link without following it
+    /// @param path Path to the symbolic link of interest
+    /// @param mode Platform-native numeric mode bits
+    /// @return Valid Result if permissions were updated successfully
+    Result lchmod(StringSpan path, uint32_t mode);
+
     /// @brief Change last modified time of a given file
     /// @param file Path to the file of interest
     /// @param time The new last modified time, as specified in the AbsoluteTime struct
@@ -406,6 +432,10 @@ struct SC_COMPILER_EXPORT FileSystem
         static Result lstat(StringSpan path, FileSystemStat& fileStat);
         static Result getFileStat(StringSpan path, FileSystemStat& fileStat);
         static Result readSymbolicLink(StringSpan path, StringPath& destination);
+        static Result chmod(StringSpan path, uint32_t mode);
+        static Result chown(StringSpan path, uint32_t uid, uint32_t gid);
+        static Result lchown(StringSpan path, uint32_t uid, uint32_t gid);
+        static Result lchmod(StringSpan path, uint32_t mode);
         static Result setLastModifiedTime(StringSpan path, TimeMs time);
 
         static StringSpan getExecutablePath(StringPath& executablePath);
