@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Internal/IGrowableBuffer.h"
+#include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringPath.h"
@@ -44,6 +45,48 @@ struct SC_COMPILER_EXPORT FileDescriptorDefinition
 
 //! @addtogroup group_file
 //! @{
+
+/// @brief A structure to describe metadata associated with an open descriptor
+enum class FileDescriptorEntryType : uint8_t
+{
+    Unknown,
+    File,
+    Directory,
+    SymbolicLink,
+    Other,
+};
+
+/// @brief A structure to describe file stats queried through a file descriptor
+struct FileDescriptorStat
+{
+    FileDescriptorEntryType entryType = FileDescriptorEntryType::Unknown; ///< Type of entry associated with descriptor
+
+    size_t fileSize      = 0; ///< Size of the file in bytes
+    size_t hardLinkCount = 0; ///< Number of hard links to the entry
+    TimeMs creationTime;      ///< Time when file was created when available
+    TimeMs accessedTime;      ///< Time when file was last accessed when available
+    TimeMs modifiedTime;      ///< Time when file was last modified
+
+    struct
+    {
+        uint32_t mode          = 0; ///< POSIX st_mode
+        uint32_t uid           = 0; ///< POSIX st_uid
+        uint32_t gid           = 0; ///< POSIX st_gid
+        uint64_t inode         = 0; ///< POSIX st_ino
+        uint64_t device        = 0; ///< POSIX st_dev
+        uint64_t specialDevice = 0; ///< POSIX st_rdev
+        uint64_t blocks        = 0; ///< POSIX st_blocks
+        uint64_t blockSize     = 0; ///< POSIX st_blksize
+    } posix;
+
+    struct
+    {
+        uint32_t attributes         = 0; ///< Windows file attributes
+        uint32_t reparseTag         = 0; ///< Windows reparse tag
+        uint32_t volumeSerialNumber = 0; ///< Windows volume serial number
+        uint64_t fileIndex          = 0; ///< Windows file index
+    } windows;
+};
 
 /// @brief Options used to open a file descriptor
 struct SC_COMPILER_EXPORT FileOpen
@@ -203,6 +246,35 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     /// @param sizeInBytes (output) total size of file
     /// @return Valid result if seek succeeds
     Result sizeInBytes(size_t& sizeInBytes) const;
+
+    /// @brief Obtains richer metadata associated with the currently open descriptor
+    /// @param[out] fileStat Destination structure receiving descriptor metadata
+    /// @return Valid result if metadata was read successfully
+    Result stat(FileDescriptorStat& fileStat) const;
+
+    /// @brief Change file permission bits for the currently open descriptor
+    /// @param mode Platform-native numeric mode bits
+    /// @return Valid result if permissions were updated successfully
+    Result chmod(uint32_t mode);
+
+    /// @brief Change owner and group for the currently open descriptor
+    /// @param uid Platform-native numeric owner identifier
+    /// @param gid Platform-native numeric group identifier
+    /// @return Valid result if ownership was updated successfully
+    Result chown(uint32_t uid, uint32_t gid);
+
+    /// @brief Flush file data and metadata to stable storage
+    /// @return Valid result if synchronization succeeded
+    Result sync();
+
+    /// @brief Flush file data to stable storage
+    /// @return Valid result if synchronization succeeded
+    Result syncData();
+
+    /// @brief Resize the underlying file to the specified size in bytes
+    /// @param sizeInBytes New desired file size
+    /// @return Valid result if truncation succeeded
+    Result truncate(uint64_t sizeInBytes);
 
   private:
     friend struct File;

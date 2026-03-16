@@ -67,7 +67,7 @@
 # Status
 🟩 Usable  
 The library contains commonly used function including links, access checks and richer path metadata.
-Some lower level filesystem features are still missing, especially descriptor-oriented APIs and filesystem-level queries.
+Some lower level filesystem features are still missing, especially filesystem-level queries.
 SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probably be refactored in a future dedicated class for handling `stat` based operations.
 
 # Blog
@@ -154,15 +154,6 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 # Roadmap
 
 🟦 Complete Features:
-- `access`
-- `fchmod`
-- `fchown`
-- `fdatasync`
-- `fstat`
-- `fsync`
-- `ftruncate`
-- `ftruncate`
-- `sendfile`
 - `statfs`
 
 # Statistics

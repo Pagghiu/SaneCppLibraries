@@ -7,6 +7,73 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+namespace
+{
+static SC::TimeMs fileDescriptorWindowsFileTimeToTimeMs(const FILETIME& fileTime)
+{
+    ULARGE_INTEGER fileTimeValue;
+    fileTimeValue.LowPart  = fileTime.dwLowDateTime;
+    fileTimeValue.HighPart = fileTime.dwHighDateTime;
+    if (fileTimeValue.QuadPart == 0)
+    {
+        return {};
+    }
+    fileTimeValue.QuadPart -= 116444736000000000ULL;
+    return SC::TimeMs{static_cast<SC::int64_t>(fileTimeValue.QuadPart / 10000ULL)};
+}
+
+static SC::FileDescriptorEntryType fileDescriptorWindowsEntryTypeFromAttributes(DWORD attributes, DWORD reparseTag)
+{
+    if (attributes & FILE_ATTRIBUTE_REPARSE_POINT)
+    {
+        if (reparseTag == IO_REPARSE_TAG_SYMLINK or reparseTag == 0)
+        {
+            return SC::FileDescriptorEntryType::SymbolicLink;
+        }
+        return SC::FileDescriptorEntryType::Other;
+    }
+    if (attributes & FILE_ATTRIBUTE_DIRECTORY)
+    {
+        return SC::FileDescriptorEntryType::Directory;
+    }
+    return SC::FileDescriptorEntryType::File;
+}
+
+static SC::Result fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileDescriptorStat& fileStat)
+{
+    fileStat = {};
+
+    BY_HANDLE_FILE_INFORMATION handleInfo;
+    SC_TRY_MSG(::GetFileInformationByHandle(fileHandle, &handleInfo) != FALSE, "GetFileInformationByHandle failed");
+
+    FILE_STANDARD_INFO standardInfo = {};
+    const bool         hasStandardInfo =
+        ::GetFileInformationByHandleEx(fileHandle, FileStandardInfo, &standardInfo, sizeof(standardInfo)) != FALSE;
+
+    FILE_ATTRIBUTE_TAG_INFO tagInfo = {};
+    if (::GetFileInformationByHandleEx(fileHandle, FileAttributeTagInfo, &tagInfo, sizeof(tagInfo)) == FALSE)
+    {
+        tagInfo.FileAttributes = handleInfo.dwFileAttributes;
+        tagInfo.ReparseTag     = 0;
+    }
+
+    fileStat.entryType = fileDescriptorWindowsEntryTypeFromAttributes(handleInfo.dwFileAttributes, tagInfo.ReparseTag);
+    fileStat.creationTime = fileDescriptorWindowsFileTimeToTimeMs(handleInfo.ftCreationTime);
+    fileStat.accessedTime = fileDescriptorWindowsFileTimeToTimeMs(handleInfo.ftLastAccessTime);
+    fileStat.modifiedTime = fileDescriptorWindowsFileTimeToTimeMs(handleInfo.ftLastWriteTime);
+    fileStat.fileSize =
+        static_cast<SC::size_t>((static_cast<SC::uint64_t>(handleInfo.nFileSizeHigh) << 32) | handleInfo.nFileSizeLow);
+    fileStat.hardLinkCount              = hasStandardInfo ? static_cast<SC::size_t>(standardInfo.NumberOfLinks)
+                                                          : static_cast<SC::size_t>(handleInfo.nNumberOfLinks);
+    fileStat.windows.attributes         = handleInfo.dwFileAttributes;
+    fileStat.windows.reparseTag         = tagInfo.ReparseTag;
+    fileStat.windows.volumeSerialNumber = handleInfo.dwVolumeSerialNumber;
+    fileStat.windows.fileIndex =
+        (static_cast<SC::uint64_t>(handleInfo.nFileIndexHigh) << 32) | handleInfo.nFileIndexLow;
+    return SC::Result(true);
+}
+} // namespace
+
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptorDefinition
 //-------------------------------------------------------------------------------------------------------
@@ -163,6 +230,70 @@ SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
     return Result::Error("GetFileSizeEx failed");
 }
 
+SC::Result SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
+    return fillFileDescriptorWindowsStat(handle, fileStat);
+}
+
+SC::Result SC::FileDescriptor::chmod(uint32_t mode)
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
+
+    FILE_BASIC_INFO basicInfo = {};
+    SC_TRY_MSG(::GetFileInformationByHandleEx(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) != FALSE,
+               "GetFileInformationByHandleEx failed");
+
+    if (mode & 0200u)
+    {
+        basicInfo.FileAttributes &= ~FILE_ATTRIBUTE_READONLY;
+    }
+    else
+    {
+        basicInfo.FileAttributes |= FILE_ATTRIBUTE_READONLY;
+    }
+
+    SC_TRY_MSG(::SetFileInformationByHandle(handle, FileBasicInfo, &basicInfo, sizeof(basicInfo)) != FALSE,
+               "SetFileInformationByHandle failed");
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
+{
+    (void)uid;
+    (void)gid;
+    SC_TRY_MSG(isValid(), "FileDescriptor::chown - Invalid handle");
+    FileDescriptorStat ignored;
+    return stat(ignored);
+}
+
+SC::Result SC::FileDescriptor::sync()
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
+    SC_TRY_MSG(::FlushFileBuffers(handle) != FALSE, "FlushFileBuffers failed");
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::syncData() { return sync(); }
+
+SC::Result SC::FileDescriptor::truncate(uint64_t sizeInBytes)
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
+
+    LARGE_INTEGER currentPosition = {};
+    LARGE_INTEGER newPosition;
+    newPosition.QuadPart = 0;
+    SC_TRY_MSG(::SetFilePointerEx(handle, newPosition, &currentPosition, FILE_CURRENT) != FALSE,
+               "SetFilePointerEx failed");
+
+    LARGE_INTEGER truncatePosition;
+    truncatePosition.QuadPart = static_cast<LONGLONG>(sizeInBytes);
+    SC_TRY_MSG(::SetFilePointerEx(handle, truncatePosition, nullptr, FILE_BEGIN) != FALSE, "SetFilePointerEx failed");
+    SC_TRY_MSG(::SetEndOfFile(handle) != FALSE, "SetEndOfFile failed");
+    SC_TRY_MSG(::SetFilePointerEx(handle, currentPosition, nullptr, FILE_BEGIN) != FALSE, "SetFilePointerEx failed");
+    return Result(true);
+}
+
 SC::Result SC::FileDescriptor::write(Span<const char> data, uint64_t offset)
 {
     SC_TRY(seek(SeekStart, offset));
@@ -273,6 +404,60 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 #include <sys/stat.h>   // fstat
 #include <sys/un.h>     // sockaddr_un
 #include <unistd.h>     // close
+
+namespace
+{
+static SC::TimeMs fileDescriptorPosixTimespecToTimeMs(const timespec& timespecValue)
+{
+    return SC::TimeMs{static_cast<SC::int64_t>(timespecValue.tv_sec) * 1000 +
+                      static_cast<SC::int64_t>(timespecValue.tv_nsec / (1000 * 1000))};
+}
+
+static SC::FileDescriptorEntryType fileDescriptorPosixEntryTypeFromMode(mode_t mode)
+{
+    if (S_ISREG(mode))
+        return SC::FileDescriptorEntryType::File;
+    if (S_ISDIR(mode))
+        return SC::FileDescriptorEntryType::Directory;
+    if (S_ISLNK(mode))
+        return SC::FileDescriptorEntryType::SymbolicLink;
+    return SC::FileDescriptorEntryType::Other;
+}
+
+static SC::Result fillFileDescriptorPosixStat(const struct stat& pathStat, SC::FileDescriptorStat& fileStat)
+{
+    fileStat               = {};
+    fileStat.entryType     = fileDescriptorPosixEntryTypeFromMode(pathStat.st_mode);
+    fileStat.fileSize      = static_cast<SC::size_t>(pathStat.st_size);
+    fileStat.hardLinkCount = static_cast<SC::size_t>(pathStat.st_nlink);
+    fileStat.accessedTime  = fileDescriptorPosixTimespecToTimeMs(
+#if __APPLE__
+        pathStat.st_atimespec
+#else
+        pathStat.st_atim
+#endif
+    );
+    fileStat.modifiedTime = fileDescriptorPosixTimespecToTimeMs(
+#if __APPLE__
+        pathStat.st_mtimespec
+#else
+        pathStat.st_mtim
+#endif
+    );
+#if __APPLE__
+    fileStat.creationTime = fileDescriptorPosixTimespecToTimeMs(pathStat.st_birthtimespec);
+#endif
+    fileStat.posix.mode          = static_cast<SC::uint32_t>(pathStat.st_mode);
+    fileStat.posix.uid           = static_cast<SC::uint32_t>(pathStat.st_uid);
+    fileStat.posix.gid           = static_cast<SC::uint32_t>(pathStat.st_gid);
+    fileStat.posix.inode         = static_cast<SC::uint64_t>(pathStat.st_ino);
+    fileStat.posix.device        = static_cast<SC::uint64_t>(pathStat.st_dev);
+    fileStat.posix.specialDevice = static_cast<SC::uint64_t>(pathStat.st_rdev);
+    fileStat.posix.blocks        = static_cast<SC::uint64_t>(pathStat.st_blocks);
+    fileStat.posix.blockSize     = static_cast<SC::uint64_t>(pathStat.st_blksize);
+    return SC::Result(true);
+}
+} // namespace
 
 //-------------------------------------------------------------------------------------------------------
 // FileDescriptorDefinition
@@ -479,6 +664,53 @@ SC::Result SC::FileDescriptor::sizeInBytes(size_t& sizeInBytes) const
     struct stat fileStat;
     SC_TRY_MSG(::fstat(handle, &fileStat) == 0, "fstat failed");
     sizeInBytes = static_cast<size_t>(fileStat.st_size);
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::stat(FileDescriptorStat& fileStat) const
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::stat - Invalid handle");
+    struct stat nativeStat;
+    SC_TRY_MSG(::fstat(handle, &nativeStat) == 0, "fstat failed");
+    return fillFileDescriptorPosixStat(nativeStat, fileStat);
+}
+
+SC::Result SC::FileDescriptor::chmod(uint32_t mode)
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::chmod - Invalid handle");
+    SC_TRY_MSG(::fchmod(handle, static_cast<mode_t>(mode)) == 0, "fchmod failed");
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::chown(uint32_t uid, uint32_t gid)
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::chown - Invalid handle");
+    SC_TRY_MSG(::fchown(handle, static_cast<uid_t>(uid), static_cast<gid_t>(gid)) == 0, "fchown failed");
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::sync()
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::sync - Invalid handle");
+    SC_TRY_MSG(::fsync(handle) == 0, "fsync failed");
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::syncData()
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::syncData - Invalid handle");
+#if __APPLE__
+    SC_TRY_MSG(::fsync(handle) == 0, "fsync failed");
+#else
+    SC_TRY_MSG(::fdatasync(handle) == 0, "fdatasync failed");
+#endif
+    return Result(true);
+}
+
+SC::Result SC::FileDescriptor::truncate(uint64_t sizeInBytes)
+{
+    SC_TRY_MSG(isValid(), "FileDescriptor::truncate - Invalid handle");
+    SC_TRY_MSG(::ftruncate(handle, static_cast<off_t>(sizeInBytes)) == 0, "ftruncate failed");
     return Result(true);
 }
 

@@ -7,6 +7,12 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#else
+#include <sys/stat.h>
+#endif
 
 namespace SC
 {
@@ -30,10 +36,20 @@ struct SC::FileTest : public SC::TestCase
         {
             testNamedPipeCreateConnectAccept();
         }
+        if (test_section("descriptor operations"))
+        {
+            testDescriptorOperations();
+        }
+        if (test_section("descriptor invalid handle"))
+        {
+            testDescriptorInvalidHandle();
+        }
     }
     inline void testOpen();
     inline void testOpenStdHandles();
     inline void testNamedPipeCreateConnectAccept();
+    inline void testDescriptorOperations();
+    inline void testDescriptorInvalidHandle();
 
     Result snippetForUniqueHandle();
     Result snippetForNamedPipeServer();
@@ -193,6 +209,130 @@ void SC::FileTest::testNamedPipeCreateConnectAccept()
     acceptAndConnect(alternateServer, alternatePath.view(), "alt!", "alt!");
     SC_TEST_EXPECT(alternateServer.close());
 #endif
+}
+
+void SC::FileTest::testDescriptorOperations()
+{
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
+
+    FileSystem fs;
+
+    const StringView directoryName = "FileDescriptorOperationsTest";
+    const StringView fileName      = "descriptor.txt";
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), directoryName}));
+    SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+    if (fs.existsAndIsDirectory(directoryName))
+    {
+        SC_TEST_EXPECT(fs.removeDirectoryRecursive(directoryName));
+    }
+    SC_TEST_EXPECT(fs.makeDirectory(directoryName));
+
+    FileDescriptor fd;
+    SC_TEST_EXPECT(fd.open(filePath.view(), FileOpen::WriteRead));
+    SC_TEST_EXPECT(fd.writeString("abcdef"));
+    SC_TEST_EXPECT(fd.sync());
+    SC_TEST_EXPECT(fd.syncData());
+
+    FileDescriptorStat statInfo;
+    SC_TEST_EXPECT(fd.stat(statInfo));
+    SC_TEST_EXPECT(statInfo.entryType == FileDescriptorEntryType::File);
+    SC_TEST_EXPECT(statInfo.fileSize == 6);
+    SC_TEST_EXPECT(statInfo.hardLinkCount >= 1);
+    SC_TEST_EXPECT(statInfo.modifiedTime.milliseconds > 0);
+    SC_TEST_EXPECT(statInfo.accessedTime.milliseconds > 0);
+
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(statInfo.creationTime.milliseconds > 0);
+    SC_TEST_EXPECT(statInfo.windows.attributes != 0);
+
+    SC_TEST_EXPECT(fd.chmod(0));
+    FileDescriptorStat readOnlyStat;
+    SC_TEST_EXPECT(fd.stat(readOnlyStat));
+    SC_TEST_EXPECT((readOnlyStat.windows.attributes & FILE_ATTRIBUTE_READONLY) != 0);
+
+    SC_TEST_EXPECT(fd.chmod(0200u));
+    FileDescriptorStat writableStat;
+    SC_TEST_EXPECT(fd.stat(writableStat));
+    SC_TEST_EXPECT((writableStat.windows.attributes & FILE_ATTRIBUTE_READONLY) == 0);
+
+    SC_TEST_EXPECT(fd.chown(123, 456));
+    FileDescriptorStat afterChownStat;
+    SC_TEST_EXPECT(fd.stat(afterChownStat));
+    SC_TEST_EXPECT(afterChownStat.entryType == FileDescriptorEntryType::File);
+    SC_TEST_EXPECT(afterChownStat.windows.attributes == writableStat.windows.attributes);
+#else
+    int nativeHandle = -1;
+    SC_TEST_EXPECT(fd.get(nativeHandle, Result::Error("native handle")));
+
+    struct stat nativeStat;
+    SC_TEST_EXPECT(::fstat(nativeHandle, &nativeStat) == 0);
+    SC_TEST_EXPECT(statInfo.posix.mode == static_cast<uint32_t>(nativeStat.st_mode));
+    SC_TEST_EXPECT(statInfo.posix.uid == static_cast<uint32_t>(nativeStat.st_uid));
+    SC_TEST_EXPECT(statInfo.posix.gid == static_cast<uint32_t>(nativeStat.st_gid));
+
+    SC_TEST_EXPECT(fd.chmod(0640u));
+    FileDescriptorStat chmodStat;
+    SC_TEST_EXPECT(fd.stat(chmodStat));
+    SC_TEST_EXPECT((chmodStat.posix.mode & 0777u) == 0640u);
+
+    SC_TEST_EXPECT(fd.chown(chmodStat.posix.uid, chmodStat.posix.gid));
+    FileDescriptorStat afterChownStat;
+    SC_TEST_EXPECT(fd.stat(afterChownStat));
+    SC_TEST_EXPECT(afterChownStat.posix.uid == chmodStat.posix.uid);
+    SC_TEST_EXPECT(afterChownStat.posix.gid == chmodStat.posix.gid);
+#endif
+
+    SC_TEST_EXPECT(fd.truncate(3));
+    FileDescriptorStat truncatedStat;
+    SC_TEST_EXPECT(fd.stat(truncatedStat));
+    SC_TEST_EXPECT(truncatedStat.fileSize == 3);
+
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekStart, 0));
+    char       truncatedContent[8] = {0};
+    Span<char> truncatedRead;
+    SC_TEST_EXPECT(fd.read({truncatedContent, sizeof(truncatedContent)}, truncatedRead));
+    SC_TEST_EXPECT(truncatedRead.sizeInBytes() == 3);
+    SC_TEST_EXPECT(truncatedContent[0] == 'a');
+    SC_TEST_EXPECT(truncatedContent[1] == 'b');
+    SC_TEST_EXPECT(truncatedContent[2] == 'c');
+
+    SC_TEST_EXPECT(fd.truncate(8));
+    FileDescriptorStat expandedStat;
+    SC_TEST_EXPECT(fd.stat(expandedStat));
+    SC_TEST_EXPECT(expandedStat.fileSize == 8);
+
+    SC_TEST_EXPECT(fd.seek(FileDescriptor::SeekStart, 0));
+    char       expandedContent[8] = {'x', 'x', 'x', 'x', 'x', 'x', 'x', 'x'};
+    Span<char> expandedRead;
+    SC_TEST_EXPECT(fd.readUntilFullOrEOF({expandedContent, sizeof(expandedContent)}, expandedRead));
+    SC_TEST_EXPECT(expandedRead.sizeInBytes() == 8);
+    SC_TEST_EXPECT(expandedContent[0] == 'a');
+    SC_TEST_EXPECT(expandedContent[1] == 'b');
+    SC_TEST_EXPECT(expandedContent[2] == 'c');
+    SC_TEST_EXPECT(expandedContent[3] == 0);
+    SC_TEST_EXPECT(expandedContent[4] == 0);
+    SC_TEST_EXPECT(expandedContent[5] == 0);
+    SC_TEST_EXPECT(expandedContent[6] == 0);
+    SC_TEST_EXPECT(expandedContent[7] == 0);
+
+    SC_TEST_EXPECT(fd.close());
+    SC_TEST_EXPECT(fs.removeFile(filePath.view()));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(dirPath.view()));
+}
+
+void SC::FileTest::testDescriptorInvalidHandle()
+{
+    FileDescriptor     fd;
+    FileDescriptorStat statInfo;
+
+    SC_TEST_EXPECT(not fd.stat(statInfo));
+    SC_TEST_EXPECT(not fd.chmod(0644u));
+    SC_TEST_EXPECT(not fd.chown(0, 0));
+    SC_TEST_EXPECT(not fd.sync());
+    SC_TEST_EXPECT(not fd.syncData());
+    SC_TEST_EXPECT(not fd.truncate(1));
 }
 
 //! [NamedPipeServerSnippet]

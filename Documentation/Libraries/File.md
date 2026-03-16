@@ -24,6 +24,12 @@
 | SC::FileDescriptor::openStdOutDuplicate   | @copybrief SC::FileDescriptor::openStdOutDuplicate    |
 | SC::FileDescriptor::openStdErrDuplicate   | @copybrief SC::FileDescriptor::openStdErrDuplicate    |
 | SC::FileDescriptor::readUntilEOF          | @copybrief SC::FileDescriptor::readUntilEOF           |
+| SC::FileDescriptor::stat                  | @copybrief SC::FileDescriptor::stat                   |
+| SC::FileDescriptor::chmod                 | @copybrief SC::FileDescriptor::chmod                  |
+| SC::FileDescriptor::chown                 | @copybrief SC::FileDescriptor::chown                  |
+| SC::FileDescriptor::sync                  | @copybrief SC::FileDescriptor::sync                   |
+| SC::FileDescriptor::syncData              | @copybrief SC::FileDescriptor::syncData               |
+| SC::FileDescriptor::truncate              | @copybrief SC::FileDescriptor::truncate               |
 
 | SC::PipeDescriptor                | @copybrief SC::PipeDescriptor                 |
 |:----------------------------------|:----------------------------------------------|
@@ -45,8 +51,9 @@
 
 # Status
 🟩 Usable  
-This library has a relatively limited scope and it should not need many additional features compared to now.   
-Will consider bumping to Complete in the future.
+This library now covers synchronous descriptor I/O together with descriptor metadata, synchronization and
+descriptor-bound permission/ownership updates.
+`sendfile` is still intentionally deferred until a dependency-safe cross-library API is defined.
 
 # Blog
 
@@ -73,7 +80,7 @@ SC::NamedPipeName::build can be used to compose platform-native endpoint names f
 # Roadmap
 
 🟦 Complete Features:
-- None for now
+- `sendfile` deferred until a dependency-safe API is defined
 
 💡 Unplanned Features:
 - None for now
