@@ -28,7 +28,8 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
     Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
     size_t notifyHandlesCount = 0;
 
-    char                       relativePathsStorage[1024];
+    char relativePathsStorage[2048];
+
     StringSpan::NativeWritable relativePaths;
 
     FolderWatcher* parentEntry = nullptr; // We could in theory use SC_COMPILER_FIELD_OFFSET somehow to obtain it...

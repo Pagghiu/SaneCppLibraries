@@ -92,7 +92,7 @@ struct FileSystemWatcher
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = 1056 + 1024 + 8;
+        static constexpr int Linux   = 1056 + 2048 + 8;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);
