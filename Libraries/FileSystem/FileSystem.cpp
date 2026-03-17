@@ -10,6 +10,7 @@
 #include <wchar.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <winioctl.h>
 
 namespace SC
 {
@@ -777,6 +778,37 @@ static SC::Result windowsStat(SC::StringSpan path, bool followLinks, SC::FileSys
 
 static constexpr SC::uint32_t windowsWriteModeBit = 0200u;
 
+struct WindowsReparseDataBuffer
+{
+    ULONG  ReparseTag;
+    USHORT ReparseDataLength;
+    USHORT Reserved;
+    union
+    {
+        struct
+        {
+            USHORT SubstituteNameOffset;
+            USHORT SubstituteNameLength;
+            USHORT PrintNameOffset;
+            USHORT PrintNameLength;
+            ULONG  Flags;
+            WCHAR  PathBuffer[1];
+        } SymbolicLinkReparseBuffer;
+        struct
+        {
+            USHORT SubstituteNameOffset;
+            USHORT SubstituteNameLength;
+            USHORT PrintNameOffset;
+            USHORT PrintNameLength;
+            WCHAR  PathBuffer[1];
+        } MountPointReparseBuffer;
+        struct
+        {
+            UCHAR DataBuffer[1];
+        } GenericReparseBuffer;
+    };
+};
+
 #define SC_TRY_WIN32(func, msg)                                                                                        \
     {                                                                                                                  \
         if (func == FALSE)                                                                                             \
@@ -941,26 +973,59 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
     }
     auto deferClose = MakeDeferred([&]() { ::CloseHandle(hFile); });
 
-    DWORD length = ::GetFinalPathNameByHandleW(hFile, destination.writableSpan().data(),
-                                               static_cast<DWORD>(StringPath::MaxPath), FILE_NAME_NORMALIZED);
-    if (length == 0 or length >= StringPath::MaxPath)
+    alignas(void*) char reparseStorage[MAXIMUM_REPARSE_DATA_BUFFER_SIZE];
+
+    DWORD bytesReturned = 0;
+    if (::DeviceIoControl(hFile, FSCTL_GET_REPARSE_POINT, nullptr, 0, reparseStorage, MAXIMUM_REPARSE_DATA_BUFFER_SIZE,
+                          &bytesReturned, nullptr) == FALSE)
     {
-        return Result::Error("readSymbolicLink: Failed to read link target");
+        return Result::Error("readSymbolicLink: Failed to query reparse point");
     }
 
-    wchar_t* buffer = destination.writableSpan().data();
-    if (length >= 4 and buffer[0] == L'\\' and buffer[1] == L'\\' and buffer[2] == L'?' and buffer[3] == L'\\')
+    auto           reparseData = reinterpret_cast<const WindowsReparseDataBuffer*>(reparseStorage);
+    const wchar_t* sourcePath  = nullptr;
+    size_t         sourceChars = 0;
+    if (reparseData->ReparseTag == IO_REPARSE_TAG_SYMLINK)
     {
-        size_t prefix = 4;
-        if (length >= 8 and buffer[4] == L'U' and buffer[5] == L'N' and buffer[6] == L'C' and buffer[7] == L'\\')
+        const auto& buffer = reparseData->SymbolicLinkReparseBuffer;
+        if (buffer.PrintNameLength != 0)
         {
-            buffer[0] = L'\\';
-            prefix    = 7;
+            sourcePath  = buffer.PathBuffer + buffer.PrintNameOffset / sizeof(wchar_t);
+            sourceChars = buffer.PrintNameLength / sizeof(wchar_t);
         }
-        ::memmove(buffer + 1, buffer + prefix, (length - prefix + 1) * sizeof(wchar_t));
-        length -= static_cast<DWORD>(prefix - 1);
+        else
+        {
+            sourcePath  = buffer.PathBuffer + buffer.SubstituteNameOffset / sizeof(wchar_t);
+            sourceChars = buffer.SubstituteNameLength / sizeof(wchar_t);
+        }
     }
-    (void)destination.resize(length);
+    else if (reparseData->ReparseTag == IO_REPARSE_TAG_MOUNT_POINT)
+    {
+        const auto& buffer = reparseData->MountPointReparseBuffer;
+        if (buffer.PrintNameLength != 0)
+        {
+            sourcePath  = buffer.PathBuffer + buffer.PrintNameOffset / sizeof(wchar_t);
+            sourceChars = buffer.PrintNameLength / sizeof(wchar_t);
+        }
+        else
+        {
+            sourcePath  = buffer.PathBuffer + buffer.SubstituteNameOffset / sizeof(wchar_t);
+            sourceChars = buffer.SubstituteNameLength / sizeof(wchar_t);
+        }
+    }
+    else
+    {
+        return Result::Error("readSymbolicLink: Unsupported reparse point");
+    }
+
+    if (sourceChars >= StringPath::MaxPath)
+    {
+        return Result::Error("readSymbolicLink: Failed to store link target");
+    }
+
+    ::memcpy(destination.writableSpan().data(), sourcePath, sourceChars * sizeof(wchar_t));
+    destination.writableSpan().data()[sourceChars] = 0;
+    (void)destination.resize(sourceChars);
     return Result(true);
 }
 
