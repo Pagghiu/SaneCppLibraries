@@ -220,10 +220,22 @@ SC::Result SC::AsyncLoopTimeout::start(AsyncEventLoop& eventLoop, TimeMs timeout
     return eventLoop.start(*this);
 }
 
-SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, EventObject& eo)
+SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, AsyncLoopWakeUpOptions options)
 {
     SC_TRY(checkState());
-    eventObject = &eo;
+    eventObject    = nullptr;
+    wakeUpOptions  = options;
+    pendingWakeUps = 0;
+    queueSubmission(eventLoop);
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, EventObject& eo, AsyncLoopWakeUpOptions options)
+{
+    SC_TRY(checkState());
+    eventObject    = &eo;
+    wakeUpOptions  = options;
+    pendingWakeUps = 0;
     queueSubmission(eventLoop);
     return SC::Result(true);
 }
@@ -231,6 +243,26 @@ SC::Result SC::AsyncLoopWakeUp::start(AsyncEventLoop& eventLoop, EventObject& eo
 SC::Result SC::AsyncLoopWakeUp::validate(AsyncEventLoop&) { return SC::Result(true); }
 
 SC::Result SC::AsyncLoopWakeUp::wakeUp(AsyncEventLoop& eventLoop) { return eventLoop.wakeUpFromExternalThread(*this); }
+
+int32_t SC::AsyncLoopWakeUp::consumePendingWakeUps()
+{
+    if (wakeUpOptions.coalesce)
+    {
+        return pendingWakeUps.exchange(0);
+    }
+
+    int32_t expected = pendingWakeUps.load();
+    while (expected > 0)
+    {
+        if (pendingWakeUps.compare_exchange_weak(expected, expected - 1))
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int32_t SC::AsyncLoopWakeUp::getPendingWakeUps() const { return pendingWakeUps.load(); }
 
 SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
 {
@@ -2011,7 +2043,7 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
     SC_ASSERT_DEBUG(async.type == AsyncRequest::Type::LoopWakeUp);
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
-    if (not notifier.pending.exchange(true))
+    if (notifier.pendingWakeUps.fetch_add(1) == 0)
     {
         return wakeUpFromExternalThread();
     }
@@ -2020,26 +2052,36 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 
 void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
 {
+    // Release the shared wake-up latch before dispatching callbacks so an external thread that requests another
+    // wake-up during callback execution can enqueue a fresh kernel notification instead of being coalesced away.
+    wakeUpPending.exchange(false);
+
     AsyncLoopWakeUp* async = activeLoopWakeUps.front;
     while (async != nullptr)
     {
         SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
         AsyncLoopWakeUp* current = async;
         async                    = static_cast<AsyncLoopWakeUp*>(async->next);
-        if (current->pending.load() == true)
+
+        const int32_t deliveryCount = current->consumePendingWakeUps();
+        if (deliveryCount > 0)
         {
+            bool                    hasBeenReactivated = false;
             Result                  res(true);
-            AsyncLoopWakeUp::Result result(eventLoop, *current, res);
+            AsyncLoopWakeUp::Result result(eventLoop, *current, res, &hasBeenReactivated);
+            result.completionData.deliveryCount = static_cast<uint32_t>(deliveryCount);
             removeActiveHandle(*current);
             current->callback(result);
             if (current->eventObject)
             {
                 current->eventObject->signal();
             }
-            current->pending.exchange(false); // allow executing the notification again
+            if (hasBeenReactivated and current->getPendingWakeUps() > 0)
+            {
+                SC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
+            }
         }
     }
-    wakeUpPending.exchange(false);
 }
 
 void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)

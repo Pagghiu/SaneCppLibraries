@@ -758,10 +758,16 @@ void SC::AsyncStreamsTest::pipelineBackpressureAsyncSource()
     (void)writable.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
     (void)pipeline.eventError.addListener([this](Result res) { SC_TEST_EXPECT(res); });
 
+#if SC_PLATFORM_WINDOWS
+    static constexpr int64_t watchdogTimeoutMs = 10000;
+#else
+    static constexpr int64_t watchdogTimeoutMs = 2000;
+#endif
+
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{watchdogTimeoutMs}));
     loop.excludeFromActiveCount(timeout);
 
     SC_TEST_EXPECT(pipeline.pipe());

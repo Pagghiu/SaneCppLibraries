@@ -97,6 +97,106 @@ void SC::AsyncTest::loopWakeUp()
     SC_TEST_EXPECT(context.wakeUp1ThreadID == Thread::CurrentThreadID());
 }
 
+void SC::AsyncTest::loopWakeUpCoalescing()
+{
+    struct Context
+    {
+        int      coalescedCallbacks           = 0;
+        int      coalescedDeliveries          = 0;
+        int      nonCoalescedCallbacks        = 0;
+        int      nonCoalescedDeliveries       = 0;
+        uint64_t coalescedThreadID            = 0;
+        uint64_t nonCoalescedThreadID         = 0;
+        Result   coalescedWakeUpResults[3]    = {Result(false), Result(false), Result(false)};
+        Result   nonCoalescedWakeUpResults[3] = {Result(false), Result(false), Result(false)};
+    } context;
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    AsyncLoopWakeUp coalescedWakeUp;
+    coalescedWakeUp.setDebugName("coalescedWakeUp");
+    coalescedWakeUp.callback = [this, &context](AsyncLoopWakeUp::Result& result)
+    {
+        context.coalescedCallbacks++;
+        context.coalescedDeliveries += static_cast<int>(result.completionData.deliveryCount);
+        context.coalescedThreadID = Thread::CurrentThreadID();
+        SC_TEST_EXPECT(result.completionData.deliveryCount == 3);
+        SC_TEST_EXPECT(not result.getAsync().isActive());
+    };
+    SC_TEST_EXPECT(coalescedWakeUp.start(eventLoop));
+
+    AsyncLoopWakeUpOptions nonCoalescingOptions;
+    nonCoalescingOptions.coalesce = false;
+
+    AsyncLoopWakeUp nonCoalescedWakeUp;
+    nonCoalescedWakeUp.setDebugName("nonCoalescedWakeUp");
+    nonCoalescedWakeUp.callback = [this, &context](AsyncLoopWakeUp::Result& result)
+    {
+        context.nonCoalescedCallbacks++;
+        context.nonCoalescedDeliveries += static_cast<int>(result.completionData.deliveryCount);
+        context.nonCoalescedThreadID = Thread::CurrentThreadID();
+        SC_TEST_EXPECT(result.completionData.deliveryCount == 1);
+        SC_TEST_EXPECT(not result.getAsync().isActive());
+        if (context.nonCoalescedCallbacks < 3)
+        {
+            result.reactivateRequest(true);
+        }
+    };
+    SC_TEST_EXPECT(nonCoalescedWakeUp.start(eventLoop, nonCoalescingOptions));
+
+    Thread senderThread;
+    struct ThreadContext
+    {
+        Context*         context;
+        AsyncEventLoop*  eventLoop;
+        AsyncLoopWakeUp* coalescedWakeUp;
+        AsyncLoopWakeUp* nonCoalescedWakeUp;
+    } threadContext   = {&context, &eventLoop, &coalescedWakeUp, &nonCoalescedWakeUp};
+    auto senderLambda = [&threadContext](Thread& thread)
+    {
+        thread.setThreadName(SC_NATIVE_STR("wakeUp"));
+        for (int i = 0; i < 3; ++i)
+        {
+            threadContext.context->coalescedWakeUpResults[i] =
+                threadContext.coalescedWakeUp->wakeUp(*threadContext.eventLoop);
+            threadContext.context->nonCoalescedWakeUpResults[i] =
+                threadContext.nonCoalescedWakeUp->wakeUp(*threadContext.eventLoop);
+        }
+    };
+    SC_TEST_EXPECT(senderThread.start(senderLambda));
+    SC_TEST_EXPECT(senderThread.join());
+
+    for (int i = 0; i < 3; ++i)
+    {
+        SC_TEST_EXPECT(context.coalescedWakeUpResults[i]);
+        SC_TEST_EXPECT(context.nonCoalescedWakeUpResults[i]);
+    }
+
+    Time::HighResolutionCounter timeout;
+    timeout.snap();
+    timeout = timeout.offsetBy(500_ms);
+
+    while ((context.coalescedCallbacks < 1 or context.nonCoalescedCallbacks < 3))
+    {
+        SC_TEST_EXPECT(eventLoop.runNoWait());
+        Time::HighResolutionCounter now;
+        now.snap();
+        if (now.isLaterThanOrEqualTo(timeout))
+        {
+            break;
+        }
+        Thread::Sleep(1);
+    }
+
+    SC_TEST_EXPECT(context.coalescedCallbacks == 1);
+    SC_TEST_EXPECT(context.coalescedDeliveries == 3);
+    SC_TEST_EXPECT(context.nonCoalescedCallbacks == 3);
+    SC_TEST_EXPECT(context.nonCoalescedDeliveries == 3);
+    SC_TEST_EXPECT(context.coalescedThreadID == Thread::CurrentThreadID());
+    SC_TEST_EXPECT(context.nonCoalescedThreadID == Thread::CurrentThreadID());
+}
+
 void SC::AsyncTest::loopWakeUpEventObject()
 {
     struct TestParams

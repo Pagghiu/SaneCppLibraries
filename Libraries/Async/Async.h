@@ -322,11 +322,23 @@ struct SC_COMPILER_EXPORT AsyncLoopTimeout : public AsyncRequest
     TimeMs expirationTime;
 };
 
+/// @brief Options for AsyncLoopWakeUp configuration
+struct AsyncLoopWakeUpOptions
+{
+    /// Merge repeated pending wakeUp() calls into a single callback (default true, matching libuv uv_async_t).
+    /// The number of merged wake-ups is reported in AsyncLoopWakeUp::CompletionData::deliveryCount.
+    bool coalesce = true;
+};
+
 /// @brief Starts a wake-up operation, allowing threads to execute callbacks on loop thread. @n
 /// SC::AsyncLoopWakeUp::callback will be invoked on the thread running SC::AsyncEventLoop::run (or its variations)
 /// after SC::AsyncLoopWakeUp::wakeUp has been called.
 /// @note There is no guarantee that after calling AsyncLoopWakeUp::start the callback has actually finished execution.
-/// An optional SC::EventObject passed to SC::AsyncLoopWakeUp::start can be used for synchronization
+/// An optional SC::EventObject passed to SC::AsyncLoopWakeUp::start can be used for synchronization.
+/// By default repeated pending wakeUp() calls are coalesced like libuv uv_async_t. Set
+/// AsyncLoopWakeUpOptions::coalesce to false to receive one callback per pending wake-up instead.
+/// @note AsyncLoopWakeUp stays active only until its callback runs. To continue receiving wake-ups after a callback,
+/// call AsyncLoopWakeUp::Result::reactivateRequest(true) from inside the callback.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet1
 ///
@@ -338,12 +350,18 @@ struct SC_COMPILER_EXPORT AsyncLoopWakeUp : public AsyncRequest
 {
     AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
 
-    using CompletionData = AsyncCompletionData;
-    using Result         = AsyncResultOf<AsyncLoopWakeUp, CompletionData>;
-    using AsyncRequest::start;
+    struct CompletionData : public AsyncCompletionData
+    {
+        uint32_t deliveryCount = 1; ///< Number of coalesced wake-up requests delivered by this callback
+    };
+
+    using Result = AsyncResultOf<AsyncLoopWakeUp, CompletionData>;
 
     /// @brief Sets async request members and calls AsyncEventLoop::start
-    SC::Result start(AsyncEventLoop& eventLoop, EventObject& eventObject);
+    SC::Result start(AsyncEventLoop& eventLoop, AsyncLoopWakeUpOptions options = {});
+
+    /// @brief Sets async request members and calls AsyncEventLoop::start
+    SC::Result start(AsyncEventLoop& eventLoop, EventObject& eventObject, AsyncLoopWakeUpOptions options = {});
 
     /// Wakes up event loop, scheduling AsyncLoopWakeUp::callback on next AsyncEventLoop::run (or its variations)
     SC::Result wakeUp(AsyncEventLoop& eventLoop);
@@ -354,8 +372,11 @@ struct SC_COMPILER_EXPORT AsyncLoopWakeUp : public AsyncRequest
   private:
     friend struct AsyncEventLoop;
     SC::Result validate(AsyncEventLoop&);
+    int32_t    consumePendingWakeUps();
+    int32_t    getPendingWakeUps() const;
 
-    Atomic<bool> pending = false;
+    AsyncLoopWakeUpOptions wakeUpOptions;
+    Atomic<int32_t>        pendingWakeUps = 0;
 };
 
 /// @brief Starts monitoring a process, notifying about its termination.

@@ -31,6 +31,7 @@ struct SC::AsyncTest : public SC::TestCase
     // Loop WakeUp
     void loopWakeUpFromExternalThread();
     void loopWakeUp();
+    void loopWakeUpCoalescing();
     void loopWakeUpEventObject();
 
     // Processes
