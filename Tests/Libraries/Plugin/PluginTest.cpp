@@ -1,9 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Plugin/Plugin.h"
+#include "Libraries/Async/Async.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemIterator/FileSystemIterator.h"
-#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
+#include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Foundation/Deferred.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
@@ -17,7 +18,8 @@
 namespace SC
 {
 struct PluginTest;
-}
+using FileSystemWatcherAsync = FileSystemWatcherAsyncT<AsyncEventLoop>;
+} // namespace SC
 
 struct SC::PluginTest : public SC::TestCase
 {

@@ -112,26 +112,6 @@
             "Foundation"
         ]
     },
-    "FileSystemWatcherAsync": {
-        "direct_dependencies": [
-            "Async",
-            "FileSystemWatcher",
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Async",
-            "FileSystemWatcher"
-        ],
-        "all_dependencies": [
-            "Async",
-            "File",
-            "FileSystem",
-            "FileSystemWatcher",
-            "Foundation",
-            "Socket",
-            "Threading"
-        ]
-    },
     "Foundation": {
         "direct_dependencies": [],
         "minimal_dependencies": [],

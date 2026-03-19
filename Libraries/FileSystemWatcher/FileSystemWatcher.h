@@ -39,8 +39,8 @@ namespace SC
 /// Example using SC::FileSystemWatcher::ThreadRunner:
 /// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp fileSystemWatcherThreadRunnerSnippet
 ///
-/// Example using SC::FileSystemWatcherAsync (that implements SC::FileSystemWatcher::EventLoopRunner):
-/// \snippet Tests/Libraries/FileSystemWatcherAsync/FileSystemWatcherAsyncTest.cpp fileSystemWatcherAsyncSnippet
+/// Example using SC::FileSystemWatcherAsyncT (that implements SC::FileSystemWatcher::EventLoopRunner):
+/// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp fileSystemWatcherAsyncSnippet
 
 //! [OpaqueDeclarationSnippet]
 struct FileSystemWatcher
@@ -150,7 +150,8 @@ struct FileSystemWatcher
 
       private:
         friend struct FileSystemWatcher;
-        friend struct FileSystemWatcherAsync;
+        template <typename T_AsyncEventLoop>
+        friend struct FileSystemWatcherAsyncT;
 #if SC_PLATFORM_WINDOWS
 #if SC_ASYNC_ENABLE_LOG
         AlignedStorage<120> asyncStorage;
@@ -228,7 +229,8 @@ struct FileSystemWatcher
   private:
     friend decltype(internal);
     friend decltype(FolderWatcher::internal);
-    friend struct EventLoopRunner;
+    template <typename T_AsyncEventLoop>
+    friend struct FileSystemWatcherAsyncT;
     // Trimmed duplicate of IntrusiveDoubleLinkedList<T>
     struct WatcherLinkedList
     {
@@ -239,6 +241,118 @@ struct FileSystemWatcher
         void remove(FolderWatcher& watcher);
     };
     WatcherLinkedList watchers;
+};
+
+/// @brief FileSystemWatcherAsyncT is an implementation of SC::FileSystemWatcher that uses SC::Async.
+///
+/// This class exists as a template is to break the dependency of SC::FileSystemWatcher from SC::AsyncEventLoop.
+///
+/// Example:
+/// \snippet Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp fileSystemWatcherAsyncSnippet
+template <typename T_AsyncEventLoop>
+struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
+{
+    using Self = FileSystemWatcherAsyncT;
+
+    using T_AsyncLoopWakeUp = typename T_AsyncEventLoop::LoopWakeUp;
+    using T_AsyncFilePoll   = typename T_AsyncEventLoop::FilePoll;
+    using T_EventObject     = typename T_AsyncEventLoop::EventObjectType;
+    using T_AsyncResult     = typename T_AsyncEventLoop::ResultType;
+
+    void init(T_AsyncEventLoop& loop) { eventLoop = &loop; }
+
+  protected:
+    T_AsyncEventLoop* eventLoop = nullptr;
+
+#if SC_PLATFORM_APPLE
+    virtual Result appleStartWakeUp() override
+    {
+        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        T_AsyncLoopWakeUp& wakeUp = asyncWakeUp;
+        wakeUp.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
+        return wakeUp.start(*eventLoop, eventObject);
+    }
+
+    virtual void appleSignalEventObject() override { eventObject.signal(); }
+
+    virtual Result appleWakeUpAndWait() override
+    {
+        const Result res = asyncWakeUp.wakeUp(*eventLoop);
+        eventObject.wait();
+        return res;
+    }
+
+    void onEventLoopNotification(typename T_AsyncLoopWakeUp::Result& result)
+    {
+        fileSystemWatcher->asyncNotify(nullptr);
+        result.reactivateRequest(true);
+    }
+
+    T_AsyncLoopWakeUp asyncWakeUp = {};
+    T_EventObject     eventObject = {};
+#elif SC_PLATFORM_LINUX
+    virtual Result linuxStartSharedFilePoll() override
+    {
+        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        SC_TRY(eventLoop->associateExternallyCreatedFileDescriptorHandle(notifyFd));
+        asyncPoll.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
+        return asyncPoll.start(*eventLoop, notifyFd);
+    }
+
+    virtual Result linuxStopSharedFilePoll() override { return asyncPoll.stop(*eventLoop); }
+
+    void onEventLoopNotification(typename T_AsyncFilePoll::Result& result)
+    {
+        fileSystemWatcher->asyncNotify(nullptr);
+        result.reactivateRequest(true);
+    }
+
+    T_AsyncFilePoll asyncPoll = {};
+#else
+    using FolderWatcher = FileSystemWatcher::FolderWatcher;
+    virtual Result windowsStartFolderFilePoll(FolderWatcher& watcher, void* handle) override
+    {
+        SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
+        SC_TRY(eventLoop->associateExternallyCreatedFileDescriptorHandle(handle));
+        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
+        placementNew(asyncPoll);
+        asyncPoll.setDebugName("FileSystemWatcherAsync Poll");
+        asyncPoll.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
+        return asyncPoll.start(*eventLoop, handle);
+    }
+
+    virtual Result windowsStopFolderFilePoll(FolderWatcher& watcher) override
+    {
+        // This is not strictly needed as file handle is being closed soon after anyway
+        // SC_TRUST_RESULT(eventLoop->removeAllAssociationsFor(fwi.fileHandle));
+        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
+
+        onAsyncPollClose = [&watcher](T_AsyncResult&)
+        {
+            T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
+            asyncPoll.~T_AsyncFilePoll();
+        };
+        return asyncPoll.stop(*eventLoop, &onAsyncPollClose);
+    }
+
+    virtual void* windowsGetOverlapped(FolderWatcher& watcher) override
+    {
+        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
+        return asyncPoll.getOverlappedPtr();
+    }
+
+    void onEventLoopNotification(typename T_AsyncFilePoll::Result& result)
+    {
+        SC_COMPILER_WARNING_PUSH_OFFSETOF;
+        auto&          storage = reinterpret_cast<decltype(FolderWatcher::asyncStorage)&>(result.getAsync());
+        FolderWatcher& watcher = SC_COMPILER_FIELD_OFFSET(FolderWatcher, asyncStorage, storage);
+        fileSystemWatcher->asyncNotify(&watcher);
+        result.reactivateRequest(true);
+        SC_COMPILER_WARNING_POP;
+    }
+
+    Function<void(T_AsyncResult&)> onAsyncPollClose;
+#endif
 };
 
 //! @}

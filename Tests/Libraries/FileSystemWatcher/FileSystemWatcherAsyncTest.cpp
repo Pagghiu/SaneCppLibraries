@@ -1,12 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
+#include "Libraries/Async/Async.h"
 #include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
+#include "Libraries/Threading/Threading.h"
 
 namespace SC
 {
@@ -33,7 +35,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
             FileSystemWatcher fileEventsWatcher;
 
-            FileSystemWatcherAsync runner;
+            FileSystemWatcherAsyncT<AsyncEventLoop> runner;
             runner.init(eventLoop);
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
 
@@ -112,7 +114,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             FileSystem        fs;
             SC_TEST_EXPECT(fs.init(appDirectory));
 
-            FileSystemWatcherAsync runner;
+            FileSystemWatcherAsyncT<AsyncEventLoop> runner;
             runner.init(eventLoop);
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             SmallStringNative<1024> path;
@@ -142,9 +144,9 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             AsyncEventLoop eventLoop;
             SC_TEST_EXPECT(eventLoop.create());
 
-            FileSystemWatcher      fileEventsWatcher;
-            FileSystemWatcherAsync runner;
+            FileSystemWatcherAsyncT<AsyncEventLoop> runner;
             runner.init(eventLoop);
+            FileSystemWatcher fileEventsWatcher;
             SC_TEST_EXPECT(fileEventsWatcher.init(runner));
             SmallStringNative<1024> path1, path2;
             SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__test1"}));
@@ -263,7 +265,7 @@ Result fileSystemWatcherAsyncSnippet(AsyncEventLoop& eventLoop, Console& console
     // Initialize the FileSystemWatcher
     FileSystemWatcher fileSystemWatcher;
 
-    FileSystemWatcherAsync eventLoopRunner;
+    FileSystemWatcherAsyncT<AsyncEventLoop> eventLoopRunner;
     eventLoopRunner.init(eventLoop);
     SC_TRY(fileSystemWatcher.init(eventLoopRunner));
 

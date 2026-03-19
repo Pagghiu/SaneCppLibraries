@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Libraries/Async/Async.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
-#include "Libraries/FileSystemWatcherAsync/FileSystemWatcherAsync.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringConverter.h"
@@ -133,6 +133,8 @@ struct HotReloadSystem
 
     PluginCompiler compiler;
     PluginSysroot  sysroot;
+
+    using FileSystemWatcherAsync = FileSystemWatcherAsyncT<AsyncEventLoop>;
 
     FileSystemWatcher      fileSystemWatcher;
     FileSystemWatcherAsync fileSystemWatcherRunner;

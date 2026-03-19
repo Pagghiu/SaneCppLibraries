@@ -12,7 +12,6 @@ Library                                     | Description                       
 @subpage library_file_system                | @copybrief library_file_system                |   1525
 @subpage library_file_system_iterator       | @copybrief library_file_system_iterator       |   430
 @subpage library_file_system_watcher        | @copybrief library_file_system_watcher        |   1431
-@subpage library_file_system_watcher_async  | @copybrief library_file_system_watcher_async  |   106
 @subpage library_foundation                 | @copybrief library_foundation                 |   1389
 @subpage library_hashing                    | @copybrief library_hashing                    |   353
 @subpage library_http                       | @copybrief library_http                       |   3058

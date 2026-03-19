@@ -16,6 +16,7 @@
 # Features
 - Get notified about modified files or directories
 - Get notified about added / removed / renamed files or directories
+- Async backend support via `FileSystemWatcherAsyncT` template
 
 # Status
 🟩 Usable  
@@ -58,7 +59,8 @@ The behavior between these different system also depends on the file system wher
 # Examples
 
 - [SCExample](@ref page_examples) uses SC::FileSystemWatcher for a simple hot-reload system
-- Unit test inside `FileSystemWatcherTest.cpp` show how the API is meant to be used
+- Tests inside `FileSystemWatcherTest.cpp` show how the API is meant to be used
+- Tests inside `FileSystemWatcherAsyncTest.cpp` show how the Async API is meant to be used
 
 # Roadmap
 
