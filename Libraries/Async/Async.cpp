@@ -903,24 +903,52 @@ SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread()
     return Result(true);
 }
 
-SC::Result SC::AsyncEventLoop::associateExternallyCreatedSocket(SocketDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& descriptor)
 {
-    return internal.kernelQueue.get().associateExternallyCreatedSocket(outDescriptor);
+    FileDescriptor::Handle handle;
+    SC_TRY(descriptor.get(handle, Result::Error("Invalid handle")));
+    return associateExternallyCreatedFileDescriptorHandle(handle);
 }
 
-SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle handle)
 {
-    return internal.kernelQueue.get().associateExternallyCreatedFileDescriptor(outDescriptor);
+    return internal.kernelQueue.get().associateExternallyCreatedFileDescriptorHandle(handle);
 }
 
-SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(SocketDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedSocket(SocketDescriptor& descriptor)
 {
-    return Internal::KernelQueue::removeAllAssociationsFor(outDescriptor);
+    SocketDescriptor::Handle handle;
+    SC_TRY(descriptor.get(handle, Result::Error("Invalid handle")));
+    return associateExternallyCreatedSocketHandle(handle);
 }
 
-SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(FileDescriptor& outDescriptor)
+SC::Result SC::AsyncEventLoop::associateExternallyCreatedSocketHandle(SocketDescriptor::Handle handle)
 {
-    return Internal::KernelQueue::removeAllAssociationsFor(outDescriptor);
+    return internal.kernelQueue.get().associateExternallyCreatedSocketHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(SocketDescriptor& descriptor)
+{
+    SocketDescriptor::Handle handle;
+    SC_TRY(descriptor.get(handle, Result::Error("Invalid handle")));
+    return removeAllAssociationsForSocketHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsForSocketHandle(SocketDescriptor::Handle handle)
+{
+    return Internal::KernelQueue::removeAllAssociationsForSocketHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsFor(FileDescriptor& descriptor)
+{
+    FileDescriptor::Handle handle;
+    SC_TRY(descriptor.get(handle, Result::Error("Invalid handle")));
+    return removeAllAssociationsForFileDescriptorHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle handle)
+{
+    return Internal::KernelQueue::removeAllAssociationsForFileDescriptorHandle(handle);
 }
 
 void SC::AsyncEventLoop::updateTime() { return internal.updateTime(); }

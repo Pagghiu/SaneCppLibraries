@@ -115,27 +115,23 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
     [[nodiscard]] static constexpr bool needsThreadPoolForFileOperations() { return true; }
 
-    Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor)
+    Result associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle handle)
     {
-        SC_TRY(removeAllAssociationsFor(outDescriptor));
+        (void)removeAllAssociationsForFileDescriptorHandle(handle);
         HANDLE loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
-        SOCKET socket;
-        SC_TRY(outDescriptor.get(socket, Result::Error("Invalid handle")));
-        HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(socket), loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedSocket CreateIoCompletionPort failed");
+        HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
         return Result(true);
     }
 
-    Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor)
+    Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle handle)
     {
-        SC_TRY(removeAllAssociationsFor(outDescriptor));
+        (void)removeAllAssociationsForSocketHandle(handle);
         HANDLE loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("loop handle")));
-        HANDLE handle;
-        SC_TRY(outDescriptor.get(handle, Result::Error("Invalid handle")));
-        HANDLE iocp = ::CreateIoCompletionPort(handle, loopHandle, 0, 0);
-        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedFileDescriptor CreateIoCompletionPort failed");
+        HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(handle), loopHandle, 0, 0);
+        SC_TRY_MSG(iocp == loopHandle, "associateExternallyCreatedSocket CreateIoCompletionPort failed");
         return Result(true);
     }
 
@@ -158,18 +154,14 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         (void)status;
     }
 
-    static Result removeAllAssociationsFor(SocketDescriptor& descriptor)
+    static Result removeAllAssociationsForSocketHandle(SocketDescriptor::Handle handle)
     {
-        SOCKET socket;
-        SC_TRY(descriptor.get(socket, Result::Error("descriptor")));
-        removeAllAssociationsFor(reinterpret_cast<HANDLE>(socket));
+        removeAllAssociationsFor(reinterpret_cast<HANDLE>(handle));
         return Result(true);
     }
 
-    static Result removeAllAssociationsFor(FileDescriptor& descriptor)
+    static Result removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle handle)
     {
-        HANDLE handle;
-        SC_TRY(descriptor.get(handle, Result::Error("descriptor")));
         removeAllAssociationsFor(handle);
         return Result(true);
     }

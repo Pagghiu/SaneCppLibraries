@@ -33,10 +33,11 @@ struct SC::AsyncEventLoop::Internal
         Result createSharedWatchers(AsyncEventLoop&);
         Result wakeUpFromExternalThread();
 
-        static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
-        static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
-        static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
-        static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }
+        Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle);
+        Result associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle);
+
+        static Result removeAllAssociationsForSocketHandle(SocketDescriptor::Handle);
+        static Result removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle);
     };
 #elif SC_PLATFORM_APPLE
     struct KernelQueuePosix;

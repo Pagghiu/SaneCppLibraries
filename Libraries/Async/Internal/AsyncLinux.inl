@@ -113,8 +113,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         return Result(true);
     }
 
-    static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
-    static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle) { return Result(true); }
+    static Result associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle) { return Result(true); }
 };
 
 struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
@@ -937,6 +937,32 @@ SC::Result SC::AsyncEventLoop::Internal::KernelQueue::createSharedWatchers(Async
 SC::Result SC::AsyncEventLoop::Internal::KernelQueue::wakeUpFromExternalThread()
 {
     return isEpoll ? getPosix().wakeUpFromExternalThread() : getUring().wakeUpFromExternalThread();
+}
+
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::associateExternallyCreatedSocketHandle(
+    SocketDescriptor::Handle handle)
+{
+    return isEpoll ? getPosix().associateExternallyCreatedSocketHandle(handle)
+                   : getUring().associateExternallyCreatedSocketHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::associateExternallyCreatedFileDescriptorHandle(
+    FileDescriptor::Handle handle)
+{
+    return isEpoll ? getPosix().associateExternallyCreatedFileDescriptorHandle(handle)
+                   : getUring().associateExternallyCreatedFileDescriptorHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::removeAllAssociationsForSocketHandle(
+    SocketDescriptor::Handle handle)
+{
+    return KernelQueuePosix::removeAllAssociationsForSocketHandle(handle);
+}
+
+SC::Result SC::AsyncEventLoop::Internal::KernelQueue::removeAllAssociationsForFileDescriptorHandle(
+    FileDescriptor::Handle handle)
+{
+    return KernelQueuePosix::removeAllAssociationsForFileDescriptorHandle(handle);
 }
 
 //----------------------------------------------------------------------------------------

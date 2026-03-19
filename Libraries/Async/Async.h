@@ -1486,14 +1486,26 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
     /// @brief Associates a previously created TCP / UDP socket with the eventLoop
     Result associateExternallyCreatedSocket(SocketDescriptor& outDescriptor);
 
+    /// @brief Associates a previously created TCP / UDP socket handle with the eventLoop
+    Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle handle);
+
     /// @brief Associates a previously created File Descriptor with the eventLoop.
     Result associateExternallyCreatedFileDescriptor(FileDescriptor& outDescriptor);
+
+    /// @brief Associates a previously created File Descriptor handle with the eventLoop.
+    Result associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle handle);
 
     /// @brief Removes association of a TCP Socket with any event loop
     static Result removeAllAssociationsFor(SocketDescriptor& outDescriptor);
 
+    /// @brief Removes association of a TCP Socket handle with any event loop
+    static Result removeAllAssociationsForSocketHandle(SocketDescriptor::Handle handle);
+
     /// @brief Removes association of a File Descriptor with any event loop
     static Result removeAllAssociationsFor(FileDescriptor& outDescriptor);
+
+    /// @brief Removes association of a File Descriptor handle with any event loop
+    static Result removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle handle);
 
     /// Updates loop time to "now"
     void updateTime();
@@ -1535,6 +1547,24 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
     void clearSequence(AsyncSequence& sequence);
 
     struct Internal;
+
+    using LoopWakeUp          = AsyncLoopWakeUp;
+    using LoopTimeout         = AsyncLoopTimeout;
+    using ProcessExit         = AsyncProcessExit;
+    using Signal              = AsyncSignal;
+    using SocketAccept        = AsyncSocketAccept;
+    using SocketConnect       = AsyncSocketConnect;
+    using SocketSend          = AsyncSocketSend;
+    using SocketSendTo        = AsyncSocketSendTo;
+    using SocketReceive       = AsyncSocketReceive;
+    using SocketReceiveFrom   = AsyncSocketReceiveFrom;
+    using FileRead            = AsyncFileRead;
+    using FileWrite           = AsyncFileWrite;
+    using FileSend            = AsyncFileSend;
+    using FilePoll            = AsyncFilePoll;
+    using FileSystemOperation = AsyncFileSystemOperation;
+    using EventObjectType     = EventObject;
+    using ResultType          = AsyncResult;
 
   public:
     struct SC_COMPILER_EXPORT InternalDefinition

@@ -291,10 +291,10 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         return setSingleWatcherImmediate<VALUE>(eventLoop, handle, filter);
     }
 
-    static Result associateExternallyCreatedSocket(SocketDescriptor&) { return Result(true); }
-    static Result associateExternallyCreatedFileDescriptor(FileDescriptor&) { return Result(true); }
-    static Result removeAllAssociationsFor(SocketDescriptor&) { return Result(true); }
-    static Result removeAllAssociationsFor(FileDescriptor&) { return Result(true); }
+    static Result associateExternallyCreatedSocketHandle(SocketDescriptor::Handle) { return Result(true); }
+    static Result associateExternallyCreatedFileDescriptorHandle(FileDescriptor::Handle) { return Result(true); }
+    static Result removeAllAssociationsForSocketHandle(SocketDescriptor::Handle) { return Result(true); }
+    static Result removeAllAssociationsForFileDescriptorHandle(FileDescriptor::Handle) { return Result(true); }
 };
 
 struct SC::AsyncEventLoop::Internal::KernelEventsPosix
