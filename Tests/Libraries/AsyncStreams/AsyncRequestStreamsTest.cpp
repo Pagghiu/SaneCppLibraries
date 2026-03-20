@@ -19,6 +19,12 @@
 namespace SC
 {
 struct AsyncRequestStreamsTest;
+
+using ReadableFileStream       = AsyncReadableFileStream<AsyncEventLoop>;
+using WritableFileStream       = AsyncWritableFileStream<AsyncEventLoop>;
+using ReadableSocketStream     = AsyncReadableSocketStream<AsyncEventLoop>;
+using WritableSocketStream     = AsyncWritableSocketStream<AsyncEventLoop>;
+using AsyncZLibTransformStream = AsyncZLibTransformStreamT<AsyncEventLoop>;
 } // namespace SC
 
 struct SC::AsyncRequestStreamsTest : public SC::TestCase

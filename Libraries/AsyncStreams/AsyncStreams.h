@@ -212,6 +212,9 @@ struct SC_COMPILER_EXPORT AsyncBuffersPool
 /// AsyncReadableStream::eventError will be emitted when an error occurs in any phase.
 struct SC_COMPILER_EXPORT AsyncReadableStream
 {
+    using BufferViewID = AsyncBufferView::ID;
+    using BuffersPool  = AsyncBuffersPool;
+
     struct Request
     {
         AsyncBufferView::ID bufferID;
@@ -336,6 +339,9 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 /// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
 struct SC_COMPILER_EXPORT AsyncWritableStream
 {
+    using BufferViewID = AsyncBufferView::ID;
+    using BuffersPool  = AsyncBuffersPool;
+
     friend struct AsyncPipeline;
 
     struct Request

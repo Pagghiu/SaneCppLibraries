@@ -6,11 +6,9 @@
 
 [SaneCppAsyncStreams.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsyncStreams.h) is a library that reads and writes data concurrently from async sources to destinations.
 
-@note Even if the state machine is not strictly depending on @ref library_async, most practical uses of this library will be using it, so it can be considered an extension of @ref library_async
-
 # Dependencies
-- Dependencies: [Async](@ref library_async)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)
+- Dependencies: [Foundation](@ref library_foundation)
+- All dependencies: [Foundation](@ref library_foundation)
 
 ![Dependency Graph](AsyncStreams.svg)
 
@@ -19,17 +17,17 @@
 
 This is the list of implemented objects stream types
 
-| Async Stream                                          | Description                           |
-|-------------------------------------------------------|---------------------------------------|
-| [AsyncReadableStream](@ref SC::AsyncReadableStream)   | @copybrief SC::AsyncReadableStream    | 
-| [AsyncWritableStream](@ref SC::AsyncWritableStream)   | @copybrief SC::AsyncWritableStream    |
-| [AsyncDuplexStream](@ref SC::AsyncDuplexStream)       | @copybrief SC::AsyncDuplexStream      |
-| [AsyncTransformStream](@ref SC::AsyncTransformStream) | @copybrief SC::AsyncTransformStream   |
-| [AsyncPipeline](@ref SC::AsyncPipeline)               | @copybrief SC::AsyncPipeline          |
-| [ReadableFileStream](@ref SC::ReadableFileStream)     | @copybrief SC::ReadableFileStream     |
-| [WritableFileStream](@ref SC::WritableFileStream)     | @copybrief SC::WritableFileStream     |
-| [ReadableSocketStream](@ref SC::ReadableSocketStream) | @copybrief SC::ReadableSocketStream   |
-| [WritableSocketStream](@ref SC::WritableSocketStream) | @copybrief SC::WritableSocketStream   |
+| Async Stream                                                      | Description                               |
+|-------------------------------------------------------------------|-------------------------------------------|
+| [AsyncReadableStream](@ref SC::AsyncReadableStream)               | @copybrief SC::AsyncReadableStream        | 
+| [AsyncWritableStream](@ref SC::AsyncWritableStream)               | @copybrief SC::AsyncWritableStream        |
+| [AsyncDuplexStream](@ref SC::AsyncDuplexStream)                   | @copybrief SC::AsyncDuplexStream          |
+| [AsyncTransformStream](@ref SC::AsyncTransformStream)             | @copybrief SC::AsyncTransformStream       |
+| [AsyncPipeline](@ref SC::AsyncPipeline)                           | @copybrief SC::AsyncPipeline              |
+| [AsyncReadableFileStream](@ref SC::AsyncReadableFileStream)       | @copybrief SC::AsyncReadableFileStream    |
+| [AsyncWritableFileStream](@ref SC::AsyncWritableFileStream)       | @copybrief SC::AsyncWritableFileStream    |
+| [AsyncReadableSocketStream](@ref SC::AsyncReadableSocketStream)   | @copybrief SC::AsyncReadableSocketStream  |
+| [AsyncWritableSocketStream](@ref SC::AsyncWritableSocketStream)   | @copybrief SC::AsyncWritableSocketStream  |
 
 # Details
 

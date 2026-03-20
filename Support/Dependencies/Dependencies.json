@@ -23,19 +23,13 @@
     },
     "AsyncStreams": {
         "direct_dependencies": [
-            "Async",
             "Foundation"
         ],
         "minimal_dependencies": [
-            "Async"
+            "Foundation"
         ],
         "all_dependencies": [
-            "Async",
-            "File",
-            "FileSystem",
-            "Foundation",
-            "Socket",
-            "Threading"
+            "Foundation"
         ]
     },
     "Containers": {
@@ -130,11 +124,13 @@
     },
     "Http": {
         "direct_dependencies": [
+            "Async",
             "AsyncStreams",
             "FileSystem",
             "Foundation"
         ],
         "minimal_dependencies": [
+            "Async",
             "AsyncStreams"
         ],
         "all_dependencies": [

@@ -3,6 +3,7 @@
 #pragma once
 #include "HttpParser.h"
 
+#include "../Async/Async.h"
 #include "../AsyncStreams/AsyncRequestStreams.h"
 #include "../Foundation/StringSpan.h"
 #include "Internal/HttpFixedBufferWriter.h"
@@ -48,6 +49,9 @@ struct SC_COMPILER_EXPORT HttpMultipartWriter
 /// @brief Shared async transport storage for HTTP client and server endpoints
 struct SC_COMPILER_EXPORT HttpConnectionBase
 {
+    using ReadableSocketStream = AsyncReadableSocketStream<AsyncEventLoop>;
+    using WritableSocketStream = AsyncWritableSocketStream<AsyncEventLoop>;
+
     ReadableSocketStream readableSocketStream;
     WritableSocketStream writableSocketStream;
     AsyncBuffersPool     buffersPool;

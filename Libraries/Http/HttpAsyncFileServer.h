@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Async/Async.h"
 #include "../AsyncStreams/AsyncRequestStreams.h"
 #include "HttpConnection.h"
 #include "HttpMultipartParser.h"
@@ -18,6 +19,8 @@ namespace SC
 /// \snippet Examples/SCExample/Examples/WebServerExample/WebServerExample.cpp WebServerExampleSnippet
 struct SC_COMPILER_EXPORT HttpAsyncFileServer
 {
+    using ReadableFileStream = AsyncReadableFileStream<AsyncEventLoop>;
+    using WritableFileStream = AsyncWritableFileStream<AsyncEventLoop>;
     /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
     struct SC_COMPILER_EXPORT Stream
     {

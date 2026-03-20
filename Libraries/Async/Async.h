@@ -616,6 +616,8 @@ struct SC_COMPILER_EXPORT AsyncSocketSend : public AsyncRequest
 
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid; ///< The socket to send data to
 
+    SC::Result closeHandle() { return detail::SocketDescriptorDefinition::releaseHandle(handle); }
+
     Span<const char>       buffer;              ///< Span of bytes to send (singleBuffer == true)
     Span<Span<const char>> buffers;             ///< Spans of bytes to send (singleBuffer == false)
     bool                   singleBuffer = true; ///< Controls if buffer or buffers will be used
@@ -686,6 +688,8 @@ struct SC_COMPILER_EXPORT AsyncSocketReceive : public AsyncRequest
     {
         using AsyncResultOf<AsyncSocketReceive, CompletionData>::AsyncResultOf;
 
+        bool isEnded() const { return completionData.disconnected; }
+
         /// @brief Get a Span of the actually read data
         /// @param outData The span of data actually read from socket
         /// @return Valid Result if the data was read without errors
@@ -706,6 +710,8 @@ struct SC_COMPILER_EXPORT AsyncSocketReceive : public AsyncRequest
 
     Span<char>               buffer; ///< The writeable span of memory where to data will be written
     SocketDescriptor::Handle handle = SocketDescriptor::Invalid; /// The Socket Descriptor handle to read data from.
+
+    SC::Result closeHandle() { return detail::SocketDescriptorDefinition::releaseHandle(handle); }
 
   protected:
     AsyncSocketReceive(Type type) : AsyncRequest(type) {}
@@ -774,6 +780,8 @@ struct SC_COMPILER_EXPORT AsyncFileRead : public AsyncRequest
     {
         using AsyncResultOf<AsyncFileRead, CompletionData>::AsyncResultOf;
 
+        bool isEnded() const { return completionData.endOfFile; }
+
         SC::Result get(Span<char>& data)
         {
             SC_TRY(getAsync().buffer.sliceStartLength(0, completionData.numBytes, data));
@@ -789,6 +797,8 @@ struct SC_COMPILER_EXPORT AsyncFileRead : public AsyncRequest
     Span<char>              buffer;   /// The writeable span of memory where to data will be written
     FileDescriptor::Handle  handle;   /// The file/pipe descriptor handle to read data from.
     /// Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+
+    SC::Result closeHandle() { return detail::FileDescriptorDefinition::releaseHandle(handle); }
 
     /// @brief Returns the last offset set with AsyncFileRead::setOffset
     uint64_t getOffset() const { return offset; }
@@ -870,6 +880,8 @@ struct SC_COMPILER_EXPORT AsyncFileWrite : public AsyncRequest
 
     FileDescriptor::Handle handle; ///< The file/pipe descriptor to write data to.
     ///< Use SC::FileDescriptor or SC::PipeDescriptor to open it.
+
+    SC::Result closeHandle() { return detail::FileDescriptorDefinition::releaseHandle(handle); }
 
     Span<const char>       buffer;              ///< The read-only span of memory where to read the data from
     Span<Span<const char>> buffers;             ///< The read-only spans of memory where to read the data from
@@ -1549,6 +1561,7 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
     struct Internal;
 
     using LoopWakeUp          = AsyncLoopWakeUp;
+    using LoopWork            = AsyncLoopWork;
     using LoopTimeout         = AsyncLoopTimeout;
     using ProcessExit         = AsyncProcessExit;
     using Signal              = AsyncSignal;
