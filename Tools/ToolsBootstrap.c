@@ -2,6 +2,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#if defined(__linux__)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -306,16 +310,19 @@ FILE* FileSystem_open(const char* path, const char* mode) {
 
 TimePoint FileSystem_getModificationTime(const char* path) {
 #ifdef _WIN32
-    struct _stat info;
     int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
     if (wlen > 0) {
         wchar_t* wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
         if (wpath) {
             MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-            int ret = _wstat(wpath, &info);
+            WIN32_FILE_ATTRIBUTE_DATA info;
+            int ret = GetFileAttributesExW(wpath, GetFileExInfoStandard, &info);
             free(wpath);
-            if (ret == 0) {
-                return info.st_mtime;
+            if (ret != 0) {
+                ULARGE_INTEGER fileTime;
+                fileTime.LowPart  = info.ftLastWriteTime.dwLowDateTime;
+                fileTime.HighPart = info.ftLastWriteTime.dwHighDateTime;
+                return (TimePoint)(fileTime.QuadPart * 100ULL);
             }
         }
     }
@@ -323,7 +330,11 @@ TimePoint FileSystem_getModificationTime(const char* path) {
 #else
     struct stat info;
     if (stat(path, &info) == 0) {
-        return info.st_mtime;
+#ifdef __APPLE__
+        return (TimePoint)info.st_mtimespec.tv_sec * 1000000000ULL + (TimePoint)info.st_mtimespec.tv_nsec;
+#else
+        return (TimePoint)info.st_mtim.tv_sec * 1000000000ULL + (TimePoint)info.st_mtim.tv_nsec;
+#endif
     }
     return 0;
 #endif
