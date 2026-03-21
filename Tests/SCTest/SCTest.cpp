@@ -82,6 +82,7 @@ void runSocketTest(TestReport& report);
 void runConsoleTest(TestReport& report);
 void runStringConverterTest(TestReport& report);
 void runStringBuilderTest(TestReport& report);
+void runCommandLineTest(TestReport& report);
 void runStringFormatTest(TestReport& report);
 void runStringViewTest(TestReport& report);
 
@@ -224,6 +225,7 @@ int main(int argc, const char* argv[])
     runConsoleTest(report);
     runStringConverterTest(report);
     runStringBuilderTest(report);
+    runCommandLineTest(report);
     runStringFormatTest(report);
     runStringTest(report);
     runStringViewTest(report);

@@ -12,6 +12,7 @@
 #include "../../Libraries/Http/HttpAsyncFileServer.h"
 #include "../../Libraries/Http/HttpAsyncServer.h"
 #include "../../Libraries/Memory/String.h"
+#include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
@@ -115,72 +116,89 @@ struct AsyncWebServerExample
     }
 };
 
-Result saneMain(Span<StringSpan> args)
+Result saneMain(Span<const StringSpan> args)
 {
     AsyncWebServerExample sample;
     SocketNetworking::initNetworking();
     Console::tryAttachingToParentConsole();
     Console    console;
     StringPath currentDirPath;
+    StringView directory;
+    uint16_t   port = static_cast<uint16_t>(sample.port);
 
     globalConsole = &console;
-    // Parse command line arguments
-    for (size_t i = 0; i < args.sizeInElements(); ++i)
+    CommandLineOption cmdOptions[6];
+    cmdOptions[0].longName  = "directory";
+    cmdOptions[0].help      = "Directory to serve (defaults to current working directory)";
+    cmdOptions[0].valueName = "PATH";
+    cmdOptions[0].shortName = 'd';
+    cmdOptions[0].value     = CommandLineValue::stringView(directory);
+
+    cmdOptions[1].longName         = "sendfile";
+    cmdOptions[1].negativeLongName = "no-sendfile";
+    cmdOptions[1].help             = "Enable or disable async file send optimization";
+    cmdOptions[1].value            = CommandLineValue::boolean(sample.useSendFile);
+
+    cmdOptions[2].longName         = "epoll";
+    cmdOptions[2].negativeLongName = "uring";
+    cmdOptions[2].help             = "Select Linux async backend (epoll or io_uring)";
+    cmdOptions[2].value            = CommandLineValue::boolean(sample.useEpoll);
+
+    cmdOptions[3].longName  = "clients";
+    cmdOptions[3].help      = "Maximum number of concurrent clients";
+    cmdOptions[3].valueName = "NUM";
+    cmdOptions[3].shortName = 'c';
+    cmdOptions[3].value     = CommandLineValue::int32(sample.maxClients);
+
+    cmdOptions[4].longName  = "threads";
+    cmdOptions[4].help      = "Number of worker threads for file operations";
+    cmdOptions[4].valueName = "NUM";
+    cmdOptions[4].shortName = 't';
+    cmdOptions[4].value     = CommandLineValue::int32(sample.numThreads);
+
+    cmdOptions[5].longName  = "port";
+    cmdOptions[5].help      = "Port to listen on";
+    cmdOptions[5].valueName = "PORT";
+    cmdOptions[5].shortName = 'p';
+    cmdOptions[5].value     = CommandLineValue::uint16(port);
+
+    CommandLineSpec spec;
+    spec.programName = "AsyncWebServer";
+    spec.summary     = "A simple async web server example using Sane C++ Libraries.";
+    spec.options     = cmdOptions;
+
+    const CommandLineParseResult parseResult = spec.parse(args);
+    if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
     {
-        if (args[i] == "--directory" and i + 1 < args.sizeInElements())
-        {
-            sample.directory = args[i + 1];
-            ++i;
-        }
-        else if (args[i] == "--sendfile")
-        {
-            sample.useSendFile = true;
-        }
-        else if (args[i] == "--no-sendfile")
-        {
-            sample.useSendFile = false;
-        }
-        else if (args[i] == "--epoll")
-        {
-            sample.useEpoll = true;
-        }
-        else if (args[i] == "--uring")
-        {
-            sample.useEpoll = false;
-        }
-        else if (args[i] == "--clients" and i + 1 < args.sizeInElements())
-        {
-            if (not StringView(args[i + 1]).parseInt32(sample.maxClients))
-            {
-                globalConsole->print("Invalid max clients value: {}", args[i + 1]);
-            }
-            ++i;
-        }
-        else if (args[i] == "--threads" and i + 1 < args.sizeInElements())
-        {
-            if (not StringView(args[i + 1]).parseInt32(sample.numThreads))
-            {
-                globalConsole->print("Invalid number of threads value: {}", args[i + 1]);
-            }
-            ++i;
-        }
-        else if (args[i] == "--port" and i + 1 < args.sizeInElements())
-        {
-            int32_t parsedPort = 0;
-            if (not StringView(args[i + 1]).parseInt32(parsedPort) or parsedPort <= 0 or parsedPort > 65535)
-            {
-                globalConsole->print("Invalid port value: {}\n", args[i + 1]);
-            }
-            else
-            {
-                sample.port = parsedPort;
-            }
-            ++i;
-        }
+        StringFormatOutput output(StringEncoding::Utf8, console, true);
+        SC_TRY(spec.writeHelp(output));
+        console.flush();
+        return Result(true);
     }
+    if (parseResult.status == CommandLineParseResult::Status::Error)
+    {
+        StringFormatOutput output(StringEncoding::Utf8, console, false);
+        SC_TRY(spec.writeError(parseResult, output));
+        console.flushStdErr();
+        return Result(false);
+    }
+
+    if (port == 0)
+    {
+        console.printError("Invalid port value: 0\n");
+        return Result(false);
+    }
+    sample.port = static_cast<int32_t>(port);
     if (sample.directory.isEmpty())
     {
-        sample.directory = FileSystem::Operations::getCurrentWorkingDirectory(currentDirPath);
+        if (directory.isEmpty())
+        {
+            sample.directory = FileSystem::Operations::getCurrentWorkingDirectory(currentDirPath);
+        }
+        else
+        {
+            sample.directory = directory;
+        }
     }
 
     AsyncEventLoop::Options options;
@@ -198,12 +216,22 @@ Result saneMain(Span<StringSpan> args)
 
 } // namespace SC
 
-int main(int argc, char** argv)
+template <typename CharType>
+static int asyncWebServerMain(int argc, CharType** argv)
 {
     using namespace SC;
-    constexpr auto NUM_ARGS_MAX = 10;
-    StringSpan     args[NUM_ARGS_MAX];
-    for (int idx = 1; idx < min(argc, NUM_ARGS_MAX); ++idx)
-        args[idx - 1] = StringSpan::fromNullTerminated(argv[idx], StringEncoding::Utf8);
-    return SC::saneMain(args) ? 0 : -1;
+    static constexpr size_t MAX_COMMAND_LINE_ARGUMENTS = 10; // 4 valued options + 2 boolean flags
+    StringSpan              argsStorage[MAX_COMMAND_LINE_ARGUMENTS];
+    CommandLineArguments    args;
+    if (not args.setFromMainArguments(argc, argv, argsStorage))
+    {
+        return -1;
+    }
+    return SC::saneMain(args.values) ? 0 : -1;
 }
+
+#if SC_PLATFORM_WINDOWS
+int wmain(int argc, wchar_t** argv) { return asyncWebServerMain(argc, argv); }
+#else
+int main(int argc, char** argv) { return asyncWebServerMain(argc, argv); }
+#endif
