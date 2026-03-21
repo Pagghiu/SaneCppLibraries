@@ -49,7 +49,19 @@ Follow [Coding Style](Documentation/Pages/CodingStyle.md) and match surrounding 
 
 **Key points:**
 - Use `and`/`or`/`not` instead of `&&`/`||`/`!`
-- When clang-format would introduce very wide alignment padding between adjacent declarations, add a blank line to split them into smaller groups instead of keeping columns aligned with large runs of spaces.
+- When clang-format would introduce very wide alignment padding between adjacent declarations, add blank lines to split them into smaller groups before formatting.
+- After running clang-format, inspect edited headers for large horizontal alignment gaps and regroup declarations if needed, then format again. Do not leave declarations aligned with obviously excessive padding.
+- Prefer grouping fields and methods by type/role so clang-format only aligns short related runs, for example:
+```cpp
+StringView name = {};
+StringView help = {};
+
+bool required  = true;
+bool remaining = false;
+
+Span<StringSpan>  remainingStorage = {};
+Span<StringSpan>* parsedValues     = nullptr;
+```
 - Format with: `./SC.sh format execute`
 - Commit message: see "Commit message format" from CONTRIBUTING.md
 
