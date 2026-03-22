@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Build.h"
 
+#include "BuildNative.inl"
+#include "BuildWriter.h"
 #include "BuildWriterMakefile.inl"
 #include "BuildWriterVisualStudio.inl"
 #include "BuildWriterXCode.inl"
@@ -93,9 +95,9 @@ SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlag
     {
         SC_TRY(flags.libraryPaths.append(opinion->libraryPaths.toSpanConst()));
         SC_TRY(flags.libraries.append(opinion->libraries.toSpanConst()));
-        SC_TRY(flags.frameworks.append(opinion->libraries.toSpanConst()));
-        SC_TRY(flags.frameworksIOS.append(opinion->libraries.toSpanConst()));
-        SC_TRY(flags.frameworksMacOS.append(opinion->libraries.toSpanConst()));
+        SC_TRY(flags.frameworks.append(opinion->frameworks.toSpanConst()));
+        SC_TRY(flags.frameworksIOS.append(opinion->frameworksIOS.toSpanConst()));
+        SC_TRY(flags.frameworksMacOS.append(opinion->frameworksMacOS.toSpanConst()));
     }
     return Result(true);
 }
@@ -302,6 +304,17 @@ SC::Result SC::Build::Definition::configure(StringView workspaceName, const Buil
     for (const auto& workspace : workspaces)
     {
         SC_TRY(workspace.validate());
+    }
+    if (parameters.generator == Generator::Native)
+    {
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+        SC_TRY(fs.makeDirectoryRecursive(parameters.directories.projectsDirectory.view()));
+        SC_TRY(fs.makeDirectoryRecursive(parameters.directories.outputsDirectory.view()));
+        SC_TRY(fs.makeDirectoryRecursive(parameters.directories.intermediatesDirectory.view()));
+        SC_TRY(fs.makeDirectoryRecursive(parameters.directories.buildCacheDirectory.view()));
+        SC_COMPILER_UNUSED(workspaceName);
+        return Result(true);
     }
     FilePathsResolver filePathsResolver;
     SC_TRY(filePathsResolver.resolve(*this));
@@ -542,6 +555,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
 
     switch (parameters.generator)
     {
+    case Generator::Native: return Result(true);
     case Generator::XCode: {
         String prjName;
         // Write all projects
@@ -598,6 +612,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(writer.writeAssets(fs, project));
             }
             break;
+            case TargetType::StaticLibrary: break;
             }
         }
         // Write workspace
@@ -679,7 +694,7 @@ struct SC::Build::Action::Internal
 {
     static Result configure(ConfigureFunction configure, const Action& action);
     static Result coverage(ConfigureFunction configure, const Action& action);
-    static Result compileRunPrint(const Action& action, Span<StringView> environment = {},
+    static Result compileRunPrint(ConfigureFunction configure, const Action& action, Span<StringView> environment = {},
                                   String* outputExecutable = nullptr);
     static Result runExecutable(StringView executablePath, Span<StringView> arguments, const Action& action);
 
@@ -753,7 +768,7 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     {
     case Print:
     case Run:
-    case Compile: return Internal::compileRunPrint(newAction);
+    case Compile: return Internal::compileRunPrint(configure, newAction);
     case Coverage: return Internal::coverage(configure, newAction);
     case Configure: return Internal::configure(configure, newAction);
     }
@@ -775,11 +790,11 @@ SC::Result SC::Build::Action::Internal::coverage(ConfigureFunction configure, co
     // Build the configuration with coverage information
     newAction.action         = Action::Compile;
     StringView environment[] = {"CC", "clang", "CXX", "clang++"};
-    SC_TRY(compileRunPrint(newAction, environment));
+    SC_TRY(compileRunPrint(configure, newAction, environment));
 
     // Get coverage configuration executable path
     newAction.action = Action::Print;
-    SC_TRY(compileRunPrint(newAction, environment, &executablePath));
+    SC_TRY(compileRunPrint(configure, newAction, environment, &executablePath));
 
     Build::Definition definition;
     SC_TRY(configure(definition, action.parameters));
@@ -982,15 +997,21 @@ SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath,
     return Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::compileRunPrint(const Action& action, Span<StringView> environment,
-                                                        String* outputExecutable)
+SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction configure, const Action& action,
+                                                        Span<StringView> environment, String* outputExecutable)
 {
+    if (action.parameters.generator == Generator::Native)
+    {
+        SC_COMPILER_UNUSED(environment);
+        return NativeBuild::execute(configure, action, outputExecutable);
+    }
 
     SmallString<256> solutionLocation;
 
     Process process;
     switch (action.parameters.generator)
     {
+    case Generator::Native: break;
     case Generator::XCode: {
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
                                              Generator::toString(action.parameters.generator), action.workspaceName,
@@ -1157,6 +1178,21 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Action& action, Sp
     }
     break;
     case Generator::Make: {
+        if (action.action == Action::Run and not action.allTargets)
+        {
+            Definition definition;
+            SC_TRY(configure(definition, action.parameters));
+            Workspace*     workspace     = nullptr;
+            Project*       project       = nullptr;
+            Configuration* configuration = nullptr;
+            if (definition.findConfiguration(action.workspaceName, action.projectName, action.configurationName,
+                                             workspace, project, configuration))
+            {
+                SC_COMPILER_UNUSED(workspace);
+                SC_COMPILER_UNUSED(configuration);
+                SC_TRY_MSG(project->targetType != TargetType::StaticLibrary, "Run requires an executable target");
+            }
+        }
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),
                                              Generator::toString(action.parameters.generator), action.workspaceName}));
         if (action.parameters.generator == Generator::Make)

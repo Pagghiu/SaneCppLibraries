@@ -59,6 +59,22 @@ struct SC::Build::ProjectWriter::WriterXCode
         return hash.assign(StringView(tmpHash.view()).sliceStartLength(0, 24));
     }
 
+    [[nodiscard]] bool computeBuiltProductFileName(const Project& project, String& fileName)
+    {
+        switch (project.targetType)
+        {
+        case TargetType::ConsoleExecutable:
+        case TargetType::GUIApplication: return fileName.assign(project.targetName.view());
+        case TargetType::StaticLibrary:
+            if (StringView(project.targetName.view()).startsWith("lib"))
+            {
+                return fileName.assign(project.targetName.view());
+            }
+            return StringBuilder::format(fileName, "lib{}", project.targetName.view());
+        }
+        Assert::unreachable();
+    }
+
     [[nodiscard]] bool fillFileGroups(RenderGroup& group, const Vector<RenderItem>& xcodeFiles)
     {
         SC_TRY(group.referenceHash.assign("7B0074092A73143F00660B94"));
@@ -123,7 +139,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool fillResourcesGroup(const Project& project, RenderGroup& group, Vector<RenderItem>& xcodeFiles)
     {
-        if (project.targetType == TargetType::ConsoleExecutable)
+        if (project.targetType != TargetType::GUIApplication)
         {
             return true;
         }
@@ -300,8 +316,10 @@ struct SC::Build::ProjectWriter::WriterXCode
 /* Begin PBXFileReference section */)delimiter");
 
         // Target
+        String     productFileName = StringEncoding::Utf8;
         StringView productType;
         StringView productExtension;
+        SC_TRY(computeBuiltProductFileName(project, productFileName));
         switch (project.targetType)
         {
         case TargetType::ConsoleExecutable: productType = "compiled.mach-o.executable"; break;
@@ -309,14 +327,18 @@ struct SC::Build::ProjectWriter::WriterXCode
             productType      = "wrapper.application";
             productExtension = ".app";
             break;
+        case TargetType::StaticLibrary:
+            productType      = "archive.ar";
+            productExtension = ".a";
+            break;
         }
 
         builder.append(R"delimiter(
         7B0074122A73143F00660B94 /* {0}{1} */ = {{isa = PBXFileReference; explicitFileType = "{2}"; includeInIndex = 0; path = "{0}{1}"; sourceTree = BUILT_PRODUCTS_DIR; }};)delimiter",
-                       project.targetName.view(), productExtension, productType);
+                       productFileName.view(), productExtension, productType);
 
         // Entitlements
-        if (project.targetType != TargetType::ConsoleExecutable)
+        if (project.targetType == TargetType::GUIApplication)
         {
             builder.append(R"delimiter(
         7B5A4A5A2C20D35E00EB8229 /* {0}.entitlements */ = {{isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.entitlements; path = {0}.entitlements; sourceTree = "<group>"; }};)delimiter",
@@ -415,14 +437,20 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     [[nodiscard]] bool writePBXNativeTarget(StringBuilder& builder, const Project& project)
     {
+        String     productFileName = StringEncoding::Utf8;
         StringView productType;
         StringView productExtension;
+        SC_TRY(computeBuiltProductFileName(project, productFileName));
         switch (project.targetType)
         {
         case TargetType::ConsoleExecutable: productType = "com.apple.product-type.tool"; break;
         case TargetType::GUIApplication:
             productType      = "com.apple.product-type.application";
             productExtension = ".app";
+            break;
+        case TargetType::StaticLibrary:
+            productType      = "com.apple.product-type.library.static";
+            productExtension = ".a";
             break;
         }
 
@@ -444,13 +472,13 @@ struct SC::Build::ProjectWriter::WriterXCode
             dependencies = (
             );
             name = {0};
-            productName = {0};
-            productReference = 7B0074122A73143F00660B94 /* {0}{1} */;
-            productType = "{2}";
+            productName = {1};
+            productReference = 7B0074122A73143F00660B94 /* {1}{2} */;
+            productType = "{3}";
         }};
 /* End PBXNativeTarget section */
 )delimiter",
-                       project.targetName.view(), productExtension, productType);
+                       project.targetName.view(), productFileName.view(), productExtension, productType);
         SC_COMPILER_WARNING_POP;
         return true;
     }
@@ -1017,6 +1045,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
         case TargetType::ConsoleExecutable: break;
         case TargetType::GUIApplication: writePBXResourcesBuildPhase(builder, project); break;
+        case TargetType::StaticLibrary: break;
         }
 
         writePBXShellScriptBuildPhase(builder);

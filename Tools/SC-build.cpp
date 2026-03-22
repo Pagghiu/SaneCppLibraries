@@ -84,7 +84,8 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     }
 }
 
-static constexpr StringView TEST_PROJECT_NAME = "SCTest";
+static constexpr StringView TEST_PROJECT_NAME       = "SCTest";
+static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
 
 Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
@@ -134,10 +135,11 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     project.addFiles("Tests/SCTest", "*.h");       // add all .h from SCTest directory
     project.addFiles("Tests/Libraries", "**.c*");  // add all tests from Libraries directory
     project.addFiles("Tests/Libraries", "**.inl"); // add all tests from Libraries directory
-    project.addFiles("Tests/Support", "**.cpp");   // add all tests from Support directory
-    project.addFiles("Tests/Tools", "**.cpp");     // add all tests from Tools directory
-    project.addFiles("Tools", "SC-*.cpp");         // add all tools
-    project.addFiles("Tools", "*.h");              // add tools headers
+    project.removeFiles("Tests/Libraries/Build", "BuildTest.cpp");
+    project.addFiles("Tests/Support", "**.cpp"); // add all tests from Support directory
+    project.addFiles("Tests/Tools", "**.cpp");   // add all tests from Tools directory
+    project.addFiles("Tools", "SC-*.cpp");       // add all tools
+    project.addFiles("Tools", "*.h");            // add tools headers
 
     // Deprecated code tests and libraries (to be removed when deprecated code will be removed)
     project.addFiles("Extra/Deprecated/Tests", "**.cpp");     // add all deprecated tests
@@ -158,6 +160,32 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     specificFiles.compile.disableWarnings({"unused-parameter"});                   // GCC and Clang
     specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"}); // Clang Only
     project.addSpecificFileFlags(specificFiles);
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
+Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
+{
+    Project project = {TargetType::ConsoleExecutable, BUILD_TEST_PROJECT_NAME};
+
+    project.setRootDirectory(parameters.directories.libraryDirectory.view());
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.addIncludePaths({
+        ".",
+        "Tests/SCBuildTest",
+    });
+
+    addSaneCppLibraries(project, parameters);
+    project.addFiles("Tests/SCBuildTest", "*.cpp");
+    project.addFiles("Tests/SCBuildTest", "*.h");
+    project.addFiles("Tests/Libraries/Build", "BuildTest.cpp");
+    project.addFiles("Tools", "SC-*.cpp");
+    project.addFiles("Tools", "*.h");
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
@@ -371,6 +399,7 @@ Result configure(Definition& definition, const Parameters& parameters)
 {
     Workspace defaultWorkspace = {DEFAULT_WORKSPACE};
     SC_TRY(configureTests(parameters, defaultWorkspace));
+    SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
     SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));

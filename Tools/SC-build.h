@@ -24,6 +24,7 @@ namespace Tools
 constexpr StringView PROJECTS_SUBDIR      = "_Projects";
 constexpr StringView OUTPUTS_SUBDIR       = "_Outputs";
 constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
+constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
 
 [[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& directories)
 {
@@ -34,12 +35,14 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     SC_TRY(Path::join(directories.projectsDirectory, {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
     SC_TRY(Path::join(directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
     SC_TRY(Path::join(directories.intermediatesDirectory, {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));
+    SC_TRY(Path::join(directories.buildCacheDirectory, {arguments.toolDestination.view(), BUILD_CACHE_SUBDIR}));
     SC_TRY(Path::join(directories.packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
     SC_TRY(
         Path::join(directories.packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
     SC_TRY(builder.append("projects         = \"{}\"\n", directories.projectsDirectory));
     SC_TRY(builder.append("outputs          = \"{}\"\n", directories.outputsDirectory));
     SC_TRY(builder.append("intermediates    = \"{}\"\n", directories.intermediatesDirectory));
+    SC_TRY(builder.append("build-cache      = \"{}\"\n", directories.buildCacheDirectory));
     builder.finalize();
     console.print(buffer.view());
     if (not Path::isAbsolute(directories.projectsDirectory.view(), SC::Path::AsNative) or
@@ -89,6 +92,14 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     action.parameters.generator = Build::Generator::Make;
     action.parameters.platform  = Build::Platform::Apple;
     arguments.console.print("Executing \"{}\" for Make on Apple platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
+    action.parameters.generator = Build::Generator::Native;
+    action.parameters.platform  = Build::Platform::Linux;
+    arguments.console.print("Executing \"{}\" for Native on Linux platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
+    action.parameters.generator = Build::Generator::Native;
+    action.parameters.platform  = Build::Platform::Apple;
+    arguments.console.print("Executing \"{}\" for Native on Apple platform\n", arguments.action);
     SC_TRY(Build::executeAction(action));
     return Result(true);
 }
@@ -156,6 +167,10 @@ constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
     else if (args[1] == "make")
     {
         action.parameters.generator = Build::Generator::Make;
+    }
+    else if (args[1] == "native")
+    {
+        action.parameters.generator = Build::Generator::Native;
     }
     else if (args[1] == "vs2022")
     {

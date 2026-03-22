@@ -131,6 +131,10 @@ endef
         builder.append("\n\nrun:");
         for (const Project& project : workspace.projects)
         {
+            if (project.targetType == TargetType::StaticLibrary)
+            {
+                continue;
+            }
             SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
             builder.append(" {0}_RUN", makeTarget.view());
         }
@@ -177,7 +181,7 @@ endif
         SmallString<255> makeTarget;
         SC_TRY(sanitizeName(project.targetName.view(), makeTarget));
 
-        writeTargetRule(builder, makeTarget.view());
+        SC_TRY(writeTargetRule(builder, project, makeTarget.view()));
 
         SC_TRY_MSG(not project.configurations.isEmpty(), "Needs at least one configuration");
         bool first = true;
@@ -221,8 +225,8 @@ endif # $(CONFIG)
         writeRebuildOnHeaderChangeRule(builder, makeTarget.view());
         writeCompileCommandsJsonRule(builder, makeTarget.view());
 
-        writeLinkExecutableRule(builder, makeTarget.view());
-        writeRunExecutableRule(builder, makeTarget.view());
+        writeFinalArtifactRule(builder, project, makeTarget.view());
+        writeRunExecutableRule(builder, project, makeTarget.view());
         writeSourceFilesList(builder, makeTarget.view(), renderer, project.filesWithSpecificFlags);
         SC_COMPILER_WARNING_POP;
         return Result(true);
@@ -261,19 +265,40 @@ endif # $(CONFIG)
         return Result(true);
     }
 
-    void writeTargetRule(StringBuilder& builder, StringView makeTarget)
+    Result computeArtifactName(const Project& project, String& artifactName)
+    {
+        switch (project.targetType)
+        {
+        case TargetType::ConsoleExecutable:
+        case TargetType::GUIApplication: SC_TRY(artifactName.assign(project.targetName.view())); return Result(true);
+        case TargetType::StaticLibrary:
+            if (StringView(project.targetName.view()).startsWith("lib"))
+            {
+                SC_TRY(StringBuilder::format(artifactName, "{}.a", project.targetName.view()));
+                return Result(true);
+            }
+            SC_TRY(StringBuilder::format(artifactName, "lib{}.a", project.targetName.view()));
+            return Result(true);
+        }
+        Assert::unreachable();
+    }
+
+    Result writeTargetRule(StringBuilder& builder, const Project& project, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        String artifactName;
+        SC_TRY(computeArtifactName(project, artifactName));
         builder.append(R"delimiter(
 # {0} Target
-{0}_TARGET_NAME := {0}
+{0}_TARGET_NAME := {1}
 
 {0}_PRINT_EXECUTABLE_PATH:
 	@echo $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
 )delimiter",
-                       makeTarget);
+                       makeTarget, artifactName.view());
         SC_COMPILER_WARNING_POP;
+        return Result(true);
     }
 
     void writeCompileCommandsJsonRule(StringBuilder& builder, StringView makeTarget)
@@ -303,28 +328,54 @@ endif
         SC_COMPILER_WARNING_POP;
     }
 
-    void writeLinkExecutableRule(StringBuilder& builder, StringView makeTarget)
+    void writeFinalArtifactRule(StringBuilder& builder, const Project& project, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-
-        builder.append(R"delimiter(
+        switch (project.targetType)
+        {
+        case TargetType::ConsoleExecutable:
+        case TargetType::GUIApplication:
+            builder.append(R"delimiter(
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
 	@echo Linking "{0}"
 	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 )delimiter",
-                       makeTarget);
+                           makeTarget);
+            break;
+        case TargetType::StaticLibrary:
+            builder.append(R"delimiter(
+$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
+	@echo Archiving "{0}"
+	$(VRBS)ar rcs $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES)
+)delimiter",
+                           makeTarget);
+            break;
+        }
         SC_COMPILER_WARNING_POP;
     }
 
-    void writeRunExecutableRule(StringBuilder& builder, StringView makeTarget)
+    void writeRunExecutableRule(StringBuilder& builder, const Project& project, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-
-        builder.append(R"delimiter(
+        switch (project.targetType)
+        {
+        case TargetType::ConsoleExecutable:
+        case TargetType::GUIApplication:
+            builder.append(R"delimiter(
 {0}_RUN: {0}
 	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 )delimiter",
-                       makeTarget);
+                           makeTarget);
+            break;
+        case TargetType::StaticLibrary:
+            builder.append(R"delimiter(
+{0}_RUN:
+	@echo "Cannot run static library target '{0}'" 1>&2
+	@false
+)delimiter",
+                           makeTarget);
+            break;
+        }
         SC_COMPILER_WARNING_POP;
     }
 

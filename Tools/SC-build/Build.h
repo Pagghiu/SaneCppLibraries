@@ -99,6 +99,7 @@ struct Generator
 {
     enum Type
     {
+        Native,           ///< Build directly by launching compiler and linker processes
         XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
         VisualStudio2019, ///< Generate projects for Visual Studio 2019
@@ -110,6 +111,7 @@ struct Generator
     {
         switch (type)
         {
+        case Native: return "Native";
         case XCode: return "XCode";
         case VisualStudio2022: return "VisualStudio2022";
         case VisualStudio2019: return "VisualStudio2019";
@@ -117,6 +119,56 @@ struct Generator
         }
         Assert::unreachable();
     }
+};
+
+/// @brief Describes how a standalone backend should invoke the toolchain
+struct Toolchain
+{
+    enum Family
+    {
+        HostDefault,
+        Clang,
+        GCC,
+        MSVC,
+        ClangCL,
+        ZigCC,
+        CustomDriver,
+    };
+
+    Family family = HostDefault;
+
+    String compilerC;
+    String compilerCpp;
+    String linker;
+    String archiver;
+
+    String targetTriple;
+    String sysroot;
+
+    Vector<String> extraCompilerFlags;
+    Vector<String> extraLinkerFlags;
+
+    Platform::Type     platform     = Platform::Unknown;
+    Architecture::Type architecture = Architecture::Any;
+};
+
+/// @brief Controls how the standalone backend executes jobs and emits output
+struct ExecutionOptions
+{
+    enum OutputPolicy
+    {
+        HybridBufferedLive,
+        AlwaysLive,
+        FullyBuffered,
+    };
+
+    size_t maxParallelJobs         = 0;
+    bool   emitCompileCommands     = true;
+    bool   useResponseFiles        = true;
+    bool   useCompilerDependencies = true;
+    bool   verbose                 = false;
+
+    OutputPolicy outputPolicy = HybridBufferedLive;
 };
 
 /// @brief Optimization level (Debug / Release)
@@ -350,8 +402,8 @@ struct Configuration
     }
 
     String name;              ///< Configuration name
-    String outputPath;        ///< Exe path. If relative, it's appended to _Outputs relative to $(PROJECT_DIR).
-    String intermediatesPath; ///< Obj path. If relative, it's appended to _Intermediates relative to $(PROJECT_DIR).
+    String outputPath;        ///< If relative, it's appended to _Outputs relative to $(PROJECT_DIR).
+    String intermediatesPath; ///< If relative, it's appended to _Intermediates relative to $(PROJECT_DIR).
 
     CompileFlags compile; ///< Configuration compile flags
     LinkFlags    link;    ///< Configuration link flags
@@ -371,6 +423,7 @@ struct TargetType
     {
         ConsoleExecutable, ///< Create console executable program
         GUIApplication,    ///< Create graphical application program
+        StaticLibrary,     ///< Create static library archive
     };
 };
 
@@ -469,6 +522,7 @@ struct Directories
     String projectsDirectory;
     String intermediatesDirectory;
     String outputsDirectory;
+    String buildCacheDirectory;
     String packagesCacheDirectory;
     String packagesInstallDirectory;
     String libraryDirectory;
@@ -487,7 +541,9 @@ struct Parameters
         architecture = Architecture::Any;
         generator    = Generator::Make;
     }
-    Directories directories;
+    Directories      directories;
+    Toolchain        toolchain;
+    ExecutionOptions execution;
 };
 
 /// @brief Top level build description holding all Workspace objects
@@ -542,5 +598,6 @@ struct Action
 
 // Defined inside SC-Build.cpp
 Result executeAction(const Action& action);
+struct NativeBuild;
 } // namespace Build
 } // namespace SC

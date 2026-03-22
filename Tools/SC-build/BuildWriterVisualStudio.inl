@@ -142,18 +142,20 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         switch (compileFlags.optimizationLevel)
         {
         case Optimization::Debug:
-            builder.append("    <ConfigurationType>Application</ConfigurationType>\n"
+            builder.append("    <ConfigurationType>{}</ConfigurationType>\n"
                            "    <UseDebugLibraries>true</UseDebugLibraries>\n"
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
+                           project.targetType == TargetType::StaticLibrary ? "StaticLibrary" : "Application",
                            platformToolset);
             break;
         case Optimization::Release:
-            builder.append("    <ConfigurationType>Application</ConfigurationType>\n"
+            builder.append("    <ConfigurationType>{}</ConfigurationType>\n"
                            "    <UseDebugLibraries>false</UseDebugLibraries>\n"
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <WholeProgramOptimization>true</WholeProgramOptimization>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
+                           project.targetType == TargetType::StaticLibrary ? "StaticLibrary" : "Application",
                            platformToolset);
             break;
         }
@@ -324,21 +326,29 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                            CppStandard::toMSVCString(compileFlags.cppStandard));
         }
         builder.append("    </ClCompile>\n");
-        builder.append("    <Link>\n");
-        switch (project.targetType)
+        if (project.targetType == TargetType::StaticLibrary)
         {
-        case TargetType::ConsoleExecutable: builder.append("      <SubSystem>Console</SubSystem>\n"); break;
-        case TargetType::GUIApplication: builder.append("      <SubSystem>Windows</SubSystem>\n"); break;
+            builder.append("    <Lib />\n");
         }
+        else
+        {
+            builder.append("    <Link>\n");
+            switch (project.targetType)
+            {
+            case TargetType::ConsoleExecutable: builder.append("      <SubSystem>Console</SubSystem>\n"); break;
+            case TargetType::GUIApplication: builder.append("      <SubSystem>Windows</SubSystem>\n"); break;
+            case TargetType::StaticLibrary: break;
+            }
 
-        switch (compileFlags.optimizationLevel)
-        {
-        case Optimization::Debug:
-            builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");
-            break;
-        case Optimization::Release: break;
+            switch (compileFlags.optimizationLevel)
+            {
+            case Optimization::Debug:
+                builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");
+                break;
+            case Optimization::Release: break;
+            }
+            builder.append("    </Link>\n");
         }
-        builder.append("    </Link>\n");
         builder.append("  </ItemDefinitionGroup>\n");
 
         SC_COMPILER_WARNING_POP;
