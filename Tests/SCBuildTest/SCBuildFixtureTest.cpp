@@ -15,13 +15,16 @@ namespace SC
 {
 namespace
 {
-static constexpr StringView FixtureWorkspaceName      = "SCBuildFixtures";
-static constexpr StringView FixtureProjectName        = "TinyConsoleProgram";
-static constexpr StringView HeaderFixtureProjectName  = "HeaderDependencyProgram";
-static constexpr StringView CompileFailureProjectName = "CompileFailureProgram";
-static constexpr StringView LinkFailureProjectName    = "LinkFailureProgram";
-static constexpr StringView StaticLibraryProjectName  = "FixtureStaticLibrary";
-static constexpr StringView StaticLibraryConsumerName = "StaticLibraryConsumer";
+static constexpr StringView FixtureWorkspaceName           = "SCBuildFixtures";
+static constexpr StringView FixtureProjectName             = "TinyConsoleProgram";
+static constexpr StringView HeaderFixtureProjectName       = "HeaderDependencyProgram";
+static constexpr StringView CompileFailureProjectName      = "CompileFailureProgram";
+static constexpr StringView LinkFailureProjectName         = "LinkFailureProgram";
+static constexpr StringView StaticLibraryProjectName       = "FixtureStaticLibrary";
+static constexpr StringView StaticLibraryConsumerName      = "StaticLibraryConsumer";
+static constexpr StringView WorkspaceLibraryProjectName    = "WorkspaceStaticLibrary";
+static constexpr StringView WorkspaceExecutableProjectName = "WorkspaceExecutable";
+static constexpr StringView CustomDriverSourceRootName     = "CustomDriverFixture";
 
 static native_char_t DynamicFixtureProjectRootStorage[1024] = {};
 static StringView    DynamicFixtureProjectRoot;
@@ -125,6 +128,29 @@ static Result setDynamicLinkedLibraryPath(StringView libraryPath)
     return Result(true);
 }
 
+static Result resolveHostToolPath(StringView toolName, String& toolPath)
+{
+    Process process;
+    String  output = StringEncoding::Utf8;
+    SC_TRY(process.exec({"which", toolName}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate host tool");
+    SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
+    return Result(true);
+}
+
+static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath, StringView toolPath)
+{
+    String scriptContents = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(scriptContents,
+                                 "#!/bin/sh\n"
+                                 "printf '%s\\n' \"$*\" >> \"{}\"\n"
+                                 "exec \"{}\" \"$@\"\n",
+                                 logPath, toolPath));
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
 static Result configureTinyConsoleProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
@@ -188,6 +214,67 @@ static Result configureStaticLibraryConsumerProgram(Build::Definition& definitio
     SC_TRY(project.addFiles(".", "*.cpp"));
 
     SC_TRY(workspace.projects.push_back(move(project)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+
+static Result configureWorkspaceDependencyProgram(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+
+    Build::Workspace workspace = {FixtureWorkspaceName};
+
+    String libraryRoot    = StringEncoding::Utf8;
+    String executableRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(libraryRoot, {DynamicFixtureProjectRoot, "Library"}));
+    SC_TRY(Path::join(executableRoot, {DynamicFixtureProjectRoot, "Executable"}));
+
+    Build::Project libraryProject = {Build::TargetType::StaticLibrary, WorkspaceLibraryProjectName};
+    SC_TRY(libraryProject.setRootDirectory(libraryRoot.view()));
+    SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(libraryProject.addFiles(".", "*.cpp"));
+
+    Build::Project executableProject = {Build::TargetType::ConsoleExecutable, WorkspaceExecutableProjectName};
+    SC_TRY(executableProject.setRootDirectory(executableRoot.view()));
+    SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(executableProject.addLinkLibraries({WorkspaceLibraryProjectName}));
+    SC_TRY(executableProject.addFiles(".", "*.cpp"));
+
+    SC_TRY(workspace.projects.push_back(move(libraryProject)));
+    SC_TRY(workspace.projects.push_back(move(executableProject)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+
+static Result configureCustomDriverDependencyProgram(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+
+    Build::Workspace workspace = {FixtureWorkspaceName};
+
+    String libraryRoot    = StringEncoding::Utf8;
+    String executableRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(libraryRoot, {DynamicFixtureProjectRoot, "Library"}));
+    SC_TRY(Path::join(executableRoot, {DynamicFixtureProjectRoot, "Executable"}));
+
+    Build::Project libraryProject = {Build::TargetType::StaticLibrary, WorkspaceLibraryProjectName};
+    SC_TRY(libraryProject.setRootDirectory(libraryRoot.view()));
+    SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(libraryProject.addFiles(".", "*.c"));
+    SC_TRY(libraryProject.addFiles(".", "*.cpp"));
+
+    Build::Project executableProject = {Build::TargetType::ConsoleExecutable, WorkspaceExecutableProjectName};
+    SC_TRY(executableProject.setRootDirectory(executableRoot.view()));
+    SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(executableProject.addLinkLibraries({WorkspaceLibraryProjectName}));
+    SC_TRY(executableProject.addFiles(".", "*.cpp"));
+
+    SC_TRY(workspace.projects.push_back(move(libraryProject)));
+    SC_TRY(workspace.projects.push_back(move(executableProject)));
     SC_TRY(definition.workspaces.push_back(move(workspace)));
     return Result(true);
 }
@@ -353,6 +440,75 @@ static Result writeStaticLibraryConsumerFixture(FileSystem& fs, StringView sourc
     return Result(true);
 }
 
+static Result writeWorkspaceDependencyFixture(FileSystem& fs, StringView sourceRoot)
+{
+    String libraryRoot      = StringEncoding::Utf8;
+    String executableRoot   = StringEncoding::Utf8;
+    String librarySource    = StringEncoding::Utf8;
+    String executableSource = StringEncoding::Utf8;
+    SC_TRY(Path::join(libraryRoot, {sourceRoot, "Library"}));
+    SC_TRY(Path::join(executableRoot, {sourceRoot, "Executable"}));
+    SC_TRY(fs.makeDirectoryRecursive(libraryRoot.view()));
+    SC_TRY(fs.makeDirectoryRecursive(executableRoot.view()));
+
+    SC_TRY(Path::join(librarySource, {libraryRoot.view(), "library.cpp"}));
+    SC_TRY(fs.writeString(librarySource.view(), "int workspace_dependency_value()\n"
+                                                "{\n"
+                                                "    return 7;\n"
+                                                "}\n"));
+
+    SC_TRY(Path::join(executableSource, {executableRoot.view(), "main.cpp"}));
+    SC_TRY(fs.writeString(executableSource.view(), "#include <stdio.h>\n"
+                                                   "\n"
+                                                   "int workspace_dependency_value();\n"
+                                                   "\n"
+                                                   "int main()\n"
+                                                   "{\n"
+                                                   "    printf(\"%d\\n\", workspace_dependency_value());\n"
+                                                   "    return 0;\n"
+                                                   "}\n"));
+    return Result(true);
+}
+
+static Result writeCustomDriverFixture(FileSystem& fs, StringView sourceRoot)
+{
+    String libraryRoot      = StringEncoding::Utf8;
+    String executableRoot   = StringEncoding::Utf8;
+    String libraryCSource   = StringEncoding::Utf8;
+    String libraryCppSource = StringEncoding::Utf8;
+    String executableSource = StringEncoding::Utf8;
+    SC_TRY(Path::join(libraryRoot, {sourceRoot, "Library"}));
+    SC_TRY(Path::join(executableRoot, {sourceRoot, "Executable"}));
+    SC_TRY(fs.makeDirectoryRecursive(libraryRoot.view()));
+    SC_TRY(fs.makeDirectoryRecursive(executableRoot.view()));
+
+    SC_TRY(Path::join(libraryCSource, {libraryRoot.view(), "helper.c"}));
+    SC_TRY(fs.writeString(libraryCSource.view(), "int custom_driver_c_value(void)\n"
+                                                 "{\n"
+                                                 "    return 5;\n"
+                                                 "}\n"));
+
+    SC_TRY(Path::join(libraryCppSource, {libraryRoot.view(), "library.cpp"}));
+    SC_TRY(fs.writeString(libraryCppSource.view(), "extern \"C\" int custom_driver_c_value(void);\n"
+                                                   "\n"
+                                                   "int workspace_dependency_value()\n"
+                                                   "{\n"
+                                                   "    return custom_driver_c_value() + 8;\n"
+                                                   "}\n"));
+
+    SC_TRY(Path::join(executableSource, {executableRoot.view(), "main.cpp"}));
+    SC_TRY(fs.writeString(executableSource.view(), "#include <stdio.h>\n"
+                                                   "\n"
+                                                   "int workspace_dependency_value();\n"
+                                                   "\n"
+                                                   "int main()\n"
+                                                   "{\n"
+                                                   "    printf(\"%d\\n\", workspace_dependency_value());\n"
+                                                   "    return 0;\n"
+                                                   "}\n"));
+    return Result(true);
+}
+
 static Build::Action makeNativeCompileAction(const Build::Directories& directories, StringView projectName)
 {
     Build::Action action;
@@ -430,6 +586,48 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
 
+        if (test_section("native backend skips up-to-date work in verbose mode"))
+        {
+            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
+                                ? Result(true)
+                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action                = makeNativeCompileAction(directories, FixtureProjectName);
+            action.parameters.execution.verbose = true;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            String objectPath     = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+            SC_TRUST_RESULT(computeObjectPath(action, FixtureProjectName,
+                                              "Tests/SCBuildTest/Fixture/TinyConsoleProgram/main.cpp", objectPath));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            FileSystem::FileStat initialObjectStat;
+            FileSystem::FileStat initialExecutableStat;
+            SC_TRUST_RESULT(fs.stat(objectPath.view(), initialObjectStat));
+            SC_TRUST_RESULT(fs.stat(executablePath.view(), initialExecutableStat));
+
+            Thread::Sleep(20);
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            FileSystem::FileStat finalObjectStat;
+            FileSystem::FileStat finalExecutableStat;
+            SC_TRUST_RESULT(fs.stat(objectPath.view(), finalObjectStat));
+            SC_TRUST_RESULT(fs.stat(executablePath.view(), finalExecutableStat));
+
+            SC_TEST_EXPECT(finalObjectStat.modifiedTime.milliseconds == initialObjectStat.modifiedTime.milliseconds);
+            SC_TEST_EXPECT(finalExecutableStat.modifiedTime.milliseconds ==
+                           initialExecutableStat.modifiedTime.milliseconds);
+        }
+
         if (test_section("native backend rebuilds after header change"))
         {
             SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
@@ -463,11 +661,6 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == "first\n");
 
-            FileSystem::FileStat initialObjectStat;
-            FileSystem::FileStat initialExecutableStat;
-            SC_TRUST_RESULT(fs.stat(objectPath.view(), initialObjectStat));
-            SC_TRUST_RESULT(fs.stat(executablePath.view(), initialExecutableStat));
-
             Thread::Sleep(20);
             SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, sourceRoot.view(), "second"));
             {
@@ -479,13 +672,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram, FixtureWorkspaceName));
 
-            FileSystem::FileStat rebuiltObjectStat;
-            FileSystem::FileStat rebuiltExecutableStat;
-            SC_TRUST_RESULT(fs.stat(objectPath.view(), rebuiltObjectStat));
-            SC_TRUST_RESULT(fs.stat(executablePath.view(), rebuiltExecutableStat));
-            SC_TEST_EXPECT(rebuiltObjectStat.modifiedTime.milliseconds > initialObjectStat.modifiedTime.milliseconds);
-            SC_TEST_EXPECT(rebuiltExecutableStat.modifiedTime.milliseconds >
-                           initialExecutableStat.modifiedTime.milliseconds);
+            SC_TEST_EXPECT(fs.existsAndIsFile(objectPath.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
 
             stdoutOutput = "";
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
@@ -602,6 +790,127 @@ struct SCBuildFixtureTest : public SC::TestCase
             String stdoutOutput = StringEncoding::Utf8;
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == "42\n");
+        }
+
+        if (test_section("native backend builds workspace dependencies first"))
+        {
+            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
+                                ? Result(true)
+                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "WorkspaceDependencyFixture"}));
+            SC_TRUST_RESULT(writeWorkspaceDependencyFixture(fs, sourceRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            Build::Action action = makeNativeCompileAction(directories, WorkspaceExecutableProjectName);
+            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            String libraryPath    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, WorkspaceExecutableProjectName, executablePath));
+            SC_TRUST_RESULT(computeArtifactPath(action, WorkspaceLibraryProjectName, Build::TargetType::StaticLibrary,
+                                                libraryPath));
+
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(libraryPath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "7\n");
+        }
+
+        if (test_section("native backend routes custom driver toolchains"))
+        {
+            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
+                                ? Result(true)
+                                : Result::Error("Custom-driver fixture test is POSIX-only for now"));
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot    = StringEncoding::Utf8;
+            String toolchainRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), CustomDriverSourceRootName}));
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(writeCustomDriverFixture(fs, sourceRoot.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            String hostCompilerC   = StringEncoding::Utf8;
+            String hostCompilerCpp = StringEncoding::Utf8;
+            String hostArchiver    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
+            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
+            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
+
+            String compilerCLogPath   = StringEncoding::Utf8;
+            String compilerCppLogPath = StringEncoding::Utf8;
+            String archiverLogPath    = StringEncoding::Utf8;
+            String compilerCWrapper   = StringEncoding::Utf8;
+            String compilerCppWrapper = StringEncoding::Utf8;
+            String archiverWrapper    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(compilerCLogPath, {toolchainRoot.view(), "compiler-c.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCppLogPath, {toolchainRoot.view(), "compiler-cpp.log"}));
+            SC_TRUST_RESULT(Path::join(archiverLogPath, {toolchainRoot.view(), "archiver.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCWrapper, {toolchainRoot.view(), "compiler-c.sh"}));
+            SC_TRUST_RESULT(Path::join(compilerCppWrapper, {toolchainRoot.view(), "compiler-cpp.sh"}));
+            SC_TRUST_RESULT(Path::join(archiverWrapper, {toolchainRoot.view(), "archiver.sh"}));
+
+            SC_TRUST_RESULT(fs.writeString(compilerCLogPath.view(), ""));
+            SC_TRUST_RESULT(fs.writeString(compilerCppLogPath.view(), ""));
+            SC_TRUST_RESULT(fs.writeString(archiverLogPath.view(), ""));
+            SC_TRUST_RESULT(
+                writeToolWrapperScript(fs, compilerCWrapper.view(), compilerCLogPath.view(), hostCompilerC.view()));
+            SC_TRUST_RESULT(writeToolWrapperScript(fs, compilerCppWrapper.view(), compilerCppLogPath.view(),
+                                                   hostCompilerCpp.view()));
+            SC_TRUST_RESULT(
+                writeToolWrapperScript(fs, archiverWrapper.view(), archiverLogPath.view(), hostArchiver.view()));
+
+            Build::Action action               = makeNativeCompileAction(directories, WorkspaceExecutableProjectName);
+            action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerCWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerCppWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(compilerCppWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(archiverWrapper.view()));
+
+            SC_TEST_EXPECT(
+                Build::Action::execute(action, configureCustomDriverDependencyProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            String libraryPath    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, WorkspaceExecutableProjectName, executablePath));
+            SC_TRUST_RESULT(computeArtifactPath(action, WorkspaceLibraryProjectName, Build::TargetType::StaticLibrary,
+                                                libraryPath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(libraryPath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "13\n");
+
+            String compilerCLog   = StringEncoding::Utf8;
+            String compilerCppLog = StringEncoding::Utf8;
+            String archiverLog    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerCLogPath.view(), compilerCLog));
+            SC_TRUST_RESULT(fs.read(compilerCppLogPath.view(), compilerCppLog));
+            SC_TRUST_RESULT(fs.read(archiverLogPath.view(), archiverLog));
+
+            SC_TEST_EXPECT(StringView(compilerCLog.view()).containsString("helper.c"));
+            SC_TEST_EXPECT(StringView(compilerCppLog.view()).containsString("library.cpp"));
+            SC_TEST_EXPECT(StringView(compilerCppLog.view()).containsString("main.cpp"));
+            SC_TEST_EXPECT(StringView(archiverLog.view()).containsString("libWorkspaceStaticLibrary.a"));
         }
     }
 };

@@ -1,5 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../Libraries/Async/Async.h"
+#include "../../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl"
 #include "BuildWriter.h"
 
 #include "../../Libraries/FileSystem/FileSystem.h"
@@ -72,6 +74,8 @@ struct SC::Build::NativeBuild
         String compileCommandsPath;
         String workspaceCompileCommandsPath;
 
+        Vector<const Project*> workspaceDependencies;
+        Vector<String>         workspaceDependencyArtifacts;
         Vector<ResolvedSource> sources;
     };
 
@@ -112,6 +116,125 @@ struct SC::Build::NativeBuild
         }
     };
 
+    enum RebuildDecision
+    {
+        UpToDate,
+        MissingOutput,
+        MissingCommandFile,
+        MissingDependencyFile,
+        CommandChanged,
+        OutputStatUnavailable,
+        DependencyScanFailed,
+        InputChanged,
+        PreviousBuildStepRan,
+    };
+
+    static constexpr size_t MaxParallelCompileJobs = 32;
+
+    struct ParallelCompileLimiter
+    {
+        struct Slot : AsyncProcessExit
+        {
+            ResolvedSource* source = nullptr;
+            String          commandString;
+        };
+
+        AsyncEventLoop                  eventLoop;
+        Result                          processResult  = Result(true);
+        FileSystem*                     fileSystem     = nullptr;
+        const ResolvedProject*          project        = nullptr;
+        bool*                           anyObjectBuilt = nullptr;
+        IntrusiveDoubleLinkedList<Slot> availableSlots;
+        Slot                            slots[MaxParallelCompileJobs];
+
+        Result create(FileSystem& fs, const ResolvedProject& resolvedProject, bool& objectBuilt, size_t maxProcesses)
+        {
+            fileSystem     = &fs;
+            project        = &resolvedProject;
+            anyObjectBuilt = &objectBuilt;
+            processResult  = Result(true);
+            if (maxProcesses == 0)
+            {
+                maxProcesses = 1;
+            }
+            if (maxProcesses > MaxParallelCompileJobs)
+            {
+                maxProcesses = MaxParallelCompileJobs;
+            }
+
+            for (size_t idx = 0; idx < maxProcesses; ++idx)
+            {
+                availableSlots.queueBack(slots[idx]);
+            }
+            return eventLoop.create();
+        }
+
+        Result close()
+        {
+            SC_TRY(eventLoop.run());
+            SC_TRY(eventLoop.close());
+            return processResult;
+        }
+
+        Result launch(size_t compileStep, size_t totalSteps, const CompilerAdapter& adapter, ResolvedSource& source,
+                      CommandLine& commandLine, String& commandString)
+        {
+            while (availableSlots.isEmpty())
+            {
+                SC_TRY(eventLoop.runOnce());
+            }
+            if (not processResult)
+            {
+                return processResult;
+            }
+
+            Slot& slot  = *availableSlots.dequeueFront();
+            slot.source = &source;
+            SC_TRY(slot.commandString.assign(commandString.view()));
+
+            SC_TRY(makeParentDirectory(*fileSystem, source.objectPath.view()));
+            globalConsole->print("[{}/{}] {} {}\n", compileStep, totalSteps, getCompileStepName(source.type),
+                                 source.displayPath.view());
+            globalConsole->flush();
+
+            SC_TRY(maybeWriteResponseFile(*fileSystem, commandLine, source.responsePath.view(), adapter));
+
+            StringSpan             views[128];
+            Span<const StringSpan> args;
+            SC_TRY(commandLine.toViews(views, args));
+
+            Process process;
+            SC_TRY(process.launch(args));
+            SC_TRY(slot.start(eventLoop, process.handle));
+            slot.callback = [this](AsyncProcessExit::Result& result)
+            {
+                Slot& finishedSlot = static_cast<Slot&>(result.getAsync());
+                int   exitStatus   = -1;
+
+                Result callbackResult = result.get(exitStatus);
+                if (callbackResult and exitStatus != 0)
+                {
+                    callbackResult = Result::Error("Native backend command failed");
+                }
+                if (callbackResult)
+                {
+                    callbackResult = fileSystem->writeString(finishedSlot.source->commandPath.view(),
+                                                             finishedSlot.commandString.view());
+                }
+                if (callbackResult)
+                {
+                    *anyObjectBuilt = true;
+                }
+                else if (processResult)
+                {
+                    processResult = callbackResult;
+                }
+                availableSlots.queueBack(finishedSlot);
+            };
+            return Result(true);
+        }
+    };
+
     static Result execute(Action::ConfigureFunction configure, const Action& action, String* outputExecutable)
     {
         SC_TRY_MSG(action.parameters.platform != Platform::Windows,
@@ -127,29 +250,7 @@ struct SC::Build::NativeBuild
         SC_TRY(findWorkspace(definition, action.workspaceName, workspace));
 
         Vector<ResolvedProject> resolvedProjects;
-        if (action.allTargets)
-        {
-            for (const Project& project : workspace->projects)
-            {
-                const Configuration* configuration = project.getConfiguration(action.configurationName);
-                SC_TRY_MSG(configuration != nullptr, "Cannot find requested configuration");
-                ResolvedProject resolvedProject;
-                SC_TRY(resolveProject(action.parameters, *workspace, project, *configuration, filePathsResolver,
-                                      resolvedProject));
-                SC_TRY(resolvedProjects.push_back(move(resolvedProject)));
-            }
-        }
-        else
-        {
-            const Project*       project       = nullptr;
-            const Configuration* configuration = nullptr;
-            SC_TRY(findProjectConfiguration(*workspace, action.projectName, action.configurationName, project,
-                                            configuration));
-            ResolvedProject resolvedProject;
-            SC_TRY(resolveProject(action.parameters, *workspace, *project, *configuration, filePathsResolver,
-                                  resolvedProject));
-            SC_TRY(resolvedProjects.push_back(move(resolvedProject)));
-        }
+        SC_TRY(resolveProjectsInBuildOrder(action, *workspace, filePathsResolver, resolvedProjects));
 
         if (action.action == Action::Print)
         {
@@ -189,8 +290,73 @@ struct SC::Build::NativeBuild
 
     static Result buildProject(FileSystem& fs, ResolvedProject& resolvedProject)
     {
-        size_t compileStep    = 0;
-        bool   anyObjectBuilt = false;
+        if (resolvedProject.parameters->execution.verbose)
+        {
+            printProjectTrace(resolvedProject);
+        }
+
+        bool anyObjectBuilt = false;
+        SC_TRY(buildCompileSteps(fs, resolvedProject, anyObjectBuilt));
+
+        CommandLine finalCommand;
+        String      finalCommandString = StringEncoding::Utf8;
+        SC_TRY(buildFinalCommand(resolvedProject, finalCommand));
+        SC_TRY(formatCommandLine(finalCommand, finalCommandString));
+        const RebuildDecision finalDecision =
+            evaluateTargetArtifactRebuild(fs, resolvedProject, finalCommandString.view(), anyObjectBuilt);
+        if (finalDecision != UpToDate)
+        {
+            if (resolvedProject.parameters->execution.verbose)
+            {
+                globalConsole->print("[trace] rebuild {} {} because {}\n", getFinalStepName(*resolvedProject.project),
+                                     resolvedProject.project->targetName.view(),
+                                     describeRebuildDecision(finalDecision));
+            }
+            globalConsole->print("[{}/{}] {} {}\n", resolvedProject.sources.size() + 1,
+                                 resolvedProject.sources.size() + 1, getFinalStepName(*resolvedProject.project),
+                                 resolvedProject.project->targetName.view());
+            globalConsole->flush();
+
+            String stdOut = StringEncoding::Utf8;
+            String stdErr = StringEncoding::Utf8;
+            SC_TRY(makeParentDirectory(fs, resolvedProject.executablePath.view()));
+            SC_TRY(executeCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter, stdOut,
+                                  stdErr));
+            if (resolvedProject.parameters->execution.verbose and not stdOut.isEmpty())
+            {
+                globalConsole->print(stdOut.view());
+            }
+            if (not stdErr.isEmpty())
+            {
+                globalConsole->printError(stdErr.view());
+                globalConsole->flushStdErr();
+            }
+            SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
+        }
+        else if (resolvedProject.parameters->execution.verbose)
+        {
+            globalConsole->print("[{}/{}] SKIP {} {} ({})\n", resolvedProject.sources.size() + 1,
+                                 resolvedProject.sources.size() + 1, getFinalStepName(*resolvedProject.project),
+                                 resolvedProject.project->targetName.view(), describeRebuildDecision(finalDecision));
+            globalConsole->print("[trace] no work to do for {}\n", resolvedProject.project->targetName.view());
+        }
+
+        return Result(true);
+    }
+
+    static Result buildCompileSteps(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt)
+    {
+        const size_t maxParallelJobs = computeMaxParallelCompileJobs(resolvedProject);
+        if (maxParallelJobs <= 1 or resolvedProject.sources.size() <= 1)
+        {
+            return buildCompileStepsSequential(fs, resolvedProject, anyObjectBuilt);
+        }
+        return buildCompileStepsParallel(fs, resolvedProject, anyObjectBuilt, maxParallelJobs);
+    }
+
+    static Result buildCompileStepsSequential(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt)
+    {
+        size_t compileStep = 0;
         for (ResolvedSource& source : resolvedProject.sources)
         {
             compileStep++;
@@ -199,9 +365,22 @@ struct SC::Build::NativeBuild
             String      commandString = StringEncoding::Utf8;
             SC_TRY(buildCompileCommand(resolvedProject, source, commandLine));
             SC_TRY(formatCommandLine(commandLine, commandString));
-            if (not shouldRebuildObject(fs, resolvedProject, source, commandString.view()))
+            const RebuildDecision compileDecision =
+                evaluateObjectRebuild(fs, resolvedProject, source, commandString.view());
+            if (compileDecision == UpToDate)
             {
+                if (resolvedProject.parameters->execution.verbose)
+                {
+                    globalConsole->print("[{}/{}] SKIP {} {} ({})\n", compileStep, resolvedProject.sources.size() + 1,
+                                         getCompileStepName(source.type), source.displayPath.view(),
+                                         describeRebuildDecision(compileDecision));
+                }
                 continue;
+            }
+            if (resolvedProject.parameters->execution.verbose)
+            {
+                globalConsole->print("[trace] rebuild {} {} because {}\n", getCompileStepName(source.type),
+                                     source.displayPath.view(), describeRebuildDecision(compileDecision));
             }
 
             SC_TRY(makeParentDirectory(fs, source.objectPath.view()));
@@ -225,36 +404,51 @@ struct SC::Build::NativeBuild
             SC_TRY(fs.writeString(source.commandPath.view(), commandString.view()));
             anyObjectBuilt = true;
         }
+        return Result(true);
+    }
 
-        CommandLine finalCommand;
-        String      finalCommandString = StringEncoding::Utf8;
-        SC_TRY(buildFinalCommand(resolvedProject, finalCommand));
-        SC_TRY(formatCommandLine(finalCommand, finalCommandString));
-        if (shouldRebuildTargetArtifact(fs, resolvedProject, finalCommandString.view(), anyObjectBuilt))
+    static Result buildCompileStepsParallel(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt,
+                                            size_t maxParallelJobs)
+    {
+        if (resolvedProject.parameters->execution.verbose)
         {
-            globalConsole->print("[{}/{}] {} {}\n", resolvedProject.sources.size() + 1,
-                                 resolvedProject.sources.size() + 1, getFinalStepName(*resolvedProject.project),
-                                 resolvedProject.project->targetName.view());
-            globalConsole->flush();
-
-            String stdOut = StringEncoding::Utf8;
-            String stdErr = StringEncoding::Utf8;
-            SC_TRY(makeParentDirectory(fs, resolvedProject.executablePath.view()));
-            SC_TRY(executeCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter, stdOut,
-                                  stdErr));
-            if (resolvedProject.parameters->execution.verbose and not stdOut.isEmpty())
-            {
-                globalConsole->print(stdOut.view());
-            }
-            if (not stdErr.isEmpty())
-            {
-                globalConsole->printError(stdErr.view());
-                globalConsole->flushStdErr();
-            }
-            SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
+            globalConsole->print("[trace] parallel compile jobs = {}\n", maxParallelJobs);
         }
 
-        return Result(true);
+        ParallelCompileLimiter limiter;
+        SC_TRY(limiter.create(fs, resolvedProject, anyObjectBuilt, maxParallelJobs));
+
+        size_t compileStep = 0;
+        for (ResolvedSource& source : resolvedProject.sources)
+        {
+            compileStep++;
+
+            CommandLine commandLine;
+            String      commandString = StringEncoding::Utf8;
+            SC_TRY(buildCompileCommand(resolvedProject, source, commandLine));
+            SC_TRY(formatCommandLine(commandLine, commandString));
+            const RebuildDecision compileDecision =
+                evaluateObjectRebuild(fs, resolvedProject, source, commandString.view());
+            if (compileDecision == UpToDate)
+            {
+                if (resolvedProject.parameters->execution.verbose)
+                {
+                    globalConsole->print("[{}/{}] SKIP {} {} ({})\n", compileStep, resolvedProject.sources.size() + 1,
+                                         getCompileStepName(source.type), source.displayPath.view(),
+                                         describeRebuildDecision(compileDecision));
+                }
+                continue;
+            }
+            if (resolvedProject.parameters->execution.verbose)
+            {
+                globalConsole->print("[trace] rebuild {} {} because {}\n", getCompileStepName(source.type),
+                                     source.displayPath.view(), describeRebuildDecision(compileDecision));
+            }
+
+            SC_TRY(limiter.launch(compileStep, resolvedProject.sources.size() + 1, resolvedProject.adapter, source,
+                                  commandLine, commandString));
+        }
+        return limiter.close();
     }
 
     static Result runExecutable(StringView executablePath, const Action& action)
@@ -369,6 +563,7 @@ struct SC::Build::NativeBuild
 
         const LinkFlags* linkOpinions[] = {&configuration.link, &project.link};
         SC_TRY(LinkFlags::merge(linkOpinions, resolvedProject.linkFlags));
+        SC_TRY(resolveWorkspaceDependencies(parameters, workspace, project, configuration, resolvedProject));
 
         SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(), configuration.outputPath.view(),
                                     resolvedProject.variables, resolvedProject.targetDirectory));
@@ -633,6 +828,11 @@ struct SC::Build::NativeBuild
 
     static Result appendLinkFlags(CommandLine& commandLine, const ResolvedProject& resolvedProject)
     {
+        for (const String& workspaceLibrary : resolvedProject.workspaceDependencyArtifacts)
+        {
+            SC_TRY(commandLine.append(workspaceLibrary.view()));
+        }
+
         for (const String& libraryPath : resolvedProject.linkFlags.libraryPaths)
         {
             String absoluteLibraryPath = StringEncoding::Utf8;
@@ -684,6 +884,185 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static Result resolveProjectsInBuildOrder(const Action& action, const Workspace& workspace,
+                                              const FilePathsResolver& filePathsResolver,
+                                              Vector<ResolvedProject>& resolvedProjects)
+    {
+        Vector<const Project*> orderedProjects;
+        if (action.allTargets)
+        {
+            for (const Project& project : workspace.projects)
+            {
+                SC_TRY(appendProjectBuildOrder(workspace, project, action.configurationName, orderedProjects));
+            }
+        }
+        else
+        {
+            const Project*       project       = nullptr;
+            const Configuration* configuration = nullptr;
+            SC_TRY(findProjectConfiguration(workspace, action.projectName, action.configurationName, project,
+                                            configuration));
+            SC_COMPILER_UNUSED(configuration);
+            SC_TRY(appendProjectBuildOrder(workspace, *project, action.configurationName, orderedProjects));
+        }
+
+        for (const Project* project : orderedProjects)
+        {
+            const Configuration* configuration = project->getConfiguration(action.configurationName);
+            SC_TRY_MSG(configuration != nullptr, "Cannot find requested configuration");
+            ResolvedProject resolvedProject;
+            SC_TRY(resolveProject(action.parameters, workspace, *project, *configuration, filePathsResolver,
+                                  resolvedProject));
+            SC_TRY(resolvedProjects.push_back(move(resolvedProject)));
+        }
+        return Result(true);
+    }
+
+    static Result appendProjectBuildOrder(const Workspace& workspace, const Project& project,
+                                          StringView configurationName, Vector<const Project*>& orderedProjects)
+    {
+        Vector<const Project*> stack;
+        return appendProjectBuildOrderRecursive(workspace, project, configurationName, stack, orderedProjects);
+    }
+
+    static Result appendProjectBuildOrderRecursive(const Workspace& workspace, const Project& project,
+                                                   StringView configurationName, Vector<const Project*>& stack,
+                                                   Vector<const Project*>& orderedProjects)
+    {
+        size_t index = 0;
+        if (orderedProjects.find([&](const Project* item) { return item == &project; }, &index))
+        {
+            return Result(true);
+        }
+        SC_TRY_MSG(not stack.find([&](const Project* item) { return item == &project; }, &index),
+                   "Native backend project dependency cycle detected");
+        SC_TRY(stack.push_back(&project));
+
+        Vector<const Project*> dependencies;
+        SC_TRY(findWorkspaceDependencies(workspace, project, configurationName, dependencies));
+        for (const Project* dependency : dependencies)
+        {
+            SC_TRY(appendProjectBuildOrderRecursive(workspace, *dependency, configurationName, stack, orderedProjects));
+        }
+        (void)stack.pop_back();
+        SC_TRY(orderedProjects.push_back(&project));
+        return Result(true);
+    }
+
+    static Result findWorkspaceDependencies(const Workspace& workspace, const Project& project,
+                                            StringView configurationName, Vector<const Project*>& dependencies)
+    {
+        const Configuration* configuration = project.getConfiguration(configurationName);
+        SC_TRY_MSG(configuration != nullptr, "Configuration not found");
+
+        LinkFlags        mergedLinkFlags;
+        const LinkFlags* linkOpinions[] = {&configuration->link, &project.link};
+        SC_TRY(LinkFlags::merge(linkOpinions, mergedLinkFlags));
+
+        for (const String& library : mergedLinkFlags.libraries)
+        {
+            const Project* dependency = nullptr;
+            if (findWorkspaceStaticLibraryDependency(workspace, library.view(), dependency))
+            {
+                size_t index = 0;
+                if (dependency != &project and
+                    not dependencies.find([&](const Project* item) { return item == dependency; }, &index))
+                {
+                    SC_TRY(dependencies.push_back(dependency));
+                }
+            }
+        }
+        return Result(true);
+    }
+
+    static Result resolveWorkspaceDependencies(const Parameters& parameters, const Workspace& workspace,
+                                               const Project& project, const Configuration& configuration,
+                                               ResolvedProject& resolvedProject)
+    {
+        SC_TRY(findWorkspaceDependencies(workspace, project, configuration.name.view(),
+                                         resolvedProject.workspaceDependencies));
+
+        Vector<String> externalLibraries;
+        for (const String& library : resolvedProject.linkFlags.libraries)
+        {
+            const Project* dependency = nullptr;
+            if (findWorkspaceStaticLibraryDependency(workspace, library.view(), dependency))
+            {
+                String    dependencyOutputDirectory = StringEncoding::Utf8;
+                String    dependencyArtifactName    = StringEncoding::Utf8;
+                String    dependencyArtifactPath    = StringEncoding::Utf8;
+                Variables dependencyVariables;
+
+                const Configuration* dependencyConfiguration = dependency->getConfiguration(configuration.name.view());
+                SC_TRY_MSG(dependencyConfiguration != nullptr, "Dependency configuration not found");
+                SC_TRY(fillVariables(parameters, *dependency, *dependencyConfiguration,
+                                     resolvedProject.adapter.displayName.view(), dependencyVariables));
+                SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(),
+                                            dependencyConfiguration->outputPath.view(), dependencyVariables,
+                                            dependencyOutputDirectory));
+                SC_TRY(computeArtifactName(*dependency, dependencyArtifactName));
+                SC_TRY(Path::join(dependencyArtifactPath,
+                                  {dependencyOutputDirectory.view(), dependencyArtifactName.view()}));
+                SC_TRY(resolvedProject.workspaceDependencyArtifacts.push_back(move(dependencyArtifactPath)));
+            }
+            else
+            {
+                String externalLibrary = StringEncoding::Utf8;
+                SC_TRY(externalLibrary.assign(library.view()));
+                SC_TRY(externalLibraries.push_back(move(externalLibrary)));
+            }
+        }
+        resolvedProject.linkFlags.libraries = move(externalLibraries);
+        return Result(true);
+    }
+
+    static bool findWorkspaceStaticLibraryDependency(const Workspace& workspace, StringView libraryReference,
+                                                     const Project*& dependencyProject)
+    {
+        for (const Project& candidate : workspace.projects)
+        {
+            if (candidate.targetType != TargetType::StaticLibrary)
+            {
+                continue;
+            }
+            if (matchesWorkspaceLibraryReference(candidate, libraryReference))
+            {
+                dependencyProject = &candidate;
+                return true;
+            }
+        }
+        dependencyProject = nullptr;
+        return false;
+    }
+
+    static bool matchesWorkspaceLibraryReference(const Project& candidate, StringView libraryReference)
+    {
+        if (libraryReference == candidate.name.view() or libraryReference == candidate.targetName.view())
+        {
+            return true;
+        }
+
+        String artifactName = StringEncoding::Utf8;
+        if (not computeArtifactName(candidate, artifactName))
+        {
+            return false;
+        }
+        if (libraryReference == artifactName.view())
+        {
+            return true;
+        }
+        const StringView artifactView = artifactName.view();
+        if (artifactView.startsWith("lib") and artifactView.endsWith(".a"))
+        {
+            const StringView strippedName = artifactView.sliceStart(3).sliceEnd(2);
+            if (libraryReference == strippedName)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static Result appendTargeting(CommandLine& commandLine, const ResolvedProject& resolvedProject, bool forCompiler)
     {
         StringView targetTriple = resolvedProject.parameters->toolchain.targetTriple.view();
@@ -722,28 +1101,28 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static bool shouldRebuildObject(FileSystem& fs, const ResolvedProject& resolvedProject,
-                                    const ResolvedSource& source, StringView commandLine)
+    static RebuildDecision evaluateObjectRebuild(FileSystem& fs, const ResolvedProject& resolvedProject,
+                                                 const ResolvedSource& source, StringView commandLine)
     {
         if (not fs.existsAndIsFile(source.objectPath.view()))
-            return true;
+            return MissingOutput;
         if (not fs.existsAndIsFile(source.commandPath.view()))
-            return true;
+            return MissingCommandFile;
         if (resolvedProject.parameters->execution.useCompilerDependencies and
             not fs.existsAndIsFile(source.dependencyPath.view()))
         {
-            return true;
+            return MissingDependencyFile;
         }
 
         String existingCommand = StringEncoding::Utf8;
         if (not fs.read(source.commandPath.view(), existingCommand))
-            return true;
+            return MissingCommandFile;
         if (existingCommand.view() != commandLine)
-            return true;
+            return CommandChanged;
 
         FileSystem::FileStat objectStat;
         if (not fs.stat(source.objectPath.view(), objectStat))
-            return true;
+            return OutputStatUnavailable;
 
         Vector<String> dependencies;
         if (resolvedProject.parameters->execution.useCompilerDependencies)
@@ -751,7 +1130,7 @@ struct SC::Build::NativeBuild
             if (not parseDependencyFile(fs, source.dependencyPath.view(), resolvedProject.project->rootDirectory.view(),
                                         dependencies))
             {
-                return true;
+                return DependencyScanFailed;
             }
         }
         else
@@ -767,41 +1146,41 @@ struct SC::Build::NativeBuild
         {
             FileSystem::FileStat dependencyStat;
             if (not fs.stat(dependency.view(), dependencyStat))
-                return true;
+                return InputChanged;
             if (dependencyStat.modifiedTime.milliseconds > objectStat.modifiedTime.milliseconds)
-                return true;
+                return InputChanged;
         }
-        return false;
+        return UpToDate;
     }
 
-    static bool shouldRebuildTargetArtifact(FileSystem& fs, const ResolvedProject& resolvedProject,
-                                            StringView commandLine, bool anyObjectBuilt)
+    static RebuildDecision evaluateTargetArtifactRebuild(FileSystem& fs, const ResolvedProject& resolvedProject,
+                                                         StringView commandLine, bool anyObjectBuilt)
     {
         if (anyObjectBuilt)
-            return true;
+            return PreviousBuildStepRan;
         if (not fs.existsAndIsFile(resolvedProject.executablePath.view()))
-            return true;
+            return MissingOutput;
         if (not fs.existsAndIsFile(resolvedProject.linkCommandPath.view()))
-            return true;
+            return MissingCommandFile;
 
         String existingCommand = StringEncoding::Utf8;
         if (not fs.read(resolvedProject.linkCommandPath.view(), existingCommand))
-            return true;
+            return MissingCommandFile;
         if (existingCommand.view() != commandLine)
-            return true;
+            return CommandChanged;
 
         FileSystem::FileStat executableStat;
         if (not fs.stat(resolvedProject.executablePath.view(), executableStat))
-            return true;
+            return OutputStatUnavailable;
         for (const ResolvedSource& source : resolvedProject.sources)
         {
             FileSystem::FileStat objectStat;
             if (not fs.stat(source.objectPath.view(), objectStat))
-                return true;
+                return InputChanged;
             if (objectStat.modifiedTime.milliseconds > executableStat.modifiedTime.milliseconds)
-                return true;
+                return InputChanged;
         }
-        return false;
+        return UpToDate;
     }
 
     static Result parseDependencyFile(FileSystem& fs, StringView dependencyPath, StringView projectRoot,
@@ -1043,6 +1422,41 @@ struct SC::Build::NativeBuild
         Assert::unreachable();
     }
 
+    static size_t computeMaxParallelCompileJobs(const ResolvedProject& resolvedProject)
+    {
+        size_t maxParallelJobs = resolvedProject.parameters->execution.maxParallelJobs;
+        if (maxParallelJobs == 0)
+        {
+            maxParallelJobs = Process::getNumberOfProcessors();
+        }
+        if (maxParallelJobs == 0)
+        {
+            maxParallelJobs = 1;
+        }
+        if (maxParallelJobs > MaxParallelCompileJobs)
+        {
+            maxParallelJobs = MaxParallelCompileJobs;
+        }
+        return maxParallelJobs;
+    }
+
+    static constexpr StringView describeRebuildDecision(RebuildDecision decision)
+    {
+        switch (decision)
+        {
+        case UpToDate: return "up to date"_a8;
+        case MissingOutput: return "output missing"_a8;
+        case MissingCommandFile: return "command fingerprint missing"_a8;
+        case MissingDependencyFile: return "dependency file missing"_a8;
+        case CommandChanged: return "command line changed"_a8;
+        case OutputStatUnavailable: return "output metadata unavailable"_a8;
+        case DependencyScanFailed: return "dependency scan unavailable"_a8;
+        case InputChanged: return "input changed"_a8;
+        case PreviousBuildStepRan: return "previous step rebuilt inputs"_a8;
+        }
+        Assert::unreachable();
+    }
+
     static constexpr StringView getFinalStepName(const Project& project)
     {
         switch (project.targetType)
@@ -1059,6 +1473,22 @@ struct SC::Build::NativeBuild
         if (resolvedProject.project->targetType == TargetType::StaticLibrary)
             return StringView();
         return resolvedProject.linkResponsePath.view();
+    }
+
+    static void printProjectTrace(const ResolvedProject& resolvedProject)
+    {
+        globalConsole->print("[trace] project {} toolchain={} c={} cpp={} link={} ar={}\n",
+                             resolvedProject.project->targetName.view(), resolvedProject.adapter.displayName.view(),
+                             resolvedProject.adapter.executableC.view(), resolvedProject.adapter.executableCpp.view(),
+                             resolvedProject.adapter.executableLink.view(),
+                             resolvedProject.adapter.executableArchive.view());
+        if (not resolvedProject.parameters->toolchain.targetTriple.isEmpty() or
+            not resolvedProject.parameters->toolchain.sysroot.isEmpty())
+        {
+            globalConsole->print("[trace] target triple={} sysroot={}\n",
+                                 resolvedProject.parameters->toolchain.targetTriple.view(),
+                                 resolvedProject.parameters->toolchain.sysroot.view());
+        }
     }
 
     static Result expandVariables(StringView source, const Variables& variables, String& output)
