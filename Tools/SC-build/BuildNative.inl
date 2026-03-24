@@ -38,6 +38,8 @@ struct SC::Build::NativeBuild
         String displayName;
 
         [[nodiscard]] bool isClangLike() const { return family == Toolchain::Clang or family == Toolchain::ZigCC; }
+        [[nodiscard]] bool isMSVCStyle() const { return family == Toolchain::MSVC or family == Toolchain::ClangCL; }
+        [[nodiscard]] bool isClangCL() const { return family == Toolchain::ClangCL; }
     };
 
     struct ResolvedSource
@@ -133,10 +135,26 @@ struct SC::Build::NativeBuild
 
     struct ParallelCompileLimiter
     {
+        static constexpr size_t ReadBufferSize = 4096;
+
         struct Slot : AsyncProcessExit
         {
             ResolvedSource* source = nullptr;
             String          commandString;
+            String          stdOutPath = StringEncoding::Utf8;
+            String          stdErrPath = StringEncoding::Utf8;
+            PipeDescriptor  stdOutPipe;
+            PipeDescriptor  stdErrPipe;
+            AsyncFileRead   asyncStdOut;
+            AsyncFileRead   asyncStdErr;
+            String          stdOut          = StringEncoding::Utf8;
+            String          stdErr          = StringEncoding::Utf8;
+            int             exitStatus      = -1;
+            bool            processFinished = false;
+            bool            stdOutFinished  = false;
+            bool            stdErrFinished  = false;
+            char            stdOutBuffer[ReadBufferSize];
+            char            stdErrBuffer[ReadBufferSize];
         };
 
         AsyncEventLoop                  eventLoop;
@@ -176,6 +194,114 @@ struct SC::Build::NativeBuild
             return processResult;
         }
 
+        static Result appendChunk(String& output, Span<char> data)
+        {
+            SC_TRY(StringBuilder::createForAppendingTo(output).append(
+                StringView(StringSpan(data, false, StringEncoding::Utf8))));
+            return Result(true);
+        }
+
+        static Result buildCapturedOutputPath(const ResolvedSource& source, StringView suffix, String& path)
+        {
+            SC_TRY(path.assign(source.objectPath.view()));
+            SC_TRY(StringBuilder::createForAppendingTo(path).append(suffix));
+            return Result(true);
+        }
+
+        static Result readFileIntoString(StringSpan path, String& output)
+        {
+            FileDescriptor file;
+            SC_TRY(file.open(path, FileOpen::Read));
+            return file.readUntilEOF(output);
+        }
+
+        Result finishSlotIfDone(Slot& slot)
+        {
+            if (not(slot.processFinished and slot.stdOutFinished and slot.stdErrFinished))
+            {
+                return Result(true);
+            }
+
+            Result slotResult = Result(true);
+            if (project->adapter.isMSVCStyle())
+            {
+                slotResult = readFileIntoString(slot.stdOutPath.view(), slot.stdOut);
+                if (slotResult)
+                {
+                    slotResult = readFileIntoString(slot.stdErrPath.view(), slot.stdErr);
+                }
+            }
+            if (project->parameters->execution.useCompilerDependencies and project->adapter.isMSVCStyle())
+            {
+                slotResult = writeWindowsDependencyFile(*fileSystem, *project, *slot.source, slot.stdOut, slot.stdErr);
+            }
+
+            if (slotResult)
+            {
+                if (slot.exitStatus != 0)
+                {
+                    if (not slot.stdOut.isEmpty())
+                    {
+                        globalConsole->print(slot.stdOut.view());
+                    }
+                    if (not slot.stdErr.isEmpty())
+                    {
+                        globalConsole->printError(slot.stdErr.view());
+                        globalConsole->flushStdErr();
+                    }
+                    slotResult = Result::Error("Native backend command failed");
+                }
+                else
+                {
+                    if (project->parameters->execution.verbose and not slot.stdOut.isEmpty())
+                    {
+                        globalConsole->print(slot.stdOut.view());
+                    }
+                    if (not slot.stdErr.isEmpty())
+                    {
+                        globalConsole->printError(slot.stdErr.view());
+                        globalConsole->flushStdErr();
+                    }
+                }
+            }
+
+            if (slotResult)
+            {
+                slotResult = fileSystem->writeString(slot.source->commandPath.view(), slot.commandString.view());
+            }
+            if (slotResult)
+            {
+                *anyObjectBuilt = true;
+            }
+            else if (processResult)
+            {
+                processResult = slotResult;
+            }
+
+            SC_TRY(slot.stdOutPipe.close());
+            SC_TRY(slot.stdErrPipe.close());
+            if (not slot.stdOutPath.isEmpty())
+            {
+                SC_TRY(fileSystem->removeFileIfExists(slot.stdOutPath.view()));
+            }
+            if (not slot.stdErrPath.isEmpty())
+            {
+                SC_TRY(fileSystem->removeFileIfExists(slot.stdErrPath.view()));
+            }
+            SC_TRY(slot.commandString.assign({}));
+            SC_TRY(slot.stdOutPath.assign({}));
+            SC_TRY(slot.stdErrPath.assign({}));
+            SC_TRY(slot.stdOut.assign({}));
+            SC_TRY(slot.stdErr.assign({}));
+            slot.source          = nullptr;
+            slot.exitStatus      = -1;
+            slot.processFinished = false;
+            slot.stdOutFinished  = false;
+            slot.stdErrFinished  = false;
+            availableSlots.queueBack(slot);
+            return Result(true);
+        }
+
         Result launch(size_t compileStep, size_t totalSteps, const CompilerAdapter& adapter, ResolvedSource& source,
                       CommandLine& commandLine, String& commandString)
         {
@@ -191,6 +317,12 @@ struct SC::Build::NativeBuild
             Slot& slot  = *availableSlots.dequeueFront();
             slot.source = &source;
             SC_TRY(slot.commandString.assign(commandString.view()));
+            SC_TRY(slot.stdOut.assign({}));
+            SC_TRY(slot.stdErr.assign({}));
+            slot.exitStatus      = -1;
+            slot.processFinished = false;
+            slot.stdOutFinished  = false;
+            slot.stdErrFinished  = false;
 
             SC_TRY(makeParentDirectory(*fileSystem, source.objectPath.view()));
             globalConsole->print("[{}/{}] {} {}\n", compileStep, totalSteps, getCompileStepName(source.type),
@@ -204,32 +336,103 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.toViews(views, args));
 
             Process process;
-            SC_TRY(process.launch(args));
-            SC_TRY(slot.start(eventLoop, process.handle));
-            slot.callback = [this](AsyncProcessExit::Result& result)
+            if (adapter.isMSVCStyle())
             {
-                Slot& finishedSlot = static_cast<Slot&>(result.getAsync());
-                int   exitStatus   = -1;
+                SC_TRY(buildCapturedOutputPath(source, ".stdout.tmp", slot.stdOutPath));
+                SC_TRY(buildCapturedOutputPath(source, ".stderr.tmp", slot.stdErrPath));
+                SC_TRY(fileSystem->removeFileIfExists(slot.stdOutPath.view()));
+                SC_TRY(fileSystem->removeFileIfExists(slot.stdErrPath.view()));
 
+                FileOpen openForChild(FileOpen::Write);
+                openForChild.inheritable = true;
+                FileDescriptor stdOutFile;
+                FileDescriptor stdErrFile;
+                SC_TRY(stdOutFile.open(slot.stdOutPath.view(), openForChild));
+                SC_TRY(stdErrFile.open(slot.stdErrPath.view(), openForChild));
+                slot.stdOutFinished = true;
+                slot.stdErrFinished = true;
+                SC_TRY(process.launch(args, stdOutFile, Process::StdIn(), stdErrFile));
+            }
+            else
+            {
+                PipeOptions pipeOptions;
+                pipeOptions.blocking         = false;
+                pipeOptions.writeInheritable = true;
+                SC_TRY(slot.stdOutPipe.createPipe(pipeOptions));
+                SC_TRY(slot.stdErrPipe.createPipe(pipeOptions));
+                SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(slot.stdOutPipe.readPipe));
+                SC_TRY(eventLoop.associateExternallyCreatedFileDescriptor(slot.stdErrPipe.readPipe));
+                SC_TRY(slot.stdOutPipe.readPipe.get(slot.asyncStdOut.handle, Result::Error("stdout handle")));
+                SC_TRY(slot.stdErrPipe.readPipe.get(slot.asyncStdErr.handle, Result::Error("stderr handle")));
+                slot.asyncStdOut.buffer   = slot.stdOutBuffer;
+                slot.asyncStdErr.buffer   = slot.stdErrBuffer;
+                slot.asyncStdOut.callback = [this, &slot](AsyncFileRead::Result& readResult)
+                {
+                    Span<char> data;
+                    Result     callbackResult = readResult.get(data);
+                    if (callbackResult and not readResult.completionData.endOfFile)
+                    {
+                        callbackResult = appendChunk(slot.stdOut, data);
+                        if (callbackResult)
+                        {
+                            readResult.reactivateRequest(true);
+                        }
+                    }
+                    else
+                    {
+                        slot.stdOutFinished = true;
+                    }
+
+                    if (not callbackResult and processResult)
+                    {
+                        processResult       = callbackResult;
+                        slot.stdOutFinished = true;
+                    }
+                    (void)finishSlotIfDone(slot);
+                };
+                slot.asyncStdErr.callback = [this, &slot](AsyncFileRead::Result& readResult)
+                {
+                    Span<char> data;
+                    Result     callbackResult = readResult.get(data);
+                    if (callbackResult and not readResult.completionData.endOfFile)
+                    {
+                        callbackResult = appendChunk(slot.stdErr, data);
+                        if (callbackResult)
+                        {
+                            readResult.reactivateRequest(true);
+                        }
+                    }
+                    else
+                    {
+                        slot.stdErrFinished = true;
+                    }
+
+                    if (not callbackResult and processResult)
+                    {
+                        processResult       = callbackResult;
+                        slot.stdErrFinished = true;
+                    }
+                    (void)finishSlotIfDone(slot);
+                };
+                SC_TRY(slot.asyncStdOut.start(eventLoop));
+                SC_TRY(slot.asyncStdErr.start(eventLoop));
+                SC_TRY(process.launch(args, slot.stdOutPipe, Process::StdIn(), slot.stdErrPipe));
+            }
+            SC_TRY(slot.start(eventLoop, process.handle));
+            slot.callback = [this, &slot](AsyncProcessExit::Result& result)
+            {
+                int    exitStatus     = -1;
                 Result callbackResult = result.get(exitStatus);
-                if (callbackResult and exitStatus != 0)
-                {
-                    callbackResult = Result::Error("Native backend command failed");
-                }
                 if (callbackResult)
                 {
-                    callbackResult = fileSystem->writeString(finishedSlot.source->commandPath.view(),
-                                                             finishedSlot.commandString.view());
-                }
-                if (callbackResult)
-                {
-                    *anyObjectBuilt = true;
+                    slot.exitStatus = exitStatus;
                 }
                 else if (processResult)
                 {
                     processResult = callbackResult;
                 }
-                availableSlots.queueBack(finishedSlot);
+                slot.processFinished = true;
+                (void)finishSlotIfDone(slot);
             };
             return Result(true);
         }
@@ -237,9 +440,6 @@ struct SC::Build::NativeBuild
 
     static Result execute(Action::ConfigureFunction configure, const Action& action, String* outputExecutable)
     {
-        SC_TRY_MSG(action.parameters.platform != Platform::Windows,
-                   "Native backend on Windows is planned but not implemented yet");
-
         Definition definition;
         SC_TRY(configure(definition, action.parameters));
 
@@ -390,8 +590,8 @@ struct SC::Build::NativeBuild
 
             String stdOut = StringEncoding::Utf8;
             String stdErr = StringEncoding::Utf8;
-            SC_TRY(
-                executeCommand(fs, commandLine, source.responsePath.view(), resolvedProject.adapter, stdOut, stdErr));
+            SC_TRY(executeCompileCommand(fs, commandLine, source.responsePath.view(), resolvedProject, source, stdOut,
+                                         stdErr));
             if (resolvedProject.parameters->execution.verbose and not stdOut.isEmpty())
             {
                 globalConsole->print(stdOut.view());
@@ -476,7 +676,8 @@ struct SC::Build::NativeBuild
     }
 
     static Result executeCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
-                                 const CompilerAdapter& adapter, String& stdOut, String& stdErr)
+                                 const CompilerAdapter& adapter, String& stdOut, String& stdErr,
+                                 bool printOnFailure = true)
     {
         SC_TRY(maybeWriteResponseFile(fs, commandLine, responsePath, adapter));
 
@@ -488,6 +689,35 @@ struct SC::Build::NativeBuild
         SC_TRY(process.exec(args, stdOut, Process::StdIn(), stdErr));
         if (process.getExitStatus() != 0)
         {
+            if (printOnFailure)
+            {
+                if (not stdOut.isEmpty())
+                {
+                    globalConsole->print(stdOut.view());
+                }
+                if (not stdErr.isEmpty())
+                {
+                    globalConsole->printError(stdErr.view());
+                    globalConsole->flushStdErr();
+                }
+            }
+            return Result::Error("Native backend command failed");
+        }
+        return Result(true);
+    }
+
+    static Result executeCompileCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
+                                        const ResolvedProject& resolvedProject, const ResolvedSource& source,
+                                        String& stdOut, String& stdErr)
+    {
+        Result commandResult =
+            executeCommand(fs, commandLine, responsePath, resolvedProject.adapter, stdOut, stdErr, false);
+        if (resolvedProject.parameters->execution.useCompilerDependencies and resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(writeWindowsDependencyFile(fs, resolvedProject, source, stdOut, stdErr));
+        }
+        if (not commandResult)
+        {
             if (not stdOut.isEmpty())
             {
                 globalConsole->print(stdOut.view());
@@ -497,7 +727,7 @@ struct SC::Build::NativeBuild
                 globalConsole->printError(stdErr.view());
                 globalConsole->flushStdErr();
             }
-            return Result::Error("Native backend command failed");
+            return commandResult;
         }
         return Result(true);
     }
@@ -571,7 +801,7 @@ struct SC::Build::NativeBuild
                                     configuration.intermediatesPath.view(), resolvedProject.variables,
                                     resolvedProject.intermediateDirectory));
         String artifactName = StringEncoding::Utf8;
-        SC_TRY(computeArtifactName(project, artifactName));
+        SC_TRY(computeArtifactName(parameters.platform, project, artifactName));
         SC_TRY(
             Path::join(resolvedProject.executablePath, {resolvedProject.targetDirectory.view(), artifactName.view()}));
         SC_TRY(Path::join(resolvedProject.linkCommandPath,
@@ -611,7 +841,8 @@ struct SC::Build::NativeBuild
 
             String objectRelative = StringEncoding::Utf8;
             SC_TRY(objectRelative.assign(renderItem.referencePath.view()));
-            SC_TRY(StringBuilder::createForAppendingTo(objectRelative).append(".o"));
+            SC_TRY(StringBuilder::createForAppendingTo(objectRelative)
+                       .append(parameters.platform == Platform::Windows ? ".obj"_a8 : ".o"_a8));
             SC_TRY(
                 Path::join(source.objectPath, {resolvedProject.intermediateDirectory.view(), objectRelative.view()}));
             SC_TRY(StringBuilder::format(source.dependencyPath, "{}.d", source.objectPath.view()));
@@ -637,8 +868,34 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append(subcommand));
         }
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(commandLine.append("/nologo"));
+            SC_TRY(appendTargeting(commandLine, resolvedProject, true));
+            SC_TRY(appendWarningFlags(commandLine, source.compileFlags, usesCppDriver, resolvedProject.adapter));
+            SC_TRY(appendCompileFlags(commandLine, resolvedProject, source, usesCppDriver));
+            if (resolvedProject.parameters->execution.useCompilerDependencies)
+            {
+                SC_TRY(commandLine.append("/showIncludes"));
+            }
+            SC_TRY(commandLine.append(usesCppDriver ? "/TP"_a8 : "/TC"_a8));
+            SC_TRY(commandLine.append("/c"));
+
+            String objectFlag = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(objectFlag, "/Fo{}", source.objectPath.view()));
+            SC_TRY(commandLine.append(objectFlag.view()));
+
+            String pdbPath = StringEncoding::Utf8;
+            SC_TRY(Path::join(pdbPath, {resolvedProject.intermediateDirectory.view(), "native.pdb"}));
+            String pdbFlag = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(pdbFlag, "/Fd{}", pdbPath.view()));
+            SC_TRY(commandLine.append("/FS"));
+            SC_TRY(commandLine.append(pdbFlag.view()));
+            SC_TRY(commandLine.append(source.sourcePath.view()));
+            return Result(true);
+        }
         SC_TRY(appendTargeting(commandLine, resolvedProject, true));
-        SC_TRY(appendWarningFlags(commandLine, source.compileFlags, usesCppDriver));
+        SC_TRY(appendWarningFlags(commandLine, source.compileFlags, usesCppDriver, resolvedProject.adapter));
         SC_TRY(appendCompileFlags(commandLine, resolvedProject, source, usesCppDriver));
         SC_TRY(commandLine.append("-c"));
         SC_TRY(commandLine.append(source.sourcePath.view()));
@@ -657,6 +914,33 @@ struct SC::Build::NativeBuild
 
     static Result buildLinkCommand(const ResolvedProject& resolvedProject, CommandLine& commandLine)
     {
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(commandLine.append(resolvedProject.adapter.executableLink.view()));
+            SC_TRY(commandLine.append("/NOLOGO"));
+            SC_TRY(appendTargeting(commandLine, resolvedProject, false));
+            switch (resolvedProject.project->targetType)
+            {
+            case TargetType::ConsoleExecutable: SC_TRY(commandLine.append("/SUBSYSTEM:CONSOLE")); break;
+            case TargetType::GUIApplication: SC_TRY(commandLine.append("/SUBSYSTEM:WINDOWS")); break;
+            case TargetType::StaticLibrary: break;
+            }
+            switch (resolvedProject.compileFlags.optimizationLevel)
+            {
+            case Optimization::Debug: SC_TRY(commandLine.append("/DEBUG")); break;
+            case Optimization::Release: break;
+            }
+            for (const ResolvedSource& source : resolvedProject.sources)
+            {
+                SC_TRY(commandLine.append(source.objectPath.view()));
+            }
+            SC_TRY(appendLinkFlags(commandLine, resolvedProject));
+            String outFlag = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(outFlag, "/OUT:{}", resolvedProject.executablePath.view()));
+            SC_TRY(commandLine.append(outFlag.view()));
+            return Result(true);
+        }
+
         SC_TRY(commandLine.append(resolvedProject.adapter.executableLink.view()));
         if (not resolvedProject.adapter.subcommandLink.isEmpty())
         {
@@ -694,6 +978,18 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append(resolvedProject.adapter.subcommandArchive));
         }
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(commandLine.append("/NOLOGO"));
+            String outFlag = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(outFlag, "/OUT:{}", resolvedProject.executablePath.view()));
+            SC_TRY(commandLine.append(outFlag.view()));
+            for (const ResolvedSource& source : resolvedProject.sources)
+            {
+                SC_TRY(commandLine.append(source.objectPath.view()));
+            }
+            return Result(true);
+        }
         SC_TRY(commandLine.append("rcs"));
         SC_TRY(commandLine.append(resolvedProject.executablePath.view()));
         for (const ResolvedSource& source : resolvedProject.sources)
@@ -718,6 +1014,77 @@ struct SC::Build::NativeBuild
                                      const ResolvedSource& source, bool usesCppDriver)
     {
         const CompileFlags& flags = source.compileFlags;
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(commandLine.append("/permissive-"));
+            if (usesCppDriver)
+            {
+                const StringView standardFlag = msvcCppStandardFlag(flags.cppStandard);
+                if (not standardFlag.isEmpty())
+                {
+                    SC_TRY(commandLine.append(standardFlag));
+                }
+                if (flags.enableExceptions)
+                {
+                    SC_TRY(commandLine.append("/EHsc"));
+                }
+                else
+                {
+                    SC_TRY(commandLine.append("/EHs-c-"));
+                }
+                SC_TRY(commandLine.append(flags.enableRTTI ? "/GR"_a8 : "/GR-"_a8));
+            }
+
+            if (flags.enableCoverage)
+            {
+                return Result::Error("Windows native coverage is not implemented yet");
+            }
+
+            switch (flags.optimizationLevel)
+            {
+            case Optimization::Debug:
+                SC_TRY(commandLine.append("/D_DEBUG=1"));
+                SC_TRY(commandLine.append("/Od"));
+                SC_TRY(commandLine.append("/Z7"));
+                SC_TRY(commandLine.append("/MTd"));
+                break;
+            case Optimization::Release:
+                SC_TRY(commandLine.append("/DNDEBUG=1"));
+                SC_TRY(commandLine.append("/O2"));
+                SC_TRY(commandLine.append("/MT"));
+                break;
+            }
+
+            if (flags.enableASAN)
+            {
+                SC_TRY(commandLine.append("/fsanitize=address"));
+            }
+
+            for (const String& define : flags.defines)
+            {
+                String expanded = StringEncoding::Utf8;
+                SC_TRY(expandVariables(define.view(), resolvedProject.variables, expanded));
+                String option = StringEncoding::Utf8;
+                SC_TRY(StringBuilder::format(option, "/D{}", expanded.view()));
+                SC_TRY(commandLine.append(option.view()));
+            }
+            for (const String& includePath : flags.includePaths)
+            {
+                String absolutePath = StringEncoding::Utf8;
+                SC_TRY(resolveBuildPath(resolvedProject.project->rootDirectory.view(), includePath.view(),
+                                        resolvedProject.variables, absolutePath));
+                String option = StringEncoding::Utf8;
+                SC_TRY(StringBuilder::format(option, "/I{}", absolutePath.view()));
+                SC_TRY(commandLine.append(option.view()));
+            }
+            const Vector<String>& extraCompilerFlags = resolvedProject.parameters->toolchain.extraCompilerFlags;
+            for (const String& extraCompilerFlag : extraCompilerFlags)
+            {
+                SC_TRY(commandLine.append(extraCompilerFlag.view()));
+            }
+            return Result(true);
+        }
+
         if (usesCppDriver)
         {
             String standard = StringEncoding::Utf8;
@@ -790,8 +1157,33 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result appendWarningFlags(CommandLine& commandLine, const CompileFlags& flags, bool usesCppDriver)
+    static Result appendWarningFlags(CommandLine& commandLine, const CompileFlags& flags, bool usesCppDriver,
+                                     const CompilerAdapter& adapter)
     {
+        if (adapter.isMSVCStyle())
+        {
+            SC_TRY(commandLine.append("/W4"));
+            SC_TRY(commandLine.append("/WX"));
+            for (const Warning& warning : flags.warnings)
+            {
+                if (warning.state == Warning::Disabled and warning.type == Warning::MSVCWarning)
+                {
+                    String option = StringEncoding::Utf8;
+                    SC_TRY(StringBuilder::format(option, "/wd{}", warning.number));
+                    SC_TRY(commandLine.append(option.view()));
+                }
+                else if (warning.state == Warning::Disabled and adapter.isClangCL() and
+                         warning.type != Warning::MSVCWarning)
+                {
+                    String option = StringEncoding::Utf8;
+                    SC_TRY(StringBuilder::format(option, "-Wno-{}", warning.name));
+                    SC_TRY(commandLine.append(option.view()));
+                }
+            }
+            SC_COMPILER_UNUSED(usesCppDriver);
+            return Result(true);
+        }
+
         if (usesCppDriver)
         {
             SC_TRY(commandLine.append("-Wnon-virtual-dtor"));
@@ -831,6 +1223,45 @@ struct SC::Build::NativeBuild
         for (const String& workspaceLibrary : resolvedProject.workspaceDependencyArtifacts)
         {
             SC_TRY(commandLine.append(workspaceLibrary.view()));
+        }
+
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            for (const String& libraryPath : resolvedProject.linkFlags.libraryPaths)
+            {
+                String absoluteLibraryPath = StringEncoding::Utf8;
+                SC_TRY(resolveBuildPath(resolvedProject.project->rootDirectory.view(), libraryPath.view(),
+                                        resolvedProject.variables, absoluteLibraryPath));
+                String option = StringEncoding::Utf8;
+                SC_TRY(StringBuilder::format(option, "/LIBPATH:{}", absoluteLibraryPath.view()));
+                SC_TRY(commandLine.append(option.view()));
+            }
+
+            for (const String& library : resolvedProject.linkFlags.libraries)
+            {
+                const StringView libraryView = library.view();
+                if (libraryView.containsCodePoint('/') or libraryView.containsCodePoint('\\') or
+                    libraryView.endsWith(".lib") or libraryView.endsWith(".dll") or libraryView.endsWith(".obj"))
+                {
+                    String absoluteLibrary = StringEncoding::Utf8;
+                    SC_TRY(resolveBuildPath(resolvedProject.project->rootDirectory.view(), libraryView,
+                                            resolvedProject.variables, absoluteLibrary));
+                    SC_TRY(commandLine.append(absoluteLibrary.view()));
+                }
+                else
+                {
+                    String option = StringEncoding::Utf8;
+                    SC_TRY(StringBuilder::format(option, "{}.lib", libraryView));
+                    SC_TRY(commandLine.append(option.view()));
+                }
+            }
+
+            const Vector<String>& extraLinkerFlags = resolvedProject.parameters->toolchain.extraLinkerFlags;
+            for (const String& extraLinkerFlag : extraLinkerFlags)
+            {
+                SC_TRY(commandLine.append(extraLinkerFlag.view()));
+            }
+            return Result(true);
         }
 
         for (const String& libraryPath : resolvedProject.linkFlags.libraryPaths)
@@ -893,7 +1324,8 @@ struct SC::Build::NativeBuild
         {
             for (const Project& project : workspace.projects)
             {
-                SC_TRY(appendProjectBuildOrder(workspace, project, action.configurationName, orderedProjects));
+                SC_TRY(appendProjectBuildOrder(workspace, action.parameters.platform, project, action.configurationName,
+                                               orderedProjects));
             }
         }
         else
@@ -903,7 +1335,8 @@ struct SC::Build::NativeBuild
             SC_TRY(findProjectConfiguration(workspace, action.projectName, action.configurationName, project,
                                             configuration));
             SC_COMPILER_UNUSED(configuration);
-            SC_TRY(appendProjectBuildOrder(workspace, *project, action.configurationName, orderedProjects));
+            SC_TRY(appendProjectBuildOrder(workspace, action.parameters.platform, *project, action.configurationName,
+                                           orderedProjects));
         }
 
         for (const Project* project : orderedProjects)
@@ -918,15 +1351,17 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result appendProjectBuildOrder(const Workspace& workspace, const Project& project,
+    static Result appendProjectBuildOrder(const Workspace& workspace, Platform::Type platform, const Project& project,
                                           StringView configurationName, Vector<const Project*>& orderedProjects)
     {
         Vector<const Project*> stack;
-        return appendProjectBuildOrderRecursive(workspace, project, configurationName, stack, orderedProjects);
+        return appendProjectBuildOrderRecursive(workspace, platform, project, configurationName, stack,
+                                                orderedProjects);
     }
 
-    static Result appendProjectBuildOrderRecursive(const Workspace& workspace, const Project& project,
-                                                   StringView configurationName, Vector<const Project*>& stack,
+    static Result appendProjectBuildOrderRecursive(const Workspace& workspace, Platform::Type platform,
+                                                   const Project& project, StringView configurationName,
+                                                   Vector<const Project*>& stack,
                                                    Vector<const Project*>& orderedProjects)
     {
         size_t index = 0;
@@ -939,17 +1374,18 @@ struct SC::Build::NativeBuild
         SC_TRY(stack.push_back(&project));
 
         Vector<const Project*> dependencies;
-        SC_TRY(findWorkspaceDependencies(workspace, project, configurationName, dependencies));
+        SC_TRY(findWorkspaceDependencies(workspace, platform, project, configurationName, dependencies));
         for (const Project* dependency : dependencies)
         {
-            SC_TRY(appendProjectBuildOrderRecursive(workspace, *dependency, configurationName, stack, orderedProjects));
+            SC_TRY(appendProjectBuildOrderRecursive(workspace, platform, *dependency, configurationName, stack,
+                                                    orderedProjects));
         }
         (void)stack.pop_back();
         SC_TRY(orderedProjects.push_back(&project));
         return Result(true);
     }
 
-    static Result findWorkspaceDependencies(const Workspace& workspace, const Project& project,
+    static Result findWorkspaceDependencies(const Workspace& workspace, Platform::Type platform, const Project& project,
                                             StringView configurationName, Vector<const Project*>& dependencies)
     {
         const Configuration* configuration = project.getConfiguration(configurationName);
@@ -962,7 +1398,7 @@ struct SC::Build::NativeBuild
         for (const String& library : mergedLinkFlags.libraries)
         {
             const Project* dependency = nullptr;
-            if (findWorkspaceStaticLibraryDependency(workspace, library.view(), dependency))
+            if (findWorkspaceStaticLibraryDependency(workspace, platform, library.view(), dependency))
             {
                 size_t index = 0;
                 if (dependency != &project and
@@ -979,14 +1415,14 @@ struct SC::Build::NativeBuild
                                                const Project& project, const Configuration& configuration,
                                                ResolvedProject& resolvedProject)
     {
-        SC_TRY(findWorkspaceDependencies(workspace, project, configuration.name.view(),
+        SC_TRY(findWorkspaceDependencies(workspace, parameters.platform, project, configuration.name.view(),
                                          resolvedProject.workspaceDependencies));
 
         Vector<String> externalLibraries;
         for (const String& library : resolvedProject.linkFlags.libraries)
         {
             const Project* dependency = nullptr;
-            if (findWorkspaceStaticLibraryDependency(workspace, library.view(), dependency))
+            if (findWorkspaceStaticLibraryDependency(workspace, parameters.platform, library.view(), dependency))
             {
                 String    dependencyOutputDirectory = StringEncoding::Utf8;
                 String    dependencyArtifactName    = StringEncoding::Utf8;
@@ -1000,7 +1436,7 @@ struct SC::Build::NativeBuild
                 SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(),
                                             dependencyConfiguration->outputPath.view(), dependencyVariables,
                                             dependencyOutputDirectory));
-                SC_TRY(computeArtifactName(*dependency, dependencyArtifactName));
+                SC_TRY(computeArtifactName(parameters.platform, *dependency, dependencyArtifactName));
                 SC_TRY(Path::join(dependencyArtifactPath,
                                   {dependencyOutputDirectory.view(), dependencyArtifactName.view()}));
                 SC_TRY(resolvedProject.workspaceDependencyArtifacts.push_back(move(dependencyArtifactPath)));
@@ -1016,8 +1452,8 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static bool findWorkspaceStaticLibraryDependency(const Workspace& workspace, StringView libraryReference,
-                                                     const Project*& dependencyProject)
+    static bool findWorkspaceStaticLibraryDependency(const Workspace& workspace, Platform::Type platform,
+                                                     StringView libraryReference, const Project*& dependencyProject)
     {
         for (const Project& candidate : workspace.projects)
         {
@@ -1025,7 +1461,7 @@ struct SC::Build::NativeBuild
             {
                 continue;
             }
-            if (matchesWorkspaceLibraryReference(candidate, libraryReference))
+            if (matchesWorkspaceLibraryReference(platform, candidate, libraryReference))
             {
                 dependencyProject = &candidate;
                 return true;
@@ -1035,7 +1471,8 @@ struct SC::Build::NativeBuild
         return false;
     }
 
-    static bool matchesWorkspaceLibraryReference(const Project& candidate, StringView libraryReference)
+    static bool matchesWorkspaceLibraryReference(Platform::Type platform, const Project& candidate,
+                                                 StringView libraryReference)
     {
         if (libraryReference == candidate.name.view() or libraryReference == candidate.targetName.view())
         {
@@ -1043,7 +1480,7 @@ struct SC::Build::NativeBuild
         }
 
         String artifactName = StringEncoding::Utf8;
-        if (not computeArtifactName(candidate, artifactName))
+        if (not computeArtifactName(platform, candidate, artifactName))
         {
             return false;
         }
@@ -1065,6 +1502,30 @@ struct SC::Build::NativeBuild
 
     static Result appendTargeting(CommandLine& commandLine, const ResolvedProject& resolvedProject, bool forCompiler)
     {
+        if (resolvedProject.adapter.isMSVCStyle())
+        {
+            if (not resolvedProject.parameters->toolchain.sysroot.isEmpty())
+            {
+                return Result::Error("Windows native sysroot selection is not implemented yet");
+            }
+            if (not resolvedProject.parameters->toolchain.targetTriple.isEmpty())
+            {
+                if (resolvedProject.adapter.isClangCL())
+                {
+                    String option = StringEncoding::Utf8;
+                    SC_TRY(StringBuilder::format(option, "--target={}",
+                                                 resolvedProject.parameters->toolchain.targetTriple.view()));
+                    SC_TRY(commandLine.append(option.view()));
+                }
+                else
+                {
+                    return Result::Error("MSVC native target triple selection is not implemented yet");
+                }
+            }
+            SC_COMPILER_UNUSED(forCompiler);
+            return Result(true);
+        }
+
         StringView targetTriple = resolvedProject.parameters->toolchain.targetTriple.view();
         if (targetTriple.isEmpty() and resolvedProject.parameters->platform == Platform::Apple and
             resolvedProject.parameters->architecture != Architecture::Any and resolvedProject.adapter.isClangLike())
@@ -1101,6 +1562,19 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static constexpr StringView msvcCppStandardFlag(CppStandard::Type type)
+    {
+        switch (type)
+        {
+        case CppStandard::CPP11:
+        case CppStandard::CPP14: return ""_a8;
+        case CppStandard::CPP17: return "/std:c++17"_a8;
+        case CppStandard::CPP20: return "/std:c++20"_a8;
+        case CppStandard::CPP23: return "/std:c++latest"_a8;
+        }
+        Assert::unreachable();
+    }
+
     static RebuildDecision evaluateObjectRebuild(FileSystem& fs, const ResolvedProject& resolvedProject,
                                                  const ResolvedSource& source, StringView commandLine)
     {
@@ -1128,7 +1602,7 @@ struct SC::Build::NativeBuild
         if (resolvedProject.parameters->execution.useCompilerDependencies)
         {
             if (not parseDependencyFile(fs, source.dependencyPath.view(), resolvedProject.project->rootDirectory.view(),
-                                        dependencies))
+                                        resolvedProject.adapter, dependencies))
             {
                 return DependencyScanFailed;
             }
@@ -1141,6 +1615,12 @@ struct SC::Build::NativeBuild
                 (void)dependencies.push_back(move(path));
             }
         }
+
+        FileSystem::FileStat sourceStat;
+        if (not fs.stat(source.sourcePath.view(), sourceStat))
+            return InputChanged;
+        if (sourceStat.modifiedTime.milliseconds > objectStat.modifiedTime.milliseconds)
+            return InputChanged;
 
         for (const String& dependency : dependencies)
         {
@@ -1184,8 +1664,13 @@ struct SC::Build::NativeBuild
     }
 
     static Result parseDependencyFile(FileSystem& fs, StringView dependencyPath, StringView projectRoot,
-                                      Vector<String>& dependencies)
+                                      const CompilerAdapter& adapter, Vector<String>& dependencies)
     {
+        if (adapter.isMSVCStyle())
+        {
+            return parseWindowsDependencyFile(fs, dependencyPath, projectRoot, dependencies);
+        }
+
         String contents = StringEncoding::Utf8;
         SC_TRY(fs.read(dependencyPath, contents));
 
@@ -1234,6 +1719,109 @@ struct SC::Build::NativeBuild
             SC_TRY(normalizeDependencyPath(projectRoot, current));
             SC_TRY(dependencies.push_back(move(current)));
         }
+        return Result(true);
+    }
+
+    static Result parseWindowsDependencyFile(FileSystem& fs, StringView dependencyPath, StringView projectRoot,
+                                             Vector<String>& dependencies)
+    {
+        String contents = StringEncoding::Utf8;
+        SC_TRY(fs.read(dependencyPath, contents));
+
+        const StringView dependencyData = contents.view();
+        const char*      bytes          = dependencyData.bytesWithoutTerminator();
+        size_t           lineStart      = 0;
+        for (size_t idx = 0; idx <= dependencyData.sizeInBytes(); ++idx)
+        {
+            if (idx < dependencyData.sizeInBytes() and bytes[idx] != '\n')
+            {
+                continue;
+            }
+
+            StringView line = dependencyData.sliceStartEnd(lineStart, idx).trimEndAnyOf({'\r'});
+            lineStart       = idx + 1;
+            line            = line.trimWhiteSpaces();
+            if (line.isEmpty())
+            {
+                continue;
+            }
+
+            String dependency = StringEncoding::Utf8;
+            SC_TRY(dependency.assign(line));
+            SC_TRY(normalizeDependencyPath(projectRoot, dependency));
+            SC_TRY(dependencies.push_back(move(dependency)));
+        }
+        return Result(true);
+    }
+
+    static Result filterWindowsDependencyOutput(const ResolvedProject& resolvedProject, StringView outputView,
+                                                Vector<String>& dependencies, String& filteredOutput)
+    {
+        const StringView includePrefix = "Note: including file:"_a8;
+        const char*      bytes         = outputView.bytesWithoutTerminator();
+        size_t           lineStart     = 0;
+        for (size_t idx = 0; idx <= outputView.sizeInBytes(); ++idx)
+        {
+            if (idx < outputView.sizeInBytes() and bytes[idx] != '\n')
+            {
+                continue;
+            }
+
+            StringView line = outputView.sliceStartEnd(lineStart, idx).trimEndAnyOf({'\r'});
+            lineStart       = idx + 1;
+
+            StringView includePath;
+            if (line.trimStartAnyOf({' ', '\t'}).splitAfter(includePrefix, includePath))
+            {
+                includePath = includePath.trimWhiteSpaces();
+                if (not includePath.isEmpty())
+                {
+                    String dependency = StringEncoding::Utf8;
+                    SC_TRY(dependency.assign(includePath));
+                    SC_TRY(normalizeDependencyPath(resolvedProject.project->rootDirectory.view(), dependency));
+                    SC_TRY(dependencies.push_back(move(dependency)));
+                }
+                continue;
+            }
+
+            if (line.trimWhiteSpaces().isEmpty())
+            {
+                continue;
+            }
+
+            if (not line.isEmpty())
+            {
+                SC_TRY(StringBuilder::createForAppendingTo(filteredOutput).append(line));
+            }
+            SC_TRY(StringBuilder::createForAppendingTo(filteredOutput).append("\n"));
+        }
+        return Result(true);
+    }
+
+    static Result writeWindowsDependencyFile(FileSystem& fs, const ResolvedProject& resolvedProject,
+                                             const ResolvedSource& source, String& stdOut, String& stdErr)
+    {
+        Vector<String> dependencies;
+
+        String sourceDependency = StringEncoding::Utf8;
+        SC_TRY(sourceDependency.assign(source.sourcePath.view()));
+        SC_TRY(dependencies.push_back(move(sourceDependency)));
+
+        String filteredStdOut = StringEncoding::Utf8;
+        String filteredStdErr = StringEncoding::Utf8;
+        SC_TRY(filterWindowsDependencyOutput(resolvedProject, stdOut.view(), dependencies, filteredStdOut));
+        SC_TRY(filterWindowsDependencyOutput(resolvedProject, stdErr.view(), dependencies, filteredStdErr));
+
+        String dependencyContents = StringEncoding::Utf8;
+        for (const String& dependency : dependencies)
+        {
+            SC_TRY(StringBuilder::createForAppendingTo(dependencyContents).append(dependency.view()));
+            SC_TRY(StringBuilder::createForAppendingTo(dependencyContents).append("\n"));
+        }
+        SC_TRY(makeParentDirectory(fs, source.dependencyPath.view()));
+        SC_TRY(fs.writeString(source.dependencyPath.view(), dependencyContents.view()));
+        stdOut = move(filteredStdOut);
+        stdErr = move(filteredStdErr);
         return Result(true);
     }
 
@@ -1313,16 +1901,26 @@ struct SC::Build::NativeBuild
     static Result resolveCompilerAdapter(const Toolchain& toolchain, Platform::Type platform,
                                          Architecture::Type architecture, CompilerAdapter& adapter)
     {
-        SC_COMPILER_UNUSED(platform);
         SC_COMPILER_UNUSED(architecture);
 
         adapter.family = toolchain.family;
         if (adapter.family == Toolchain::HostDefault)
         {
-            if (HostPlatform == SC::Platform::Apple)
+            if (platform == Platform::Windows)
+            {
+                adapter.family = Toolchain::MSVC;
+            }
+#if SC_PLATFORM_WINDOWS
+            else
+            {
+                adapter.family = Toolchain::MSVC;
+            }
+#elif SC_PLATFORM_APPLE
+            else
             {
                 adapter.family = Toolchain::Clang;
             }
+#else
             else if (probeExecutable("clang++"))
             {
                 adapter.family = Toolchain::Clang;
@@ -1331,6 +1929,7 @@ struct SC::Build::NativeBuild
             {
                 adapter.family = Toolchain::GCC;
             }
+#endif
         }
 
         switch (adapter.family)
@@ -1370,7 +1969,19 @@ struct SC::Build::NativeBuild
             SC_TRY(adapter.displayName.assign(Path::basename(adapter.executableCpp.view(), Path::AsNative)));
             break;
         case Toolchain::MSVC:
-        case Toolchain::ClangCL: return Result::Error("MSVC-style Native backend is planned but not implemented yet");
+            SC_TRY(resolveExecutable(toolchain.compilerC.view(), "cl", adapter.executableC));
+            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), adapter.executableC.view(), adapter.executableCpp));
+            SC_TRY(resolveExecutable(toolchain.linker.view(), "link", adapter.executableLink));
+            SC_TRY(resolveExecutable(toolchain.archiver.view(), "lib", adapter.executableArchive));
+            SC_TRY(adapter.displayName.assign("msvc"));
+            break;
+        case Toolchain::ClangCL:
+            SC_TRY(resolveExecutable(toolchain.compilerC.view(), "clang-cl", adapter.executableC));
+            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), adapter.executableC.view(), adapter.executableCpp));
+            SC_TRY(resolveExecutable(toolchain.linker.view(), "link", adapter.executableLink));
+            SC_TRY(resolveExecutable(toolchain.archiver.view(), "lib", adapter.executableArchive));
+            SC_TRY(adapter.displayName.assign("clang-cl"));
+            break;
         case Toolchain::HostDefault: return Result::Error("Unexpected HostDefault toolchain");
         }
         return Result(true);
@@ -1404,13 +2015,27 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result computeArtifactName(const Project& project, String& output)
+    static Result computeArtifactName(Platform::Type platform, const Project& project, String& output)
     {
         switch (project.targetType)
         {
         case TargetType::ConsoleExecutable:
-        case TargetType::GUIApplication: SC_TRY(output.assign(project.targetName.view())); return Result(true);
+        case TargetType::GUIApplication:
+            if (platform == Platform::Windows)
+            {
+                SC_TRY(StringBuilder::format(output, "{}.exe", project.targetName.view()));
+            }
+            else
+            {
+                SC_TRY(output.assign(project.targetName.view()));
+            }
+            return Result(true);
         case TargetType::StaticLibrary:
+            if (platform == Platform::Windows)
+            {
+                SC_TRY(StringBuilder::format(output, "{}.lib", project.targetName.view()));
+                return Result(true);
+            }
             if (StringView(project.targetName.view()).startsWith("lib"))
             {
                 SC_TRY(StringBuilder::format(output, "{}.a", project.targetName.view()));
@@ -1599,7 +2224,11 @@ struct SC::Build::NativeBuild
     {
         Process process;
         String  output = StringEncoding::Utf8;
-        return process.exec({executable, "--version"}, output) and process.getExitStatus() == 0;
+        if (process.exec({executable, "--version"}, output) and process.getExitStatus() == 0)
+        {
+            return true;
+        }
+        return process.exec({executable}, output) and process.getExitStatus() == 0;
     }
 
     static Result findWorkspace(const Definition& definition, StringView workspaceName, const Workspace*& workspace)

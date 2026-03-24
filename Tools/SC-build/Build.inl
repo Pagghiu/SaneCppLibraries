@@ -130,7 +130,8 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
             // VS ASAN is unsupported on ARM64 and needs manual flags / libs with ClangCL toolset
             // It also needs paths where clang_rt.asan_*.dll exist to be manually set before debugging
             if (parameters.generator != Generator::VisualStudio2022 and
-                parameters.generator != Generator::VisualStudio2019)
+                parameters.generator != Generator::VisualStudio2019 and
+                not(parameters.generator == Generator::Native and parameters.platform == Platform::Windows))
             {
                 compile.enableASAN = true;
             }

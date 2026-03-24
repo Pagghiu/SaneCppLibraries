@@ -24,7 +24,9 @@ static constexpr StringView StaticLibraryProjectName       = "FixtureStaticLibra
 static constexpr StringView StaticLibraryConsumerName      = "StaticLibraryConsumer";
 static constexpr StringView WorkspaceLibraryProjectName    = "WorkspaceStaticLibrary";
 static constexpr StringView WorkspaceExecutableProjectName = "WorkspaceExecutable";
-static constexpr StringView CustomDriverSourceRootName     = "CustomDriverFixture";
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+static constexpr StringView CustomDriverSourceRootName = "CustomDriverFixture";
+#endif
 
 static native_char_t DynamicFixtureProjectRootStorage[1024] = {};
 static StringView    DynamicFixtureProjectRoot;
@@ -54,6 +56,15 @@ static Build::Architecture::Type getBuildArchitecture()
     Assert::unreachable();
 }
 
+static Result verifyNativeBackendHostSupport()
+{
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX or SC_PLATFORM_WINDOWS
+    return Result(true);
+#else
+    return Result::Error("Native backend fixture test is not supported on this host yet");
+#endif
+}
+
 static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& compilerName)
 {
     switch (toolchain.family)
@@ -61,30 +72,33 @@ static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& 
     case Build::Toolchain::Clang: compilerName = "clang"; return Result(true);
     case Build::Toolchain::GCC: compilerName = "gcc"; return Result(true);
     case Build::Toolchain::ZigCC: compilerName = "zigcc"; return Result(true);
+    case Build::Toolchain::MSVC: compilerName = "msvc"; return Result(true);
+    case Build::Toolchain::ClangCL: compilerName = "clang-cl"; return Result(true);
     case Build::Toolchain::CustomDriver:
         compilerName = Path::basename(toolchain.compilerCpp.view(), Path::AsNative);
         return Result(true);
     case Build::Toolchain::HostDefault:
-        if (HostPlatform == SC::Platform::Apple)
+#if SC_PLATFORM_WINDOWS
+        compilerName = "msvc";
+        return Result(true);
+#elif SC_PLATFORM_APPLE
+        compilerName = "clang";
+        return Result(true);
+#else
+    {
+        Process probeProcess;
+        String  output = StringEncoding::Utf8;
+        if (probeProcess.exec({"clang++", "--version"}, output) and probeProcess.getExitStatus() == 0)
         {
             compilerName = "clang";
-            return Result(true);
         }
+        else
         {
-            Process probeProcess;
-            String  output = StringEncoding::Utf8;
-            if (probeProcess.exec({"clang++", "--version"}, output) and probeProcess.getExitStatus() == 0)
-            {
-                compilerName = "clang";
-            }
-            else
-            {
-                compilerName = "gcc";
-            }
-            return Result(true);
+            compilerName = "gcc";
         }
-    case Build::Toolchain::MSVC:
-    case Build::Toolchain::ClangCL: return Result::Error("MSVC-style native backend is not implemented yet");
+        return Result(true);
+    }
+#endif
     }
     Assert::unreachable();
 }
@@ -128,6 +142,7 @@ static Result setDynamicLinkedLibraryPath(StringView libraryPath)
     return Result(true);
 }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Result resolveHostToolPath(StringView toolName, String& toolPath)
 {
     Process process;
@@ -137,7 +152,6 @@ static Result resolveHostToolPath(StringView toolName, String& toolPath)
     SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
     return Result(true);
 }
-
 static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath, StringView toolPath)
 {
     String scriptContents = StringEncoding::Utf8;
@@ -150,6 +164,7 @@ static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, Stri
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
+#endif
 
 static Result configureTinyConsoleProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
@@ -248,6 +263,7 @@ static Result configureWorkspaceDependencyProgram(Build::Definition& definition,
     return Result(true);
 }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Result configureCustomDriverDependencyProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
@@ -278,6 +294,7 @@ static Result configureCustomDriverDependencyProgram(Build::Definition& definiti
     SC_TRY(definition.workspaces.push_back(move(workspace)));
     return Result(true);
 }
+#endif
 
 static Result configureDynamicFixtureProgram(Build::Definition& definition, const Build::Parameters& parameters,
                                              Build::TargetType::Type targetType, StringView projectName)
@@ -338,9 +355,22 @@ static Result computeArtifactPath(const Build::Action& action, StringView projec
     switch (targetType)
     {
     case Build::TargetType::ConsoleExecutable:
-    case Build::TargetType::GUIApplication: SC_TRY(artifactName.assign(projectName)); break;
+    case Build::TargetType::GUIApplication:
+        if (action.parameters.platform == Build::Platform::Windows)
+        {
+            SC_TRY(StringBuilder::format(artifactName, "{}.exe", projectName));
+        }
+        else
+        {
+            SC_TRY(artifactName.assign(projectName));
+        }
+        break;
     case Build::TargetType::StaticLibrary:
-        if (projectName.startsWith("lib"))
+        if (action.parameters.platform == Build::Platform::Windows)
+        {
+            SC_TRY(StringBuilder::format(artifactName, "{}.lib", projectName));
+        }
+        else if (projectName.startsWith("lib"))
         {
             SC_TRY(StringBuilder::format(artifactName, "{}.a", projectName));
         }
@@ -368,7 +398,8 @@ static Result computeObjectPath(const Build::Action& action, StringView projectN
     SC_TRY(computeBuildDirectoryName(action, buildDirectory));
 
     String objectName = StringEncoding::Utf8;
-    SC_TRY(StringBuilder::format(objectName, "{}.o", sourceName));
+    SC_TRY(StringBuilder::format(objectName, "{}{}", sourceName,
+                                 action.parameters.platform == Build::Platform::Windows ? ".obj" : ".o"));
     SC_TRY(Path::join(objectPath, {action.parameters.directories.intermediatesDirectory.view(), projectName,
                                    buildDirectory.view(), objectName.view()}));
     return Result(true);
@@ -470,6 +501,7 @@ static Result writeWorkspaceDependencyFixture(FileSystem& fs, StringView sourceR
     return Result(true);
 }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Result writeCustomDriverFixture(FileSystem& fs, StringView sourceRoot)
 {
     String libraryRoot      = StringEncoding::Utf8;
@@ -508,6 +540,7 @@ static Result writeCustomDriverFixture(FileSystem& fs, StringView sourceRoot)
                                                    "}\n"));
     return Result(true);
 }
+#endif
 
 static Build::Action makeNativeCompileAction(const Build::Directories& directories, StringView projectName)
 {
@@ -527,8 +560,15 @@ static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
 {
     StringSpan processArguments[] = {executablePath};
     Process    process;
-    SC_TRY(process.exec({processArguments, 1}, stdoutOutput));
+    String     rawStdout = StringEncoding::Utf8;
+    SC_TRY(process.exec({processArguments, 1}, rawStdout));
     SC_TRY_MSG(process.getExitStatus() == 0, "Fixture program exited with non-zero status");
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(stdoutOutput.assign({}));
+    SC_TRY(StringBuilder::create(stdoutOutput).appendReplaceAll(rawStdout.view(), "\r\n", "\n"));
+#else
+    SC_TRY(stdoutOutput.assign(rawStdout.view()));
+#endif
     return Result(true);
 }
 } // namespace
@@ -559,9 +599,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend builds and runs fixture"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -588,9 +626,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend skips up-to-date work in verbose mode"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -630,9 +666,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend rebuilds after header change"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -682,9 +716,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend reports compile failures"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -715,9 +747,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend reports link failures"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -749,9 +779,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend builds static libraries"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -794,9 +822,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
         if (test_section("native backend builds workspace dependencies first"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Native backend fixture test is POSIX-only for now"));
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -827,12 +853,9 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == "7\n");
         }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
         if (test_section("native backend routes custom driver toolchains"))
         {
-            SC_TRUST_RESULT(HostPlatform == SC::Platform::Apple or HostPlatform == SC::Platform::Linux
-                                ? Result(true)
-                                : Result::Error("Custom-driver fixture test is POSIX-only for now"));
-
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
             SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
@@ -912,6 +935,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(compilerCppLog.view()).containsString("main.cpp"));
             SC_TEST_EXPECT(StringView(archiverLog.view()).containsString("libWorkspaceStaticLibrary.a"));
         }
+#endif
     }
 };
 

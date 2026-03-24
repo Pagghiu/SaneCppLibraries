@@ -68,7 +68,11 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
         project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
     }
 
-    if (parameters.platform != Platform::Windows)
+    if (parameters.platform == Platform::Windows)
+    {
+        project.addLinkLibraries({"Advapi32"});
+    }
+    else
     {
         project.addLinkLibraries({"dl", "pthread"});
     }
