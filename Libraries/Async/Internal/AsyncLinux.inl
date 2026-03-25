@@ -10,6 +10,7 @@
 #include <errno.h>        // errno
 #include <signal.h>       // sigset_t
 #include <stdint.h>       // uint32_t
+#include <stdio.h>        // snprintf
 #include <sys/eventfd.h>  // eventfd
 #include <sys/poll.h>     // POLLIN
 #include <sys/sendfile.h> // sendfile
@@ -125,6 +126,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     io_uring_cqe*  events;
     io_uring_cqe** eventPointers;
 
+    char lastErrorMessage[96] = {};
+
     int&      newEvents;
     const int totalNumEvents;
 
@@ -144,6 +147,17 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_cqe& completion = events[idx];
         return reinterpret_cast<AsyncRequest*>(globalLibURing.io_uring_cqe_get_data(&completion));
+    }
+
+    Result makeIoUringCompletionError(int completionResult)
+    {
+        const int written = ::snprintf(lastErrorMessage, sizeof(lastErrorMessage),
+                                       "Error in processing event (io_uring, errno=%d)", -completionResult);
+        if (written <= 0 or static_cast<size_t>(written) >= sizeof(lastErrorMessage))
+        {
+            return Result::Error("Error in processing event (io_uring)");
+        }
+        return Result::FromStableCharPointer(lastErrorMessage);
     }
 
     uint32_t getNumEvents() const { return static_cast<uint32_t>(newEvents); }
@@ -332,7 +346,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                 continueProcessing = false; // Don't process cancellations
                 if (completion.res != -ECANCELED)
                 {
-                    return Result::Error("Error in processing event (io uring)");
+                    return makeIoUringCompletionError(completion.res);
                 }
             }
             else
