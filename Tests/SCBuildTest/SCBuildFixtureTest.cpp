@@ -24,6 +24,8 @@ static constexpr StringView StaticLibraryProjectName       = "FixtureStaticLibra
 static constexpr StringView StaticLibraryConsumerName      = "StaticLibraryConsumer";
 static constexpr StringView WorkspaceLibraryProjectName    = "WorkspaceStaticLibrary";
 static constexpr StringView WorkspaceExecutableProjectName = "WorkspaceExecutable";
+static constexpr StringView IndependentProgramOneName      = "IndependentProgramOne";
+static constexpr StringView IndependentProgramTwoName      = "IndependentProgramTwo";
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static constexpr StringView CustomDriverSourceRootName = "CustomDriverFixture";
 #endif
@@ -166,6 +168,31 @@ static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, Stri
 }
 #endif
 
+#if SC_PLATFORM_WINDOWS
+static Result resolveVisualStudioLLVMToolPath(StringView executableName, String& toolPath)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String vswherePath = StringEncoding::Utf8;
+    SC_TRY(vswherePath.assign("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe"));
+    SC_TRY_MSG(fs.existsAndIsFile(vswherePath.view()), "Cannot locate vswhere.exe");
+
+    Process process;
+    String  output = StringEncoding::Utf8;
+    SC_TRY(process.exec({vswherePath.view(), "-latest", "-property", "installationPath"}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate Visual Studio installation");
+
+    String installPath = StringEncoding::Utf8;
+    SC_TRY(installPath.assign(StringView(output.view()).trimWhiteSpaces()));
+    SC_TRY_MSG(not installPath.isEmpty(), "Visual Studio installation path is empty");
+
+    SC_TRY(Path::join(toolPath, {installPath.view(), "VC", "Tools", "Llvm", "bin", executableName}));
+    SC_TRY_MSG(fs.existsAndIsFile(toolPath.view()), "Bundled LLVM tool is missing");
+    return Result(true);
+}
+#endif
+
 static Result configureTinyConsoleProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
@@ -259,6 +286,35 @@ static Result configureWorkspaceDependencyProgram(Build::Definition& definition,
 
     SC_TRY(workspace.projects.push_back(move(libraryProject)));
     SC_TRY(workspace.projects.push_back(move(executableProject)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+
+static Result configureIndependentWorkspacePrograms(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
+
+    Build::Workspace workspace = {FixtureWorkspaceName};
+
+    String programOneRoot = StringEncoding::Utf8;
+    String programTwoRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(programOneRoot, {DynamicFixtureProjectRoot, "ProgramOne"}));
+    SC_TRY(Path::join(programTwoRoot, {DynamicFixtureProjectRoot, "ProgramTwo"}));
+
+    Build::Project programOne = {Build::TargetType::ConsoleExecutable, IndependentProgramOneName};
+    SC_TRY(programOne.setRootDirectory(programOneRoot.view()));
+    SC_TRY(programOne.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(programOne.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(programOne.addFiles(".", "*.cpp"));
+
+    Build::Project programTwo = {Build::TargetType::ConsoleExecutable, IndependentProgramTwoName};
+    SC_TRY(programTwo.setRootDirectory(programTwoRoot.view()));
+    SC_TRY(programTwo.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(programTwo.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(programTwo.addFiles(".", "*.cpp"));
+
+    SC_TRY(workspace.projects.push_back(move(programOne)));
+    SC_TRY(workspace.projects.push_back(move(programTwo)));
     SC_TRY(definition.workspaces.push_back(move(workspace)));
     return Result(true);
 }
@@ -468,6 +524,26 @@ static Result writeStaticLibraryConsumerFixture(FileSystem& fs, StringView sourc
                                              "    printf(\"%d\\n\", fixture_library_value());\n"
                                              "    return 0;\n"
                                              "}\n"));
+    return Result(true);
+}
+
+static Result writeIndependentProgramFixture(FileSystem& fs, StringView sourceRoot, StringView message)
+{
+    SC_TRY(fs.makeDirectoryRecursive(sourceRoot));
+
+    String sourcePath = StringEncoding::Utf8;
+    SC_TRY(Path::join(sourcePath, {sourceRoot, "main.cpp"}));
+    String sourceContents = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(sourceContents,
+                                 "#include <stdio.h>\n"
+                                 "\n"
+                                 "int main()\n"
+                                 "{{\n"
+                                 "    puts(\"{}\");\n"
+                                 "    return 0;\n"
+                                 "}}\n",
+                                 message));
+    SC_TRY(fs.writeString(sourcePath.view(), sourceContents.view()));
     return Result(true);
 }
 
@@ -852,6 +928,93 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == "7\n");
         }
+
+        if (test_section("native backend builds independent workspace targets together"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String programOneRoot = StringEncoding::Utf8;
+            String programTwoRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(programOneRoot, {buildRoot.view(), "ProgramOne"}));
+            SC_TRUST_RESULT(Path::join(programTwoRoot, {buildRoot.view(), "ProgramTwo"}));
+            SC_TRUST_RESULT(writeIndependentProgramFixture(fs, programOneRoot.view(), "program-one"));
+            SC_TRUST_RESULT(writeIndependentProgramFixture(fs, programTwoRoot.view(), "program-two"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(buildRoot.view()));
+
+            Build::Action action                        = makeNativeCompileAction(directories, {});
+            action.parameters.execution.maxParallelJobs = 2;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureIndependentWorkspacePrograms, FixtureWorkspaceName));
+
+            String programOneExecutable = StringEncoding::Utf8;
+            String programTwoExecutable = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, IndependentProgramOneName, programOneExecutable));
+            SC_TRUST_RESULT(computeExecutablePath(action, IndependentProgramTwoName, programTwoExecutable));
+
+            SC_TEST_EXPECT(fs.existsAndIsFile(programOneExecutable.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(programTwoExecutable.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(programOneExecutable.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "program-one\n");
+
+            stdoutOutput = "";
+            SC_TEST_EXPECT(runBuiltProgram(programTwoExecutable.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "program-two\n");
+        }
+
+#if SC_PLATFORM_WINDOWS
+        if (test_section("native backend routes clang-cl toolchains"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "ClangCLWorkspaceFixture"}));
+            SC_TRUST_RESULT(writeWorkspaceDependencyFixture(fs, sourceRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            String clangClPath = StringEncoding::Utf8;
+            String llvmLibPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(resolveVisualStudioLLVMToolPath("clang-cl.exe", clangClPath));
+            SC_TRUST_RESULT(resolveVisualStudioLLVMToolPath("llvm-lib.exe", llvmLibPath));
+
+            Build::Action action               = makeNativeCompileAction(directories, WorkspaceExecutableProjectName);
+            action.parameters.toolchain.family = Build::Toolchain::ClangCL;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(clangClPath.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(clangClPath.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(llvmLibPath.view()));
+            action.parameters.execution.maxParallelJobs = 2;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            String libraryPath    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, WorkspaceExecutableProjectName, executablePath));
+            SC_TRUST_RESULT(computeArtifactPath(action, WorkspaceLibraryProjectName, Build::TargetType::StaticLibrary,
+                                                libraryPath));
+
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(libraryPath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "7\n");
+        }
+#endif
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
         if (test_section("native backend routes custom driver toolchains"))
