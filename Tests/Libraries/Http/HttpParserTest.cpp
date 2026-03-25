@@ -58,9 +58,9 @@ struct HttpParserTest : public TestCase
 
             const StringView originalString = "HTTP/1.1   200   OK\r\n"
                                               "Server: nginx/1.2.1\r\n"
-                                              "Content-Type: text/html\r\n"
-                                              "Content-Length: 8\r\n"
-                                              "Connection: keep-alive\r\n"
+                                              "content-type: text/html\r\n"
+                                              "content-length: 8\r\n"
+                                              "Connection: close\r\n"
                                               "\r\n"
                                               "<html />";
 
@@ -100,17 +100,20 @@ struct HttpParserTest : public TestCase
                         switch (numMatches[static_cast<int>(HttpParser::Token::HeaderName)])
                         {
                         case 0: SC_TEST_EXPECT(parsed == "Server"); break;
-                        case 1: SC_TEST_EXPECT(parsed == "Content-Type"); break;
-                        case 2: SC_TEST_EXPECT(parsed == "Content-Length"); break;
+                        case 1: SC_TEST_EXPECT(parsed == "content-type"); break;
+                        case 2: SC_TEST_EXPECT(parsed == "content-length"); break;
                         case 3: SC_TEST_EXPECT(parsed == "Connection"); break;
                         }
-                        if (numMatches[static_cast<int>(HttpParser::Token::HeaderName)] == 2)
+                        switch (numMatches[static_cast<int>(HttpParser::Token::HeaderName)])
                         {
-                            SC_TEST_EXPECT(parser.matchesHeader(HttpParser::HeaderType::ContentLength));
-                        }
-                        else
-                        {
+                        case 1: SC_TEST_EXPECT(parser.matchesHeader(HttpParser::HeaderType::ContentType)); break;
+                        case 2: SC_TEST_EXPECT(parser.matchesHeader(HttpParser::HeaderType::ContentLength)); break;
+                        case 3: SC_TEST_EXPECT(parser.matchesHeader(HttpParser::HeaderType::Connection)); break;
+                        default:
+                            SC_TEST_EXPECT(not parser.matchesHeader(HttpParser::HeaderType::ContentType));
                             SC_TEST_EXPECT(not parser.matchesHeader(HttpParser::HeaderType::ContentLength));
+                            SC_TEST_EXPECT(not parser.matchesHeader(HttpParser::HeaderType::Connection));
+                            break;
                         }
                         break;
                     }
@@ -120,7 +123,7 @@ struct HttpParserTest : public TestCase
                         case 0: SC_TEST_EXPECT(parsed == "nginx/1.2.1"); break;
                         case 1: SC_TEST_EXPECT(parsed == "text/html"); break;
                         case 2: SC_TEST_EXPECT(parsed == "8"); break;
-                        case 3: SC_TEST_EXPECT(parsed == "keep-alive"); break;
+                        case 3: SC_TEST_EXPECT(parsed == "close"); break;
                         }
                         break;
                     }
@@ -145,6 +148,7 @@ struct HttpParserTest : public TestCase
             SC_TEST_EXPECT(parser.state == HttpParser::State::Finished);
             SC_TEST_EXPECT(parser.statusCode == 200);
             SC_TEST_EXPECT(parser.contentLength == 8);
+            SC_TEST_EXPECT(parser.connectionKeepAlive == false);
 
             SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::Method)] == 0);
             SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::Url)] == 0);
@@ -155,6 +159,27 @@ struct HttpParserTest : public TestCase
             SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::HeaderValue)] == 4);
             SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::HeadersEnd)] == 1);
             SC_TEST_EXPECT(numMatches[static_cast<int>(HttpParser::Token::Body)] == 1);
+        }
+        if (test_section("request large Content-Length"))
+        {
+            constexpr StringView originalString = "POST /asd HTTP/1.1\r\n"
+                                                  "Content-Length: 4294967297\r\n"
+                                                  "\r\n";
+
+            HttpParser parser;
+            parser.type = HttpParser::Type::Request;
+
+            Span<const char> remaining = originalString.toCharSpan();
+            size_t           readBytes = 0;
+            while (parser.state != HttpParser::State::Finished)
+            {
+                Span<const char> parsedData;
+                SC_TEST_EXPECT(parser.parse(remaining, readBytes, parsedData));
+                SC_TEST_EXPECT(readBytes <= remaining.sizeInBytes());
+                SC_TEST_EXPECT(remaining.sliceStart(readBytes, remaining));
+            }
+
+            SC_TEST_EXPECT(parser.contentLength == 4294967297ULL);
         }
         if (test_section("benchmark contiguous request"))
         {

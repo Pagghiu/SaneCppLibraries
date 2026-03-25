@@ -4,6 +4,31 @@
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
 
+namespace
+{
+static constexpr SC::StringSpan SC_HTTP_TRACKED_HEADERS[] = {"Content-Length", "Connection", "Content-Type"};
+static_assert(sizeof(SC_HTTP_TRACKED_HEADERS) / sizeof(SC_HTTP_TRACKED_HEADERS[0]) ==
+                  static_cast<SC::size_t>(SC::HttpParser::HeaderType::ContentType) + 1,
+              "Tracked header table must match HttpParser::HeaderType");
+
+static char scHttpToLowerAscii(char value)
+{
+    return value >= 'A' and value <= 'Z' ? static_cast<char>(value + ('a' - 'A')) : value;
+}
+
+static bool scHttpEqualsIgnoreCaseAscii(const char* lhs, const char* rhs, SC::size_t length)
+{
+    for (SC::size_t idx = 0; idx < length; ++idx)
+    {
+        if (scHttpToLowerAscii(lhs[idx]) != scHttpToLowerAscii(rhs[idx]))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+} // namespace
+
 // https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html
 #if SC_COMPILER_MSVC
 #define SC_CAT(x, y)  SC_CAT2(x, y)
@@ -236,7 +261,7 @@ SC::Result SC::HttpParser::parse(Span<const char> data, size_t& readBytes, Span<
                 do
                 {
                     SC_TRY((process<&HttpParser::parseNumberValue, Token::HeaderValue>(data, readBytes, parsedData)));
-                    contentLength = static_cast<uint32_t>(number);
+                    contentLength = number;
                     SC_CO_RETURN(topLevelCoroutine, Result(true));
                 } while (state == State::Parsing);
             }
@@ -289,8 +314,6 @@ bool SC::HttpParser::matchesHeader(HeaderType headerName) const
 template <bool (SC::HttpParser::*Func)(char), SC::HttpParser::Token currentResult>
 SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Span<const char>& parsedData)
 {
-    static constexpr StringSpan headers[] = {"Content-Length", "Connection"};
-
     const auto initialStart  = tokenStart;
     const auto initialLength = tokenLength;
     const auto bytes         = data.data();
@@ -313,8 +336,9 @@ SC::Result SC::HttpParser::process(Span<const char>& data, size_t& readBytes, Sp
                 for (size_t idx = 0; idx < numMatches; ++idx)
                 {
                     matchingHeaderValid[idx] = false;
-                    if (headers[idx].sizeInBytes() == headerLen and
-                        ::memcmp(headers[idx].bytesWithoutTerminator(), bytes, headerLen) == 0)
+                    if (SC_HTTP_TRACKED_HEADERS[idx].sizeInBytes() == headerLen and
+                        scHttpEqualsIgnoreCaseAscii(SC_HTTP_TRACKED_HEADERS[idx].bytesWithoutTerminator(), bytes,
+                                                    headerLen))
                     {
                         matchingHeaderValid[idx] = true;
                     }
@@ -489,13 +513,11 @@ bool SC::HttpParser::parseVersion(char currentChar)
 
 bool SC::HttpParser::parseHeaderName(char currentChar)
 {
-    static constexpr StringSpan headers[] = {"Content-Length", "Connection", "Content-Type"};
-
     SC_CO_BEGIN(nestedParserCoroutine);
     matchIndex = 0;
     for (size_t idx = 0; idx < numMatches; ++idx)
     {
-        matchingHeader[idx]      = headers[idx].sizeInBytes();
+        matchingHeader[idx]      = SC_HTTP_TRACKED_HEADERS[idx].sizeInBytes();
         matchingHeaderValid[idx] = false;
     }
     while (currentChar != ':')
@@ -504,7 +526,8 @@ bool SC::HttpParser::parseHeaderName(char currentChar)
         {
             if (matchingHeader[idx] == 0)
                 continue;
-            if (headers[idx].bytesIncludingTerminator()[matchIndex] == currentChar)
+            if (scHttpToLowerAscii(SC_HTTP_TRACKED_HEADERS[idx].bytesIncludingTerminator()[matchIndex]) ==
+                scHttpToLowerAscii(currentChar))
             {
                 matchingHeader[idx] -= 1;
                 if (matchingHeader[idx] == 0)

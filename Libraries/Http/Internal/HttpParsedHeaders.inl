@@ -16,21 +16,21 @@ void HttpParsedHeaders::reset(HttpParser::Type type, Span<char> memory)
     headersEndMatch    = 0;
     parser             = {};
     parser.type        = type;
-    numHeaders         = 0;
+    numTokens          = 0;
 }
 
 bool HttpParsedHeaders::getHeader(StringSpan headerName, StringSpan& value) const
 {
-    for (size_t idx = 0; idx < numHeaders; ++idx)
+    for (size_t idx = 0; idx < numTokens; ++idx)
     {
-        const HeaderOffset& header = headerOffsets[idx];
+        const TokenOffset& header = tokenOffsets[idx];
         if (header.token == HttpParser::Token::HeaderName)
         {
             StringSpan name({readHeaders.data() + header.start, header.length}, false, StringEncoding::Ascii);
-            if (idx + 1 < numHeaders and headerOffsets[idx + 1].token == HttpParser::Token::HeaderValue and
+            if (idx + 1 < numTokens and tokenOffsets[idx + 1].token == HttpParser::Token::HeaderValue and
                 HttpStringIterator::equalsIgnoreCase(name, headerName))
             {
-                const HeaderOffset& valueHeader = headerOffsets[idx + 1];
+                const TokenOffset& valueHeader = tokenOffsets[idx + 1];
                 value = StringSpan({readHeaders.data() + valueHeader.start, valueHeader.length}, false,
                                    StringEncoding::Ascii);
                 return true;
@@ -42,9 +42,9 @@ bool HttpParsedHeaders::getHeader(StringSpan headerName, StringSpan& value) cons
 
 bool HttpParsedHeaders::findParserToken(HttpParser::Token token, StringSpan& value) const
 {
-    for (size_t idx = 0; idx < numHeaders; ++idx)
+    for (size_t idx = 0; idx < numTokens; ++idx)
     {
-        const HeaderOffset& header = headerOffsets[idx];
+        const TokenOffset& header = tokenOffsets[idx];
         if (header.token == token)
         {
             value = StringSpan({readHeaders.data() + header.start, header.length}, false, StringEncoding::Ascii);
@@ -56,9 +56,9 @@ bool HttpParsedHeaders::findParserToken(HttpParser::Token token, StringSpan& val
 
 size_t HttpParsedHeaders::getHeadersLength() const
 {
-    if (numHeaders > 0)
+    if (numTokens > 0)
     {
-        const HeaderOffset& last = headerOffsets[numHeaders - 1];
+        const TokenOffset& last = tokenOffsets[numTokens - 1];
         if (last.token == HttpParser::Token::HeadersEnd)
         {
             return static_cast<size_t>(last.start + last.length);
@@ -140,13 +140,13 @@ Result HttpParsedHeaders::copyHeaderBytes(uint32_t maxHeaderSize, Span<const cha
 
 Result HttpParsedHeaders::pushToken()
 {
-    HeaderOffset header;
-    header.token  = parser.token;
-    header.start  = static_cast<uint32_t>(parser.tokenStart);
-    header.length = static_cast<uint32_t>(parser.tokenLength);
-    if (numHeaders < MaxNumHeaders)
+    TokenOffset token;
+    token.token  = parser.token;
+    token.start  = static_cast<uint32_t>(parser.tokenStart);
+    token.length = static_cast<uint32_t>(parser.tokenLength);
+    if (numTokens < MaxNumTokens)
     {
-        headerOffsets[numHeaders++] = header;
+        tokenOffsets[numTokens++] = token;
         return Result(true);
     }
     parsedSuccessfully = false;

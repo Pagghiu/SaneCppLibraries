@@ -76,9 +76,6 @@ struct SC_COMPILER_EXPORT HttpParser
         ContentType   = 2, ///< Content-Type header
     };
 
-    StringSpan contentTypeValue;  ///< Value of Content-Type header
-    StringSpan multipartBoundary; ///< Extracted multipart boundary (if Content-Type is multipart/form-data)
-
     /// @brief Check if current result matches this HeaderType
     [[nodiscard]] bool matchesHeader(HeaderType headerName) const;
 
@@ -91,7 +88,7 @@ struct SC_COMPILER_EXPORT HttpParser
     bool   parsedConnection      = false;
     size_t matchIndex            = 0;
 
-    static constexpr size_t numMatches = 2;
+    static constexpr size_t numMatches = static_cast<size_t>(HeaderType::ContentType) + 1;
 
     size_t   matchingHeader[numMatches]      = {0};
     bool     matchingHeaderValid[numMatches] = {false};

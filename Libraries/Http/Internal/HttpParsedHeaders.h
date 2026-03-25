@@ -9,14 +9,14 @@ namespace SC
 {
 struct SC_COMPILER_EXPORT HttpParsedHeaders
 {
-    struct HeaderOffset
+    struct TokenOffset
     {
         HttpParser::Token token  = HttpParser::Token::Method;
         uint32_t          start  = 0;
         uint32_t          length = 0;
     };
 
-    static constexpr size_t MaxNumHeaders = 64;
+    static constexpr size_t MaxNumTokens = 64;
 
     void reset(HttpParser::Type type, Span<char> memory);
 
@@ -101,8 +101,8 @@ struct SC_COMPILER_EXPORT HttpParsedHeaders
 
     HttpParser parser;
 
-    HeaderOffset headerOffsets[MaxNumHeaders];
-    size_t       numHeaders = 0;
+    TokenOffset tokenOffsets[MaxNumTokens];
+    size_t      numTokens = 0;
 
   private:
     Result scanHeadersEnd(Span<const char> readData, size_t& bytesToCopy, bool& foundHeadersEnd);

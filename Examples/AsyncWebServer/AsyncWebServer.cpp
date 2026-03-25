@@ -62,7 +62,7 @@ struct AsyncWebServerExample
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
-            SC_TRY(threadPool.create(numThreads));
+            SC_TRY(threadPool.create(static_cast<size_t>(numThreads)));
             if (not useSendFile)
             {
                 globalConsole->print("IO/Threads: {}\n", numThreads);
