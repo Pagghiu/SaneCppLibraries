@@ -33,6 +33,13 @@ Arm Machines
 - **Windows**: `SC.bat build compile SCTest Debug default arm64`
 - **Posix**: `SC.sh build compile SCTest Debug default arm64`
 
+## Command-line Native Backend
+
+- **macOS / Linux**: `./SC.sh build compile SCTest Debug native`
+- **macOS / Linux**: `./SC.sh build run SCBuildTest Debug native`
+
+@note The native backend currently supports macOS and Linux with Clang-like, GCC-like, or custom-driver toolchains, plus Windows-native execution.
+
 ## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 
 - Build the default configuration target (or another one you prefer)
@@ -79,7 +86,7 @@ Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
 
 # Run the tests
 Executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.  
-For example assuming host to be ARM64 Linux, compiling with Clang in Debug will cause the folder to be `_Build/_Outputs/linux-arm64-make-clang-Debug/SCTest`.
+For example assuming host to be ARM64 Linux, compiling with the native backend through Clang in Debug will cause the folder to be `_Build/_Outputs/linux-arm64-Native-clang-Debug/SCTest`.
 
 
 # Debug the tests
@@ -126,4 +133,3 @@ The `SC-build.cpp` from [SC::Tool](@ref page_tools) downloads Doxygen and some c
 ## VSCode
 Under VSCode select `Tasks: Run Task` and choose:
 - `Build Documentation`
-

@@ -113,12 +113,12 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 # SC-build.cpp
 
-`SC-build` configures (generating projects) and compiles Sane C++ repository projects using [SC::Build](@ref page_build).
+`SC-build` configures generated projects and can also build Sane C++ repository targets directly through the standalone native backend in [SC::Build](@ref page_build).
 
 ## Actions
 
 - `configure`: Configure (generates) the projects into `_Build/_Projects`
-- `compile`: Compiles all projects into `_Build/_Projects`
+- `compile`: Compiles projects through the selected backend
 - `documentation`: Builds the documentation into `_Build/_Documentation`
 - `coverage`: Builds the clang source coverage into `_Build/_Coverage`
 
@@ -148,6 +148,11 @@ SC-build "configure" finished (took 72 ms)
 Build all projects
 ```
 ./SC.sh build compile
+```
+
+Build through the native backend
+```
+./SC.sh build compile SCTest Debug native
 ```
 
 Possible Output:
@@ -270,10 +275,9 @@ The bootstrap process bringing from the command line to final execution is the f
 # Roadmap
 
 - Generate ready made .vscode configurations to debug the programs easily
-- When and if [SC::Build](@ref page_build) will be capable of launching build commands autonomously, get rid of the tool `Tools\Build\$(PLATFORM)` makefiles.
+- As the native backend in [SC::Build](@ref page_build) matures across all supported platforms, reduce and eventually remove the tool `Tools\Build\$(PLATFORM)` makefiles.
 - Investigate better way of expressing the dependencies chain between scripts
 - Investigate if Tools (scripts) can be sandboxed using os facilities
 - Do not require to have a C++ toolchain already installed on the system [*]
 
 [*] Running the Sane C++ Tools scripts on a machine without a pre-installed compiler could be implemented by shipping a pre-compiled `SC-package.cpp` (that is already capable of downloading `clang` on all platforms) or by adding to the bootstrap script ability to download a suitable compiler (and sysroot).
-
