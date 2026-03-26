@@ -251,6 +251,9 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
     /// @brief Returns true if the stream has been already destroyed (asynchronously through destroy())
     [[nodiscard]] bool hasBeenDestroyed() const { return destroyed; }
 
+    /// @brief Returns true when start() is currently valid for this stream
+    [[nodiscard]] bool canStart() const { return state == State::CanRead; }
+
     /// @brief Obtains the AsyncBuffersPool to request more buffers
     AsyncBuffersPool& getBuffersPool();
 
@@ -511,6 +514,17 @@ struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
         Finalized,
     };
     State state = State::None;
+};
+
+/// @brief Traits exposing AsyncStreams public types through a single template parameter.
+/// This helps adapters depend on stream types only when they are instantiated.
+struct SC_COMPILER_EXPORT AsyncStreams
+{
+    using BufferView     = AsyncBufferView;
+    using BuffersPool    = AsyncBuffersPool;
+    using ReadableStream = AsyncReadableStream;
+    using WritableStream = AsyncWritableStream;
+    using DuplexStream   = AsyncDuplexStream;
 };
 
 /// @brief Pipes read data from SC::AsyncReadableStream, forwarding them to SC::AsyncWritableStream.
