@@ -198,6 +198,44 @@ SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan ur
     return connectAsync.start(*eventLoop, clientSocket, localHost);
 }
 
+SC::Result SC::HttpTestClient::sendRaw(AsyncEventLoop& loop, StringSpan url, StringSpan request)
+{
+    bodyDelay = {};
+    eventLoop = &loop;
+
+    uint16_t      port;
+    HttpURLParser urlParser;
+    SC_TRY(urlParser.parse(url));
+    SC_TRY_MSG(urlParser.protocol == "http", "Invalid protocol");
+    char       buffer[256];
+    Span<char> ipAddress = {buffer};
+    SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
+    port = urlParser.port;
+    SocketIPAddress localHost;
+    SC_TRY(localHost.fromAddressPort({ipAddress, true, StringEncoding::Ascii}, port));
+    SC_TRY(eventLoop->createAsyncTCPSocket(localHost.getAddressFamily(), clientSocket));
+
+    {
+        GrowableBuffer<decltype(content)> gb = {content};
+
+        HttpStringAppend& sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+        sb.clear();
+        SC_TRY(sb.append(request));
+        headerBytes = content.size();
+    }
+
+    connectAsync.callback.bind<HttpTestClient, &HttpTestClient::startSendingHeaders>(*this);
+    parser              = {};
+    parser.type         = HttpParser::Type::Response;
+    receivedBytes       = 0;
+    parsedBytes         = 0;
+    contentLen          = 0;
+    headersReceived     = false;
+    keepConnectionOpen  = false;
+    hasActiveConnection = false;
+    return connectAsync.start(*eventLoop, clientSocket, localHost);
+}
+
 SC::StringSpan SC::HttpTestClient::getResponse() const
 {
     return StringSpan(content.toSpanConst(), false, StringEncoding::Ascii);

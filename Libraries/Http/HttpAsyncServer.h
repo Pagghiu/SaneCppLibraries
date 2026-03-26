@@ -19,7 +19,7 @@ struct IsBaseOf
 /// @brief Adds compile-time configurable read and write queues to HttpConnection
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
 struct SC_COMPILER_EXPORT HttpAsyncConnection
-    : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 0, HttpConnection>
+    : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 8, HttpConnection>
 {
 };
 
@@ -111,6 +111,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     void closeAsync(HttpConnection& requestClient);
     void deactivateConnection(HttpConnection& requestClient);
     void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
+    void onRequestBodyData(HttpConnection& client, AsyncBufferView::ID bufferID);
 
     Result waitForStopToFinish();
     Result initInternal(SpanWithStride<HttpConnection> connections);
@@ -121,6 +122,7 @@ struct SC_COMPILER_EXPORT HttpAsyncServer
     AsyncSocketAccept asyncServerAccept;
 
     struct EventDataListener;
+    struct EventBodyDataListener;
     struct EventEndListener;
 };
 } // namespace SC

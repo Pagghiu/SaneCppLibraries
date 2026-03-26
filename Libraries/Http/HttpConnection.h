@@ -14,6 +14,16 @@ namespace SC
 //! @addtogroup group_http
 //! @{
 
+enum class HttpBodyFramingKind : uint8_t
+{
+    None,
+    ContentLength,
+    Chunked,
+    CloseDelimited,
+};
+
+struct HttpAsyncClient;
+
 struct SC_COMPILER_EXPORT HttpMultipartWriter
 {
     struct Part
@@ -71,14 +81,36 @@ struct SC_COMPILER_EXPORT HttpConnectionBase
 /// @brief Incoming message from the perspective of the participants of an HTTP transaction
 struct SC_COMPILER_EXPORT HttpIncomingMessage
 {
+    struct SC_COMPILER_EXPORT BodyStream : public AsyncReadableStream
+    {
+        BodyStream();
+
+        Result begin(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest);
+        bool   pushBodyData(AsyncBufferView::ID bufferID, size_t sizeInBytes);
+        void   finishBody();
+        void   failBody(Result result);
+
+        Function<Result()> onReadRequest;
+        Request            queue[4];
+
+      private:
+        virtual Result asyncRead() override;
+    };
+
     /// @brief Gets the associated HttpParser
     const HttpParser& getParser() const { return parsedHeaders.parser; }
 
     /// @brief Gets whether the other party requested the connection to stay alive
     [[nodiscard]] bool getKeepAlive() const { return parsedHeaders.parser.connectionKeepAlive; }
 
+    /// @brief Returns the effective framing mode for the incoming body
+    [[nodiscard]] HttpBodyFramingKind getBodyFramingKind() const { return bodyFramingKind; }
+
     /// @brief Returns how many body bytes are still expected for this message
     [[nodiscard]] uint64_t getBodyBytesRemaining() const { return bodyBytesRemaining; }
+
+    /// @brief Returns true once the full body has been received according to its framing
+    [[nodiscard]] bool isBodyComplete() const { return bodyComplete; }
 
     /// @brief Checks if the request is a multipart/form-data request
     [[nodiscard]] bool isMultipart() const;
@@ -107,8 +139,21 @@ struct SC_COMPILER_EXPORT HttpIncomingMessage
     [[nodiscard]] bool       hasReceivedHeaders() const { return parsedHeaders.headersEndReceived; }
     [[nodiscard]] Span<char> getUnusedHeaderMemory() const { return parsedHeaders.availableHeader; }
 
-    void attachReadableStream(AsyncReadableStream& stream) { readableStream = &stream; }
+    Result initBodyStream(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest);
+    Result startBodyStream();
+    bool   pushBodyData(AsyncBufferView::ID bufferID, size_t sizeInBytes);
+    void   finishBodyStream();
+    void   failBodyStream(Result result);
+    void   abortBodyStream();
+    Result prepareBodyStream(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest,
+                             bool allowCloseDelimited);
+    Result processBodyData(AsyncReadableStream& sourceStream, AsyncBufferView::ID bufferID, Span<const char> readData,
+                           bool allowTrailingData);
+
     void setBodyBytesRemaining(uint64_t value) { bodyBytesRemaining = value; }
+    void setBodyFramingKind(HttpBodyFramingKind value) { bodyFramingKind = value; }
+    void setBodyComplete(bool value) { bodyComplete = value; }
+    void attachReadableStream(AsyncReadableStream& stream) { readableStream = &stream; }
 
     /// @brief Finds a specific HttpParser::Result in the list of parsed header
     /// @param token The result to look for (Method, Url etc.)
@@ -120,15 +165,36 @@ struct SC_COMPILER_EXPORT HttpIncomingMessage
     /// If it encounters body data, it will create a child view and unshift it to the stream.
     Result writeHeaders(const uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
                         AsyncBufferView::ID bufferID, const char* outOfSpaceError, const char* sizeExceededError,
-                        bool stopAtHeadersEnd);
+                        bool stopAtHeadersEnd, bool unshiftPendingBodyToStream = true);
 
     /// @brief Gets the length of the headers in bytes
     [[nodiscard]] size_t getHeadersLength() const;
+
+    enum class ChunkedState : uint8_t
+    {
+        Size,
+        SizeExtension,
+        SizeLF,
+        Data,
+        DataCR,
+        DataLF,
+        TrailerLineStart,
+        TrailerEndLF,
+        Finished,
+    };
 
     HttpParsedHeaders    parsedHeaders;
     Span<char>           headerMemory;
     AsyncReadableStream* readableStream     = nullptr;
     uint64_t             bodyBytesRemaining = 0;
+    HttpBodyFramingKind  bodyFramingKind    = HttpBodyFramingKind::None;
+    bool                 bodyComplete       = true;
+    bool                 bodyStreamStarted  = false;
+    BodyStream           bodyStream;
+    ChunkedState         chunkedState          = ChunkedState::Size;
+    uint64_t             chunkedChunkSize      = 0;
+    uint64_t             chunkedBytesRemaining = 0;
+    bool                 chunkedSizeHasDigits  = false;
 };
 
 /// @brief Incoming HTTP request received by the server
@@ -160,8 +226,7 @@ struct SC_COMPILER_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
   private:
     friend struct HttpAsyncClient;
 
-    void reset(Span<char> memory);
-
+    void   reset(Span<char> memory);
     Result writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
                         AsyncBufferView::ID bufferID);
 };
@@ -169,10 +234,42 @@ struct SC_COMPILER_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
 /// @brief Outgoing message from the perspective of the participants of an HTTP transaction
 struct SC_COMPILER_EXPORT HttpOutgoingMessage
 {
+    struct SC_COMPILER_EXPORT ChunkedWritableStream : public AsyncWritableStream
+    {
+        ChunkedWritableStream();
+
+        Result init(AsyncBuffersPool& buffersPool, AsyncWritableStream& destination);
+
+      protected:
+        virtual Result asyncWrite(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)> cb) override;
+        virtual bool   canEndWritable() override;
+
+      private:
+        void onChunkHeaderWritten(AsyncBufferView::ID);
+        void onChunkBodyWritten(AsyncBufferView::ID);
+        void onChunkTerminatorWritten(AsyncBufferView::ID);
+        void onFinalChunkWritten(AsyncBufferView::ID);
+
+        AsyncWritableStream* destination = nullptr;
+
+        AsyncBufferView::ID                 currentBodyBufferID;
+        Function<void(AsyncBufferView::ID)> currentBodyCallback;
+
+        bool finalChunkStarted = false;
+        bool finalChunkWritten = false;
+
+        char headerStorage[20] = {0};
+
+        Request queue[4];
+    };
+
     /// @brief Writes an http header to this response
     /// @return Valid Result if header was added successfully.
     /// @warning Adding a "Connection" header can fail if keep-alive has been force disabled
     Result addHeader(StringSpan headerName, StringSpan headerValue);
+
+    /// @brief Enables chunked transfer-encoding for subsequent body writes
+    Result setChunkedTransferEncoding();
 
     /// @brief Start sending response headers, before sending any data
     Result sendHeaders(Function<void(AsyncBufferView::ID)> callback = {});
@@ -207,11 +304,16 @@ struct SC_COMPILER_EXPORT HttpOutgoingMessage
     };
 
     void setHeaderMemory(Span<char> memory);
-    void setWritableStream(AsyncWritableStream& stream) { writableStream = &stream; }
+    void setWritableStream(AsyncWritableStream& stream)
+    {
+        destinationStream = &stream;
+        writableStream    = &stream;
+    }
 
     [[nodiscard]] bool hasHeader(KnownHeader header) const;
     [[nodiscard]] bool hasSentHeaders() const { return headersSent; }
     [[nodiscard]] bool hasEnded() const { return endCalled; }
+    [[nodiscard]] bool isChunkedTransferEncodingEnabled() const { return chunkedTransferEncodingEnabled; }
 
     HttpFixedBufferWriter responseHeaders;
     Span<char>            headerMemory;
@@ -219,16 +321,19 @@ struct SC_COMPILER_EXPORT HttpOutgoingMessage
     bool headersSent = false;
     bool endCalled   = false;
 
-    bool forceDisableKeepAlive = false; ///< Whether keep alive has been force disabled permanently
-    bool keepAlive             = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
-    bool connectionHeaderAdded = false; ///< Whether Connection header was manually added
-    bool hostHeaderAdded       = false;
-    bool userAgentHeaderAdded  = false;
-    bool contentLengthAdded    = false;
-    bool contentTypeAdded      = false;
-    bool transferEncodingAdded = false;
+    bool forceDisableKeepAlive          = false; ///< Whether keep alive has been force disabled permanently
+    bool keepAlive                      = true;  ///< Whether to keep connection alive (HTTP/1.1 default)
+    bool connectionHeaderAdded          = false; ///< Whether Connection header was manually added
+    bool hostHeaderAdded                = false;
+    bool userAgentHeaderAdded           = false;
+    bool contentLengthAdded             = false;
+    bool contentTypeAdded               = false;
+    bool transferEncodingAdded          = false;
+    bool chunkedTransferEncodingEnabled = false;
 
-    AsyncWritableStream* writableStream = nullptr;
+    AsyncWritableStream*  destinationStream = nullptr;
+    AsyncWritableStream*  writableStream    = nullptr;
+    ChunkedWritableStream chunkedWritableStream;
 };
 
 /// @brief Outgoing HTTP response sent by the server
@@ -263,6 +368,7 @@ struct SC_COMPILER_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
     Result setExpectedBodyLength(uint64_t value);
     Result setBody(Span<const char> value);
     Result setBody(StringSpan value) { return setBody(value.toCharSpan()); }
+    Result setBody(AsyncReadableStream& stream);
     void   setBody(AsyncReadableStream& stream, uint64_t contentLengthValue);
     void   setMultipart(HttpMultipartWriter& value);
     Result sendHeaders(Function<void(AsyncBufferView::ID)> callback = {});
@@ -272,6 +378,7 @@ struct SC_COMPILER_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
     [[nodiscard]] StringSpan getURL() const { return url; }
     [[nodiscard]] BodyType   getBodyType() const { return bodyType; }
     [[nodiscard]] uint64_t   getContentLength() const { return contentLength; }
+    [[nodiscard]] bool       usesChunkedTransferEncoding() const { return chunkedTransferEncodingEnabled; }
 
   private:
     friend struct HttpAsyncClient;

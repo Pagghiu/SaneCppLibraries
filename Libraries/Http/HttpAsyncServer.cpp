@@ -122,6 +122,14 @@ struct HttpAsyncServer::EventDataListener
     void operator()(AsyncBufferView::ID bufferID) { pself.onStreamReceive(client, bufferID); }
 };
 
+struct HttpAsyncServer::EventBodyDataListener
+{
+    HttpAsyncServer& pself;
+    HttpConnection&  client;
+
+    void operator()(AsyncBufferView::ID bufferID) { pself.onRequestBodyData(client, bufferID); }
+};
+
 struct HttpAsyncServer::EventEndListener
 {
     HttpAsyncServer& pself;
@@ -187,14 +195,54 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         {
             SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.removeListener(EventEndListener{*this, client}));
         }
-        const size_t contentLength = static_cast<size_t>(client.request.getBodyBytesRemaining());
-        if (contentLength == 0)
+        StringSpan transferEncoding;
+        const bool hasTransferEncoding = client.request.getHeader("Transfer-Encoding", transferEncoding);
+        if (hasTransferEncoding)
         {
-            // If there is no body, we pause the stream
-            client.readableSocketStream.pause();
+            Result prepareBody = client.request.prepareBodyStream(client.buffersPool,
+                                                                  {[&client]() -> Result
+                                                                   {
+                                                                       if (not client.request.isBodyComplete())
+                                                                       {
+                                                                           client.readableSocketStream.resumeReading();
+                                                                       }
+                                                                       return Result(true);
+                                                                   }},
+                                                                  false);
+            if (not prepareBody)
+            {
+                closeAsync(client);
+                return;
+            }
+        }
+        else if (client.request.getBodyBytesRemaining() > 0)
+        {
+            client.request.setBodyFramingKind(HttpBodyFramingKind::ContentLength);
+            client.request.setBodyComplete(false);
+        }
+        else
+        {
+            client.request.setBodyFramingKind(HttpBodyFramingKind::None);
+            client.request.setBodyComplete(true);
+        }
+
+        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked)
+        {
+            const bool addedBodyData =
+                client.readableSocketStream.eventData.addListener(EventBodyDataListener{*this, client});
+            SC_ASSERT_RELEASE(addedBodyData);
         }
 
         onRequest(client);
+
+        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::None)
+        {
+            client.readableSocketStream.pause();
+        }
+        else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked)
+        {
+            SC_TRUST_RESULT(client.request.startBodyStream());
+        }
 
         // Using a struct instead of a lambda so it can unregister itself
         struct AfterWrite
@@ -245,6 +293,31 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
     }
 }
 
+void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView::ID bufferID)
+{
+    Span<const char> readData;
+    Result           readable = client.buffersPool.getReadableData(bufferID, readData);
+    if (not readable)
+    {
+        closeAsync(client);
+        return;
+    }
+
+    Result process = client.request.processBodyData(client.readableSocketStream, bufferID, readData, true);
+    if (not process)
+    {
+        closeAsync(client);
+        return;
+    }
+
+    if (client.request.isBodyComplete())
+    {
+        const bool removed = client.readableSocketStream.eventData.removeListener(EventBodyDataListener{*this, client});
+        SC_COMPILER_UNUSED(removed);
+        client.readableSocketStream.pause();
+    }
+}
+
 void HttpAsyncServer::closeAsync(HttpConnection& client)
 {
     if (client.state == HttpConnection::State::Inactive)
@@ -256,6 +329,8 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
     // These events may or may not be registered depending on when the close request arrives
     EventDataListener dataListener{*this, client};
     (void)client.readableSocketStream.eventData.removeListener(dataListener);
+    EventBodyDataListener bodyDataListener{*this, client};
+    (void)client.readableSocketStream.eventData.removeListener(bodyDataListener);
     EventEndListener endListener{*this, client};
     (void)client.readableSocketStream.eventEnd.removeListener(endListener);
 

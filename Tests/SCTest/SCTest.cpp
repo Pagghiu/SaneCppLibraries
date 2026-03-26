@@ -52,6 +52,7 @@ void runHashingTest(TestReport& report);
 
 // Http
 void runHttpParserTest(TestReport& report);
+void runHttpAsyncClientTest(TestReport& report);
 void runHttpAsyncServerTest(TestReport& report);
 void runHttpAsyncFileServerTest(TestReport& report);
 void runHttpURLParserTest(TestReport& report);
@@ -192,6 +193,7 @@ int main(int argc, const char* argv[])
 
     // Http tests
     runHttpParserTest(report);
+    runHttpAsyncClientTest(report);
     runHttpAsyncServerTest(report);
     runHttpAsyncFileServerTest(report);
     runHttpURLParserTest(report);

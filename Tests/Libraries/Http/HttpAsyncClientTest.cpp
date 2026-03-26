@@ -1,0 +1,1100 @@
+// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#include "Libraries/Http/HttpAsyncClient.h"
+#include "HttpStringAppend.h"
+#include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Foundation/Assert.h"
+#include "Libraries/Http/HttpAsyncFileServer.h"
+#include "Libraries/Http/HttpAsyncServer.h"
+#include "Libraries/Memory/Buffer.h"
+#include "Libraries/Memory/String.h"
+#include "Libraries/Strings/StringBuilder.h"
+#include "Libraries/Strings/StringView.h"
+#include "Libraries/Testing/Testing.h"
+
+namespace SC
+{
+struct HttpAsyncClientTest;
+}
+
+namespace
+{
+using ServerConnection = SC::HttpAsyncConnection<3, 3, 8 * 1024, 8 * 1024>;
+using ClientConnection = SC::HttpAsyncClientConnection<4, 6, 8 * 1024, 8 * 1024>;
+using size_t           = SC::size_t;
+
+struct ResponseCollector
+{
+    SC::Buffer buffer;
+
+    SC::AsyncReadableStream*     readable = nullptr;
+    SC::HttpAsyncClientResponse* response = nullptr;
+
+    SC::Function<void(SC::HttpAsyncClientResponse&)> onEnd;
+
+    void reset() { buffer = {}; }
+
+    SC::Result append(SC::Span<const char> data)
+    {
+        SC::GrowableBuffer<SC::Buffer> gb(buffer);
+
+        SC::HttpStringAppend& sb = static_cast<SC::HttpStringAppend&>(static_cast<SC::IGrowableBuffer&>(gb));
+        return SC::Result(sb.append(data, 0));
+    }
+
+    void attach(SC::HttpAsyncClientResponse&                       newResponse,
+                SC::Function<void(SC::HttpAsyncClientResponse&)>&& endCallback = {})
+    {
+        detach();
+        reset();
+        response = &newResponse;
+        readable = &newResponse.getReadableStream();
+        onEnd    = SC::move(endCallback);
+
+        const bool added = readable->eventData.addListener<ResponseCollector, &ResponseCollector::onData>(*this);
+        SC_ASSERT_RELEASE(added);
+        if (onEnd.isValid())
+        {
+            const bool addedEnd =
+                readable->eventEnd.addListener<ResponseCollector, &ResponseCollector::onStreamEnd>(*this);
+            SC_ASSERT_RELEASE(addedEnd);
+        }
+    }
+
+    void detach()
+    {
+        if (readable)
+        {
+            (void)readable->eventData.removeListener<ResponseCollector, &ResponseCollector::onData>(*this);
+            if (onEnd.isValid())
+            {
+                (void)readable->eventEnd.removeListener<ResponseCollector, &ResponseCollector::onStreamEnd>(*this);
+            }
+            readable = nullptr;
+        }
+        response = nullptr;
+        onEnd    = {};
+    }
+
+    void onData(SC::AsyncBufferView::ID bufferID)
+    {
+        SC::Span<const char> data;
+        SC_ASSERT_RELEASE(readable != nullptr);
+        SC_ASSERT_RELEASE(readable->getBuffersPool().getReadableData(bufferID, data));
+        SC_ASSERT_RELEASE(append(data));
+    }
+
+    void onStreamEnd()
+    {
+        SC_ASSERT_RELEASE(response != nullptr);
+        if (onEnd.isValid())
+        {
+            onEnd(*response);
+        }
+    }
+
+    [[nodiscard]] SC::StringSpan view() const { return {buffer.toSpanConst(), false, SC::StringEncoding::Ascii}; }
+};
+
+struct ChunkedBodyStream : public SC::AsyncReadableStream
+{
+    SC::AsyncReadableStream::Request readQueue[2];
+
+    SC::AsyncBufferView::ID rootBufferID;
+    SC::Span<const char>    sourceData;
+
+    size_t offset    = 0;
+    size_t chunkSize = 0;
+
+    ChunkedBodyStream() { setReadQueue(readQueue); }
+
+    SC::Result init(SC::AsyncBuffersPool& pool, SC::Span<const char> data, size_t chunk)
+    {
+        sourceData   = data;
+        offset       = 0;
+        chunkSize    = chunk;
+        rootBufferID = {};
+        SC_TRY(SC::AsyncReadableStream::init(pool));
+        SC_TRY(pool.pushBuffer(SC::AsyncBufferView(data), rootBufferID));
+        pool.refBuffer(rootBufferID);
+        return SC::Result(true);
+    }
+
+  private:
+    virtual SC::Result asyncRead() override
+    {
+        if (offset >= sourceData.sizeInBytes())
+        {
+            pushEnd();
+            return SC::Result(true);
+        }
+
+        const size_t remaining = sourceData.sizeInBytes() - offset;
+        const size_t length    = chunkSize < remaining ? chunkSize : remaining;
+
+        SC::AsyncBufferView::ID childID;
+        SC_TRY(getBuffersPool().createChildView(rootBufferID, offset, length, childID));
+        const bool shouldContinue = push(childID, length);
+        getBuffersPool().unrefBuffer(childID);
+        offset += length;
+        reactivate(offset < sourceData.sizeInBytes() and shouldContinue);
+        return SC::Result(true);
+    }
+
+    virtual SC::Result asyncDestroyReadable() override
+    {
+        if (rootBufferID.isValid())
+        {
+            getBuffersPool().unrefBuffer(rootBufferID);
+            rootBufferID = {};
+        }
+        return finishedDestroyingReadable();
+    }
+};
+
+struct TimeoutGuard
+{
+    SC::AsyncLoopTimeout timeout;
+
+    SC::Result start(SC::AsyncEventLoop& loop, SC::TimeMs duration)
+    {
+        timeout.callback = [](SC::AsyncLoopTimeout::Result&)
+        { SC_ASSERT_RELEASE("Test never finished. Event loop timeout expired." && false); };
+        SC_TRY(timeout.start(loop, duration));
+        loop.excludeFromActiveCount(timeout);
+        return SC::Result(true);
+    }
+};
+} // namespace
+
+struct SC::HttpAsyncClientTest : public SC::TestCase
+{
+    HttpAsyncClientTest(SC::TestReport& report) : TestCase(report, "HttpAsyncClientTest")
+    {
+        if (test_section("basic GET"))
+        {
+            basicGet();
+        }
+        if (test_section("PUT with span body"))
+        {
+            putSpanBody();
+        }
+        if (test_section("PUT with streamed body"))
+        {
+            putStreamBody();
+        }
+        if (test_section("PUT with chunked streamed body"))
+        {
+            putChunkedStreamBody();
+        }
+        if (test_section("PUT with writable body"))
+        {
+            putWritableBody();
+        }
+        if (test_section("keep-alive reuse and origin reconnect"))
+        {
+            keepAliveAndReconnect();
+        }
+        if (test_section("zero-length response"))
+        {
+            zeroLengthResponse();
+        }
+        if (test_section("chunked response"))
+        {
+            chunkedResponse();
+        }
+        if (test_section("chunked response rejects trailers"))
+        {
+            chunkedResponseRejectsTrailers();
+        }
+        if (test_section("close-delimited response"))
+        {
+            closeDelimitedResponse();
+        }
+        if (test_section("multipart upload"))
+        {
+            multipartUpload();
+        }
+    }
+
+    void basicGet();
+    void putSpanBody();
+    void putStreamBody();
+    void putChunkedStreamBody();
+    void putWritableBody();
+    void keepAliveAndReconnect();
+    void zeroLengthResponse();
+    void chunkedResponse();
+    void chunkedResponseRejectsTrailers();
+    void closeDelimitedResponse();
+    void multipartUpload();
+};
+
+void SC::HttpAsyncClientTest::basicGet()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[2];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26100);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "5"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("hello"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+
+    TimeoutGuard timeout;
+    String       url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/hello", port));
+
+    //! [HttpAsyncClientBasicSnippet]
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(StringView(ctx.collector.view()) == "hello");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    //! [HttpAsyncClientBasicSnippet]
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::putSpanBody()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+
+    ServerConnection    connections[1];
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
+
+    const uint16_t port = report.mapPort(26101);
+
+    ThreadPool threadPool;
+    if (loop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+    SC_TEST_EXPECT(fileServer.init(threadPool, loop, webServerFolder));
+    struct ServerContext
+    {
+        HttpAsyncFileServer&                 fileServer;
+        HttpAsyncFileServer::StreamQueue<2>* streams;
+    } serverCtx          = {fileServer, streams};
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(
+            serverCtx.fileServer.handleRequest(serverCtx.streams[connection.getConnectionID().getIndex()], connection));
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    FileSystem        fs;
+
+    String url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        FileSystem&        fs;
+    } ctx = {collector, httpServer, fs};
+
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/client-put-span.txt", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 201);
+                                 String content;
+                                 SC_TEST_EXPECT(ctx.fs.read("client-put-span.txt", content));
+                                 SC_TEST_EXPECT(content == "InlineBody");
+                                 SC_TEST_EXPECT(ctx.fs.removeFile("client-put-span.txt"));
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.put(loop, url.view(), StringSpan("InlineBody")));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::putStreamBody()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+
+    ServerConnection    connections[1];
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
+
+    const uint16_t port = report.mapPort(26102);
+
+    ThreadPool threadPool;
+    if (loop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+    SC_TEST_EXPECT(fileServer.init(threadPool, loop, webServerFolder));
+    struct ServerContext
+    {
+        HttpAsyncFileServer&                 fileServer;
+        HttpAsyncFileServer::StreamQueue<2>* streams;
+    } serverCtx          = {fileServer, streams};
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(
+            serverCtx.fileServer.handleRequest(serverCtx.streams[connection.getConnectionID().getIndex()], connection));
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    ChunkedBodyStream bodyStream;
+    TimeoutGuard      timeout;
+
+    FileSystem fs;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        FileSystem&        fs;
+    } ctx = {collector, httpServer, fs};
+
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/client-put-stream.txt", port));
+    SC_TEST_EXPECT(bodyStream.init(clientStorage.buffersPool, StringSpan("ChunkedBody").toCharSpan(), 3));
+
+    //! [HttpAsyncClientStreamSnippet]
+    client.onPrepareRequest = [this, &bodyStream](HttpAsyncClientRequest& request)
+    {
+        request.setBody(bodyStream, 11);
+        SC_TEST_EXPECT(request.sendHeaders());
+    };
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 201);
+                                 String content;
+                                 SC_TEST_EXPECT(ctx.fs.read("client-put-stream.txt", content));
+                                 SC_TEST_EXPECT(content == "ChunkedBody");
+                                 SC_TEST_EXPECT(ctx.fs.removeFile("client-put-stream.txt"));
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(client.start(loop, HttpParser::Method::HttpPUT, url.view()));
+    //! [HttpAsyncClientStreamSnippet]
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::putChunkedStreamBody()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26111);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    struct ServerContext
+    {
+        HttpConnection* connection = nullptr;
+
+        Buffer body;
+        bool   responseSent = false;
+
+        Result append(Span<const char> data)
+        {
+            GrowableBuffer<Buffer> gb(body);
+            HttpStringAppend&      sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+            return Result(sb.append(data, 0));
+        }
+
+        void onData(AsyncBufferView::ID bufferID)
+        {
+            SC_ASSERT_RELEASE(connection != nullptr);
+            AsyncReadableStream& readable = connection->request.getReadableStream();
+            Span<const char>     data;
+            SC_ASSERT_RELEASE(readable.getBuffersPool().getReadableData(bufferID, data));
+            SC_ASSERT_RELEASE(append(data));
+            SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+        }
+
+        void onEnd()
+        {
+            SC_ASSERT_RELEASE(connection != nullptr);
+            SC_ASSERT_RELEASE(connection->request.getBodyFramingKind() == HttpBodyFramingKind::Chunked);
+            SC_ASSERT_RELEASE(StringView(StringSpan(body.toSpanConst(), false, StringEncoding::Ascii)) ==
+                              "ChunkedBody");
+            responseSent = true;
+            SC_ASSERT_RELEASE(connection->response.startResponse(200));
+            SC_ASSERT_RELEASE(connection->response.addHeader("Content-Length", "6"));
+            SC_ASSERT_RELEASE(connection->response.sendHeaders());
+            SC_ASSERT_RELEASE(connection->response.getWritableStream().write("stored"));
+            SC_ASSERT_RELEASE(connection->response.end());
+        }
+
+        [[nodiscard]] StringSpan view() const { return {body.toSpanConst(), false, StringEncoding::Ascii}; }
+    } serverCtx;
+
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        serverCtx.connection = &connection;
+        const bool addedData =
+            connection.request.getReadableStream().eventData.addListener<ServerContext, &ServerContext::onData>(
+                serverCtx);
+        SC_TEST_EXPECT(addedData);
+        const bool addedEnd =
+            connection.request.getReadableStream().eventEnd.addListener<ServerContext, &ServerContext::onEnd>(
+                serverCtx);
+        SC_TEST_EXPECT(addedEnd);
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    ChunkedBodyStream bodyStream;
+    TimeoutGuard      timeout;
+
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        ServerContext&     serverCtx;
+    } ctx = {collector, httpServer, serverCtx};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/chunked-upload", port));
+    SC_TEST_EXPECT(bodyStream.init(clientStorage.buffersPool, StringSpan("ChunkedBody").toCharSpan(), 3));
+
+    client.onPrepareRequest = [this, &bodyStream](HttpAsyncClientRequest& request)
+    {
+        SC_TEST_EXPECT(request.setBody(bodyStream));
+        SC_TEST_EXPECT(request.sendHeaders());
+    };
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(StringView(ctx.collector.view()) == "stored");
+                                 SC_TEST_EXPECT(StringView(ctx.serverCtx.view()) == "ChunkedBody");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.start(loop, HttpParser::Method::HttpPUT, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::putWritableBody()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26108);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    struct ServerContext
+    {
+        HttpConnection* connection = nullptr;
+
+        Buffer body;
+        bool   responseSent = false;
+
+        Result append(Span<const char> data)
+        {
+            GrowableBuffer<Buffer> gb(body);
+            HttpStringAppend&      sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+            return Result(sb.append(data, 0));
+        }
+
+        void onData(AsyncBufferView::ID bufferID)
+        {
+            SC_ASSERT_RELEASE(connection != nullptr);
+            AsyncReadableStream& readable = connection->request.getReadableStream();
+            Span<const char>     data;
+            SC_ASSERT_RELEASE(readable.getBuffersPool().getReadableData(bufferID, data));
+            SC_ASSERT_RELEASE(data.sizeInBytes() <= connection->request.getBodyBytesRemaining());
+            SC_ASSERT_RELEASE(append(data));
+            SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+            if (connection->request.getBodyBytesRemaining() == 0 and not responseSent)
+            {
+                responseSent       = true;
+                const bool removed = readable.eventData.removeListener<ServerContext, &ServerContext::onData>(*this);
+                SC_ASSERT_RELEASE(removed);
+                SC_ASSERT_RELEASE(connection->response.startResponse(200));
+                SC_ASSERT_RELEASE(connection->response.addHeader("Content-Length", "6"));
+                SC_ASSERT_RELEASE(connection->response.sendHeaders());
+                SC_ASSERT_RELEASE(connection->response.getWritableStream().write("stored"));
+                SC_ASSERT_RELEASE(connection->response.end());
+            }
+        }
+
+        [[nodiscard]] StringSpan view() const { return {body.toSpanConst(), false, StringEncoding::Ascii}; }
+    } serverCtx;
+
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        serverCtx.connection = &connection;
+        SC_TEST_EXPECT(connection.request.getBodyBytesRemaining() == 11);
+        const bool added =
+            connection.request.getReadableStream().eventData.addListener<ServerContext, &ServerContext::onData>(
+                serverCtx);
+        SC_TEST_EXPECT(added);
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+
+    String url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        ServerContext&     serverCtx;
+    } ctx = {collector, httpServer, serverCtx};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/writable", port));
+
+    client.onPrepareRequest = [this](HttpAsyncClientRequest& request)
+    {
+        SC_TEST_EXPECT(request.setExpectedBodyLength(11));
+        SC_TEST_EXPECT(request.sendHeaders());
+        SC_TEST_EXPECT(request.getWritableStream().write("ChunkedBody"));
+        SC_TEST_EXPECT(request.end());
+    };
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(StringView(ctx.collector.view()) == "stored");
+                                 SC_TEST_EXPECT(StringView(ctx.serverCtx.view()) == "ChunkedBody");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.start(loop, HttpParser::Method::HttpPUT, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::keepAliveAndReconnect()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection server1Connections[2];
+    ServerConnection server2Connections[2];
+    HttpAsyncServer  server1;
+    HttpAsyncServer  server2;
+    const uint16_t   port1 = report.mapPort(26103);
+    const uint16_t   port2 = report.mapPort(26104);
+    SC_TEST_EXPECT(server1.init(Span<ServerConnection>(server1Connections)));
+    SC_TEST_EXPECT(server2.init(Span<ServerConnection>(server2Connections)));
+    SC_TEST_EXPECT(server1.start(loop, "127.0.0.1", port1));
+    SC_TEST_EXPECT(server2.start(loop, "127.0.0.1", port2));
+
+    int server1Requests = 0;
+    int server2Requests = 0;
+    server1.onRequest   = [this, &server1Requests](HttpConnection& connection)
+    {
+        server1Requests++;
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "5"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("first"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+    server2.onRequest = [this, &server2Requests](HttpConnection& connection)
+    {
+        server2Requests++;
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "6"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("second"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    AsyncLoopTimeout  deferredStep;
+
+    String url1 = StringEncoding::Ascii;
+    String url2 = StringEncoding::Ascii;
+
+    int completions = 0;
+    struct Context
+    {
+        enum class DeferredAction : uint8_t
+        {
+            None,
+            RepeatFirstRequest,
+            SecondOriginRequest,
+            StopServers,
+        };
+
+        ResponseCollector& collector;
+
+        HttpAsyncClient& client;
+        HttpAsyncServer& server1;
+        HttpAsyncServer& server2;
+
+        String& url1;
+        String& url2;
+
+        int& completions;
+        int& server1Requests;
+        int& server2Requests;
+
+        AsyncEventLoop&   loop;
+        AsyncLoopTimeout& deferredStep;
+
+        DeferredAction deferredAction = DeferredAction::None;
+
+        Result scheduleDeferred(DeferredAction action)
+        {
+            deferredAction = action;
+            deferredStep.callback.bind<Context, &Context::onDeferred>(*this);
+            SC_TRY(deferredStep.start(loop, TimeMs{0}));
+            return Result(true);
+        }
+
+        void onDeferred(AsyncLoopTimeout::Result&)
+        {
+            switch (deferredAction)
+            {
+            case DeferredAction::RepeatFirstRequest: SC_ASSERT_RELEASE(client.get(loop, url1.view(), true)); break;
+            case DeferredAction::SecondOriginRequest: SC_ASSERT_RELEASE(client.get(loop, url2.view(), true)); break;
+            case DeferredAction::StopServers:
+                SC_ASSERT_RELEASE(server1.stop());
+                SC_ASSERT_RELEASE(server2.stop());
+                break;
+            case DeferredAction::None: break;
+            }
+            deferredAction = DeferredAction::None;
+        }
+    } ctx = {collector,   client,          server1,         server2, url1,        url2,
+             completions, server1Requests, server2Requests, loop,    deferredStep};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url1, "http://127.0.0.1:{}/first", port1));
+    SC_TEST_EXPECT(StringBuilder::format(url2, "http://127.0.0.1:{}/second", port2));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 ctx.completions++;
+                                 if (ctx.completions == 1)
+                                 {
+                                     SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                     SC_TEST_EXPECT(StringView(ctx.collector.view()) == "first");
+                                     SC_TEST_EXPECT(ctx.scheduleDeferred(Context::DeferredAction::RepeatFirstRequest));
+                                 }
+                                 else if (ctx.completions == 2)
+                                 {
+                                     SC_TEST_EXPECT(StringView(ctx.collector.view()) == "first");
+                                     SC_TEST_EXPECT(ctx.scheduleDeferred(Context::DeferredAction::SecondOriginRequest));
+                                 }
+                                 else
+                                 {
+                                     SC_TEST_EXPECT(StringView(ctx.collector.view()) == "second");
+                                     SC_TEST_EXPECT(ctx.server1Requests == 2);
+                                     SC_TEST_EXPECT(ctx.server2Requests == 1);
+                                     SC_TEST_EXPECT(ctx.scheduleDeferred(Context::DeferredAction::StopServers));
+                                 }
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{3000}));
+    SC_TEST_EXPECT(client.get(loop, url1.view(), true));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(server1.close());
+    SC_TEST_EXPECT(server2.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::zeroLengthResponse()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26105);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "0"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/empty", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view().sizeInBytes() == 0);
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::chunkedResponse()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26106);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.setChunkedTransferEncoding());
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("hello"));
+        SC_TEST_EXPECT(connection.response.getWritableStream().write(" world"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/chunked", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        SC_TEST_EXPECT(response.getBodyFramingKind() == HttpBodyFramingKind::Chunked);
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view() == "hello world");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::chunkedResponseRejectsTrailers()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26109);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Transfer-Encoding", "chunked"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("5\r\nhello\r\n0\r\nX-Test: yes\r\n\r\n"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    TimeoutGuard     timeout;
+    struct Context
+    {
+        bool             sawError;
+        HttpAsyncServer& httpServer;
+    } ctx = {false, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/chunked-trailer", port));
+
+    client.onResponse = [this](HttpAsyncClientResponse&) {};
+    client.onError    = [this, &ctx](Result result)
+    {
+        ctx.sawError = true;
+        SC_TEST_EXPECT(not result);
+        SC_TEST_EXPECT(ctx.httpServer.stop());
+    };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(ctx.sawError);
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::closeDelimitedResponse()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26110);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        connection.response.setKeepAlive(false);
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("goodbye"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/close-delimited", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        SC_TEST_EXPECT(response.getBodyFramingKind() == HttpBodyFramingKind::CloseDelimited);
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view() == "goodbye");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::multipartUpload()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+
+    ServerConnection    connections[1];
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
+
+    const uint16_t port = report.mapPort(26107);
+
+    ThreadPool threadPool;
+    if (loop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+    SC_TEST_EXPECT(fileServer.init(threadPool, loop, webServerFolder));
+    struct ServerContext
+    {
+        HttpAsyncFileServer&                 fileServer;
+        HttpAsyncFileServer::StreamQueue<2>* streams;
+    } serverCtx = {fileServer, streams};
+
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(
+            serverCtx.fileServer.handleRequest(serverCtx.streams[connection.getConnectionID().getIndex()], connection));
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    FileSystem        fs;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        FileSystem&        fs;
+    } ctx = {collector, httpServer, fs};
+
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+    SC_TEST_EXPECT(client.init(clientStorage));
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/upload", port));
+    HttpMultipartWriter writer;
+    SC_TEST_EXPECT(writer.setBoundary("----SCMultipartBoundary"));
+    SC_TEST_EXPECT(writer.addFile("file", "multipart-public.txt", StringSpan("MultipartContent").toCharSpan()));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 201);
+                                 String content;
+                                 SC_TEST_EXPECT(ctx.fs.read("multipart-public.txt", content));
+                                 SC_TEST_EXPECT(content == "MultipartContent");
+                                 SC_TEST_EXPECT(ctx.fs.removeFile("multipart-public.txt"));
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.postMultipart(loop, url.view(), writer));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+namespace SC
+{
+void runHttpAsyncClientTest(SC::TestReport& report) { HttpAsyncClientTest test(report); }
+} // namespace SC

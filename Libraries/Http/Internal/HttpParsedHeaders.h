@@ -27,7 +27,7 @@ struct SC_COMPILER_EXPORT HttpParsedHeaders
     template <typename OnParserResult>
     Result writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
                         AsyncBufferView::ID bufferID, const char* outOfSpaceError, const char* sizeExceededError,
-                        bool stopAtHeadersEnd, OnParserResult&& onParserResult)
+                        bool stopAtHeadersEnd, bool unshiftPendingBodyToStream, OnParserResult&& onParserResult)
     {
         if (headersEndReceived)
         {
@@ -84,7 +84,7 @@ struct SC_COMPILER_EXPORT HttpParsedHeaders
         SC_TRY(parsedSuccessfully);
         headersEndReceived = true;
 
-        if (bytesToCopy < readData.sizeInBytes())
+        if (unshiftPendingBodyToStream and bytesToCopy < readData.sizeInBytes())
         {
             SC_TRY(unshiftPendingBody(readData, stream, bufferID, bytesToCopy));
         }

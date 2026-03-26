@@ -216,37 +216,21 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     fd.detach();
     stream.writableFileStream.setAutoCloseDescriptor(true);
 
-    struct OnFileWritten
-    {
-        HttpConnection&              client;
-        HttpAsyncFileServer::Stream& stream;
-
-        void operator()()
-        {
-            SC_ASSERT_RELEASE(stream.writableFileStream.eventFinish.removeListener(*this));
-            (void)client.response.startResponse(201);
-            (void)client.response.addHeader("Content-Length", "0");
-            (void)client.response.sendHeaders();
-            (void)client.response.end();
-        }
-    };
-    SC_TRY(stream.writableFileStream.eventFinish.addListener(OnFileWritten{connection, stream}));
-
     HttpConnection& asyncConnection = static_cast<HttpConnection&>(connection);
+
+    stream.putFileListener.connection     = &asyncConnection;
+    stream.putFileListener.remainingBytes = totalFileUploadBytes;
 
     connection.pipeline.source   = &connection.request.getReadableStream();
     connection.pipeline.sinks[0] = &stream.writableFileStream;
     SC_TRY(connection.pipeline.pipe());
-    SC_TRY(connection.pipeline.start());
-
-    stream.putFileListener.connection     = &asyncConnection;
-    stream.putFileListener.remainingBytes = totalFileUploadBytes;
     // Add this listener after the pipeline one, so the body has already been dispatched to the writable stream.
     const bool addedBodyListener =
         connection.request.getReadableStream()
             .eventData.addListener<HttpAsyncFileServer::Stream::PutFileListener,
                                    &HttpAsyncFileServer::Stream::PutFileListener::onData>(stream.putFileListener);
     SC_ASSERT_RELEASE(addedBodyListener);
+    SC_TRY(connection.pipeline.start());
     return Result(true);
 }
 
@@ -267,16 +251,13 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
             readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
                                               &HttpAsyncFileServer::Stream::PutFileListener::onData>(*this);
         SC_ASSERT_RELEASE(removedBodyListener);
-        if (writable.isStillWriting())
+        const bool addedDrainListener =
+            writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                            &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
+        SC_ASSERT_RELEASE(addedDrainListener);
+        if (not writable.isStillWriting())
         {
-            const bool addedDrainListener =
-                writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
-                                                &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
-            SC_ASSERT_RELEASE(addedDrainListener);
-        }
-        else
-        {
-            writable.end();
+            onDrain();
         }
     }
     else if (remainingBytes > data.sizeInBytes())
@@ -303,16 +284,13 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
             readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
                                               &HttpAsyncFileServer::Stream::PutFileListener::onData>(*this);
         SC_ASSERT_RELEASE(removedBodyListener);
-        if (writable.isStillWriting())
+        const bool addedDrainListener =
+            writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
+                                            &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
+        SC_ASSERT_RELEASE(addedDrainListener);
+        if (not writable.isStillWriting())
         {
-            const bool addedDrainListener =
-                writable.eventDrain.addListener<HttpAsyncFileServer::Stream::PutFileListener,
-                                                &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
-            SC_ASSERT_RELEASE(addedDrainListener);
-        }
-        else
-        {
-            writable.end();
+            onDrain();
         }
     }
 }
@@ -325,7 +303,11 @@ void HttpAsyncFileServer::Stream::PutFileListener::onDrain()
         writable.eventDrain.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
                                            &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
     SC_ASSERT_RELEASE(removedDrainListener);
-    writable.end();
+    writable.destroy();
+    SC_ASSERT_RELEASE(connection->response.startResponse(201));
+    SC_ASSERT_RELEASE(connection->response.addHeader("Content-Length", "0"));
+    SC_ASSERT_RELEASE(connection->response.sendHeaders());
+    SC_ASSERT_RELEASE(connection->response.end());
 }
 
 StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)
@@ -454,8 +436,6 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
         connection.request.getReadableStream()
             .eventData.addListener<HttpAsyncFileServer::Stream::MultipartListener,
                                    &HttpAsyncFileServer::Stream::MultipartListener::onData>(stream.multipartListener)));
-
-    (void)connection.request.getReadableStream().start();
 
     return Result(true);
 }

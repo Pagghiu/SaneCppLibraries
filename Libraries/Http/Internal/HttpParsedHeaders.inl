@@ -56,13 +56,9 @@ bool HttpParsedHeaders::findParserToken(HttpParser::Token token, StringSpan& val
 
 size_t HttpParsedHeaders::getHeadersLength() const
 {
-    if (numTokens > 0)
+    if (headersEndReceived)
     {
-        const TokenOffset& last = tokenOffsets[numTokens - 1];
-        if (last.token == HttpParser::Token::HeadersEnd)
-        {
-            return static_cast<size_t>(last.start + last.length);
-        }
+        return readHeaders.sizeInBytes();
     }
     return 0;
 }

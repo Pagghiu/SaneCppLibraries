@@ -7,6 +7,89 @@
 #include "Internal/HttpFixedBufferWriter.inl"
 #include "Internal/HttpParsedHeaders.inl"
 
+namespace
+{
+static bool scHttpHexValue(char current, uint8_t& value)
+{
+    if (current >= '0' and current <= '9')
+    {
+        value = static_cast<uint8_t>(current - '0');
+        return true;
+    }
+    if (current >= 'a' and current <= 'f')
+    {
+        value = static_cast<uint8_t>(10 + current - 'a');
+        return true;
+    }
+    if (current >= 'A' and current <= 'F')
+    {
+        value = static_cast<uint8_t>(10 + current - 'A');
+        return true;
+    }
+    return false;
+}
+
+static bool scHttpTransferEncodingIsChunked(SC::StringSpan value)
+{
+    SC::HttpStringIterator it(value);
+    while (it.match(' ') or it.match('\t'))
+    {
+        if (not it.stepForward())
+        {
+            break;
+        }
+    }
+    const auto start = it;
+    while (not it.isAtEnd() and not it.match(' ') and not it.match('\t'))
+    {
+        if (not it.stepForward())
+        {
+            break;
+        }
+    }
+    SC::StringSpan token = SC::HttpStringIterator::fromIterators(start, it, value.getEncoding());
+    if (not SC::HttpStringIterator::equalsIgnoreCase(token, "chunked"))
+    {
+        return false;
+    }
+    while (it.match(' ') or it.match('\t'))
+    {
+        if (not it.stepForward())
+        {
+            break;
+        }
+    }
+    return it.isAtEnd();
+}
+
+static SC::Result scHttpFormatChunkHeader(uint64_t size, SC::Span<char> storage, SC::StringSpan& header)
+{
+    static constexpr const char HexDigits[] = "0123456789ABCDEF";
+
+    SC_TRY_MSG(storage.sizeInBytes() >= 4, "HttpOutgoingMessage chunk header buffer too small");
+
+    char   reversed[16];
+    size_t numDigits = 0;
+    do
+    {
+        reversed[numDigits++] = HexDigits[size & 0xF];
+        size >>= 4;
+    } while (size > 0 and numDigits < sizeof(reversed));
+
+    SC_TRY_MSG(size == 0, "HttpOutgoingMessage chunk size overflow");
+    SC_TRY_MSG(numDigits + 2 <= storage.sizeInBytes(), "HttpOutgoingMessage chunk header buffer too small");
+
+    for (size_t idx = 0; idx < numDigits; ++idx)
+    {
+        storage[idx] = reversed[numDigits - idx - 1];
+    }
+    storage[numDigits + 0] = '\r';
+    storage[numDigits + 1] = '\n';
+    header                 = SC::StringSpan({storage.data(), numDigits + 2}, false, SC::StringEncoding::Ascii);
+    return SC::Result(true);
+}
+} // namespace
+
 namespace SC
 {
 //-------------------------------------------------------------------------------------------------------
@@ -117,10 +200,48 @@ void HttpConnectionBase::reset()
 //-------------------------------------------------------------------------------------------------------
 void HttpIncomingMessage::resetIncoming(HttpParser::Type type, Span<char> memory)
 {
-    headerMemory       = memory;
-    readableStream     = nullptr;
-    bodyBytesRemaining = 0;
+    bodyStream.destroy();
+    headerMemory          = memory;
+    readableStream        = &bodyStream;
+    bodyBytesRemaining    = 0;
+    bodyFramingKind       = HttpBodyFramingKind::None;
+    bodyComplete          = true;
+    bodyStreamStarted     = false;
+    chunkedState          = ChunkedState::Size;
+    chunkedChunkSize      = 0;
+    chunkedBytesRemaining = 0;
+    chunkedSizeHasDigits  = false;
     parsedHeaders.reset(type, memory);
+}
+
+HttpIncomingMessage::BodyStream::BodyStream()
+{
+    setReadQueue(queue);
+    setAutoDestroy(false);
+}
+
+Result HttpIncomingMessage::BodyStream::begin(AsyncBuffersPool& buffersPool, Function<Result()>&& callback)
+{
+    onReadRequest = move(callback);
+    return init(buffersPool);
+}
+
+bool HttpIncomingMessage::BodyStream::pushBodyData(AsyncBufferView::ID bufferID, size_t sizeInBytes)
+{
+    return push(bufferID, sizeInBytes);
+}
+
+void HttpIncomingMessage::BodyStream::finishBody() { pushEnd(); }
+
+void HttpIncomingMessage::BodyStream::failBody(Result result) { emitError(result); }
+
+Result HttpIncomingMessage::BodyStream::asyncRead()
+{
+    if (onReadRequest.isValid())
+    {
+        return onReadRequest();
+    }
+    return Result(true);
 }
 
 bool HttpIncomingMessage::findParserToken(HttpParser::Token token, StringSpan& res) const
@@ -147,19 +268,290 @@ const AsyncReadableStream& HttpIncomingMessage::getReadableStream() const
 
 Result HttpIncomingMessage::consumeBodyBytes(size_t bytes)
 {
+    if (bodyFramingKind != HttpBodyFramingKind::ContentLength)
+    {
+        return Result(true);
+    }
     SC_TRY_MSG(bytes <= bodyBytesRemaining, "HttpIncomingMessage body exceeds Content-Length");
     bodyBytesRemaining -= bytes;
     return Result(true);
 }
 
+Result HttpIncomingMessage::initBodyStream(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest)
+{
+    bodyStream.destroy();
+    attachReadableStream(bodyStream);
+    bodyStreamStarted = false;
+    return bodyStream.begin(buffersPool, move(onReadRequest));
+}
+
+Result HttpIncomingMessage::startBodyStream()
+{
+    if (bodyStream.canStart())
+    {
+        SC_TRY(bodyStream.start());
+    }
+    else
+    {
+        bodyStream.resumeReading();
+    }
+    bodyStreamStarted = true;
+    return Result(true);
+}
+
+bool HttpIncomingMessage::pushBodyData(AsyncBufferView::ID bufferID, size_t sizeInBytes)
+{
+    return bodyStream.pushBodyData(bufferID, sizeInBytes);
+}
+
+void HttpIncomingMessage::finishBodyStream()
+{
+    bodyComplete = true;
+    bodyStream.finishBody();
+}
+
+void HttpIncomingMessage::failBodyStream(Result result)
+{
+    bodyComplete = false;
+    bodyStream.failBody(result);
+}
+
+void HttpIncomingMessage::abortBodyStream() { bodyStream.destroy(); }
+
+Result HttpIncomingMessage::prepareBodyStream(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest,
+                                              bool allowCloseDelimited)
+{
+    StringSpan transferEncoding;
+    StringSpan contentLengthValue;
+    const bool hasTransferEncoding = getHeader("Transfer-Encoding", transferEncoding);
+    if (hasTransferEncoding and getHeader("Content-Length", contentLengthValue))
+    {
+        return Result::Error("HttpIncomingMessage conflicting Content-Length and Transfer-Encoding");
+    }
+
+    if (hasTransferEncoding)
+    {
+        if (not scHttpTransferEncodingIsChunked(transferEncoding))
+        {
+            return Result::Error("HttpIncomingMessage unsupported Transfer-Encoding");
+        }
+        bodyFramingKind       = HttpBodyFramingKind::Chunked;
+        bodyBytesRemaining    = 0;
+        bodyComplete          = false;
+        chunkedState          = ChunkedState::Size;
+        chunkedChunkSize      = 0;
+        chunkedBytesRemaining = 0;
+        chunkedSizeHasDigits  = false;
+    }
+    else if (getHeader("Content-Length", contentLengthValue))
+    {
+        bodyFramingKind    = HttpBodyFramingKind::ContentLength;
+        bodyBytesRemaining = getParser().contentLength;
+        bodyComplete       = (bodyBytesRemaining == 0);
+    }
+    else if (allowCloseDelimited)
+    {
+        bodyFramingKind    = HttpBodyFramingKind::CloseDelimited;
+        bodyBytesRemaining = 0;
+        bodyComplete       = false;
+    }
+    else
+    {
+        bodyFramingKind    = HttpBodyFramingKind::None;
+        bodyBytesRemaining = 0;
+        bodyComplete       = true;
+    }
+
+    return initBodyStream(buffersPool, move(onReadRequest));
+}
+
+Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, AsyncBufferView::ID bufferID,
+                                            Span<const char> readData, bool allowTrailingData)
+{
+    if (bodyFramingKind == HttpBodyFramingKind::None)
+    {
+        if (readData.sizeInBytes() > 0)
+        {
+            return Result::Error("HttpIncomingMessage unexpected body data");
+        }
+        return Result(true);
+    }
+
+    if (bodyFramingKind == HttpBodyFramingKind::ContentLength or bodyFramingKind == HttpBodyFramingKind::CloseDelimited)
+    {
+        if (bodyFramingKind == HttpBodyFramingKind::ContentLength and readData.sizeInBytes() > bodyBytesRemaining)
+        {
+            return Result::Error("HttpIncomingMessage received body beyond Content-Length");
+        }
+
+        const bool shouldContinue = pushBodyData(bufferID, readData.sizeInBytes());
+        SC_TRY(consumeBodyBytes(readData.sizeInBytes()));
+        if (bodyFramingKind == HttpBodyFramingKind::ContentLength and bodyBytesRemaining == 0)
+        {
+            finishBodyStream();
+        }
+        if (not shouldContinue)
+        {
+            sourceStream.pause();
+        }
+        return Result(true);
+    }
+
+    size_t rawOffset = 0;
+    while (rawOffset < readData.sizeInBytes())
+    {
+        const char current = readData.data()[rawOffset];
+        switch (chunkedState)
+        {
+        case ChunkedState::Size: {
+            uint8_t hexValue = 0;
+            if (scHttpHexValue(current, hexValue))
+            {
+                SC_TRY_MSG(chunkedChunkSize <= (UINT64_MAX - hexValue) / 16, "HttpIncomingMessage chunk size overflow");
+                chunkedChunkSize     = chunkedChunkSize * 16 + hexValue;
+                chunkedSizeHasDigits = true;
+                rawOffset++;
+                break;
+            }
+            if (current == ';')
+            {
+                SC_TRY_MSG(chunkedSizeHasDigits, "HttpIncomingMessage invalid chunk size");
+                chunkedState = ChunkedState::SizeExtension;
+                rawOffset++;
+                break;
+            }
+            if (current == '\r')
+            {
+                SC_TRY_MSG(chunkedSizeHasDigits, "HttpIncomingMessage invalid chunk size");
+                chunkedState = ChunkedState::SizeLF;
+                rawOffset++;
+                break;
+            }
+            return Result::Error("HttpIncomingMessage invalid chunk size");
+        }
+        case ChunkedState::SizeExtension:
+            if (current == '\r')
+            {
+                chunkedState = ChunkedState::SizeLF;
+            }
+            rawOffset++;
+            break;
+        case ChunkedState::SizeLF:
+            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed chunk header");
+            rawOffset++;
+            if (chunkedChunkSize == 0)
+            {
+                chunkedState = ChunkedState::TrailerLineStart;
+            }
+            else
+            {
+                chunkedBytesRemaining = chunkedChunkSize;
+                chunkedChunkSize      = 0;
+                chunkedSizeHasDigits  = false;
+                chunkedState          = ChunkedState::Data;
+            }
+            break;
+        case ChunkedState::Data: {
+            const size_t available = readData.sizeInBytes() - rawOffset;
+            const size_t toEmit =
+                available < chunkedBytesRemaining ? available : static_cast<size_t>(chunkedBytesRemaining);
+            if (toEmit == 0)
+            {
+                chunkedState = ChunkedState::DataCR;
+                break;
+            }
+            AsyncBufferView::ID childID;
+            SC_TRY(sourceStream.getBuffersPool().createChildView(bufferID, rawOffset, toEmit, childID));
+            const bool shouldContinue = pushBodyData(childID, toEmit);
+            sourceStream.getBuffersPool().unrefBuffer(childID);
+            chunkedBytesRemaining -= toEmit;
+            rawOffset += toEmit;
+            if (chunkedBytesRemaining == 0)
+            {
+                chunkedState = ChunkedState::DataCR;
+            }
+            if (not shouldContinue)
+            {
+                if (rawOffset < readData.sizeInBytes())
+                {
+                    AsyncBufferView::ID pendingID;
+                    SC_TRY(sourceStream.getBuffersPool().createChildView(
+                        bufferID, rawOffset, readData.sizeInBytes() - rawOffset, pendingID));
+                    SC_TRY(sourceStream.unshift(pendingID));
+                    sourceStream.getBuffersPool().unrefBuffer(pendingID);
+                }
+                sourceStream.pause();
+                return Result(true);
+            }
+            break;
+        }
+        case ChunkedState::DataCR:
+            SC_TRY_MSG(current == '\r', "HttpIncomingMessage malformed chunk terminator");
+            chunkedState = ChunkedState::DataLF;
+            rawOffset++;
+            break;
+        case ChunkedState::DataLF:
+            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed chunk terminator");
+            chunkedChunkSize     = 0;
+            chunkedSizeHasDigits = false;
+            chunkedState         = ChunkedState::Size;
+            rawOffset++;
+            break;
+        case ChunkedState::TrailerLineStart:
+            if (current == '\r')
+            {
+                chunkedState = ChunkedState::TrailerEndLF;
+                rawOffset++;
+                break;
+            }
+            return Result::Error("HttpIncomingMessage non-empty trailers are not supported");
+        case ChunkedState::TrailerEndLF:
+            SC_TRY_MSG(current == '\n', "HttpIncomingMessage malformed trailer terminator");
+            chunkedState = ChunkedState::Finished;
+            bodyComplete = true;
+            rawOffset++;
+            if (rawOffset < readData.sizeInBytes())
+            {
+                if (allowTrailingData)
+                {
+                    AsyncBufferView::ID pendingID;
+                    SC_TRY(sourceStream.getBuffersPool().createChildView(
+                        bufferID, rawOffset, readData.sizeInBytes() - rawOffset, pendingID));
+                    SC_TRY(sourceStream.unshift(pendingID));
+                    sourceStream.getBuffersPool().unrefBuffer(pendingID);
+                }
+                else
+                {
+                    return Result::Error("HttpIncomingMessage does not support pipelined body data");
+                }
+            }
+            finishBodyStream();
+            return Result(true);
+        case ChunkedState::Finished:
+            if (allowTrailingData)
+            {
+                AsyncBufferView::ID pendingID;
+                SC_TRY(sourceStream.getBuffersPool().createChildView(bufferID, rawOffset,
+                                                                     readData.sizeInBytes() - rawOffset, pendingID));
+                SC_TRY(sourceStream.unshift(pendingID));
+                sourceStream.getBuffersPool().unrefBuffer(pendingID);
+                return Result(true);
+            }
+            return Result::Error("HttpIncomingMessage does not support pipelined body data");
+        }
+    }
+    return Result(true);
+}
+
 Result HttpIncomingMessage::writeHeaders(const uint32_t maxSize, Span<const char> readData, AsyncReadableStream& stream,
                                          AsyncBufferView::ID bufferID, const char* outOfSpaceError,
-                                         const char* sizeExceededError, bool stopAtHeadersEnd)
+                                         const char* sizeExceededError, bool stopAtHeadersEnd,
+                                         bool unshiftPendingBodyToStream)
 {
     attachReadableStream(stream);
     const auto onParserResult = [&](const HttpParser&) -> Result { return Result(true); };
     SC_TRY(parsedHeaders.writeHeaders(maxSize, readData, stream, bufferID, outOfSpaceError, sizeExceededError,
-                                      stopAtHeadersEnd, onParserResult));
+                                      stopAtHeadersEnd, unshiftPendingBodyToStream, onParserResult));
     return Result(true);
 }
 
@@ -238,13 +630,110 @@ Result HttpAsyncClientResponse::writeHeaders(uint32_t maxHeaderSize, Span<const 
 {
     SC_TRY(HttpIncomingMessage::writeHeaders(maxHeaderSize, readData, stream, bufferID,
                                              "HttpAsyncClientResponse header space is finished",
-                                             "HttpAsyncClientResponse header size exceeded", true));
+                                             "HttpAsyncClientResponse header size exceeded", true, false));
     return Result(true);
 }
 
 //-------------------------------------------------------------------------------------------------------
 // HttpOutgoingMessage
 //-------------------------------------------------------------------------------------------------------
+HttpOutgoingMessage::ChunkedWritableStream::ChunkedWritableStream() { setWriteQueue(queue); }
+
+Result HttpOutgoingMessage::ChunkedWritableStream::init(AsyncBuffersPool&    buffersPool,
+                                                        AsyncWritableStream& newDestination)
+{
+    destination         = &newDestination;
+    currentBodyBufferID = {};
+    currentBodyCallback = {};
+    finalChunkStarted   = false;
+    finalChunkWritten   = false;
+    return AsyncWritableStream::init(buffersPool);
+}
+
+Result HttpOutgoingMessage::ChunkedWritableStream::asyncWrite(AsyncBufferView::ID                 bufferID,
+                                                              Function<void(AsyncBufferView::ID)> cb)
+{
+    SC_TRY_MSG(destination != nullptr, "HttpOutgoingMessage chunked destination missing");
+
+    Span<const char> body;
+    SC_TRY(getBuffersPool().getReadableData(bufferID, body));
+
+    StringSpan header;
+    SC_TRY(scHttpFormatChunkHeader(static_cast<uint64_t>(body.sizeInBytes()), headerStorage, header));
+
+    currentBodyBufferID = bufferID;
+    currentBodyCallback = move(cb);
+    getBuffersPool().refBuffer(bufferID);
+    return destination->write(AsyncBufferView(header.toCharSpan()),
+                              {[this](AsyncBufferView::ID writtenBufferID) { onChunkHeaderWritten(writtenBufferID); }});
+}
+
+bool HttpOutgoingMessage::ChunkedWritableStream::canEndWritable()
+{
+    if (finalChunkWritten)
+    {
+        return true;
+    }
+    if (finalChunkStarted)
+    {
+        return false;
+    }
+
+    SC_ASSERT_RELEASE(destination != nullptr);
+    finalChunkStarted = true;
+    Result finalWrite = destination->write(AsyncBufferView("0\r\n\r\n"), {[this](AsyncBufferView::ID writtenBufferID)
+                                                                          { onFinalChunkWritten(writtenBufferID); }});
+    if (not finalWrite)
+    {
+        eventError.emit(finalWrite);
+        finalChunkWritten = true;
+        destination->end();
+        return true;
+    }
+    return false;
+}
+
+void HttpOutgoingMessage::ChunkedWritableStream::onChunkHeaderWritten(AsyncBufferView::ID)
+{
+    SC_ASSERT_RELEASE(destination != nullptr);
+    Result bodyWrite = destination->write(
+        currentBodyBufferID, {[this](AsyncBufferView::ID writtenBufferID) { onChunkBodyWritten(writtenBufferID); }});
+    if (not bodyWrite)
+    {
+        eventError.emit(bodyWrite);
+    }
+}
+
+void HttpOutgoingMessage::ChunkedWritableStream::onChunkBodyWritten(AsyncBufferView::ID)
+{
+    SC_ASSERT_RELEASE(destination != nullptr);
+    Result terminatorWrite =
+        destination->write(AsyncBufferView("\r\n"), {[this](AsyncBufferView::ID writtenBufferID)
+                                                     { onChunkTerminatorWritten(writtenBufferID); }});
+    if (not terminatorWrite)
+    {
+        eventError.emit(terminatorWrite);
+    }
+}
+
+void HttpOutgoingMessage::ChunkedWritableStream::onChunkTerminatorWritten(AsyncBufferView::ID)
+{
+    AsyncBufferView::ID                 savedBufferID = currentBodyBufferID;
+    Function<void(AsyncBufferView::ID)> savedCallback = move(currentBodyCallback);
+    currentBodyBufferID                               = {};
+    currentBodyCallback                               = {};
+    getBuffersPool().unrefBuffer(savedBufferID);
+    finishedWriting(savedBufferID, move(savedCallback), Result(true));
+}
+
+void HttpOutgoingMessage::ChunkedWritableStream::onFinalChunkWritten(AsyncBufferView::ID)
+{
+    SC_ASSERT_RELEASE(destination != nullptr);
+    finalChunkWritten = true;
+    destination->end();
+    resumeWriting();
+}
+
 void HttpOutgoingMessage::setHeaderMemory(Span<char> memory)
 {
     headerMemory = memory;
@@ -313,10 +802,39 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
     return Result(true);
 }
 
+Result HttpOutgoingMessage::setChunkedTransferEncoding()
+{
+    SC_TRY_MSG(not headersSent, "Headers already sent");
+    if (chunkedTransferEncodingEnabled)
+    {
+        return Result(true);
+    }
+    chunkedTransferEncodingEnabled = true;
+    if (not transferEncodingAdded)
+    {
+        SC_TRY(addHeader("Transfer-Encoding", "chunked"));
+    }
+    return Result(true);
+}
+
 Result HttpOutgoingMessage::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
     SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
+    SC_TRY_MSG(not(chunkedTransferEncodingEnabled and contentLengthAdded),
+               "HttpOutgoingMessage does not support Content-Length with Transfer-Encoding");
+
+    if (chunkedTransferEncodingEnabled)
+    {
+        SC_TRY_MSG(destinationStream != nullptr, "HttpOutgoingMessage missing destination stream");
+        SC_TRY(chunkedWritableStream.init(destinationStream->getBuffersPool(), *destinationStream));
+        writableStream = &chunkedWritableStream;
+    }
+    else
+    {
+        writableStream = destinationStream;
+    }
+
     if (not connectionHeaderAdded)
     {
         if (forceDisableKeepAlive or not keepAlive)
@@ -331,23 +849,26 @@ Result HttpOutgoingMessage::sendHeaders(Function<void(AsyncBufferView::ID)> call
         }
     }
     SC_TRY(responseHeaders.appendLiteral("\r\n", "HttpOutgoingMessage::appendAscii - header space is finished"));
-    SC_TRY(writableStream->write(responseHeaders.written(), move(callback)));
+    SC_TRY(destinationStream->write(responseHeaders.written(), move(callback)));
     headersSent = true;
     return Result(true);
 }
 
 void HttpOutgoingMessage::reset()
 {
-    headersSent           = false;
-    endCalled             = false;
-    keepAlive             = true;
-    connectionHeaderAdded = false;
-    hostHeaderAdded       = false;
-    userAgentHeaderAdded  = false;
-    contentLengthAdded    = false;
-    contentTypeAdded      = false;
-    transferEncodingAdded = false;
-    forceDisableKeepAlive = false;
+    chunkedWritableStream.destroy();
+    headersSent                    = false;
+    endCalled                      = false;
+    keepAlive                      = true;
+    connectionHeaderAdded          = false;
+    hostHeaderAdded                = false;
+    userAgentHeaderAdded           = false;
+    contentLengthAdded             = false;
+    contentTypeAdded               = false;
+    transferEncodingAdded          = false;
+    chunkedTransferEncodingEnabled = false;
+    forceDisableKeepAlive          = false;
+    writableStream                 = destinationStream;
     responseHeaders.reset(headerMemory);
 }
 
@@ -434,40 +955,54 @@ Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan
 
 Result HttpAsyncClientRequest::setExpectedBodyLength(uint64_t value)
 {
-    bodyType        = value > 0 ? BodyType::Manual : BodyType::None;
-    bodySpan        = {};
-    bodyStream      = nullptr;
-    multipartWriter = nullptr;
-    contentLength   = value;
+    bodyType                       = value > 0 ? BodyType::Manual : BodyType::None;
+    bodySpan                       = {};
+    bodyStream                     = nullptr;
+    multipartWriter                = nullptr;
+    contentLength                  = value;
+    chunkedTransferEncodingEnabled = false;
     return Result(true);
 }
 
 Result HttpAsyncClientRequest::setBody(Span<const char> value)
 {
-    bodyType        = BodyType::Span;
-    bodySpan        = value;
-    bodyStream      = nullptr;
-    contentLength   = value.sizeInBytes();
-    multipartWriter = nullptr;
+    bodyType                       = BodyType::Span;
+    bodySpan                       = value;
+    bodyStream                     = nullptr;
+    contentLength                  = value.sizeInBytes();
+    multipartWriter                = nullptr;
+    chunkedTransferEncodingEnabled = false;
     return Result(true);
 }
 
-void HttpAsyncClientRequest::setBody(AsyncReadableStream& stream, uint64_t contentLengthValue)
+Result HttpAsyncClientRequest::setBody(AsyncReadableStream& stream)
 {
     bodyType        = BodyType::Stream;
     bodySpan        = {};
     bodyStream      = &stream;
-    contentLength   = contentLengthValue;
+    contentLength   = 0;
     multipartWriter = nullptr;
+    return setChunkedTransferEncoding();
+}
+
+void HttpAsyncClientRequest::setBody(AsyncReadableStream& stream, uint64_t contentLengthValue)
+{
+    bodyType                       = BodyType::Stream;
+    bodySpan                       = {};
+    bodyStream                     = &stream;
+    contentLength                  = contentLengthValue;
+    multipartWriter                = nullptr;
+    chunkedTransferEncodingEnabled = false;
 }
 
 void HttpAsyncClientRequest::setMultipart(HttpMultipartWriter& value)
 {
-    bodyType        = BodyType::Multipart;
-    bodySpan        = {};
-    bodyStream      = nullptr;
-    multipartWriter = &value;
-    contentLength   = value.getContentLength();
+    bodyType                       = BodyType::Multipart;
+    bodySpan                       = {};
+    bodyStream                     = nullptr;
+    multipartWriter                = &value;
+    contentLength                  = value.getContentLength();
+    chunkedTransferEncodingEnabled = false;
 }
 
 Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> callback)
@@ -494,7 +1029,7 @@ Result HttpAsyncClientRequest::sendHeaders(Function<void(AsyncBufferView::ID)> c
     }
 
     const bool hasBody = bodyType != BodyType::None;
-    if (hasBody and not hasHeader(KnownHeader::ContentLength))
+    if (hasBody and not chunkedTransferEncodingEnabled and not hasHeader(KnownHeader::ContentLength))
     {
         SC_TRY(responseHeaders.appendContentLength(contentLength, HeaderSpaceFinished,
                                                    "HttpAsyncClientRequest failed formatting Content-Length"));

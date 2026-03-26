@@ -43,6 +43,9 @@ struct HttpTestClient
     Result postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName, StringSpan fileName,
                          StringSpan fileContent, TimeMs bodyDelay = {});
 
+    /// @brief Sends a caller-provided raw HTTP request to the given endpoint
+    Result sendRaw(AsyncEventLoop& loop, StringSpan url, StringSpan request);
+
     Delegate<HttpTestClient&> callback; ///< The callback that is called after `GET` operation succeeded
 
     /// @brief Get the response StringSpan sent by the server
