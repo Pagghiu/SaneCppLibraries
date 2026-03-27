@@ -339,6 +339,7 @@ endif
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
 	@echo Linking "{0}"
 	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+	$(VRBS)$({0}_POST_LINK_STRIP)
 )delimiter",
                            makeTarget);
             break;
@@ -713,6 +714,7 @@ endif
     Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        builder.append("\n{0}_POST_LINK_STRIP := :", makeTarget);
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)");
         // Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
@@ -733,10 +735,14 @@ endif
         {
             builder.append("\nifeq ($(TARGET_OS),macOS)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
+            builder.append("\n{0}_POST_LINK_STRIP := strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
             builder.append("\nelse ifeq ($(TARGET_OS),iOS)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
+            builder.append("\n{0}_POST_LINK_STRIP := strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
             builder.append("\nelse ifeq ($(TARGET_OS),linux)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -Wl,--gc-sections", makeTarget);
+            builder.append("\n{0}_POST_LINK_STRIP := strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                           makeTarget);
             builder.append("\nendif");
         }
         builder.append("\nelse");
@@ -745,6 +751,8 @@ endif
         if (compileFlags.optimizationLevel == Optimization::Release)
         {
             builder.append(" -Wl,--gc-sections");
+            builder.append("\n{0}_POST_LINK_STRIP := strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                           makeTarget);
         }
         builder.append("\nendif");
         return Result(true);

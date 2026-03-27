@@ -551,6 +551,43 @@ struct SC::Build::NativeBuild
         return buildCompileSteps(fs, resolvedProject, anyObjectBuilt, progress, maxParallelJobsOverride);
     }
 
+    static bool shouldStripLinkedArtifact(const ResolvedProject& resolvedProject)
+    {
+        if (resolvedProject.project->targetType == TargetType::StaticLibrary)
+        {
+            return false;
+        }
+        if (resolvedProject.compileFlags.optimizationLevel != Optimization::Release)
+        {
+            return false;
+        }
+
+        switch (resolvedProject.parameters->platform)
+        {
+        case Platform::Apple:
+        case Platform::Linux: return true;
+        case Platform::Unknown:
+        case Platform::Windows:
+        case Platform::Wasm: return false;
+        }
+        Assert::unreachable();
+    }
+
+    static Result buildStripCommand(const ResolvedProject& resolvedProject, CommandLine& commandLine)
+    {
+        SC_TRY(commandLine.append("strip"));
+        switch (resolvedProject.parameters->platform)
+        {
+        case Platform::Apple: SC_TRY(commandLine.append("-x")); break;
+        case Platform::Linux: SC_TRY(commandLine.append("--strip-unneeded")); break;
+        case Platform::Unknown:
+        case Platform::Windows:
+        case Platform::Wasm: return Result::Error("Strip command is unsupported on this platform");
+        }
+        SC_TRY(commandLine.append(resolvedProject.executablePath.view()));
+        return Result(true);
+    }
+
     static Result buildProjectFinalPhase(FileSystem& fs, ResolvedProject& resolvedProject, bool anyObjectBuilt,
                                          const ProjectProgress& progress)
     {
@@ -558,6 +595,18 @@ struct SC::Build::NativeBuild
         String      finalCommandString = StringEncoding::Utf8;
         SC_TRY(buildFinalCommand(resolvedProject, finalCommand));
         SC_TRY(formatCommandLine(finalCommand, finalCommandString));
+        CommandLine stripCommand;
+        String      stripCommandString = StringEncoding::Utf8;
+        const bool  shouldStrip        = shouldStripLinkedArtifact(resolvedProject);
+        if (shouldStrip)
+        {
+            SC_TRY(buildStripCommand(resolvedProject, stripCommand));
+            SC_TRY(formatCommandLine(stripCommand, stripCommandString));
+            auto builder = StringBuilder::createForAppendingTo(finalCommandString);
+            SC_TRY(builder.append("\n"));
+            SC_TRY(builder.append(stripCommandString.view()));
+            builder.finalize();
+        }
         const RebuildDecision finalDecision =
             evaluateTargetArtifactRebuild(fs, resolvedProject, finalCommandString.view(), anyObjectBuilt);
         if (finalDecision != UpToDate)
@@ -586,6 +635,22 @@ struct SC::Build::NativeBuild
             {
                 globalConsole->printError(stdErr.view());
                 globalConsole->flushStdErr();
+            }
+            if (shouldStrip)
+            {
+                String stripStdOut = StringEncoding::Utf8;
+                String stripStdErr = StringEncoding::Utf8;
+                SC_TRY(
+                    executeCommand(fs, stripCommand, StringView(), resolvedProject.adapter, stripStdOut, stripStdErr));
+                if (resolvedProject.parameters->execution.verbose and not stripStdOut.isEmpty())
+                {
+                    globalConsole->print(stripStdOut.view());
+                }
+                if (not stripStdErr.isEmpty())
+                {
+                    globalConsole->printError(stripStdErr.view());
+                    globalConsole->flushStdErr();
+                }
             }
             SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
         }

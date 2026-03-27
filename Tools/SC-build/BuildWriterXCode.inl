@@ -822,8 +822,11 @@ struct SC::Build::ProjectWriter::WriterXCode
         case Optimization::Release:
             builder.append(R"delimiter(
                            COPY_PHASE_STRIP = YES;
+                           DEPLOYMENT_POSTPROCESSING = YES;
                            DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-                           ENABLE_NS_ASSERTIONS = NO;)delimiter");
+                           ENABLE_NS_ASSERTIONS = NO;
+                           STRIP_INSTALLED_PRODUCT = YES;
+                           STRIP_STYLE = non-global;)delimiter");
             break;
         }
 
