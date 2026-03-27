@@ -65,7 +65,7 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     // Libraries to link
     if (parameters.platform == Platform::Apple)
     {
-        project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
+        project.addLinkFrameworks({"CoreFoundation", "CoreServices", "CFNetwork", "Foundation"});
     }
 
     if (parameters.platform == Platform::Windows)

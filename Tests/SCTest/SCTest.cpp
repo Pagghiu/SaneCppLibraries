@@ -59,6 +59,9 @@ void runHttpURLParserTest(TestReport& report);
 void runHttpKeepAliveTest(TestReport& report);
 void runHttpMultipartParserTest(TestReport& report);
 
+// HttpClient
+void runHttpClientTest(TestReport& report);
+
 // Plugin
 void runPluginTest(TestReport& report);
 
@@ -199,6 +202,9 @@ int main(int argc, const char* argv[])
     runHttpURLParserTest(report);
     runHttpKeepAliveTest(report);
     runHttpMultipartParserTest(report);
+
+    // HttpClient tests
+    runHttpClientTest(report);
 
     // Plugin tests
 #if SC_XCTEST

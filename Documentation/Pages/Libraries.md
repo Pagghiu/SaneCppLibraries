@@ -15,6 +15,7 @@ Library                                     | Description                       
 @subpage library_foundation                 | @copybrief library_foundation                 |   1389
 @subpage library_hashing                    | @copybrief library_hashing                    |   353
 @subpage library_http                       | @copybrief library_http                       |   3058
+@subpage library_http_client                | @copybrief library_http_client                |   2150
 @subpage library_memory                     | @copybrief library_memory                     |   1510
 @subpage library_plugin                     | @copybrief library_plugin                     |   1841
 @subpage library_process                    | @copybrief library_process                    |   1353

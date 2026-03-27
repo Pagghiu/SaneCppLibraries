@@ -143,6 +143,17 @@
             "Threading"
         ]
     },
+    "HttpClient": {
+        "direct_dependencies": [
+            "Foundation"
+        ],
+        "minimal_dependencies": [
+            "Foundation"
+        ],
+        "all_dependencies": [
+            "Foundation"
+        ]
+    },
     "Memory": {
         "direct_dependencies": [
             "Foundation"
