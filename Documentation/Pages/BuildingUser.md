@@ -47,6 +47,10 @@ If you really need you can:
 - `Rstrtmgr.lib`
 - `DbgHelp.lib`
 
+If you use the [Plugin](@ref library_plugin) library without `SC::Build`, make sure the host executable defines
+`SC_EXPORT_LIBRARY_<LIBRARY>=1` for each Sane C++ library that must be visible to plugins; on Linux also add
+`-rdynamic` to the host executable link step.
+
 # Single Files Amalgamation
 
 Sane C++ Libraries can be consumed also as single-file amalgamated files.

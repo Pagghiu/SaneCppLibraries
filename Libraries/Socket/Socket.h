@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_SOCKET
+#define SC_EXPORT_LIBRARY_SOCKET 0
+#endif
+#define SC_SOCKET_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SOCKET)
+
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Result.h"
 #include "../Foundation/StringSpan.h"
@@ -17,7 +23,7 @@ namespace detail
 /// @brief Definition for SocketDescriptor
 #if SC_PLATFORM_WINDOWS
 
-struct SC_COMPILER_EXPORT SocketDescriptorDefinition
+struct SC_SOCKET_EXPORT SocketDescriptorDefinition
 {
     using Handle = size_t; // SOCKET
     static Result releaseHandle(Handle& handle);
@@ -27,7 +33,7 @@ struct SC_COMPILER_EXPORT SocketDescriptorDefinition
 
 #else
 
-struct SC_COMPILER_EXPORT SocketDescriptorDefinition
+struct SC_SOCKET_EXPORT SocketDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -39,7 +45,7 @@ struct SC_COMPILER_EXPORT SocketDescriptorDefinition
 } // namespace detail
 
 /// @brief Flags for SocketDescriptor (Blocking / Inheritable, IPVx, SocketType)
-struct SC_COMPILER_EXPORT SocketFlags
+struct SC_SOCKET_EXPORT SocketFlags
 {
     /// @brief Sets the socket as blocking / nonblocking mode
     enum BlockingType
@@ -96,7 +102,7 @@ struct SC_COMPILER_EXPORT SocketFlags
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketIpAddressSnippet
-struct SC_COMPILER_EXPORT SocketIPAddress
+struct SC_SOCKET_EXPORT SocketIPAddress
 {
     /// @brief Maximum length of the ASCII representation of an IP Address
     static constexpr int MAX_ASCII_STRING_LENGTH = 46;
@@ -149,7 +155,7 @@ struct SC_COMPILER_EXPORT SocketIPAddress
 /// @n
 /// Example (extracted from unit test):
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketCreateSnippet
-struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
+struct SC_SOCKET_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketDescriptorDefinition>
 {
     /// @brief Creates a new SocketDescriptor Descriptor of given family, type, protocol
     /// @param addressFamily Address family (IPV4 / IPV6)
@@ -233,7 +239,7 @@ struct SC_COMPILER_EXPORT SocketDescriptor : public UniqueHandle<detail::SocketD
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketServerSnippet
-struct SC_COMPILER_EXPORT SocketServer
+struct SC_SOCKET_EXPORT SocketServer
 {
     enum class BindReuseAddress : uint8_t
     {
@@ -289,7 +295,7 @@ struct SC_COMPILER_EXPORT SocketServer
 ///
 /// Example (connecting client to server, doing two synchronous writes):
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp socketClientConnectSnippet
-struct SC_COMPILER_EXPORT SocketClient
+struct SC_SOCKET_EXPORT SocketClient
 {
     /// @brief Constructs this SocketClient from a SocketDescriptor (already created with SocketDescriptor::create)
     /// @param socket A socket descriptor created with SocketDescriptor::create to be used as client
@@ -333,7 +339,7 @@ struct SC_COMPILER_EXPORT SocketClient
 ///
 /// Example:
 /// @snippet Tests/Libraries/Socket/SocketTest.cpp resolveDNSSnippet
-struct SC_COMPILER_EXPORT SocketDNS
+struct SC_SOCKET_EXPORT SocketDNS
 {
     /// @brief Resolve an host string to an ip address (blocking until DNS response arrives)
     /// @param[in] host The ASCII encoded host string (example.com)
@@ -346,7 +352,7 @@ struct SC_COMPILER_EXPORT SocketDNS
 };
 
 /// @brief Networking globals initialization (Winsock2 WSAStartup)
-struct SC_COMPILER_EXPORT SocketNetworking
+struct SC_SOCKET_EXPORT SocketNetworking
 {
     /// @brief Initializes Winsock2 on Windows (WSAStartup)
     static void initNetworking();

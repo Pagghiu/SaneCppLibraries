@@ -16,7 +16,7 @@ namespace SC
 /// @brief Caller-owned memory for one HttpClientAsyncT operation.
 /// @tparam T_AsyncStreams Traits exposing the AsyncStreams types used by the adapter.
 template <typename T_AsyncStreams>
-struct SC_COMPILER_EXPORT HttpClientAsyncOperationMemoryT
+struct SC_HTTP_CLIENT_EXPORT HttpClientAsyncOperationMemoryT
 {
     using T_AsyncBufferView      = typename T_AsyncStreams::BufferView;
     using T_AsyncReadableStream  = typename T_AsyncStreams::ReadableStream;

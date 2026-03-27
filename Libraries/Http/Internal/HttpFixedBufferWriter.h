@@ -4,10 +4,11 @@
 #include "../../Foundation/Result.h"
 #include "../../Foundation/Span.h"
 #include "../../Foundation/StringSpan.h"
+#include "../HttpExport.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpFixedBufferWriter
+struct SC_HTTP_EXPORT HttpFixedBufferWriter
 {
     void reset(Span<char> memory)
     {

@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/StringSpan.h"
 #include "../Memory/Buffer.h"
+#include "../Memory/Memory.h"
 
 namespace SC
 {
@@ -23,7 +24,7 @@ struct Reflect;
 /// A SC::StringSpan can be obtained from it calling SC::String::view method but it's up to the user making sure that
 /// the usage of such SC::StringSpan doesn't exceed lifetime of the SC::String it originated from (but thankfully
 /// Address Sanitizer will catch the issue if it goes un-noticed).
-struct SC_COMPILER_EXPORT String
+struct SC_MEMORY_EXPORT String
 {
     /// @brief Builds an empty String with a given Encoding
     /// @param encoding The encoding of the String
@@ -148,7 +149,7 @@ struct SC_COMPILER_EXPORT String
 
     template <typename T>
     friend struct GrowableBuffer;
-    struct SC_COMPILER_EXPORT GrowableImplementation
+    struct SC_MEMORY_EXPORT GrowableImplementation
     {
         String& string;
 
@@ -170,7 +171,7 @@ struct SC_COMPILER_EXPORT String
 /// @brief String with compile time configurable inline storage (small string optimization)
 /// @tparam N number of chars to reserve in inline storage
 template <int N>
-struct SC_COMPILER_EXPORT SmallString : public String
+struct SC_MEMORY_EXPORT SmallString : public String
 {
     // Unfortunately we have to repeat all these overloads to set inline capacity and hasInlineData flag
     SmallString(StringEncoding encoding = StringEncoding::Utf8) : String(encoding, N) {}
@@ -198,7 +199,7 @@ using SmallStringNative = SmallString<N * sizeof(native_char_t)>;
 
 // Enables File library from reading data from file descriptor into a String
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<String> : public IGrowableBuffer
+struct SC_MEMORY_EXPORT GrowableBuffer<String> : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
     GrowableBuffer(String& string)
@@ -213,7 +214,7 @@ struct SC_COMPILER_EXPORT GrowableBuffer<String> : public IGrowableBuffer
 };
 
 template <int N>
-struct SC_COMPILER_EXPORT GrowableBuffer<SmallString<N>> : public IGrowableBuffer
+struct SC_MEMORY_EXPORT GrowableBuffer<SmallString<N>> : public IGrowableBuffer
 {
     String::GrowableImplementation gi;
     GrowableBuffer(String& string)

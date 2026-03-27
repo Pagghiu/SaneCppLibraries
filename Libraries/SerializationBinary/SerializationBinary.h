@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_SERIALIZATION_BINARY
+#define SC_EXPORT_LIBRARY_SERIALIZATION_BINARY 0
+#endif
+#define SC_SERIALIZATION_BINARY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIALIZATION_BINARY)
+
 #include "Internal/SerializationBinaryBuffer.h"
 #include "Internal/SerializationBinaryReadVersioned.h"
 #include "Internal/SerializationBinaryReadWriteExact.h"

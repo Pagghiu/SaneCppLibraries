@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Assert.h"
 #include "../Foundation/Span.h"
+#include "../Memory/Memory.h"
 
 namespace SC
 {
@@ -16,7 +17,7 @@ enum class SegmentAllocator
 
 namespace detail
 {
-struct SC_COMPILER_EXPORT SegmentHeader;
+struct SC_MEMORY_EXPORT SegmentHeader;
 struct alignas(uint64_t) SegmentHeader
 {
     static constexpr uint32_t MaxCapacity = (~static_cast<uint32_t>(0)) >> 1;
@@ -34,7 +35,7 @@ struct alignas(uint64_t) SegmentHeader
     uint32_t hasInlineData : 1;
 };
 
-struct SC_COMPILER_EXPORT SegmentHeaderOffset
+struct SC_MEMORY_EXPORT SegmentHeaderOffset
 {
     using PtrOffset = size_t;
     SegmentHeader header;
@@ -42,7 +43,7 @@ struct SC_COMPILER_EXPORT SegmentHeaderOffset
 };
 
 template <typename T>
-struct SC_COMPILER_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOffset
+struct SC_MEMORY_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOffset
 {
     // clang-format off
     SC_COMPILER_FORCE_INLINE T*       data() noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
@@ -69,7 +70,7 @@ struct SC_COMPILER_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOf
 
 /// @brief Allows SC::Segment handle trivial types
 template <typename T>
-struct SC_COMPILER_EXPORT SegmentTrivial
+struct SC_MEMORY_EXPORT SegmentTrivial
 {
     using Type = T;
     inline static void destruct(Span<T> data) noexcept;
@@ -87,7 +88,7 @@ struct SC_COMPILER_EXPORT SegmentTrivial
 /// @brief Helps creating custom Segments
 template <typename ParentSegment, typename CommonParent, int N = 0,
           SegmentAllocator Allocator = SegmentAllocator::ThreadLocal>
-struct SC_COMPILER_EXPORT SegmentCustom : public ParentSegment
+struct SC_MEMORY_EXPORT SegmentCustom : public ParentSegment
 {
     SegmentCustom() : ParentSegment(N, Allocator) {}
     SegmentCustom(const CommonParent& other) : SegmentCustom() { CommonParent::operator=(other); }
@@ -109,7 +110,7 @@ struct SC_COMPILER_EXPORT SegmentCustom : public ParentSegment
 /// @note Implementation is in `.inl` to reduce include bloat for non-templated derived classes like SC::Buffer.
 /// This reduces header bloat as the `.inl` can be included where derived class is defined (typically a `.cpp` file).
 template <typename VTable>
-struct SC_COMPILER_EXPORT Segment : public VTable
+struct SC_MEMORY_EXPORT Segment : public VTable
 {
     using VTable::data;
     using T = typename VTable::Type;

@@ -4,6 +4,7 @@
 #include "../Async/Async.h"
 #include "../AsyncStreams/AsyncRequestStreams.h"
 #include "HttpConnection.h"
+#include "HttpExport.h"
 #include "HttpMultipartParser.h"
 
 namespace SC
@@ -17,12 +18,12 @@ namespace SC
 ///
 /// Example using dynamically allocated buffers for connections:
 /// \snippet Examples/SCExample/Examples/WebServerExample/WebServerExample.cpp WebServerExampleSnippet
-struct SC_COMPILER_EXPORT HttpAsyncFileServer
+struct SC_HTTP_EXPORT HttpAsyncFileServer
 {
     using ReadableFileStream = AsyncReadableFileStream<AsyncEventLoop>;
     using WritableFileStream = AsyncWritableFileStream<AsyncEventLoop>;
     /// @brief Support class for HttpAsyncFileServer holding file stream and pipeline
-    struct SC_COMPILER_EXPORT Stream
+    struct SC_HTTP_EXPORT Stream
     {
         ReadableFileStream  readableFileStream;
         WritableFileStream  writableFileStream;
@@ -58,7 +59,7 @@ struct SC_COMPILER_EXPORT HttpAsyncFileServer
     };
 
     template <int RequestsSize>
-    struct SC_COMPILER_EXPORT StreamQueue : public Stream
+    struct SC_HTTP_EXPORT StreamQueue : public Stream
     {
         static_assert(RequestsSize >= 2, "HttpAsyncFileServer::StreamQueue requires RequestsSize >= 2");
 

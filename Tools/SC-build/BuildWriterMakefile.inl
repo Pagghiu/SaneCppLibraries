@@ -217,7 +217,7 @@ endif # $(CONFIG)
 
         writeMergedCompileFlags(builder, makeTarget.view());
         writeTargetFlags(builder, makeTarget.view());
-        writeLinkerFlags(builder, makeTarget.view(), project.link);
+        writeLinkerFlags(builder, makeTarget.view(), project, project.link);
 
         // Rules
         writeCleanRule(builder, makeTarget.view());
@@ -429,7 +429,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         SC_COMPILER_WARNING_POP;
     }
 
-    void writeLinkerFlags(StringBuilder& builder, StringView makeTarget, const LinkFlags& link)
+    void writeLinkerFlags(StringBuilder& builder, StringView makeTarget, const Project& project, const LinkFlags& link)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n{0}_FRAMEWORKS_ANY :=", makeTarget);
@@ -473,8 +473,15 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("else ifeq ($(TARGET_OS),iOS)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget);
         builder.append("else ifeq ($(TARGET_OS),linux)\n");
-        // -rdynamic is needed to resolve Plugin symbols in the executable
-        builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget);
+        if (project.targetType != TargetType::StaticLibrary and not project.exportLibraries.isEmpty())
+        {
+            // -rdynamic is needed to resolve Plugin symbols in the executable
+            builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget);
+        }
+        else
+        {
+            builder.append("     {0}_OS_LDFLAGS :=\n", makeTarget);
+        }
         builder.append("else\n");
         builder.append("     {0}_OS_LDFLAGS :=\n", makeTarget);
         builder.append("endif\n");
@@ -652,7 +659,9 @@ endif
             builder.append("\n{0}_OPTIMIZATION_CPPFLAGS := -D_DEBUG=1 -g -ggdb -O0 -fstrict-aliasing", makeTarget);
             break;
         case Optimization::Release:
-            builder.append("\n{0}_OPTIMIZATION_CPPFLAGS := -DNDEBUG=1 -O3 -fstrict-aliasing", makeTarget);
+            builder.append("\n{0}_OPTIMIZATION_CPPFLAGS := -DNDEBUG=1 -O3 -fstrict-aliasing -ffunction-sections "
+                           "-fdata-sections",
+                           makeTarget);
             break;
         }
         return Result(true);
@@ -720,9 +729,23 @@ endif
             builder.append("\n{0}_COMPILER_LDFLAGS += -nostdlib++", makeTarget); // This is only Clang and GCC 13+
             builder.append("\nendif");
         }
+        if (compileFlags.optimizationLevel == Optimization::Release)
+        {
+            builder.append("\nifeq ($(TARGET_OS),macOS)");
+            builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
+            builder.append("\nelse ifeq ($(TARGET_OS),iOS)");
+            builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
+            builder.append("\nelse ifeq ($(TARGET_OS),linux)");
+            builder.append("\n{0}_COMPILER_LDFLAGS += -Wl,--gc-sections", makeTarget);
+            builder.append("\nendif");
+        }
         builder.append("\nelse");
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
+        if (compileFlags.optimizationLevel == Optimization::Release)
+        {
+            builder.append(" -Wl,--gc-sections");
+        }
         builder.append("\nendif");
         return Result(true);
         SC_COMPILER_WARNING_POP;

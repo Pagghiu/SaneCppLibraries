@@ -45,9 +45,45 @@ The list of dependencies makes it possible to find recursive dependencies and un
 
 The library doesn't use a build system, but it compiles the `.cpp` files directly, linking it with symbols exported from
 the loading executable (using `bundle_loader` on macOS and linking library exported from loading executable on windows).
+Host executables must explicitly opt into exporting the needed Sane C++ libraries through `SC::Build::Project::addExportLibraries`;
+normal executables do not export SC symbols by default anymore.
 Plugin Dynamic Libraries are compiled with `nostdlib` and `nostdlib++` and they include a stub the allows defining some symbols needed due to not linking the C++ CRT.  
 Some special build flags however allow using `libc`, `libc++` or other sysroot / compiler supplied windows.  
 The idea is that plugins only use functionality provided by the calling executable or by other plugins.
+
+## Exporting SC symbols without SC::Build
+
+If the host executable is not built with `SC::Build`, you must manually export the Sane C++ libraries that the plugin
+will use.
+
+`SC::Build::Project::addExportLibraries({"Foundation", "Memory", "Strings"})` is equivalent to adding preprocessor
+defines like:
+
+```cpp
+SC_EXPORT_LIBRARY_FOUNDATION=1
+SC_EXPORT_LIBRARY_MEMORY=1
+SC_EXPORT_LIBRARY_STRINGS=1
+```
+
+to the **host executable** build.
+
+Each public library header locally defines its export macro from one of these `SC_EXPORT_LIBRARY_<LIBRARY>=1` switches,
+for example:
+
+- `Foundation` -> `SC_EXPORT_LIBRARY_FOUNDATION=1`
+- `Memory` -> `SC_EXPORT_LIBRARY_MEMORY=1`
+- `Strings` -> `SC_EXPORT_LIBRARY_STRINGS=1`
+- `Containers` -> `SC_EXPORT_LIBRARY_CONTAINERS=1`
+- `Async` -> `SC_EXPORT_LIBRARY_ASYNC=1`
+
+Define only the libraries that must be visible to the plugin. These defines must be present consistently while
+compiling the host executable target, not while compiling the plugin source itself.
+
+On Linux, the host executable must also export its symbols to the dynamic loader, typically with `-rdynamic`.
+`SC::Build` adds this automatically when `addExportLibraries` is used.
+
+On macOS and Windows no extra SC-specific define is needed beyond the `SC_EXPORT_LIBRARY_<LIBRARY>=1` switches.  
+The plugin loader already links plugins against the host executable using the platform-specific mechanism.
 
 On Windows, some extra care has been taken to force-unlock the `.pdb` file from visual studio debugger, that happens if the dll is being loaded on a program being debugged.
 

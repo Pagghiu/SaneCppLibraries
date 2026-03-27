@@ -16,7 +16,7 @@ namespace SC
 /// Example:
 /// \snippet Tests/Libraries/Foundation/FunctionTest.cpp FunctionMainSnippet
 template <typename FuncType, int LAMBDA_SIZE = sizeof(void*) * 2>
-struct SC_COMPILER_EXPORT Function;
+struct SC_FOUNDATION_EXPORT Function;
 
 template <int LAMBDA_SIZE, typename R, typename... Args>
 struct Function<R(Args...), LAMBDA_SIZE>

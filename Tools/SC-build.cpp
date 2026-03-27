@@ -145,6 +145,11 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     project.addFiles("Tools", "SC-*.cpp");       // add all tools
     project.addFiles("Tools", "*.h");            // add tools headers
 
+    if (not project.addExportLibraries({"Foundation", "Memory", "Strings", "Containers"}))
+    {
+        return Result::Error("Failed to configure exported SCTest libraries");
+    }
+
     // Deprecated code tests and libraries (to be removed when deprecated code will be removed)
     project.addFiles("Extra/Deprecated/Tests", "**.cpp");     // add all deprecated tests
     project.addFiles("Extra/Deprecated/Libraries", "**.h");   // add all deprecated libraries header files
@@ -155,6 +160,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     // For testing purposes let's create a needlessly complex selection filter for "SC Spaces.cpp"
     specificFiles.addSelection("Tests/SCTest", "*.cpp");
     specificFiles.removeSelection("Tests/SCTest", "SCTest.cpp");
+
     // Add an useless define to be checked inside "SC Spaces.cpp" and "SCTest.cpp"
     specificFiles.compile.addDefines({"SC_SPACES_SPECIFIC_DEFINE=1"});
     specificFiles.compile.addIncludePaths({"../Directory With Spaces"});
@@ -285,6 +291,13 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     }
     project.addFiles("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
     project.addFiles("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
+
+    if (not project.addExportLibraries({"Async", "Containers", "ContainersReflection", "File", "FileSystem",
+                                        "Foundation", "Http", "Memory", "Plugin", "Process", "Reflection",
+                                        "SerializationBinary", "SerializationText", "Socket", "Strings", "Threading"}))
+    {
+        return Result::Error("Failed to configure exported SCExample libraries");
+    }
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);

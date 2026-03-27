@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_THREADING
+#define SC_EXPORT_LIBRARY_THREADING 0
+#endif
+#define SC_THREADING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_THREADING)
+
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/Result.h"
@@ -19,7 +25,7 @@ namespace SC
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp mutexSnippet
-struct SC_COMPILER_EXPORT Mutex
+struct SC_THREADING_EXPORT Mutex
 {
     Mutex();
     ~Mutex();
@@ -54,7 +60,7 @@ struct SC_COMPILER_EXPORT Mutex
 };
 
 /// @brief A native OS condition variable.
-struct SC_COMPILER_EXPORT ConditionVariable
+struct SC_THREADING_EXPORT ConditionVariable
 {
     ConditionVariable();
     ~ConditionVariable();
@@ -109,7 +115,7 @@ struct SC_COMPILER_EXPORT ConditionVariable
 /// @endcode
 ///
 /// @warning Thread destructor will assert if SC::Thread::detach() or SC::Thread::join() has not been called.
-struct SC_COMPILER_EXPORT Thread
+struct SC_THREADING_EXPORT Thread
 {
     Thread() = default;
     ~Thread();
@@ -165,7 +171,7 @@ struct SC_COMPILER_EXPORT Thread
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp rwlockSnippet
-struct SC_COMPILER_EXPORT RWLock
+struct SC_THREADING_EXPORT RWLock
 {
     RWLock()  = default;
     ~RWLock() = default;
@@ -202,7 +208,7 @@ struct SC_COMPILER_EXPORT RWLock
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp barrierSnippet
-struct SC_COMPILER_EXPORT Barrier
+struct SC_THREADING_EXPORT Barrier
 {
     /// @brief Creates a barrier that waits for the specified number of threads
     /// @param count The number of threads that must reach the barrier before any can continue
@@ -225,7 +231,7 @@ struct SC_COMPILER_EXPORT Barrier
 /// @n
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp eventObjectSnippet
-struct SC_COMPILER_EXPORT EventObject
+struct SC_THREADING_EXPORT EventObject
 {
     bool autoReset = true;
 
@@ -246,7 +252,7 @@ struct SC_COMPILER_EXPORT EventObject
 ///
 /// Example:
 /// @snippet Tests/Libraries/Threading/ThreadingTest.cpp semaphoreSnippet
-struct SC_COMPILER_EXPORT Semaphore
+struct SC_THREADING_EXPORT Semaphore
 {
     /// @brief Creates a semaphore with an initial count
     /// @param initialCount The initial number of resources available

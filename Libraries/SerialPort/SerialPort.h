@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_SERIAL_PORT
+#define SC_EXPORT_LIBRARY_SERIAL_PORT 0
+#endif
+#define SC_SERIAL_PORT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIAL_PORT)
+
 #include "../File/File.h"
 
 namespace SC
@@ -14,7 +20,7 @@ namespace SC
 //! @{
 
 /// @brief Serial port settings.
-struct SC_COMPILER_EXPORT SerialSettings
+struct SC_SERIAL_PORT_EXPORT SerialSettings
 {
     enum class DataBits : uint8_t
     {
@@ -52,7 +58,7 @@ struct SC_COMPILER_EXPORT SerialSettings
 };
 
 /// @brief Open options for a serial descriptor.
-struct SC_COMPILER_EXPORT SerialOpenOptions
+struct SC_SERIAL_PORT_EXPORT SerialOpenOptions
 {
     bool blocking    = true;
     bool inheritable = false;
@@ -63,7 +69,7 @@ struct SC_COMPILER_EXPORT SerialOpenOptions
 
 /// @brief Native serial port descriptor with configuration support.
 /// \snippet Tests/Libraries/SerialPort/SerialPortTest.cpp SerialDescriptorSnippet
-struct SC_COMPILER_EXPORT SerialDescriptor : public FileDescriptor
+struct SC_SERIAL_PORT_EXPORT SerialDescriptor : public FileDescriptor
 {
     /// @brief Opens a serial port and applies the requested settings.
     /// @param path Serial device path (`/dev/tty*` on Posix, `COM*` on Windows)

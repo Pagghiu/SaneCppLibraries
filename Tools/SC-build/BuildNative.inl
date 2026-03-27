@@ -1189,7 +1189,10 @@ struct SC::Build::NativeBuild
             switch (resolvedProject.compileFlags.optimizationLevel)
             {
             case Optimization::Debug: SC_TRY(commandLine.append("/DEBUG")); break;
-            case Optimization::Release: break;
+            case Optimization::Release:
+                SC_TRY(commandLine.append("/OPT:REF"));
+                SC_TRY(commandLine.append("/OPT:ICF"));
+                break;
             }
             SC_TRY(appendLinkFlags(commandLine, resolvedProject));
             String outFlag = StringEncoding::Utf8;
@@ -1212,7 +1215,10 @@ struct SC::Build::NativeBuild
             switch (resolvedProject.compileFlags.optimizationLevel)
             {
             case Optimization::Debug: SC_TRY(commandLine.append("/DEBUG")); break;
-            case Optimization::Release: break;
+            case Optimization::Release:
+                SC_TRY(commandLine.append("/OPT:REF"));
+                SC_TRY(commandLine.append("/OPT:ICF"));
+                break;
             }
             for (const ResolvedSource& source : resolvedProject.sources)
             {
@@ -1335,6 +1341,8 @@ struct SC::Build::NativeBuild
             case Optimization::Release:
                 SC_TRY(commandLine.append("/DNDEBUG=1"));
                 SC_TRY(commandLine.append("/O2"));
+                SC_TRY(commandLine.append("/Gy"));
+                SC_TRY(commandLine.append("/Gw"));
                 SC_TRY(commandLine.append("/MT"));
                 break;
             }
@@ -1402,6 +1410,8 @@ struct SC::Build::NativeBuild
         case Optimization::Release:
             SC_TRY(commandLine.append("-DNDEBUG=1"));
             SC_TRY(commandLine.append("-O3"));
+            SC_TRY(commandLine.append("-ffunction-sections"));
+            SC_TRY(commandLine.append("-fdata-sections"));
             break;
         }
 
@@ -1546,6 +1556,26 @@ struct SC::Build::NativeBuild
                 SC_TRY(commandLine.append(extraLinkerFlag.view()));
             }
             return Result(true);
+        }
+
+        if (resolvedProject.parameters->platform == Platform::Linux and
+            resolvedProject.project->targetType != TargetType::StaticLibrary and
+            not resolvedProject.project->exportLibraries.isEmpty())
+        {
+            SC_TRY(commandLine.append("-rdynamic"));
+        }
+
+        if (resolvedProject.project->targetType != TargetType::StaticLibrary and
+            resolvedProject.compileFlags.optimizationLevel == Optimization::Release)
+        {
+            if (resolvedProject.parameters->platform == Platform::Apple)
+            {
+                SC_TRY(commandLine.append("-dead_strip"));
+            }
+            else if (resolvedProject.parameters->platform == Platform::Linux)
+            {
+                SC_TRY(commandLine.append("-Wl,--gc-sections"));
+            }
         }
 
         for (const String& libraryPath : resolvedProject.linkFlags.libraryPaths)

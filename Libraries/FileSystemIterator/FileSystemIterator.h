@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_FILE_SYSTEM_ITERATOR
+#define SC_EXPORT_LIBRARY_FILE_SYSTEM_ITERATOR 0
+#endif
+#define SC_FILE_SYSTEM_ITERATOR_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_ITERATOR)
+
 #include "../Foundation/Result.h"
 #include "../Foundation/StringPath.h"
 

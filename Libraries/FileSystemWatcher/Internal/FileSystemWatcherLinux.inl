@@ -28,7 +28,7 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
     Pair   notifyHandles[FolderWatcherSizes::MaxNumberOfSubdirs];
     size_t notifyHandlesCount = 0;
 
-    char relativePathsStorage[2048];
+    char relativePathsStorage[4096];
 
     StringSpan::NativeWritable relativePaths;
 

@@ -262,6 +262,78 @@ bool SC::Build::Project::addLinkFrameworksIOS(Span<const StringView> frameworks)
 
 bool SC::Build::Project::addDefines(Span<const StringView> defines) { return files.compile.defines.append(defines); }
 
+namespace
+{
+static bool buildAppendUpperSnakeCase(SC::StringView input, SC::String& output)
+{
+    auto builder = SC::StringBuilder::create(output);
+    for (SC::size_t idx = 0; idx < input.sizeInBytes(); ++idx)
+    {
+        const char current = input.bytesWithoutTerminator()[idx];
+        if (current >= 'A' and current <= 'Z')
+        {
+            if (idx > 0)
+            {
+                const char previous = input.bytesWithoutTerminator()[idx - 1];
+                if (previous >= 'a' and previous <= 'z')
+                {
+                    SC_TRY(builder.append("_"));
+                }
+            }
+            const char upperString[] = {current, 0};
+            SC_TRY(builder.append(SC::StringView::fromNullTerminated(upperString, SC::StringEncoding::Ascii)));
+        }
+        else if (current >= 'a' and current <= 'z')
+        {
+            const char upperString[] = {char(current - 'a' + 'A'), 0};
+            SC_TRY(builder.append(SC::StringView::fromNullTerminated(upperString, SC::StringEncoding::Ascii)));
+        }
+        else
+        {
+            const char character[] = {current, 0};
+            SC_TRY(builder.append(SC::StringView::fromNullTerminated(character, SC::StringEncoding::Ascii)));
+        }
+    }
+    builder.finalize();
+    return true;
+}
+} // namespace
+
+bool SC::Build::Project::addExportLibraries(Span<const StringView> libraries)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    for (const StringView library : libraries)
+    {
+        size_t existingIndex = 0;
+        if (exportLibraries.find([&](const String& item) { return item.view() == library; }, &existingIndex))
+        {
+            continue;
+        }
+
+        String libraryPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(libraryPath, {rootDirectory.view(), "Libraries", library}));
+        if (not fs.existsAndIsDirectory(libraryPath.view()))
+        {
+            return false;
+        }
+
+        String defineName = StringEncoding::Ascii;
+        SC_TRY(buildAppendUpperSnakeCase(library, defineName));
+
+        String define = StringEncoding::Ascii;
+        SC_TRY(StringBuilder::format(define, "SC_EXPORT_LIBRARY_{}=1", defineName.view()));
+
+        SC_TRY(files.compile.defines.push_back(define));
+
+        String exportedLibrary = StringEncoding::Utf8;
+        SC_TRY(exportedLibrary.assign(library));
+        SC_TRY(exportLibraries.push_back(move(exportedLibrary)));
+    }
+    return true;
+}
+
 bool SC::Build::Project::addFile(StringView singleFile) { return addFiles({}, singleFile); }
 
 bool SC::Build::Project::addSpecificFileFlags(SourceFiles selection)

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "HttpConnection.h"
+#include "HttpExport.h"
 
 namespace SC
 {
@@ -18,7 +19,7 @@ struct IsBaseOf
 
 /// @brief Adds compile-time configurable read and write queues to HttpConnection
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
-struct SC_COMPILER_EXPORT HttpAsyncConnection
+struct SC_HTTP_EXPORT HttpAsyncConnection
     : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 8, HttpConnection>
 {
 };
@@ -35,7 +36,7 @@ struct SC_COMPILER_EXPORT HttpAsyncConnection
 /// @see SC::HttpAsyncFileServer, SC::HttpConnectionsPool
 ///
 /// \snippet Tests/Libraries/Http/HttpAsyncServerTest.cpp HttpAsyncServerSnippet
-struct SC_COMPILER_EXPORT HttpAsyncServer
+struct SC_HTTP_EXPORT HttpAsyncServer
 {
     /// @brief Initializes the async server with all needed memory buffers
     template <typename T,

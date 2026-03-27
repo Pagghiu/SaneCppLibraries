@@ -1,12 +1,18 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_MEMORY
+#define SC_EXPORT_LIBRARY_MEMORY 0
+#endif
+#define SC_MEMORY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_MEMORY)
+
 #include "../Foundation/PrimitiveTypes.h"
 namespace SC
 {
-struct SC_COMPILER_EXPORT Memory;
-struct SC_COMPILER_EXPORT MemoryAllocator;
-struct SC_COMPILER_EXPORT FixedAllocator;
+struct SC_MEMORY_EXPORT Memory;
+struct SC_MEMORY_EXPORT MemoryAllocator;
+struct SC_MEMORY_EXPORT FixedAllocator;
 } // namespace SC
 //! @addtogroup group_memory
 //! @{

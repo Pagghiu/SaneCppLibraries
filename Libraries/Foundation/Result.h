@@ -4,7 +4,7 @@
 #include "Compiler.h" // SC_LANGUAGE_LIKELY
 namespace SC
 {
-struct SC_COMPILER_EXPORT Result;
+struct SC_FOUNDATION_EXPORT Result;
 //! @addtogroup group_foundation_utility
 //! @{
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#include "ContainersExport.h"
 
 namespace SC
 {
@@ -21,7 +22,7 @@ template <typename T>
 struct SC::ArenaMapKey
 {
   private:
-    struct SC_COMPILER_EXPORT Generation
+    struct SC_CONTAINERS_EXPORT Generation
     {
         uint32_t used       : 1;
         uint32_t generation : 31;

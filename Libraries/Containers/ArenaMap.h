@@ -5,6 +5,7 @@
 #include "../Memory/Globals.h"
 #include "../Memory/Memory.h"
 #include "ArenaMapKey.h"
+#include "ContainersExport.h"
 
 namespace SC
 {

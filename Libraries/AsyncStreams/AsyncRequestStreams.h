@@ -235,13 +235,13 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
 
 // clang-format off
 /// @brief Uses an SC::AsyncFileRead to stream data from a file
-template <typename AsyncEventLoopType> struct SC_COMPILER_EXPORT AsyncReadableFileStream : public AsyncRequestReadableStream<typename AsyncEventLoopType::FileRead, AsyncEventLoopType>{};
+template <typename AsyncEventLoopType> struct SC_ASYNC_STREAMS_EXPORT AsyncReadableFileStream : public AsyncRequestReadableStream<typename AsyncEventLoopType::FileRead, AsyncEventLoopType>{};
 /// @brief Uses an SC::AsyncFileWrite to stream data to a file
-template <typename AsyncEventLoopType> struct SC_COMPILER_EXPORT AsyncWritableFileStream : public AsyncRequestWritableStream<typename AsyncEventLoopType::FileWrite, AsyncEventLoopType>{};
+template <typename AsyncEventLoopType> struct SC_ASYNC_STREAMS_EXPORT AsyncWritableFileStream : public AsyncRequestWritableStream<typename AsyncEventLoopType::FileWrite, AsyncEventLoopType>{};
 /// @brief Uses an SC::AsyncSocketReceive to stream data from a socket
-template <typename AsyncEventLoopType> struct SC_COMPILER_EXPORT AsyncReadableSocketStream : public AsyncRequestReadableStream<typename AsyncEventLoopType::SocketReceive, AsyncEventLoopType>{};
+template <typename AsyncEventLoopType> struct SC_ASYNC_STREAMS_EXPORT AsyncReadableSocketStream : public AsyncRequestReadableStream<typename AsyncEventLoopType::SocketReceive, AsyncEventLoopType>{};
 /// @brief Uses an SC::AsyncSocketSend to stream data to a socket
-template <typename AsyncEventLoopType> struct SC_COMPILER_EXPORT AsyncWritableSocketStream : public AsyncRequestWritableStream<typename AsyncEventLoopType::SocketSend, AsyncEventLoopType>{};
+template <typename AsyncEventLoopType> struct SC_ASYNC_STREAMS_EXPORT AsyncWritableSocketStream : public AsyncRequestWritableStream<typename AsyncEventLoopType::SocketSend, AsyncEventLoopType>{};
 // clang-format on
 
 } // namespace SC

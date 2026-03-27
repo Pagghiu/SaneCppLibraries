@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_CONTAINERS_REFLECTION
+#define SC_EXPORT_LIBRARY_CONTAINERS_REFLECTION 0
+#endif
+#define SC_CONTAINERS_REFLECTION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_CONTAINERS_REFLECTION)
+
 #include "../Containers/Array.h"
 #include "../Containers/Vector.h"
 #include "../Containers/VectorMap.h"

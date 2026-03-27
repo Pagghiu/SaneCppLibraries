@@ -5,6 +5,7 @@
 #include "../Foundation/TypeTraits.h"                 // IsTriviallyCopyable
 #include "../Memory/Internal/Segment.inl"             // IWYU pragma: keep
 #include "../Memory/Internal/SegmentTrivial.inl"      // IWYU pragma: keep
+#include "ContainersExport.h"
 
 namespace SC
 {

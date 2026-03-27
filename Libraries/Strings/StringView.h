@@ -3,12 +3,13 @@
 #pragma once
 #include "../Foundation/Span.h"
 #include "../Strings/StringIterator.h"
+#include "StringsExport.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT StringView;
-struct SC_COMPILER_EXPORT StringViewTokenizer;
-struct SC_COMPILER_EXPORT StringAlgorithms;
+struct SC_STRINGS_EXPORT StringView;
+struct SC_STRINGS_EXPORT StringViewTokenizer;
+struct SC_STRINGS_EXPORT StringAlgorithms;
 
 } // namespace SC
 

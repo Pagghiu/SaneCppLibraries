@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_REFLECTION
+#define SC_EXPORT_LIBRARY_REFLECTION 0
+#endif
+#define SC_REFLECTION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_REFLECTION)
+
 #include "../Foundation/TypeTraits.h" // EnableIf
 #include "ReflectionFoundation.h"
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Containers/Vector.h"
+#include "ContainersExport.h"
 
 namespace SC
 {

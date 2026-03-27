@@ -3,12 +3,19 @@
 #pragma once
 
 #include "../../Foundation/Compiler.h"
+#ifndef SC_HTTP_CLIENT_EXPORT
+#ifndef SC_EXPORT_LIBRARY_HTTP_CLIENT
+#define SC_EXPORT_LIBRARY_HTTP_CLIENT 0
+#endif
+#define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
+#endif
+
 #include "../../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {
 /// Internal synchronization helpers duplicated in HttpClient to avoid a dependency on Threading.
-struct SC_COMPILER_EXPORT HttpClientLocalMutex final
+struct SC_HTTP_CLIENT_EXPORT HttpClientLocalMutex final
 {
     HttpClientLocalMutex();
     ~HttpClientLocalMutex();
@@ -27,7 +34,7 @@ struct SC_COMPILER_EXPORT HttpClientLocalMutex final
 };
 
 /// Internal synchronization helpers duplicated in HttpClient to avoid a dependency on Threading.
-struct SC_COMPILER_EXPORT HttpClientLocalConditionVariable final
+struct SC_HTTP_CLIENT_EXPORT HttpClientLocalConditionVariable final
 {
     HttpClientLocalConditionVariable();
     ~HttpClientLocalConditionVariable();

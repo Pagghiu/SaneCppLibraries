@@ -2,12 +2,20 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../../Foundation/Compiler.h"
+#ifndef SC_HTTP_CLIENT_EXPORT
+#ifndef SC_EXPORT_LIBRARY_HTTP_CLIENT
+#define SC_EXPORT_LIBRARY_HTTP_CLIENT 0
+#endif
+#define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
+#endif
+
 #include "../../Foundation/Function.h"
 
 namespace SC
 {
 template <int MaxListeners, typename... T>
-struct SC_COMPILER_EXPORT HttpClientEvent
+struct SC_HTTP_CLIENT_EXPORT HttpClientEvent
 {
     template <typename... U>
     void emit(U&&... t)

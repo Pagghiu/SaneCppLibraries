@@ -3,11 +3,11 @@
 #pragma once
 #include "../Foundation/Assert.h"
 #include "../Foundation/PrimitiveTypes.h"
-#include "../Memory/Memory.h" // FixedAllocator
+#include "../Memory/Memory.h"
 namespace SC
 {
-struct SC_COMPILER_EXPORT VirtualMemory;
-struct SC_COMPILER_EXPORT VirtualAllocator;
+struct SC_MEMORY_EXPORT VirtualMemory;
+struct SC_MEMORY_EXPORT VirtualAllocator;
 } // namespace SC
 //! @addtogroup group_memory
 //! @{

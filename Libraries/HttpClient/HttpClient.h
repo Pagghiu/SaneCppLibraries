@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_HTTP_CLIENT
+#define SC_EXPORT_LIBRARY_HTTP_CLIENT 0
+#endif
+#define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
+
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
@@ -13,7 +19,7 @@ namespace SC
 //! @{
 
 /// @brief Configuration for an outgoing HTTP request
-struct SC_COMPILER_EXPORT HttpClientRequest
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequest
 {
     enum Method : uint8_t
     {
@@ -42,7 +48,7 @@ struct SC_COMPILER_EXPORT HttpClientRequest
 };
 
 /// @brief Parsed response metadata filled when headers arrive
-struct SC_COMPILER_EXPORT HttpClientResponse
+struct SC_HTTP_CLIENT_EXPORT HttpClientResponse
 {
     enum class Protocol : uint8_t
     {
@@ -62,7 +68,7 @@ struct SC_COMPILER_EXPORT HttpClientResponse
 };
 
 /// @brief Pull-based provider for streamed request bodies
-struct SC_COMPILER_EXPORT HttpClientRequestBodyProvider
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestBodyProvider
 {
     virtual ~HttpClientRequestBodyProvider() {}
 
@@ -75,7 +81,7 @@ struct SC_COMPILER_EXPORT HttpClientRequestBodyProvider
 };
 
 /// @brief Listener receiving response notifications during HttpClientOperation::poll
-struct SC_COMPILER_EXPORT HttpClientOperationListener{
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperationListener{
     virtual ~HttpClientOperationListener(){}
 
     /// @brief Called once the response status code and headers are available
@@ -96,10 +102,10 @@ virtual void onError(Result error) { SC_COMPILER_UNUSED(error); }
 }
 ;
 
-struct SC_COMPILER_EXPORT HttpClientOperation;
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperation;
 
 /// @brief Optional notifier used by external adapters to wake up their own event loop
-struct SC_COMPILER_EXPORT HttpClientOperationNotifier
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperationNotifier
 {
     virtual ~HttpClientOperationNotifier() {}
 
@@ -109,7 +115,7 @@ struct SC_COMPILER_EXPORT HttpClientOperationNotifier
 };
 
 /// @brief Caller-owned response buffer descriptor for one HttpClientOperation
-struct SC_COMPILER_EXPORT HttpClientResponseBuffer
+struct SC_HTTP_CLIENT_EXPORT HttpClientResponseBuffer
 {
     Span<char> data;
 
@@ -119,7 +125,7 @@ struct SC_COMPILER_EXPORT HttpClientResponseBuffer
 };
 
 /// @brief Event slot storage used by HttpClientOperation to hand off backend notifications
-struct SC_COMPILER_EXPORT HttpClientOperationEvent
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperationEvent
 {
     enum class Type : uint8_t
     {
@@ -136,7 +142,7 @@ struct SC_COMPILER_EXPORT HttpClientOperationEvent
 };
 
 /// @brief Caller-owned memory for one HttpClientOperation
-struct SC_COMPILER_EXPORT HttpClientOperationMemory
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperationMemory
 {
     Span<HttpClientResponseBuffer> responseBuffers;
     Span<HttpClientOperationEvent> eventQueue;
@@ -151,7 +157,7 @@ struct SC_COMPILER_EXPORT HttpClientOperationMemory
 #pragma warning(push)
 #pragma warning(disable : 4324)
 #endif
-struct SC_COMPILER_EXPORT HttpClient
+struct SC_HTTP_CLIENT_EXPORT HttpClient
 {
     HttpClient();
     ~HttpClient();
@@ -200,7 +206,7 @@ struct SC_COMPILER_EXPORT HttpClient
 };
 
 /// @brief One in-flight HTTP request/response operation
-struct SC_COMPILER_EXPORT HttpClientOperation
+struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
 {
     HttpClientOperation();
     ~HttpClientOperation();

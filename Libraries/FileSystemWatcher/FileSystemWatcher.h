@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER
+#define SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER 0
+#endif
+#define SC_FILE_SYSTEM_WATCHER_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER)
+
 #include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/Result.h"
@@ -92,7 +98,7 @@ struct FileSystemWatcher
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(void*);
-        static constexpr int Linux   = 1056 + 2048 + 8;
+        static constexpr int Linux   = 1056 + 4096 + 8;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = alignof(void*);

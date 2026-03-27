@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_TIME
+#define SC_EXPORT_LIBRARY_TIME 0
+#endif
+#define SC_TIME_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_TIME)
+
 #include "../Foundation/PrimitiveTypes.h"
 
 namespace SC

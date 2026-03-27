@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_PLUGIN
+#define SC_EXPORT_LIBRARY_PLUGIN 0
+#endif
+#define SC_PLUGIN_LIBRARY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PLUGIN)
+
 #include "../Foundation/Function.h"
 #include "../Foundation/Platform.h"
 #include "../Foundation/PrimitiveTypes.h"

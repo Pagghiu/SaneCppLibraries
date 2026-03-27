@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringSpan.h"
+#include "StringsExport.h"
 
 namespace SC
 {
@@ -16,7 +17,7 @@ namespace SC
 ///
 /// Example:
 /// \snippet Tests/Libraries/Strings/StringConverterTest.cpp stringConverterTestSnippet
-struct SC_COMPILER_EXPORT StringConverter
+struct SC_STRINGS_EXPORT StringConverter
 {
     /// @brief Specifies if to add a null terminator
     enum StringTermination

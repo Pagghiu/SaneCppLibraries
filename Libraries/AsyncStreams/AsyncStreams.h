@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_ASYNC_STREAMS
+#define SC_EXPORT_LIBRARY_ASYNC_STREAMS 0
+#endif
+#define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
+
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Function.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
@@ -46,9 +52,9 @@ namespace SC
 {
 
 /// @brief A Span of bytes memory to be read or written by async streams
-struct SC_COMPILER_EXPORT AsyncBufferView
+struct SC_ASYNC_STREAMS_EXPORT AsyncBufferView
 {
-    struct SC_COMPILER_EXPORT ID
+    struct SC_ASYNC_STREAMS_EXPORT ID
     {
         using NumericType = int32_t;
 
@@ -159,7 +165,7 @@ struct SC_COMPILER_EXPORT AsyncBufferView
 
 /// @brief Holds a Span of AsyncBufferView (allocated by user) holding available memory for the streams
 /// @note User must fill the AsyncBuffersPool::buffers with a `Span` of AsyncBufferView
-struct SC_COMPILER_EXPORT AsyncBuffersPool
+struct SC_ASYNC_STREAMS_EXPORT AsyncBuffersPool
 {
     /// @brief Increments a buffer reference count
     void refBuffer(AsyncBufferView::ID bufferID);
@@ -210,7 +216,7 @@ struct SC_COMPILER_EXPORT AsyncBuffersPool
 /// The stream must be paused when the AsyncBuffersPool is full (use AsyncReadableStream::getBufferOrPause).
 /// Once the stream is ended, it will emit AsyncReadableStream::eventEnd and it cannot be used further.
 /// AsyncReadableStream::eventError will be emitted when an error occurs in any phase.
-struct SC_COMPILER_EXPORT AsyncReadableStream
+struct SC_ASYNC_STREAMS_EXPORT AsyncReadableStream
 {
     using BufferViewID = AsyncBufferView::ID;
     using BuffersPool  = AsyncBuffersPool;
@@ -340,7 +346,7 @@ struct SC_COMPILER_EXPORT AsyncReadableStream
 /// will be made available again (i.e. a write finishes).
 /// User can listen to AsyncWritableStream::eventWritten to know when a buffer is written
 /// (and its refcount decreased) or AsyncWritableStream::eventDrain when the queue is empty.
-struct SC_COMPILER_EXPORT AsyncWritableStream
+struct SC_ASYNC_STREAMS_EXPORT AsyncWritableStream
 {
     using BufferViewID = AsyncBufferView::ID;
     using BuffersPool  = AsyncBuffersPool;
@@ -468,7 +474,7 @@ struct SC_COMPILER_EXPORT AsyncWritableStream
 };
 
 /// @brief A stream that can both produce and consume buffers
-struct SC_COMPILER_EXPORT AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStream
+struct SC_ASYNC_STREAMS_EXPORT AsyncDuplexStream : public AsyncReadableStream, public AsyncWritableStream
 {
     AsyncDuplexStream();
 
@@ -479,7 +485,7 @@ struct SC_COMPILER_EXPORT AsyncDuplexStream : public AsyncReadableStream, public
 };
 
 /// @brief A duplex stream that produces new buffers transforming received buffers
-struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
+struct SC_ASYNC_STREAMS_EXPORT AsyncTransformStream : public AsyncDuplexStream
 {
     AsyncTransformStream();
 
@@ -518,7 +524,7 @@ struct SC_COMPILER_EXPORT AsyncTransformStream : public AsyncDuplexStream
 
 /// @brief Traits exposing AsyncStreams public types through a single template parameter.
 /// This helps adapters depend on stream types only when they are instantiated.
-struct SC_COMPILER_EXPORT AsyncStreams
+struct SC_ASYNC_STREAMS_EXPORT AsyncStreams
 {
     using BufferView     = AsyncBufferView;
     using BuffersPool    = AsyncBuffersPool;
@@ -534,7 +540,7 @@ struct SC_COMPILER_EXPORT AsyncStreams
 /// When a writable has finished writing, AsyncReadableStream::resume will be called to try un-pausing.
 /// Caller needs to set AsyncPipeline::source field and AsyncPipeline::sinks with valid streams.
 /// @note It's crucial to use the same AsyncBuffersPool for the AsyncReadableStream and all AsyncWritableStream
-struct SC_COMPILER_EXPORT AsyncPipeline
+struct SC_ASYNC_STREAMS_EXPORT AsyncPipeline
 {
     static constexpr int MaxListeners  = 8;
     static constexpr int MaxTransforms = 8;

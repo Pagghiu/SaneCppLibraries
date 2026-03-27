@@ -4,6 +4,7 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
+#include "HttpExport.h"
 
 namespace SC
 {
@@ -11,7 +12,7 @@ namespace SC
 //! @{
 
 /// @brief Incremental HTTP multipart/form-data parser
-struct SC_COMPILER_EXPORT HttpMultipartParser
+struct SC_HTTP_EXPORT HttpMultipartParser
 {
     /// @brief Initializes the parser with the given boundary (that excludes the leading '--')
     Result initWithBoundary(StringSpan boundary);

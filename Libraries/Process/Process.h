@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_PROCESS
+#define SC_EXPORT_LIBRARY_PROCESS 0
+#endif
+#define SC_PROCESS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PROCESS)
+
 #include "../File/File.h"
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
@@ -9,9 +15,9 @@
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT ProcessChain;
+struct SC_PROCESS_EXPORT ProcessChain;
 
-struct SC_COMPILER_EXPORT ProcessDescriptor
+struct SC_PROCESS_EXPORT ProcessDescriptor
 {
     using Handle                  = detail::FileDescriptorDefinition::Handle;
     static constexpr auto Invalid = detail::FileDescriptorDefinition::Invalid;
@@ -68,9 +74,9 @@ struct ProcessID
 /// Example: Disable environment variable inheritance
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessEnvironmentDisableInheritance
 
-struct SC_COMPILER_EXPORT Process
+struct SC_PROCESS_EXPORT Process
 {
-    struct SC_COMPILER_EXPORT Options
+    struct SC_PROCESS_EXPORT Options
     {
         bool windowsHide; ///< [Windows] Hides child process window (default == Process::isWindowsConsoleSubsystem)
         Options();
@@ -321,7 +327,7 @@ struct SC_COMPILER_EXPORT Process
 ///
 /// Example: Read standard output into a string using a Pipe
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp processChainPipeDualSnippet
-struct SC_COMPILER_EXPORT ProcessChain
+struct SC_PROCESS_EXPORT ProcessChain
 {
     Process::Options options;
     /// @brief Add a process to the chain, with given arguments
@@ -443,7 +449,7 @@ struct ProcessEnvironment
 ///
 /// Example: Fork current process modifying memory in forked process leaving parent's one unmodified.
 /// \snippet Tests/Libraries/Process/ProcessTest.cpp ProcessFork
-struct SC_COMPILER_EXPORT ProcessFork
+struct SC_PROCESS_EXPORT ProcessFork
 {
     ProcessFork();
     ~ProcessFork();

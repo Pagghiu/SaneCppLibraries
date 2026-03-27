@@ -4,6 +4,7 @@
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Strings/StringView.h"
+#include "StringsExport.h"
 
 namespace SC
 {
@@ -22,7 +23,7 @@ struct StringFormatterFor
 //! @addtogroup group_strings
 //! @{
 /// @brief Allows pushing results of StringFormat to a buffer or to the console
-struct SC_COMPILER_EXPORT StringFormatOutput
+struct SC_STRINGS_EXPORT StringFormatOutput
 {
     StringFormatOutput(StringEncoding encoding, IGrowableBuffer& buffer) : encoding(encoding), growableBuffer(&buffer)
     {}
@@ -220,38 +221,38 @@ bool SC::StringFormat<RangeIterator>::format(StringFormatOutput& data, StringVie
 namespace SC
 {
 // clang-format off
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<float>        {static bool format(StringFormatOutput&, const StringSpan, const float);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringSpan, const double);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<float>        {static bool format(StringFormatOutput&, const StringSpan, const float);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<double>       {static bool format(StringFormatOutput&, const StringSpan, const double);};
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #if SC_PLATFORM_64_BIT == 0
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
 #endif
 #else
 #if !SC_PLATFORM_LINUX
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringSpan, const SC::size_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::size_t>   {static bool format(StringFormatOutput&, const StringSpan, const SC::size_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::ssize_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::ssize_t);};
 #endif
 #endif
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::int64_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int64_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::uint64_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint64_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::int32_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int32_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::uint32_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint32_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::int16_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int16_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::uint16_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint16_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, const StringSpan, const SC::int8_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::uint8_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringSpan, const char);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringSpan, const bool);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringSpan, const StringView);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringSpan, const char*);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<const void*>  {static bool format(StringFormatOutput&, const StringSpan, const void*);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::int64_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int64_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::uint64_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint64_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::int32_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int32_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::uint32_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint32_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::int16_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::int16_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::uint16_t> {static bool format(StringFormatOutput&, const StringSpan, const SC::uint16_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::int8_t>   {static bool format(StringFormatOutput&, const StringSpan, const SC::int8_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<SC::uint8_t>  {static bool format(StringFormatOutput&, const StringSpan, const SC::uint8_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<char>         {static bool format(StringFormatOutput&, const StringSpan, const char);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<bool>         {static bool format(StringFormatOutput&, const StringSpan, const bool);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<StringView>   {static bool format(StringFormatOutput&, const StringSpan, const StringView);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<const char*>  {static bool format(StringFormatOutput&, const StringSpan, const char*);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<const void*>  {static bool format(StringFormatOutput&, const StringSpan, const void*);};
 #if SC_PLATFORM_WINDOWS
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringSpan, const wchar_t);};
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringSpan, const wchar_t*);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<wchar_t>        {static bool format(StringFormatOutput&, const StringSpan, const wchar_t);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<const wchar_t*> {static bool format(StringFormatOutput&, const StringSpan, const wchar_t*);};
 #endif
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringSpan> {static bool format(StringFormatOutput&, const StringSpan, const StringSpan);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<StringSpan> {static bool format(StringFormatOutput&, const StringSpan, const StringSpan);};
 struct StringPath;
-template <> struct SC_COMPILER_EXPORT StringFormatterFor<StringPath> {static bool format(StringFormatOutput&, const StringSpan, const StringPath&);};
+template <> struct SC_STRINGS_EXPORT StringFormatterFor<StringPath> {static bool format(StringFormatOutput&, const StringSpan, const StringPath&);};
 
 // clang-format on
 

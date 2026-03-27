@@ -1,13 +1,19 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_SERIALIZATION_TEXT
+#define SC_EXPORT_LIBRARY_SERIALIZATION_TEXT 0
+#endif
+#define SC_SERIALIZATION_TEXT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIALIZATION_TEXT)
+
 #include "../Strings/StringFormat.h" //StringFormatOutput
 #include "Internal/SerializationTextReadVersioned.h"
 #include "Internal/SerializationTextReadWriteExact.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT SerializationJson;
+struct SC_SERIALIZATION_TEXT_EXPORT SerializationJson;
 } // namespace SC
 
 //! @defgroup group_serialization_text Serialization Text
@@ -43,7 +49,7 @@ struct SC_COMPILER_EXPORT SerializationJson;
 struct SC::SerializationJson
 {
     /// @brief Formatting options
-    struct SC_COMPILER_EXPORT Options
+    struct SC_SERIALIZATION_TEXT_EXPORT Options
     {
         uint8_t floatDigits; ///< How many digits should be used when printing floating points
         Options() { floatDigits = 2; }
@@ -104,7 +110,7 @@ struct SC::SerializationJson
   private:
     /// @brief Writer interface for Serializer that generates output JSON from C++ types.
     /// Its methods are meant to be called by Serializer
-    struct SC_COMPILER_EXPORT Writer
+    struct SC_SERIALIZATION_TEXT_EXPORT Writer
     {
         StringFormatOutput& output;
 
@@ -160,7 +166,7 @@ struct SC::SerializationJson
 
     /// @brief Writer interface for Serializer that parses JSON into C++ types.
     /// Its methods are meant to be called by Serializer
-    struct SC_COMPILER_EXPORT Reader
+    struct SC_SERIALIZATION_TEXT_EXPORT Reader
     {
         Reader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
 

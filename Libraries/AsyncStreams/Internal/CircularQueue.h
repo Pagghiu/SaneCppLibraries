@@ -1,6 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Compiler.h"
+#ifndef SC_ASYNC_STREAMS_EXPORT
+#ifndef SC_EXPORT_LIBRARY_ASYNC_STREAMS
+#define SC_EXPORT_LIBRARY_ASYNC_STREAMS 0
+#endif
+#define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
+#endif
+
 #include "../../Foundation/Span.h"
 
 namespace SC
@@ -8,7 +16,7 @@ namespace SC
 /// @brief A fixed size circular queue (also known as ring buffer)
 /// @note Uses only up to N-1 element slots of the passed in Span
 template <typename T>
-struct SC_COMPILER_EXPORT CircularQueue
+struct SC_ASYNC_STREAMS_EXPORT CircularQueue
 {
     constexpr CircularQueue() = default;
     constexpr CircularQueue(Span<T> buffer) : buffer(buffer) {}

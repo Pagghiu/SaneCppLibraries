@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_FILE
+#define SC_EXPORT_LIBRARY_FILE 0
+#endif
+#define SC_FILE_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE)
+
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Result.h"
@@ -17,7 +23,7 @@ namespace SC
 namespace detail
 {
 #if SC_PLATFORM_WINDOWS
-struct SC_COMPILER_EXPORT FileDescriptorDefinition
+struct SC_FILE_EXPORT FileDescriptorDefinition
 {
     using Handle = void*; // HANDLE
     static Result releaseHandle(Handle& handle);
@@ -32,7 +38,7 @@ struct SC_COMPILER_EXPORT FileDescriptorDefinition
 //! [UniqueHandleDeclaration1Snippet]
 
 /// @brief Definition used to declare FileDescriptor (as argument to UniqueHandle)
-struct SC_COMPILER_EXPORT FileDescriptorDefinition
+struct SC_FILE_EXPORT FileDescriptorDefinition
 {
     using Handle = int; // fd
     static Result releaseHandle(Handle& handle);
@@ -89,7 +95,7 @@ struct FileDescriptorStat
 };
 
 /// @brief Options used to open a file descriptor
-struct SC_COMPILER_EXPORT FileOpen
+struct SC_FILE_EXPORT FileOpen
 {
     /// @brief Indicates the mode in which the file should be opened (read, write, append, etc.)
     enum Mode : uint8_t
@@ -118,7 +124,7 @@ struct SC_COMPILER_EXPORT FileOpen
 //! [UniqueHandleDeclaration2Snippet]
 
 /// @brief Open, read and write to/from a file descriptor (like a file or pipe).
-struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescriptorDefinition>
+struct SC_FILE_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescriptorDefinition>
 {
     using UniqueHandle::UniqueHandle;
 
@@ -282,7 +288,7 @@ struct SC_COMPILER_EXPORT FileDescriptor : public UniqueHandle<detail::FileDescr
     struct Internal;
 };
 
-struct SC_COMPILER_EXPORT PipeOptions
+struct SC_FILE_EXPORT PipeOptions
 {
     bool readInheritable  = false; ///< Set to true to make the read side of the pipe visible to child processes
     bool writeInheritable = false; ///< Set to true to make the write side of the pipe visible to child processes
@@ -290,7 +296,7 @@ struct SC_COMPILER_EXPORT PipeOptions
 };
 
 /// @brief Read / Write pipe (Process stdin/stdout and IPC communication)
-struct SC_COMPILER_EXPORT PipeDescriptor
+struct SC_FILE_EXPORT PipeDescriptor
 {
     FileDescriptor readPipe;  ///< The read side of the pipe
     FileDescriptor writePipe; ///< The write side of the pipe
@@ -304,13 +310,13 @@ struct SC_COMPILER_EXPORT PipeDescriptor
     Result close();
 };
 
-struct SC_COMPILER_EXPORT NamedPipeNameOptions
+struct SC_FILE_EXPORT NamedPipeNameOptions
 {
     StringSpan posixDirectory = "/tmp"; ///< Posix only. Must be an absolute directory path.
 };
 
 /// @brief Utility for building platform-native named pipe endpoint names from logical names.
-struct SC_COMPILER_EXPORT NamedPipeName
+struct SC_FILE_EXPORT NamedPipeName
 {
     /// @brief Builds a platform-native named pipe endpoint path.
     /// @param logicalName A logical pipe name token (must not contain `/` or `\`).
@@ -320,7 +326,7 @@ struct SC_COMPILER_EXPORT NamedPipeName
     static Result build(StringSpan logicalName, StringPath& outName, NamedPipeNameOptions options = {});
 };
 
-struct SC_COMPILER_EXPORT NamedPipeServerOptions
+struct SC_FILE_EXPORT NamedPipeServerOptions
 {
     PipeOptions connectionOptions     = {}; ///< Accepted connection options (blocking + inheritability)
     uint32_t    maxPendingConnections = 16; ///< Max number of pending connections to queue
@@ -332,7 +338,7 @@ struct SC_COMPILER_EXPORT NamedPipeServerOptions
     } posix;
 };
 
-struct SC_COMPILER_EXPORT NamedPipeClientOptions
+struct SC_FILE_EXPORT NamedPipeClientOptions
 {
     PipeOptions connectionOptions = {}; ///< Connection options (blocking + inheritability)
     struct Windows
@@ -345,7 +351,7 @@ struct SC_COMPILER_EXPORT NamedPipeClientOptions
 /// @note See @ref SC::NamedPipeClient for client-side connection.
 /// @note Example:
 /// \snippet Tests/Libraries/File/FileTest.cpp NamedPipeServerSnippet
-struct SC_COMPILER_EXPORT NamedPipeServer
+struct SC_FILE_EXPORT NamedPipeServer
 {
     /// @brief Creates a named pipe server endpoint.
     /// @param name Platform-native absolute endpoint name.
@@ -376,7 +382,7 @@ struct SC_COMPILER_EXPORT NamedPipeServer
 };
 
 /// @brief Named pipe client endpoint creator.
-struct SC_COMPILER_EXPORT NamedPipeClient
+struct SC_FILE_EXPORT NamedPipeClient
 {
     /// @brief Connects to an existing named pipe server endpoint.
     /// @param name Platform-native absolute endpoint name.

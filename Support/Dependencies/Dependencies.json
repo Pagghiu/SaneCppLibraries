@@ -48,6 +48,7 @@
     "ContainersReflection": {
         "direct_dependencies": [
             "Containers",
+            "Foundation",
             "Memory",
             "Reflection"
         ],

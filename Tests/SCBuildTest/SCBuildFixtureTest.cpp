@@ -17,6 +17,7 @@ namespace
 {
 static constexpr StringView FixtureWorkspaceName           = "SCBuildFixtures";
 static constexpr StringView FixtureProjectName             = "TinyConsoleProgram";
+static constexpr StringView SmallFixtureProjectName        = "SmallSCProgram";
 static constexpr StringView HeaderFixtureProjectName       = "HeaderDependencyProgram";
 static constexpr StringView CompileFailureProjectName      = "CompileFailureProgram";
 static constexpr StringView LinkFailureProjectName         = "LinkFailureProgram";
@@ -34,6 +35,10 @@ static native_char_t DynamicFixtureProjectRootStorage[1024] = {};
 static StringView    DynamicFixtureProjectRoot;
 static native_char_t DynamicLinkedLibraryPathStorage[1024] = {};
 static StringView    DynamicLinkedLibraryPath;
+
+static constexpr size_t SmallFixtureMaxBytesMacOS   = 128 * 1024;
+static constexpr size_t SmallFixtureMaxBytesLinux   = 128 * 1024;
+static constexpr size_t SmallFixtureMaxBytesWindows = 256 * 1024;
 
 static Build::Platform::Type getBuildPlatform()
 {
@@ -101,6 +106,18 @@ static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& 
         return Result(true);
     }
 #endif
+    }
+    Assert::unreachable();
+}
+
+static size_t getSmallFixtureMaxBytes()
+{
+    switch (HostPlatform)
+    {
+    case SC::Platform::Apple: return SmallFixtureMaxBytesMacOS;
+    case SC::Platform::Linux: return SmallFixtureMaxBytesLinux;
+    case SC::Platform::Windows: return SmallFixtureMaxBytesWindows;
+    case SC::Platform::Emscripten: break;
     }
     Assert::unreachable();
 }
@@ -202,6 +219,29 @@ static Result configureTinyConsoleProgram(Build::Definition& definition, const B
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(project.addFiles("Tests/SCBuildTest/Fixture/TinyConsoleProgram", "main.cpp"));
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    SC_TRY(definition.workspaces.push_back(move(workspace)));
+    return Result(true);
+}
+
+static Result configureSmallSCProgram(Build::Definition& definition, const Build::Parameters& parameters)
+{
+    Build::Workspace workspace = {FixtureWorkspaceName};
+    Build::Project   project   = {Build::TargetType::ConsoleExecutable, SmallFixtureProjectName};
+
+    SC_TRY(project.setRootDirectory(parameters.directories.libraryDirectory.view()));
+    SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
+    SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
+    SC_TRY(project.addIncludePaths({"."}));
+    SC_TRY(project.addFile("Libraries/Foundation/Foundation.cpp"));
+    SC_TRY(project.addFile("Libraries/Memory/Memory.cpp"));
+    SC_TRY(project.addFile("Libraries/Strings/Strings.cpp"));
+    SC_TRY(project.addFile("Tests/SCBuildTest/Fixture/SmallSCProgram/main.cpp"));
+    if (parameters.platform == Build::Platform::Apple)
+    {
+        SC_TRY(project.addLinkFrameworks({"CoreFoundation"}));
+    }
 
     SC_TRY(workspace.projects.push_back(move(project)));
     SC_TRY(definition.workspaces.push_back(move(workspace)));
@@ -447,6 +487,19 @@ static Result computeExecutablePath(const Build::Action& action, StringView proj
     return computeArtifactPath(action, projectName, Build::TargetType::ConsoleExecutable, executablePath);
 }
 
+#if SC_PLATFORM_WINDOWS
+static Result computeWindowsImportLibraryPath(const Build::Action& action, StringView projectName, String& libraryPath)
+{
+    String buildDirectory = StringEncoding::Utf8;
+    SC_TRY(computeBuildDirectoryName(action, buildDirectory));
+    String artifactName = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(artifactName, "{}.lib", projectName));
+    SC_TRY(Path::join(libraryPath, {action.parameters.directories.outputsDirectory.view(), buildDirectory.view(),
+                                    artifactName.view()}));
+    return Result(true);
+}
+#endif
+
 static Result computeObjectPath(const Build::Action& action, StringView projectName, StringView sourceName,
                                 String& objectPath)
 {
@@ -618,13 +671,14 @@ static Result writeCustomDriverFixture(FileSystem& fs, StringView sourceRoot)
 }
 #endif
 
-static Build::Action makeNativeCompileAction(const Build::Directories& directories, StringView projectName)
+static Build::Action makeNativeCompileAction(const Build::Directories& directories, StringView projectName,
+                                             StringView configurationName = "Debug")
 {
     Build::Action action;
     action.action                  = Build::Action::Compile;
     action.workspaceName           = FixtureWorkspaceName;
     action.projectName             = projectName;
-    action.configurationName       = "Debug";
+    action.configurationName       = configurationName;
     action.parameters.generator    = Build::Generator::Native;
     action.parameters.platform     = getBuildPlatform();
     action.parameters.architecture = getBuildArchitecture();
@@ -647,28 +701,76 @@ static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
 #endif
     return Result(true);
 }
+
+static Result verifyNoSCExportsFromExecutable(StringView executablePath, StringView importLibraryPath = {})
+{
+#if SC_PLATFORM_WINDOWS
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY_MSG(not importLibraryPath.isEmpty(), "Missing import library path");
+    SC_TRY_MSG(not fs.existsAndIsFile(importLibraryPath), "Unexpected import library emitted for executable");
+    SC_COMPILER_UNUSED(executablePath);
+    return Result(true);
+#else
+    SC_COMPILER_UNUSED(importLibraryPath);
+    String nmPath = StringEncoding::Utf8;
+    SC_TRY(resolveHostToolPath("nm", nmPath));
+
+    StringSpan argumentsStorage[5];
+    size_t     numArguments          = 0;
+    argumentsStorage[numArguments++] = nmPath.view();
+#if SC_PLATFORM_APPLE
+    argumentsStorage[numArguments++] = "-gU";
+    argumentsStorage[numArguments++] = "-C";
+#else
+    argumentsStorage[numArguments++] = "-D";
+    argumentsStorage[numArguments++] = "--defined-only";
+    argumentsStorage[numArguments++] = "-C";
+#endif
+    argumentsStorage[numArguments++] = executablePath;
+
+    Process process;
+    String  output = StringEncoding::Utf8;
+    SC_TRY(process.exec({argumentsStorage, numArguments}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed to inspect executable exports");
+    SC_TRY_MSG(not StringView(output.view()).containsString("SC::"), "Unexpected SC export from executable");
+    return Result(true);
+#endif
+}
 } // namespace
 
 struct SCBuildFixtureTest : public SC::TestCase
 {
     SCBuildFixtureTest(SC::TestReport& report) : TestCase(report, "SCBuildTest")
     {
-        String fixtureDirectory = report.libraryRootDirectory.view();
+        String tinyFixtureDirectory = report.libraryRootDirectory.view();
+        SC_TRUST_RESULT(Path::append(tinyFixtureDirectory, {"Tests", "SCBuildTest", "Fixture", "TinyConsoleProgram"},
+                                     Path::AsNative));
+        String smallFixtureDirectory = report.libraryRootDirectory.view();
         SC_TRUST_RESULT(
-            Path::append(fixtureDirectory, {"Tests", "SCBuildTest", "Fixture", "TinyConsoleProgram"}, Path::AsNative));
+            Path::append(smallFixtureDirectory, {"Tests", "SCBuildTest", "Fixture", "SmallSCProgram"}, Path::AsNative));
 
         if (test_section("fixture layout"))
         {
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
 
-            SC_TEST_EXPECT(fs.exists(fixtureDirectory.view()));
+            SC_TEST_EXPECT(fs.exists(tinyFixtureDirectory.view()));
+            SC_TEST_EXPECT(fs.exists(smallFixtureDirectory.view()));
 
-            String mainSource = fixtureDirectory.view();
+            String mainSource = tinyFixtureDirectory.view();
             SC_TRUST_RESULT(Path::append(mainSource, {"main.cpp"}, Path::AsNative));
             SC_TEST_EXPECT(fs.exists(mainSource.view()));
 
-            String expectedOutput = fixtureDirectory.view();
+            String expectedOutput = tinyFixtureDirectory.view();
+            SC_TRUST_RESULT(Path::append(expectedOutput, {"stdout.txt"}, Path::AsNative));
+            SC_TEST_EXPECT(fs.exists(expectedOutput.view()));
+
+            mainSource = smallFixtureDirectory.view();
+            SC_TRUST_RESULT(Path::append(mainSource, {"main.cpp"}, Path::AsNative));
+            SC_TEST_EXPECT(fs.exists(mainSource.view()));
+
+            expectedOutput = smallFixtureDirectory.view();
             SC_TRUST_RESULT(Path::append(expectedOutput, {"stdout.txt"}, Path::AsNative));
             SC_TEST_EXPECT(fs.exists(expectedOutput.view()));
         }
@@ -698,6 +800,43 @@ struct SCBuildFixtureTest : public SC::TestCase
             String expectedOutput = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/TinyConsoleProgram/stdout.txt", expectedOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
+        }
+
+        if (test_section("native backend keeps small fixture small and unexported"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action = makeNativeCompileAction(directories, SmallFixtureProjectName, "Release");
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureSmallSCProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, SmallFixtureProjectName, executablePath));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+
+            String expectedOutput = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/SmallSCProgram/stdout.txt", expectedOutput));
+            SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
+
+            FileSystem::FileStat executableStat;
+            SC_TRUST_RESULT(fs.stat(executablePath.view(), executableStat));
+            SC_TEST_EXPECT(executableStat.fileSize <= getSmallFixtureMaxBytes());
+
+            String importLibraryPath = StringEncoding::Utf8;
+#if SC_PLATFORM_WINDOWS
+            SC_TRUST_RESULT(computeWindowsImportLibraryPath(action, SmallFixtureProjectName, importLibraryPath));
+#endif
+            SC_TEST_EXPECT(verifyNoSCExportsFromExecutable(executablePath.view(), importLibraryPath.view()));
         }
 
         if (test_section("native backend skips up-to-date work in verbose mode"))

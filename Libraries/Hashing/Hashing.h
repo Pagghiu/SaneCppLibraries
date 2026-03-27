@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_HASHING
+#define SC_EXPORT_LIBRARY_HASHING 0
+#endif
+#define SC_HASHING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HASHING)
+
 #include "../Foundation/Span.h"
 namespace SC
 {

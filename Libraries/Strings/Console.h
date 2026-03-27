@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Strings/StringFormat.h"
+#include "StringsExport.h"
 
 namespace SC
 {
@@ -21,7 +22,7 @@ struct String;
 /// // Have fun printing
 /// console.print(str.view());
 /// @endcode
-struct SC_COMPILER_EXPORT Console
+struct SC_STRINGS_EXPORT Console
 {
     /// @brief Constructs a console with an OPTIONAL conversion buffer used for UTF encoding conversions on Windows
     /// @param conversionBuffer The optional buffer used for UTF conversions

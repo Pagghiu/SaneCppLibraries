@@ -58,27 +58,37 @@
 
 #endif
 
-/// Define compiler-specific export macros for DLL visibility.
+/// Define compiler-specific visibility macros.
 #if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
+#define SC_COMPILER_SYMBOL_IMPORT __declspec(dllimport)
+#define SC_COMPILER_SYMBOL_EXPORT __declspec(dllexport)
+#define SC_COMPILER_SYMBOL_HIDDEN
+#else
+#define SC_COMPILER_SYMBOL_IMPORT
+#define SC_COMPILER_SYMBOL_EXPORT __attribute__((visibility("default")))
+#define SC_COMPILER_SYMBOL_HIDDEN __attribute__((visibility("hidden")))
+#endif
 
 #if defined(SC_PLUGIN_LIBRARY)
-#define SC_COMPILER_EXPORT __declspec(dllimport) ///< Macro for importing symbols from DLL in MSVC.
 #define SC_COMPILER_EXTERN extern
 #else
-#define SC_COMPILER_EXPORT __declspec(dllexport) ///< Macro for exporting symbols from DLL in MSVC.
 #define SC_COMPILER_EXTERN
 #endif
 
-#else
-
-#define SC_COMPILER_EXTERN
 #if defined(SC_PLUGIN_LIBRARY)
-#define SC_COMPILER_EXPORT
+#define SC_COMPILER_LIBRARY_EXPORT_0 SC_COMPILER_SYMBOL_IMPORT
+#define SC_COMPILER_LIBRARY_EXPORT_1 SC_COMPILER_SYMBOL_IMPORT
 #else
-#define SC_COMPILER_EXPORT __attribute__((visibility("default")))
+#define SC_COMPILER_LIBRARY_EXPORT_0 SC_COMPILER_SYMBOL_HIDDEN
+#define SC_COMPILER_LIBRARY_EXPORT_1 SC_COMPILER_SYMBOL_EXPORT
 #endif
+#define SC_COMPILER_LIBRARY_EXPORT(value)      SC_COMPILER_LIBRARY_EXPORT_IMPL(value)
+#define SC_COMPILER_LIBRARY_EXPORT_IMPL(value) SC_COMPILER_LIBRARY_EXPORT_##value
 
+#ifndef SC_EXPORT_LIBRARY_FOUNDATION
+#define SC_EXPORT_LIBRARY_FOUNDATION 0
 #endif
+#define SC_FOUNDATION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FOUNDATION)
 
 #define WIDEN2(x) L##x
 #define WIDEN(x)  WIDEN2(x)

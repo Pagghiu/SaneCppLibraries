@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../Foundation/Span.h"
 #include "../Memory/VirtualMemory.h"
+#include "ContainersExport.h"
 
 namespace SC
 {

@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_ASYNC
+#define SC_EXPORT_LIBRARY_ASYNC 0
+#endif
+#define SC_ASYNC_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC)
+
 #include "../Async/Internal/IntrusiveDoubleLinkedList.h"
 #include "../File/File.h"
 #include "../FileSystem/FileSystem.h"
@@ -70,7 +76,7 @@ struct AsyncWinWaitDefinition
 
     static Result releaseHandle(Handle& waitHandle);
 };
-struct SC_COMPILER_EXPORT WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
+struct SC_ASYNC_EXPORT WinWaitHandle : public UniqueHandle<AsyncWinWaitDefinition>
 {
 };
 } // namespace detail
@@ -113,7 +119,7 @@ struct SC_COMPILER_EXPORT WinWaitHandle : public UniqueHandle<AsyncWinWaitDefini
 /// 3. Async in Active state (so after setupAsync and activateAsync) --> will receive cancelAsync and teardownAsync
 ///
 /// Any other case is considered an error (trying to cancel an async already being cancelled or being teardown).
-struct SC_COMPILER_EXPORT AsyncRequest
+struct SC_ASYNC_EXPORT AsyncRequest
 {
     AsyncRequest* next = nullptr;
     AsyncRequest* prev = nullptr;
@@ -233,7 +239,7 @@ struct SC_COMPILER_EXPORT AsyncRequest
 /// Requests are being queued on a sequence using AsyncRequest::executeOn.
 /// AsyncTaskSequence can be used to force running asyncs on a thread (useful for buffered files)
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
-struct SC_COMPILER_EXPORT AsyncSequence
+struct SC_ASYNC_EXPORT AsyncSequence
 {
     AsyncSequence* next = nullptr;
     AsyncSequence* prev = nullptr;
@@ -249,11 +255,11 @@ struct SC_COMPILER_EXPORT AsyncSequence
 };
 
 /// @brief Empty base struct for all AsyncRequest-derived CompletionData (internal) structs.
-struct SC_COMPILER_EXPORT AsyncCompletionData{};
+struct SC_ASYNC_EXPORT AsyncCompletionData{};
 
 /// @brief Base class for all async results (argument of completion callbacks).
 /// It holds Result (returnCode) and re-activation flag.
-struct SC_COMPILER_EXPORT AsyncResult
+struct SC_ASYNC_EXPORT AsyncResult
 {
     /// @brief Constructs an async result from a request and a result
     AsyncResult(AsyncEventLoop& eventLoop, AsyncRequest& request, SC::Result& res, bool* hasBeenReactivated = nullptr)
@@ -298,7 +304,7 @@ struct AsyncResultOf : public AsyncResult
 /// @note For a periodic timeout, call AsyncLoopTimeout::Result::reactivateRequest(true) in the completion callback
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopTimeoutSnippet
-struct SC_COMPILER_EXPORT AsyncLoopTimeout : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncLoopTimeout : public AsyncRequest
 {
     AsyncLoopTimeout() : AsyncRequest(Type::LoopTimeout) {}
 
@@ -346,7 +352,7 @@ struct AsyncLoopWakeUpOptions
 /// that the callback has finished its execution.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet2
-struct SC_COMPILER_EXPORT AsyncLoopWakeUp : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncLoopWakeUp : public AsyncRequest
 {
     AsyncLoopWakeUp() : AsyncRequest(Type::LoopWakeUp) {}
 
@@ -383,7 +389,7 @@ struct SC_COMPILER_EXPORT AsyncLoopWakeUp : public AsyncRequest
 /// @ref library_process library can be used to start a process and obtain the native process handle.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncProcessSnippet
-struct SC_COMPILER_EXPORT AsyncProcessExit : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncProcessExit : public AsyncRequest
 {
     AsyncProcessExit() : AsyncRequest(Type::ProcessExit) {}
 
@@ -445,7 +451,7 @@ struct AsyncSignalOptions
 /// are mapped to `SIGINT` (2), signal 21, and `SIGTERM` (15) respectively.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSignalSnippet
-struct SC_COMPILER_EXPORT AsyncSignal : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncSignal : public AsyncRequest
 {
     AsyncSignal() : AsyncRequest(Type::Signal) {}
 
@@ -486,7 +492,7 @@ namespace detail
 {
 /// @brief Support object to Socket Accept.
 /// This has been split out of AsyncSocketAccept because on Windows it's quite big to allow heap allocating it
-struct SC_COMPILER_EXPORT AsyncSocketAcceptData
+struct SC_ASYNC_EXPORT AsyncSocketAcceptData
 {
 #if SC_PLATFORM_WINDOWS
     void (*pAcceptEx)() = nullptr;
@@ -500,7 +506,7 @@ struct SC_COMPILER_EXPORT AsyncSocketAcceptData
 };
 
 /// @brief Base class for AsyncSocketAccept to allow dynamically allocating AsyncSocketAcceptData
-struct SC_COMPILER_EXPORT AsyncSocketAcceptBase : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncSocketAcceptBase : public AsyncRequest
 {
     AsyncSocketAcceptBase() : AsyncRequest(Type::SocketAccept) {}
 
@@ -542,7 +548,7 @@ struct SC_COMPILER_EXPORT AsyncSocketAcceptBase : public AsyncRequest
 /// @note To continue accepting new socket SC::AsyncResult::reactivateRequest must be called.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketAcceptSnippet
-struct SC_COMPILER_EXPORT AsyncSocketAccept : public detail::AsyncSocketAcceptBase
+struct SC_ASYNC_EXPORT AsyncSocketAccept : public detail::AsyncSocketAcceptBase
 {
     AsyncSocketAccept() { AsyncSocketAcceptBase::acceptData = &data; }
     using AsyncSocketAcceptBase::start;
@@ -562,7 +568,7 @@ struct SC_COMPILER_EXPORT AsyncSocketAccept : public detail::AsyncSocketAcceptBa
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketConnectSnippet
-struct SC_COMPILER_EXPORT AsyncSocketConnect : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncSocketConnect : public AsyncRequest
 {
     AsyncSocketConnect() : AsyncRequest(Type::SocketConnect) {}
 
@@ -596,7 +602,7 @@ struct SC_COMPILER_EXPORT AsyncSocketConnect : public AsyncRequest
 /// Alternatively SC::AsyncEventLoop::createAsyncTCPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketSendSnippet
-struct SC_COMPILER_EXPORT AsyncSocketSend : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncSocketSend : public AsyncRequest
 {
     AsyncSocketSend() : AsyncRequest(Type::SocketSend) {}
     struct CompletionData : public AsyncCompletionData
@@ -642,7 +648,7 @@ struct SC_COMPILER_EXPORT AsyncSocketSend : public AsyncRequest
 /// Alternatively SC::AsyncEventLoop::createAsyncUDPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketSendToSnippet
-struct SC_COMPILER_EXPORT AsyncSocketSendTo : public AsyncSocketSend
+struct SC_ASYNC_EXPORT AsyncSocketSendTo : public AsyncSocketSend
 {
     AsyncSocketSendTo() : AsyncSocketSend(Type::SocketSendTo) {}
 
@@ -674,7 +680,7 @@ struct SC_COMPILER_EXPORT AsyncSocketSendTo : public AsyncSocketSend
 /// - SC::AsyncSocketReceive::CompletionData::disconnected will be set to true when client disconnects
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketReceiveSnippet
-struct SC_COMPILER_EXPORT AsyncSocketReceive : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncSocketReceive : public AsyncRequest
 {
     AsyncSocketReceive() : AsyncRequest(Type::SocketReceive) {}
 
@@ -731,7 +737,7 @@ struct SC_COMPILER_EXPORT AsyncSocketReceive : public AsyncRequest
 /// Alternatively SC::AsyncEventLoop::createAsyncUDPSocket creates and associates the socket to the loop.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSocketReceiveFromSnippet
-struct SC_COMPILER_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
+struct SC_ASYNC_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
 {
     AsyncSocketReceiveFrom() : AsyncSocketReceive(Type::SocketReceiveFrom) {}
     using AsyncSocketReceive::start;
@@ -766,7 +772,7 @@ struct SC_COMPILER_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
 /// - `io_uring` backend will not use thread pool because that API allows proper async file read/writes
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileReadSnippet
-struct SC_COMPILER_EXPORT AsyncFileRead : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncFileRead : public AsyncRequest
 {
     AsyncFileRead() : AsyncRequest(Type::FileRead) { handle = FileDescriptor::Invalid; }
 
@@ -842,7 +848,7 @@ struct SC_COMPILER_EXPORT AsyncFileRead : public AsyncRequest
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
-struct SC_COMPILER_EXPORT AsyncFileWrite : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncFileWrite : public AsyncRequest
 {
     AsyncFileWrite() : AsyncRequest(Type::FileWrite) { handle = FileDescriptor::Invalid; }
 
@@ -920,7 +926,7 @@ struct SC_COMPILER_EXPORT AsyncFileWrite : public AsyncRequest
 /// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
 /// Callback will be called when any of the three API signals readiness events on the given file descriptor.
 /// Check @ref library_file_system_watcher for an example usage of this notification.
-struct SC_COMPILER_EXPORT AsyncFilePoll : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncFilePoll : public AsyncRequest
 {
     AsyncFilePoll() : AsyncRequest(Type::FilePoll) {}
 
@@ -970,7 +976,7 @@ struct SC_COMPILER_EXPORT AsyncFilePoll : public AsyncRequest
 /// Files can be opened with any mode (blocking or non-blocking).
 /// The implementation uses `IORING_OP_SPLICE` for efficient zero-copy transfer.
 /// Pipe used for splice is automatically created as non-blocking.
-struct SC_COMPILER_EXPORT AsyncFileSend : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncFileSend : public AsyncRequest
 {
     AsyncFileSend() : AsyncRequest(Type::FileSend) {}
 
@@ -1036,7 +1042,7 @@ struct SC_COMPILER_EXPORT AsyncFileSend : public AsyncRequest
 struct AsyncLoopWork;
 struct AsyncFileSystemOperation;
 
-struct SC_COMPILER_EXPORT AsyncFileSystemOperationCompletionData : public AsyncCompletionData
+struct SC_ASYNC_EXPORT AsyncFileSystemOperationCompletionData : public AsyncCompletionData
 {
     FileDescriptor::Handle handle = FileDescriptor::Invalid; // for open
 
@@ -1047,7 +1053,7 @@ struct SC_COMPILER_EXPORT AsyncFileSystemOperationCompletionData : public AsyncC
 namespace detail
 {
 // A simple hand-made variant of all completion types
-struct SC_COMPILER_EXPORT AsyncCompletionVariant
+struct SC_ASYNC_EXPORT AsyncCompletionVariant
 {
     AsyncCompletionVariant() {}
     ~AsyncCompletionVariant() { destroy(); }
@@ -1112,7 +1118,7 @@ struct SC_COMPILER_EXPORT AsyncCompletionVariant
 /// @brief An AsyncSequence using a SC::ThreadPool to execute one or more SC::AsyncRequest in a background thread.
 /// Calling SC::AsyncRequest::executeOn on multiple requests with the same SC::AsyncTaskSequence queues them to be
 /// serially executed on the same thread.
-struct SC_COMPILER_EXPORT AsyncTaskSequence : public AsyncSequence
+struct SC_ASYNC_EXPORT AsyncTaskSequence : public AsyncSequence
 {
   protected:
     ThreadPoolTask task;
@@ -1131,7 +1137,7 @@ struct SC_COMPILER_EXPORT AsyncTaskSequence : public AsyncSequence
 /// AsyncLoopWork::callback will be called as a completion, on the event loop thread AFTER work callback is finished.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTestLoopWork.inl AsyncLoopWorkSnippet
-struct SC_COMPILER_EXPORT AsyncLoopWork : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncLoopWork : public AsyncRequest
 {
     AsyncLoopWork() : AsyncRequest(Type::LoopWork) {}
 
@@ -1184,7 +1190,7 @@ struct SC_COMPILER_EXPORT AsyncLoopWork : public AsyncRequest
 /// Example of async remove file operation:
 /// \snippet Tests/Libraries/Async/AsyncTestFileSystemOperation.inl AsyncFileSystemOperationRemoveFileSnippet
 ///
-struct SC_COMPILER_EXPORT AsyncFileSystemOperation : public AsyncRequest
+struct SC_ASYNC_EXPORT AsyncFileSystemOperation : public AsyncRequest
 {
     AsyncFileSystemOperation() : AsyncRequest(Type::FileSystemOperation) {}
     ~AsyncFileSystemOperation() { destroy(); }
@@ -1360,7 +1366,7 @@ struct SC_COMPILER_EXPORT AsyncFileSystemOperation : public AsyncRequest
 /// @brief Allows user to supply a block of memory that will store kernel I/O events retrieved from
 /// AsyncEventLoop::runOnce. Such events can then be later passed to AsyncEventLoop::dispatchCompletions.
 /// @see AsyncEventLoop::runOnce
-struct SC_COMPILER_EXPORT AsyncKernelEvents
+struct SC_ASYNC_EXPORT AsyncKernelEvents
 {
     Span<uint8_t> eventsMemory; ///< User supplied block of memory used to store kernel I/O events
 
@@ -1370,7 +1376,7 @@ struct SC_COMPILER_EXPORT AsyncKernelEvents
 };
 
 /// @brief Allow library user to provide callbacks signaling different phases of async event loop cycle
-struct SC_COMPILER_EXPORT AsyncEventLoopListeners
+struct SC_ASYNC_EXPORT AsyncEventLoopListeners
 {
     Function<void(AsyncEventLoop&)> beforeBlockingPoll;
     Function<void(AsyncEventLoop&)> afterBlockingPoll;
@@ -1382,7 +1388,7 @@ struct SC_COMPILER_EXPORT AsyncEventLoopListeners
 ///
 /// Basic lifetime for an event loop is:
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncEventLoopSnippet
-struct SC_COMPILER_EXPORT AsyncEventLoop
+struct SC_ASYNC_EXPORT AsyncEventLoop
 {
     /// @brief Options given to AsyncEventLoop::create
     struct Options
@@ -1580,7 +1586,7 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
     using ResultType          = AsyncResult;
 
   public:
-    struct SC_COMPILER_EXPORT InternalDefinition
+    struct SC_ASYNC_EXPORT InternalDefinition
     {
         static constexpr int Windows = 552;
         static constexpr int Apple   = 520;
@@ -1608,7 +1614,7 @@ struct SC_COMPILER_EXPORT AsyncEventLoop
 /// @brief Monitors Async I/O events from a background thread using a blocking kernel function (no CPU usage on idle).
 /// AsyncEventLoopMonitor makes it easy to integrate AsyncEventLoop within a GUI event loop or another I/O event loop.
 /// This pattern avoids constantly polling the kernel, using virtually 0% of CPU time when waiting for events.
-struct SC_COMPILER_EXPORT AsyncEventLoopMonitor
+struct SC_ASYNC_EXPORT AsyncEventLoopMonitor
 {
     Function<void(void)> onNewEventsAvailable; ///< Informs to call dispatchCompletions on GUI Event Loop
 

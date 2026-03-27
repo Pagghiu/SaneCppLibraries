@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Strings/StringFormat.h"
+#include "StringsExport.h"
 namespace SC
 {
 template <typename T>
@@ -22,7 +23,7 @@ struct StringBuilderFor;
 ///
 /// StringBuilder::create example:
 /// @snippet Tests/Libraries/Strings/StringBuilderTest.cpp stringBuilderTestAppendSnippet
-struct SC_COMPILER_EXPORT StringBuilder
+struct SC_STRINGS_EXPORT StringBuilder
 {
     // clang-format off
     /// @brief Creates a StringBuilder for the given string or buffer, replacing its current contents

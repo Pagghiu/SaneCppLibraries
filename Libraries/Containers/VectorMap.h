@@ -3,6 +3,7 @@
 #pragma once
 #include "../Containers/StrongID.h"
 #include "../Containers/Vector.h"
+#include "ContainersExport.h"
 
 namespace SC
 {

@@ -3,12 +3,13 @@
 #pragma once
 #include "../Containers/Algorithms/AlgorithmFind.h" // contains
 #include "../Containers/Vector.h"                   // ObjectVTable<T>
+#include "ContainersExport.h"
 namespace SC
 {
 namespace detail
 {
 template <typename T, int N>
-struct SC_COMPILER_EXPORT ArrayVTable : public ObjectVTable<T>
+struct SC_CONTAINERS_EXPORT ArrayVTable : public ObjectVTable<T>
 {
     static constexpr bool IsArray = true;
 
@@ -47,7 +48,7 @@ struct SC_COMPILER_EXPORT ArrayVTable : public ObjectVTable<T>
 ///
 /// \snippet Tests/Libraries/Containers/ArrayTest.cpp ArraySnippet
 template <typename T, int N>
-struct SC_COMPILER_EXPORT Array : public Segment<detail::ArrayVTable<T, N>>
+struct SC_CONTAINERS_EXPORT Array : public Segment<detail::ArrayVTable<T, N>>
 {
     using Parent = Segment<detail::ArrayVTable<T, N>>;
     Array() : Parent(sizeof(T) * N) {};

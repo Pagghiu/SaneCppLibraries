@@ -3,11 +3,12 @@
 #pragma once
 #include "../../AsyncStreams/AsyncStreams.h"
 #include "../../Foundation/StringSpan.h"
+#include "../HttpExport.h"
 #include "../HttpParser.h"
 
 namespace SC
 {
-struct SC_COMPILER_EXPORT HttpParsedHeaders
+struct SC_HTTP_EXPORT HttpParsedHeaders
 {
     struct TokenOffset
     {

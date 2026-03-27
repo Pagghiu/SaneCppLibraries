@@ -3,12 +3,13 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Strings/StringView.h"
+#include "StringsExport.h"
 
 namespace SC
 {
 struct StringFormatOutput;
 
-struct SC_COMPILER_EXPORT CommandLineParseResult
+struct SC_STRINGS_EXPORT CommandLineParseResult
 {
     enum class Status : uint8_t
     {
@@ -38,7 +39,7 @@ struct SC_COMPILER_EXPORT CommandLineParseResult
     StringView name     = {};
 };
 
-struct SC_COMPILER_EXPORT CommandLineValue
+struct SC_STRINGS_EXPORT CommandLineValue
 {
     enum class Type : uint8_t
     {
@@ -68,7 +69,7 @@ struct SC_COMPILER_EXPORT CommandLineValue
     [[nodiscard]] bool requiresValue() const;
 };
 
-struct SC_COMPILER_EXPORT CommandLineOption
+struct SC_STRINGS_EXPORT CommandLineOption
 {
     StringView       longName          = {};
     StringView       negativeLongName  = {};
@@ -80,7 +81,7 @@ struct SC_COMPILER_EXPORT CommandLineOption
     CommandLineValue value             = {};
 };
 
-struct SC_COMPILER_EXPORT CommandLinePositional
+struct SC_STRINGS_EXPORT CommandLinePositional
 {
     StringView name = {};
     StringView help = {};
@@ -94,7 +95,7 @@ struct SC_COMPILER_EXPORT CommandLinePositional
     Span<StringSpan>* parsedValues     = nullptr;
 };
 
-struct SC_COMPILER_EXPORT CommandLineSpec
+struct SC_STRINGS_EXPORT CommandLineSpec
 {
     StringView programName = {};
     StringView summary     = {};
@@ -108,7 +109,7 @@ struct SC_COMPILER_EXPORT CommandLineSpec
     [[nodiscard]] bool writeError(const CommandLineParseResult& result, StringFormatOutput& output) const;
 };
 
-struct SC_COMPILER_EXPORT CommandLineArguments
+struct SC_STRINGS_EXPORT CommandLineArguments
 {
     Span<StringSpan> values = {};
 

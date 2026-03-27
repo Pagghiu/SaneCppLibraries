@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Threading/Threading.h"
 
 namespace SC
 {
@@ -41,7 +42,7 @@ template <typename T>
 struct Atomic;
 
 template <>
-struct SC_COMPILER_EXPORT Atomic<int32_t>
+struct SC_THREADING_EXPORT Atomic<int32_t>
 {
     Atomic(int32_t value = 0);
 
@@ -69,7 +70,7 @@ struct SC_COMPILER_EXPORT Atomic<int32_t>
 };
 
 template <>
-struct SC_COMPILER_EXPORT Atomic<bool>
+struct SC_THREADING_EXPORT Atomic<bool>
 {
     Atomic(bool value = false);
 

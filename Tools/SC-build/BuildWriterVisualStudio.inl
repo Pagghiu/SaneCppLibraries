@@ -325,6 +325,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("      <LanguageStandard>{}</LanguageStandard>\n",
                            CppStandard::toMSVCString(compileFlags.cppStandard));
         }
+        if (compileFlags.optimizationLevel == Optimization::Release)
+        {
+            builder.append("      <FunctionLevelLinking>true</FunctionLevelLinking>\n");
+        }
         builder.append("    </ClCompile>\n");
         if (project.targetType == TargetType::StaticLibrary)
         {
@@ -345,7 +349,10 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             case Optimization::Debug:
                 builder.append("      <GenerateDebugInformation>true</GenerateDebugInformation>\n");
                 break;
-            case Optimization::Release: break;
+            case Optimization::Release:
+                builder.append("      <OptimizeReferences>true</OptimizeReferences>\n");
+                builder.append("      <EnableCOMDATFolding>true</EnableCOMDATFolding>\n");
+                break;
             }
             builder.append("    </Link>\n");
         }

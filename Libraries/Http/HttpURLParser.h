@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Result.h"
 #include "../Foundation/StringSpan.h"
+#include "HttpExport.h"
 
 namespace SC
 {
@@ -10,7 +11,7 @@ namespace SC
 //! @{
 
 /// @brief Parse an URL splitting it into its base components
-struct SC_COMPILER_EXPORT HttpURLParser
+struct SC_HTTP_EXPORT HttpURLParser
 {
     StringSpan protocol; ///< Returns `http` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)
     StringSpan username; ///< Returns `user` (from `http://user:pass@site.com:80/pa/th?q=val#hash`)

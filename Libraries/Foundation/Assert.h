@@ -12,7 +12,7 @@ namespace SC
 //! @{
 
 /// @brief Functions and macros to assert, exit() or abort() and capture backtraces.
-struct SC_COMPILER_EXPORT Assert
+struct SC_FOUNDATION_EXPORT Assert
 {
     [[noreturn]] SC_COMPILER_FORCE_INLINE static void unreachable()
     {

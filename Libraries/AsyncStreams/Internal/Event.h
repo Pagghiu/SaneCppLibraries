@@ -1,6 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Compiler.h"
+#ifndef SC_ASYNC_STREAMS_EXPORT
+#ifndef SC_EXPORT_LIBRARY_ASYNC_STREAMS
+#define SC_EXPORT_LIBRARY_ASYNC_STREAMS 0
+#endif
+#define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
+#endif
+
 #include "../../Foundation/Function.h"
 
 namespace SC
@@ -12,7 +20,7 @@ namespace SC
 /// Listeners can be removed with the integer written by Event::addListener in a parameter pointer.
 /// @note The ordering of listeners will __NOT__ be preserved under multiple add / remove
 template <int MaxListeners, typename... T>
-struct SC_COMPILER_EXPORT Event
+struct SC_ASYNC_STREAMS_EXPORT Event
 {
     /// @brief Emits the event, calling all registered listeners with the given parameters
     template <typename... U>

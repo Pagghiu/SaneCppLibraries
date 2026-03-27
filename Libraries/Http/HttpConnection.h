@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "HttpExport.h"
 #include "HttpParser.h"
 
 #include "../Async/Async.h"
@@ -24,7 +25,7 @@ enum class HttpBodyFramingKind : uint8_t
 
 struct HttpAsyncClient;
 
-struct SC_COMPILER_EXPORT HttpMultipartWriter
+struct SC_HTTP_EXPORT HttpMultipartWriter
 {
     struct Part
     {
@@ -57,7 +58,7 @@ struct SC_COMPILER_EXPORT HttpMultipartWriter
 };
 
 /// @brief Shared async transport storage for HTTP client and server endpoints
-struct SC_COMPILER_EXPORT HttpConnectionBase
+struct SC_HTTP_EXPORT HttpConnectionBase
 {
     using ReadableSocketStream = AsyncReadableSocketStream<AsyncEventLoop>;
     using WritableSocketStream = AsyncWritableSocketStream<AsyncEventLoop>;
@@ -79,9 +80,9 @@ struct SC_COMPILER_EXPORT HttpConnectionBase
 };
 
 /// @brief Incoming message from the perspective of the participants of an HTTP transaction
-struct SC_COMPILER_EXPORT HttpIncomingMessage
+struct SC_HTTP_EXPORT HttpIncomingMessage
 {
-    struct SC_COMPILER_EXPORT BodyStream : public AsyncReadableStream
+    struct SC_HTTP_EXPORT BodyStream : public AsyncReadableStream
     {
         BodyStream();
 
@@ -198,7 +199,7 @@ struct SC_COMPILER_EXPORT HttpIncomingMessage
 };
 
 /// @brief Incoming HTTP request received by the server
-struct SC_COMPILER_EXPORT HttpRequest : public HttpIncomingMessage
+struct SC_HTTP_EXPORT HttpRequest : public HttpIncomingMessage
 {
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
@@ -221,7 +222,7 @@ struct SC_COMPILER_EXPORT HttpRequest : public HttpIncomingMessage
 };
 
 /// @brief Incoming HTTP response received by the client
-struct SC_COMPILER_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
+struct SC_HTTP_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
 {
   private:
     friend struct HttpAsyncClient;
@@ -232,9 +233,9 @@ struct SC_COMPILER_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
 };
 
 /// @brief Outgoing message from the perspective of the participants of an HTTP transaction
-struct SC_COMPILER_EXPORT HttpOutgoingMessage
+struct SC_HTTP_EXPORT HttpOutgoingMessage
 {
-    struct SC_COMPILER_EXPORT ChunkedWritableStream : public AsyncWritableStream
+    struct SC_HTTP_EXPORT ChunkedWritableStream : public AsyncWritableStream
     {
         ChunkedWritableStream();
 
@@ -337,7 +338,7 @@ struct SC_COMPILER_EXPORT HttpOutgoingMessage
 };
 
 /// @brief Outgoing HTTP response sent by the server
-struct SC_COMPILER_EXPORT HttpResponse : public HttpOutgoingMessage
+struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
 {
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
     Result startResponse(int httpCode);
@@ -351,7 +352,7 @@ struct SC_COMPILER_EXPORT HttpResponse : public HttpOutgoingMessage
 };
 
 /// @brief Outgoing HTTP request sent by the client
-struct SC_COMPILER_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
+struct SC_HTTP_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
 {
     enum class BodyType : uint8_t
     {
@@ -405,11 +406,11 @@ struct SC_COMPILER_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
 };
 
 /// @brief Http connection abstraction holding both the incoming and outgoing messages in an HTTP transaction
-struct SC_COMPILER_EXPORT HttpConnection : public HttpConnectionBase
+struct SC_HTTP_EXPORT HttpConnection : public HttpConnectionBase
 {
     HttpConnection();
 
-    struct SC_COMPILER_EXPORT ID
+    struct SC_HTTP_EXPORT ID
     {
         size_t getIndex() const { return index; }
 
@@ -444,7 +445,7 @@ struct SC_COMPILER_EXPORT HttpConnection : public HttpConnectionBase
 
 /// @brief View over a contiguous sequence of items with a custom stride between elements.
 template <typename Type>
-struct SC_COMPILER_EXPORT SpanWithStride
+struct SC_HTTP_EXPORT SpanWithStride
 {
     /// @brief Builds an empty SpanWithStride
     constexpr SpanWithStride() : data(nullptr), sizeElements(0), strideInBytes(0) {}
@@ -488,7 +489,7 @@ struct SC_COMPILER_EXPORT SpanWithStride
 };
 
 /// @brief A pool of HttpConnection that can be active or inactive
-struct SC_COMPILER_EXPORT HttpConnectionsPool
+struct SC_HTTP_EXPORT HttpConnectionsPool
 {
     struct Configuration
     {
@@ -499,7 +500,7 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
         size_t streamBytesLength = 512 * 1024;
     };
 
-    struct SC_COMPILER_EXPORT Memory
+    struct SC_HTTP_EXPORT Memory
     {
         Span<AsyncReadableStream::Request> allReadQueue;
         Span<AsyncWritableStream::Request> allWriteQueue;
@@ -553,7 +554,7 @@ struct SC_COMPILER_EXPORT HttpConnectionsPool
 
 /// @brief Adds compile-time configurable read and write queues to any class subclassing HttpConnectionBase
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes, int ExtraBuffers, typename BaseClass>
-struct SC_COMPILER_EXPORT HttpStaticConnection : public BaseClass
+struct SC_HTTP_EXPORT HttpStaticConnection : public BaseClass
 {
     AsyncReadableStream::Request readQueue[ReadQueue];
     AsyncWritableStream::Request writeQueue[WriteQueue];

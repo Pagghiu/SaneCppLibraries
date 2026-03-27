@@ -4,6 +4,7 @@
 #include "../Foundation/Assert.h" //Assert::unreachable
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
+#include "StringsExport.h"
 
 namespace SC
 {
@@ -32,7 +33,7 @@ constexpr bool StringEncodingAreBinaryCompatible(StringEncoding encoding1, Strin
 /// Invariants: start <= end and it >= start and it <= end.
 /// @tparam CharIterator StringIteratorASCII, StringIteratorUTF8 or StringIteratorUTF16
 template <typename CharIterator>
-struct SC_COMPILER_EXPORT StringIterator
+struct SC_STRINGS_EXPORT StringIterator
 {
     static constexpr StringEncoding getEncoding() { return CharIterator::getEncoding(); }
 
@@ -235,7 +236,7 @@ struct SC_COMPILER_EXPORT StringIterator
 };
 
 /// @brief A string iterator for ASCII strings
-struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIteratorASCII>
+struct SC_STRINGS_EXPORT StringIteratorASCII : public StringIterator<StringIteratorASCII>
 {
     [[nodiscard]] constexpr bool advanceUntilMatches(CodePoint c);
 
@@ -258,7 +259,7 @@ struct SC_COMPILER_EXPORT StringIteratorASCII : public StringIterator<StringIter
 };
 
 /// @brief A string iterator for UTF16 strings
-struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIteratorUTF16>
+struct SC_STRINGS_EXPORT StringIteratorUTF16 : public StringIterator<StringIteratorUTF16>
 {
   private:
     using StringIterator::StringIterator;
@@ -276,7 +277,7 @@ struct SC_COMPILER_EXPORT StringIteratorUTF16 : public StringIterator<StringIter
 };
 
 /// @brief A string iterator for UTF8 strings
-struct SC_COMPILER_EXPORT StringIteratorUTF8 : public StringIterator<StringIteratorUTF8>
+struct SC_STRINGS_EXPORT StringIteratorUTF8 : public StringIterator<StringIteratorUTF8>
 {
   private:
     using Parent = StringIterator<StringIteratorUTF8>;

@@ -3,6 +3,7 @@
 #pragma once
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Strings/StringView.h"
+#include "StringsExport.h"
 
 namespace SC
 {
@@ -12,7 +13,7 @@ struct String;
 //! @{
 
 /// @brief Parse and compose filesystem paths for windows and posix
-struct SC_COMPILER_EXPORT Path
+struct SC_STRINGS_EXPORT Path
 {
     /// @brief Path type (windows or posix)
     enum Type

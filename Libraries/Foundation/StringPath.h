@@ -38,7 +38,7 @@ struct StringNativeFixed
 } // namespace detail
 
 /// @brief Pre-sized char array holding enough space to represent a file system path
-struct SC_COMPILER_EXPORT StringPath
+struct SC_FOUNDATION_EXPORT StringPath
 {
     /// @brief Maximum size of paths on current native platform
 #if SC_PLATFORM_WINDOWS
@@ -63,7 +63,7 @@ struct SC_COMPILER_EXPORT StringPath
 };
 
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<StringPath> : public IGrowableBuffer
+struct SC_FOUNDATION_EXPORT GrowableBuffer<StringPath> : public IGrowableBuffer
 {
     StringPath& sp;
     GrowableBuffer(StringPath& string) noexcept;

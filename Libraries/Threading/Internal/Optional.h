@@ -1,6 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Foundation/Compiler.h"
+#ifndef SC_THREADING_EXPORT
+#ifndef SC_EXPORT_LIBRARY_THREADING
+#define SC_EXPORT_LIBRARY_THREADING 0
+#endif
+#define SC_THREADING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_THREADING)
+#endif
+
 #include "../../Foundation/TypeTraits.h" // Conditional
 
 namespace SC
@@ -9,7 +17,7 @@ template <typename Value>
 struct Optional;
 
 template <typename Value>
-struct SC_COMPILER_EXPORT UniqueOptional;
+struct SC_THREADING_EXPORT UniqueOptional;
 
 namespace TypeTraits
 {

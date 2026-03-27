@@ -4,6 +4,7 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
+#include "HttpExport.h"
 
 namespace SC
 {
@@ -11,7 +12,7 @@ namespace SC
 //! @{
 
 /// @brief Incremental HTTP request or response parser
-struct SC_COMPILER_EXPORT HttpParser
+struct SC_HTTP_EXPORT HttpParser
 {
     /// @brief Method of the current request / response
     enum class Method

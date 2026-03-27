@@ -1,6 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Foundation/Compiler.h"
+#ifndef SC_EXPORT_LIBRARY_FILE_SYSTEM
+#define SC_EXPORT_LIBRARY_FILE_SYSTEM 0
+#endif
+#define SC_FILE_SYSTEM_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM)
+
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Result.h"
@@ -102,7 +108,7 @@ struct FileSystemCopyFlags
 /// clauses for each method. Only the specific returned result behaviour of the given method will be described.
 ///
 /// \snippet Tests/Libraries/FileSystem/FileSystemTest.cpp FileSystemQuickSheetSnippet
-struct SC_COMPILER_EXPORT FileSystem
+struct SC_FILE_SYSTEM_EXPORT FileSystem
 {
     bool preciseErrorMessages = false; ///< Formats errors in an internal buffer when returning failed Result
 
@@ -410,7 +416,7 @@ struct SC_COMPILER_EXPORT FileSystem
 
     /// @brief Low level filesystem API, requiring paths in native encoding (UTF-16 on Windows, UTF-8 elsewhere)
     /// @see SC::FileSystem is the higher level API that also handles paths in a different encoding is needed
-    struct SC_COMPILER_EXPORT Operations
+    struct SC_FILE_SYSTEM_EXPORT Operations
     {
         static Result access(StringSpan path, AccessMode accessMode);
         static Result createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile);

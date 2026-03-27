@@ -443,6 +443,8 @@ struct Project
     SourceFiles files; ///< Project source files with their associated compile flags
     LinkFlags   link;  ///< Linker flags applied to all files in the project
 
+    Vector<String> exportLibraries; ///< SC libraries that this executable explicitly exports for plugins
+
     Vector<SourceFiles> filesWithSpecificFlags; ///< List of files with specific flags different from project/config
 
     Vector<Configuration> configurations; ///< Build configurations created inside the project
@@ -493,6 +495,9 @@ struct Project
 
     /// @brief Adds some pre-processor defines
     [[nodiscard]] bool addDefines(Span<const StringView> defines);
+
+    /// @brief Export selected Sane C++ libraries from this target for plugin consumers
+    [[nodiscard]] bool addExportLibraries(Span<const StringView> libraries);
 
     /// @brief Remove files matching a filter, to remove only a specific file type after Project::addDirectory
     /// @param subdirectory The subdirectory to search files into, absolute or relative to project root. No `*` allowed.

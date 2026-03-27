@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#include "../Memory/Memory.h"
 namespace SC
 {
-struct SC_COMPILER_EXPORT GlobalSettings;
-struct SC_COMPILER_EXPORT Globals;
+struct SC_MEMORY_EXPORT GlobalSettings;
+struct SC_MEMORY_EXPORT Globals;
 struct MemoryAllocator;
 } // namespace SC
 //! @addtogroup group_memory

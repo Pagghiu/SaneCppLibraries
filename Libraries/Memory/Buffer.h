@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/Internal/IGrowableBuffer.h"
+#include "../Memory/Memory.h"
 #include "../Memory/Segment.h"
 
 namespace SC
@@ -12,7 +13,7 @@ namespace SC
 
 namespace detail
 {
-struct SC_COMPILER_EXPORT SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePointer<char>
+struct SC_MEMORY_EXPORT SegmentBuffer : public SegmentTrivial<char>, public SegmentSelfRelativePointer<char>
 {
     static constexpr bool IsArray = false;
 };
@@ -25,7 +26,7 @@ struct SC_COMPILER_EXPORT SegmentBuffer : public SegmentTrivial<char>, public Se
 ///
 /// Example:
 /// \snippet Tests/Libraries/Memory/BufferTest.cpp BufferBasicSnippet
-struct SC_COMPILER_EXPORT Buffer : public Segment<detail::SegmentBuffer>
+struct SC_MEMORY_EXPORT Buffer : public Segment<detail::SegmentBuffer>
 {
     using Segment::Segment;
 };
@@ -62,13 +63,13 @@ template <int N>
 using SmallBufferTL = detail::SegmentCustom<SmallBuffer<N>, Buffer, N, SegmentAllocator::ThreadLocal>;
 
 #if SC_COMPILER_MSVC
-// Adding the SC_COMPILER_EXPORT on Buffer declaration causes MSVC to issue error C2491
-struct SC_COMPILER_EXPORT Buffer;
+// Adding the SC_MEMORY_EXPORT on Buffer declaration causes MSVC to issue error C2491
+struct SC_MEMORY_EXPORT Buffer;
 #endif
 
 // Enables File library from reading data from file descriptor into a Buffer
 template <>
-struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> : public IGrowableBuffer
+struct SC_MEMORY_EXPORT GrowableBuffer<Buffer> : public IGrowableBuffer
 {
     Buffer& buffer;
     GrowableBuffer(Buffer& buffer) noexcept;
@@ -78,7 +79,7 @@ struct SC_COMPILER_EXPORT GrowableBuffer<Buffer> : public IGrowableBuffer
 };
 
 template <int N>
-struct SC_COMPILER_EXPORT GrowableBuffer<SmallBuffer<N>> : public IGrowableBuffer
+struct SC_MEMORY_EXPORT GrowableBuffer<SmallBuffer<N>> : public IGrowableBuffer
 {
     Buffer& buffer;
     GrowableBuffer(Buffer& buffer) noexcept : IGrowableBuffer(&GrowableBuffer::tryGrowTo), buffer(buffer)

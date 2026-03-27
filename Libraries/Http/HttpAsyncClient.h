@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "HttpConnection.h"
+#include "HttpExport.h"
 #include "HttpURLParser.h"
 
 namespace SC
@@ -10,7 +11,7 @@ namespace SC
 //! @{
 
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
-struct SC_COMPILER_EXPORT HttpAsyncClientConnection
+struct SC_HTTP_EXPORT HttpAsyncClientConnection
     : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 8, HttpConnectionBase>
 {
     static constexpr int ExtraBuffers = 8;
@@ -41,7 +42,7 @@ struct SC_COMPILER_EXPORT HttpAsyncClientConnection
 ///
 /// Example streaming the request body:
 /// \snippet Tests/Libraries/Http/HttpAsyncClientTest.cpp HttpAsyncClientStreamSnippet
-struct SC_COMPILER_EXPORT HttpAsyncClient
+struct SC_HTTP_EXPORT HttpAsyncClient
 {
     /// @brief Initializes the client with caller-provided connection storage
     /// The storage must outlive the client and provides buffers, queues and socket state.

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#include "ContainersExport.h"
 namespace SC
 {
 template <typename TagType, typename IDType = int32_t, IDType InvalidValue = -1>
