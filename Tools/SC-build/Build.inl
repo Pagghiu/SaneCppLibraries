@@ -89,6 +89,8 @@ bool SC::Build::CompileFlags::addDefines(Span<const StringView> preprocessorDefi
 SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlags& flags)
 {
     CompileFlags::Internal::writeStrongest(&LinkFlags::enableASAN, opinions, flags);
+    CompileFlags::Internal::writeStrongest(&LinkFlags::enableDeadCodeStripping, opinions, flags);
+    CompileFlags::Internal::writeStrongest(&LinkFlags::preserveExportedSymbols, opinions, flags);
 
     // TODO: Implement ability to "remove" paths from stronger opinions
     for (const LinkFlags* opinion : opinions)
@@ -117,7 +119,8 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
         {
             compile.enableCoverage = true;
         }
-        compile.optimizationLevel = Optimization::Debug;
+        compile.optimizationLevel    = Optimization::Debug;
+        link.enableDeadCodeStripping = false;
         SC_TRY(compile.defines.append({"DEBUG=1"}));
         if (parameters.generator == Build::Generator::VisualStudio2022)
         {
@@ -136,11 +139,13 @@ bool SC::Build::Configuration::applyPreset(const Project& project, Preset newPre
                 compile.enableASAN = true;
             }
         }
-        compile.optimizationLevel = Optimization::Debug;
+        compile.optimizationLevel    = Optimization::Debug;
+        link.enableDeadCodeStripping = false;
         SC_TRY(compile.defines.append({"DEBUG=1"}));
         break;
     case Configuration::Preset::Release:
-        compile.optimizationLevel = Optimization::Release;
+        compile.optimizationLevel    = Optimization::Release;
+        link.enableDeadCodeStripping = true;
         SC_TRY(compile.defines.append({"NDEBUG=1"}));
         break;
     default: return false;
@@ -362,6 +367,43 @@ bool SC::Build::Project::addExportLibraries(Span<const StringView> libraries)
 }
 
 bool SC::Build::Project::addExportAllLibraries() { return addExportLibraries({ALL_SC_EXPORT_LIBRARIES}); }
+
+bool SC::Build::Project::addExportDirectories(Span<const StringView> directories)
+{
+    for (const StringView directory : directories)
+    {
+        if (directory.containsCodePoint('*') or directory.containsCodePoint('?'))
+            return false;
+
+        String normalizedDirectory = StringEncoding::Utf8;
+        if (Path::isAbsolute(directory, Path::AsNative))
+        {
+            SC_TRY(Path::relativeFromTo(normalizedDirectory, rootDirectory.view(), directory, Path::AsNative,
+                                        Path::AsPosix));
+        }
+        else
+        {
+            SC_TRY(Path::normalize(normalizedDirectory, directory, Path::AsPosix));
+        }
+
+        const StringView normalizedDirectoryView = normalizedDirectory.view();
+        if (normalizedDirectoryView.endsWith("/"))
+        {
+            String trimmedDirectory = StringEncoding::Utf8;
+            SC_TRY(trimmedDirectory.assign(
+                normalizedDirectoryView.sliceStartLength(0, normalizedDirectoryView.sizeInBytes() - 1)));
+            normalizedDirectory = move(trimmedDirectory);
+        }
+
+        size_t existingIndex = 0;
+        if (exportDirectories.find([&](const String& item) { return item == normalizedDirectory; }, &existingIndex))
+        {
+            continue;
+        }
+        SC_TRY(exportDirectories.push_back(move(normalizedDirectory)));
+    }
+    return true;
+}
 
 bool SC::Build::Project::addFile(StringView singleFile) { return addFiles({}, singleFile); }
 

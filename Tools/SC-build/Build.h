@@ -315,7 +315,11 @@ struct LinkFlags
     Vector<String> frameworksIOS;   ///< Frameworks to link on iOS only
     Vector<String> frameworksMacOS; ///< Frameworks to link on macOS only
 
-    Parameter<bool> enableASAN = false; ///< Enable linking Address Sanitizer
+    Parameter<bool> enableASAN              = false; ///< Enable linking Address Sanitizer
+    Parameter<bool> enableDeadCodeStripping = false; ///< Enable linker dead code stripping
+    Parameter<bool> preserveExportedSymbols = false; ///< Keep explicitly exported symbols alive while stripping
+                                                     ///< (currently ignored by the XCode backend, which disables dead
+                                                     ///< code stripping instead)
 
     /// @brief Merges opinions about flags into target flags
     /// @param opinions Opinions about flags from strongest to weakest
@@ -444,7 +448,8 @@ struct Project
     SourceFiles files; ///< Project source files with their associated compile flags
     LinkFlags   link;  ///< Linker flags applied to all files in the project
 
-    Vector<String> exportLibraries; ///< SC libraries that this executable explicitly exports for plugins
+    Vector<String> exportLibraries;   ///< SC libraries that this executable explicitly exports for plugins
+    Vector<String> exportDirectories; ///< Additional source roots whose symbols are exported for plugins
 
     Vector<SourceFiles> filesWithSpecificFlags; ///< List of files with specific flags different from project/config
 
@@ -502,6 +507,9 @@ struct Project
 
     /// @brief Export all Sane C++ libraries from this target for plugin consumers
     [[nodiscard]] bool addExportAllLibraries();
+
+    /// @brief Export symbols produced from sources under the given directories for plugin consumers
+    [[nodiscard]] bool addExportDirectories(Span<const StringView> directories);
 
     /// @brief Remove files matching a filter, to remove only a specific file type after Project::addDirectory
     /// @param subdirectory The subdirectory to search files into, absolute or relative to project root. No `*` allowed.

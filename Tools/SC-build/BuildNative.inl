@@ -75,6 +75,8 @@ struct SC::Build::NativeBuild
         String linkResponsePath;
         String compileCommandsPath;
         String workspaceCompileCommandsPath;
+        String exportedSymbolsPath;
+        String exportedSymbolsLinkerPath;
 
         Vector<const Project*> workspaceDependencies;
         Vector<String>         workspaceDependencyArtifacts;
@@ -557,7 +559,7 @@ struct SC::Build::NativeBuild
         {
             return false;
         }
-        if (resolvedProject.compileFlags.optimizationLevel != Optimization::Release)
+        if (not resolvedProject.linkFlags.enableDeadCodeStripping)
         {
             return false;
         }
@@ -575,11 +577,27 @@ struct SC::Build::NativeBuild
 
     static Result buildStripCommand(const ResolvedProject& resolvedProject, CommandLine& commandLine)
     {
-        SC_TRY(commandLine.append("strip"));
         switch (resolvedProject.parameters->platform)
         {
-        case Platform::Apple: SC_TRY(commandLine.append("-x")); break;
-        case Platform::Linux: SC_TRY(commandLine.append("--strip-unneeded")); break;
+        case Platform::Apple:
+            SC_TRY(commandLine.append("strip"));
+            SC_TRY(commandLine.append("-x"));
+            break;
+        case Platform::Linux:
+            if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags))
+            {
+                SC_TRY(commandLine.append("objcopy"));
+                SC_TRY(commandLine.append("--strip-unneeded"));
+                String option = StringEncoding::Utf8;
+                SC_TRY(StringBuilder::format(option, "--keep-symbols={}", resolvedProject.exportedSymbolsPath.view()));
+                SC_TRY(commandLine.append(option.view()));
+            }
+            else
+            {
+                SC_TRY(commandLine.append("strip"));
+                SC_TRY(commandLine.append("--strip-unneeded"));
+            }
+            break;
         case Platform::Unknown:
         case Platform::Windows:
         case Platform::Wasm: return Result::Error("Strip command is unsupported on this platform");
@@ -588,13 +606,138 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static Result appendUniqueSymbolLines(StringView text, Vector<String>& symbols)
+    {
+        StringViewTokenizer tokenizer(text);
+        while (tokenizer.tokenizeNextLine())
+        {
+            const StringView line = tokenizer.component.trimWhiteSpaces();
+            if (not line.isEmpty())
+            {
+                String symbol = StringEncoding::Utf8;
+                SC_TRY(symbol.assign(line));
+                SC_TRY(symbols.push_back(move(symbol)));
+            }
+        }
+        return Result(true);
+    }
+
+    static Result writeExportedSymbolsFiles(FileSystem& fs, const ResolvedProject& resolvedProject, String& signature)
+    {
+        Vector<String> symbols;
+        for (const ResolvedSource& source : resolvedProject.sources)
+        {
+            if (not WriterInternal::isRenderItemInExportSet(*resolvedProject.project, source.displayPath.view()))
+            {
+                continue;
+            }
+            if (not fs.existsAndIsFile(source.objectPath.view()))
+            {
+                continue;
+            }
+
+            CommandLine nmCommand;
+            SC_TRY(nmCommand.append("nm"));
+            switch (resolvedProject.parameters->platform)
+            {
+            case Platform::Apple: SC_TRY(nmCommand.append("-gjU")); break;
+            case Platform::Linux:
+                SC_TRY(nmCommand.append("-g"));
+                SC_TRY(nmCommand.append("--defined-only"));
+                SC_TRY(nmCommand.append("-j"));
+                break;
+            case Platform::Unknown:
+            case Platform::Windows:
+            case Platform::Wasm: return Result::Error("Exported symbols preservation is unsupported on this platform");
+            }
+            SC_TRY(nmCommand.append(source.objectPath.view()));
+
+            String stdOut = StringEncoding::Utf8;
+            String stdErr = StringEncoding::Utf8;
+            SC_TRY(executeCommand(fs, nmCommand, StringView(), resolvedProject.adapter, stdOut, stdErr));
+            SC_TRY(appendUniqueSymbolLines(stdOut.view(), symbols));
+        }
+
+        Algorithms::bubbleSort(symbols.begin(), symbols.end(), [](const String& left, const String& right)
+                               { return left.view().compare(right.view()) == StringView::Comparison::Smaller; });
+
+        String exportedSymbols = StringEncoding::Utf8;
+        {
+            auto   builder       = StringBuilder::create(exportedSymbols);
+            size_t uniqueSymbols = 0;
+            for (size_t index = 0; index < symbols.size(); ++index)
+            {
+                if (index > 0 and symbols[index - 1].view() == symbols[index].view())
+                {
+                    continue;
+                }
+                if (uniqueSymbols > 0)
+                {
+                    SC_TRY(builder.append("\n"));
+                }
+                SC_TRY(builder.append(symbols[index].view()));
+                uniqueSymbols++;
+            }
+            builder.finalize();
+        }
+
+        SC_TRY(makeParentDirectory(fs, resolvedProject.exportedSymbolsPath.view()));
+        SC_TRY(fs.writeString(resolvedProject.exportedSymbolsPath.view(), exportedSymbols.view()));
+
+        String linkerSymbols = StringEncoding::Utf8;
+        if (resolvedProject.parameters->platform == Platform::Linux)
+        {
+            auto builder = StringBuilder::create(linkerSymbols);
+            SC_TRY(builder.append("{\n"));
+            StringViewTokenizer tokenizer(exportedSymbols.view());
+            while (tokenizer.tokenizeNextLine())
+            {
+                const StringView line = tokenizer.component.trimWhiteSpaces();
+                if (not line.isEmpty())
+                {
+                    SC_TRY(builder.append("  "));
+                    SC_TRY(builder.append(line));
+                    SC_TRY(builder.append(";\n"));
+                }
+            }
+            SC_TRY(builder.append("};\n"));
+            builder.finalize();
+            SC_TRY(fs.writeString(resolvedProject.exportedSymbolsLinkerPath.view(), linkerSymbols.view()));
+        }
+
+        SC_TRY(signature.assign(exportedSymbols.view()));
+        if (resolvedProject.parameters->platform == Platform::Linux)
+        {
+            auto builder = StringBuilder::createForAppendingTo(signature);
+            SC_TRY(builder.append("\n# dynamic-list\n"));
+            SC_TRY(builder.append(linkerSymbols.view()));
+            builder.finalize();
+        }
+        return Result(true);
+    }
+
     static Result buildProjectFinalPhase(FileSystem& fs, ResolvedProject& resolvedProject, bool anyObjectBuilt,
                                          const ProjectProgress& progress)
     {
+        String exportedSymbolsSignature = StringEncoding::Utf8;
+        if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags) and
+            (resolvedProject.parameters->platform == Platform::Apple or
+             resolvedProject.parameters->platform == Platform::Linux))
+        {
+            SC_TRY(writeExportedSymbolsFiles(fs, resolvedProject, exportedSymbolsSignature));
+        }
+
         CommandLine finalCommand;
         String      finalCommandString = StringEncoding::Utf8;
         SC_TRY(buildFinalCommand(resolvedProject, finalCommand));
         SC_TRY(formatCommandLine(finalCommand, finalCommandString));
+        if (not exportedSymbolsSignature.isEmpty())
+        {
+            auto builder = StringBuilder::createForAppendingTo(finalCommandString);
+            SC_TRY(builder.append("\n# exported symbols\n"));
+            SC_TRY(builder.append(exportedSymbolsSignature.view()));
+            builder.finalize();
+        }
         CommandLine stripCommand;
         String      stripCommandString = StringEncoding::Utf8;
         const bool  shouldStrip        = shouldStripLinkedArtifact(resolvedProject);
@@ -1135,6 +1278,10 @@ struct SC::Build::NativeBuild
         SC_TRY(Path::join(
             resolvedProject.workspaceCompileCommandsPath,
             {parameters.directories.intermediatesDirectory.view(), workspace.name.view(), "compile_commands.json"}));
+        SC_TRY(Path::join(resolvedProject.exportedSymbolsPath,
+                          {resolvedProject.intermediateDirectory.view(), "exported_symbols.list"}));
+        SC_TRY(Path::join(resolvedProject.exportedSymbolsLinkerPath,
+                          {resolvedProject.intermediateDirectory.view(), "exported_symbols.ld"}));
 
         Vector<WriterInternal::RenderItem> renderItems;
         SC_TRY(WriterInternal::renderProject(project.rootDirectory.view(), project, filePathsResolver, renderItems));
@@ -1644,16 +1791,15 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        const bool isExecutableTarget = resolvedProject.project->targetType == TargetType::ConsoleExecutable or
-                                        resolvedProject.project->targetType == TargetType::GUIApplication;
-        if (resolvedProject.parameters->platform == Platform::Linux and isExecutableTarget and
+        if (resolvedProject.parameters->platform == Platform::Linux and
+            WriterInternal::isExecutableTarget(*resolvedProject.project) and
             not resolvedProject.project->exportLibraries.isEmpty())
         {
             SC_TRY(commandLine.append("-rdynamic"));
         }
 
         if (resolvedProject.project->targetType != TargetType::StaticLibrary and
-            resolvedProject.compileFlags.optimizationLevel == Optimization::Release)
+            resolvedProject.linkFlags.enableDeadCodeStripping)
         {
             if (resolvedProject.parameters->platform == Platform::Apple)
             {
@@ -1662,6 +1808,30 @@ struct SC::Build::NativeBuild
             else if (resolvedProject.parameters->platform == Platform::Linux)
             {
                 SC_TRY(commandLine.append("-Wl,--gc-sections"));
+            }
+        }
+
+        if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags))
+        {
+            switch (resolvedProject.parameters->platform)
+            {
+            case Platform::Apple:
+                SC_TRY(commandLine.append("-Xlinker"));
+                SC_TRY(commandLine.append("-exported_symbols_list"));
+                SC_TRY(commandLine.append("-Xlinker"));
+                SC_TRY(commandLine.append(resolvedProject.exportedSymbolsPath.view()));
+                break;
+            case Platform::Linux: {
+                SC_TRY(commandLine.append("-Wl,--gc-keep-exported"));
+                String option = StringEncoding::Utf8;
+                SC_TRY(StringBuilder::format(option, "-Wl,--dynamic-list={}",
+                                             resolvedProject.exportedSymbolsLinkerPath.view()));
+                SC_TRY(commandLine.append(option.view()));
+                break;
+            }
+            case Platform::Unknown:
+            case Platform::Windows:
+            case Platform::Wasm: break;
             }
         }
 

@@ -36,6 +36,10 @@ For host executables using the [Plugin](@ref library_plugin) library, `SC::Build
 needed `SC_EXPORT_LIBRARY_<LIBRARY>=1` defines to the executable build and `SC::Build::Project::addExportAllLibraries`
 does the same for every Sane C++ library; both also enable `-rdynamic` on Linux.
 
+`SC::Build::LinkFlags::preserveExportedSymbols` currently performs fine-grained symbol preservation only on the
+standalone Native backend and on generated Makefiles. The XCode backend currently ignores the fine-grained preservation
+path and falls back to disabling dead code stripping when preservation is requested.
+
 @note Check the [Tools](@ref page_tools) page for more details on `SC.sh build`.
 
 # Native Backend

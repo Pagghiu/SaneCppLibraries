@@ -471,9 +471,9 @@ struct SC::Build::ProjectWriter::WriterXCode
             buildConfigurationList = 7B0074192A73143F00660B94 /* Build configuration list for PBXNativeTarget "{0}" */;
             buildPhases = (
                 7B00740E2A73143F00660B94 /* Sources */,
+                7B6078112B3CEF9400680265 /* ShellScript */,
                 7B00740F2A73143F00660B94 /* Frameworks */,
                 7B0074102A73143F00660B94 /* CopyFiles */,
-                7B6078112B3CEF9400680265 /* ShellScript */,
 				7BEC30B42C31C33D00961B17 /* Resources */,
             );
             buildRules = (
@@ -556,9 +556,27 @@ struct SC::Build::ProjectWriter::WriterXCode
         return true;
     }
 
-    [[nodiscard]] bool writePBXShellScriptBuildPhase(StringBuilder& builder)
+    [[nodiscard]] bool appendPBXQuotedString(StringBuilder& builder, StringView text)
+    {
+        String            escaped        = StringEncoding::Utf8;
+        auto              sb             = StringBuilder::create(escaped);
+        const ReplacePair replacements[] = {
+            {"\\", "\\\\"},
+            {"\"", "\\\""},
+            {"\n", "\\n"},
+        };
+        SC_TRY(ProjectWriter::appendReplaceMultiple(sb, text,
+                                                    {replacements, sizeof(replacements) / sizeof(replacements[0])}));
+        sb.finalize();
+        return builder.append(escaped.view());
+    }
+
+    [[nodiscard]] bool writePBXShellScriptBuildPhase(StringBuilder& builder, const Project& project,
+                                                     const Vector<RenderItem>& xcodeFiles)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
+        (void)project;
+        (void)xcodeFiles;
         builder.append(R"delimiter(
 /* Begin PBXShellScriptBuildPhase section */
         7B6078112B3CEF9400680265 /* ShellScript */ = {
@@ -577,7 +595,20 @@ struct SC::Build::ProjectWriter::WriterXCode
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "sed -e '1s/^/[\\'$'\\n''/' -e '$s/,$/\\'$'\\n'']/' \"${SYMROOT}/CompilationDatabase/\"*.json > \"${SYMROOT}/\"compile_commands.json\nrm -rf \"${SYMROOT}/CompilationDatabase/\"";
+			shellScript = ")delimiter");
+
+        String script = StringEncoding::Utf8;
+        {
+            auto scriptBuilder = StringBuilder::create(script);
+            SC_TRY(scriptBuilder.append(
+                "sed -e '1s/^/[\\'$'\\n''/' -e '$s/,$/\\'$'\\n'']/' \"${SYMROOT}/CompilationDatabase/\"*.json > "
+                "\"${SYMROOT}/compile_commands.json\"\n"));
+            SC_TRY(scriptBuilder.append("rm -rf \"${SYMROOT}/CompilationDatabase/\"\n"));
+            scriptBuilder.finalize();
+        }
+
+        SC_TRY(appendPBXQuotedString(builder, script.view()));
+        builder.append(R"delimiter(";
 			showEnvVarsInLog = 0;        };
 /* End PBXShellScriptBuildPhase section */
 )delimiter");
@@ -724,7 +755,6 @@ struct SC::Build::ProjectWriter::WriterXCode
                        CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
                        CLANG_WARN_UNREACHABLE_CODE = YES;
                        CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-                       DEAD_CODE_STRIPPING = YES;
                        ENABLE_STRICT_OBJC_MSGSEND = YES;
                        ENABLE_USER_SCRIPT_SANDBOXING = NO;
                        GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -769,8 +799,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         SC_TRY(CompileFlags::merge(compileSources, compileFlags));
 
         LinkFlags        linkFlags;
-        const LinkFlags* linkSources[] = {&project.link, &configuration->link};
+        const LinkFlags* linkSources[] = {&configuration->link, &project.link};
         SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+        const bool preserveExportedSymbols = WriterInternal::shouldPreserveExportedSymbols(project, linkFlags);
+        const bool enableDeadCodeStripping = linkFlags.enableDeadCodeStripping and not preserveExportedSymbols;
 
         builder.append(
             R"delimiter(
@@ -781,6 +813,8 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         writeCommonOptions(builder, project, compileFlags.cppStandard);
         writeDirectories(builder, configuration);
+
+        builder.append("\n                       DEAD_CODE_STRIPPING = {};", enableDeadCodeStripping ? "YES" : "NO");
 
         if (compileFlags.enableRTTI)
         {
@@ -815,7 +849,16 @@ struct SC::Build::ProjectWriter::WriterXCode
         }
         if (not compileFlags.enableStdCpp)
         {
-            builder.append("\n                       OTHER_LDFLAGS = \"-nostdlib++\";");
+            builder.append(R"delimiter(
+                       OTHER_LDFLAGS = (
+                         "$(inherited)",)delimiter");
+            if (not compileFlags.enableStdCpp)
+            {
+                builder.append(R"delimiter(
+                         "-nostdlib++",)delimiter");
+            }
+            builder.append(R"delimiter(
+                       );)delimiter");
         }
         switch (compileFlags.optimizationLevel)
         {
@@ -829,13 +872,25 @@ struct SC::Build::ProjectWriter::WriterXCode
                            GCC_OPTIMIZATION_LEVEL = 0;)delimiter");
             break;
         case Optimization::Release:
-            builder.append(R"delimiter(
+            if (enableDeadCodeStripping)
+            {
+                builder.append(R"delimiter(
                            COPY_PHASE_STRIP = YES;
                            DEPLOYMENT_POSTPROCESSING = YES;
                            DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
                            ENABLE_NS_ASSERTIONS = NO;
                            STRIP_INSTALLED_PRODUCT = YES;
                            STRIP_STYLE = non-global;)delimiter");
+            }
+            else
+            {
+                builder.append(R"delimiter(
+                           COPY_PHASE_STRIP = NO;
+                           DEPLOYMENT_POSTPROCESSING = NO;
+                           DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+                           ENABLE_NS_ASSERTIONS = NO;
+                           STRIP_INSTALLED_PRODUCT = NO;)delimiter");
+            }
             break;
         }
 
@@ -884,12 +939,20 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
             if (configuration.type == RenderItem::Configuration)
             {
+                const Configuration* projectConfiguration = project.getConfiguration(configuration.name.view());
+                SC_TRY(projectConfiguration != nullptr);
+                LinkFlags        linkFlags;
+                const LinkFlags* linkSources[] = {&projectConfiguration->link, &project.link};
+                SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+                const bool enableDeadCodeStripping =
+                    linkFlags.enableDeadCodeStripping and
+                    not WriterInternal::shouldPreserveExportedSymbols(project, linkFlags);
                 builder.append(R"delimiter(
         {0} /* {1} */ = {{
             isa = XCBuildConfiguration;
             buildSettings = {{
                 CODE_SIGN_STYLE = Automatic;
-                DEAD_CODE_STRIPPING = YES;
+                DEAD_CODE_STRIPPING = {3};
                 PRODUCT_NAME = "$(TARGET_NAME)";
                 INFOPLIST_KEY_NSHumanReadableCopyright = "";
                 PRODUCT_BUNDLE_IDENTIFIER = "{2}";
@@ -900,7 +963,8 @@ struct SC::Build::ProjectWriter::WriterXCode
             }};
             name = {1};
         }};)delimiter",
-                               configuration.buildHash.view(), configuration.name.view(), project.name.view());
+                               configuration.buildHash.view(), configuration.name.view(), project.name.view(),
+                               enableDeadCodeStripping ? "YES" : "NO");
             }
         }
         builder.append("\n/* End XCBuildConfiguration section */\n");
@@ -1061,7 +1125,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         case TargetType::StaticLibrary: break;
         }
 
-        writePBXShellScriptBuildPhase(builder);
+        writePBXShellScriptBuildPhase(builder, project, renderer.renderItems);
         writePBXSourcesBuildPhase(builder, renderer.renderItems);
         writeXCBuildConfiguration(builder, project, renderer.renderItems);
         writeXCConfigurationList(builder, project, renderer.renderItems);

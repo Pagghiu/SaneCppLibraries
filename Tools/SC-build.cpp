@@ -149,6 +149,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     {
         return Result::Error("Failed to configure exported SCTest libraries");
     }
+    project.link.preserveExportedSymbols = true;
 
     // Deprecated code tests and libraries (to be removed when deprecated code will be removed)
     project.addFiles("Extra/Deprecated/Tests", "**.cpp");     // add all deprecated tests
@@ -283,6 +284,8 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     SC_TRY(StringBuilder::format(imguiDefine, "SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
     project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
     project.addExportAllLibraries(); // Export all SC libraries for plugins
+    SC_TRY(project.addExportDirectories({imgui.packageLocalDirectory.view()}));
+    project.link.preserveExportedSymbols = true;
     if (parameters.platform == Platform::Apple)
     {
         project.addFiles("Examples/SCExample", "*.m"); // add all .m from SCExample directory

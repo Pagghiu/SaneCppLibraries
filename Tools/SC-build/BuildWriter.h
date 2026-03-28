@@ -197,6 +197,55 @@ struct SC::Build::WriterInternal
         return true;
     }
 
+    [[nodiscard]] static bool isExecutableTarget(const Project& project)
+    {
+        return project.targetType == TargetType::ConsoleExecutable or project.targetType == TargetType::GUIApplication;
+    }
+
+    [[nodiscard]] static bool shouldPreserveExportedSymbols(const Project& project, const LinkFlags& linkFlags)
+    {
+        return isExecutableTarget(project) and linkFlags.enableDeadCodeStripping and
+               linkFlags.preserveExportedSymbols and
+               (not project.exportLibraries.isEmpty() or not project.exportDirectories.isEmpty());
+    }
+
+    [[nodiscard]] static bool isRenderItemInExportSet(const Project& project, StringView referencePath)
+    {
+        if (not referencePath.startsWith("Libraries/"_a8))
+        {
+            for (const String& exportDirectory : project.exportDirectories)
+            {
+                const StringView exportDirectoryView = exportDirectory.view();
+                if (referencePath == exportDirectoryView)
+                {
+                    return true;
+                }
+                if (referencePath.startsWith(exportDirectoryView) and
+                    referencePath.sizeInBytes() > exportDirectoryView.sizeInBytes() and
+                    referencePath.bytesWithoutTerminator()[exportDirectoryView.sizeInBytes()] == '/')
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        const StringView libraryComponent = referencePath.sliceStart(sizeof("Libraries/") - 1);
+        StringView       libraryName;
+        if (not libraryComponent.splitBefore("/", libraryName))
+        {
+            libraryName = libraryComponent;
+        }
+        for (const String& exportedLibrary : project.exportLibraries)
+        {
+            if (exportedLibrary.view() == libraryName)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
     [[nodiscard]] static Result getPathsRelativeTo(StringView referenceDirectory, StringView rootDirectory,
                                                    const SourceFiles& files, const FilePathsResolver& filePathsResolver,
 

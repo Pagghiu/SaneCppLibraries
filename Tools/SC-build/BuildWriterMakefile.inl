@@ -198,7 +198,7 @@ endif
             {
                 builder.append("\n\nelse ifeq ($(CONFIG),{0})\n", configName.view());
             }
-            SC_TRY(writeConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view(),
+            SC_TRY(writeConfiguration(builder, project, configuration, renderer, relativeDirectories, makeTarget.view(),
                                       configName.view()))
 
             writePerFileConfiguration(builder, project, configuration, relativeDirectories, makeTarget.view());
@@ -358,7 +358,7 @@ endif
         case TargetType::ConsoleExecutable:
         case TargetType::GUIApplication:
             builder.append(R"delimiter(
-$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
+$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) $({0}_LINK_DEPENDENCIES) | $({0}_TARGET_DIR)
 	@echo Linking "{0}"
 	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 	$(VRBS)$({0}_POST_LINK_STRIP)
@@ -367,7 +367,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
             break;
         case TargetType::SharedLibrary:
             builder.append(R"delimiter(
-$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
+$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) $({0}_LINK_DEPENDENCIES) | $({0}_TARGET_DIR)
 	@echo Linking shared library "{0}"
 ifeq ($(TARGET_OS),macOS)
 	$(VRBS)$(CXX) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
@@ -519,9 +519,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("else ifeq ($(TARGET_OS),iOS)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget);
         builder.append("else ifeq ($(TARGET_OS),linux)\n");
-        const bool isExecutableTarget =
-            project.targetType == TargetType::ConsoleExecutable or project.targetType == TargetType::GUIApplication;
-        if (isExecutableTarget and not project.exportLibraries.isEmpty())
+        if (WriterInternal::isExecutableTarget(project) and not project.exportLibraries.isEmpty())
         {
             // -rdynamic is needed to resolve Plugin symbols in the executable
             builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget);
@@ -536,7 +534,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
 
         builder.append("\n{0}_CONFIG_LDFLAGS := $({0}_SANITIZE_CPPFLAGS) $({0}_COMPILER_LDFLAGS)", makeTarget);
         builder.append("\n{0}_LDFLAGS := $({0}_TARGET_CPPFLAGS) $({0}_CONFIG_LDFLAGS) $({0}_LIBRARIES) "
-                       "$({0}_OS_LDFLAGS) $(LDFLAGS)",
+                       "$({0}_OS_LDFLAGS) $({0}_EXPORTED_SYMBOLS_LDFLAGS) $(LDFLAGS)",
                        makeTarget);
         SC_COMPILER_WARNING_POP;
     }
@@ -550,6 +548,7 @@ ifneq ($(and $({0}_TARGET_DIR),$({0}_INTERMEDIATE_DIR)),)
 	@echo Cleaning {0}
 	$(VRBS)rm -f $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 	$(VRBS)rm -f $({0}_OBJECT_FILES) $({0}_OBJECT_FILES:.o=.d) $({0}_OBJECT_FILES:.o=.json) $({0}_OBJECT_FILES:.o=.o.json)
+	$(VRBS)rm -f $({0}_EXPORTED_SYMBOLS_FILE) $({0}_EXPORTED_SYMBOLS_LD_FILE)
 	$(VRBS)rm -f $({0}_INTERMEDIATE_DIR)/compile_commands.json
 	$(VRBS)if [ -d "$({0}_INTERMEDIATE_DIR)" ]; then rmdir "$({0}_INTERMEDIATE_DIR)" 2>/dev/null || true; fi
 	$(VRBS)if [ -d "$({0}_TARGET_DIR)" ]; then rmdir "$({0}_TARGET_DIR)" 2>/dev/null || true; fi
@@ -758,10 +757,11 @@ endif
         SC_COMPILER_WARNING_POP;
     }
 
-    Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags)
+    Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const Project& project,
+                                   const LinkFlags& linkFlags, const CompileFlags& compileFlags)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        builder.append("\n{0}_POST_LINK_STRIP := :", makeTarget);
+        builder.append("\n{0}_POST_LINK_STRIP = :", makeTarget);
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)");
         // Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
@@ -778,32 +778,117 @@ endif
             builder.append("\n{0}_COMPILER_LDFLAGS += -nostdlib++", makeTarget); // This is only Clang and GCC 13+
             builder.append("\nendif");
         }
-        if (compileFlags.optimizationLevel == Optimization::Release)
+        if (linkFlags.enableDeadCodeStripping)
         {
             builder.append("\nifeq ($(TARGET_OS),macOS)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
-            builder.append("\n{0}_POST_LINK_STRIP := strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
+            builder.append("\n{0}_POST_LINK_STRIP = strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
             builder.append("\nelse ifeq ($(TARGET_OS),iOS)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -dead_strip", makeTarget);
-            builder.append("\n{0}_POST_LINK_STRIP := strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
+            builder.append("\n{0}_POST_LINK_STRIP = strip -x $({0}_TARGET_DIR)/$({0}_TARGET_NAME)", makeTarget);
             builder.append("\nelse ifeq ($(TARGET_OS),linux)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -Wl,--gc-sections", makeTarget);
-            builder.append("\n{0}_POST_LINK_STRIP := strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
-                           makeTarget);
+            if (WriterInternal::shouldPreserveExportedSymbols(project, linkFlags))
+            {
+                builder.append(
+                    "\n{0}_POST_LINK_STRIP = objcopy --strip-unneeded --keep-symbols=$({0}_EXPORTED_SYMBOLS_FILE) "
+                    "$({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                    makeTarget);
+            }
+            else
+            {
+                builder.append("\n{0}_POST_LINK_STRIP = strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                               makeTarget);
+            }
             builder.append("\nendif");
         }
         builder.append("\nelse");
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
-        if (compileFlags.optimizationLevel == Optimization::Release)
+        if (linkFlags.enableDeadCodeStripping)
         {
             builder.append(" -Wl,--gc-sections");
-            builder.append("\n{0}_POST_LINK_STRIP := strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
-                           makeTarget);
+            if (WriterInternal::shouldPreserveExportedSymbols(project, linkFlags))
+            {
+                builder.append(
+                    "\n{0}_POST_LINK_STRIP = objcopy --strip-unneeded --keep-symbols=$({0}_EXPORTED_SYMBOLS_FILE) "
+                    "$({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                    makeTarget);
+            }
+            else
+            {
+                builder.append("\n{0}_POST_LINK_STRIP = strip --strip-unneeded $({0}_TARGET_DIR)/$({0}_TARGET_NAME)",
+                               makeTarget);
+            }
         }
         builder.append("\nendif");
         return Result(true);
         SC_COMPILER_WARNING_POP;
+    }
+
+    Result appendExportedSymbolsRules(StringBuilder& builder, StringView makeTarget, const Project& project,
+                                      const Renderer& renderer, const LinkFlags& linkFlags)
+    {
+        SC_TRY(builder.append("\n{0}_LINK_DEPENDENCIES :=", makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOLS_FILE :=", makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOLS_LD_FILE :=", makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOLS_LDFLAGS :=", makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOL_OBJECTS :=", makeTarget));
+
+        if (not WriterInternal::shouldPreserveExportedSymbols(project, linkFlags))
+        {
+            return Result(true);
+        }
+
+        SC_TRY(
+            builder.append("\n{0}_EXPORTED_SYMBOLS_FILE := $({0}_INTERMEDIATE_DIR)/exported_symbols.list", makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOLS_LD_FILE := $({0}_INTERMEDIATE_DIR)/exported_symbols.ld",
+                              makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOL_OBJECTS :=", makeTarget));
+
+        for (const RenderItem& item : renderer.renderItems)
+        {
+            const StringView extension = RenderItem::getExtension(item.type);
+            if (extension.isEmpty() or not WriterInternal::isRenderItemInExportSet(project, item.referencePath.view()))
+            {
+                continue;
+            }
+            SC_TRY(builder.append(" \\\n$({0}_INTERMEDIATE_DIR)/", makeTarget));
+            SC_TRY(builder.appendReplaceAll(Path::basename(item.name.view(), extension), " ", "\\ "));
+            SC_TRY(builder.append(".o"));
+        }
+
+        SC_TRY(builder.append("\nifeq ($(TARGET_OS),linux)"));
+        SC_TRY(builder.append("\n{0}_LINK_DEPENDENCIES := $({0}_EXPORTED_SYMBOLS_FILE) $({0}_EXPORTED_SYMBOLS_LD_FILE)",
+                              makeTarget));
+        SC_TRY(builder.append("\n{0}_EXPORTED_SYMBOLS_LDFLAGS := -Wl,--gc-keep-exported "
+                              "-Wl,--dynamic-list=$({0}_EXPORTED_SYMBOLS_LD_FILE)",
+                              makeTarget));
+        SC_TRY(builder.append("\nelse"));
+        SC_TRY(builder.append("\n{0}_LINK_DEPENDENCIES := $({0}_EXPORTED_SYMBOLS_FILE)", makeTarget));
+        SC_TRY(builder.append(
+            "\n{0}_EXPORTED_SYMBOLS_LDFLAGS := -Xlinker -exported_symbols_list -Xlinker $({0}_EXPORTED_SYMBOLS_FILE)",
+            makeTarget));
+        SC_TRY(builder.append("\nendif\n"));
+
+        SC_TRY(builder.append(R"delimiter(
+$({0}_EXPORTED_SYMBOLS_FILE): $({0}_EXPORTED_SYMBOL_OBJECTS) | $({0}_INTERMEDIATE_DIR)
+	@echo Writing "{0}" exported symbols
+	$(VRBS)rm -f "$@"
+ifeq ($(TARGET_OS),linux)
+	$(VRBS)for file in $({0}_EXPORTED_SYMBOL_OBJECTS); do nm -g --defined-only -j "$$file"; done | sort -u > "$@"
+else
+	$(VRBS)for file in $({0}_EXPORTED_SYMBOL_OBJECTS); do nm -gjU "$$file"; done | sort -u > "$@"
+endif
+
+$({0}_EXPORTED_SYMBOLS_LD_FILE): $({0}_EXPORTED_SYMBOLS_FILE)
+	@echo Writing "{0}" exported dynamic list
+	$(VRBS)printf '{{\n' > "$@"
+	$(VRBS)sed 's/$$/;/' "$<" >> "$@"
+	$(VRBS)printf '}};\n' >> "$@"
+)delimiter",
+                              makeTarget));
+        return Result(true);
     }
 
     Result appendIntermediateDir(StringBuilder& builder, StringView makeTarget,
@@ -889,13 +974,18 @@ $({0}_TARGET_DIR):
     }
 
     Result writeConfiguration(StringBuilder& builder, const Project& project, const Configuration& configuration,
-                              const RelativeDirectories& relativeDirectories, StringView makeTarget,
-                              StringView configName)
+                              const Renderer& renderer, const RelativeDirectories& relativeDirectories,
+                              StringView makeTarget, StringView configName)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         CompileFlags        compileFlags;
         const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
         SC_TRY(CompileFlags::merge(compileSources, compileFlags));
+
+        LinkFlags        linkFlags;
+        const LinkFlags* linkSources[] = {&configuration.link, &project.link};
+        SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+
         if (compileFlags.enableCoverage)
         {
             builder.append(
@@ -918,7 +1008,8 @@ endif
         {
             builder.append("\n{0}_PIC_CPPFLAGS :=", makeTarget);
         }
-        appendCompilerLinkFlags(builder, makeTarget, compileFlags);
+        appendCompilerLinkFlags(builder, makeTarget, project, linkFlags, compileFlags);
+        SC_TRY(appendExportedSymbolsRules(builder, makeTarget, project, renderer, linkFlags));
 
         SC_COMPILER_WARNING_POP;
         return Result(true);
