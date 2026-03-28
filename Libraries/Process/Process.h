@@ -76,6 +76,8 @@ struct ProcessID
 
 struct SC_PROCESS_EXPORT Process
 {
+    static constexpr size_t InlineCommandStorageCapacity = StringPath::MaxPath + 1024;
+
     struct SC_PROCESS_EXPORT Options
     {
         bool windowsHide; ///< [Windows] Hides child process window (default == Process::isWindowsConsoleSubsystem)
@@ -280,7 +282,7 @@ struct SC_PROCESS_EXPORT Process
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).
     // This is done so that in this single buffer with no allocation (under 255) or a single allocation (above 255)
     // we can track all arguments to be passed to execve.
-    native_char_t              commandStorage[StringPath::MaxPath + 1024];
+    native_char_t              commandStorage[InlineCommandStorageCapacity];
     StringSpan::NativeWritable command;
 #if !SC_PLATFORM_WINDOWS // On Posix we need to track the "sub-strings" hidden in command
     static constexpr size_t MAX_NUM_ARGUMENTS = 64;
