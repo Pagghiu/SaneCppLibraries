@@ -45,8 +45,8 @@ The list of dependencies makes it possible to find recursive dependencies and un
 
 The library doesn't use a build system, but it compiles the `.cpp` files directly, linking it with symbols exported from
 the loading executable (using `bundle_loader` on macOS and linking library exported from loading executable on windows).
-Host executables must explicitly opt into exporting the needed Sane C++ libraries through `SC::Build::Project::addExportLibraries`;
-normal executables do not export SC symbols by default anymore.
+Host executables must explicitly opt into exporting the needed Sane C++ libraries through `SC::Build::Project::addExportLibraries`
+or `SC::Build::Project::addExportAllLibraries`; normal executables do not export SC symbols by default anymore.
 Plugin Dynamic Libraries are compiled with `nostdlib` and `nostdlib++` and they include a stub the allows defining some symbols needed due to not linking the C++ CRT.  
 Some special build flags however allow using `libc`, `libc++` or other sysroot / compiler supplied windows.  
 The idea is that plugins only use functionality provided by the calling executable or by other plugins.
@@ -66,6 +66,9 @@ SC_EXPORT_LIBRARY_STRINGS=1
 ```
 
 to the **host executable** build.
+
+If exporting every library is acceptable for your host, `SC::Build::Project::addExportAllLibraries()` enables all
+`SC_EXPORT_LIBRARY_<LIBRARY>=1` switches for you.
 
 Each public library header locally defines its export macro from one of these `SC_EXPORT_LIBRARY_<LIBRARY>=1` switches,
 for example:

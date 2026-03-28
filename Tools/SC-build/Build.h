@@ -423,6 +423,7 @@ struct TargetType
     {
         ConsoleExecutable, ///< Create console executable program
         GUIApplication,    ///< Create graphical application program
+        SharedLibrary,     ///< Create shared library / dynamic library
         StaticLibrary,     ///< Create static library archive
     };
 };
@@ -498,6 +499,9 @@ struct Project
 
     /// @brief Export selected Sane C++ libraries from this target for plugin consumers
     [[nodiscard]] bool addExportLibraries(Span<const StringView> libraries);
+
+    /// @brief Export all Sane C++ libraries from this target for plugin consumers
+    [[nodiscard]] bool addExportAllLibraries();
 
     /// @brief Remove files matching a filter, to remove only a specific file type after Project::addDirectory
     /// @param subdirectory The subdirectory to search files into, absolute or relative to project root. No `*` allowed.

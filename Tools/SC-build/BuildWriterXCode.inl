@@ -65,6 +65,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
         case TargetType::ConsoleExecutable:
         case TargetType::GUIApplication: return fileName.assign(project.targetName.view());
+        case TargetType::SharedLibrary: return fileName.assign(project.targetName.view());
         case TargetType::StaticLibrary:
             if (StringView(project.targetName.view()).startsWith("lib"))
             {
@@ -327,6 +328,10 @@ struct SC::Build::ProjectWriter::WriterXCode
             productType      = "wrapper.application";
             productExtension = ".app";
             break;
+        case TargetType::SharedLibrary:
+            productType      = "compiled.mach-o.dylib";
+            productExtension = ".dylib";
+            break;
         case TargetType::StaticLibrary:
             productType      = "archive.ar";
             productExtension = ".a";
@@ -447,6 +452,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         case TargetType::GUIApplication:
             productType      = "com.apple.product-type.application";
             productExtension = ".app";
+            break;
+        case TargetType::SharedLibrary:
+            productType      = "com.apple.product-type.library.dynamic";
+            productExtension = ".dylib";
             break;
         case TargetType::StaticLibrary:
             productType      = "com.apple.product-type.library.static";
@@ -1048,6 +1057,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         {
         case TargetType::ConsoleExecutable: break;
         case TargetType::GUIApplication: writePBXResourcesBuildPhase(builder, project); break;
+        case TargetType::SharedLibrary: break;
         case TargetType::StaticLibrary: break;
         }
 

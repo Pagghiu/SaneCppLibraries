@@ -131,7 +131,7 @@ endef
         builder.append("\n\nrun:");
         for (const Project& project : workspace.projects)
         {
-            if (project.targetType == TargetType::StaticLibrary)
+            if (project.targetType == TargetType::StaticLibrary or project.targetType == TargetType::SharedLibrary)
             {
                 continue;
             }
@@ -271,6 +271,7 @@ endif # $(CONFIG)
         {
         case TargetType::ConsoleExecutable:
         case TargetType::GUIApplication: SC_TRY(artifactName.assign(project.targetName.view())); return Result(true);
+        case TargetType::SharedLibrary: SC_TRY(artifactName.assign(project.targetName.view())); return Result(true);
         case TargetType::StaticLibrary:
             if (StringView(project.targetName.view()).startsWith("lib"))
             {
@@ -286,9 +287,29 @@ endif # $(CONFIG)
     Result writeTargetRule(StringBuilder& builder, const Project& project, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        String artifactName;
-        SC_TRY(computeArtifactName(project, artifactName));
-        builder.append(R"delimiter(
+        if (project.targetType == TargetType::SharedLibrary)
+        {
+            SC_TRY(builder.append(R"delimiter(
+# {0} Target
+ifeq ($(TARGET_OS),macOS)
+{0}_TARGET_NAME := {1}.dylib
+else ifeq ($(TARGET_OS),iOS)
+{0}_TARGET_NAME := {1}.dylib
+else
+{0}_TARGET_NAME := {1}.so
+endif
+
+{0}_PRINT_EXECUTABLE_PATH:
+	@echo $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+
+)delimiter",
+                                  makeTarget, project.targetName.view()));
+        }
+        else
+        {
+            String artifactName;
+            SC_TRY(computeArtifactName(project, artifactName));
+            SC_TRY(builder.append(R"delimiter(
 # {0} Target
 {0}_TARGET_NAME := {1}
 
@@ -296,7 +317,8 @@ endif # $(CONFIG)
 	@echo $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
 
 )delimiter",
-                       makeTarget, artifactName.view());
+                                  makeTarget, artifactName.view()));
+        }
         SC_COMPILER_WARNING_POP;
         return Result(true);
     }
@@ -343,6 +365,21 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
 )delimiter",
                            makeTarget);
             break;
+        case TargetType::SharedLibrary:
+            builder.append(R"delimiter(
+$({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
+	@echo Linking shared library "{0}"
+ifeq ($(TARGET_OS),macOS)
+	$(VRBS)$(CXX) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+else ifeq ($(TARGET_OS),iOS)
+	$(VRBS)$(CXX) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+else
+	$(VRBS)$(CXX) -shared -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+endif
+	$(VRBS)$({0}_POST_LINK_STRIP)
+)delimiter",
+                           makeTarget);
+            break;
         case TargetType::StaticLibrary:
             builder.append(R"delimiter(
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
@@ -365,6 +402,14 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
             builder.append(R"delimiter(
 {0}_RUN: {0}
 	$({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+)delimiter",
+                           makeTarget);
+            break;
+        case TargetType::SharedLibrary:
+            builder.append(R"delimiter(
+{0}_RUN:
+	@echo "Cannot run shared library target '{0}'" 1>&2
+	@false
 )delimiter",
                            makeTarget);
             break;
@@ -474,7 +519,9 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("else ifeq ($(TARGET_OS),iOS)\n");
         builder.append("     {0}_OS_LDFLAGS := $({0}_FRAMEWORKS)\n", makeTarget);
         builder.append("else ifeq ($(TARGET_OS),linux)\n");
-        if (project.targetType != TargetType::StaticLibrary and not project.exportLibraries.isEmpty())
+        const bool isExecutableTarget =
+            project.targetType == TargetType::ConsoleExecutable or project.targetType == TargetType::GUIApplication;
+        if (isExecutableTarget and not project.exportLibraries.isEmpty())
         {
             // -rdynamic is needed to resolve Plugin symbols in the executable
             builder.append("     {0}_OS_LDFLAGS := -rdynamic\n", makeTarget);
@@ -863,6 +910,14 @@ endif
                               configuration.intermediatesPath.view());
         appendTargetDir(builder, makeTarget, relativeDirectories, configName, configuration.outputPath.view());
         writeCompileFlags(builder, makeTarget, relativeDirectories, compileFlags);
+        if (project.targetType == TargetType::SharedLibrary)
+        {
+            builder.append("\n{0}_PIC_CPPFLAGS := -fPIC", makeTarget);
+        }
+        else
+        {
+            builder.append("\n{0}_PIC_CPPFLAGS :=", makeTarget);
+        }
         appendCompilerLinkFlags(builder, makeTarget, compileFlags);
 
         SC_COMPILER_WARNING_POP;
@@ -887,10 +942,11 @@ endif
     {
         return builder.append(R"delimiter(
 {0}_CONFIG_CPPFLAGS := $({0}_COMPILER_CPPFLAGS) $({0}_VISIBILITY_CPPFLAGS) $({0}_WARNING_CPPFLAGS) $({0}_OPTIMIZATION_CPPFLAGS) $({0}_SANITIZE_CPPFLAGS) $({0}_DEFINES) $({0}_INCLUDE_PATHS)
+{0}_TARGET_CPPFLAGS := $({0}_PIC_CPPFLAGS)
 {0}_CONFIG_CXXFLAGS := $({0}_COMMON_CXXFLAGS) $({0}_COMPILER_CXXFLAGS) $({0}_VISIBILITY_CXXFLAGS) $({0}_WARNING_CXXFLAGS)
 
 # Flags for both .c and .cpp files
-{0}_CPPFLAGS := $({0}_CONFIG_CPPFLAGS) $(CPPFLAGS)
+{0}_CPPFLAGS := $({0}_CONFIG_CPPFLAGS) $({0}_TARGET_CPPFLAGS) $(CPPFLAGS)
 
 # Flags for .c files
 {0}_CFLAGS := $({0}_CPPFLAGS) $(CFLAGS)

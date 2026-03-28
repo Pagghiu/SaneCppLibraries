@@ -297,6 +297,33 @@ static bool buildAppendUpperSnakeCase(SC::StringView input, SC::String& output)
     builder.finalize();
     return true;
 }
+
+static constexpr SC::StringView ALL_SC_EXPORT_LIBRARIES[] = {
+    "Async",
+    "AsyncStreams",
+    "Containers",
+    "ContainersReflection",
+    "File",
+    "FileSystem",
+    "FileSystemIterator",
+    "FileSystemWatcher",
+    "Foundation",
+    "Hashing",
+    "Http",
+    "HttpClient",
+    "Memory",
+    "Plugin",
+    "Process",
+    "Reflection",
+    "SerialPort",
+    "SerializationBinary",
+    "SerializationText",
+    "Socket",
+    "Strings",
+    "Testing",
+    "Threading",
+    "Time",
+};
 } // namespace
 
 bool SC::Build::Project::addExportLibraries(Span<const StringView> libraries)
@@ -333,6 +360,8 @@ bool SC::Build::Project::addExportLibraries(Span<const StringView> libraries)
     }
     return true;
 }
+
+bool SC::Build::Project::addExportAllLibraries() { return addExportLibraries({ALL_SC_EXPORT_LIBRARIES}); }
 
 bool SC::Build::Project::addFile(StringView singleFile) { return addFiles({}, singleFile); }
 
@@ -685,6 +714,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(writer.writeAssets(fs, project));
             }
             break;
+            case TargetType::SharedLibrary: break;
             case TargetType::StaticLibrary: break;
             }
         }
@@ -1263,7 +1293,9 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
             {
                 SC_COMPILER_UNUSED(workspace);
                 SC_COMPILER_UNUSED(configuration);
-                SC_TRY_MSG(project->targetType != TargetType::StaticLibrary, "Run requires an executable target");
+                SC_TRY_MSG(project->targetType == TargetType::ConsoleExecutable or
+                               project->targetType == TargetType::GUIApplication,
+                           "Run requires an executable target");
             }
         }
         SC_TRY(Path::join(solutionLocation, {action.parameters.directories.projectsDirectory.view(),

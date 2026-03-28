@@ -123,6 +123,15 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
         SC_TRY(CompileFlags::merge(compileSources, compileFlags));
 
+        StringView configurationType = "Application";
+        switch (project.targetType)
+        {
+        case TargetType::ConsoleExecutable:
+        case TargetType::GUIApplication: configurationType = "Application"; break;
+        case TargetType::SharedLibrary: configurationType = "DynamicLibrary"; break;
+        case TargetType::StaticLibrary: configurationType = "StaticLibrary"; break;
+        }
+
         StringView platformToolset = configuration.visualStudio.platformToolset;
         if (platformToolset.isEmpty())
         {
@@ -146,8 +155,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                            "    <UseDebugLibraries>true</UseDebugLibraries>\n"
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
-                           project.targetType == TargetType::StaticLibrary ? "StaticLibrary" : "Application",
-                           platformToolset);
+                           configurationType, platformToolset);
             break;
         case Optimization::Release:
             builder.append("    <ConfigurationType>{}</ConfigurationType>\n"
@@ -155,8 +163,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                            "    <PlatformToolset>{}</PlatformToolset>\n"
                            "    <WholeProgramOptimization>true</WholeProgramOptimization>\n"
                            "    <CharacterSet>Unicode</CharacterSet>\n",
-                           project.targetType == TargetType::StaticLibrary ? "StaticLibrary" : "Application",
-                           platformToolset);
+                           configurationType, platformToolset);
             break;
         }
 
@@ -341,6 +348,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             {
             case TargetType::ConsoleExecutable: builder.append("      <SubSystem>Console</SubSystem>\n"); break;
             case TargetType::GUIApplication: builder.append("      <SubSystem>Windows</SubSystem>\n"); break;
+            case TargetType::SharedLibrary: break;
             case TargetType::StaticLibrary: break;
             }
 

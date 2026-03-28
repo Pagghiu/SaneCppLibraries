@@ -201,6 +201,23 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
     return Result(true);
 }
 
+Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspace)
+{
+    Project project = {TargetType::SharedLibrary, "SC"};
+
+    project.setRootDirectory(parameters.directories.libraryDirectory.view());
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    project.addIncludePaths({"."});
+    addSaneCppLibraries(project, parameters);
+    SC_TRY_MSG(project.addExportAllLibraries(), "Failed to configure exported Sane C++ libraries");
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
 Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {TargetType::ConsoleExecutable, "InteropSTL"};
@@ -265,7 +282,7 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 
     SC_TRY(StringBuilder::format(imguiDefine, "SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
     project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
-
+    project.addExportAllLibraries(); // Export all SC libraries for plugins
     if (parameters.platform == Platform::Apple)
     {
         project.addFiles("Examples/SCExample", "*.m"); // add all .m from SCExample directory
@@ -417,6 +434,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     Workspace defaultWorkspace = {DEFAULT_WORKSPACE};
     SC_TRY(configureTests(parameters, defaultWorkspace));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
+    SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
     SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));

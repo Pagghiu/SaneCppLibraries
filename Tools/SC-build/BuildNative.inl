@@ -842,7 +842,8 @@ struct SC::Build::NativeBuild
         if (action.action == Action::Run)
         {
             SC_TRY_MSG(resolvedProjects.size() == 1, "Run requires selecting a single project");
-            SC_TRY_MSG(resolvedProjects[0].project->targetType != TargetType::StaticLibrary,
+            SC_TRY_MSG(resolvedProjects[0].project->targetType == TargetType::ConsoleExecutable or
+                           resolvedProjects[0].project->targetType == TargetType::GUIApplication,
                        "Run requires an executable target");
             SC_TRY(runExecutable(resolvedProjects[0].executablePath.view(), action));
         }
@@ -1058,7 +1059,9 @@ struct SC::Build::NativeBuild
             return Result(true);
         if (adapter.family == Toolchain::ZigCC)
             return Result(true);
-        if (not(commandLine.size() > 48 or commandLine.totalCharacters() > 4096))
+        const size_t inlineCommandBytes = commandLine.totalCharacters() + commandLine.size() + 1;
+        if (not(commandLine.size() > 48 or commandLine.totalCharacters() > 4096 or
+                inlineCommandBytes >= Process::InlineCommandStorageCapacity))
             return Result(true);
 
         String contents = StringEncoding::Utf8;
@@ -1249,6 +1252,7 @@ struct SC::Build::NativeBuild
             {
             case TargetType::ConsoleExecutable: SC_TRY(commandLine.append("/SUBSYSTEM:CONSOLE")); break;
             case TargetType::GUIApplication: SC_TRY(commandLine.append("/SUBSYSTEM:WINDOWS")); break;
+            case TargetType::SharedLibrary: SC_TRY(commandLine.append("/DLL")); break;
             case TargetType::StaticLibrary: break;
             }
             switch (resolvedProject.compileFlags.optimizationLevel)
@@ -1275,6 +1279,7 @@ struct SC::Build::NativeBuild
             {
             case TargetType::ConsoleExecutable: SC_TRY(commandLine.append("/SUBSYSTEM:CONSOLE")); break;
             case TargetType::GUIApplication: SC_TRY(commandLine.append("/SUBSYSTEM:WINDOWS")); break;
+            case TargetType::SharedLibrary: SC_TRY(commandLine.append("/DLL")); break;
             case TargetType::StaticLibrary: break;
             }
             switch (resolvedProject.compileFlags.optimizationLevel)
@@ -1315,6 +1320,17 @@ struct SC::Build::NativeBuild
             resolvedProject.parameters->platform != Platform::Linux)
         {
             SC_TRY(commandLine.append("-nostdlib++"));
+        }
+        if (resolvedProject.project->targetType == TargetType::SharedLibrary)
+        {
+            if (resolvedProject.parameters->platform == Platform::Apple)
+            {
+                SC_TRY(commandLine.append("-dynamiclib"));
+            }
+            else
+            {
+                SC_TRY(commandLine.append("-shared"));
+            }
         }
         for (const ResolvedSource& source : resolvedProject.sources)
         {
@@ -1360,6 +1376,7 @@ struct SC::Build::NativeBuild
         {
         case TargetType::ConsoleExecutable:
         case TargetType::GUIApplication: return buildLinkCommand(resolvedProject, commandLine);
+        case TargetType::SharedLibrary: return buildLinkCommand(resolvedProject, commandLine);
         case TargetType::StaticLibrary: return buildArchiveCommand(resolvedProject, commandLine);
         }
         Assert::unreachable();
@@ -1460,6 +1477,10 @@ struct SC::Build::NativeBuild
             {
                 SC_TRY(commandLine.append("-nostdinc++"));
             }
+        }
+        if (resolvedProject.project->targetType == TargetType::SharedLibrary)
+        {
+            SC_TRY(commandLine.append("-fPIC"));
         }
 
         SC_TRY(commandLine.append("-fvisibility=hidden"));
@@ -1623,8 +1644,9 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        if (resolvedProject.parameters->platform == Platform::Linux and
-            resolvedProject.project->targetType != TargetType::StaticLibrary and
+        const bool isExecutableTarget = resolvedProject.project->targetType == TargetType::ConsoleExecutable or
+                                        resolvedProject.project->targetType == TargetType::GUIApplication;
+        if (resolvedProject.parameters->platform == Platform::Linux and isExecutableTarget and
             not resolvedProject.project->exportLibraries.isEmpty())
         {
             SC_TRY(commandLine.append("-rdynamic"));
@@ -2420,6 +2442,20 @@ struct SC::Build::NativeBuild
                 SC_TRY(output.assign(project.targetName.view()));
             }
             return Result(true);
+        case TargetType::SharedLibrary:
+            if (platform == Platform::Windows)
+            {
+                SC_TRY(StringBuilder::format(output, "{}.dll", project.targetName.view()));
+            }
+            else if (platform == Platform::Apple)
+            {
+                SC_TRY(StringBuilder::format(output, "{}.dylib", project.targetName.view()));
+            }
+            else
+            {
+                SC_TRY(StringBuilder::format(output, "{}.so", project.targetName.view()));
+            }
+            return Result(true);
         case TargetType::StaticLibrary:
             if (platform == Platform::Windows)
             {
@@ -2478,6 +2514,7 @@ struct SC::Build::NativeBuild
         {
         case TargetType::ConsoleExecutable:
         case TargetType::GUIApplication: return "LINK"_a8;
+        case TargetType::SharedLibrary: return "LINK"_a8;
         case TargetType::StaticLibrary: return "AR"_a8;
         }
         Assert::unreachable();
