@@ -255,7 +255,9 @@ struct SC_ASYNC_EXPORT AsyncSequence
 };
 
 /// @brief Empty base struct for all AsyncRequest-derived CompletionData (internal) structs.
-struct SC_ASYNC_EXPORT AsyncCompletionData{};
+struct SC_ASYNC_EXPORT AsyncCompletionData
+{
+};
 
 /// @brief Base class for all async results (argument of completion callbacks).
 /// It holds Result (returnCode) and re-activation flag.

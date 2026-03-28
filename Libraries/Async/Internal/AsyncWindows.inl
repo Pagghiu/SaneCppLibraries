@@ -990,7 +990,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         // Seek to offset if needed
         LARGE_INTEGER offset;
         offset.QuadPart = async.offset;
-        if (not::SetFilePointerEx(async.fileHandle, offset, nullptr, FILE_BEGIN))
+        if (not ::SetFilePointerEx(async.fileHandle, offset, nullptr, FILE_BEGIN))
         {
             return Result::Error("SetFilePointerEx failed");
         }

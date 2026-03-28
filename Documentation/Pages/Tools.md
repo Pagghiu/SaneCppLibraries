@@ -28,7 +28,7 @@ Some relevant blog posts are:
 - Allow C++ programmers to use regular C++ IDE / Debuggers when writing _automation / shell scripts_
 - Use Sane C++ Libraries for real tasks to improve them and fix bugs:
     - Example: `Tools/SC-package.cpp` uses SC::Process library to download some third party binary 
-    - Example: `Tools/SC-package.cpp` uses SC::Hashing library to check downloads MD5 hash
+    - Example: `Tools/SC-package.cpp` uses SC::Hashing library to check downloaded package hashes
     - Example: `Tools/SC-format.cpp` uses SC::FileSystemIterator library to find all files to format in the repo
 - Create portable scripts that can be written once and run (or be debugged) on all platforms
 - Avoid introducing additional dependencies
@@ -186,15 +186,15 @@ SC-build "compile" finished (took 3071 ms)
 # SC-package.cpp
 
 `SC-package` downloads third party tools needed for Sane C++ development (example: `clang-format`).  
-Proper OS / Architecture combination is selected (Windows/Linux/Mac and Intel/ARM) and all downloaded files (_packages_) `MD5` hash is checked for correctness.  
-_Packages_ are placed and extracted in `_Build/_Packages` and once extracted, they are symlinked in `_Build/Tools`.  
+Proper OS / Architecture combination is selected (Windows/Linux/Mac and Intel/ARM) and all downloaded files (_packages_) are hash checked for correctness.  
+_Packages_ are placed and extracted in `_Build/_Packages` while downloaded archives are reused from `_Build/_PackagesCache`.  
 
 @note Directory naming has been chosen to avoid clashes when mounting the same working copy folder in multiple concurrent virtual machines with different Operating Systems / architectures.  
 This happens during regular development, where new code is frequently tested in parallel on macOS, Windows and Linux before even committing it and pushing it to the CI system.
 
 ## Actions
 
-- `install`: Downloads requires tools (LLVM / 7zip)
+- `install`: Downloads required tools (LLVM archives / documentation tools)
 
 ## Examples
 
@@ -205,11 +205,12 @@ This happens during regular development, where new code is frequently tested in 
 ## Packages
 These are the packages that are currently downloaded and extracted / symlinked by `SC-package.cpp`:
 
-- `LLVM 15`: Downloads LLVM from the official github repository
-- `7zip`: 7zip executable (needed to decompress LLVM installer on Windows)
-- `7zr.exe`: 7Zip console executable (needed to decompress 7zip installer on Windows)
+- `LLVM 20.1.8`: Downloads `clang-format` from the official LLVM github repository using SHA256 pinned archives
 - `doxygen`: Doxygen documentation generator
 - `doxygen-awesome-css`: Doxygen awesome css (Doxygen theme)
+
+@note Automatic `clang-format` install is available on macOS ARM64, Linux ARM64/x64 and Windows ARM64/x64.  
+Intel macOS users should install `llvm@20` manually (for example through Homebrew) because recent official LLVM releases no longer provide Intel macOS archives.
 
 # SC-format.cpp
 

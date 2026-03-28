@@ -31,6 +31,10 @@ jobs:
     timeout-minutes: 40
     steps:
     - uses: actions/checkout@v4
+    - uses: actions/cache@v4
+      with:
+        path: _Build/_PackagesCache
+        key: sc-packages-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: Generate Single File Libs (Javascript)
@@ -46,7 +50,7 @@ jobs:
     - name: Check if Single File Libs are equal
       run: python3 Support/SingleFileLibs/check_if_equal.py _Build/_SingleFileLibraries _Build/_SingleFileLibrariesJS
     - name: install dependencies
-      run: sudo apt-get install -y liburing-dev clang-format-19 libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev graphviz
+      run: sudo apt-get install -y liburing-dev libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev graphviz
     - name: clang-format
       run: ./SC.sh format check
     - name: build documentation

@@ -26,7 +26,9 @@ struct Download
     SmallString<255> shallowClone;
     SmallString<255> packagePlatform;
     SmallString<255> url;
-    SmallString<255> fileMD5;
+    SmallString<255> expectedHash;
+
+    Hashing::Type hashType = Hashing::TypeMD5;
 
     bool createLink = true;
     bool isGitClone = false;
@@ -91,12 +93,23 @@ struct CustomFunctions
     return Result(true);
 }
 
-[[nodiscard]] inline Result checkFileMD5(StringView fileName, StringView wantedMD5)
+[[nodiscard]] inline StringView packageHashName(Hashing::Type hashType)
+{
+    switch (hashType)
+    {
+    case Hashing::TypeMD5: return "md5";
+    case Hashing::TypeSHA1: return "sha1";
+    case Hashing::TypeSHA256: return "sha256";
+    }
+    Assert::unreachable();
+}
+
+[[nodiscard]] inline Result checkFileHash(StringView fileName, Hashing::Type hashType, StringView wantedHash)
 {
     FileDescriptor fd;
     SC_TRY(fd.open(fileName, FileOpen::Read));
     Hashing hashing;
-    SC_TRY(hashing.setType(Hashing::TypeMD5));
+    SC_TRY(hashing.setType(hashType));
     for (;;)
     {
         uint8_t       data[4096];
@@ -111,19 +124,20 @@ struct CustomFunctions
             SC_TRY(fd.close());
             Hashing::Result res;
             SC_TRY(hashing.getHash(res));
-            SmallString<32> result;
+            SmallString<64> result;
             SC_TRY(StringBuilder::create(result).appendHex(res.toBytesSpan(), StringBuilder::AppendHexCase::LowerCase));
-            SC_TRY_MSG(result.view() == wantedMD5, "MD5 doesn't match");
+            SC_TRY_MSG(result.view() == wantedHash, "Package hash doesn't match");
             return Result(true);
         }
     }
 }
 
-[[nodiscard]] inline Result downloadFileMD5(StringView remoteURL, StringView localFile, StringView localFileMD5)
+[[nodiscard]] inline Result downloadFileHash(StringView remoteURL, StringView localFile, Hashing::Type hashType,
+                                             StringView expectedHash)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
-    if (not fs.existsAndIsFile(localFile) or not checkFileMD5(localFile, localFileMD5))
+    if (not fs.existsAndIsFile(localFile) or not checkFileHash(localFile, hashType, expectedHash))
     {
         Process process;
         String  output;
@@ -145,8 +159,76 @@ struct CustomFunctions
         {
             return Result::Error("Cannot find neither curl nor wget");
         }
-        SC_TRY(checkFileMD5(localFile, localFileMD5));
+        SC_TRY(checkFileHash(localFile, hashType, expectedHash));
     }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result readFileIntoString(StringSpan path, String& output)
+{
+    FileDescriptor file;
+    SC_TRY(file.open(path, FileOpen::Read));
+    return file.readUntilEOF(output);
+}
+
+[[nodiscard]] inline Result packageMetadataMatches(const Download& download, const Package& package, bool& matches)
+{
+    matches = false;
+    if (download.isGitClone)
+    {
+        matches = true;
+        return Result(true);
+    }
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsFile(package.packageLocalTxt.view()))
+    {
+        return Result(true);
+    }
+
+    String metadata;
+    SC_TRY(readFileIntoString(package.packageLocalTxt.view(), metadata));
+    StringView metadataView = metadata.view();
+
+    // Old sidecars are MD5-only and should trigger a fresh install.
+    if (metadataView.containsString("SC_PACKAGE_MD5="))
+    {
+        return Result(true);
+    }
+
+    StringView          urlValue;
+    StringView          hashValue;
+    StringViewTokenizer lines(metadataView);
+    while (lines.tokenizeNextLine())
+    {
+        StringView line = lines.component.trimWhiteSpaces();
+        if (line.startsWith("SC_PACKAGE_URL="))
+        {
+            SC_TRY(line.splitAfter("SC_PACKAGE_URL=", urlValue));
+        }
+        else if (line.startsWith("SC_PACKAGE_HASH="))
+        {
+            SC_TRY(line.splitAfter("SC_PACKAGE_HASH=", hashValue));
+        }
+    }
+
+    if (urlValue != download.url.view())
+    {
+        return Result(true);
+    }
+
+    if (download.expectedHash.isEmpty())
+    {
+        matches = hashValue.isEmpty();
+        return Result(true);
+    }
+
+    SmallString<80> expectedMetadataHash;
+    auto            builder = StringBuilder::create(expectedMetadataHash);
+    SC_TRY(builder.append("{}:{}", packageHashName(download.hashType), download.expectedHash.view()));
+    builder.finalize();
+    matches = hashValue == expectedMetadataHash.view();
     return Result(true);
 }
 
@@ -175,6 +257,10 @@ struct CustomFunctions
     SC_TRY_MSG(not download.packageVersion.isEmpty(), "Missing packageVersion");
     SC_TRY_MSG(not download.packagePlatform.isEmpty(), "Missing packagePlatform");
     SC_TRY_MSG(not download.url.isEmpty(), "Missing url");
+    if (not download.isGitClone)
+    {
+        SC_TRY_MSG(not download.expectedHash.isEmpty(), "Missing expectedHash");
+    }
     FileSystem fs;
     package.packageFullName =
         format("{0}-{1}-{2}", download.packageName, download.packageVersion, download.packagePlatform);
@@ -209,19 +295,25 @@ struct CustomFunctions
     // If test failed just try recreating the link
     if (not testSucceeded and download.createLink and fs.existsAndIsFile(package.packageLocalTxt.view()))
     {
-        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
-        if (createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        bool metadataMatchesCurrent = false;
+        SC_TRY(packageMetadataMatches(download, package, metadataMatchesCurrent));
+        if (metadataMatchesCurrent)
         {
-            testSucceeded = functions.testFunction(download, package);
+            SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+            if (createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+            {
+                testSucceeded = functions.testFunction(download, package);
+            }
         }
     }
 
     // If it's still failed let's re-download and extract + link everything
     if (not testSucceeded)
     {
-        if (!download.isGitClone)
+        if (not download.isGitClone)
         {
-            SC_TRY(downloadFileMD5(download.url.view(), package.packageLocalFile.view(), download.fileMD5.view()));
+            SC_TRY(downloadFileHash(download.url.view(), package.packageLocalFile.view(), download.hashType,
+                                    download.expectedHash.view()));
         }
         if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
         {
@@ -311,8 +403,14 @@ struct CustomFunctions
         SC_TRY(functions.testFunction(download, package));
         if (createPackageFile)
         {
-            String packageTxt =
-                format("SC_PACKAGE_URL={0}\nSC_PACKAGE_MD5={1}\n", download.url.view(), download.fileMD5.view());
+            String packageTxt = format("SC_PACKAGE_URL={0}\n", download.url.view());
+            if (not download.expectedHash.isEmpty())
+            {
+                auto builder = StringBuilder::createForAppendingTo(packageTxt);
+                SC_TRY(builder.append("SC_PACKAGE_HASH={}:{}\n", packageHashName(download.hashType),
+                                      download.expectedHash.view()));
+                builder.finalize();
+            }
             SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
         }
     }

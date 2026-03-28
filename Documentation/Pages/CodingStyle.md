@@ -8,7 +8,7 @@
 If you really like to contribute check also [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)!
 
 # Formatting
-All files should be formatted according to the `.clang-format` file using `clang-format` version 15.  
+All files should be formatted according to the `.clang-format` file using `clang-format` version 20.1.8.  
 
 
 Github CI will fail on PR that are not properly formatted.
