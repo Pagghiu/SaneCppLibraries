@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Serialization Text"
+  short_description: "JSON serialization from reflection"
+  default_prompt: "Use $sane-serialization-text to serialize reflected data to JSON or other text formats."

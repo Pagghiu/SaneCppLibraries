@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Testing"
+  short_description: "Help with Sane testing and examples"
+  default_prompt: "Use $sane-testing to help me find the right Sane test files or write a new Sane-style test."

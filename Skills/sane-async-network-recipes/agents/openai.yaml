@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Async Network Recipes"
+  short_description: "Async networking composition recipes"
+  default_prompt: "Use $sane-async-network-recipes to choose the right Sane libraries for a socket, async, stream, or HTTP workflow."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Tools"
+  short_description: "SC.sh and custom tool invocation help"
+  default_prompt: "Use $sane-tools to explain how SC.sh, SC.bat, and custom tools are compiled and invoked."

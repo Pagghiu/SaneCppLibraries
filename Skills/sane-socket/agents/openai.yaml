@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Socket"
+  short_description: "Socket networking and DNS guidance"
+  default_prompt: "Use $sane-socket to choose and apply the right socket primitives for synchronous networking and DNS lookup."

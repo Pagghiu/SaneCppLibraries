@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Containers Reflection"
+  short_description: "Bridge Sane containers into reflection"
+  default_prompt: "Use $sane-containers-reflection to enable SC::Vector and SC::String in reflection and serialization."

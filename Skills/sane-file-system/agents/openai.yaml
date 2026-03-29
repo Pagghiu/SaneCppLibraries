@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane File System"
+  short_description: "Filesystem ops for files and directories"
+  default_prompt: "Use $sane-file-system to copy, delete, and inspect paths with Sane C++."

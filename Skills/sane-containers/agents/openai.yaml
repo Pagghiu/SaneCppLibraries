@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Containers"
+  short_description: "Help with Sane container selection"
+  default_prompt: "Use $sane-containers to help me pick the right Sane container type for this data structure."

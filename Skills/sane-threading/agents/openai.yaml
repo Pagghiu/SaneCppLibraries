@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Threading"
+  short_description: "Help with Sane threading and sync"
+  default_prompt: "Use $sane-threading to help me choose the right Sane synchronization primitive."

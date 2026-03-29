@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Http"
+  short_description: "HTTP server and parser workflows"
+  default_prompt: "Use $sane-http to explain the HTTP parser, async server, file server, and client composition patterns."

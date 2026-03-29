@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Http Client"
+  short_description: "Streaming HTTP client workflows"
+  default_prompt: "Use $sane-http-client to explain how to stream requests and responses with the native HTTP client."

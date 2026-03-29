@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Process"
+  short_description: "Launch processes and chain stdio streams"
+  default_prompt: "Use $sane-process to launch child processes and redirect their input and output."

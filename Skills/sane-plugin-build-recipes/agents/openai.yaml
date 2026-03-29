@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Plugin Build Recipes"
+  short_description: "Recipes for plugin exports and hot reload"
+  default_prompt: "Use $sane-plugin-build-recipes to combine Plugin and SC::Build correctly for host exports on each platform."

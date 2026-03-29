@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Async Streams"
+  short_description: "Async streaming pipelines and backpressure"
+  default_prompt: "Use $sane-async-streams to design readable, writable, and transform stream pipelines with backpressure-aware composition."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane Serial Port"
+  short_description: "Serial port open and configuration flows"
+  default_prompt: "Use $sane-serial-port to configure and open serial ports with Sane C++."
