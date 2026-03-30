@@ -72,6 +72,6 @@ trivially done by just pushing the outputs of the tokenizer into a hierarchical 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 280			| 134		| 414	|
+| Headers   | 284			| 135		| 419	|
 | Sources   | 348			| 78		| 426	|
-| Sum       | 628			| 212		| 840	|
+| Sum       | 632			| 213		| 845	|

@@ -265,6 +265,6 @@ Lastly it's also possible associating to a field an `MemberTag` integer field, t
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 601			| 267		| 868	|
+| Headers   | 605			| 268		| 873	|
 | Sources   | 0			| 0		| 0	|
-| Sum       | 601			| 267		| 868	|
+| Sum       | 605			| 268		| 873	|

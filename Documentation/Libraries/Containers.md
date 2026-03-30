@@ -97,6 +97,6 @@ Some relevant blog posts are:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 955			| 452		| 1407	|
+| Headers   | 959			| 459		| 1418	|
 | Sources   | 0			| 0		| 0	|
-| Sum       | 955			| 452		| 1407	|
+| Sum       | 959			| 459		| 1418	|

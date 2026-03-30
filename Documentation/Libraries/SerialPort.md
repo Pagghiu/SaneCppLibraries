@@ -62,6 +62,6 @@ Example command:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 48			| 40		| 88	|
+| Headers   | 52			| 41		| 93	|
 | Sources   | 591			| 76		| 667	|
-| Sum       | 639			| 116		| 755	|
+| Sum       | 643			| 117		| 760	|

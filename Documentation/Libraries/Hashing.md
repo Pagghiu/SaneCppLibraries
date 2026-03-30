@@ -39,6 +39,6 @@ The library is very simple it it has what is needed so far (mainly by [Build](@r
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 86			| 96		| 182	|
+| Headers   | 90			| 97		| 187	|
 | Sources   | 267			| 51		| 318	|
-| Sum       | 353			| 147		| 500	|
+| Sum       | 357			| 148		| 505	|

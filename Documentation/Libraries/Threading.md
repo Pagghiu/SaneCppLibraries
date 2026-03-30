@@ -79,6 +79,6 @@ This is the list of videos that have been recorded showing some of the internal 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 399			| 248		| 647	|
+| Headers   | 409			| 250		| 659	|
 | Sources   | 906			| 167		| 1073	|
-| Sum       | 1305			| 415		| 1720	|
+| Sum       | 1315			| 417		| 1732	|

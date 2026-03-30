@@ -107,6 +107,6 @@ both styles of usage.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 451			| 325		| 776	|
-| Sources   | 2607			| 490		| 3097	|
-| Sum       | 3058			| 815		| 3873	|
+| Headers   | 886			| 518		| 1404	|
+| Sources   | 4198			| 655		| 4853	|
+| Sum       | 5084			| 1173		| 6257	|

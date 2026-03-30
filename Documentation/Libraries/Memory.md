@@ -91,6 +91,6 @@ For this reason this library is missing Smart Pointers.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 453			| 406		| 859	|
+| Headers   | 457			| 407		| 864	|
 | Sources   | 1057			| 223		| 1280	|
-| Sum       | 1510			| 629		| 2139	|
+| Sum       | 1514			| 630		| 2144	|

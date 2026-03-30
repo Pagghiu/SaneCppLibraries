@@ -143,6 +143,6 @@ any system or compiler header.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 364			| 230		| 594	|
+| Headers   | 368			| 231		| 599	|
 | Sources   | 1477			| 259		| 1736	|
-| Sum       | 1841			| 489		| 2330	|
+| Sum       | 1845			| 490		| 2335	|

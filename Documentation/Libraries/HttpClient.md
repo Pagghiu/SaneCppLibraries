@@ -4,7 +4,7 @@
 
 [TOC]
 
-`SC::HttpClient` is a streaming-first HTTP client built on native OS backends.
+[SaneCppHttpClient.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttpClient.h) is a streaming-first HTTP client built on native OS backends.
 
 # Dependencies
 - Dependencies: [Foundation](@ref library_foundation)
@@ -104,6 +104,6 @@ With the standard Async Streams library, instantiate the adapter as
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 200			| 85		| 285	|
-| Sources   | 1950			| 318		| 2268	|
-| Sum       | 2150			| 403		| 2553	|
+| Headers   | 664			| 229		| 893	|
+| Sources   | 2090			| 335		| 2425	|
+| Sum       | 2754			| 564		| 3318	|

@@ -88,6 +88,6 @@ SC::NamedPipeName::build can be used to compose platform-native endpoint names f
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 144			| 172		| 316	|
-| Sources   | 1087			| 173		| 1260	|
-| Sum       | 1231			| 345		| 1576	|
+| Headers   | 189			| 203		| 392	|
+| Sources   | 1292			| 200		| 1492	|
+| Sum       | 1481			| 403		| 1884	|

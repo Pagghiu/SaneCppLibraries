@@ -48,6 +48,6 @@ So far it doesn't support test discovery and all tests must be manually invoked 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 133			| 102		| 235	|
+| Headers   | 137			| 103		| 240	|
 | Sources   | 295			| 28		| 323	|
-| Sum       | 428			| 130		| 558	|
+| Sum       | 432			| 131		| 563	|

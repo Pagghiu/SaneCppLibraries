@@ -74,6 +74,6 @@ The behavior between these different system also depends on the file system wher
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 126			| 118		| 244	|
-| Sources   | 1305			| 299		| 1604	|
-| Sum       | 1431			| 417		| 1848	|
+| Headers   | 219			| 144		| 363	|
+| Sources   | 1305			| 300		| 1605	|
+| Sum       | 1524			| 444		| 1968	|
