@@ -99,7 +99,7 @@ struct Generator
 {
     enum Type
     {
-        Native,           ///< Build directly by launching compiler and linker processes
+        Native,           ///< Build directly on the host without generating project files first
         XCode,            ///< Generate projects for XCode (Version 14+)
         VisualStudio2022, ///< Generate projects for Visual Studio 2022
         VisualStudio2019, ///< Generate projects for Visual Studio 2019
@@ -152,23 +152,12 @@ struct Toolchain
     Architecture::Type architecture = Architecture::Any;
 };
 
-/// @brief Controls how the standalone backend executes jobs and emits output
+/// @brief Controls how the standalone native backend executes jobs
 struct ExecutionOptions
 {
-    enum OutputPolicy
-    {
-        HybridBufferedLive,
-        AlwaysLive,
-        FullyBuffered,
-    };
-
-    size_t maxParallelJobs         = 0;
-    bool   emitCompileCommands     = true;
-    bool   useResponseFiles        = true;
-    bool   useCompilerDependencies = true;
-    bool   verbose                 = false;
-
-    OutputPolicy outputPolicy = HybridBufferedLive;
+    size_t maxParallelJobs         = 0;     ///< Native backend max parallel compile jobs, 0 means auto-detect
+    bool   useCompilerDependencies = true;  ///< Enables native backend to consume compiler-generated dependencies
+    bool   verbose                 = false; ///< Print native backend commands and incremental-build decisions
 };
 
 /// @brief Optimization level (Debug / Release)
@@ -479,6 +468,8 @@ struct Project
     [[nodiscard]] bool addFile(StringView singleFile);
 
     /// @brief Add a set of flags that apply to some files only
+    /// @note Native and Make backends merge the full compile flags. Generated XCode / Visual Studio backends currently
+    /// emit per-file include paths, defines and backend-specific warning disables only.
     [[nodiscard]] bool addSpecificFileFlags(SourceFiles selection);
 
     /// @brief Adds paths to include paths list
@@ -571,6 +562,8 @@ struct Definition
     /// @brief Generates projects for all workspaces, with specified parameters at given root path.
     /// @param workspaceName Name of the workspace to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
+    /// @note When `parameters.generator == Generator::Native`, this only prepares the directory layout. Direct native
+    /// builds are driven through `Action::Compile`, `Action::Run`, and `Action::Coverage`.
     Result configure(StringView workspaceName, const Parameters& parameters) const;
 
     /// @brief Finds the configuration with given name in given workspace and project

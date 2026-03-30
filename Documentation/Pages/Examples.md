@@ -3,9 +3,12 @@
 
 ## Building
 
-@note All of the examples assume build configure to be already run, as described in [Building Contributor](@ref page_building_contributor):
+@note Generated-backend workflows assume `build configure` has already run, as described in
+[Building Contributor](@ref page_building_contributor):
 - Posix: `./SC.sh build configure`
 - Windows: `SC.bat build configure`
+
+Native `build compile` / `build run` can build examples directly without a prior `configure`.
 
 @note Projects will be generated in `_Build/_Projects`.  
 After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.
@@ -22,12 +25,13 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 |               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
 |               | Windows: None                                                                                                                     |
 |               | macOS: None                                                                                                                       |
-| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during `./SC.sh build configure` or  `SC.bat build configure`               |
+| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during `./SC.sh build configure`, `SC.bat build configure`, or the first native `build compile` / `build run` |
 | Run (Posix)   | `./SC.sh build run SCExample` (will also compile before running)                                                                  |
 | Run (Windows) | `SC.bat build run SCExample`  (will also compile before running)                                                                  |
+| Run (Native)  | `./SC.sh build run SCExample Debug native` or `SC.bat build run SCExample Debug native`                                           |
 | Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
-| Debug (XCode) | Open `_Build/_Projects/SCWorkspace/XCode/SCExample.xcodeproj` and choose `Product` --> `Run`                                      |
-| Debug (VS2022)| Open `_Build/_Projects/SCWorkspace/VisualStudio2022/SCExample.sln` and start Debugging (F5)                                       |
+| Debug (XCode) | Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `SCExample` scheme                               |
+| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5)                                     |
 
 ## AsyncWebServerExample
 
@@ -44,8 +48,8 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 | Run (Windows) | `Examples/AsyncWebServer/BuildAndRun.bat` (will also compile before running)                                                      |
 | Parameters    | All parameters can be added after `BuildAndRun` for example `BuildAndRun.sh --directory /somedir`:                                |
 |               | `--directory /path/to/dir`: Serves the given folder                                                                               |
-| Debug (XCode) | Open `_Build/_Projects/SCWorkspace/XCode/AsyncWebServer.xcodeproj` and choose `Product` --> `Run`                                 |
-| Debug (VS2022)| Open `_Build/_Projects/SCWorkspace/VisualStudio2022/AsyncWebServer.sln` and start Debugging (F5)                                  |
+| Debug (XCode) | Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `AsyncWebServer` scheme                          |
+| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5)                                     |
 
 # Blog
 
@@ -89,4 +93,3 @@ https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad
 <iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" frameborder="0" allowfullscreen>
 </iframe>
 \endhtmlonly
-

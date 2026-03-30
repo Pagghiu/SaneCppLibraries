@@ -117,10 +117,28 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 ## Actions
 
-- `configure`: Configure (generates) the projects into `_Build/_Projects`
-- `compile`: Compiles projects through the selected backend
+- `configure`: Generates repository projects into `_Build/_Projects/<Generator>/<Workspace>`
+- `compile`: Builds one project or an entire workspace through the selected backend
+- `run`: Builds a single executable target if needed and then runs it
+- `coverage`: Builds clang coverage output into `_Build/_Coverage`
 - `documentation`: Builds the documentation into `_Build/_Documentation`
-- `coverage`: Builds the clang source coverage into `_Build/_Coverage`
+
+`SC-build` command shape:
+
+```text
+./SC.sh build configure [workspace:project | project]
+./SC.sh build compile [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
+./SC.sh build run [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
+./SC.sh build coverage [workspace:project | project] [configuration] [generator] [architecture]
+```
+
+Generator keywords are `default`, `native`, `make`, `xcode`, `vs2022`, and `vs2019`.
+
+Current defaults:
+
+- Windows: `default` resolves to `vs2022`
+- macOS / Linux: `default` resolves to `make`
+- Native builds do not require a prior `configure` step
 
 ## Examples
 Configure project, generating them:
@@ -154,6 +172,19 @@ Build through the native backend
 ```
 ./SC.sh build compile SCTest Debug native
 ```
+
+Run a generated-backend executable and pass extra test arguments after `--`
+```
+SC.bat build run SCTest Debug vs2022 -- --test "ThreadingTest"
+```
+
+Open generated projects:
+
+- XCode: `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace`
+- Visual Studio 2022: `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
+- Visual Studio 2019: `_Build/_Projects/VisualStudio2019/SCWorkspace/SCWorkspace.sln`
+- Make (macOS): `_Build/_Projects/Make/SCWorkspace/apple`
+- Make (Linux): `_Build/_Projects/Make/SCWorkspace/linux`
 
 Possible Output:
 ```
@@ -258,8 +289,8 @@ The bootstrap process bringing from the command line to final execution is the f
 
 1. The user invokes a tool like for example: `./SC.sh build compile SCTest Debug`
 2. The first argument to the `SC.sh` is the `${TOOL_NAME}` (in this case `build`)
-3. `SC.sh` checks if `Tools/ToolsBootstrap` executable exists and is up to date with `Tools/ToolsBootstrap.cpp`
-4. If not, it compiles `Tools/ToolsBootstrap.cpp` to create the bootstrap executable
+3. `SC.sh` checks if `Tools/ToolsBootstrap` executable exists and is up to date with `Tools/ToolsBootstrap.c`
+4. If not, it compiles `Tools/ToolsBootstrap.c` to create the bootstrap executable
 5. `SC.sh` invokes `Tools/ToolsBootstrap` with the library directory, tool source directory, build directory, tool name, and any additional arguments
 6. A similar process occurs on Windows with `SC.bat` setting up the MSVC environment and compiling `Tools/ToolsBootstrap.exe` if needed
 7. `ToolsBootstrap` receives 3 predefined arguments:
@@ -267,10 +298,10 @@ The bootstrap process bringing from the command line to final execution is the f
     b. The directory containing Tools `${TOOL_SOURCE_DIR}`
     c. The build products directory `${BUILD_DIR}` containing intermediates and final products
 8. Additional arguments are the tool name and action/parameters
-9. `ToolsBootstrap` checks if the SC-build executable exists and is up to date
-10. If not, `ToolsBootstrap` compiles `Tools/Tools.cpp` and `Tools/SC-build.cpp` (and their dependencies) to create the SC-build executable
-11. `ToolsBootstrap` invokes the SC-build executable with the original action and parameters
-12. The SC-build tool proceeds to configure projects, compile, or perform other actions based on the arguments
+9. `ToolsBootstrap` checks if the selected tool executable exists and is up to date
+10. If not, `ToolsBootstrap` compiles `Tools/Tools.cpp` and the selected tool source (for example `Tools/SC-build.cpp`)
+11. `ToolsBootstrap` invokes the compiled tool with the original action and parameters
+12. The `SC-build` tool then configures projects, compiles, runs, or performs the selected action
 
 
 # Roadmap

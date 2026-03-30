@@ -37,20 +37,23 @@ Arm Machines
 
 - **macOS / Linux**: `./SC.sh build compile SCTest Debug native`
 - **macOS / Linux**: `./SC.sh build run SCBuildTest Debug native`
+- **Windows**: `SC.bat build compile SCTest Debug native`
+- **Windows**: `SC.bat build run SCBuildTest Debug native`
 
-@note The native backend currently supports macOS and Linux with Clang-like, GCC-like, or custom-driver toolchains, plus Windows-native execution.
+@note The native backend currently supports direct host builds on macOS, Linux, and Windows. Windows sysroot selection is
+not implemented yet, and the exact toolchain combinations available still depend on the installed host tools.
 
 ## Visual Studio 2022
-- Open `_Build/_Projects/VisualStudio2022/SCTest.sln` 
+- Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
 - Build the default configuration target (or another one you prefer)
 
 ## XCode
-- Open `_Build/_Projects/XCode/SCTest.xcodeproj/project.xcworkspace` 
+- Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace`
 - Build the default configuration target (or another one you prefer)
 
 ## Makefile
-- Linux: `cd _Build/_Projects/Makefile/linux` 
-- macOS: `cd _Build/_Projects/Makefile/apple`
+- Linux: `cd _Build/_Projects/Make/SCWorkspace/linux`
+- macOS: `cd _Build/_Projects/Make/SCWorkspace/apple`
 - Build Debug: `make -j SCTest`
 - Build Release: `make -j SCTest CONFIG=Release`
 

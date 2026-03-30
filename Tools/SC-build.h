@@ -48,7 +48,7 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
     if (not Path::isAbsolute(directories.projectsDirectory.view(), SC::Path::AsNative) or
         not Path::isAbsolute(arguments.libraryDirectory.view(), SC::Path::AsNative))
     {
-        return Result::Error("Both --target and --sources must be absolute paths");
+        return Result::Error("Both the build output directory and the library directory must be absolute paths");
     }
     return Result(true);
 }
@@ -295,7 +295,8 @@ Result runBuildTool(Tool::Arguments& arguments)
 #endif
     else
     {
-        return Result::Error("SC-format unknown action (supported \"configure\" or \"compile\")");
+        return Result::Error("SC-build unknown action (supported \"configure\", \"compile\", \"run\", \"coverage\", or "
+                             "\"documentation\")");
     }
 }
 

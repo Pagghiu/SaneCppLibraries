@@ -461,6 +461,20 @@ static Result computeArtifactPath(const Build::Action& action, StringView projec
             SC_TRY(artifactName.assign(projectName));
         }
         break;
+    case Build::TargetType::SharedLibrary:
+        if (action.parameters.platform == Build::Platform::Windows)
+        {
+            SC_TRY(StringBuilder::format(artifactName, "{}.dll", projectName));
+        }
+        else if (action.parameters.platform == Build::Platform::Apple)
+        {
+            SC_TRY(StringBuilder::format(artifactName, "{}.dylib", projectName));
+        }
+        else
+        {
+            SC_TRY(StringBuilder::format(artifactName, "{}.so", projectName));
+        }
+        break;
     case Build::TargetType::StaticLibrary:
         if (action.parameters.platform == Build::Platform::Windows)
         {
