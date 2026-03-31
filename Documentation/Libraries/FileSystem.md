@@ -75,6 +75,7 @@ SC::FileSystem::getFileTime and SC::FileSystem::setLastModifiedTime will probabl
 Some relevant blog posts are:
 
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
+- [March 2026 Update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
 
 # Description 
 

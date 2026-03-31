@@ -80,6 +80,12 @@ With the standard Async Streams library, instantiate the adapter as
 `SC::HttpClientAsyncT<SC::AsyncEventLoop, SC::AsyncStreams>` and the adapter memory as
 `SC::HttpClientAsyncOperationMemoryT<SC::AsyncStreams>`.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [March 2026 Update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
+
 # Examples
 
 - Unit tests in `Tests/Libraries/HttpClient` show blocking and async usage patterns
