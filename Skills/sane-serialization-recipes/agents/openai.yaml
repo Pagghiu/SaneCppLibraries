@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Serialization Recipes"
-  short_description: "Choose reflection serialization workflows"
-  default_prompt: "Use $sane-serialization-recipes to choose a binary or text serialization workflow."

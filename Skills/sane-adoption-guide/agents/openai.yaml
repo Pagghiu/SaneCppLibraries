@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Adoption Guide"
-  short_description: "Adopt Sane C++ Libraries in user projects"
-  default_prompt: "Use $sane-adoption-guide to help me integrate Sane C++ Libraries into my project."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Time"
-  short_description: "Help with Sane time types and timing"
-  default_prompt: "Use $sane-time to help me choose the right Sane time type or clock source."

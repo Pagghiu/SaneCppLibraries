@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Reflection"
-  short_description: "Reflect C++ structs for serialization"
-  default_prompt: "Use $sane-reflection to describe a struct so Sane serializers can inspect it."

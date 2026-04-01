@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Serialization Binary"
-  short_description: "Binary serialization from reflection"
-  default_prompt: "Use $sane-serialization-binary to persist reflected data to a binary format."

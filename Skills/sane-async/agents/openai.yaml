@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Async"
-  short_description: "Async event-loop and request workflows"
-  default_prompt: "Use $sane-async to explain how to drive the async event loop, request lifecycle, and wake-up patterns."

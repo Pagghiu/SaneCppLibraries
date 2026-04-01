@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane File"
-  short_description: "File descriptors, pipes, and named pipes"
-  default_prompt: "Use $sane-file to read, write, and pipe bytes with Sane C++."

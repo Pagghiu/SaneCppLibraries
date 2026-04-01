@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane File System Iterator"
-  short_description: "Enumerate files and directories recursively"
-  default_prompt: "Use $sane-file-system-iterator to traverse files and directories with Sane C++."

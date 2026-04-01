@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Build"
-  short_description: "Build-system guidance for Sane C++ users"
-  default_prompt: "Use $sane-build to decide how to adopt SC::Build and the native backend in a Sane C++ project."

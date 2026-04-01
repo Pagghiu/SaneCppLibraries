@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Example Finder"
-  short_description: "Find the best Sane C++ example entrypoints"
-  default_prompt: "Use $sane-example-finder to route me to the best Sane C++ examples and tests for my task."

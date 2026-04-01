@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Hashing"
-  short_description: "Help with Sane hashing workflows"
-  default_prompt: "Use $sane-hashing to help me hash byte data or choose the right Sane hash algorithm."

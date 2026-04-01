@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Plugin"
-  short_description: "Plugin hot-reload guidance for C++ agents"
-  default_prompt: "Use $sane-plugin to explain host exports, plugin loading, and hot-reload setup for a Sane C++ app."

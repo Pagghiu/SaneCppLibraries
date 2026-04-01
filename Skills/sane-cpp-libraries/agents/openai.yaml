@@ -1,0 +1,4 @@
+interface:
+  display_name: "Sane C++ Libraries"
+  short_description: "Unified guide for all Sane C++ Libraries topics"
+  default_prompt: "Use $sane-cpp-libraries to choose the right Sane C++ Libraries guides, examples, tests, and integration patterns for this task."

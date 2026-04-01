@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Core Patterns"
-  short_description: "Help with Sane C++ adoption rules"
-  default_prompt: "Use $sane-core-patterns to adapt code to the global Sane C++ rules and constraints."

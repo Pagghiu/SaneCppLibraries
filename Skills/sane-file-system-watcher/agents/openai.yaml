@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane File System Watcher"
-  short_description: "Watch directories for file changes"
-  default_prompt: "Use $sane-file-system-watcher to react to add, remove, rename, and modify events."

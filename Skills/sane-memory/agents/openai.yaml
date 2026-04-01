@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Memory"
-  short_description: "Help with Sane memory and allocators"
-  default_prompt: "Use $sane-memory to help me choose the right Sane allocation and buffer model."

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Sane Foundation"
-  short_description: "Help with Sane Foundation primitives"
-  default_prompt: "Use $sane-foundation to explain the Sane base primitives I need for this integration."
