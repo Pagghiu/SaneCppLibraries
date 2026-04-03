@@ -2,21 +2,22 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
-#if SC_COMPILER_ENABLE_STD_CPP || SC_LANGUAGE_EXCEPTIONS
+#if SC_COMPILER_ENABLE_STD_CPP || SC_LANGUAGE_EXCEPTIONS ||                                                            \
+    (SC_PLATFORM_WINDOWS && not SC_COMPILER_MSVC and not SC_COMPILER_CLANG_CL)
 #include <memory.h>
 #include <string.h>
 #else
 #if SC_PLATFORM_WINDOWS
 extern "C"
 {
-    void* __cdecl memmove(void* dst, const void* src, size_t n);
-    void* __cdecl memcpy(void* dst, const void* src, size_t n);
-    int __cdecl memcmp(const void* s1, const void* s2, size_t n);
-    void* __cdecl memset(void* dst, SC::int32_t c, size_t len);
-    [[nodiscard]] void const* __cdecl memchr(const void* ptr, SC::int32_t c, size_t count);
+    void* __cdecl memmove(void* dst, const void* src, SC::size_t n);
+    void* __cdecl memcpy(void* dst, const void* src, SC::size_t n);
+    int __cdecl memcmp(const void* s1, const void* s2, SC::size_t n);
+    void* __cdecl memset(void* dst, SC::int32_t c, SC::size_t len);
+    [[nodiscard]] void const* __cdecl memchr(const void* ptr, SC::int32_t c, SC::size_t count);
 
     SC::size_t strlen(const char* s);
-    size_t __cdecl wcslen(wchar_t const*);
+    SC::size_t __cdecl wcslen(wchar_t const*);
 }
 #elif SC_PLATFORM_APPLE
 extern "C"

@@ -21,15 +21,6 @@ using int8_t  = signed char;
 using int16_t = short;
 using int32_t = int;
 using int64_t = long long;
-
-#if SC_PLATFORM_64_BIT
-using size_t  = unsigned __int64;
-using ssize_t = signed __int64;
-#else
-
-using size_t  = unsigned int;
-using ssize_t = long;
-#endif
 #else
 using native_char_t = char; ///< The native char for the platform (wchar_t (4 bytes) on Windows, char (1 byte) everywhere else )
 
@@ -49,14 +40,10 @@ using int64_t = signed long int;          ///< Platform independent (8) bytes si
 #else
 using int64_t = long long;          ///< Platform independent (8) bytes signed int
 #endif
-#if SC_PLATFORM_EMSCRIPTEN
-using size_t  = unsigned __PTRDIFF_TYPE__;
-using ssize_t = signed  __PTRDIFF_TYPE__;
-#else
-using size_t  = unsigned long;      ///< Platform independent unsigned size type
-using ssize_t = signed long;        ///< Platform independent signed size type
 #endif
-#endif
+
+using size_t  = decltype(sizeof(0));                                                  ///< Platform independent unsigned size type
+using ssize_t = decltype(static_cast<char*>(nullptr) - static_cast<char*>(nullptr)); ///< Platform independent signed size type
 
 /// @brief A vocabulary type representing a time interval in milliseconds since epoch
 struct TimeMs
@@ -84,8 +71,8 @@ inline void* operator new(size_t, void* p, SC::PlacementNew) noexcept { return p
 inline void* operator new[](size_t, void* p, SC::PlacementNew) noexcept { return p; }
 inline void  operator delete(void*, void*, SC::PlacementNew) noexcept {}
 #else
-inline void* operator new(SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
-inline void* operator new[](SC::size_t, void* p, SC::PlacementNew) noexcept { return p; }
+inline void* operator new(decltype(sizeof(0)), void* p, SC::PlacementNew) noexcept { return p; }
+inline void* operator new[](decltype(sizeof(0)), void* p, SC::PlacementNew) noexcept { return p; }
 #endif
 namespace SC
 {

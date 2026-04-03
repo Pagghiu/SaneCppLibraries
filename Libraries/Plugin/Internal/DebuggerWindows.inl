@@ -40,9 +40,37 @@ struct SC::Debugger
 #include <RestartManager.h>
 #include <winternl.h>
 
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "ntdll.lib")
 #pragma comment(lib, "Rstrtmgr.lib")
+#endif
 
+#if defined(__MINGW32__)
+typedef SYSTEM_HANDLE_ENTRY SYSTEM_HANDLE, *PSYSTEM_HANDLE;
+
+[[nodiscard]] static constexpr ULONG systemHandleCount(const SYSTEM_HANDLE_INFORMATION& handleInfo)
+{
+    return handleInfo.Count;
+}
+
+[[nodiscard]] static constexpr DWORD systemHandleProcessId(const SYSTEM_HANDLE& handle) { return handle.OwnerPid; }
+
+[[nodiscard]] static constexpr ACCESS_MASK systemHandleGrantedAccess(const SYSTEM_HANDLE& handle)
+{
+    return handle.AccessMask;
+}
+
+[[nodiscard]] static constexpr USHORT systemHandleValue(const SYSTEM_HANDLE& handle) { return handle.HandleValue; }
+
+[[nodiscard]] static constexpr NTSTATUS statusInfoLengthMismatchValue()
+{
+#if defined(STATUS_INFO_LENGTH_MISMATCH)
+    return STATUS_INFO_LENGTH_MISMATCH;
+#else
+    return static_cast<NTSTATUS>(0xC0000004);
+#endif
+}
+#else
 typedef struct _SYSTEM_HANDLE
 {
     ULONG       ProcessId;
@@ -67,7 +95,24 @@ typedef struct _OBJECT_NAME_INFORMATION
 {
     UNICODE_STRING Name;
 } OBJECT_NAME_INFORMATION, *POBJECT_NAME_INFORMATION;
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+
+[[nodiscard]] static constexpr ULONG systemHandleCount(const SYSTEM_HANDLE_INFORMATION& handleInfo)
+{
+    return handleInfo.HandleCount;
+}
+
+[[nodiscard]] static constexpr DWORD systemHandleProcessId(const SYSTEM_HANDLE& handle) { return handle.ProcessId; }
+
+[[nodiscard]] static constexpr ACCESS_MASK systemHandleGrantedAccess(const SYSTEM_HANDLE& handle)
+{
+    return handle.GrantedAccess;
+}
+
+[[nodiscard]] static constexpr USHORT systemHandleValue(const SYSTEM_HANDLE& handle) { return handle.Handle; }
+
+[[nodiscard]] static constexpr NTSTATUS statusInfoLengthMismatchValue() { return STATUS_INFO_LENGTH_MISMATCH; }
+#endif
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(push)
 #pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
 #endif
@@ -127,7 +172,7 @@ struct SC::Debugger::Internal
                 handleInfo = nullptr;
             });
         while (NtQuerySystemInformation(SystemHandleInformation, handleInfo, handleInfoSize, NULL) ==
-               STATUS_INFO_LENGTH_MISMATCH)
+               statusInfoLengthMismatchValue())
         {
             handleInfoSize *= 2;
             void* newMemory = ::realloc(handleInfo, handleInfoSize);
@@ -137,21 +182,26 @@ struct SC::Debugger::Internal
         }
 
         const HANDLE currentProcess = GetCurrentProcess();
-        for (DWORD handleIdx = 0; handleIdx < handleInfo->HandleCount; ++handleIdx)
+        for (DWORD handleIdx = 0; handleIdx < systemHandleCount(*handleInfo); ++handleIdx)
         {
-            HANDLE        dupHandle;
+            HANDLE dupHandle;
+#if defined(__MINGW32__)
+            SYSTEM_HANDLE handle = handleInfo->Handle[handleIdx];
+#else
             SYSTEM_HANDLE handle = handleInfo->Handles[handleIdx];
-            if (handle.ProcessId != processId)
+#endif
+            if (systemHandleProcessId(handle) != processId)
                 continue;
 
             // Skip handles that will block NtDuplicateObject
-            if ((handle.GrantedAccess == 0x00120189) or (handle.GrantedAccess == 0x00100000) or
-                (handle.GrantedAccess == 0x0012019f) or (handle.GrantedAccess == 0x001a019f))
+            if ((systemHandleGrantedAccess(handle) == 0x00120189) or
+                (systemHandleGrantedAccess(handle) == 0x00100000) or
+                (systemHandleGrantedAccess(handle) == 0x0012019f) or (systemHandleGrantedAccess(handle) == 0x001a019f))
             {
                 continue;
             }
-            BOOL res = DuplicateHandle(processHandle, (HANDLE)(ULONG_PTR)handle.Handle, currentProcess, &dupHandle, 0,
-                                       FALSE, DUPLICATE_SAME_ACCESS);
+            BOOL res = DuplicateHandle(processHandle, (HANDLE)(ULONG_PTR)systemHandleValue(handle), currentProcess,
+                                       &dupHandle, 0, FALSE, DUPLICATE_SAME_ACCESS);
             if (res == FALSE)
             {
                 continue;
@@ -166,7 +216,7 @@ struct SC::Debugger::Internal
             // Get the required buffer size
             ULONG    bufferSize = 0;
             NTSTATUS status     = NtQueryObject(dupHandle, ObjectNameInformation, nullptr, 0, &bufferSize);
-            if (status != STATUS_INFO_LENGTH_MISMATCH)
+            if (status != statusInfoLengthMismatchValue())
             {
                 continue;
             }
@@ -209,8 +259,8 @@ struct SC::Debugger::Internal
                 deferDeleteDupHandle.disarm();
                 dupHandle = INVALID_HANDLE_VALUE;
                 HANDLE newHandle;
-                if (DuplicateHandle(processHandle, reinterpret_cast<HANDLE>(handle.Handle), currentProcess, &newHandle,
-                                    0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
+                if (DuplicateHandle(processHandle, reinterpret_cast<HANDLE>(systemHandleValue(handle)), currentProcess,
+                                    &newHandle, 0, FALSE, DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS))
                 {
                     CloseHandle(newHandle);
                     return Result(true);
@@ -220,7 +270,7 @@ struct SC::Debugger::Internal
         return false;
     }
 };
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(pop)
 #endif
 

@@ -80,6 +80,7 @@ static SC::Result fillFileDescriptorWindowsStat(HANDLE fileHandle, SC::FileDescr
 SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
 {
     BOOL res;
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
     __try
     {
         res = ::CloseHandle(handle);
@@ -88,6 +89,9 @@ SC::Result SC::detail::FileDescriptorDefinition::releaseHandle(Handle& handle)
     {
         res = FALSE;
     }
+#else
+    res = ::CloseHandle(handle);
+#endif
     if (res == FALSE)
     {
         return Result::Error("FileDescriptorDefinition::releaseHandle - CloseHandle failed");

@@ -8,7 +8,9 @@ using socklen_t = int;
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "Ws2_32.lib")
+#endif
 
 #include "../../Foundation/Assert.h"
 #include "../../Foundation/Compiler.h"

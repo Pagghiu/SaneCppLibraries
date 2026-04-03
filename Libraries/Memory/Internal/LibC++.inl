@@ -23,13 +23,13 @@ void operator delete[](void* p, size_t) noexcept
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(push)
 #pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
 #endif
 void* operator new(size_t len) { return ::malloc(len); }
 void* operator new[](size_t len) { return ::malloc(len); }
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(pop)
 #endif
 #endif

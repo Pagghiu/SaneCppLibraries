@@ -330,7 +330,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
         {
             PrimitiveStruct objectToSerialize;
             PrimitiveStruct deserializedObject;
-            memset(&deserializedObject, 0, sizeof(deserializedObject));
+            memset(static_cast<void*>(&deserializedObject), 0, sizeof(deserializedObject));
 
             // Serialization
             SmallBuffer<256> buffer;
@@ -348,7 +348,7 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
         {
             TopLevelStruct objectToSerialize;
             TopLevelStruct deserializedObject;
-            memset(&deserializedObject, 0, sizeof(deserializedObject));
+            memset(static_cast<void*>(&deserializedObject), 0, sizeof(deserializedObject));
 
             // Serialization
             SmallBuffer<256> buffer;

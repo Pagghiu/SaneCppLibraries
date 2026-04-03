@@ -5,6 +5,7 @@
 
 #if _WIN32
 #include "../Foundation/Deferred.h"
+#include <errno.h>
 #include <io.h>
 #include <stdio.h>
 #include <wchar.h>

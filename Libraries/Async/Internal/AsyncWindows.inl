@@ -9,7 +9,9 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "Mswsock.lib") // TransmitFile
+#endif
 
 #include <stddef.h> // offsetof
 

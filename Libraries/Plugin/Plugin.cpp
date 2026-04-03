@@ -758,7 +758,6 @@ SC::Result SC::PluginSysroot::findBestSysroot(PluginCompiler::Type compilerType,
 #if SC_PLATFORM_WINDOWS
     // TODO: This is clearly semi-hardcoded, and we could get the installed directory by looking at registry
     StringView baseDirectory = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10");
-    StringView baseInclude   = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");
 
     StringPath windowsSdkVersion;
     StringView searchPath = SC_NATIVE_STR("C:\\Program Files (x86)\\Windows Kits\\10\\include");

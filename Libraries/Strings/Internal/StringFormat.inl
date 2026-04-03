@@ -45,7 +45,7 @@ bool StringFormatterFor<ssize_t>::format(StringFormatOutput& data, const StringS
 }
 #endif
 #else
-#if !SC_PLATFORM_LINUX
+#if !SC_PLATFORM_LINUX && !(SC_PLATFORM_WINDOWS && SC_PLATFORM_64_BIT)
 bool StringFormatterFor<SC::size_t>::format(StringFormatOutput& data, const StringSpan specifier,
                                             const SC::size_t value)
 {

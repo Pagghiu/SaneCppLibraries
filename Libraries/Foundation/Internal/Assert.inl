@@ -5,7 +5,9 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "Dbghelp.lib")
+#endif
 #include <DbgHelp.h> // For stack trace symbol resolution
 #else
 #include <execinfo.h> // backtrace

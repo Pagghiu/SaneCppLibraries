@@ -5,13 +5,15 @@
 #include "../../Memory/Memory.h"
 #include "SortedAllocations.inl"
 
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #define _CRTDBG_MAP_ALLOC
 #ifdef _malloca
 #undef _malloca
 #endif
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma warning(push)
 #pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
+#endif
 #include <crtdbg.h>
 #endif
 #include <stdlib.h>
@@ -113,7 +115,7 @@ void SC::Globals::init(Type type, GlobalSettings settings)
         Internal::DefaultAllocator& defaultAllocator = Internal::getStatic(type).defaultAllocator;
         defaultAllocator.reserveForSortedAllocations(settings.ownershipTrackingBytes);
     }
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
     if (type == Type::Global)
     {
         ::_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -145,6 +147,6 @@ SC::Globals* SC::Globals::pop(Type type)
 }
 
 SC::Globals& SC::Globals::get(Type type) { return *Internal::getStatic(type).current; }
-#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG
+#if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(pop)
 #endif

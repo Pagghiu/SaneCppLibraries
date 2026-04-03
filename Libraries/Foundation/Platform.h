@@ -75,7 +75,13 @@ static constexpr Platform HostPlatform = Platform::Linux;
 
 #endif
 
-#if defined(_WIN64)
+#if defined(__SIZEOF_POINTER__)
+#if __SIZEOF_POINTER__ == 8
+#define SC_PLATFORM_64_BIT 1 ///< True (1) when compiling to a 64 bit platform
+#else
+#define SC_PLATFORM_64_BIT 0 ///< True (1) when compiling to a 64 bit platform
+#endif
+#elif defined(_WIN64)
 #define SC_PLATFORM_64_BIT 1 ///< True (1) when compiling to a 64 bit platform
 #elif defined(_WIN32)
 #define SC_PLATFORM_64_BIT 0 ///< True (1) when compiling to a 64 bit platform

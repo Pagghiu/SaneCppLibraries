@@ -19,6 +19,10 @@ bool SC::Process::isWindowsConsoleSubsystem() { return ::GetStdHandle(STD_OUTPUT
 
 bool SC::Process::isWindowsEmulatedProcess()
 {
+#if defined(__MINGW32__)
+    BOOL wow64Process = FALSE;
+    return ::IsWow64Process(::GetCurrentProcess(), &wow64Process) != FALSE && wow64Process != FALSE;
+#else
     USHORT processMachine = 0;
     USHORT nativeMachine  = 0;
     ::IsWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine);
@@ -37,6 +41,7 @@ bool SC::Process::isWindowsEmulatedProcess()
         }
     }
     return processMachine != nativeMachine;
+#endif
 }
 
 SC::size_t SC::Process::getNumberOfProcessors()
@@ -339,8 +344,12 @@ extern "C"
     NTSYSCALLAPI NTSTATUS NTAPI NtTerminateProcess(_In_opt_ HANDLE ProcessHandle, _In_ NTSTATUS ExitStatus);
 }
 
+#if !defined(NT_SUCCESS)
 #define NT_SUCCESS(Status) (((NTSTATUS)(Status)) >= 0)
+#endif
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
 #pragma comment(lib, "ntdll.lib")
+#endif
 #if SC_COMPILER_MSVC
 #pragma warning(pop)
 #endif

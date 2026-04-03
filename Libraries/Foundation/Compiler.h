@@ -150,10 +150,12 @@ template <int offset, typename T, typename R> T& fieldOffset(R& object) { return
 /// Disables `unused-result` warning (due to ignoring a return value marked as `[[nodiscard]]`)
 #if SC_COMPILER_CLANG
 #define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT                                                                         \
-    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunused-result\"")
+    _Pragma("clang diagnostic push") _Pragma("clang diagnostic ignored \"-Wunused-result\"")                           \
+        _Pragma("clang diagnostic ignored \"-Wunused-value\"")
 #elif SC_COMPILER_GCC
 #define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT                                                                         \
-    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"")
+    _Pragma("GCC diagnostic push") _Pragma("GCC diagnostic ignored \"-Wunused-result\"")                               \
+        _Pragma("GCC diagnostic ignored \"-Wunused-value\"")
 #else
 #define SC_COMPILER_WARNING_PUSH_UNUSED_RESULT _Pragma("warning(push)") _Pragma("warning(disable : 4834 6031)")
 #endif
