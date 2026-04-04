@@ -6,8 +6,8 @@ Use this guide when the task is to persist reflected data efficiently in binary 
 
 ## What To Do
 
-- Start with [Documentation/Libraries/SerializationBinary.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationBinary.md).
-- Inspect [Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp) and [Tests/Libraries/SerializationBinary/SerializationSuiteTest.h](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationBinary/SerializationSuiteTest.h).
+- Start with `Documentation/Libraries/SerializationBinary.md`.
+- Inspect `Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp` and `Tests/Libraries/SerializationBinary/SerializationSuiteTest.h`.
 - Use `SC::SerializationBinary::write` for output.
 - Use `SC::SerializationBinary::loadExact` when the schema is unchanged.
 - Use `SC::SerializationBinary::loadVersioned` when field additions, removals, or moves must remain compatible.

@@ -4,11 +4,11 @@ Use this file to map user requests to the best entrypoints in the repo.
 
 ## Start With These High-Value Paths
 
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/README.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/BuildingUser.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/Examples.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples`
+- `README.md`
+- `Documentation/Pages/BuildingUser.md`
+- `Documentation/Pages/Examples.md`
+- `Tests/Libraries`
+- `Examples`
 
 ## Route By Request
 
@@ -16,71 +16,71 @@ Use this file to map user requests to the best entrypoints in the repo.
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/README.md`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/BuildingUser.md`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/SingleFileLibs.md`
+1. `README.md`
+2. `Documentation/Pages/BuildingUser.md`
+3. `Documentation/Pages/SingleFileLibs.md`
 
 ### "Show me an HTTP server example" or "How do I serve files?"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/AsyncWebServer/AsyncWebServer.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Http/HttpAsyncFileServerTest.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Http.md`
+1. `Examples/AsyncWebServer/AsyncWebServer.cpp`
+2. `Tests/Libraries/Http/HttpAsyncFileServerTest.cpp`
+3. `Documentation/Libraries/Http.md`
 
 ### "Show me an HTTP client example"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/SaneHttpGet/SaneHttpGet.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/HttpClient/HttpClientTest.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/HttpClient.md`
+1. `Examples/SaneHttpGet/SaneHttpGet.cpp`
+2. `Tests/Libraries/HttpClient/HttpClientTest.cpp`
+3. `Documentation/Libraries/HttpClient.md`
 
 ### "Show me async event loop usage"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Async/AsyncTest.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Async/AsyncTestLoop.inl`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Async.md`
-4. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/SCExample/SCExample.cpp`
+1. `Tests/Libraries/Async/AsyncTest.cpp`
+2. `Tests/Libraries/Async/AsyncTestLoop.inl`
+3. `Documentation/Libraries/Async.md`
+4. `Examples/SCExample/SCExample.cpp`
 
 ### "Show me plugin hot reload" or "How does SCExample wire plugins?"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/SCExample/HotReloadSystem.h`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/SCExample/SCExample.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Plugin/PluginTest.cpp`
-4. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Plugin.md`
+1. `Examples/SCExample/HotReloadSystem.h`
+2. `Examples/SCExample/SCExample.cpp`
+3. `Tests/Libraries/Plugin/PluginTest.cpp`
+4. `Documentation/Libraries/Plugin.md`
 
 ### "Show me reflection or serialization examples"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Reflection/ReflectionTest.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationText/SerializationJsonTest.cpp`
-4. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md`
+1. `Tests/Libraries/Reflection/ReflectionTest.cpp`
+2. `Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp`
+3. `Tests/Libraries/SerializationText/SerializationJsonTest.cpp`
+4. `Documentation/Libraries/Reflection.md`
 
 ### "Show me filesystem watching"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/FileSystemWatcher.md`
-4. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Examples/SCExample/HotReloadSystem.h`
+1. `Tests/Libraries/FileSystemWatcher/FileSystemWatcherTest.cpp`
+2. `Tests/Libraries/FileSystemWatcher/FileSystemWatcherAsyncTest.cpp`
+3. `Documentation/Libraries/FileSystemWatcher.md`
+4. `Examples/SCExample/HotReloadSystem.h`
 
 ### "Show me how SC::Build or SC::Tools are used in real code"
 
 Prioritize:
 
-1. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tools/SC-build.cpp`
-2. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tools/SC-package.cpp`
-3. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tools/SC-format.cpp`
-4. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/Build.md`
-5. `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/Tools.md`
+1. `Tools/SC-build.cpp`
+2. `Tools/SC-package.cpp`
+3. `Tools/SC-format.cpp`
+4. `Documentation/Pages/Build.md`
+5. `Documentation/Pages/Tools.md`
 
 ## Curation Rules
 

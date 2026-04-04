@@ -4,10 +4,10 @@ Use this reference when an agent needs human-readable serialization.
 
 ## Read First
 
-- [Documentation/Libraries/SerializationText.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationText.md)
-- [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md)
-- [Tests/Libraries/SerializationText/SerializationJsonTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationText/SerializationJsonTest.cpp)
-- [Tests/Libraries/SerializationText/JsonTokenizerTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationText/JsonTokenizerTest.cpp)
+- `Documentation/Libraries/SerializationText.md`
+- `Documentation/Libraries/Reflection.md`
+- `Tests/Libraries/SerializationText/SerializationJsonTest.cpp`
+- `Tests/Libraries/SerializationText/JsonTokenizerTest.cpp`
 
 ## Main Entry Points
 

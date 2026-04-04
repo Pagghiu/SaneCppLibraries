@@ -6,8 +6,8 @@ Use this guide when the task is to choose the right serialization path or to con
 
 ## What To Do
 
-- Start with [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md).
-- Inspect [Documentation/Libraries/SerializationBinary.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationBinary.md) and [Documentation/Libraries/SerializationText.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationText.md).
+- Start with `Documentation/Libraries/Reflection.md`.
+- Inspect `Documentation/Libraries/SerializationBinary.md` and `Documentation/Libraries/SerializationText.md`.
 - Include `containers-reflection` whenever the model contains Sane containers.
 - Route detailed binary workflows to `serialization-binary` and detailed text workflows to `serialization-text`.
 - Focus on decision making, not on repeating every API detail from the lower-level skills.

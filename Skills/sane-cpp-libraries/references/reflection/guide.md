@@ -6,8 +6,8 @@ Use this guide when a task needs compile-time reflection for a user-defined type
 
 ## What To Do
 
-- Start with [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md).
-- Inspect [Tests/Libraries/Reflection/ReflectionTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Reflection/ReflectionTest.cpp) for supported macros and packed versus unpacked examples.
+- Start with `Documentation/Libraries/Reflection.md`.
+- Inspect `Tests/Libraries/Reflection/ReflectionTest.cpp` for supported macros and packed versus unpacked examples.
 - Prefer `SC_REFLECT_STRUCT_VISIT`, `SC_REFLECT_STRUCT_FIELD`, and `SC_REFLECT_STRUCT_LEAVE` when macro-based reflection is the clearest fit.
 - Treat reflection as a compile-time schema builder, not as runtime RTTI.
 - Keep reflected members limited to supported shapes and avoid pointers or references.

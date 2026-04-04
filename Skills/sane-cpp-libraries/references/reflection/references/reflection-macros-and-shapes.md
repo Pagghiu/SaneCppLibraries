@@ -4,8 +4,8 @@ Use this reference when an agent needs the smallest useful summary of Sane refle
 
 ## Read First
 
-- [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md)
-- [Tests/Libraries/Reflection/ReflectionTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/Reflection/ReflectionTest.cpp)
+- `Documentation/Libraries/Reflection.md`
+- `Tests/Libraries/Reflection/ReflectionTest.cpp`
 
 ## Key Rules
 

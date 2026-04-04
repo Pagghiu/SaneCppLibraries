@@ -4,10 +4,10 @@ Use this reference when an agent needs a compact decision guide for Sane seriali
 
 ## Read First
 
-- [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md)
-- [Documentation/Libraries/SerializationBinary.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationBinary.md)
-- [Documentation/Libraries/SerializationText.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationText.md)
-- [Documentation/Libraries/ContainersReflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/ContainersReflection.md)
+- `Documentation/Libraries/Reflection.md`
+- `Documentation/Libraries/SerializationBinary.md`
+- `Documentation/Libraries/SerializationText.md`
+- `Documentation/Libraries/ContainersReflection.md`
 
 ## Recipe Map
 

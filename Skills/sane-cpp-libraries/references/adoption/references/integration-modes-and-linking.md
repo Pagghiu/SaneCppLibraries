@@ -19,9 +19,9 @@
 
 Source references:
 
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/README.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/BuildingUser.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/SingleFileLibs.md`
+- `README.md`
+- `Documentation/Pages/BuildingUser.md`
+- `Documentation/Pages/SingleFileLibs.md`
 
 Recommended steps:
 
@@ -41,13 +41,13 @@ Generation paths to mention when the user wants current-main artifacts:
 
 Source references:
 
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/README.md`
-- `/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Pages/BuildingUser.md`
+- `README.md`
+- `Documentation/Pages/BuildingUser.md`
 
 Recommended steps:
 
 1. Vendor or clone the repo into the user's project.
-2. Add `/Users/stefano/Developer/Projects/SC-skills/SC-skills/SC.cpp` to the user's build.
+2. Add `SC.cpp` to the user's build.
 3. Include only public headers from `Libraries/<Library>/*.h`.
 4. Do not include `Internal` or `Tests` headers as public dependencies.
 5. Add platform link requirements.

@@ -4,9 +4,9 @@ Use this reference when an agent needs a compact binary persistence path.
 
 ## Read First
 
-- [Documentation/Libraries/SerializationBinary.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/SerializationBinary.md)
-- [Documentation/Libraries/Reflection.md](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Documentation/Libraries/Reflection.md)
-- [Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp](/Users/stefano/Developer/Projects/SC-skills/SC-skills/Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp)
+- `Documentation/Libraries/SerializationBinary.md`
+- `Documentation/Libraries/Reflection.md`
+- `Tests/Libraries/SerializationBinary/SerializationBinaryTest.cpp`
 
 ## Main Entry Points
 
