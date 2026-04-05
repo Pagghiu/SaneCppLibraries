@@ -36,12 +36,15 @@ Arm Machines
 ## Command-line Native Backend
 
 - **macOS / Linux**: `./SC.sh build compile SCTest Debug native`
+- **macOS / Linux**: `./SC.sh build compile SCTest Debug native arm64 verbose`
 - **macOS / Linux**: `./SC.sh build run SCBuildTest Debug native`
 - **Windows**: `SC.bat build compile SCTest Debug native`
 - **Windows**: `SC.bat build run SCBuildTest Debug native`
 
 @note The native backend currently supports direct host builds on macOS, Linux, and Windows. Windows sysroot selection is
 not implemented yet, and the exact toolchain combinations available still depend on the installed host tools.
+@note Native `compile` and `run` commands also accept an optional output mode after the architecture token:
+`quiet`, `normal`, or `verbose`.
 
 ## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`

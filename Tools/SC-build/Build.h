@@ -152,12 +152,37 @@ struct Toolchain
     Architecture::Type architecture = Architecture::Any;
 };
 
+/// @brief Controls how the native backend presents build progress and child process output
+struct OutputMode
+{
+    enum Type
+    {
+        Quiet,
+        Normal,
+        Verbose,
+    };
+
+    /// @brief Get StringView from OutputMode::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case Quiet: return "quiet"_a8;
+        case Normal: return "normal"_a8;
+        case Verbose: return "verbose"_a8;
+        }
+        Assert::unreachable();
+    }
+};
+
 /// @brief Controls how the standalone native backend executes jobs
 struct ExecutionOptions
 {
     size_t maxParallelJobs         = 0;     ///< Native backend max parallel compile jobs, 0 means auto-detect
     bool   useCompilerDependencies = true;  ///< Enables native backend to consume compiler-generated dependencies
-    bool   verbose                 = false; ///< Print native backend commands and incremental-build decisions
+    bool   verbose                 = false; ///< Legacy compatibility alias for outputMode == Verbose
+
+    Parameter<OutputMode::Type> outputMode = OutputMode::Normal;
 };
 
 /// @brief Optimization level (Debug / Release)

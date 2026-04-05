@@ -142,9 +142,9 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
             action.projectName = arguments.arguments[0];
         }
     }
-    StringSpan args[3];
+    StringSpan args[4];
 
-    for (size_t idx = 1; idx < min(size_t(4), arguments.arguments.sizeInElements()); ++idx)
+    for (size_t idx = 1; idx < min(size_t(5), arguments.arguments.sizeInElements()); ++idx)
     {
         auto arg = arguments.arguments[idx];
         if (arg == "--")
@@ -204,6 +204,22 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
     else if (args[2] == "any")
     {
         action.parameters.architecture = Build::Architecture::Any;
+    }
+
+    if (action.parameters.generator == Build::Generator::Native)
+    {
+        if (args[3] == "quiet")
+        {
+            action.parameters.execution.outputMode = Build::OutputMode::Quiet;
+        }
+        else if (args[3] == "normal")
+        {
+            action.parameters.execution.outputMode = Build::OutputMode::Normal;
+        }
+        else if (args[3] == "verbose")
+        {
+            action.parameters.execution.outputMode = Build::OutputMode::Verbose;
+        }
     }
 
     return Build::executeAction(action);

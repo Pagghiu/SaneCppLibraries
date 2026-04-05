@@ -4,12 +4,21 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
+#include "Libraries/Strings/Console.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
 #include "Tools/SC-build/Build.h"
+
+#if SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#else
+#include <fcntl.h>
+#include <unistd.h>
+#endif
 
 namespace SC
 {
@@ -179,6 +188,22 @@ static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, Stri
                                  "printf '%s\\n' \"$*\" >> \"{}\"\n"
                                  "exec \"{}\" \"$@\"\n",
                                  logPath, toolPath));
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
+static Result writeNoisyToolWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                          StringView toolPath, StringView stdOutText, StringView stdErrText)
+{
+    String scriptContents = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(scriptContents,
+                                 "#!/bin/sh\n"
+                                 "printf '%s\\n' \"$*\" >> \"{}\"\n"
+                                 "printf '%s\\n' '{}'\n"
+                                 "printf '%s\\n' '{}' 1>&2\n"
+                                 "exec \"{}\" \"$@\"\n",
+                                 logPath, stdOutText, stdErrText, toolPath));
     SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
@@ -499,6 +524,134 @@ static Result computeArtifactPath(const Build::Action& action, StringView projec
 static Result computeExecutablePath(const Build::Action& action, StringView projectName, String& executablePath)
 {
     return computeArtifactPath(action, projectName, Build::TargetType::ConsoleExecutable, executablePath);
+}
+
+struct CapturedBuildOutput
+{
+    String stdOut = StringEncoding::Utf8;
+    String stdErr = StringEncoding::Utf8;
+};
+
+static Result normalizeConsoleOutput(String& output)
+{
+#if SC_PLATFORM_WINDOWS
+    String normalized = StringEncoding::Utf8;
+    auto   builder    = StringBuilder::create(normalized);
+    SC_TRY(builder.appendReplaceAll(output.view(), "\r\n", "\n"));
+    builder.finalize();
+    output = move(normalized);
+#else
+    SC_COMPILER_UNUSED(output);
+#endif
+    return Result(true);
+}
+
+static Result captureBuildActionOutput(const Build::Action& action, Build::Action::ConfigureFunction configure,
+                                       StringView defaultWorkspaceName, Result& buildResult,
+                                       CapturedBuildOutput& capturedOutput)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String captureDirectory = StringEncoding::Utf8;
+    String stdoutPath       = StringEncoding::Utf8;
+    String stderrPath       = StringEncoding::Utf8;
+    SC_TRY(Path::join(captureDirectory, {action.parameters.directories.intermediatesDirectory.view(), "_Captured"}));
+    SC_TRY(fs.makeDirectoryRecursive(captureDirectory.view()));
+    SC_TRY(Path::join(stdoutPath, {captureDirectory.view(), "stdout.txt"}));
+    SC_TRY(Path::join(stderrPath, {captureDirectory.view(), "stderr.txt"}));
+    SC_TRY(fs.writeString(stdoutPath.view(), ""));
+    SC_TRY(fs.writeString(stderrPath.view(), ""));
+
+    Console        redirectedConsole;
+    Console* const previousConsole = globalConsole;
+    globalConsole                  = &redirectedConsole;
+
+#if SC_PLATFORM_WINDOWS
+    HANDLE oldStdOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
+    HANDLE oldStdErr = ::GetStdHandle(STD_ERROR_HANDLE);
+
+    FileDescriptor stdoutFile;
+    FileDescriptor stderrFile;
+    SC_TRY(stdoutFile.open(stdoutPath.view(), FileOpen::WriteRead));
+    SC_TRY(stderrFile.open(stderrPath.view(), FileOpen::WriteRead));
+
+    void* stdoutHandle = nullptr;
+    void* stderrHandle = nullptr;
+    SC_TRY(stdoutFile.get(stdoutHandle, Result::Error("Captured stdout handle is invalid")));
+    SC_TRY(stderrFile.get(stderrHandle, Result::Error("Captured stderr handle is invalid")));
+    SC_TRY_MSG(::SetStdHandle(STD_OUTPUT_HANDLE, stdoutHandle) == TRUE, "SetStdHandle(stdout) failed");
+    SC_TRY_MSG(::SetStdHandle(STD_ERROR_HANDLE, stderrHandle) == TRUE, "SetStdHandle(stderr) failed");
+
+    Console windowsRedirectedConsole;
+    globalConsole = &windowsRedirectedConsole;
+    buildResult   = Build::Action::execute(action, configure, defaultWorkspaceName);
+    globalConsole->flush();
+    globalConsole->flushStdErr();
+
+    globalConsole = previousConsole;
+    SC_TRY_MSG(::SetStdHandle(STD_OUTPUT_HANDLE, oldStdOut) == TRUE, "Restore stdout handle failed");
+    SC_TRY_MSG(::SetStdHandle(STD_ERROR_HANDLE, oldStdErr) == TRUE, "Restore stderr handle failed");
+
+    SC_TRY(stdoutFile.seek(FileDescriptor::SeekStart, 0));
+    SC_TRY(stderrFile.seek(FileDescriptor::SeekStart, 0));
+    SC_TRY(stdoutFile.readUntilEOF(capturedOutput.stdOut));
+    SC_TRY(stderrFile.readUntilEOF(capturedOutput.stdErr));
+#else
+    const int oldStdOut = ::dup(STDOUT_FILENO);
+    SC_TRY_MSG(oldStdOut != -1, "dup(stdout) failed");
+    const int oldStdErr = ::dup(STDERR_FILENO);
+    if (oldStdErr == -1)
+    {
+        (void)::close(oldStdOut);
+        return Result::Error("dup(stderr) failed");
+    }
+
+    const int stdoutDescriptor = ::open(stdoutPath.view().getNullTerminatedNative(), O_CREAT | O_TRUNC | O_RDWR, 0600);
+    if (stdoutDescriptor == -1)
+    {
+        (void)::close(oldStdOut);
+        (void)::close(oldStdErr);
+        return Result::Error("open(stdout capture) failed");
+    }
+    const int stderrDescriptor = ::open(stderrPath.view().getNullTerminatedNative(), O_CREAT | O_TRUNC | O_RDWR, 0600);
+    if (stderrDescriptor == -1)
+    {
+        (void)::close(stdoutDescriptor);
+        (void)::close(oldStdOut);
+        (void)::close(oldStdErr);
+        return Result::Error("open(stderr capture) failed");
+    }
+
+    if (::dup2(stdoutDescriptor, STDOUT_FILENO) == -1 or ::dup2(stderrDescriptor, STDERR_FILENO) == -1)
+    {
+        (void)::close(stdoutDescriptor);
+        (void)::close(stderrDescriptor);
+        (void)::close(oldStdOut);
+        (void)::close(oldStdErr);
+        return Result::Error("dup2 capture redirect failed");
+    }
+    (void)::close(stdoutDescriptor);
+    (void)::close(stderrDescriptor);
+
+    buildResult = Build::Action::execute(action, configure, defaultWorkspaceName);
+    globalConsole->flush();
+    globalConsole->flushStdErr();
+
+    globalConsole           = previousConsole;
+    const int restoreStdOut = ::dup2(oldStdOut, STDOUT_FILENO);
+    const int restoreStdErr = ::dup2(oldStdErr, STDERR_FILENO);
+    (void)::close(oldStdOut);
+    (void)::close(oldStdErr);
+    SC_TRY_MSG(restoreStdOut != -1 and restoreStdErr != -1, "dup2 restore failed");
+
+    SC_TRY(fs.read(stdoutPath.view(), capturedOutput.stdOut));
+    SC_TRY(fs.read(stderrPath.view(), capturedOutput.stdErr));
+#endif
+
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdOut));
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdErr));
+    return Result(true);
 }
 
 #if SC_PLATFORM_WINDOWS
@@ -974,6 +1127,42 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(not fs.existsAndIsFile(executablePath.view()));
         }
 
+        if (test_section("native backend groups quiet mode failures"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "QuietFailureFixture"}));
+            SC_TRUST_RESULT(writeSourceFixture(fs, sourceRoot.view(),
+                                               "#include <stdio.h>\n"
+                                               "int main()\n"
+                                               "{\n"
+                                               "    this_will_not_compile(\n"
+                                               "}\n"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            Build::Action action                   = makeNativeCompileAction(directories, CompileFailureProjectName);
+            action.parameters.execution.outputMode = Build::OutputMode::Quiet;
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureCompileFailureProgram, FixtureWorkspaceName,
+                                                     buildResult, capturedOutput));
+            SC_TEST_EXPECT(not buildResult);
+            const StringView quietStdOut = capturedOutput.stdOut.view();
+            SC_TEST_EXPECT(quietStdOut.isEmpty() or quietStdOut.bytesWithoutTerminator()[0] != '[');
+            SC_TEST_EXPECT(not StringView(quietStdOut).containsString("\n[1/"));
+            SC_TEST_EXPECT(StringView(quietStdOut).containsString("FAILED:"));
+            SC_TEST_EXPECT(StringView(quietStdOut).containsString("Build Summary:"));
+        }
+
         if (test_section("native backend reports link failures"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
@@ -1122,6 +1311,187 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(runBuiltProgram(programTwoExecutable.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == "program-two\n");
         }
+
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+        if (test_section("native backend suppresses successful compile noise in normal mode"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot    = StringEncoding::Utf8;
+            String toolchainRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "NormalOutputModeFixture"}));
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(writeSourceFixture(fs, sourceRoot.view(),
+                                               "#include <stdio.h>\n"
+                                               "int main()\n"
+                                               "{\n"
+                                               "    puts(\"normal-output-mode\");\n"
+                                               "    return 0;\n"
+                                               "}\n"));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            String hostCompilerC   = StringEncoding::Utf8;
+            String hostCompilerCpp = StringEncoding::Utf8;
+            String hostArchiver    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
+            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
+            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
+
+            String compilerLogPath = StringEncoding::Utf8;
+            String compilerWrapper = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
+            SC_TRUST_RESULT(writeNoisyToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(),
+                                                        hostCompilerCpp.view(), "noisy compiler stdout",
+                                                        "noisy compiler stderr"));
+
+            Build::Action action                   = makeNativeCompileAction(directories, HeaderFixtureProjectName);
+            action.parameters.toolchain.family     = Build::Toolchain::CustomDriver;
+            action.parameters.execution.outputMode = Build::OutputMode::Normal;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
+                                                     buildResult, capturedOutput));
+            SC_TEST_EXPECT(buildResult);
+            SC_TEST_EXPECT(not StringView(capturedOutput.stdOut.view()).containsString("noisy compiler stdout"));
+            SC_TEST_EXPECT(not StringView(capturedOutput.stdErr.view()).containsString("noisy compiler stderr"));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("Build Summary:"));
+        }
+
+        if (test_section("native backend prints successful compile noise in verbose mode"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot    = StringEncoding::Utf8;
+            String toolchainRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "VerboseOutputModeFixture"}));
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {sourceRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(writeSourceFixture(fs, sourceRoot.view(),
+                                               "#include <stdio.h>\n"
+                                               "int main()\n"
+                                               "{\n"
+                                               "    puts(\"verbose-output-mode\");\n"
+                                               "    return 0;\n"
+                                               "}\n"));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            String hostCompilerC   = StringEncoding::Utf8;
+            String hostCompilerCpp = StringEncoding::Utf8;
+            String hostArchiver    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
+            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
+            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
+
+            String compilerLogPath = StringEncoding::Utf8;
+            String compilerWrapper = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
+            SC_TRUST_RESULT(writeNoisyToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(),
+                                                        hostCompilerCpp.view(), "noisy compiler stdout",
+                                                        "noisy compiler stderr"));
+
+            Build::Action action                   = makeNativeCompileAction(directories, HeaderFixtureProjectName);
+            action.parameters.toolchain.family     = Build::Toolchain::CustomDriver;
+            action.parameters.execution.outputMode = Build::OutputMode::Verbose;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
+                                                     buildResult, capturedOutput));
+            SC_TEST_EXPECT(buildResult);
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("OUTPUT:"));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("noisy compiler stdout"));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdErr.view()).containsString("noisy compiler stderr"));
+        }
+
+        if (test_section("native backend fail-fast skips later workspace targets"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String programOneRoot = StringEncoding::Utf8;
+            String programTwoRoot = StringEncoding::Utf8;
+            String toolchainRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(programOneRoot, {buildRoot.view(), "ProgramOne"}));
+            SC_TRUST_RESULT(Path::join(programTwoRoot, {buildRoot.view(), "ProgramTwo"}));
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(writeSourceFixture(fs, programOneRoot.view(),
+                                               "#include <stdio.h>\n"
+                                               "int main()\n"
+                                               "{\n"
+                                               "    this_will_not_compile(\n"
+                                               "}\n"));
+            SC_TRUST_RESULT(writeIndependentProgramFixture(fs, programTwoRoot.view(), "program-two"));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(buildRoot.view()));
+
+            String hostCompilerC   = StringEncoding::Utf8;
+            String hostCompilerCpp = StringEncoding::Utf8;
+            String hostArchiver    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(resolveHostToolPath("clang", hostCompilerC));
+            SC_TRUST_RESULT(resolveHostToolPath("clang++", hostCompilerCpp));
+            SC_TRUST_RESULT(resolveHostToolPath("ar", hostArchiver));
+
+            String compilerLogPath = StringEncoding::Utf8;
+            String compilerWrapper = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
+            SC_TRUST_RESULT(
+                writeToolWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view(), hostCompilerCpp.view()));
+
+            Build::Action action                        = makeNativeCompileAction(directories, {});
+            action.parameters.execution.maxParallelJobs = 1;
+            action.parameters.execution.outputMode      = Build::OutputMode::Quiet;
+            action.parameters.toolchain.family          = Build::Toolchain::CustomDriver;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(hostCompilerCpp.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(hostArchiver.view()));
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureIndependentWorkspacePrograms,
+                                                     FixtureWorkspaceName, buildResult, capturedOutput));
+            SC_TEST_EXPECT(not buildResult);
+            const StringView quietStdOut = capturedOutput.stdOut.view();
+            SC_TEST_EXPECT(quietStdOut.isEmpty() or quietStdOut.bytesWithoutTerminator()[0] != '[');
+            SC_TEST_EXPECT(not StringView(quietStdOut).containsString("\n[1/"));
+            SC_TEST_EXPECT(StringView(quietStdOut).containsString("FAILED:"));
+
+            String compilerLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("ProgramOne/./main.cpp"));
+            SC_TEST_EXPECT(not StringView(compilerLog.view()).containsString("ProgramTwo/./main.cpp"));
+        }
+#endif
 
 #if SC_PLATFORM_WINDOWS
         if (test_section("native backend routes clang-cl toolchains"))

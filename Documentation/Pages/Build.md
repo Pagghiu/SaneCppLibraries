@@ -39,8 +39,8 @@ The repository tool surface is the `SC-build` tool described in [Tools](@ref pag
 
 ```text
 ./SC.sh build configure [workspace:project | project]
-./SC.sh build compile [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
-./SC.sh build run [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
+./SC.sh build compile [workspace:project | project] [configuration] [generator] [architecture] [output-mode] [-- extra args...]
+./SC.sh build run [workspace:project | project] [configuration] [generator] [architecture] [output-mode] [-- extra args...]
 ./SC.sh build coverage [workspace:project | project] [configuration] [generator] [architecture]
 ```
 
@@ -68,6 +68,7 @@ Current CLI behavior:
 - If no configuration is specified, `Debug` is used
 - Host-default generator selection is `vs2022` on Windows and `make` on macOS / Linux
 - `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
+- Native `compile` / `run` commands accept an optional `output-mode` token after `architecture`: `quiet`, `normal`, or `verbose`
 
 This is the repository `Tools/SC-build.cpp` file used to configure the default workspace:
 \include Tools/SC-build.cpp
@@ -81,6 +82,7 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `Generator::{Native, XCode, VisualStudio2022, VisualStudio2019, Make}`
 - `Toolchain::{HostDefault, Clang, GCC, MSVC, ClangCL, ZigCC, CustomDriver}`
 - `ExecutionOptions` for native-backend parallelism / verbosity knobs
+- `OutputMode::{Quiet, Normal, Verbose}` and `ExecutionOptions::outputMode` for native-backend presentation control
 - `Project::addSpecificFileFlags` for per-file flag groups
 - `Project::addExportLibraries`, `addExportAllLibraries`, and `addExportDirectories` for plugin host exports
 
@@ -106,12 +108,14 @@ Current implemented scope:
 - Incrementality: skips up-to-date compile and link steps
 - Workspace dependency ordering: native executable targets can link workspace-local static libraries by name
 - Parallelism: compile fan-out is controlled by `ExecutionOptions::maxParallelJobs`
+- Output modes: `quiet` hides progress lines and successful child output, `normal` shows progress plus grouped failures and summaries, and `verbose` also shows rebuild traces, skip lines, and successful compile output
 - Output layout: `_Build/_Outputs`, `_Build/_Intermediates`, and `_Build/_BuildCache`
 
 Typical native commands:
 
 ```bash
 ./SC.sh build compile SCBuildTest Debug native
+./SC.sh build compile SCBuildTest Debug native arm64 verbose
 ./SC.sh build run SCBuildTest Debug native -- --test "BuildTest"
 SC.bat build compile SCTest Debug native
 ```

@@ -7,6 +7,9 @@
 #include "../../Libraries/FileSystem/FileSystem.h"
 #include "../../Libraries/Strings/Path.h"
 #include "../../Libraries/Strings/StringBuilder.h"
+#include "../../Libraries/Time/Time.h"
+
+#include "BuildNativeOutput.inl"
 
 struct SC::Build::NativeBuild
 {
@@ -151,15 +154,13 @@ struct SC::Build::NativeBuild
             const ResolvedProject* project        = nullptr;
             ResolvedSource*        source         = nullptr;
             bool*                  anyObjectBuilt = nullptr;
-            String                 commandString;
+            NativeJobRecord        job;
             String                 stdOutPath = StringEncoding::Utf8;
             String                 stdErrPath = StringEncoding::Utf8;
             PipeDescriptor         stdOutPipe;
             PipeDescriptor         stdErrPipe;
             AsyncFileRead          asyncStdOut;
             AsyncFileRead          asyncStdErr;
-            String                 stdOut          = StringEncoding::Utf8;
-            String                 stdErr          = StringEncoding::Utf8;
             int                    exitStatus      = -1;
             bool                   processFinished = false;
             bool                   stdOutFinished  = false;
@@ -171,12 +172,14 @@ struct SC::Build::NativeBuild
         AsyncEventLoop                  eventLoop;
         Result                          processResult = Result(true);
         FileSystem*                     fileSystem    = nullptr;
+        NativeBuildReporter*            reporter      = nullptr;
         IntrusiveDoubleLinkedList<Slot> availableSlots;
         Slot                            slots[MaxParallelCompileJobs];
 
-        Result create(FileSystem& fs, size_t maxProcesses)
+        Result create(FileSystem& fs, NativeBuildReporter& buildReporter, size_t maxProcesses)
         {
             fileSystem    = &fs;
+            reporter      = &buildReporter;
             processResult = Result(true);
             if (maxProcesses == 0)
             {
@@ -232,56 +235,19 @@ struct SC::Build::NativeBuild
             Result slotResult = Result(true);
             if (slot.project->adapter.isMSVCStyle())
             {
-                slotResult = readFileIntoString(slot.stdOutPath.view(), slot.stdOut);
+                slotResult = readFileIntoString(slot.stdOutPath.view(), slot.job.stdOut);
                 if (slotResult)
                 {
-                    slotResult = readFileIntoString(slot.stdErrPath.view(), slot.stdErr);
+                    slotResult = readFileIntoString(slot.stdErrPath.view(), slot.job.stdErr);
                 }
-            }
-            if (slot.project->parameters->execution.useCompilerDependencies and slot.project->adapter.isMSVCStyle())
-            {
-                slotResult =
-                    writeWindowsDependencyFile(*fileSystem, *slot.project, *slot.source, slot.stdOut, slot.stdErr);
-            }
-
-            if (slotResult)
-            {
-                if (slot.exitStatus != 0)
-                {
-                    if (not slot.stdOut.isEmpty())
-                    {
-                        globalConsole->print(slot.stdOut.view());
-                    }
-                    if (not slot.stdErr.isEmpty())
-                    {
-                        globalConsole->printError(slot.stdErr.view());
-                        globalConsole->flushStdErr();
-                    }
-                    slotResult = Result::Error("Native backend command failed");
-                }
-                else
-                {
-                    if (slot.project->parameters->execution.verbose and not slot.stdOut.isEmpty())
-                    {
-                        globalConsole->print(slot.stdOut.view());
-                    }
-                    if (not slot.stdErr.isEmpty())
-                    {
-                        globalConsole->printError(slot.stdErr.view());
-                        globalConsole->flushStdErr();
-                    }
-                }
-            }
-
-            if (slotResult)
-            {
-                slotResult = fileSystem->writeString(slot.source->commandPath.view(), slot.commandString.view());
             }
             if (slotResult)
             {
-                *slot.anyObjectBuilt = true;
+                slot.job.exitStatus = slot.exitStatus;
+                slotResult = finalizeCompileJob(*fileSystem, *slot.project, *slot.source, slot.job.command.view(),
+                                                *slot.anyObjectBuilt, slot.job, *reporter);
             }
-            else if (processResult)
+            if (not slotResult and processResult)
             {
                 processResult = slotResult;
             }
@@ -296,11 +262,9 @@ struct SC::Build::NativeBuild
             {
                 SC_TRY(fileSystem->removeFileIfExists(slot.stdErrPath.view()));
             }
-            SC_TRY(slot.commandString.assign({}));
             SC_TRY(slot.stdOutPath.assign({}));
             SC_TRY(slot.stdErrPath.assign({}));
-            SC_TRY(slot.stdOut.assign({}));
-            SC_TRY(slot.stdErr.assign({}));
+            SC_TRY(slot.job.clear());
             slot.project         = nullptr;
             slot.source          = nullptr;
             slot.anyObjectBuilt  = nullptr;
@@ -313,8 +277,9 @@ struct SC::Build::NativeBuild
         }
 
         Result launch(size_t compileStep, size_t totalSteps, const ResolvedProject& project, ResolvedSource& source,
-                      CommandLine& commandLine, String& commandString, bool& anyObjectBuilt)
+                      CommandLine& commandLine, String& commandString, bool& anyObjectBuilt, bool& launched)
         {
+            launched = false;
             while (availableSlots.isEmpty())
             {
                 SC_TRY(eventLoop.runOnce());
@@ -323,23 +288,30 @@ struct SC::Build::NativeBuild
             {
                 return processResult;
             }
+            if (reporter->shouldStopScheduling())
+            {
+                return Result(true);
+            }
 
             Slot& slot          = *availableSlots.dequeueFront();
             slot.project        = &project;
             slot.source         = &source;
             slot.anyObjectBuilt = &anyObjectBuilt;
-            SC_TRY(slot.commandString.assign(commandString.view()));
-            SC_TRY(slot.stdOut.assign({}));
-            SC_TRY(slot.stdErr.assign({}));
+            SC_TRY(slot.job.clear());
+            slot.job.step       = compileStep;
+            slot.job.totalSteps = totalSteps;
+            slot.job.kind       = NativeJobKind::Compile;
+            slot.job.status     = NativeJobStatus::Succeeded;
+            SC_TRY(slot.job.stepName.assign(getCompileStepName(source.type)));
+            SC_TRY(slot.job.label.assign(source.displayPath.view()));
+            SC_TRY(slot.job.command.assign(commandString.view()));
             slot.exitStatus      = -1;
             slot.processFinished = false;
             slot.stdOutFinished  = false;
             slot.stdErrFinished  = false;
 
             SC_TRY(makeParentDirectory(*fileSystem, source.objectPath.view()));
-            globalConsole->print("[{}/{}] {} {}\n", compileStep, totalSteps, getCompileStepName(source.type),
-                                 source.displayPath.view());
-            globalConsole->flush();
+            SC_TRY(reporter->printStepStarted(slot.job));
 
             SC_TRY(maybeWriteResponseFile(*fileSystem, commandLine, source.responsePath.view(), project.adapter));
 
@@ -384,7 +356,7 @@ struct SC::Build::NativeBuild
                     Result     callbackResult = readResult.get(data);
                     if (callbackResult and not readResult.completionData.endOfFile)
                     {
-                        callbackResult = appendChunk(slot.stdOut, data);
+                        callbackResult = appendChunk(slot.job.stdOut, data);
                         if (callbackResult)
                         {
                             readResult.reactivateRequest(true);
@@ -408,7 +380,7 @@ struct SC::Build::NativeBuild
                     Result     callbackResult = readResult.get(data);
                     if (callbackResult and not readResult.completionData.endOfFile)
                     {
-                        callbackResult = appendChunk(slot.stdErr, data);
+                        callbackResult = appendChunk(slot.job.stdErr, data);
                         if (callbackResult)
                         {
                             readResult.reactivateRequest(true);
@@ -446,6 +418,7 @@ struct SC::Build::NativeBuild
                 slot.processFinished = true;
                 (void)finishSlotIfDone(slot);
             };
+            launched = true;
             return Result(true);
         }
     };
@@ -544,13 +517,15 @@ struct SC::Build::NativeBuild
     }
 
     static Result buildProjectCompilePhase(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt,
-                                           const ProjectProgress& progress, size_t maxParallelJobsOverride = 0)
+                                           const ProjectProgress& progress, NativeBuildReporter& reporter,
+                                           bool& compilePhaseCompleted, size_t maxParallelJobsOverride = 0)
     {
-        if (resolvedProject.parameters->execution.verbose)
+        if (reporter.isVerbose())
         {
             printProjectTrace(resolvedProject);
         }
-        return buildCompileSteps(fs, resolvedProject, anyObjectBuilt, progress, maxParallelJobsOverride);
+        return buildCompileSteps(fs, resolvedProject, anyObjectBuilt, progress, reporter, compilePhaseCompleted,
+                                 maxParallelJobsOverride);
     }
 
     static bool shouldStripLinkedArtifact(const ResolvedProject& resolvedProject)
@@ -652,10 +627,12 @@ struct SC::Build::NativeBuild
             }
             SC_TRY(nmCommand.append(source.objectPath.view()));
 
-            String stdOut = StringEncoding::Utf8;
-            String stdErr = StringEncoding::Utf8;
-            SC_TRY(executeCommand(fs, nmCommand, StringView(), resolvedProject.adapter, stdOut, stdErr));
-            SC_TRY(appendUniqueSymbolLines(stdOut.view(), symbols));
+            NativeJobRecord nmJob;
+            SC_TRY(initializeJobRecord(0, 0, NativeJobKind::Link, "NM"_a8, source.displayPath.view(), StringView(),
+                                       StringView(), nmJob));
+            SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, nmJob));
+            SC_TRY_MSG(nmJob.status == NativeJobStatus::Succeeded, "Native backend command failed");
+            SC_TRY(appendUniqueSymbolLines(nmJob.stdOut.view(), symbols));
         }
 
         Algorithms::bubbleSort(symbols.begin(), symbols.end(), [](const String& left, const String& right)
@@ -716,9 +693,75 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result buildProjectFinalPhase(FileSystem& fs, ResolvedProject& resolvedProject, bool anyObjectBuilt,
-                                         const ProjectProgress& progress)
+    static Result initializeJobRecord(size_t step, size_t totalSteps, NativeJobKind::Type kind, StringView stepName,
+                                      StringView label, StringView command, StringView rebuildReason,
+                                      NativeJobRecord& job)
     {
+        SC_TRY(job.clear());
+        job.step       = step;
+        job.totalSteps = totalSteps;
+        job.kind       = kind;
+        job.status     = NativeJobStatus::Succeeded;
+        SC_TRY(job.stepName.assign(stepName));
+        SC_TRY(job.label.assign(label));
+        SC_TRY(job.command.assign(command));
+        SC_TRY(job.rebuildReason.assign(rebuildReason));
+        return Result(true);
+    }
+
+    static Result runCapturedCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
+                                     const CompilerAdapter& adapter, NativeJobRecord& job)
+    {
+        SC_TRY(maybeWriteResponseFile(fs, commandLine, responsePath, adapter));
+
+        StringSpan             views[128];
+        Span<const StringSpan> args;
+        SC_TRY(commandLine.toViews(views, args));
+
+        Process process;
+        SC_TRY(process.exec(args, job.stdOut, Process::StdIn(), job.stdErr));
+        job.exitStatus = process.getExitStatus();
+        job.status     = job.exitStatus == 0 ? NativeJobStatus::Succeeded : NativeJobStatus::Failed;
+        return Result(true);
+    }
+
+    static Result finalizeCompileJob(FileSystem& fs, const ResolvedProject& resolvedProject,
+                                     const ResolvedSource& source, StringView commandString, bool& anyObjectBuilt,
+                                     NativeJobRecord& job, NativeBuildReporter& reporter)
+    {
+        if (resolvedProject.parameters->execution.useCompilerDependencies and resolvedProject.adapter.isMSVCStyle())
+        {
+            SC_TRY(writeWindowsDependencyFile(fs, resolvedProject, source, job.stdOut, job.stdErr));
+        }
+
+        if (job.status == NativeJobStatus::Succeeded)
+        {
+            SC_TRY(fs.writeString(source.commandPath.view(), commandString));
+            anyObjectBuilt = true;
+        }
+        return reporter.recordCompleted(job);
+    }
+
+    static size_t countPendingProjectSteps(const ResolvedProject& resolvedProject, size_t nextSourceIndex,
+                                           bool includeFinalStep = true)
+    {
+        size_t count = 0;
+        if (nextSourceIndex < resolvedProject.sources.size())
+        {
+            count += resolvedProject.sources.size() - nextSourceIndex;
+        }
+        if (includeFinalStep)
+        {
+            count += 1;
+        }
+        return count;
+    }
+
+    static Result buildProjectFinalPhase(FileSystem& fs, ResolvedProject& resolvedProject, bool anyObjectBuilt,
+                                         const ProjectProgress& progress, NativeBuildReporter& reporter,
+                                         bool& finalPhaseCompleted)
+    {
+        finalPhaseCompleted             = false;
         String exportedSymbolsSignature = StringEncoding::Utf8;
         if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags) and
             (resolvedProject.parameters->platform == Platform::Apple or
@@ -754,76 +797,86 @@ struct SC::Build::NativeBuild
             evaluateTargetArtifactRebuild(fs, resolvedProject, finalCommandString.view(), anyObjectBuilt);
         if (finalDecision != UpToDate)
         {
-            if (resolvedProject.parameters->execution.verbose)
-            {
-                globalConsole->print("[trace] rebuild {} {} because {}\n", getFinalStepName(*resolvedProject.project),
-                                     resolvedProject.project->targetName.view(),
-                                     describeRebuildDecision(finalDecision));
-            }
-            globalConsole->print("[{}/{}] {} {}\n", progress.finalStep, progress.totalSteps,
-                                 getFinalStepName(*resolvedProject.project),
-                                 resolvedProject.project->targetName.view());
-            globalConsole->flush();
-
-            String stdOut = StringEncoding::Utf8;
-            String stdErr = StringEncoding::Utf8;
+            NativeJobRecord finalJob;
+            SC_TRY(initializeJobRecord(
+                progress.finalStep, progress.totalSteps,
+                resolvedProject.project->targetType == TargetType::StaticLibrary ? NativeJobKind::Archive
+                                                                                 : NativeJobKind::Link,
+                getFinalStepName(*resolvedProject.project), resolvedProject.project->targetName.view(),
+                finalCommandString.view(), describeRebuildDecision(finalDecision), finalJob));
+            SC_TRY(reporter.printRebuildTrace(finalJob.stepName.view(), finalJob.label.view(),
+                                              finalJob.rebuildReason.view()));
+            SC_TRY(reporter.printStepStarted(finalJob));
             SC_TRY(makeParentDirectory(fs, resolvedProject.executablePath.view()));
-            SC_TRY(executeCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter, stdOut,
-                                  stdErr));
-            if (resolvedProject.parameters->execution.verbose and not stdOut.isEmpty())
+            SC_TRY(runCapturedCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter,
+                                      finalJob));
+            SC_TRY(reporter.recordCompleted(finalJob));
+            if (reporter.shouldStopScheduling())
             {
-                globalConsole->print(stdOut.view());
-            }
-            if (not stdErr.isEmpty())
-            {
-                globalConsole->printError(stdErr.view());
-                globalConsole->flushStdErr();
+                return Result(true);
             }
             if (shouldStrip)
             {
-                String stripStdOut = StringEncoding::Utf8;
-                String stripStdErr = StringEncoding::Utf8;
-                SC_TRY(
-                    executeCommand(fs, stripCommand, StringView(), resolvedProject.adapter, stripStdOut, stripStdErr));
-                if (resolvedProject.parameters->execution.verbose and not stripStdOut.isEmpty())
+                NativeJobRecord stripJob;
+                SC_TRY(initializeJobRecord(progress.finalStep, progress.totalSteps, NativeJobKind::Strip, "STRIP"_a8,
+                                           resolvedProject.project->targetName.view(), stripCommandString.view(),
+                                           "post-link strip"_a8, stripJob));
+                SC_TRY(reporter.printStepStarted(stripJob));
+                SC_TRY(runCapturedCommand(fs, stripCommand, StringView(), resolvedProject.adapter, stripJob));
+                SC_TRY(reporter.recordCompleted(stripJob));
+                if (reporter.shouldStopScheduling())
                 {
-                    globalConsole->print(stripStdOut.view());
-                }
-                if (not stripStdErr.isEmpty())
-                {
-                    globalConsole->printError(stripStdErr.view());
-                    globalConsole->flushStdErr();
+                    return Result(true);
                 }
             }
             SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
         }
-        else if (resolvedProject.parameters->execution.verbose)
+        else
         {
-            globalConsole->print("[{}/{}] SKIP {} {} ({})\n", progress.finalStep, progress.totalSteps,
-                                 getFinalStepName(*resolvedProject.project), resolvedProject.project->targetName.view(),
-                                 describeRebuildDecision(finalDecision));
-            globalConsole->print("[trace] no work to do for {}\n", resolvedProject.project->targetName.view());
+            SC_TRY(reporter.recordSkipped(
+                progress.finalStep, progress.totalSteps, getFinalStepName(*resolvedProject.project),
+                resolvedProject.project->targetName.view(), describeRebuildDecision(finalDecision)));
+            if (reporter.isVerbose())
+            {
+                globalConsole->print("[trace] no work to do for {}\n", resolvedProject.project->targetName.view());
+            }
         }
 
+        finalPhaseCompleted = not reporter.shouldStopScheduling();
         return Result(true);
     }
 
     static Result buildResolvedProjectWave(const Vector<ResolvedProject*>& waveProjects,
                                            const Vector<ResolvedProject>&  resolvedProjects,
                                            const Vector<ProjectProgress>&  progressByProject,
-                                           size_t                          workspaceParallelJobs)
+                                           size_t workspaceParallelJobs, NativeBuildReporter& reporter)
     {
         if (waveProjects.isEmpty())
         {
             return Result(true);
         }
-        if (waveProjects.size() == 1 or workspaceParallelJobs <= 1)
+        if (workspaceParallelJobs <= 1)
         {
             FileSystem fs;
             SC_TRY(fs.init("."));
-            size_t projectIndex = 0;
-            SC_TRY(findResolvedProjectIndex(resolvedProjects, *waveProjects[0]->project, projectIndex));
-            return buildProject(fs, *waveProjects[0], progressByProject[projectIndex], workspaceParallelJobs);
+            for (size_t waveIndex = 0; waveIndex < waveProjects.size(); ++waveIndex)
+            {
+                size_t projectIndex = 0;
+                SC_TRY(findResolvedProjectIndex(resolvedProjects, *waveProjects[waveIndex]->project, projectIndex));
+                SC_TRY(buildProject(fs, *waveProjects[waveIndex], progressByProject[projectIndex], reporter,
+                                    workspaceParallelJobs));
+                if (reporter.shouldStopScheduling())
+                {
+                    size_t cancelled = 0;
+                    for (size_t idx = waveIndex + 1; idx < waveProjects.size(); ++idx)
+                    {
+                        cancelled += countPendingProjectSteps(*waveProjects[idx], 0);
+                    }
+                    reporter.recordCancelled(cancelled);
+                    return Result(true);
+                }
+            }
+            return Result(true);
         }
 
         FileSystem fs;
@@ -836,7 +889,21 @@ struct SC::Build::NativeBuild
         }
 
         ParallelCompileLimiter limiter;
-        SC_TRY(limiter.create(fs, workspaceParallelJobs));
+        SC_TRY(limiter.create(fs, reporter, workspaceParallelJobs));
+
+        auto countRemainingWaveSteps = [&](size_t projectIndex, size_t sourceIndex) -> size_t
+        {
+            size_t cancelled = 0;
+            for (size_t idx = projectIndex; idx < waveProjects.size(); ++idx)
+            {
+                const ResolvedProject& pendingProject = *waveProjects[idx];
+                const size_t           nextSource     = idx == projectIndex ? sourceIndex : 0;
+                cancelled += countPendingProjectSteps(pendingProject, nextSource);
+            }
+            return cancelled;
+        };
+
+        bool countedWaveCancellation = false;
 
         for (size_t projectIndex = 0; projectIndex < waveProjects.size(); ++projectIndex)
         {
@@ -844,7 +911,7 @@ struct SC::Build::NativeBuild
             size_t           resolvedProjectIndex = 0;
             SC_TRY(findResolvedProjectIndex(resolvedProjects, *resolvedProject.project, resolvedProjectIndex));
             const ProjectProgress& progress = progressByProject[resolvedProjectIndex];
-            if (resolvedProject.parameters->execution.verbose)
+            if (reporter.isVerbose())
             {
                 printProjectTrace(resolvedProject);
                 globalConsole->print("[trace] workspace compile wave jobs = {}\n", workspaceParallelJobs);
@@ -853,6 +920,12 @@ struct SC::Build::NativeBuild
             size_t compileStep = 0;
             for (ResolvedSource& source : resolvedProject.sources)
             {
+                if (reporter.shouldStopScheduling())
+                {
+                    reporter.recordCancelled(countRemainingWaveSteps(projectIndex, compileStep));
+                    countedWaveCancellation = true;
+                    break;
+                }
                 compileStep++;
 
                 CommandLine commandLine;
@@ -863,33 +936,53 @@ struct SC::Build::NativeBuild
                     evaluateObjectRebuild(fs, resolvedProject, source, commandString.view());
                 if (compileDecision == UpToDate)
                 {
-                    if (resolvedProject.parameters->execution.verbose)
-                    {
-                        globalConsole->print("[{}/{}] SKIP {} {} ({})\n", progress.compileStartStep + compileStep - 1,
-                                             progress.totalSteps, getCompileStepName(source.type),
-                                             source.displayPath.view(), describeRebuildDecision(compileDecision));
-                    }
+                    SC_TRY(reporter.recordSkipped(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                                  getCompileStepName(source.type), source.displayPath.view(),
+                                                  describeRebuildDecision(compileDecision)));
                     continue;
                 }
-                if (resolvedProject.parameters->execution.verbose)
-                {
-                    globalConsole->print("[trace] rebuild {} {} because {}\n", getCompileStepName(source.type),
-                                         source.displayPath.view(), describeRebuildDecision(compileDecision));
-                }
+                SC_TRY(reporter.printRebuildTrace(getCompileStepName(source.type), source.displayPath.view(),
+                                                  describeRebuildDecision(compileDecision)));
 
+                bool launched = false;
                 SC_TRY(limiter.launch(progress.compileStartStep + compileStep - 1, progress.totalSteps, resolvedProject,
-                                      source, commandLine, commandString, anyObjectBuiltFlags[projectIndex]));
+                                      source, commandLine, commandString, anyObjectBuiltFlags[projectIndex], launched));
+                if (not launched)
+                {
+                    reporter.recordCancelled(countRemainingWaveSteps(projectIndex, compileStep - 1));
+                    countedWaveCancellation = true;
+                    break;
+                }
+            }
+
+            if (reporter.shouldStopScheduling())
+            {
+                break;
             }
         }
         SC_TRY(limiter.close());
+        if (reporter.shouldStopScheduling())
+        {
+            if (not countedWaveCancellation)
+            {
+                reporter.recordCancelled(waveProjects.size());
+            }
+            return Result(true);
+        }
 
         for (size_t projectIndex = 0; projectIndex < waveProjects.size(); ++projectIndex)
         {
             size_t resolvedProjectIndex = 0;
             SC_TRY(
                 findResolvedProjectIndex(resolvedProjects, *waveProjects[projectIndex]->project, resolvedProjectIndex));
+            bool finalPhaseCompleted = false;
             SC_TRY(buildProjectFinalPhase(fs, *waveProjects[projectIndex], anyObjectBuiltFlags[projectIndex],
-                                          progressByProject[resolvedProjectIndex]));
+                                          progressByProject[resolvedProjectIndex], reporter, finalPhaseCompleted));
+            if (not finalPhaseCompleted)
+            {
+                reporter.recordCancelled(waveProjects.size() - projectIndex - 1);
+                return Result(true);
+            }
         }
         return Result(true);
     }
@@ -903,19 +996,29 @@ struct SC::Build::NativeBuild
 
         const size_t            workspaceParallelJobs = computeWorkspaceParallelJobs(parameters);
         Vector<ProjectProgress> progressByProject;
-        if (resolvedProjects.size() == 1 or workspaceParallelJobs <= 1)
+        NativeBuildReporter     reporter;
+        if (resolvedProjects.size() == 1)
         {
             FileSystem fs;
             SC_TRY(fs.init("."));
             Vector<size_t> projectLevels;
             SC_TRY(projectLevels.push_back(0));
             SC_TRY(computeResolvedProjectProgress(resolvedProjects, projectLevels, progressByProject));
-            return buildProject(fs, resolvedProjects[0], progressByProject[0], workspaceParallelJobs);
+            SC_TRY(reporter.begin(parameters.execution, progressByProject[0].totalSteps));
+            SC_TRY(buildProject(fs, resolvedProjects[0], progressByProject[0], reporter, workspaceParallelJobs));
+            SC_TRY(reporter.flushDeferredFailures());
+            SC_TRY(reporter.printFinalSummary());
+            if (reporter.shouldStopScheduling())
+            {
+                return Result::Error("Native backend command failed");
+            }
+            return Result(true);
         }
 
         Vector<size_t> projectLevels;
         SC_TRY(computeResolvedProjectLevels(resolvedProjects, projectLevels));
         SC_TRY(computeResolvedProjectProgress(resolvedProjects, projectLevels, progressByProject));
+        SC_TRY(reporter.begin(parameters.execution, progressByProject[0].totalSteps));
 
         size_t maxLevel = 0;
         for (size_t projectLevel : projectLevels)
@@ -937,7 +1040,27 @@ struct SC::Build::NativeBuild
                     SC_TRY(waveProjects.push_back(&resolvedProjects[idx]));
                 }
             }
-            SC_TRY(buildResolvedProjectWave(waveProjects, resolvedProjects, progressByProject, workspaceParallelJobs));
+            SC_TRY(buildResolvedProjectWave(waveProjects, resolvedProjects, progressByProject, workspaceParallelJobs,
+                                            reporter));
+            if (reporter.shouldStopScheduling())
+            {
+                size_t cancelled = 0;
+                for (size_t idx = 0; idx < resolvedProjects.size(); ++idx)
+                {
+                    if (projectLevels[idx] > level)
+                    {
+                        cancelled += countPendingProjectSteps(resolvedProjects[idx], 0);
+                    }
+                }
+                reporter.recordCancelled(cancelled);
+                break;
+            }
+        }
+        SC_TRY(reporter.flushDeferredFailures());
+        SC_TRY(reporter.printFinalSummary());
+        if (reporter.shouldStopScheduling())
+        {
+            return Result::Error("Native backend command failed");
         }
         return Result(true);
     }
@@ -994,15 +1117,25 @@ struct SC::Build::NativeBuild
     }
 
     static Result buildProject(FileSystem& fs, ResolvedProject& resolvedProject, const ProjectProgress& progress,
-                               size_t maxParallelJobsOverride = 0)
+                               NativeBuildReporter& reporter, size_t maxParallelJobsOverride = 0)
     {
-        bool anyObjectBuilt = false;
-        SC_TRY(buildProjectCompilePhase(fs, resolvedProject, anyObjectBuilt, progress, maxParallelJobsOverride));
-        return buildProjectFinalPhase(fs, resolvedProject, anyObjectBuilt, progress);
+        bool anyObjectBuilt        = false;
+        bool compilePhaseCompleted = false;
+        SC_TRY(buildProjectCompilePhase(fs, resolvedProject, anyObjectBuilt, progress, reporter, compilePhaseCompleted,
+                                        maxParallelJobsOverride));
+        if (not compilePhaseCompleted)
+        {
+            return Result(true);
+        }
+
+        bool finalPhaseCompleted = false;
+        SC_TRY(buildProjectFinalPhase(fs, resolvedProject, anyObjectBuilt, progress, reporter, finalPhaseCompleted));
+        return Result(true);
     }
 
     static Result buildCompileSteps(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt,
-                                    const ProjectProgress& progress, size_t maxParallelJobsOverride = 0)
+                                    const ProjectProgress& progress, NativeBuildReporter& reporter,
+                                    bool& compilePhaseCompleted, size_t maxParallelJobsOverride = 0)
     {
         size_t maxParallelJobs = computeMaxParallelCompileJobs(resolvedProject);
         if (maxParallelJobsOverride != 0 and maxParallelJobsOverride < maxParallelJobs)
@@ -1011,17 +1144,27 @@ struct SC::Build::NativeBuild
         }
         if (maxParallelJobs <= 1 or resolvedProject.sources.size() <= 1)
         {
-            return buildCompileStepsSequential(fs, resolvedProject, anyObjectBuilt, progress);
+            return buildCompileStepsSequential(fs, resolvedProject, anyObjectBuilt, progress, reporter,
+                                               compilePhaseCompleted);
         }
-        return buildCompileStepsParallel(fs, resolvedProject, anyObjectBuilt, progress, maxParallelJobs);
+        return buildCompileStepsParallel(fs, resolvedProject, anyObjectBuilt, progress, reporter, compilePhaseCompleted,
+                                         maxParallelJobs);
     }
 
     static Result buildCompileStepsSequential(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt,
-                                              const ProjectProgress& progress)
+                                              const ProjectProgress& progress, NativeBuildReporter& reporter,
+                                              bool& compilePhaseCompleted)
     {
-        size_t compileStep = 0;
+        compilePhaseCompleted = true;
+        size_t compileStep    = 0;
         for (ResolvedSource& source : resolvedProject.sources)
         {
+            if (reporter.shouldStopScheduling())
+            {
+                reporter.recordCancelled(countPendingProjectSteps(resolvedProject, compileStep));
+                compilePhaseCompleted = false;
+                return Result(true);
+            }
             compileStep++;
 
             CommandLine commandLine;
@@ -1032,58 +1175,58 @@ struct SC::Build::NativeBuild
                 evaluateObjectRebuild(fs, resolvedProject, source, commandString.view());
             if (compileDecision == UpToDate)
             {
-                if (resolvedProject.parameters->execution.verbose)
-                {
-                    globalConsole->print("[{}/{}] SKIP {} {} ({})\n", progress.compileStartStep + compileStep - 1,
-                                         progress.totalSteps, getCompileStepName(source.type),
-                                         source.displayPath.view(), describeRebuildDecision(compileDecision));
-                }
+                SC_TRY(reporter.recordSkipped(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                              getCompileStepName(source.type), source.displayPath.view(),
+                                              describeRebuildDecision(compileDecision)));
                 continue;
             }
-            if (resolvedProject.parameters->execution.verbose)
-            {
-                globalConsole->print("[trace] rebuild {} {} because {}\n", getCompileStepName(source.type),
-                                     source.displayPath.view(), describeRebuildDecision(compileDecision));
-            }
+            SC_TRY(reporter.printRebuildTrace(getCompileStepName(source.type), source.displayPath.view(),
+                                              describeRebuildDecision(compileDecision)));
 
             SC_TRY(makeParentDirectory(fs, source.objectPath.view()));
-            globalConsole->print("[{}/{}] {} {}\n", progress.compileStartStep + compileStep - 1, progress.totalSteps,
-                                 getCompileStepName(source.type), source.displayPath.view());
-            globalConsole->flush();
-
-            String stdOut = StringEncoding::Utf8;
-            String stdErr = StringEncoding::Utf8;
-            SC_TRY(executeCompileCommand(fs, commandLine, source.responsePath.view(), resolvedProject, source, stdOut,
-                                         stdErr));
-            if (resolvedProject.parameters->execution.verbose and not stdOut.isEmpty())
+            NativeJobRecord job;
+            SC_TRY(initializeJobRecord(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                       NativeJobKind::Compile, getCompileStepName(source.type),
+                                       source.displayPath.view(), commandString.view(),
+                                       describeRebuildDecision(compileDecision), job));
+            SC_TRY(reporter.printStepStarted(job));
+            SC_TRY(runCapturedCommand(fs, commandLine, source.responsePath.view(), resolvedProject.adapter, job));
+            SC_TRY(
+                finalizeCompileJob(fs, resolvedProject, source, commandString.view(), anyObjectBuilt, job, reporter));
+            if (reporter.shouldStopScheduling())
             {
-                globalConsole->print(stdOut.view());
+                reporter.recordCancelled(countPendingProjectSteps(resolvedProject, compileStep));
+                compilePhaseCompleted = false;
+                return Result(true);
             }
-            if (not stdErr.isEmpty())
-            {
-                globalConsole->printError(stdErr.view());
-                globalConsole->flushStdErr();
-            }
-            SC_TRY(fs.writeString(source.commandPath.view(), commandString.view()));
-            anyObjectBuilt = true;
         }
         return Result(true);
     }
 
     static Result buildCompileStepsParallel(FileSystem& fs, ResolvedProject& resolvedProject, bool& anyObjectBuilt,
-                                            const ProjectProgress& progress, size_t maxParallelJobs)
+                                            const ProjectProgress& progress, NativeBuildReporter& reporter,
+                                            bool& compilePhaseCompleted, size_t maxParallelJobs)
     {
-        if (resolvedProject.parameters->execution.verbose)
+        compilePhaseCompleted = true;
+        if (reporter.isVerbose())
         {
             globalConsole->print("[trace] parallel compile jobs = {}\n", maxParallelJobs);
         }
 
         ParallelCompileLimiter limiter;
-        SC_TRY(limiter.create(fs, maxParallelJobs));
+        SC_TRY(limiter.create(fs, reporter, maxParallelJobs));
 
-        size_t compileStep = 0;
+        size_t compileStep                = 0;
+        bool   countedProjectCancellation = false;
         for (ResolvedSource& source : resolvedProject.sources)
         {
+            if (reporter.shouldStopScheduling())
+            {
+                reporter.recordCancelled(countPendingProjectSteps(resolvedProject, compileStep));
+                countedProjectCancellation = true;
+                compilePhaseCompleted      = false;
+                break;
+            }
             compileStep++;
 
             CommandLine commandLine;
@@ -1094,24 +1237,35 @@ struct SC::Build::NativeBuild
                 evaluateObjectRebuild(fs, resolvedProject, source, commandString.view());
             if (compileDecision == UpToDate)
             {
-                if (resolvedProject.parameters->execution.verbose)
-                {
-                    globalConsole->print("[{}/{}] SKIP {} {} ({})\n", progress.compileStartStep + compileStep - 1,
-                                         progress.totalSteps, getCompileStepName(source.type),
-                                         source.displayPath.view(), describeRebuildDecision(compileDecision));
-                }
+                SC_TRY(reporter.recordSkipped(progress.compileStartStep + compileStep - 1, progress.totalSteps,
+                                              getCompileStepName(source.type), source.displayPath.view(),
+                                              describeRebuildDecision(compileDecision)));
                 continue;
             }
-            if (resolvedProject.parameters->execution.verbose)
-            {
-                globalConsole->print("[trace] rebuild {} {} because {}\n", getCompileStepName(source.type),
-                                     source.displayPath.view(), describeRebuildDecision(compileDecision));
-            }
+            SC_TRY(reporter.printRebuildTrace(getCompileStepName(source.type), source.displayPath.view(),
+                                              describeRebuildDecision(compileDecision)));
 
+            bool launched = false;
             SC_TRY(limiter.launch(progress.compileStartStep + compileStep - 1, progress.totalSteps, resolvedProject,
-                                  source, commandLine, commandString, anyObjectBuilt));
+                                  source, commandLine, commandString, anyObjectBuilt, launched));
+            if (not launched)
+            {
+                reporter.recordCancelled(countPendingProjectSteps(resolvedProject, compileStep - 1));
+                countedProjectCancellation = true;
+                compilePhaseCompleted      = false;
+                break;
+            }
         }
-        return limiter.close();
+        SC_TRY(limiter.close());
+        if (reporter.shouldStopScheduling())
+        {
+            compilePhaseCompleted = false;
+            if (not countedProjectCancellation)
+            {
+                reporter.recordCancelled(1);
+            }
+        }
+        return Result(true);
     }
 
     static Result runExecutable(StringView executablePath, const Action& action)
@@ -1135,63 +1289,6 @@ struct SC::Build::NativeBuild
         globalConsole->flush();
         SC_TRY(process.exec({arguments, numArguments}));
         SC_TRY_MSG(process.getExitStatus() == 0, "Run exited with non zero status");
-        return Result(true);
-    }
-
-    static Result executeCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
-                                 const CompilerAdapter& adapter, String& stdOut, String& stdErr,
-                                 bool printOnFailure = true)
-    {
-        SC_TRY(maybeWriteResponseFile(fs, commandLine, responsePath, adapter));
-
-        StringSpan             views[128];
-        Span<const StringSpan> args;
-        SC_TRY(commandLine.toViews(views, args));
-
-        Process process;
-        SC_TRY(process.exec(args, stdOut, Process::StdIn(), stdErr));
-        if (process.getExitStatus() != 0)
-        {
-            if (printOnFailure)
-            {
-                if (not stdOut.isEmpty())
-                {
-                    globalConsole->print(stdOut.view());
-                }
-                if (not stdErr.isEmpty())
-                {
-                    globalConsole->printError(stdErr.view());
-                    globalConsole->flushStdErr();
-                }
-            }
-            return Result::Error("Native backend command failed");
-        }
-        return Result(true);
-    }
-
-    static Result executeCompileCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
-                                        const ResolvedProject& resolvedProject, const ResolvedSource& source,
-                                        String& stdOut, String& stdErr)
-    {
-        Result commandResult =
-            executeCommand(fs, commandLine, responsePath, resolvedProject.adapter, stdOut, stdErr, false);
-        if (resolvedProject.parameters->execution.useCompilerDependencies and resolvedProject.adapter.isMSVCStyle())
-        {
-            SC_TRY(writeWindowsDependencyFile(fs, resolvedProject, source, stdOut, stdErr));
-        }
-        if (not commandResult)
-        {
-            if (not stdOut.isEmpty())
-            {
-                globalConsole->print(stdOut.view());
-            }
-            if (not stdErr.isEmpty())
-            {
-                globalConsole->printError(stdErr.view());
-                globalConsole->flushStdErr();
-            }
-            return commandResult;
-        }
         return Result(true);
     }
 
