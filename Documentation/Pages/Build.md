@@ -39,12 +39,22 @@ The repository tool surface is the `SC-build` tool described in [Tools](@ref pag
 
 ```text
 ./SC.sh build configure [workspace:project | project]
-./SC.sh build compile [workspace:project | project] [configuration] [generator] [architecture] [output-mode] [-- extra args...]
-./SC.sh build run [workspace:project | project] [configuration] [generator] [architecture] [output-mode] [-- extra args...]
-./SC.sh build coverage [workspace:project | project] [configuration] [generator] [architecture]
+./SC.sh build compile [workspace:project | project] [options]
+./SC.sh build run [workspace:project | project] [options] [-- extra args...]
+./SC.sh build coverage [workspace:project | project] [options]
 ```
 
-Generator keywords accepted by the tool are:
+Named options accepted by `compile`, `run`, and `coverage` are:
+
+- `-c`, `--config <NAME>`
+- `-g`, `--generator <NAME>`
+- `-a`, `--arch <NAME>`
+- `-o`, `--output <MODE>` (`compile` and `run` only)
+- `-q`, `--quiet` (`compile` and `run` only)
+- `--normal` (`compile` and `run` only)
+- `-v`, `--verbose` (`compile` and `run` only)
+
+Generator values accepted by the tool are:
 
 - `default`
 - `native`
@@ -53,7 +63,7 @@ Generator keywords accepted by the tool are:
 - `vs2022`
 - `vs2019`
 
-Architecture keywords accepted by the tool are:
+Architecture values accepted by the tool are:
 
 - `arm64`
 - `intel64`
@@ -68,7 +78,8 @@ Current CLI behavior:
 - If no configuration is specified, `Debug` is used
 - Host-default generator selection is `vs2022` on Windows and `make` on macOS / Linux
 - `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
-- Native `compile` / `run` commands accept an optional `output-mode` token after `architecture`: `quiet`, `normal`, or `verbose`
+- `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
+- Legacy positional compatibility is still supported after `target` as `[configuration] [generator] [architecture] [output-mode]`
 
 This is the repository `Tools/SC-build.cpp` file used to configure the default workspace:
 \include Tools/SC-build.cpp
@@ -114,9 +125,9 @@ Current implemented scope:
 Typical native commands:
 
 ```bash
-./SC.sh build compile SCBuildTest Debug native
-./SC.sh build compile SCBuildTest Debug native arm64 verbose
-./SC.sh build run SCBuildTest Debug native -- --test "BuildTest"
+./SC.sh build compile SCBuildTest --config Debug --generator native
+./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
+./SC.sh build run SCBuildTest --config Debug --generator native -- --test "BuildTest"
 SC.bat build compile SCTest Debug native
 ```
 

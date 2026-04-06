@@ -853,6 +853,14 @@ static Build::Action makeNativeCompileAction(const Build::Directories& directori
     return action;
 }
 
+static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
+                                                StringView configurationName = "Debug")
+{
+    Build::Action action        = makeNativeCompileAction(directories, projectName, configurationName);
+    action.parameters.generator = Build::Generator::Make;
+    return action;
+}
+
 static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
 {
     StringSpan processArguments[] = {executablePath};
@@ -1313,6 +1321,75 @@ struct SCBuildFixtureTest : public SC::TestCase
         }
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+        if (test_section("generated make backend suppresses successful compile chatter in quiet mode"))
+        {
+            String             normalBuildRoot = StringEncoding::Utf8;
+            Build::Directories normalDirectories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, normalBuildRoot, normalDirectories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String normalSourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(normalSourceRoot, {normalBuildRoot.view(), "GeneratedQuietNormalFixture"}));
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, normalSourceRoot.view(), "normal-generated"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(normalSourceRoot.view()));
+
+            Build::Action normalAction = makeGeneratedCompileAction(normalDirectories, HeaderFixtureProjectName);
+            normalAction.parameters.execution.outputMode = Build::OutputMode::Normal;
+
+            Result              normalBuildResult = Result(true);
+            CapturedBuildOutput normalOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(normalAction, configureHeaderDependencyProgram,
+                                                     FixtureWorkspaceName, normalBuildResult, normalOutput));
+            SC_TEST_EXPECT(normalBuildResult);
+
+            String             quietBuildRoot = StringEncoding::Utf8;
+            Build::Directories quietDirectories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, quietBuildRoot, quietDirectories));
+
+            String quietSourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(quietSourceRoot, {quietBuildRoot.view(), "GeneratedQuietModeFixture"}));
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, quietSourceRoot.view(), "quiet-generated"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(quietSourceRoot.view()));
+
+            Build::Action quietAction = makeGeneratedCompileAction(quietDirectories, HeaderFixtureProjectName);
+            quietAction.parameters.execution.outputMode = Build::OutputMode::Quiet;
+
+            Result              quietBuildResult = Result(true);
+            CapturedBuildOutput quietOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(quietAction, configureHeaderDependencyProgram,
+                                                     FixtureWorkspaceName, quietBuildResult, quietOutput));
+            SC_TEST_EXPECT(quietBuildResult);
+            SC_TEST_EXPECT(quietOutput.stdOut.view().sizeInBytes() < normalOutput.stdOut.view().sizeInBytes());
+        }
+
+        if (test_section("generated make run keeps program output in quiet mode"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "GeneratedRunQuietFixture"}));
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, sourceRoot.view(), "quiet-run"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            Build::Action action                   = makeGeneratedCompileAction(directories, HeaderFixtureProjectName);
+            action.action                          = Build::Action::Run;
+            action.parameters.execution.outputMode = Build::OutputMode::Quiet;
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
+                                                     buildResult, capturedOutput));
+            SC_TEST_EXPECT(buildResult);
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("quiet-run\n"));
+        }
+
         if (test_section("native backend suppresses successful compile noise in normal mode"))
         {
             String             buildRoot = StringEncoding::Utf8;

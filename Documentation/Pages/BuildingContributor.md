@@ -26,25 +26,25 @@ Under VSCode select `Tasks: Run Task` and choose:
 ## Command-line
 
 Intel Machines
-- **Windows**: `SC.bat build compile SCTest Debug default intel64`
-- **Posix**: `SC.sh build compile SCTest Debug default intel64`
+- **Windows**: `SC.bat build compile SCTest --config Debug --generator default --arch intel64`
+- **Posix**: `SC.sh build compile SCTest --config Debug --generator default --arch intel64`
 
 Arm Machines
-- **Windows**: `SC.bat build compile SCTest Debug default arm64`
-- **Posix**: `SC.sh build compile SCTest Debug default arm64`
+- **Windows**: `SC.bat build compile SCTest --config Debug --generator default --arch arm64`
+- **Posix**: `SC.sh build compile SCTest --config Debug --generator default --arch arm64`
 
 ## Command-line Native Backend
 
-- **macOS / Linux**: `./SC.sh build compile SCTest Debug native`
-- **macOS / Linux**: `./SC.sh build compile SCTest Debug native arm64 verbose`
-- **macOS / Linux**: `./SC.sh build run SCBuildTest Debug native`
-- **Windows**: `SC.bat build compile SCTest Debug native`
-- **Windows**: `SC.bat build run SCBuildTest Debug native`
+- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --generator native`
+- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --generator native --arch arm64 --verbose`
+- **macOS / Linux**: `./SC.sh build run SCBuildTest --config Debug --generator native`
+- **Windows**: `SC.bat build compile SCTest --config Debug --generator native`
+- **Windows**: `SC.bat build run SCBuildTest --config Debug --generator native`
 
 @note The native backend currently supports direct host builds on macOS, Linux, and Windows. Windows sysroot selection is
 not implemented yet, and the exact toolchain combinations available still depend on the installed host tools.
-@note Native `compile` and `run` commands also accept an optional output mode after the architecture token:
-`quiet`, `normal`, or `verbose`.
+@note Native `compile` and `run` commands also accept `--output quiet|normal|verbose`, or the `--quiet`, `--normal`,
+and `--verbose` shortcuts. Legacy positional syntax is still accepted for compatibility.
 
 ## Visual Studio 2022
 - Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`

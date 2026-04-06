@@ -1142,6 +1142,26 @@ SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath,
     return Result(true);
 }
 
+static SC::Build::OutputMode::Type resolveGeneratedOutputMode(const SC::Build::ExecutionOptions& execution)
+{
+    return SC::Build::NativeBuildReporter::resolveMode(execution);
+}
+
+static SC::Result printCapturedProcessOutput(SC::StringView stdOut, SC::StringView stdErr)
+{
+    if (not stdOut.isEmpty())
+    {
+        globalConsole->print(stdOut);
+        globalConsole->flush();
+    }
+    if (not stdErr.isEmpty())
+    {
+        globalConsole->printError(stdErr);
+        globalConsole->flushStdErr();
+    }
+    return SC::Result(true);
+}
+
 SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction configure, const Action& action,
                                                         Span<StringView> environment, String* outputExecutable)
 {
@@ -1151,7 +1171,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         return NativeBuild::execute(configure, action, outputExecutable);
     }
 
-    SmallString<256> solutionLocation;
+    SmallString<256>       solutionLocation;
+    const OutputMode::Type outputMode = resolveGeneratedOutputMode(action.parameters.execution);
 
     Process process;
     switch (action.parameters.generator)
@@ -1254,7 +1275,20 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         }
         else
         {
-            SC_TRY(process.exec({arguments, numArgs}));
+            if (outputMode == OutputMode::Quiet)
+            {
+                String stdOut = StringEncoding::Utf8;
+                String stdErr = StringEncoding::Utf8;
+                SC_TRY(process.exec({arguments, numArgs}, stdOut, {}, stdErr));
+                if (process.getExitStatus() != 0)
+                {
+                    SC_TRY(printCapturedProcessOutput(stdOut.view(), stdErr.view()));
+                }
+            }
+            else
+            {
+                SC_TRY(process.exec({arguments, numArgs}));
+            }
             SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
         }
     }
@@ -1286,7 +1320,20 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         switch (action.action)
         {
         case Action::Compile:
-            SC_TRY(process.exec({arguments, numArgs}));
+            if (outputMode == OutputMode::Quiet)
+            {
+                String stdOut = StringEncoding::Utf8;
+                String stdErr = StringEncoding::Utf8;
+                SC_TRY(process.exec({arguments, numArgs}, stdOut, {}, stdErr));
+                if (process.getExitStatus() != 0)
+                {
+                    SC_TRY(printCapturedProcessOutput(stdOut.view(), stdErr.view()));
+                }
+            }
+            else
+            {
+                SC_TRY(process.exec({arguments, numArgs}));
+            }
             SC_TRY_MSG(process.getExitStatus() == 0, "Compile returned error");
             break;
         case Action::Print:
@@ -1422,9 +1469,17 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         }
         else
         {
-            String stdError;
-            SC_TRY(process.exec({arguments, numArgs}, {}, {}, stdError));
-            if (not stdError.isEmpty())
+            String stdOut   = StringEncoding::Utf8;
+            String stdError = StringEncoding::Utf8;
+            if (outputMode == OutputMode::Quiet)
+            {
+                SC_TRY(process.exec({arguments, numArgs}, stdOut, {}, stdError));
+            }
+            else
+            {
+                SC_TRY(process.exec({arguments, numArgs}, {}, {}, stdError));
+            }
+            if (not stdError.isEmpty() and outputMode != OutputMode::Quiet)
             {
                 globalConsole->printError(stdError.view());
                 globalConsole->flushStdErr();
@@ -1432,6 +1487,10 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
             if (process.getExitStatus() == 0)
             {
                 return Result(true);
+            }
+            if (outputMode == OutputMode::Quiet)
+            {
+                SC_TRY(printCapturedProcessOutput(stdOut.view(), stdError.view()));
             }
             else if (StringView(stdError.view()).startsWith("make: *** No rule to make target"))
             {

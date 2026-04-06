@@ -451,4 +451,10 @@ SC_COMPILER_WARNING_POP;
 
 Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE); }
 } // namespace Build
+
+#if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
+StringView Tools::Tool::getToolName() { return "SC-build"; }
+StringView Tools::Tool::getDefaultAction() { return "configure"; }
+Result     Tools::Tool::runTool(Tools::Tool::Arguments& arguments) { return Tools::runBuildTool(arguments); }
+#endif
 } // namespace SC

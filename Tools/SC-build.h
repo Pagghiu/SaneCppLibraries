@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Libraries/Process/Process.h"
+#include "../Libraries/Strings/CommandLine.h"
 #include "../Libraries/Strings/Console.h"
 #include "../Libraries/Strings/Path.h"
 #include "../Libraries/Strings/StringBuilder.h"
+#include "../Libraries/Strings/StringFormat.h"
 #include "SC-build/Build.h"
 #include "Tools.h"
 
@@ -18,6 +20,14 @@
 
 namespace SC
 {
+namespace Build
+{
+Result configure(Definition& definition, const Parameters& parameters);
+}
+} // namespace SC
+
+namespace SC
+{
 namespace Tools
 {
 
@@ -25,13 +35,722 @@ constexpr StringView PROJECTS_SUBDIR      = "_Projects";
 constexpr StringView OUTPUTS_SUBDIR       = "_Outputs";
 constexpr StringView INTERMEDIATES_SUBDIR = "_Intermediates";
 constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
+constexpr StringView DEFAULT_WORKSPACE    = "SCWorkspace";
+
+enum class BuildCLIStatus : uint8_t
+{
+    Ready,
+    HelpRequested,
+    Error,
+};
+
+struct BuildCLIResolvedStorage
+{
+    String configurationName = StringEncoding::Ascii;
+};
+
+struct BuildCLIParseContext
+{
+    StringSpan target           = {};
+    StringSpan configuration    = {};
+    StringSpan generator        = {};
+    StringSpan architecture     = {};
+    StringSpan output           = {};
+    bool       quietRequested   = false;
+    bool       normalRequested  = false;
+    bool       verboseRequested = false;
+
+    StringSpan       legacyStorage[4];
+    Span<StringSpan> legacyValues = {};
+};
+
+[[nodiscard]] inline char asciiToLower(char c)
+{
+    return (c >= 'A' and c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+}
+
+[[nodiscard]] inline uint32_t asciiToLowerCodePoint(uint32_t c)
+{
+    return (c >= 'A' and c <= 'Z') ? static_cast<uint32_t>(c - 'A' + 'a') : c;
+}
+
+[[nodiscard]] inline bool equalsAsciiIgnoreCase(StringView lhs, StringView rhs)
+{
+    return StringView::withIterators(
+        lhs, rhs,
+        [](auto lhsIterator, auto rhsIterator)
+        {
+            uint32_t lhsCodePoint = 0;
+            uint32_t rhsCodePoint = 0;
+            while (lhsIterator.advanceRead(lhsCodePoint) and rhsIterator.advanceRead(rhsCodePoint))
+            {
+                if (asciiToLowerCodePoint(lhsCodePoint) != asciiToLowerCodePoint(rhsCodePoint))
+                {
+                    return false;
+                }
+            }
+            return lhsIterator.isAtEnd() and rhsIterator.isAtEnd();
+        });
+}
+
+[[nodiscard]] inline bool startsWithAsciiIgnoreCase(StringView value, StringView prefix)
+{
+    return StringView::withIterators(value, prefix,
+                                     [](auto valueIterator, auto prefixIterator)
+                                     {
+                                         uint32_t valueCodePoint  = 0;
+                                         uint32_t prefixCodePoint = 0;
+                                         while (prefixIterator.advanceRead(prefixCodePoint))
+                                         {
+                                             if (not valueIterator.advanceRead(valueCodePoint))
+                                             {
+                                                 return false;
+                                             }
+                                             if (asciiToLowerCodePoint(valueCodePoint) !=
+                                                 asciiToLowerCodePoint(prefixCodePoint))
+                                             {
+                                                 return false;
+                                             }
+                                         }
+                                         return true;
+                                     });
+}
+
+[[nodiscard]] inline bool isShortOptionToken(StringView token)
+{
+    return token.sizeInBytes() >= 2 and token.bytesWithoutTerminator()[0] == '-' and
+           token.bytesWithoutTerminator()[1] != '-';
+}
+
+[[nodiscard]] inline bool isLongOptionToken(StringView token)
+{
+    return token.sizeInBytes() >= 3 and token.bytesWithoutTerminator()[0] == '-' and
+           token.bytesWithoutTerminator()[1] == '-';
+}
+
+[[nodiscard]] inline Result printBuildActionHelp(const CommandLineSpec& spec, Build::Action::Type actionType,
+                                                 Console& console)
+{
+    StringFormatOutput output(StringEncoding::Utf8, console, true);
+    SC_TRY_MSG(spec.writeHelp(output), "Failed writing SC-build help");
+    if (actionType == Build::Action::Run)
+    {
+        SC_TRY_MSG(output.append("\nArguments after -- are forwarded to the built executable.\n"),
+                   "Failed writing SC-build help");
+    }
+    SC_TRY_MSG(output.append("\nLegacy compatibility: after <target> you can still pass up to four positional "
+                             "values in this order: <config> <generator> <arch> <output>.\n"),
+               "Failed writing SC-build help");
+    console.flush();
+    return Result(true);
+}
+
+[[nodiscard]] inline Result printBuildActionParseError(const CommandLineSpec&        spec,
+                                                       const CommandLineParseResult& parseResult, Console& console)
+{
+    StringFormatOutput output(StringEncoding::Utf8, console, false);
+    if (parseResult.error == CommandLineParseResult::Error::InsufficientPositionalStorage)
+    {
+        SC_TRY_MSG(output.append("Too many legacy positional arguments after <target>. Supported order is: <config> "
+                                 "<generator> <arch> <output>.\nUse --help to show usage.\n"),
+                   "Failed writing SC-build parse error");
+    }
+    else
+    {
+        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing SC-build parse error");
+    }
+    console.flushStdErr();
+    return Result(true);
+}
+
+[[nodiscard]] inline Result printBuildActionValueError(Console& console, StringView optionName, StringView value,
+                                                       StringView message)
+{
+    console.printError("{} {}: {}\n", message, optionName, value);
+    console.flushStdErr();
+    return Result::Error("Invalid SC-build option value");
+}
+
+[[nodiscard]] inline Result printBuildActionAmbiguity(Console& console, StringView optionName, StringView value,
+                                                      Span<const StringView> matches)
+{
+    SmallString<256> details = StringEncoding::Ascii;
+    auto             builder = StringBuilder::create(details);
+    SC_TRY(builder.append("Ambiguous value for {}: {} (matches: ", optionName, value));
+    for (size_t idx = 0; idx < matches.sizeInElements(); ++idx)
+    {
+        if (idx > 0)
+        {
+            SC_TRY(builder.append(", "));
+        }
+        SC_TRY(builder.append(matches[idx]));
+    }
+    SC_TRY(builder.append(")\n"));
+    builder.finalize();
+    console.printError(details.view());
+    console.flushStdErr();
+    return Result::Error("Ambiguous SC-build option value");
+}
+
+[[nodiscard]] inline Result splitBuildArgumentsAtTerminator(Span<const StringView>  arguments,
+                                                            Span<const StringView>& beforeTerminator,
+                                                            Span<const StringView>& afterTerminator)
+{
+    beforeTerminator = arguments;
+    afterTerminator  = {};
+    for (size_t idx = 0; idx < arguments.sizeInElements(); ++idx)
+    {
+        if (arguments[idx] == "--")
+        {
+            beforeTerminator = {arguments.data(), idx};
+            SC_TRY(arguments.sliceStart(idx + 1, afterTerminator));
+            break;
+        }
+    }
+    return Result(true);
+}
+
+inline void applyHostDefaultBuildParameters(Build::Action& action)
+{
+    switch (HostPlatform)
+    {
+    case Platform::Windows:
+        action.parameters.generator = Build::Generator::VisualStudio2022;
+        action.parameters.platform  = Build::Platform::Windows;
+        break;
+    case Platform::Apple:
+        action.parameters.generator = Build::Generator::Make;
+        action.parameters.platform  = Build::Platform::Apple;
+        break;
+    case Platform::Linux:
+        action.parameters.generator = Build::Generator::Make;
+        action.parameters.platform  = Build::Platform::Linux;
+        break;
+    default: break;
+    }
+}
+
+[[nodiscard]] inline Result setBuildActionTarget(Build::Action& action, StringView target)
+{
+    if (target.isEmpty())
+    {
+        return Result(true);
+    }
+    if (target.splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
+    {
+        SC_TRY(target.splitAfter(SC_NATIVE_STR(":"), action.projectName));
+    }
+    else
+    {
+        action.projectName = target;
+    }
+    return Result(true);
+}
+
+template <typename Configurations>
+[[nodiscard]] inline Result addUniqueConfigName(const Configurations&        configurations,
+                                                SmallVector<StringView, 16>& names)
+{
+    for (const auto& configuration : configurations)
+    {
+        const StringView name = configuration.name.view();
+        if (not names.contains(name))
+        {
+            SC_TRY(names.push_back(name));
+        }
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result collectBuildConfigurations(const Build::Action& action, SmallVector<StringView, 16>& names)
+{
+    Build::Definition definition;
+    SC_TRY(Build::configure(definition, action.parameters));
+
+    const StringView workspaceName = action.workspaceName.isEmpty() ? DEFAULT_WORKSPACE : action.workspaceName;
+
+    size_t workspaceIndex = 0;
+    if (definition.workspaces.find([&](const Build::Workspace& workspace) { return workspace.name == workspaceName; },
+                                   &workspaceIndex))
+    {
+        const Build::Workspace& workspace = definition.workspaces[workspaceIndex];
+        if (action.projectName.isEmpty())
+        {
+            for (const auto& project : workspace.projects)
+            {
+                SC_TRY(addUniqueConfigName(project.configurations, names));
+            }
+        }
+        else
+        {
+            size_t projectIndex = 0;
+            if (workspace.projects.find([&](const Build::Project& project)
+                                        { return project.name == action.projectName; }, &projectIndex))
+            {
+                SC_TRY(addUniqueConfigName(workspace.projects[projectIndex].configurations, names));
+            }
+        }
+    }
+
+    if (names.isEmpty())
+    {
+        for (const auto& workspace : definition.workspaces)
+        {
+            for (const auto& project : workspace.projects)
+            {
+                SC_TRY(addUniqueConfigName(project.configurations, names));
+            }
+        }
+    }
+
+    if (names.isEmpty())
+    {
+        SC_TRY(names.push_back("Debug"));
+        SC_TRY(names.push_back("Release"));
+    }
+    return Result(true);
+}
+
+template <size_t N>
+[[nodiscard]] inline Result resolveKeywordValue(StringView optionName, StringView              input,
+                                                const StringView (&candidates)[N], StringView& resolved,
+                                                Console& console)
+{
+    SmallVector<StringView, N> matches;
+
+    for (const auto& candidate : candidates)
+    {
+        if (equalsAsciiIgnoreCase(candidate, input))
+        {
+            resolved = candidate;
+            return Result(true);
+        }
+    }
+
+    for (const auto& candidate : candidates)
+    {
+        if (startsWithAsciiIgnoreCase(candidate, input))
+        {
+            SC_TRY(matches.push_back(candidate));
+        }
+    }
+
+    if (matches.size() == 1)
+    {
+        resolved = matches[0];
+        return Result(true);
+    }
+    if (matches.size() > 1)
+    {
+        return printBuildActionAmbiguity(console, optionName, input, matches.toSpanConst());
+    }
+    return printBuildActionValueError(console, optionName, input, "Unknown value for");
+}
+
+[[nodiscard]] inline Result resolveConfigurationValue(StringView input, BuildCLIResolvedStorage& storage,
+                                                      StringView& resolved)
+{
+    if (equalsAsciiIgnoreCase(input, "d"))
+    {
+        SC_TRY(storage.configurationName.assign("Debug"));
+        resolved = storage.configurationName.view();
+        return Result(true);
+    }
+    if (equalsAsciiIgnoreCase(input, "r"))
+    {
+        SC_TRY(storage.configurationName.assign("Release"));
+        resolved = storage.configurationName.view();
+        return Result(true);
+    }
+    if (equalsAsciiIgnoreCase(input, "dc"))
+    {
+        SC_TRY(storage.configurationName.assign("DebugCoverage"));
+        resolved = storage.configurationName.view();
+        return Result(true);
+    }
+    if (equalsAsciiIgnoreCase(input, "dv"))
+    {
+        SC_TRY(storage.configurationName.assign("DebugValgrind"));
+        resolved = storage.configurationName.view();
+        return Result(true);
+    }
+
+    SC_TRY(storage.configurationName.assign(input));
+    resolved = storage.configurationName.view();
+    return Result(true);
+}
+
+[[nodiscard]] inline Result applyConfigurationValue(Build::Action& action, StringView configurationValue,
+                                                    BuildCLIResolvedStorage& storage, Console& console)
+{
+    if (configurationValue.isEmpty())
+    {
+        return Result(true);
+    }
+    StringView resolved;
+    SC_COMPILER_UNUSED(console);
+    SC_TRY(resolveConfigurationValue(configurationValue, storage, resolved));
+    action.configurationName = resolved;
+    return Result(true);
+}
+
+[[nodiscard]] inline Result applyGeneratorValue(Build::Action& action, StringView generatorValue, Console& console)
+{
+    if (generatorValue.isEmpty())
+    {
+        return Result(true);
+    }
+    static constexpr StringView generatorNames[] = {"default", "native", "make", "xcode", "vs2022", "vs2019"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--generator", generatorValue, generatorNames, resolved, console));
+    if (equalsAsciiIgnoreCase(resolved, "native"))
+    {
+        action.parameters.generator = Build::Generator::Native;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "make"))
+    {
+        action.parameters.generator = Build::Generator::Make;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "xcode"))
+    {
+        action.parameters.generator = Build::Generator::XCode;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "vs2022"))
+    {
+        action.parameters.generator = Build::Generator::VisualStudio2022;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "vs2019"))
+    {
+        action.parameters.generator = Build::Generator::VisualStudio2019;
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result applyArchitectureValue(Build::Action& action, StringView architectureValue,
+                                                   Console& console)
+{
+    if (architectureValue.isEmpty())
+    {
+        return Result(true);
+    }
+    static constexpr StringView architectureNames[] = {"arm64", "intel32", "intel64", "wasm", "any"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--arch", architectureValue, architectureNames, resolved, console));
+    if (equalsAsciiIgnoreCase(resolved, "arm64"))
+    {
+        action.parameters.architecture = Build::Architecture::Arm64;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "intel32"))
+    {
+        action.parameters.architecture = Build::Architecture::Intel32;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "intel64"))
+    {
+        action.parameters.architecture = Build::Architecture::Intel64;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "wasm"))
+    {
+        action.parameters.architecture = Build::Architecture::Wasm;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "any"))
+    {
+        action.parameters.architecture = Build::Architecture::Any;
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result resolveOutputModeValue(StringView value, Build::OutputMode::Type& outputMode,
+                                                   Console& console)
+{
+    static constexpr StringView outputNames[] = {"quiet", "normal", "verbose"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--output", value, outputNames, resolved, console));
+    if (equalsAsciiIgnoreCase(resolved, "quiet"))
+    {
+        outputMode = Build::OutputMode::Quiet;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "normal"))
+    {
+        outputMode = Build::OutputMode::Normal;
+    }
+    else
+    {
+        outputMode = Build::OutputMode::Verbose;
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result scanNamedOutputMode(Span<const StringView> arguments, Build::OutputMode::Type& outputMode,
+                                                bool& wasProvided, Console& console)
+{
+    wasProvided = false;
+    for (size_t idx = 0; idx < arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments[idx];
+        if (isLongOptionToken(argument))
+        {
+            StringView nameAndMaybeValue = argument.sliceStart(2);
+            StringView longName          = nameAndMaybeValue;
+            StringView inlineValue;
+            if (nameAndMaybeValue.splitBefore("=", longName))
+            {
+                SC_TRY(nameAndMaybeValue.splitAfter("=", inlineValue));
+            }
+
+            if (equalsAsciiIgnoreCase(longName, "quiet"))
+            {
+                outputMode  = Build::OutputMode::Quiet;
+                wasProvided = true;
+                continue;
+            }
+            if (equalsAsciiIgnoreCase(longName, "normal"))
+            {
+                outputMode  = Build::OutputMode::Normal;
+                wasProvided = true;
+                continue;
+            }
+            if (equalsAsciiIgnoreCase(longName, "verbose"))
+            {
+                outputMode  = Build::OutputMode::Verbose;
+                wasProvided = true;
+                continue;
+            }
+            if (equalsAsciiIgnoreCase(longName, "output"))
+            {
+                StringView value = inlineValue;
+                if (value.isEmpty() and idx + 1 < arguments.sizeInElements())
+                {
+                    value = arguments[idx + 1];
+                    idx += 1;
+                }
+                SC_TRY(resolveOutputModeValue(value, outputMode, console));
+                wasProvided = true;
+            }
+            continue;
+        }
+
+        if (isShortOptionToken(argument))
+        {
+            const StringView shortGroup = argument.sliceStart(1);
+            const char*      chars      = shortGroup.bytesWithoutTerminator();
+            for (size_t shortIdx = 0; shortIdx < shortGroup.sizeInBytes(); ++shortIdx)
+            {
+                switch (chars[shortIdx])
+                {
+                case 'q':
+                    outputMode  = Build::OutputMode::Quiet;
+                    wasProvided = true;
+                    break;
+                case 'v':
+                    outputMode  = Build::OutputMode::Verbose;
+                    wasProvided = true;
+                    break;
+                case 'o':
+                    if (shortGroup.sizeInBytes() != 1)
+                    {
+                        return Result::Error("Invalid short option group");
+                    }
+                    SC_TRY(resolveOutputModeValue(
+                        idx + 1 < arguments.sizeInElements() ? arguments[idx + 1] : StringView(), outputMode, console));
+                    idx += 1;
+                    wasProvided = true;
+                    break;
+                default: break;
+                }
+            }
+        }
+    }
+    return Result(true);
+}
+
+[[nodiscard]] inline Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& arguments,
+                                               Build::Action& action, BuildCLIResolvedStorage& resolvedStorage,
+                                               BuildCLIStatus& status)
+{
+    status        = BuildCLIStatus::Ready;
+    action        = Build::Action();
+    action.action = actionType;
+    SC_TRY(Path::join(action.parameters.directories.projectsDirectory,
+                      {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
+    SC_TRY(
+        Path::join(action.parameters.directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
+    SC_TRY(Path::join(action.parameters.directories.intermediatesDirectory,
+                      {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));
+    SC_TRY(Path::join(action.parameters.directories.buildCacheDirectory,
+                      {arguments.toolDestination.view(), BUILD_CACHE_SUBDIR}));
+    SC_TRY(Path::join(action.parameters.directories.packagesCacheDirectory,
+                      {arguments.toolDestination.view(), PackagesCacheDirectory}));
+    SC_TRY(Path::join(action.parameters.directories.packagesInstallDirectory,
+                      {arguments.toolDestination.view(), PackagesInstallDirectory}));
+    action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
+
+    switch (HostPlatform)
+    {
+    case Platform::Windows:
+    case Platform::Apple:
+    case Platform::Linux: applyHostDefaultBuildParameters(action); break;
+    default: return Result::Error("Unsupported platform for compile");
+    }
+
+    Span<const StringView> preArguments;
+    Span<const StringView> postArguments;
+    SC_TRY(splitBuildArgumentsAtTerminator(arguments.arguments, preArguments, postArguments));
+
+    StringSpan argumentStorage[16];
+    for (size_t idx = 0; idx < preArguments.sizeInElements(); ++idx)
+    {
+        argumentStorage[idx] = preArguments[idx];
+    }
+
+    BuildCLIParseContext  context;
+    CommandLineOption     options[7];
+    CommandLinePositional positionals[2];
+    CommandLineSpec       spec;
+    size_t                numOptions = 0;
+
+    options[numOptions].longName  = "config";
+    options[numOptions].shortName = 'c';
+    options[numOptions].help      = "Build configuration name";
+    options[numOptions].valueName = "NAME";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.configuration);
+    numOptions++;
+
+    options[numOptions].longName  = "generator";
+    options[numOptions].shortName = 'g';
+    options[numOptions].help      = "Build generator (default, native, make, xcode, vs2022, vs2019)";
+    options[numOptions].valueName = "NAME";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.generator);
+    numOptions++;
+
+    options[numOptions].longName  = "arch";
+    options[numOptions].shortName = 'a';
+    options[numOptions].help      = "Build architecture (arm64, intel64, intel32, wasm, any)";
+    options[numOptions].valueName = "NAME";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.architecture);
+    numOptions++;
+
+    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    {
+        options[numOptions].longName  = "output";
+        options[numOptions].shortName = 'o';
+        options[numOptions].help      = "Output mode (quiet, normal, verbose)";
+        options[numOptions].valueName = "MODE";
+        options[numOptions].value     = CommandLineValue::stringSpan(context.output);
+        numOptions++;
+
+        options[numOptions].longName  = "quiet";
+        options[numOptions].shortName = 'q';
+        options[numOptions].help      = "Shortcut for --output quiet";
+        options[numOptions].value     = CommandLineValue::boolean(context.quietRequested);
+        numOptions++;
+
+        options[numOptions].longName = "normal";
+        options[numOptions].help     = "Shortcut for --output normal";
+        options[numOptions].value    = CommandLineValue::boolean(context.normalRequested);
+        numOptions++;
+
+        options[numOptions].longName  = "verbose";
+        options[numOptions].shortName = 'v';
+        options[numOptions].help      = "Shortcut for --output verbose";
+        options[numOptions].value     = CommandLineValue::boolean(context.verboseRequested);
+        numOptions++;
+    }
+
+    positionals[0].name     = "target";
+    positionals[0].help     = "Optional workspace:project or project name";
+    positionals[0].required = false;
+    positionals[0].value    = CommandLineValue::stringSpan(context.target);
+
+    positionals[1].name             = "legacy";
+    positionals[1].help             = "Legacy positional values";
+    positionals[1].required         = false;
+    positionals[1].remaining        = true;
+    positionals[1].remainingStorage = context.legacyStorage;
+    positionals[1].parsedValues     = &context.legacyValues;
+
+    spec.programName = actionType == Build::Action::Compile ? "./SC.sh build compile"_a8
+                       : actionType == Build::Action::Run   ? "./SC.sh build run"_a8
+                                                            : "./SC.sh build coverage"_a8;
+    spec.summary     = actionType == Build::Action::Compile ? "Compile one target or the default workspace."_a8
+                       : actionType == Build::Action::Run ? "Build a target if needed and run the resulting executable."_a8
+                                                          : "Build coverage output for a target."_a8;
+    spec.options     = {options, numOptions};
+    spec.positionals = positionals;
+
+    const auto parseResult = spec.parse({argumentStorage, preArguments.sizeInElements()});
+    if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
+    {
+        SC_TRY(printBuildActionHelp(spec, actionType, arguments.console));
+        status = BuildCLIStatus::HelpRequested;
+        return Result(true);
+    }
+    if (parseResult.status == CommandLineParseResult::Status::Error)
+    {
+        SC_TRY(printBuildActionParseError(spec, parseResult, arguments.console));
+        status = BuildCLIStatus::Error;
+        return Result::Error("Invalid SC-build arguments");
+    }
+
+    if (actionType != Build::Action::Run and postArguments.sizeInElements() > 0)
+    {
+        arguments.console.printError("Arguments after -- are only supported by \"build run\".\n");
+        arguments.console.flushStdErr();
+        status = BuildCLIStatus::Error;
+        return Result::Error("Unexpected arguments after --");
+    }
+    action.additionalArguments = postArguments;
+
+    SC_TRY(setBuildActionTarget(action, context.target));
+
+    if (context.legacyValues.sizeInElements() >= 1)
+    {
+        SC_TRY(applyConfigurationValue(action, context.legacyValues[0], resolvedStorage, arguments.console));
+    }
+    if (context.legacyValues.sizeInElements() >= 2)
+    {
+        SC_TRY(applyGeneratorValue(action, context.legacyValues[1], arguments.console));
+    }
+    if (context.legacyValues.sizeInElements() >= 3)
+    {
+        SC_TRY(applyArchitectureValue(action, context.legacyValues[2], arguments.console));
+    }
+    if (context.legacyValues.sizeInElements() >= 4 and
+        (actionType == Build::Action::Compile or actionType == Build::Action::Run))
+    {
+        Build::OutputMode::Type legacyOutputMode = Build::OutputMode::Normal;
+        SC_TRY(resolveOutputModeValue(context.legacyValues[3], legacyOutputMode, arguments.console));
+        action.parameters.execution.outputMode = legacyOutputMode;
+    }
+
+    if (not context.configuration.isEmpty())
+    {
+        SC_TRY(applyConfigurationValue(action, context.configuration, resolvedStorage, arguments.console));
+    }
+    if (not context.generator.isEmpty())
+    {
+        SC_TRY(applyGeneratorValue(action, context.generator, arguments.console));
+    }
+    if (not context.architecture.isEmpty())
+    {
+        SC_TRY(applyArchitectureValue(action, context.architecture, arguments.console));
+    }
+
+    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    {
+        Build::OutputMode::Type namedOutputMode = Build::OutputMode::Normal;
+        bool                    namedOutputSet  = false;
+        SC_TRY(scanNamedOutputMode(preArguments, namedOutputMode, namedOutputSet, arguments.console));
+        if (namedOutputSet)
+        {
+            action.parameters.execution.outputMode = namedOutputMode;
+        }
+    }
+
+    return Result(true);
+}
 
 [[nodiscard]] inline Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& directories)
 {
-    SmallStringNative<256> buffer;
-
-    Console& console = arguments.console;
-    auto     builder = StringBuilder::create(buffer);
     SC_TRY(Path::join(directories.projectsDirectory, {arguments.toolDestination.view(), PROJECTS_SUBDIR}));
     SC_TRY(Path::join(directories.outputsDirectory, {arguments.toolDestination.view(), OUTPUTS_SUBDIR}));
     SC_TRY(Path::join(directories.intermediatesDirectory, {arguments.toolDestination.view(), INTERMEDIATES_SUBDIR}));
@@ -39,6 +758,11 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
     SC_TRY(Path::join(directories.packagesCacheDirectory, {arguments.toolDestination.view(), PackagesCacheDirectory}));
     SC_TRY(
         Path::join(directories.packagesInstallDirectory, {arguments.toolDestination.view(), PackagesInstallDirectory}));
+
+    SmallStringNative<256> buffer;
+
+    Console& console = arguments.console;
+    auto     builder = StringBuilder::create(buffer);
     SC_TRY(builder.append("projects         = \"{}\"\n", directories.projectsDirectory));
     SC_TRY(builder.append("outputs          = \"{}\"\n", directories.outputsDirectory));
     SC_TRY(builder.append("intermediates    = \"{}\"\n", directories.intermediatesDirectory));
@@ -106,121 +830,21 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
 
 [[nodiscard]] inline Result runBuildAction(Build::Action::Type actionType, Tool::Arguments& arguments)
 {
-    Build::Action action;
-    action.action = actionType;
+    Build::Action           action;
+    BuildCLIResolvedStorage resolvedStorage;
+    BuildCLIStatus          status = BuildCLIStatus::Ready;
+    SC_TRY(prepareBuildAction(actionType, arguments, action, resolvedStorage, status));
+    if (status == BuildCLIStatus::HelpRequested)
+    {
+        return Result(true);
+    }
+    if (status == BuildCLIStatus::Error)
+    {
+        return Result::Error("Invalid SC-build arguments");
+    }
+
     SC_TRY(runBuildValidate(arguments, action.parameters.directories));
     action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
-    switch (HostPlatform)
-    {
-    case Platform::Windows: {
-        action.parameters.generator = Build::Generator::VisualStudio2022;
-        action.parameters.platform  = Build::Platform::Windows;
-    }
-    break;
-    case Platform::Apple: {
-        action.parameters.generator = Build::Generator::Make;
-        action.parameters.platform  = Build::Platform::Apple;
-    }
-    break;
-    case Platform::Linux: {
-        action.parameters.generator = Build::Generator::Make;
-        action.parameters.platform  = Build::Platform::Linux;
-    }
-    break;
-    default: return Result::Error("Unsupported platform for compile");
-    }
-
-    if (arguments.arguments.sizeInElements() >= 1)
-    {
-        StringView afterSplit;
-        if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
-        {
-            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.projectName));
-        }
-        else
-        {
-            action.projectName = arguments.arguments[0];
-        }
-    }
-    StringSpan args[4];
-
-    for (size_t idx = 1; idx < min(size_t(5), arguments.arguments.sizeInElements()); ++idx)
-    {
-        auto arg = arguments.arguments[idx];
-        if (arg == "--")
-        {
-            (void)arguments.arguments.sliceStart(idx + 1, action.additionalArguments);
-            break;
-        }
-        args[idx - 1] = arg;
-    }
-
-    if (not args[0].isEmpty())
-    {
-        action.configurationName = args[0];
-    }
-
-    if (args[1] == "xcode")
-    {
-        action.parameters.generator = Build::Generator::XCode;
-    }
-    else if (args[1] == "make")
-    {
-        action.parameters.generator = Build::Generator::Make;
-    }
-    else if (args[1] == "native")
-    {
-        action.parameters.generator = Build::Generator::Native;
-    }
-    else if (args[1] == "vs2022")
-    {
-        action.parameters.generator = Build::Generator::VisualStudio2022;
-    }
-    else if (args[1] == "vs2019")
-    {
-        action.parameters.generator = Build::Generator::VisualStudio2019;
-    }
-    else if (args[1] == "default")
-    {
-        // Defaults already set
-    }
-
-    if (args[2] == "arm64")
-    {
-        action.parameters.architecture = Build::Architecture::Arm64;
-    }
-    else if (args[2] == "intel32")
-    {
-        action.parameters.architecture = Build::Architecture::Intel32;
-    }
-    else if (args[2] == "intel64")
-    {
-        action.parameters.architecture = Build::Architecture::Intel64;
-    }
-    else if (args[2] == "wasm")
-    {
-        action.parameters.architecture = Build::Architecture::Wasm;
-    }
-    else if (args[2] == "any")
-    {
-        action.parameters.architecture = Build::Architecture::Any;
-    }
-
-    if (action.parameters.generator == Build::Generator::Native)
-    {
-        if (args[3] == "quiet")
-        {
-            action.parameters.execution.outputMode = Build::OutputMode::Quiet;
-        }
-        else if (args[3] == "normal")
-        {
-            action.parameters.execution.outputMode = Build::OutputMode::Normal;
-        }
-        else if (args[3] == "verbose")
-        {
-            action.parameters.execution.outputMode = Build::OutputMode::Verbose;
-        }
-    }
 
     return Build::executeAction(action);
 }
@@ -271,7 +895,7 @@ constexpr StringView BUILD_CACHE_SUBDIR   = "_BuildCache";
     return Result(true);
 }
 
-Result runBuildTool(Tool::Arguments& arguments)
+inline Result runBuildTool(Tool::Arguments& arguments)
 {
     if (arguments.action == "configure")
     {
@@ -316,11 +940,6 @@ Result runBuildTool(Tool::Arguments& arguments)
     }
 }
 
-#if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
-StringView Tool::getToolName() { return "SC-build"; }
-StringView Tool::getDefaultAction() { return "configure"; }
-Result     Tool::runTool(Tool::Arguments& arguments) { return runBuildTool(arguments); }
-#endif
 } // namespace Tools
 
 } // namespace SC

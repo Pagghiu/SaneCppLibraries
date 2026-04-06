@@ -128,18 +128,29 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 ```text
 ./SC.sh build configure [workspace:project | project]
-./SC.sh build compile [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
-./SC.sh build run [workspace:project | project] [configuration] [generator] [architecture] [-- extra args...]
-./SC.sh build coverage [workspace:project | project] [configuration] [generator] [architecture]
+./SC.sh build compile [workspace:project | project] [options]
+./SC.sh build run [workspace:project | project] [options] [-- extra args...]
+./SC.sh build coverage [workspace:project | project] [options]
 ```
 
 Generator keywords are `default`, `native`, `make`, `xcode`, `vs2022`, and `vs2019`.
+
+Named options are:
+
+- `-c`, `--config <NAME>`
+- `-g`, `--generator <NAME>`
+- `-a`, `--arch <NAME>`
+- `-o`, `--output <MODE>` (`compile` / `run`)
+- `-q`, `--quiet` (`compile` / `run`)
+- `--normal` (`compile` / `run`)
+- `-v`, `--verbose` (`compile` / `run`)
 
 Current defaults:
 
 - Windows: `default` resolves to `vs2022`
 - macOS / Linux: `default` resolves to `make`
 - Native builds do not require a prior `configure` step
+- Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples
 Configure project, generating them:
@@ -171,12 +182,12 @@ Build all projects
 
 Build through the native backend
 ```
-./SC.sh build compile SCTest Debug native
+./SC.sh build compile SCTest --config Debug --generator native
 ```
 
 Run a generated-backend executable and pass extra test arguments after `--`
 ```
-SC.bat build run SCTest Debug vs2022 -- --test "ThreadingTest"
+SC.bat build run SCTest --config Debug --generator vs2022 -- --test "ThreadingTest"
 ```
 
 Open generated projects:
