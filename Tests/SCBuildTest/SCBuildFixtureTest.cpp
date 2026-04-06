@@ -976,6 +976,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String expectedOutput = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/TinyConsoleProgram/stdout.txt", expectedOutput));
+            SC_TRUST_RESULT(normalizeConsoleOutput(expectedOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
 
@@ -1003,6 +1004,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String expectedOutput = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/SmallSCProgram/stdout.txt", expectedOutput));
+            SC_TRUST_RESULT(normalizeConsoleOutput(expectedOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
 
             FileSystem::FileStat executableStat;
