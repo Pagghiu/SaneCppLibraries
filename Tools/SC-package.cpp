@@ -7,6 +7,45 @@ namespace SC
 {
 namespace Tools
 {
+static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView destinationDirectory)
+{
+    String  archiveListing;
+    Process listProcess;
+    SC_TRY(listProcess.exec({"tar", "-tf", sourceFile}, archiveListing));
+    SC_TRY_MSG(listProcess.getExitStatus() == 0, "tar listing failed");
+
+    StringViewTokenizer tokenizer(archiveListing.view());
+    SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "tar archive is empty");
+
+    StringView rootDirectory = tokenizer.component.trimAnyOf({'\r', '\n', '/'});
+    StringView nestedPath;
+    if (rootDirectory.splitBefore("/", nestedPath))
+    {
+        rootDirectory = nestedPath;
+    }
+    SC_TRY_MSG(not rootDirectory.isEmpty(), "tar archive root directory is empty");
+
+    String     tempDirectory = format("{}-extracting", destinationDirectory);
+    String     extractedRoot = format("{}/{}", tempDirectory.view(), rootDirectory);
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (fs.existsAndIsDirectory(tempDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoryRecursive(tempDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(tempDirectory.view()));
+
+    Process extractProcess;
+    SC_TRY(extractProcess.exec({"tar", "-xf", sourceFile, "-C", tempDirectory.view()}));
+    SC_TRY_MSG(extractProcess.getExitStatus() == 0, "tar extraction failed");
+    SC_TRY_MSG(fs.existsAndIsDirectory(extractedRoot.view()), "tar extraction root directory missing");
+
+    SC_TRY(fs.removeDirectoryRecursive(destinationDirectory));
+    SC_TRY(fs.rename(extractedRoot.view(), destinationDirectory));
+    SC_TRY(fs.removeDirectoryRecursive(tempDirectory.view()));
+    return Result(true);
+}
+
 Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     // https://github.com/doxygen/doxygen/releases/download/Release_1_12_0/Doxygen-1.12.0.dmg
@@ -311,6 +350,74 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
     return Result(true);
 }
 
+Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                 Package& package)
+{
+    static constexpr StringView packageVersion = "20260324";
+    static constexpr StringView llvmVersion    = "22.1.2";
+
+    CustomFunctions functions;
+
+    Download download;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
+    download.packageName              = "llvm-mingw";
+    download.packageVersion           = packageVersion;
+    download.hashType                 = Hashing::TypeSHA256;
+
+    switch (HostPlatform)
+    {
+    case Platform::Apple:
+        download.packagePlatform = "macos_universal";
+        download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                   "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
+        download.expectedHash    = "1834ad45eb1a26c8bf3aa6137bc79db12fa1ef368af3ed0bbfba7c60adbe2fa6";
+        package.packageBaseName  = "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
+        break;
+    case Platform::Linux:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64:
+            download.packagePlatform = "linux_arm64";
+            download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                       "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
+            download.expectedHash    = "d28db713552e9d92699081b573a5b7c543d1d8095ed0d1c15dba184bf6e51440";
+            package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
+            break;
+        case InstructionSet::Intel64:
+            download.packagePlatform = "linux_intel64";
+            download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                       "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
+            download.expectedHash    = "f92b02c4f835470deb5ac5fb92ddb458239e80ddff9ce8867155679ee5f57ffc";
+            package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
+            break;
+        case InstructionSet::Intel32: return Result::Error("Unsupported platform");
+        }
+        break;
+    case Platform::Windows: return Result::Error("Automatic llvm-mingw install is not supported on Windows hosts yet");
+    case Platform::Emscripten: return Result::Error("Unsupported platform");
+    }
+
+    functions.extractFunction = [](StringView sourceFile, StringView destinationDirectory)
+    { return extractTarArchiveFlatteningRoot(sourceFile, destinationDirectory); };
+
+    functions.testFunction = [](const Download&, const Package& package)
+    {
+        String  result;
+        String  compilerExecutable;
+        Process process;
+        compilerExecutable = format("{}/bin/x86_64-w64-mingw32-clang++", package.installDirectoryLink);
+        SC_TRY(process.exec({compilerExecutable.view(), "--version"}, result));
+        SC_TRY_MSG(process.getExitStatus() == 0, "llvm-mingw compiler returned error");
+        SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "llvm-mingw compiler version missing");
+        SC_TRY_MSG(StringView(result.view()).containsString(llvmVersion), "llvm-mingw compiler version doesn't match");
+        return Result(true);
+    };
+
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
@@ -348,6 +455,11 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(
                 Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else if (packageName == "llvm-mingw")
+        {
+            SC_TRY(Tools::installLLVMMingwToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
+                                                    *package));
         }
         else
         {

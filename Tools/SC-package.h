@@ -237,7 +237,7 @@ struct CustomFunctions
     Process          process;
     SmallString<255> stripString;
     SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
-    SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view()}));
+    SC_TRY(process.exec({"tar", "-xf", fileName, "-C", directory, stripString.view()}));
     return Result(process.getExitStatus() == 0);
 }
 
@@ -247,7 +247,7 @@ struct CustomFunctions
     Process          process;
     SmallString<255> stripString;
     SC_TRY(StringBuilder::format(stripString, "--strip-components={}", stripComponents));
-    SC_TRY(process.exec({"tar", "-xvf", fileName, "-C", directory, stripString.view(), singleFilePath}));
+    SC_TRY(process.exec({"tar", "-xf", fileName, "-C", directory, stripString.view(), singleFilePath}));
     return Result(process.getExitStatus() == 0);
 }
 
@@ -444,6 +444,10 @@ inline Result verifyGitCommitHashInstall(const Download& download, const Package
 
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
+
+Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                 Package& package);
+Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
 
 } // namespace Tools
 } // namespace SC
