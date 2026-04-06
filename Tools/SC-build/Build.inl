@@ -679,6 +679,8 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     return Result(true);
 }
 
+static SC::Result writeGeneratedFileIfChanged(SC::FileSystem& fs, SC::StringView path, SC::StringView contents);
+
 SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
 {
     const Directories& directories = parameters.directories;
@@ -720,8 +722,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
 
                 SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/project.pbxproj", projectName));
-                SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), buffer.view()));
             }
             {
                 auto builder = StringBuilder::create(buffer);
@@ -732,8 +733,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
                 SC_TRY(StringBuilder::format(prjName, "{}.xcodeproj/xcshareddata/xcschemes/{}.xcscheme", projectName,
                                              projectName));
-                SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), builder.finalize()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), builder.finalize()));
             }
             switch (project.targetType)
             {
@@ -743,15 +743,13 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(StringBuilder::format(prjName, "{0}.entitlements", projectName));
                 SC_TRY(writer.writeEntitlements(builderEntitlements, project));
                 builderEntitlements.finalize();
-                SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), buffer.view()));
 
                 auto builderStoryboard = StringBuilder::create(buffer);
                 SC_TRY(StringBuilder::format(prjName, "{0}.storyboard", projectName));
                 SC_TRY(writer.writeStoryboard(builderStoryboard, project));
                 builderStoryboard.finalize();
-                SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), buffer.view()));
 
                 SC_TRY(writer.writeAssets(fs, project));
             }
@@ -768,8 +766,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             SC_TRY(StringBuilder::format(prjName, "{}.xcworkspace", workspace.name));
             SC_TRY(fs.makeDirectoryIfNotExists({prjName.view()}));
             SC_TRY(StringBuilder::format(prjName, "{}.xcworkspace/contents.xcworkspacedata", workspace.name));
-            SC_TRY(fs.removeFileIfExists(prjName.view()));
-            SC_TRY(fs.writeString(prjName.view(), buffer.view()));
+            SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), buffer.view()));
         }
         break;
     }
@@ -794,16 +791,14 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 SC_TRY(writer.writeProject(builder, project, renderer));
                 String prjName;
                 SC_TRY(StringBuilder::format(prjName, "{}.vcxproj", project.name));
-                SC_TRY(fs.removeFileIfExists(prjName.view()));
-                SC_TRY(fs.writeString(prjName.view(), builder.finalize()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjName.view(), builder.finalize()));
             }
             {
                 auto builder = StringBuilder::create(buffer);
                 SC_TRY(writer.writeFilters(builder, renderer));
                 String prjFilterName;
                 SC_TRY(StringBuilder::format(prjFilterName, "{}.vcxproj.filters", project.name));
-                SC_TRY(fs.removeFileIfExists(prjFilterName.view()));
-                SC_TRY(fs.writeString(prjFilterName.view(), builder.finalize()));
+                SC_TRY(writeGeneratedFileIfChanged(fs, prjFilterName.view(), builder.finalize()));
             }
             SC_TRY(projectsGuids.push_back(writer.projectGuid));
         }
@@ -814,8 +809,7 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                                                      projectsGuids.toSpanConst()));
             String slnName;
             SC_TRY(StringBuilder::format(slnName, "{}.sln", workspace.name));
-            SC_TRY(fs.removeFileIfExists(slnName.view()));
-            SC_TRY(fs.writeString(slnName.view(), builder.finalize()));
+            SC_TRY(writeGeneratedFileIfChanged(fs, slnName.view(), builder.finalize()));
         }
         break;
     }
@@ -826,13 +820,28 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
             auto builder = StringBuilder::create(buffer);
             SC_TRY(writer.writeMakefile(builder, workspace, renderer));
             builder.finalize();
-            SC_TRY(fs.removeFileIfExists("Makefile"));
-            SC_TRY(fs.writeString("Makefile", buffer.view()));
+            SC_TRY(writeGeneratedFileIfChanged(fs, "Makefile", buffer.view()));
         }
         break;
     }
     }
     return Result(true);
+}
+
+static SC::Result writeGeneratedFileIfChanged(SC::FileSystem& fs, SC::StringView path, SC::StringView contents)
+{
+    if (fs.existsAndIsFile(path))
+    {
+        SC::String currentContents = SC::StringEncoding::Utf8;
+        SC_TRY(fs.read(path, currentContents));
+        if (currentContents.view() == contents)
+        {
+            return SC::Result(true);
+        }
+        SC_TRY(fs.removeFileIfExists(path));
+    }
+    SC_TRY(fs.writeString(path, contents));
+    return SC::Result(true);
 }
 
 struct SC::Build::Action::Internal
@@ -1122,8 +1131,10 @@ SC::Result SC::Build::Action::Internal::runExecutable(StringView executablePath,
                                                       const Build::Action& action)
 {
     Process runProcess;
-    size_t  numArgs = 1;
-    arguments[0]    = StringView(executablePath).trimWhiteSpaces();
+    size_t  numArgs          = 1;
+    String  executableBuffer = StringEncoding::Utf8;
+    SC_TRY(Path::normalize(executableBuffer, StringView(executablePath).trimWhiteSpaces(), Path::AsNative));
+    arguments[0] = executableBuffer.view();
     globalConsole->print("COMMAND = {}\n", arguments[0]);
     for (size_t idx = 0; idx < action.additionalArguments.sizeInElements(); ++idx)
     {
@@ -1162,6 +1173,23 @@ static SC::Result printCapturedProcessOutput(SC::StringView stdOut, SC::StringVi
     return SC::Result(true);
 }
 
+static SC::Result extractLastNonEmptyOutputLine(SC::StringView output, SC::StringView& line)
+{
+    SC::StringViewTokenizer tokenizer(output);
+    SC::StringView          lastNonEmptyLine;
+    while (tokenizer.tokenizeNextLine())
+    {
+        const SC::StringView trimmedLine = tokenizer.component.trimWhiteSpaces();
+        if (not trimmedLine.isEmpty())
+        {
+            lastNonEmptyLine = trimmedLine;
+        }
+    }
+    SC_TRY_MSG(not lastNonEmptyLine.isEmpty(), "Cannot extract non-empty output line");
+    line = lastNonEmptyLine;
+    return SC::Result(true);
+}
+
 SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction configure, const Action& action,
                                                         Span<StringView> environment, String* outputExecutable)
 {
@@ -1170,6 +1198,10 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         SC_COMPILER_UNUSED(environment);
         return NativeBuild::execute(configure, action, outputExecutable);
     }
+
+    Definition definition;
+    SC_TRY(configure(definition, action.parameters));
+    SC_TRY(definition.configure(action.workspaceName, action.parameters));
 
     SmallString<256>       solutionLocation;
     const OutputMode::Type outputMode = resolveGeneratedOutputMode(action.parameters.execution);
@@ -1372,8 +1404,6 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
     case Generator::Make: {
         if (action.action == Action::Run and not action.allTargets)
         {
-            Definition definition;
-            SC_TRY(configure(definition, action.parameters));
             Workspace*     workspace     = nullptr;
             Project*       project       = nullptr;
             Configuration* configuration = nullptr;
@@ -1410,6 +1440,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         arguments[numArgs++] = "make"; // 1
 
         SmallString<32> targetName;
+        SmallString<32> compileTargetName;
         switch (action.action)
         {
         case Action::Compile: {
@@ -1424,7 +1455,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         }
         break;
         case Action::Run: {
-            // Not using the _RUN target to avoid one level of indirection
+            SC_TRY(StringBuilder::format(compileTargetName, "{}_COMPILE_COMMANDS", action.projectName));
             SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", action.projectName));
         }
         break;
@@ -1444,47 +1475,40 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
         {
             arguments[numArgs++] = architecture; // 7
         }
-        SC_TRY(process.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
-        if (environment.sizeInElements() % 2 == 0)
+
+        const auto setMakeEnvironment = [&](Process& processInstance)
         {
-            for (size_t idx = 0; idx < environment.sizeInElements(); idx += 2)
+            SC_TRY(processInstance.setEnvironment("GNUMAKEFLAGS", "--no-print-directory"));
+            if (environment.sizeInElements() % 2 == 0)
             {
-                SC_TRY(process.setEnvironment(environment[idx], environment[idx + 1]));
+                for (size_t idx = 0; idx < environment.sizeInElements(); idx += 2)
+                {
+                    SC_TRY(processInstance.setEnvironment(environment[idx], environment[idx + 1]));
+                }
             }
-        }
-        if (action.action == Action::Print)
+            return Result(true);
+        };
+        const auto executeMakeCompileTarget = [&](StringView target)
         {
-            SC_TRY(process.exec({arguments, numArgs}, *outputExecutable));
-            StringView out    = outputExecutable->view();
-            *outputExecutable = out.trimWhiteSpaces();
-        }
-        else if (action.action == Action::Run)
-        {
-            // We are actually invoking _PRINT_EXECUTABLE_PATH
-            String executableName;
-            SC_TRY(process.exec({arguments, numArgs}, executableName));
-            SC_TRY_MSG(process.getExitStatus() == 0, "Print returned error");
-            StringView executablePath = executableName.view();
-            SC_TRY(runExecutable(executablePath, arguments, action));
-        }
-        else
-        {
-            String stdOut   = StringEncoding::Utf8;
-            String stdError = StringEncoding::Utf8;
+            arguments[1]     = target;
+            String  stdOut   = StringEncoding::Utf8;
+            String  stdError = StringEncoding::Utf8;
+            Process buildProcess;
+            SC_TRY(setMakeEnvironment(buildProcess));
             if (outputMode == OutputMode::Quiet)
             {
-                SC_TRY(process.exec({arguments, numArgs}, stdOut, {}, stdError));
+                SC_TRY(buildProcess.exec({arguments, numArgs}, stdOut, {}, stdError));
             }
             else
             {
-                SC_TRY(process.exec({arguments, numArgs}, {}, {}, stdError));
+                SC_TRY(buildProcess.exec({arguments, numArgs}, {}, {}, stdError));
             }
             if (not stdError.isEmpty() and outputMode != OutputMode::Quiet)
             {
                 globalConsole->printError(stdError.view());
                 globalConsole->flushStdErr();
             }
-            if (process.getExitStatus() == 0)
+            if (buildProcess.getExitStatus() == 0)
             {
                 return Result(true);
             }
@@ -1498,11 +1522,13 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
                 globalConsole->flush();
                 arguments[1] = "clean";
                 Process cleanProcess;
+                SC_TRY(setMakeEnvironment(cleanProcess));
                 SC_TRY(cleanProcess.exec({arguments, numArgs}));
                 if (cleanProcess.getExitStatus() == 0)
                 {
-                    arguments[1] = targetName.view();
+                    arguments[1] = target;
                     Process retryProcess;
+                    SC_TRY(setMakeEnvironment(retryProcess));
                     SC_TRY(retryProcess.exec({arguments, numArgs}));
                     if (retryProcess.getExitStatus() == 0)
                     {
@@ -1512,6 +1538,34 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
                 return Result::Error("Compile returned error");
             }
             return Result::Error("Compile returned error");
+        };
+
+        if (action.action == Action::Print)
+        {
+            SC_TRY(setMakeEnvironment(process));
+            String output = StringEncoding::Utf8;
+            SC_TRY(process.exec({arguments, numArgs}, output));
+            StringView executablePath;
+            SC_TRY(extractLastNonEmptyOutputLine(output.view(), executablePath));
+            SC_TRY(Path::normalize(*outputExecutable, executablePath, Path::AsNative));
+        }
+        else if (action.action == Action::Run)
+        {
+            SC_TRY(executeMakeCompileTarget(compileTargetName.view()));
+
+            // We are actually invoking _PRINT_EXECUTABLE_PATH
+            arguments[1] = targetName.view();
+            SC_TRY(setMakeEnvironment(process));
+            String executableName;
+            SC_TRY(process.exec({arguments, numArgs}, executableName));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Print returned error");
+            StringView executablePath;
+            SC_TRY(extractLastNonEmptyOutputLine(executableName.view(), executablePath));
+            SC_TRY(runExecutable(executablePath, arguments, action));
+        }
+        else
+        {
+            SC_TRY(executeMakeCompileTarget(targetName.view()));
         }
     }
     break;

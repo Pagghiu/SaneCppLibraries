@@ -853,6 +853,7 @@ static Build::Action makeNativeCompileAction(const Build::Directories& directori
     return action;
 }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
                                                 StringView configurationName = "Debug")
 {
@@ -860,6 +861,7 @@ static Build::Action makeGeneratedCompileAction(const Build::Directories& direct
     action.parameters.generator = Build::Generator::Make;
     return action;
 }
+#endif
 
 static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
 {
@@ -1388,6 +1390,35 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                      buildResult, capturedOutput));
             SC_TEST_EXPECT(buildResult);
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("quiet-run\n"));
+        }
+
+        if (test_section("generated make backend keeps incremental rebuilds"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "GeneratedIncrementalFixture"}));
+            SC_TRUST_RESULT(writeHeaderDependencyFixture(fs, sourceRoot.view(), "incremental"));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            Build::Action action                   = makeGeneratedCompileAction(directories, HeaderFixtureProjectName);
+            action.parameters.execution.outputMode = Build::OutputMode::Normal;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram, FixtureWorkspaceName));
+
+            Result              buildResult = Result(true);
+            CapturedBuildOutput capturedOutput;
+            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
+                                                     buildResult, capturedOutput));
+            SC_TEST_EXPECT(buildResult);
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("Nothing to be done"));
+            SC_TEST_EXPECT(not StringView(capturedOutput.stdOut.view()).containsString("Compiling "));
+            SC_TEST_EXPECT(not StringView(capturedOutput.stdOut.view()).containsString("Linking "));
         }
 
         if (test_section("native backend suppresses successful compile noise in normal mode"))
