@@ -41,6 +41,9 @@ jobs:
     - name: compile SCTest
       run: ./SC.sh build compile SCTest ${{ matrix.config }}
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: compile SCBuildTest
+      run: ./SC.sh build compile SCBuildTest ${{ matrix.config }}
+      if: matrix.config == 'Release'
     - name: compile SCSingleFileLibs
       run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
     - name: compile InteropSTL
@@ -48,6 +51,9 @@ jobs:
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'
+    - name: test SCBuildTest
+      run: ./SC.sh build run SCBuildTest ${{ matrix.config }}
+      if: matrix.config == 'Release'
     - name: test InteropSTL
       run: ./SC.sh build run InteropSTL ${{ matrix.config }}
     - name: compile SCTest xcode

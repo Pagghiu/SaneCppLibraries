@@ -38,12 +38,20 @@ jobs:
     - name: compile SCTest
       shell: cmd
       run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: compile SCBuildTest
+      shell: cmd
+      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      if: matrix.config == 'Release'
     - name: compile InteropSTL
       shell: cmd
       run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
     - name: test SCTest
       shell: cmd
       run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} -- --all-tests
+    - name: test SCBuildTest
+      shell: cmd
+      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      if: matrix.config == 'Release'
     - name: test InteropSTL
       shell: cmd
       run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
