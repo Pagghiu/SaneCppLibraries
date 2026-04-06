@@ -52,6 +52,7 @@ struct BuildCLIResolvedStorage
 struct BuildCLIParseContext
 {
     StringSpan target           = {};
+    StringSpan targetProfile    = {};
     StringSpan configuration    = {};
     StringSpan generator        = {};
     StringSpan architecture     = {};
@@ -214,6 +215,21 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
 {
     switch (HostPlatform)
     {
+    case Platform::Windows: action.parameters.hostMachine.platform = Build::Platform::Windows; break;
+    case Platform::Apple: action.parameters.hostMachine.platform = Build::Platform::Apple; break;
+    case Platform::Linux: action.parameters.hostMachine.platform = Build::Platform::Linux; break;
+    default: break;
+    }
+    switch (HostInstructionSet)
+    {
+    case InstructionSet::ARM64: action.parameters.hostMachine.architecture = Build::Architecture::Arm64; break;
+    case InstructionSet::Intel64: action.parameters.hostMachine.architecture = Build::Architecture::Intel64; break;
+    case InstructionSet::Intel32: action.parameters.hostMachine.architecture = Build::Architecture::Intel32; break;
+    }
+    action.parameters.hostMachine.environment = Build::TargetEnvironment::Native;
+
+    switch (HostPlatform)
+    {
     case Platform::Windows:
         action.parameters.generator = Build::Generator::VisualStudio2022;
         action.parameters.platform  = Build::Platform::Windows;
@@ -228,6 +244,70 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
         break;
     default: break;
     }
+    action.parameters.targetMachine.platform     = action.parameters.platform;
+    action.parameters.targetMachine.architecture = action.parameters.architecture;
+    action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
+}
+
+[[nodiscard]] inline Result applyTargetProfileValue(Build::Action& action, StringView targetProfile, Console& console)
+{
+    if (targetProfile.isEmpty())
+    {
+        return Result(true);
+    }
+
+    StringView resolved = targetProfile;
+    if (equalsAsciiIgnoreCase(targetProfile, "h"))
+    {
+        resolved = "host";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "n"))
+    {
+        resolved = "native";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "windows-gnu-x64"))
+    {
+        resolved = "windows-gnu-x86_64";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "windows-gnu-aarch64"))
+    {
+        resolved = "windows-gnu-arm64";
+    }
+    else if (not(equalsAsciiIgnoreCase(targetProfile, "host") or equalsAsciiIgnoreCase(targetProfile, "native") or
+                 equalsAsciiIgnoreCase(targetProfile, "windows-gnu-x86_64") or
+                 equalsAsciiIgnoreCase(targetProfile, "windows-gnu-arm64")))
+    {
+        return printBuildActionValueError(console, "--target", targetProfile, "Unknown value for");
+    }
+
+    if (equalsAsciiIgnoreCase(resolved, "host") or equalsAsciiIgnoreCase(resolved, "native"))
+    {
+        action.parameters.targetMachine    = action.parameters.hostMachine;
+        action.parameters.platform         = action.parameters.targetMachine.platform;
+        action.parameters.architecture     = action.parameters.targetMachine.architecture;
+        action.parameters.toolchain.family = Build::Toolchain::HostDefault;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
+        return Result(true);
+    }
+
+    action.parameters.targetMachine.platform    = Build::Platform::Windows;
+    action.parameters.targetMachine.environment = Build::TargetEnvironment::WindowsGNU;
+    action.parameters.platform                  = Build::Platform::Windows;
+    action.parameters.toolchain.family          = Build::Toolchain::LLVMMingw;
+
+    if (equalsAsciiIgnoreCase(resolved, "windows-gnu-arm64"))
+    {
+        action.parameters.targetMachine.architecture = Build::Architecture::Arm64;
+        action.parameters.architecture               = Build::Architecture::Arm64;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign("aarch64-w64-windows-gnu"));
+    }
+    else
+    {
+        action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+        action.parameters.architecture               = Build::Architecture::Intel64;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign("x86_64-w64-windows-gnu"));
+    }
+    return Result(true);
 }
 
 [[nodiscard]] inline Result setBuildActionTarget(Build::Action& action, StringView target)
@@ -603,7 +683,7 @@ template <size_t N>
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[7];
+    CommandLineOption     options[8];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -613,6 +693,13 @@ template <size_t N>
     options[numOptions].help      = "Build configuration name";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.configuration);
+    numOptions++;
+
+    options[numOptions].longName  = "target";
+    options[numOptions].shortName = 't';
+    options[numOptions].help      = "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64)";
+    options[numOptions].valueName = "PROFILE";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;
 
     options[numOptions].longName  = "generator";
@@ -733,6 +820,10 @@ template <size_t N>
     if (not context.architecture.isEmpty())
     {
         SC_TRY(applyArchitectureValue(action, context.architecture, arguments.console));
+    }
+    if (not context.targetProfile.isEmpty())
+    {
+        SC_TRY(applyTargetProfileValue(action, context.targetProfile, arguments.console));
     }
 
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)

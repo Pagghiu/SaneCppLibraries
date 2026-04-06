@@ -70,7 +70,7 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
 
     if (parameters.platform == Platform::Windows)
     {
-        project.addLinkLibraries({"Advapi32"});
+        project.addLinkLibraries({"Advapi32", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"});
     }
     else
     {
@@ -251,7 +251,10 @@ static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
 Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 {
-    Project project = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
+    Project    project            = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
+    const bool isWindowsGNUTarget = parameters.platform == Platform::Windows and
+                                    (parameters.targetMachine.environment == TargetEnvironment::WindowsGNU or
+                                     parameters.toolchain.family == Toolchain::LLVMMingw);
 
     // All relative paths are evaluated from this project root directory.
     project.setRootDirectory(parameters.directories.libraryDirectory.view());
@@ -304,6 +307,7 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     if (parameters.platform == Platform::Windows)
     {
         project.addDefines({"IMGUI_API=__declspec( dllexport )"});
+        project.addLinkLibraries({"d3d11", "dxgi", "gdi32", "kernel32", "shell32", "user32"});
     }
     else
     {
@@ -317,6 +321,19 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
                                         "SerializationBinary", "SerializationText", "Socket", "Strings", "Threading"}))
     {
         return Result::Error("Failed to configure exported SCExample libraries");
+    }
+
+    if (isWindowsGNUTarget)
+    {
+        SourceFiles sokolWarnings;
+        sokolWarnings.addSelection("Examples/SCExample", "SCExampleSokol.c");
+        sokolWarnings.compile.disableClangWarnings({"unknown-pragmas"});
+        project.addSpecificFileFlags(sokolWarnings);
+
+        SourceFiles imguiWarnings;
+        imguiWarnings.addSelection(imgui.packageLocalDirectory.view(), "*.cpp");
+        imguiWarnings.compile.disableClangWarnings({"uninitialized-const-pointer"});
+        project.addSpecificFileFlags(imguiWarnings);
     }
 
     SC_TRY(workspace.projects.push_back(move(project)));

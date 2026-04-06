@@ -40,9 +40,16 @@ struct SC::Build::NativeBuild
 
         String displayName;
 
-        [[nodiscard]] bool isClangLike() const { return family == Toolchain::Clang or family == Toolchain::ZigCC; }
+        [[nodiscard]] bool isClangLike() const { return family == Toolchain::Clang or family == Toolchain::LLVMMingw; }
         [[nodiscard]] bool isMSVCStyle() const { return family == Toolchain::MSVC or family == Toolchain::ClangCL; }
         [[nodiscard]] bool isClangCL() const { return family == Toolchain::ClangCL; }
+    };
+
+    struct ResolvedTargetContext
+    {
+        Machine buildMachine;
+        Machine hostMachine;
+        Machine targetMachine;
     };
 
     struct ResolvedSource
@@ -66,10 +73,11 @@ struct SC::Build::NativeBuild
         const Project*       project       = nullptr;
         const Configuration* configuration = nullptr;
 
-        Variables       variables;
-        CompilerAdapter adapter;
-        CompileFlags    compileFlags;
-        LinkFlags       linkFlags;
+        Variables             variables;
+        ResolvedTargetContext targetContext;
+        CompilerAdapter       adapter;
+        CompileFlags          compileFlags;
+        LinkFlags             linkFlags;
 
         String targetDirectory;
         String intermediateDirectory;
@@ -539,7 +547,7 @@ struct SC::Build::NativeBuild
             return false;
         }
 
-        switch (resolvedProject.parameters->platform)
+        switch (targetPlatform(resolvedProject.targetContext))
         {
         case Platform::Apple:
         case Platform::Linux: return true;
@@ -552,7 +560,7 @@ struct SC::Build::NativeBuild
 
     static Result buildStripCommand(const ResolvedProject& resolvedProject, CommandLine& commandLine)
     {
-        switch (resolvedProject.parameters->platform)
+        switch (targetPlatform(resolvedProject.targetContext))
         {
         case Platform::Apple:
             SC_TRY(commandLine.append("strip"));
@@ -613,7 +621,7 @@ struct SC::Build::NativeBuild
 
             CommandLine nmCommand;
             SC_TRY(nmCommand.append("nm"));
-            switch (resolvedProject.parameters->platform)
+            switch (targetPlatform(resolvedProject.targetContext))
             {
             case Platform::Apple: SC_TRY(nmCommand.append("-gjU")); break;
             case Platform::Linux:
@@ -662,7 +670,7 @@ struct SC::Build::NativeBuild
         SC_TRY(fs.writeString(resolvedProject.exportedSymbolsPath.view(), exportedSymbols.view()));
 
         String linkerSymbols = StringEncoding::Utf8;
-        if (resolvedProject.parameters->platform == Platform::Linux)
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
         {
             auto builder = StringBuilder::create(linkerSymbols);
             SC_TRY(builder.append("{\n"));
@@ -683,7 +691,7 @@ struct SC::Build::NativeBuild
         }
 
         SC_TRY(signature.assign(exportedSymbols.view()));
-        if (resolvedProject.parameters->platform == Platform::Linux)
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
         {
             auto builder = StringBuilder::createForAppendingTo(signature);
             SC_TRY(builder.append("\n# dynamic-list\n"));
@@ -764,8 +772,8 @@ struct SC::Build::NativeBuild
         finalPhaseCompleted             = false;
         String exportedSymbolsSignature = StringEncoding::Utf8;
         if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags) and
-            (resolvedProject.parameters->platform == Platform::Apple or
-             resolvedProject.parameters->platform == Platform::Linux))
+            (targetPlatform(resolvedProject.targetContext) == Platform::Apple or
+             targetPlatform(resolvedProject.targetContext) == Platform::Linux))
         {
             SC_TRY(writeExportedSymbolsFiles(fs, resolvedProject, exportedSymbolsSignature));
         }
@@ -1270,6 +1278,15 @@ struct SC::Build::NativeBuild
 
     static Result runExecutable(StringView executablePath, const Action& action)
     {
+        ResolvedTargetContext targetContext;
+        SC_TRY(resolveTargetContext(action.parameters, targetContext));
+        if (targetPlatform(targetContext) != targetContext.hostMachine.platform or
+            targetArchitecture(targetContext) != targetContext.hostMachine.architecture or
+            targetContext.targetMachine.environment != TargetEnvironment::Native)
+        {
+            return Result::Error("Running foreign targets is not implemented yet");
+        }
+
         Process    process;
         StringSpan arguments[64];
         size_t     numArguments = 1;
@@ -1296,8 +1313,6 @@ struct SC::Build::NativeBuild
                                          const CompilerAdapter& adapter)
     {
         if (responsePath.isEmpty())
-            return Result(true);
-        if (adapter.family == Toolchain::ZigCC)
             return Result(true);
         const size_t inlineCommandBytes = commandLine.totalCharacters() + commandLine.size() + 1;
         if (not(commandLine.size() > 48 or commandLine.totalCharacters() > 4096 or
@@ -1345,10 +1360,10 @@ struct SC::Build::NativeBuild
         resolvedProject.project       = &project;
         resolvedProject.configuration = &configuration;
 
-        SC_TRY(resolveCompilerAdapter(parameters.toolchain, parameters.platform, parameters.architecture,
-                                      resolvedProject.adapter));
-        SC_TRY(fillVariables(parameters, project, configuration, resolvedProject.adapter.displayName.view(),
-                             resolvedProject.variables));
+        SC_TRY(resolveTargetContext(parameters, resolvedProject.targetContext));
+        SC_TRY(resolveCompilerAdapter(parameters, resolvedProject.targetContext, resolvedProject.adapter));
+        SC_TRY(fillVariables(parameters, project, configuration, resolvedProject.targetContext,
+                             resolvedProject.adapter.displayName.view(), resolvedProject.variables));
 
         const CompileFlags* compileOpinions[] = {&configuration.compile, &project.files.compile};
         SC_TRY(CompileFlags::merge(compileOpinions, resolvedProject.compileFlags));
@@ -1363,7 +1378,7 @@ struct SC::Build::NativeBuild
                                     configuration.intermediatesPath.view(), resolvedProject.variables,
                                     resolvedProject.intermediateDirectory));
         String artifactName = StringEncoding::Utf8;
-        SC_TRY(computeArtifactName(parameters.platform, project, artifactName));
+        SC_TRY(computeArtifactName(targetPlatform(resolvedProject.targetContext), project, artifactName));
         SC_TRY(
             Path::join(resolvedProject.executablePath, {resolvedProject.targetDirectory.view(), artifactName.view()}));
         SC_TRY(Path::join(resolvedProject.linkCommandPath,
@@ -1407,8 +1422,9 @@ struct SC::Build::NativeBuild
 
             String objectRelative = StringEncoding::Utf8;
             SC_TRY(objectRelative.assign(renderItem.referencePath.view()));
-            SC_TRY(StringBuilder::createForAppendingTo(objectRelative)
-                       .append(parameters.platform == Platform::Windows ? ".obj"_a8 : ".o"_a8));
+            SC_TRY(
+                StringBuilder::createForAppendingTo(objectRelative)
+                    .append(targetPlatform(resolvedProject.targetContext) == Platform::Windows ? ".obj"_a8 : ".o"_a8));
             SC_TRY(
                 Path::join(source.objectPath, {resolvedProject.intermediateDirectory.view(), objectRelative.view()}));
             SC_TRY(StringBuilder::format(source.dependencyPath, "{}.d", source.objectPath.view()));
@@ -1561,13 +1577,13 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-fsanitize=address,undefined"));
         }
         if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike() and
-            resolvedProject.parameters->platform != Platform::Linux)
+            targetPlatform(resolvedProject.targetContext) != Platform::Linux)
         {
             SC_TRY(commandLine.append("-nostdlib++"));
         }
         if (resolvedProject.project->targetType == TargetType::SharedLibrary)
         {
-            if (resolvedProject.parameters->platform == Platform::Apple)
+            if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
             {
                 SC_TRY(commandLine.append("-dynamiclib"));
             }
@@ -1888,7 +1904,7 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        if (resolvedProject.parameters->platform == Platform::Linux and
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Linux and
             WriterInternal::isExecutableTarget(*resolvedProject.project) and
             not resolvedProject.project->exportLibraries.isEmpty())
         {
@@ -1898,11 +1914,11 @@ struct SC::Build::NativeBuild
         if (resolvedProject.project->targetType != TargetType::StaticLibrary and
             resolvedProject.linkFlags.enableDeadCodeStripping)
         {
-            if (resolvedProject.parameters->platform == Platform::Apple)
+            if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
             {
                 SC_TRY(commandLine.append("-dead_strip"));
             }
-            else if (resolvedProject.parameters->platform == Platform::Linux)
+            else if (targetPlatform(resolvedProject.targetContext) == Platform::Linux)
             {
                 SC_TRY(commandLine.append("-Wl,--gc-sections"));
             }
@@ -1910,7 +1926,7 @@ struct SC::Build::NativeBuild
 
         if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags))
         {
-            switch (resolvedProject.parameters->platform)
+            switch (targetPlatform(resolvedProject.targetContext))
             {
             case Platform::Apple:
                 SC_TRY(commandLine.append("-Xlinker"));
@@ -1942,7 +1958,7 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(option.view()));
         }
 
-        if (resolvedProject.parameters->platform == Platform::Apple)
+        if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
         {
             for (const String& framework : resolvedProject.linkFlags.frameworks)
             {
@@ -1987,13 +2003,16 @@ struct SC::Build::NativeBuild
                                               const FilePathsResolver& filePathsResolver,
                                               Vector<ResolvedProject>& resolvedProjects)
     {
+        ResolvedTargetContext actionTargetContext;
+        SC_TRY(resolveTargetContext(action.parameters, actionTargetContext));
+
         Vector<const Project*> orderedProjects;
         if (action.allTargets)
         {
             for (const Project& project : workspace.projects)
             {
-                SC_TRY(appendProjectBuildOrder(workspace, action.parameters.platform, project, action.configurationName,
-                                               orderedProjects));
+                SC_TRY(appendProjectBuildOrder(workspace, targetPlatform(actionTargetContext), project,
+                                               action.configurationName, orderedProjects));
             }
         }
         else
@@ -2003,8 +2022,8 @@ struct SC::Build::NativeBuild
             SC_TRY(findProjectConfiguration(workspace, action.projectName, action.configurationName, project,
                                             configuration));
             SC_COMPILER_UNUSED(configuration);
-            SC_TRY(appendProjectBuildOrder(workspace, action.parameters.platform, *project, action.configurationName,
-                                           orderedProjects));
+            SC_TRY(appendProjectBuildOrder(workspace, targetPlatform(actionTargetContext), *project,
+                                           action.configurationName, orderedProjects));
         }
 
         for (const Project* project : orderedProjects)
@@ -2083,14 +2102,15 @@ struct SC::Build::NativeBuild
                                                const Project& project, const Configuration& configuration,
                                                ResolvedProject& resolvedProject)
     {
-        SC_TRY(findWorkspaceDependencies(workspace, parameters.platform, project, configuration.name.view(),
-                                         resolvedProject.workspaceDependencies));
+        SC_TRY(findWorkspaceDependencies(workspace, targetPlatform(resolvedProject.targetContext), project,
+                                         configuration.name.view(), resolvedProject.workspaceDependencies));
 
         Vector<String> externalLibraries;
         for (const String& library : resolvedProject.linkFlags.libraries)
         {
             const Project* dependency = nullptr;
-            if (findWorkspaceStaticLibraryDependency(workspace, parameters.platform, library.view(), dependency))
+            if (findWorkspaceStaticLibraryDependency(workspace, targetPlatform(resolvedProject.targetContext),
+                                                     library.view(), dependency))
             {
                 String    dependencyOutputDirectory = StringEncoding::Utf8;
                 String    dependencyArtifactName    = StringEncoding::Utf8;
@@ -2099,12 +2119,13 @@ struct SC::Build::NativeBuild
 
                 const Configuration* dependencyConfiguration = dependency->getConfiguration(configuration.name.view());
                 SC_TRY_MSG(dependencyConfiguration != nullptr, "Dependency configuration not found");
-                SC_TRY(fillVariables(parameters, *dependency, *dependencyConfiguration,
+                SC_TRY(fillVariables(parameters, *dependency, *dependencyConfiguration, resolvedProject.targetContext,
                                      resolvedProject.adapter.displayName.view(), dependencyVariables));
                 SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(),
                                             dependencyConfiguration->outputPath.view(), dependencyVariables,
                                             dependencyOutputDirectory));
-                SC_TRY(computeArtifactName(parameters.platform, *dependency, dependencyArtifactName));
+                SC_TRY(computeArtifactName(targetPlatform(resolvedProject.targetContext), *dependency,
+                                           dependencyArtifactName));
                 SC_TRY(Path::join(dependencyArtifactPath,
                                   {dependencyOutputDirectory.view(), dependencyArtifactName.view()}));
                 SC_TRY(resolvedProject.workspaceDependencyArtifacts.push_back(move(dependencyArtifactPath)));
@@ -2168,6 +2189,101 @@ struct SC::Build::NativeBuild
         return false;
     }
 
+    static Machine resolveBuildMachine()
+    {
+        Machine buildMachine;
+        switch (HostPlatform)
+        {
+        case SC::Platform::Apple: buildMachine.platform = Build::Platform::Apple; break;
+        case SC::Platform::Linux: buildMachine.platform = Build::Platform::Linux; break;
+        case SC::Platform::Windows: buildMachine.platform = Build::Platform::Windows; break;
+        case SC::Platform::Emscripten: buildMachine.platform = Build::Platform::Wasm; break;
+        }
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: buildMachine.architecture = Build::Architecture::Arm64; break;
+        case InstructionSet::Intel64: buildMachine.architecture = Build::Architecture::Intel64; break;
+        case InstructionSet::Intel32: buildMachine.architecture = Build::Architecture::Intel32; break;
+        }
+        buildMachine.environment = TargetEnvironment::Native;
+        return buildMachine;
+    }
+
+    static Result resolveTargetContext(const Parameters& parameters, ResolvedTargetContext& context)
+    {
+        context.buildMachine = resolveBuildMachine();
+
+        context.hostMachine = parameters.hostMachine;
+        if (context.hostMachine.platform == Platform::Unknown)
+        {
+            context.hostMachine.platform = context.buildMachine.platform;
+        }
+        if (context.hostMachine.architecture == Architecture::Any)
+        {
+            context.hostMachine.architecture = context.buildMachine.architecture;
+        }
+        if (context.hostMachine.environment == TargetEnvironment::Native)
+        {
+            context.hostMachine.environment = context.buildMachine.environment;
+        }
+
+        context.targetMachine = parameters.targetMachine;
+        if (context.targetMachine.platform == Platform::Unknown)
+        {
+            context.targetMachine.platform = parameters.platform;
+        }
+        if (context.targetMachine.architecture == Architecture::Any)
+        {
+            context.targetMachine.architecture = parameters.architecture;
+        }
+        if (context.targetMachine.platform == Platform::Unknown)
+        {
+            context.targetMachine.platform = context.hostMachine.platform;
+        }
+        if (context.targetMachine.architecture == Architecture::Any)
+        {
+            context.targetMachine.architecture = context.hostMachine.architecture;
+        }
+        if (context.targetMachine.environment == TargetEnvironment::Native and
+            parameters.toolchain.family == Toolchain::LLVMMingw)
+        {
+            context.targetMachine.environment = TargetEnvironment::WindowsGNU;
+        }
+        return Result(true);
+    }
+
+    static constexpr bool isWindowsGNUTarget(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.platform == Platform::Windows and
+               context.targetMachine.environment == TargetEnvironment::WindowsGNU;
+    }
+
+    static constexpr Platform::Type targetPlatform(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.platform;
+    }
+
+    static constexpr Architecture::Type targetArchitecture(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.architecture;
+    }
+
+    static constexpr StringView defaultTargetTriple(const ResolvedTargetContext& context)
+    {
+        if (isWindowsGNUTarget(context))
+        {
+            switch (targetArchitecture(context))
+            {
+            case Architecture::Intel64: return "x86_64-w64-windows-gnu";
+            case Architecture::Arm64: return "aarch64-w64-windows-gnu";
+            case Architecture::Intel32:
+            case Architecture::Any:
+            case Architecture::Wasm: break;
+            }
+        }
+        return {};
+    }
+
     static Result appendTargeting(CommandLine& commandLine, const ResolvedProject& resolvedProject, bool forCompiler)
     {
         if (resolvedProject.adapter.isMSVCStyle())
@@ -2175,7 +2291,7 @@ struct SC::Build::NativeBuild
             StringView targetTriple = resolvedProject.parameters->toolchain.targetTriple.view();
             if (targetTriple.isEmpty() and resolvedProject.adapter.isClangCL())
             {
-                switch (resolvedProject.parameters->architecture)
+                switch (targetArchitecture(resolvedProject.targetContext))
                 {
                 case Architecture::Intel64: targetTriple = "x86_64-pc-windows-msvc"; break;
                 case Architecture::Intel32: targetTriple = "i686-pc-windows-msvc"; break;
@@ -2206,10 +2322,15 @@ struct SC::Build::NativeBuild
         }
 
         StringView targetTriple = resolvedProject.parameters->toolchain.targetTriple.view();
-        if (targetTriple.isEmpty() and resolvedProject.parameters->platform == Platform::Apple and
-            resolvedProject.parameters->architecture != Architecture::Any and resolvedProject.adapter.isClangLike())
+        if (targetTriple.isEmpty())
         {
-            switch (resolvedProject.parameters->architecture)
+            targetTriple = defaultTargetTriple(resolvedProject.targetContext);
+        }
+        if (targetTriple.isEmpty() and targetPlatform(resolvedProject.targetContext) == Platform::Apple and
+            targetArchitecture(resolvedProject.targetContext) != Architecture::Any and
+            resolvedProject.adapter.isClangLike())
+        {
+            switch (targetArchitecture(resolvedProject.targetContext))
             {
             case Architecture::Arm64: targetTriple = "arm64-apple-macos11"; break;
             case Architecture::Intel64: targetTriple = "x86_64-apple-macos11"; break;
@@ -2226,7 +2347,7 @@ struct SC::Build::NativeBuild
 
         if (not resolvedProject.parameters->toolchain.sysroot.isEmpty())
         {
-            if (resolvedProject.parameters->platform == Platform::Apple)
+            if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
             {
                 SC_TRY(commandLine.append("-isysroot"));
                 SC_TRY(commandLine.append(resolvedProject.parameters->toolchain.sysroot.view()));
@@ -2565,27 +2686,32 @@ struct SC::Build::NativeBuild
     }
 
     static Result fillVariables(const Parameters& parameters, const Project& project,
-                                const Configuration& configuration, StringView compilerName, Variables& variables)
+                                const Configuration& configuration, const ResolvedTargetContext& targetContext,
+                                StringView compilerName, Variables& variables)
     {
         SC_TRY(variables.projectName.assign(project.name.view()));
         SC_TRY(variables.projectRoot.assign(project.rootDirectory.view()));
-        SC_TRY(variables.targetOS.assign(platformName(parameters.platform)));
-        SC_TRY(variables.targetArchitectures.assign(architectureName(parameters.architecture)));
+        SC_TRY(variables.targetOS.assign(platformName(targetPlatform(targetContext))));
+        SC_TRY(variables.targetArchitectures.assign(architectureName(targetArchitecture(targetContext))));
         SC_TRY(variables.buildSystem.assign(Generator::toString(parameters.generator)));
         SC_TRY(variables.compiler.assign(compilerName));
         SC_TRY(variables.configuration.assign(configuration.name.view()));
         return Result(true);
     }
 
-    static Result resolveCompilerAdapter(const Toolchain& toolchain, Platform::Type platform,
-                                         Architecture::Type architecture, CompilerAdapter& adapter)
+    static Result resolveCompilerAdapter(const Parameters& parameters, const ResolvedTargetContext& targetContext,
+                                         CompilerAdapter& adapter)
     {
-        SC_COMPILER_UNUSED(architecture);
+        const Toolchain& toolchain = parameters.toolchain;
 
         adapter.family = toolchain.family;
         if (adapter.family == Toolchain::HostDefault)
         {
-            if (platform == Platform::Windows)
+            if (isWindowsGNUTarget(targetContext))
+            {
+                adapter.family = Toolchain::LLVMMingw;
+            }
+            else if (targetPlatform(targetContext) == Platform::Windows)
             {
                 adapter.family = Toolchain::MSVC;
             }
@@ -2627,17 +2753,43 @@ struct SC::Build::NativeBuild
             SC_TRY(resolveExecutable(toolchain.archiver.view(), "ar", adapter.executableArchive));
             SC_TRY(adapter.displayName.assign("gcc"));
             break;
-        case Toolchain::ZigCC:
-            SC_TRY(resolveExecutable(toolchain.compilerC.view(), "zig", adapter.executableC));
-            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), adapter.executableC.view(), adapter.executableCpp));
+        case Toolchain::LLVMMingw: {
+            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
+                           targetContext.hostMachine.platform == Platform::Linux,
+                       "llvm-mingw cross compilation is only supported on macOS and Linux hosts");
+            SC_TRY_MSG(isWindowsGNUTarget(targetContext), "llvm-mingw requires a Windows GNU target");
+
+            Tools::Package llvmMingwPackage;
+            SC_TRY(Tools::installLLVMMingwToolchain(parameters.directories.packagesCacheDirectory.view(),
+                                                    parameters.directories.packagesInstallDirectory.view(),
+                                                    llvmMingwPackage));
+
+            StringView compilerPrefix;
+            switch (targetArchitecture(targetContext))
+            {
+            case Architecture::Intel64: compilerPrefix = "x86_64-w64-mingw32"; break;
+            case Architecture::Arm64: compilerPrefix = "aarch64-w64-mingw32"; break;
+            case Architecture::Intel32:
+            case Architecture::Any:
+            case Architecture::Wasm:
+                return Result::Error("llvm-mingw only supports x86_64 and arm64 Windows GNU targets");
+            }
+
+            String defaultCompilerC   = StringEncoding::Utf8;
+            String defaultCompilerCpp = StringEncoding::Utf8;
+            String defaultArchiver    = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(defaultCompilerC, "{}/bin/{}-clang", llvmMingwPackage.installDirectoryLink,
+                                         compilerPrefix));
+            SC_TRY(StringBuilder::format(defaultCompilerCpp, "{}/bin/{}-clang++", llvmMingwPackage.installDirectoryLink,
+                                         compilerPrefix));
+            SC_TRY(StringBuilder::format(defaultArchiver, "{}/bin/llvm-ar", llvmMingwPackage.installDirectoryLink));
+            SC_TRY(resolveExecutable(toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
+            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), defaultCompilerCpp.view(), adapter.executableCpp));
             SC_TRY(resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
-            SC_TRY(resolveExecutable(toolchain.archiver.view(), adapter.executableC.view(), adapter.executableArchive));
-            adapter.subcommandC       = "cc";
-            adapter.subcommandCpp     = "c++";
-            adapter.subcommandLink    = "c++";
-            adapter.subcommandArchive = "ar";
-            SC_TRY(adapter.displayName.assign("zigcc"));
+            SC_TRY(resolveExecutable(toolchain.archiver.view(), defaultArchiver.view(), adapter.executableArchive));
+            SC_TRY(adapter.displayName.assign("llvm-mingw"));
             break;
+        }
         case Toolchain::CustomDriver:
             SC_TRY_MSG(not toolchain.compilerC.isEmpty(), "CustomDriver requires compilerC");
             SC_TRY_MSG(not toolchain.compilerCpp.isEmpty(), "CustomDriver requires compilerCpp");
@@ -2801,6 +2953,11 @@ struct SC::Build::NativeBuild
                              resolvedProject.adapter.executableC.view(), resolvedProject.adapter.executableCpp.view(),
                              resolvedProject.adapter.executableLink.view(),
                              resolvedProject.adapter.executableArchive.view());
+        globalConsole->print("[trace] build={} host={} target={} env={}\n",
+                             platformName(resolvedProject.targetContext.buildMachine.platform),
+                             platformName(resolvedProject.targetContext.hostMachine.platform),
+                             platformName(targetPlatform(resolvedProject.targetContext)),
+                             TargetEnvironment::toString(resolvedProject.targetContext.targetMachine.environment));
         if (not resolvedProject.parameters->toolchain.targetTriple.isEmpty() or
             not resolvedProject.parameters->toolchain.sysroot.isEmpty())
         {

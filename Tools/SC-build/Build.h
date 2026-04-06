@@ -121,6 +121,41 @@ struct Generator
     }
 };
 
+/// @brief Describes the target runtime / ABI environment for a machine
+struct TargetEnvironment
+{
+    enum Type
+    {
+        Native = 0,
+        WindowsGNU,
+        WindowsMSVC,
+        LinuxGlibc,
+        LinuxMusl,
+    };
+
+    /// @brief Get StringView from TargetEnvironment::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case Native: return "native";
+        case WindowsGNU: return "windows-gnu";
+        case WindowsMSVC: return "windows-msvc";
+        case LinuxGlibc: return "linux-glibc";
+        case LinuxMusl: return "linux-musl";
+        }
+        Assert::unreachable();
+    }
+};
+
+/// @brief Describes the machine a build runs on or targets
+struct Machine
+{
+    Platform::Type          platform     = Platform::Unknown;
+    Architecture::Type      architecture = Architecture::Any;
+    TargetEnvironment::Type environment  = TargetEnvironment::Native;
+};
+
 /// @brief Describes how a standalone backend should invoke the toolchain
 struct Toolchain
 {
@@ -131,7 +166,7 @@ struct Toolchain
         GCC,
         MSVC,
         ClangCL,
-        ZigCC,
+        LLVMMingw,
         CustomDriver,
     };
 
@@ -574,8 +609,12 @@ struct Parameters
         architecture = Architecture::Any;
         generator    = Generator::Make;
     }
-    Directories      directories;
-    Toolchain        toolchain;
+    Directories directories;
+    Toolchain   toolchain;
+
+    Machine hostMachine;   ///< Machine that owns host-side tools and paths
+    Machine targetMachine; ///< Machine the produced artifacts are built for
+
     ExecutionOptions execution;
 };
 

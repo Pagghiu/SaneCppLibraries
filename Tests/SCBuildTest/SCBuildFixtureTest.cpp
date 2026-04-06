@@ -87,7 +87,7 @@ static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& 
     {
     case Build::Toolchain::Clang: compilerName = "clang"; return Result(true);
     case Build::Toolchain::GCC: compilerName = "gcc"; return Result(true);
-    case Build::Toolchain::ZigCC: compilerName = "zigcc"; return Result(true);
+    case Build::Toolchain::LLVMMingw: compilerName = "llvm-mingw"; return Result(true);
     case Build::Toolchain::MSVC: compilerName = "msvc"; return Result(true);
     case Build::Toolchain::ClangCL: compilerName = "clang-cl"; return Result(true);
     case Build::Toolchain::CustomDriver:
@@ -979,6 +979,35 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(normalizeConsoleOutput(expectedOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
+
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+        if (test_section("native backend cross compiles Windows fixture with llvm-mingw"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
+            action.parameters.platform                   = Build::Platform::Windows;
+            action.parameters.architecture               = Build::Architecture::Intel64;
+            action.parameters.toolchain.family           = Build::Toolchain::LLVMMingw;
+            action.parameters.targetMachine.platform     = Build::Platform::Windows;
+            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsGNU;
+            SC_TRUST_RESULT(action.parameters.toolchain.targetTriple.assign("x86_64-w64-windows-gnu"));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+        }
+#endif
 
         if (test_section("native backend keeps small fixture small and unexported"))
         {

@@ -73,6 +73,31 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Arm64);
             SC_TEST_EXPECT(action.parameters.execution.outputMode == Build::OutputMode::Quiet);
         }
+        if (test_section("build cli parses Windows GNU target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "native";
+            args[3]             = "--target";
+            args[4]             = "windows-gnu-x86_64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+            SC_TEST_EXPECT(action.parameters.platform == Build::Platform::Windows);
+            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::LLVMMingw);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsGNU);
+            SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "x86_64-w64-windows-gnu");
+        }
         if (test_section("build cli parses utf16 legacy generator values"))
         {
             arguments.tool               = "build";
