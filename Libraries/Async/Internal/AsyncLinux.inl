@@ -343,10 +343,21 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         {
             if (completion.res < 0)
             {
-                continueProcessing = false; // Don't process cancellations
-                if (completion.res != -ECANCELED)
+                AsyncRequest* async = getAsyncRequest(idx);
+                if (completion.res == -EINTR and async != nullptr and
+                    (async->type == AsyncRequest::Type::FileRead or async->type == AsyncRequest::Type::FileWrite))
                 {
-                    return makeIoUringCompletionError(completion.res);
+                    // Character devices such as PTYs can transiently surface EINTR on io_uring file I/O.
+                    // Match the synchronous POSIX backends and let completeAsync re-submit transparently.
+                    continueProcessing = true;
+                }
+                else
+                {
+                    continueProcessing = false; // Don't process cancellations
+                    if (completion.res != -ECANCELED)
+                    {
+                        return makeIoUringCompletionError(completion.res);
+                    }
                 }
             }
             else
@@ -503,7 +514,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncFileRead::Result& result)
     {
-        io_uring_cqe& completion       = events[result.eventIndex];
+        io_uring_cqe& completion = events[result.eventIndex];
+        if (completion.res == -EINTR)
+        {
+            result.shouldCallCallback = false;
+            result.reactivateRequest(true);
+            return Result(true);
+        }
         result.completionData.numBytes = static_cast<size_t>(completion.res);
         if (completion.res == 0)
         {
@@ -539,7 +556,14 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncFileWrite::Result& result)
     {
-        result.completionData.numBytes = static_cast<size_t>(events[result.eventIndex].res);
+        io_uring_cqe& completion = events[result.eventIndex];
+        if (completion.res == -EINTR)
+        {
+            result.shouldCallCallback = false;
+            result.reactivateRequest(true);
+            return Result(true);
+        }
+        result.completionData.numBytes = static_cast<size_t>(completion.res);
         return Result(result.completionData.numBytes == Internal::getSummedSizeOfBuffers(result.getAsync()));
     }
 
