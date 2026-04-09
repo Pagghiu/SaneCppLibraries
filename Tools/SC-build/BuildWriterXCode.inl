@@ -571,11 +571,10 @@ struct SC::Build::ProjectWriter::WriterXCode
         return builder.append(escaped.view());
     }
 
-    [[nodiscard]] bool writePBXShellScriptBuildPhase(StringBuilder& builder, const Project& project,
+    [[nodiscard]] bool writePBXShellScriptBuildPhase(StringBuilder&            builder, const Project&,
                                                      const Vector<RenderItem>& xcodeFiles)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        (void)project;
         (void)xcodeFiles;
         builder.append(R"delimiter(
 /* Begin PBXShellScriptBuildPhase section */
@@ -592,6 +591,8 @@ struct SC::Build::ProjectWriter::WriterXCode
 			);
 			outputPaths = (
 				"$(SYMROOT)/compile_commands.json",
+)delimiter");
+        builder.append(R"delimiter(
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
@@ -1387,6 +1388,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             {"$(BUILD_SYSTEM)", "xcode"},                            //
             {"$(COMPILER)", "clang"},                                //
             {"$(COMPILER_VERSION)", "15"},                           // TODO: Detect apple-clang version
+            {"\\", "\\\\"},                                          // Keep escaped sequences intact
             {"\"", "\\\\\\\""},                                      // Escape double quotes
         };
         return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});

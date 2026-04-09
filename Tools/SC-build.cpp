@@ -88,6 +88,239 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
     }
 }
 
+static constexpr StringView buildPlatformName(Platform::Type platform)
+{
+    switch (platform)
+    {
+    case Platform::Apple: return "macOS";
+    case Platform::Linux: return "linux";
+    case Platform::Windows: return "windows";
+    case Platform::Wasm: return "wasm";
+    case Platform::Unknown: return "unknown";
+    }
+    Assert::unreachable();
+}
+
+static constexpr Architecture::Type hostArchitecture()
+{
+    switch (HostInstructionSet)
+    {
+    case InstructionSet::Intel32: return Architecture::Intel32;
+    case InstructionSet::Intel64: return Architecture::Intel64;
+    case InstructionSet::ARM64: return Architecture::Arm64;
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView buildArchitectureName(const Parameters& parameters, const Configuration& configuration)
+{
+    Architecture::Type architecture = configuration.architecture;
+    if (architecture == Architecture::Any)
+    {
+        architecture = parameters.architecture;
+    }
+
+    if (parameters.generator == Generator::XCode)
+    {
+        switch (architecture)
+        {
+        case Architecture::Intel64: return "x86_64";
+        case Architecture::Arm64: return "arm64";
+        case Architecture::Any: return "arm64 x86_64";
+        case Architecture::Intel32:
+        case Architecture::Wasm: return "unsupported";
+        }
+    }
+    else if (parameters.generator == Generator::VisualStudio2019 or parameters.generator == Generator::VisualStudio2022)
+    {
+        if (architecture == Architecture::Any)
+        {
+            architecture = hostArchitecture();
+        }
+        switch (architecture)
+        {
+        case Architecture::Intel32: return "x86";
+        case Architecture::Intel64: return "x64";
+        case Architecture::Arm64: return "ARM64";
+        case Architecture::Any:
+        case Architecture::Wasm: return "unsupported";
+        }
+    }
+    else
+    {
+        if (architecture == Architecture::Any)
+        {
+            architecture = hostArchitecture();
+        }
+        switch (architecture)
+        {
+        case Architecture::Intel32: return "x86";
+        case Architecture::Intel64: return "x86_64";
+        case Architecture::Arm64: return "arm64";
+        case Architecture::Any:
+        case Architecture::Wasm: return "unsupported";
+        }
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView buildSystemName(Generator::Type generator)
+{
+    switch (generator)
+    {
+    case Generator::Native: return "Native";
+    case Generator::Make: return "make";
+    case Generator::XCode: return "xcode";
+    case Generator::VisualStudio2019:
+    case Generator::VisualStudio2022: return "msbuild";
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView compilerName(const Parameters& parameters)
+{
+    switch (parameters.toolchain.family)
+    {
+    case Toolchain::Clang: return "clang";
+    case Toolchain::GCC: return "gcc";
+    case Toolchain::MSVC: return "msvc";
+    case Toolchain::ClangCL: return "clang-cl";
+    case Toolchain::LLVMMingw: return "llvm-mingw";
+    case Toolchain::CustomDriver: return "custom-driver";
+    case Toolchain::HostDefault:
+        if (parameters.platform == Platform::Windows)
+        {
+            return "msvc";
+        }
+        if (parameters.generator == Generator::XCode or parameters.platform == Platform::Apple)
+        {
+            return "clang";
+        }
+        return "gcc";
+    }
+    Assert::unreachable();
+}
+
+static Result expandBuildDirectoryVariables(StringView source, const Parameters& parameters,
+                                            const Configuration& configuration, String& output)
+{
+    const ProjectWriter::ReplacePair substitutions[] = {
+        {"$(TARGET_OS)", buildPlatformName(parameters.platform)},
+        {"$(TARGET_ARCHITECTURES)", buildArchitectureName(parameters, configuration)},
+        {"$(BUILD_SYSTEM)", buildSystemName(parameters.generator)},
+        {"$(COMPILER)", compilerName(parameters)},
+        {"$(CONFIGURATION)", configuration.name.view()},
+    };
+    auto builder = StringBuilder::create(output);
+    SC_TRY(ProjectWriter::appendReplaceMultiple(builder, source, substitutions));
+    builder.finalize();
+    return Result(true);
+}
+
+static Result computeExecutableDirectory(const Project& project, const Parameters& parameters,
+                                         const Configuration& configuration, String& executableDirectory)
+{
+    String outputDirectory = StringEncoding::Utf8;
+    SC_TRY(expandBuildDirectoryVariables(configuration.outputPath.view(), parameters, configuration, outputDirectory));
+
+    if (Path::isAbsolute(outputDirectory.view(), Path::AsNative))
+    {
+        SC_TRY(executableDirectory.assign(outputDirectory.view()));
+    }
+    else
+    {
+        SC_TRY(
+            Path::join(executableDirectory, {parameters.directories.outputsDirectory.view(), outputDirectory.view()}));
+    }
+
+    if (project.targetType == TargetType::GUIApplication and parameters.generator == Generator::XCode)
+    {
+        String bundleDirectory = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(bundleDirectory, "{}.app", project.targetName.view()));
+        String fullDirectory = StringEncoding::Utf8;
+        SC_TRY(Path::join(fullDirectory, {executableDirectory.view(), bundleDirectory.view(), "Contents", "MacOS"}));
+        executableDirectory = move(fullDirectory);
+    }
+    return Result(true);
+}
+
+static Result appendEscapedCString(StringBuilder& builder, StringView text)
+{
+    for (size_t idx = 0; idx < text.sizeInBytes(); ++idx)
+    {
+        const char ch = text.bytesWithoutTerminator()[idx];
+        if (ch == '\\' or ch == '"')
+        {
+            SC_TRY(builder.append("\\"));
+        }
+        const char character[] = {ch, 0};
+        SC_TRY(builder.append(StringView::fromNullTerminated(character, StringEncoding::Utf8)));
+    }
+    return Result(true);
+}
+
+static Result normalizeRelativePathForCompileDefine(String& path)
+{
+    const StringView pathView   = path.view();
+    String           normalized = StringEncoding::Utf8;
+    auto             builder    = StringBuilder::create(normalized);
+    for (size_t idx = 0; idx < pathView.sizeInBytes(); ++idx)
+    {
+        char ch = pathView.bytesWithoutTerminator()[idx];
+        if (ch == '\\')
+        {
+            ch = '/';
+        }
+        const char character[] = {ch, 0};
+        SC_TRY(builder.append(StringView::fromNullTerminated(character, StringEncoding::Utf8)));
+    }
+    builder.finalize();
+    path = move(normalized);
+    return Result(true);
+}
+
+static Result addCompiledLibraryRootDefine(Project& project, const Parameters& parameters)
+{
+    for (Configuration& configuration : project.configurations)
+    {
+        String executableDirectory = StringEncoding::Utf8;
+        SC_TRY(computeExecutableDirectory(project, parameters, configuration, executableDirectory));
+
+        String relativeRoot = StringEncoding::Utf8;
+        SC_TRY(Path::relativeFromTo(relativeRoot, executableDirectory.view(), project.rootDirectory.view(),
+                                    Path::AsNative, Path::AsNative));
+        SC_TRY(normalizeRelativePathForCompileDefine(relativeRoot));
+
+        String define = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(define, "SC_LIBRARY_ROOT={}", relativeRoot.view()));
+        SC_TRY(configuration.compile.defines.push_back(move(define)));
+    }
+    return Result(true);
+}
+
+static Result addHotReloadIncludePathsDefine(Project& project, const Parameters& parameters, StringView imguiDirectory)
+{
+    for (Configuration& configuration : project.configurations)
+    {
+        String executableDirectory = StringEncoding::Utf8;
+        SC_TRY(computeExecutableDirectory(project, parameters, configuration, executableDirectory));
+
+        String relativeImgui = StringEncoding::Utf8;
+        SC_TRY(Path::relativeFromTo(relativeImgui, executableDirectory.view(), imguiDirectory, Path::AsNative,
+                                    Path::AsNative));
+        SC_TRY(normalizeRelativePathForCompileDefine(relativeImgui));
+
+        String define  = StringEncoding::Utf8;
+        auto   builder = StringBuilder::create(define);
+        SC_TRY(builder.append("SC_HOT_RELOAD_INCLUDE_PATHS=\""));
+        SC_TRY(appendEscapedCString(builder, relativeImgui.view()));
+        SC_TRY(builder.append("\""));
+        builder.finalize();
+        SC_TRY(configuration.compile.defines.push_back(move(define)));
+    }
+    return Result(true);
+}
+
 static constexpr StringView TEST_PROJECT_NAME       = "SCTest";
 static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
 
@@ -126,7 +359,8 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
 
     // Defines
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
-    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
 
     // Includes
     project.addIncludePaths({
@@ -185,7 +419,8 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", "SC_COMPILER_ENABLE_CONFIG=1"});
+    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({
         ".",
         "Tests/SCBuildTest",
@@ -238,6 +473,7 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
 
     // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
     project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({"."}); // Libraries path
     addSaneCppLibraries(project, parameters);
     project.addFiles("Tests/InteropSTL", "*.cpp");
@@ -280,12 +516,8 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addFiles(sokol.packageLocalDirectory.view(), "*.h");
-    String imguiRelative, imguiDefine;
-    SC_TRY(Path::relativeFromTo(imguiRelative, project.rootDirectory.view(), imgui.packageLocalDirectory.view(),
-                                Path::AsNative));
-
-    SC_TRY(StringBuilder::format(imguiDefine, "SC_IMGUI_PATH=$(PROJECT_ROOT)/{}", imguiRelative));
-    project.addDefines({"SC_LIBRARY_PATH=$(PROJECT_ROOT)", imguiDefine.view()});
+    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
+    SC_TRY(addHotReloadIncludePathsDefine(project, parameters, imgui.packageLocalDirectory.view()));
     project.addExportAllLibraries(); // Export all SC libraries for plugins
     SC_TRY(project.addExportDirectories({imgui.packageLocalDirectory.view()}));
     project.link.preserveExportedSymbols = true;
@@ -469,7 +701,7 @@ SC_COMPILER_WARNING_POP;
 Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE); }
 } // namespace Build
 
-#if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
+#if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)
 StringView Tools::Tool::getToolName() { return "SC-build"; }
 StringView Tools::Tool::getDefaultAction() { return "configure"; }
 Result     Tools::Tool::runTool(Tools::Tool::Arguments& arguments) { return Tools::runBuildTool(arguments); }

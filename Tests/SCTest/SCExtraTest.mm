@@ -36,16 +36,8 @@
     TestReport::Output<Console> trConsole = {console};
 
     TestReport report(trConsole, 5, argv);
-    FileSystem::Operations::getExecutablePath(report.executableFile);
-    FileSystem::Operations::getApplicationRootDirectory(report.applicationRootDirectory);
-    SmallString<255> correctedPath;
-    {
-        StringView components[64];
-        (void)Path::normalizeUNCAndTrimQuotes(correctedPath,SC_COMPILER_LIBRARY_PATH,  Path::AsNative, components);
-        // If you hit this assertion you must figure out a way to derive location of Libraries
-        SC_ASSERT_RELEASE(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
-    }
-    SC_ASSERT_RELEASE(report.libraryRootDirectory.assign(correctedPath.view()));
+    if (report.hasStartupFailure())
+        return;
     report.debugBreakOnFailedTest = true;
 
     globalConsole = &console;

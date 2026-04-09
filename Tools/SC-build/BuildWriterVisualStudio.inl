@@ -299,7 +299,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("    <PreprocessorDefinitions>");
             for (const String& it : compileFlags.defines)
             {
-                SC_TRY(appendVariable(builder, it.view()));
+                SC_TRY(appendPreprocessorDefinition(builder, it.view()));
                 builder.append(";");
             }
             builder.append("%(PreprocessorDefinitions)</PreprocessorDefinitions>\n");
@@ -383,6 +383,14 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     using RenderGroup = WriterInternal::RenderGroup;
     using Renderer    = WriterInternal::Renderer;
 
+    [[nodiscard]] bool appendXMLTextEscaped(StringBuilder& builder, StringView text)
+    {
+        const ReplacePair replacements[] = {
+            {"&", "&amp;"}, {"<", "&lt;"}, {">", "&gt;"}, {"\"", "&quot;"}, {"'", "&apos;"},
+        };
+        return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
+    }
+
     [[nodiscard]] bool writeSourceFiles(StringBuilder& builder, const Project& project, Vector<RenderItem>& files)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
@@ -419,7 +427,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         for (const String& define : file.compileFlags->defines)
         {
-            writeForAllArchitectures("PreprocessorDefinitions", builder, project, define.view());
+            writeForAllArchitectures("PreprocessorDefinitions", builder, project, define.view(), true);
         }
 
         String allWarnings;
@@ -441,7 +449,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
-    Result writeForAllArchitectures(StringView tag, StringBuilder& builder, const Project& project, StringView value)
+    Result writeForAllArchitectures(StringView tag, StringBuilder& builder, const Project& project, StringView value,
+                                    bool isPreprocessorDefinition = false)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         return forArchitecture(
@@ -452,7 +461,14 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 builder.append("      <{0} "
                                "Condition=\"'$(Configuration)|$(Platform)'=='{1}|{2}'\">",
                                tag, configuration.name, platform);
-                appendVariable(builder, value);
+                if (isPreprocessorDefinition)
+                {
+                    appendPreprocessorDefinition(builder, value);
+                }
+                else
+                {
+                    appendVariable(builder, value);
+                }
                 builder.append("</{0}>\n", tag);
                 return true;
             });
@@ -778,6 +794,25 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
 
         const ReplacePair replacements[] = {
             {"/", "\\"},                                                 //
+            {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
+            {"$(PROJECT_ROOT)", relativeRoot},                           //
+            {"$(CONFIGURATION)", "$(Configuration)"},                    //
+            {"$(PROJECT_NAME)", "$(ProjectName)"},                       //
+            {"$(TARGET_OS)", "windows"},                                 // $(SDKIdentifier)
+            {"$(TARGET_OS_VERSION)", "$(WindowsTargetPlatformVersion)"}, //
+            {"$(TARGET_ARCHITECTURES)", "$(PlatformTarget)"},            //
+            {"$(BUILD_SYSTEM)", "msbuild"},                              //
+            {"$(COMPILER)", "msvc"},                                     //
+            {"$(COMPILER_VERSION)", "17"},                               // TODO: Detect MSVC version
+        };
+        return appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])});
+    }
+
+    [[nodiscard]] bool appendPreprocessorDefinition(StringBuilder& builder, StringView text)
+    {
+        const StringView relativeRoot = relativeDirectories.projectRootRelativeToProjects.view();
+
+        const ReplacePair replacements[] = {
             {"$(PROJECT_DIR)\\", "$(ProjectDir)"},                       //
             {"$(PROJECT_ROOT)", relativeRoot},                           //
             {"$(CONFIGURATION)", "$(Configuration)"},                    //

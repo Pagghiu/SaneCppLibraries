@@ -223,7 +223,7 @@ endif # $(CONFIG)
         writeCleanRule(builder, makeTarget.view());
         writeObjectFilesList(builder, makeTarget.view(), renderer);
         writeRebuildOnHeaderChangeRule(builder, makeTarget.view());
-        writeCompileCommandsJsonRule(builder, makeTarget.view());
+        writeCompileCommandsJsonRule(builder, project, makeTarget.view());
 
         writeFinalArtifactRule(builder, project, makeTarget.view());
         writeRunExecutableRule(builder, project, makeTarget.view());
@@ -284,6 +284,20 @@ endif # $(CONFIG)
         Assert::unreachable();
     }
 
+    Result appendShellDoubleQuoted(StringBuilder& builder, StringView text)
+    {
+        const ReplacePair replacements[] = {
+            {"\\", "\\\\"},
+            {"\"", "\\\""},
+            {"$", "\\$"},
+            {"`", "\\`"},
+        };
+        SC_TRY(builder.append("\""));
+        SC_TRY(appendReplaceMultiple(builder, text, {replacements, sizeof(replacements) / sizeof(replacements[0])}));
+        SC_TRY(builder.append("\""));
+        return Result(true);
+    }
+
     Result writeTargetRule(StringBuilder& builder, const Project& project, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
@@ -323,19 +337,26 @@ endif
         return Result(true);
     }
 
-    void writeCompileCommandsJsonRule(StringBuilder& builder, StringView makeTarget)
+    void writeCompileCommandsJsonRule(StringBuilder& builder, const Project&, StringView makeTarget)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-
         builder.append(R"delimiter(
 
 {0}: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+)delimiter",
+                       makeTarget);
+
+        builder.append(R"delimiter(
 
 ifeq ($(CLANG_DETECTED),yes)
-{0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json
+)delimiter");
+        builder.append("{0}_COMPILE_COMMANDS: $({0}_INTERMEDIATE_DIR)/compile_commands.json\n", makeTarget);
+        builder.append(R"delimiter(
 else
 # On GCC generating compile_commands.json is not supported but it's expected for _COMPILE_COMMANDS to compile the executable too
-{0}_COMPILE_COMMANDS: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)
+)delimiter");
+        builder.append("{0}_COMPILE_COMMANDS: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)\n", makeTarget);
+        builder.append(R"delimiter(
 endif
 
 $({0}_INTERMEDIATE_DIR)/compile_commands.json: $({0}_TARGET_DIR)/$({0}_TARGET_NAME)

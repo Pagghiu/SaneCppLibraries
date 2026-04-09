@@ -7,7 +7,7 @@
 #include "../Libraries/Foundation/Deferred.h"
 #include "SC-package.h"
 
-#if !defined(SC_LIBRARY_PATH)
+#if !defined(SC_TOOLS_COMPILED_SEPARATELY)
 #define SC_TOOLS_IMPORT
 #include "SC-package.cpp"
 #undef SC_TOOLS_IMPORT
@@ -95,7 +95,7 @@ Result runFormatTool(Tool::Arguments& arguments)
         return Result::Error("SC-format unknown action (supported \"execute\" or \"check\")");
     }
 }
-#if !defined(SC_LIBRARY_PATH) && !defined(SC_TOOLS_IMPORT)
+#if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)
 StringView Tool::getToolName() { return "SC-format"; }
 StringView Tool::getDefaultAction() { return "execute"; }
 Result     Tool::runTool(Tool::Arguments& arguments) { return runFormatTool(arguments); }

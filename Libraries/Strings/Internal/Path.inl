@@ -356,25 +356,6 @@ bool SC::Path::join(IGrowableBuffer&& output, StringEncoding encoding, Span<cons
     return true;
 }
 
-bool SC::Path::normalizeUNCAndTrimQuotes(IGrowableBuffer&& outputPath, StringEncoding encoding, StringView fileLocation,
-                                         Type type, Span<StringView> components)
-{
-    // The macro escaping Library Path from defines adds escaped double quotes
-    fileLocation = fileLocation.trimAnyOf({'"'});
-#if SC_COMPILER_MSVC
-    StringPath fixUncPathsOnMSVC;
-    if (fileLocation.startsWithAnyOf({'\\'}) and not fileLocation.startsWith("\\\\"))
-    {
-        // On MSVC __FILE__ when building on UNC paths reports a single starting backslash...
-        SC_TRY(fixUncPathsOnMSVC.append("\\"));
-        SC_TRY(fixUncPathsOnMSVC.append(fileLocation));
-        fileLocation = fixUncPathsOnMSVC.view();
-    }
-#endif
-    SC_TRY(Path::normalize(move(outputPath), encoding, fileLocation, type, components));
-    return true;
-}
-
 bool SC::Path::normalize(IGrowableBuffer&& output, StringEncoding encoding, StringView view, Type type,
                          Span<StringView> components)
 {

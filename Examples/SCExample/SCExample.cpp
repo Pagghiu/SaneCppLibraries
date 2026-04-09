@@ -20,6 +20,63 @@
 
 namespace SC
 {
+static Result resolveCompiledPathFromExecutableDirectory(StringView compiledPath, StringView executableDirectory,
+                                                         String& resolved)
+{
+    SC_TRY_MSG(not compiledPath.isEmpty(), "SCExample missing required compile-time path");
+    if (Path::isAbsolute(compiledPath, Path::AsNative))
+    {
+        SC_TRY(resolved.assign(compiledPath));
+        return Result(true);
+    }
+    SC_TRY(Path::join(resolved, {executableDirectory, compiledPath}));
+    return Result(true);
+}
+
+static Result appendLine(String& text, StringView line)
+{
+    if (line.isEmpty())
+        return Result(true);
+
+    auto builder = StringBuilder::createForAppendingTo(text);
+    if (not text.isEmpty())
+    {
+        SC_TRY(builder.append("\n"));
+    }
+    SC_TRY(builder.append(line));
+    builder.finalize();
+    return Result(true);
+}
+
+struct HotReloadOptionsStorage
+{
+    String examplesPath            = StringEncoding::Utf8;
+    String defaultIncludePathsText = StringEncoding::Utf8;
+};
+
+static Result buildHotReloadOptions(HotReloadOptionsStorage& storage)
+{
+    StringPath executablePath;
+    SC_TRY_MSG(not FileSystem::Operations::getExecutablePath(executablePath).isEmpty(),
+               "SCExample could not resolve executable path");
+
+    String executableDirectory = StringEncoding::Utf8;
+    SC_TRY(executableDirectory.assign(Path::dirname(executablePath.view(), Path::AsNative)));
+
+    const StringView compiledLibraryRoot =
+        StringView::fromNullTerminated(SC_COMPILER_LIBRARY_PATH, StringEncoding::Utf8);
+    const StringView compiledExtraIncludePaths =
+        StringView::fromNullTerminated(SC_HOT_RELOAD_INCLUDE_PATHS, StringEncoding::Utf8);
+
+    String libraryRoot = StringEncoding::Utf8;
+    SC_TRY(resolveCompiledPathFromExecutableDirectory(compiledLibraryRoot, executableDirectory.view(), libraryRoot));
+
+    SC_TRY(Path::join(storage.examplesPath, {libraryRoot.view(), "Examples", "SCExample", "Examples"}));
+    SC_TRY(appendLine(storage.defaultIncludePathsText, compiledLibraryRoot));
+    SC_TRY(appendLine(storage.defaultIncludePathsText, compiledExtraIncludePaths));
+    return Result(true);
+}
+
 struct ApplicationState
 {
     static constexpr int NumPauseFrames = 2;
@@ -40,7 +97,8 @@ struct ApplicationSystem
 {
     ApplicationState state;
 
-    HotReloadSystem hotReloadSystem;
+    HotReloadSystem         hotReloadSystem;
+    HotReloadOptionsStorage hotReloadOptionsStorage;
 
     Result create()
     {
@@ -57,7 +115,10 @@ struct ApplicationSystem
         SC_TRY(timeout.start(eventLoop, Time::Milliseconds(state.timeoutOccursEveryMs)));
         eventLoopMonitor.onNewEventsAvailable = []() { sokol_wake_up(); };
         SC_TRY(eventLoopMonitor.create(eventLoop));
-        SC_TRY(hotReloadSystem.create(eventLoop));
+        SC_TRY(buildHotReloadOptions(hotReloadOptionsStorage));
+        const HotReloadSystem::Options hotReloadOptions = {hotReloadOptionsStorage.examplesPath.view(),
+                                                           hotReloadOptionsStorage.defaultIncludePathsText.view()};
+        SC_TRY(hotReloadSystem.create(eventLoop, hotReloadOptions));
         SC_TRY(hotReloadSystem.syncRegistry());
         return Result(true);
     }

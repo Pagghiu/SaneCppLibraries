@@ -261,19 +261,6 @@ struct SC_STRINGS_EXPORT Path
     /// @return A StringView without its initial separator
     [[nodiscard]] static StringView removeStartingSeparator(StringView path);
 
-    /// @brief An extended Path::normalize handling a bug with incorrect __FILE__ backslash escape on Windows when
-    /// using UNC Paths, and also removing quote characters '"' added when passing such paths to compiler command line.
-    template <typename T>
-    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(T& outputPath, StringView fileLocation, Type type,
-                                                        Span<StringView> components)
-    {
-        return normalizeUNCAndTrimQuotes(GrowableBuffer<T>{outputPath}, outputPath.getEncoding(), fileLocation, type,
-                                         components);
-    }
-    [[nodiscard]] static bool normalizeUNCAndTrimQuotes(IGrowableBuffer&& outputPath, StringEncoding encoding,
-                                                        StringView fileLocation, Type type,
-                                                        Span<StringView> components);
-
   private:
     [[nodiscard]] static StringView removeTrailingSeparator(StringView path);
     struct Internal;

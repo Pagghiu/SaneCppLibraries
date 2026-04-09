@@ -6,21 +6,54 @@
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Plugin/Plugin.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringConverter.h"
 
 #include "Examples/ISCExample.h"
+#include "Examples/ImguiHelpers.h"
+
+#ifndef SC_HOT_RELOAD_INCLUDE_PATHS
+#define SC_HOT_RELOAD_INCLUDE_PATHS ""
+#endif
 
 namespace SC
 {
 static constexpr int ToolbarHeight = 35;
 
+static bool rebuildHotReloadIncludePaths(StringView executableDirectory, StringView includePathsText,
+                                         PluginCompiler& compiler)
+{
+    compiler.includePaths.clear();
+
+    StringViewTokenizer lines(includePathsText);
+    while (lines.tokenizeNext({'\n'}, StringViewTokenizer::IncludeEmpty))
+    {
+        const StringView line = lines.component.trimWhiteSpaces().trimEndAnyOf({'\r'});
+        if (line.isEmpty())
+            continue;
+
+        StringPath includePath;
+        if (Path::isAbsolute(line, Path::AsNative))
+        {
+            SC_TRY(includePath.assign(line));
+        }
+        else
+        {
+            SC_TRY(Path::join(includePath, {executableDirectory, line}));
+        }
+        SC_TRY_MSG(compiler.includePaths.push_back(includePath), "HotReloadSystem exceeded include path capacity");
+    }
+    return true;
+}
+
 struct HotReloadState
 {
-    String libraryRootDirectory;
-    String imguiPath;
-    String pluginsPath;
+    String examplesPath;
+    String includePathsText = StringEncoding::Utf8;
 
     StringPath executablePath;
+    StringPath executableDirectory;
+    Buffer     includePathsBuffer;
 
     char isysroot[255];
 };
@@ -28,23 +61,28 @@ struct HotReloadState
 // A simple hot reload system using the Plugin and FileSystemWatcher library
 struct HotReloadSystem
 {
+    struct Options
+    {
+        StringView examplesPath;
+        StringView defaultIncludePathsText;
+    };
+
     HotReloadState state;
 
     PluginDynamicLibrary storage[16]; // Max 16 examples
     PluginRegistry       registry;
 
-    Result create(AsyncEventLoop& loop)
+    Result create(AsyncEventLoop& loop, const Options& options)
     {
         registry.init(storage);
         eventLoop = &loop;
-        // Setup Paths
+        FileSystem fs;
+        SC_TRY(fs.init("."));
         FileSystem::Operations::getExecutablePath(state.executablePath);
-        StringView components[64];
-        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.libraryRootDirectory, SC_COMPILER_LIBRARY_PATH, Path::AsNative,
-                                               components));
-        constexpr const StringView escapedImgui = SC_COMPILER_MACRO_TO_LITERAL(SC_COMPILER_MACRO_ESCAPE(SC_IMGUI_PATH));
-        SC_TRY(Path::normalizeUNCAndTrimQuotes(state.imguiPath, escapedImgui, Path::AsNative, components));
-        SC_TRY(Path::join(state.pluginsPath, {state.libraryRootDirectory.view(), "Examples", "SCExample", "Examples"}));
+        SC_TRY(state.executableDirectory.assign(Path::dirname(state.executablePath.view(), Path::AsNative)));
+        SC_TRY_MSG(not options.examplesPath.isEmpty(), "HotReloadSystem missing examples path");
+        SC_TRY(state.examplesPath.assign(options.examplesPath));
+        SC_TRY_MSG(fs.existsAndIsDirectory(state.examplesPath.view()), "HotReloadSystem examples path does not exist");
         StringView iosSysroot = "/var/mobile/theos/sdks/iPhoneOS14.4.sdk";
         if (FileSystem().existsAndIsDirectory(iosSysroot))
         {
@@ -55,18 +93,14 @@ struct HotReloadSystem
         // Setup Compiler
         SC_TRY(PluginCompiler::findBestCompiler(compiler));
         SC_TRY(PluginSysroot::findBestSysroot(compiler.type, sysroot));
-        StringPath libraryRoot;
-        SC_TRY(libraryRoot.assign(state.libraryRootDirectory.view()));
-        SC_TRY(compiler.includePaths.push_back(libraryRoot));
-        StringPath imguiPath;
-        SC_TRY(imguiPath.assign(state.imguiPath.view()));
-        SC_TRY(compiler.includePaths.push_back(imguiPath));
+        SC_TRY(state.includePathsText.assign(options.defaultIncludePathsText));
+        SC_TRY(rebuildCompilerIncludePaths());
 
         // Setup File System Watcher
         fileSystemWatcherRunner.init(*eventLoop);
         SC_TRY(fileSystemWatcher.init(fileSystemWatcherRunner));
         folderWatcher.notifyCallback.bind<HotReloadSystem, &HotReloadSystem::onFileChange>(*this);
-        SC_TRY(fileSystemWatcher.watch(folderWatcher, state.pluginsPath.view()));
+        SC_TRY(fileSystemWatcher.watch(folderWatcher, state.examplesPath.view()));
         return Result(true);
     }
 
@@ -82,7 +116,7 @@ struct HotReloadSystem
         PluginDefinition       definitions[16];
         Span<PluginDefinition> definitionSpan;
         Buffer                 fileBuffer;
-        SC_TRY(PluginScanner::scanDirectory(state.pluginsPath.view(), definitions, fileBuffer, definitionSpan))
+        SC_TRY(PluginScanner::scanDirectory(state.examplesPath.view(), definitions, fileBuffer, definitionSpan))
         SC_TRY(registry.replaceDefinitions(move(definitionSpan)));
         return Result(true);
     }
@@ -127,6 +161,12 @@ struct HotReloadSystem
     void unload(StringView identifier) { (void)registry.unloadPlugin(identifier); }
 
     void setSysroot(StringView isysroot) { (void)sysroot.isysroot.assign(isysroot); }
+
+    Result rebuildCompilerIncludePaths()
+    {
+        SC_TRY(rebuildHotReloadIncludePaths(state.executableDirectory.view(), state.includePathsText.view(), compiler));
+        return Result(true);
+    }
 
   private:
     AsyncEventLoop* eventLoop = nullptr;
@@ -177,6 +217,17 @@ struct HotReloadView
             }
         }
         ImGui::PopItemWidth();
+
+        ImGui::Text("Include Paths:");
+        bool         includePathsModified = false;
+        const ImVec2 includePathsSize(ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2,
+                                      ImGui::GetTextLineHeightWithSpacing() * 6.0f);
+        SC_TRY(InputTextMultiline("##-include-paths", state.includePathsBuffer, state.includePathsText,
+                                  includePathsSize, includePathsModified));
+        if (includePathsModified)
+        {
+            SC_TRY(system.rebuildCompilerIncludePaths());
+        }
 
         if (ImGui::Button("Sync Registry"))
         {

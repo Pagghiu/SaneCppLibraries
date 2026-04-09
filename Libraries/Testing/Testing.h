@@ -76,6 +76,9 @@ struct TestReport
     /// @return `-1` if tests are failed, `0` if tests are successful
     [[nodiscard]] int getTestReturnCode() const;
 
+    /// @brief Returns true when startup path resolution failed before tests ran
+    [[nodiscard]] bool hasStartupFailure() const { return startupFailure; }
+
     /// @brief Applies an optional port offset configured through command line or environment
     /// @param basePort The default test port
     /// @return The mapped port (basePort + portOffset if representable as uint16_t)
@@ -120,6 +123,7 @@ struct TestReport
     StringSpan firstFailedTest;
     StringSpan testToRun;
     StringSpan sectionToRun;
+    bool       startupFailure = false;
 };
 
 /// @brief A test case that can be split into multiple sections.

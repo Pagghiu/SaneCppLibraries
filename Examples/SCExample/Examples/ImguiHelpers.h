@@ -9,25 +9,27 @@
 
 namespace SC
 {
-inline Result InputText(const char* name, Buffer& buffer, String& str, bool& modified)
+namespace Internal
 {
-    struct Funcs
+struct InputTextFuncs
+{
+    static int MyResizeCallback(ImGuiInputTextCallbackData* data)
     {
-        static int MyResizeCallback(ImGuiInputTextCallbackData* data)
+        if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
         {
-            if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
+            Buffer& str = *reinterpret_cast<Buffer*>(data->UserData);
+            if (not str.resize(static_cast<size_t>(data->BufSize)))
             {
-                Buffer& str = *reinterpret_cast<Buffer*>(data->UserData);
-                if (not str.resize(static_cast<size_t>(data->BufSize)))
-                {
-                    return 0;
-                }
-                data->Buf = str.data();
+                return 0;
             }
-            return 0;
+            data->Buf = str.data();
         }
-    };
+        return 0;
+    }
+};
 
+inline Result PrepareInputTextBuffer(Buffer& buffer, String& str)
+{
     if (str.view().isEmpty())
     {
         buffer.clear();
@@ -39,11 +41,30 @@ inline Result InputText(const char* name, Buffer& buffer, String& str, bool& mod
         SC_TRY(buffer.append(str.view().toCharSpan()));
         SC_TRY(buffer.push_back(0));
     }
+    return Result(true);
+}
+} // namespace Internal
+
+inline Result InputText(const char* name, Buffer& buffer, String& str, bool& modified)
+{
+    SC_TRY(Internal::PrepareInputTextBuffer(buffer, str));
     if (ImGui::InputText(name, buffer.data(), buffer.size(), ImGuiInputTextFlags_CallbackResize,
-                         Funcs::MyResizeCallback, &buffer))
+                         Internal::InputTextFuncs::MyResizeCallback, &buffer))
     {
         modified = true;
-        SC_TRY(str.assign(StringView::fromNullTerminated(buffer.data(), StringEncoding::Ascii)));
+        SC_TRY(str.assign(StringView::fromNullTerminated(buffer.data(), StringEncoding::Utf8)));
+    }
+    return Result(true);
+}
+
+inline Result InputTextMultiline(const char* name, Buffer& buffer, String& str, ImVec2 size, bool& modified)
+{
+    SC_TRY(Internal::PrepareInputTextBuffer(buffer, str));
+    if (ImGui::InputTextMultiline(name, buffer.data(), buffer.size(), size, ImGuiInputTextFlags_CallbackResize,
+                                  Internal::InputTextFuncs::MyResizeCallback, &buffer))
+    {
+        modified = true;
+        SC_TRY(str.assign(StringView::fromNullTerminated(buffer.data(), StringEncoding::Utf8)));
     }
     return Result(true);
 }

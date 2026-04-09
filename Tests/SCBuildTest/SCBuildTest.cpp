@@ -30,17 +30,8 @@ int main(int argc, const char* argv[])
 
     TestReport::Output<Console> trConsole = {console};
     TestReport                  report(trConsole, argc, argv);
-
-    FileSystem::Operations::getExecutablePath(report.executableFile);
-    FileSystem::Operations::getApplicationRootDirectory(report.applicationRootDirectory);
-
-    SmallString<255> correctedPath;
-    {
-        StringView components[64];
-        (void)Path::normalizeUNCAndTrimQuotes(correctedPath, SC_COMPILER_LIBRARY_PATH, Path::AsNative, components);
-        SC_ASSERT_RELEASE(Path::isAbsolute(correctedPath.view(), SC::Path::AsNative));
-    }
-    SC_ASSERT_RELEASE(report.libraryRootDirectory.assign(correctedPath.view()));
+    if (report.hasStartupFailure())
+        return report.getTestReturnCode();
     report.debugBreakOnFailedTest = true;
 
     runSCBuildTest(report);

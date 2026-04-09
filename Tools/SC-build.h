@@ -12,7 +12,7 @@
 
 #include "SC-package.h"
 
-#if !defined(SC_LIBRARY_PATH)
+#if !defined(SC_TOOLS_COMPILED_SEPARATELY)
 #define SC_TOOLS_IMPORT
 #include "SC-package.cpp"
 #undef SC_TOOLS_IMPORT

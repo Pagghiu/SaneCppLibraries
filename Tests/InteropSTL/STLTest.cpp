@@ -27,8 +27,8 @@ int main(int argc, const char* argv[])
     TestReport::Output<Console> trConsole = {console};
 
     TestReport report(trConsole, argc, argv);
-    FileSystem::Operations::getExecutablePath(report.executableFile);
-    FileSystem::Operations::getApplicationRootDirectory(report.applicationRootDirectory);
+    if (report.hasStartupFailure())
+        return report.getTestReturnCode();
     report.debugBreakOnFailedTest = true;
 
     runCppSTLStringsTest(report);
