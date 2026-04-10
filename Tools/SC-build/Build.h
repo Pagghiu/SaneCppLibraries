@@ -220,6 +220,38 @@ struct ExecutionOptions
     Parameter<OutputMode::Type> outputMode = OutputMode::Normal;
 };
 
+/// @brief Describes how a built executable should be launched
+struct RunnerSpec
+{
+    enum Type
+    {
+        Auto,
+        None,
+        Wine,
+        QEMU,
+        Custom,
+    };
+
+    /// @brief Get StringView from RunnerSpec::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case Auto: return "auto";
+        case None: return "none";
+        case Wine: return "wine";
+        case QEMU: return "qemu";
+        case Custom: return "custom";
+        }
+        Assert::unreachable();
+    }
+
+    Type type = Auto;
+
+    String         executable;
+    Vector<String> arguments;
+};
+
 /// @brief Optimization level (Debug / Release)
 struct Optimization
 {
@@ -611,6 +643,7 @@ struct Parameters
     }
     Directories directories;
     Toolchain   toolchain;
+    RunnerSpec  runner;
 
     Machine hostMachine;   ///< Machine that owns host-side tools and paths
     Machine targetMachine; ///< Machine the produced artifacts are built for

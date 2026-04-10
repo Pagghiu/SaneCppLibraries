@@ -208,6 +208,32 @@ static Result writeNoisyToolWrapperScript(FileSystem& fs, StringView scriptPath,
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
+
+static Result writeLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                            StringView stdOutText = {})
+{
+    String scriptContents = StringEncoding::Utf8;
+    if (stdOutText.isEmpty())
+    {
+        SC_TRY(StringBuilder::format(scriptContents,
+                                     "#!/bin/sh\n"
+                                     "printf '%s\\n' \"$*\" >> \"{}\"\n"
+                                     "exit 0\n",
+                                     logPath));
+    }
+    else
+    {
+        SC_TRY(StringBuilder::format(scriptContents,
+                                     "#!/bin/sh\n"
+                                     "printf '%s\\n' \"$*\" >> \"{}\"\n"
+                                     "printf '%s\\n' '{}'\n"
+                                     "exit 0\n",
+                                     logPath, stdOutText));
+    }
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
 #endif
 
 #if SC_PLATFORM_WINDOWS
@@ -532,6 +558,13 @@ struct CapturedBuildOutput
     String stdErr = StringEncoding::Utf8;
 };
 
+struct CapturedProcessOutput
+{
+    String stdOut     = StringEncoding::Utf8;
+    String stdErr     = StringEncoding::Utf8;
+    int    exitStatus = -1;
+};
+
 static Result normalizeConsoleOutput(String& output)
 {
 #if SC_PLATFORM_WINDOWS
@@ -653,6 +686,32 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     SC_TRY(normalizeConsoleOutput(capturedOutput.stdErr));
     return Result(true);
 }
+
+#if SC_PLATFORM_APPLE
+static Result captureRepositoryBuildCommand(TestReport& report, Span<const StringSpan> arguments,
+                                            CapturedProcessOutput& capturedOutput)
+{
+    String scriptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC.sh"}));
+
+    StringSpan processArguments[32];
+    size_t     numArguments          = 0;
+    processArguments[numArguments++] = scriptPath.view();
+    for (const StringSpan argument : arguments)
+    {
+        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many process arguments");
+        processArguments[numArguments++] = argument;
+    }
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(report.libraryRootDirectory.view()));
+    SC_TRY(process.exec({processArguments, numArguments}, capturedOutput.stdOut, {}, capturedOutput.stdErr));
+    capturedOutput.exitStatus = process.getExitStatus();
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdOut));
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdErr));
+    return Result(true);
+}
+#endif
 
 #if SC_PLATFORM_WINDOWS
 static Result computeWindowsImportLibraryPath(const Build::Action& action, StringView projectName, String& libraryPath)
@@ -1006,6 +1065,94 @@ struct SCBuildFixtureTest : public SC::TestCase
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
             SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+        }
+
+        if (test_section("native backend routes Windows runs through a Wine runner"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String toolRoot         = StringEncoding::Utf8;
+            String runnerLog        = StringEncoding::Utf8;
+            String runnerConsoleLog = StringEncoding::Utf8;
+            String runnerPath       = StringEncoding::Utf8;
+            String runnerConsole    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(runnerLog, {toolRoot.view(), "wine.log"}));
+            SC_TRUST_RESULT(Path::join(runnerConsoleLog, {toolRoot.view(), "wineconsole.log"}));
+            SC_TRUST_RESULT(Path::join(runnerPath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(Path::join(runnerConsole, {toolRoot.view(), "wineconsole"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(writeLoggingOnlyWrapperScript(fs, runnerPath.view(), runnerLog.view(), "wrapped"));
+            SC_TRUST_RESULT(
+                writeLoggingOnlyWrapperScript(fs, runnerConsole.view(), runnerConsoleLog.view(), "console"));
+
+            Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
+            action.action                                = Build::Action::Run;
+            action.parameters.platform                   = Build::Platform::Windows;
+            action.parameters.architecture               = Build::Architecture::Intel64;
+            action.parameters.toolchain.family           = Build::Toolchain::LLVMMingw;
+            action.parameters.targetMachine.platform     = Build::Platform::Windows;
+            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsGNU;
+            action.parameters.runner.type                = Build::RunnerSpec::Wine;
+            SC_TRUST_RESULT(action.parameters.toolchain.targetTriple.assign("x86_64-w64-windows-gnu"));
+            SC_TRUST_RESULT(action.parameters.runner.executable.assign(runnerPath.view()));
+
+            StringView forwardedArguments[] = {"--fixture", "runner"};
+            action.additionalArguments      = forwardedArguments;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String runnerInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(runnerLog.view(), runnerInvocation));
+            SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("reg add"));
+            SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("reg delete"));
+
+            if (HostPlatform == SC::Platform::Linux)
+            {
+                String runnerConsoleInvocation = StringEncoding::Utf8;
+                SC_TRUST_RESULT(fs.read(runnerConsoleLog.view(), runnerConsoleInvocation));
+                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("--backend=curses"));
+                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString(executablePath.view()));
+                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("--fixture runner"));
+            }
+            else
+            {
+                SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString(executablePath.view()));
+                SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("--fixture runner"));
+            }
+        }
+#endif
+
+#if SC_PLATFORM_APPLE
+        if (test_section("native backend smoke-starts SCTest through Wine on macOS"))
+        {
+            CapturedProcessOutput capturedOutput;
+            const StringSpan      arguments[] = {
+                "build",    "run",   "SCTest", "--target", "windows-gnu-x86_64", "--runner",       "auto",
+                "--output", "quiet", "--",     "--test",   "BaseTest",           "--test-section", "new/delete",
+            };
+            SC_TRUST_RESULT(captureRepositoryBuildCommand(report, arguments, capturedOutput));
+
+            SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("RUNNER = "));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("SCTest.exe"));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                               .containsString("TestReport::Running single test \"BaseTest\""));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                               .containsString("TestReport::Running single section \"new/delete\""));
+            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
         }
 #endif
 

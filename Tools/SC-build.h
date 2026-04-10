@@ -56,6 +56,8 @@ struct BuildCLIParseContext
     StringSpan configuration    = {};
     StringSpan generator        = {};
     StringSpan architecture     = {};
+    StringSpan runner           = {};
+    StringSpan runnerPath       = {};
     StringSpan output           = {};
     bool       quietRequested   = false;
     bool       normalRequested  = false;
@@ -293,6 +295,7 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     action.parameters.targetMachine.platform    = Build::Platform::Windows;
     action.parameters.targetMachine.environment = Build::TargetEnvironment::WindowsGNU;
     action.parameters.platform                  = Build::Platform::Windows;
+    action.parameters.generator                 = Build::Generator::Native;
     action.parameters.toolchain.family          = Build::Toolchain::LLVMMingw;
 
     if (equalsAsciiIgnoreCase(resolved, "windows-gnu-arm64"))
@@ -560,6 +563,39 @@ template <size_t N>
     return Result(true);
 }
 
+[[nodiscard]] inline Result applyRunnerValue(Build::Action& action, StringView runnerValue, Console& console)
+{
+    if (runnerValue.isEmpty())
+    {
+        return Result(true);
+    }
+
+    static constexpr StringView runnerNames[] = {"auto", "none", "wine", "qemu", "custom"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--runner", runnerValue, runnerNames, resolved, console));
+    if (equalsAsciiIgnoreCase(resolved, "none"))
+    {
+        action.parameters.runner.type = Build::RunnerSpec::None;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "wine"))
+    {
+        action.parameters.runner.type = Build::RunnerSpec::Wine;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "qemu"))
+    {
+        action.parameters.runner.type = Build::RunnerSpec::QEMU;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "custom"))
+    {
+        action.parameters.runner.type = Build::RunnerSpec::Custom;
+    }
+    else
+    {
+        action.parameters.runner.type = Build::RunnerSpec::Auto;
+    }
+    return Result(true);
+}
+
 [[nodiscard]] inline Result scanNamedOutputMode(Span<const StringView> arguments, Build::OutputMode::Type& outputMode,
                                                 bool& wasProvided, Console& console)
 {
@@ -683,7 +719,7 @@ template <size_t N>
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[8];
+    CommandLineOption     options[10];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -740,6 +776,21 @@ template <size_t N>
         options[numOptions].shortName = 'v';
         options[numOptions].help      = "Shortcut for --output verbose";
         options[numOptions].value     = CommandLineValue::boolean(context.verboseRequested);
+        numOptions++;
+    }
+
+    if (actionType == Build::Action::Run)
+    {
+        options[numOptions].longName  = "runner";
+        options[numOptions].help      = "Execution runner (auto, none, wine, qemu, custom)";
+        options[numOptions].valueName = "NAME";
+        options[numOptions].value     = CommandLineValue::stringSpan(context.runner);
+        numOptions++;
+
+        options[numOptions].longName  = "runner-path";
+        options[numOptions].help      = "Override the runner executable path";
+        options[numOptions].valueName = "PATH";
+        options[numOptions].value     = CommandLineValue::stringSpan(context.runnerPath);
         numOptions++;
     }
 
@@ -824,6 +875,14 @@ template <size_t N>
     if (not context.targetProfile.isEmpty())
     {
         SC_TRY(applyTargetProfileValue(action, context.targetProfile, arguments.console));
+    }
+    if (not context.runner.isEmpty())
+    {
+        SC_TRY(applyRunnerValue(action, context.runner, arguments.console));
+    }
+    if (not context.runnerPath.isEmpty())
+    {
+        SC_TRY(action.parameters.runner.executable.assign(context.runnerPath));
     }
 
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)

@@ -98,6 +98,45 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsGNU);
             SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "x86_64-w64-windows-gnu");
         }
+        if (test_section("build run parses runner selection"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--runner";
+            args[4]             = "wine";
+            args[5]             = "--runner-path";
+            args[6]             = "/tmp/fake-wine";
+            arguments.arguments = {args, 7};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.runner.type == Build::RunnerSpec::Wine);
+            SC_TEST_EXPECT(action.parameters.runner.executable == "/tmp/fake-wine");
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
+        }
+        if (test_section("build target profile selects native backend automatically"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            arguments.arguments = {args, 3};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::LLVMMingw);
+        }
         if (test_section("build cli parses utf16 legacy generator values"))
         {
             arguments.tool               = "build";

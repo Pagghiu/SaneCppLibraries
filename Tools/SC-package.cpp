@@ -418,6 +418,51 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     return Result(true);
 }
 
+Result installWineStableRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
+{
+    static constexpr StringView packageVersion = "11.0";
+    static constexpr StringView packageURL =
+        "https://github.com/Gcenx/macOS_Wine_builds/releases/download/11.0/wine-stable-11.0-osx64.tar.xz";
+    static constexpr StringView packageHash = "573d43fc4618521148d98ad9c74e63387831827395c014925fdfdc52fe55cb5a";
+
+    switch (HostPlatform)
+    {
+    case Platform::Apple: break;
+    case Platform::Linux:
+    case Platform::Windows:
+    case Platform::Emscripten: return Result::Error("Automatic Wine install is only supported on macOS hosts yet");
+    }
+
+    Download download;
+    download.packagesCacheDirectory   = packagesCacheDirectory;
+    download.packagesInstallDirectory = packagesInstallDirectory;
+    download.packageName              = "wine-stable";
+    download.packageVersion           = packageVersion;
+    download.packagePlatform          = "macos_universal";
+    download.url                      = packageURL;
+    download.expectedHash             = packageHash;
+    download.hashType                 = Hashing::TypeSHA256;
+    package.packageBaseName           = "wine-stable-11.0-osx64.tar.xz";
+
+    CustomFunctions functions;
+    functions.testFunction = [](const Download&, const Package& package)
+    {
+        String executable = StringEncoding::Utf8;
+        String version    = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(executable, "{}/Wine Stable.app/Contents/Resources/wine/bin/wine",
+                                     package.installDirectoryLink));
+
+        Process process;
+        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Wine runner returned error");
+        SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Wine runner version doesn't match");
+        return Result(true);
+    };
+
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
@@ -460,6 +505,11 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(Tools::installLLVMMingwToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
                                                     *package));
+        }
+        else if (packageName == "wine")
+        {
+            SC_TRY(Tools::installWineStableRunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
+                                                  *package));
         }
         else
         {

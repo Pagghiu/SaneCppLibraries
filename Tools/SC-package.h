@@ -445,6 +445,8 @@ inline Result verifyGitCommitHashInstall(const Download& download, const Package
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
 
+Result installWineStableRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                               Package& package);
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);

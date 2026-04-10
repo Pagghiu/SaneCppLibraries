@@ -52,6 +52,20 @@ struct SC::Build::NativeBuild
         Machine targetMachine;
     };
 
+    struct ResolvedRunner
+    {
+        enum Mode
+        {
+            Direct,
+            Wrapped,
+        };
+
+        Mode mode = Direct;
+
+        String         executable;
+        Vector<String> arguments;
+    };
+
     struct ResolvedSource
     {
         WriterInternal::RenderItem::Type type = WriterInternal::RenderItem::Unknown;
@@ -1119,7 +1133,8 @@ struct SC::Build::NativeBuild
             SC_TRY_MSG(resolvedProjects[0].project->targetType == TargetType::ConsoleExecutable or
                            resolvedProjects[0].project->targetType == TargetType::GUIApplication,
                        "Run requires an executable target");
-            SC_TRY(runExecutable(resolvedProjects[0].executablePath.view(), action));
+            SC_TRY(runExecutable(resolvedProjects[0].executablePath.view(), action,
+                                 resolvedProjects[0].project->targetType));
         }
         return Result(true);
     }
@@ -1276,22 +1291,102 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result runExecutable(StringView executablePath, const Action& action)
+    static Result runExecutable(StringView executablePath, const Action& action, TargetType::Type targetType)
     {
         ResolvedTargetContext targetContext;
         SC_TRY(resolveTargetContext(action.parameters, targetContext));
-        if (targetPlatform(targetContext) != targetContext.hostMachine.platform or
-            targetArchitecture(targetContext) != targetContext.hostMachine.architecture or
-            targetContext.targetMachine.environment != TargetEnvironment::Native)
-        {
-            return Result::Error("Running foreign targets is not implemented yet");
-        }
+
+        ResolvedRunner runner;
+        SC_TRY(resolveRunner(action.parameters, targetContext, runner));
 
         Process    process;
-        StringSpan arguments[64];
-        size_t     numArguments = 1;
-        arguments[0]            = StringView(executablePath).trimWhiteSpaces();
-        globalConsole->print("COMMAND = {}\n", arguments[0]);
+        StringSpan arguments[96];
+        size_t     numArguments     = 0;
+        String     normalizedTarget = StringEncoding::Utf8;
+        SC_TRY(Path::normalize(normalizedTarget, StringView(executablePath).trimWhiteSpaces(), Path::AsNative));
+        if (runner.mode == ResolvedRunner::Wrapped and StringView(runner.executable.view()).containsString("/wine"))
+        {
+            String     prefixDirectory = StringEncoding::Utf8;
+            StringView architectureName;
+            switch (targetArchitecture(targetContext))
+            {
+            case Architecture::Intel64: architectureName = "x86_64"; break;
+            case Architecture::Arm64: architectureName = "arm64"; break;
+            case Architecture::Intel32: architectureName = "x86"; break;
+            case Architecture::Wasm:
+            case Architecture::Any: architectureName = "unknown"; break;
+            }
+            SC_TRY(StringBuilder::format(prefixDirectory, "{}/wine-prefix-{}",
+                                         action.parameters.directories.buildCacheDirectory, architectureName));
+            FileSystem fs;
+            SC_TRY(fs.init("."));
+            SC_TRY(fs.makeDirectoryRecursive(prefixDirectory.view()));
+            SC_TRY(prepareWinePrefixHeadless(runner.executable.view(), prefixDirectory.view(), targetContext));
+            SC_TRY(configureWineProcess(process, prefixDirectory.view(), targetContext));
+            globalConsole->print("WINEPREFIX = {}\n", prefixDirectory.view());
+
+            String workingDirectory = StringEncoding::Utf8;
+            SC_TRY(workingDirectory.assign(Path::dirname(normalizedTarget.view(), Path::AsNative)));
+            if (not workingDirectory.isEmpty())
+            {
+                SC_TRY(process.setWorkingDirectory(workingDirectory.view()));
+            }
+
+            if (targetType == TargetType::ConsoleExecutable and targetContext.hostMachine.platform == Platform::Linux)
+            {
+                String wineConsole = StringEncoding::Utf8;
+                SC_TRY(wineConsole.assign(Path::dirname(runner.executable.view(), Path::AsNative)));
+                SC_TRY(Path::append(wineConsole, {"wineconsole"}, Path::AsNative));
+                if (pathExists(wineConsole.view()))
+                {
+                    SC_TRY(runner.executable.assign(wineConsole.view()));
+                    SC_TRY(runner.arguments.insert(0, {"--backend=curses"}));
+                }
+            }
+        }
+
+        if (runner.mode == ResolvedRunner::Wrapped)
+        {
+            if (runner.executable.isEmpty())
+            {
+                SC_TRY_MSG(not runner.arguments.isEmpty(), "Missing wrapped runner command");
+                arguments[numArguments] = runner.arguments[0].view();
+                numArguments++;
+                for (size_t idx = 1; idx < runner.arguments.size(); ++idx)
+                {
+                    if (numArguments == sizeof(arguments) / sizeof(arguments[0]))
+                    {
+                        globalConsole->printLine("Exceeded max number of arguments that can be passed to the runner");
+                        break;
+                    }
+                    arguments[numArguments] = runner.arguments[idx].view();
+                    globalConsole->print("RUNNER_ARGS[{}] = {}\n", idx - 1, arguments[numArguments]);
+                    numArguments++;
+                }
+                globalConsole->print("RUNNER = {}\n", arguments[0]);
+            }
+            else
+            {
+                arguments[numArguments] = runner.executable.view();
+                globalConsole->print("RUNNER = {}\n", arguments[numArguments]);
+                numArguments++;
+                for (size_t idx = 0; idx < runner.arguments.size(); ++idx)
+                {
+                    if (numArguments == sizeof(arguments) / sizeof(arguments[0]))
+                    {
+                        globalConsole->printLine("Exceeded max number of arguments that can be passed to the runner");
+                        break;
+                    }
+                    arguments[numArguments] = runner.arguments[idx].view();
+                    globalConsole->print("RUNNER_ARGS[{}] = {}\n", idx, arguments[numArguments]);
+                    numArguments++;
+                }
+            }
+        }
+
+        arguments[numArguments] = normalizedTarget.view();
+        globalConsole->print("COMMAND = {}\n", arguments[numArguments]);
+        numArguments++;
         for (size_t idx = 0; idx < action.additionalArguments.sizeInElements(); ++idx)
         {
             if (numArguments == sizeof(arguments) / sizeof(arguments[0]))
@@ -2282,6 +2377,233 @@ struct SC::Build::NativeBuild
             }
         }
         return {};
+    }
+
+    static constexpr bool canRunDirectly(const ResolvedTargetContext& context)
+    {
+        return targetPlatform(context) == context.hostMachine.platform and
+               targetArchitecture(context) == context.hostMachine.architecture and
+               context.targetMachine.environment == TargetEnvironment::Native;
+    }
+
+    static Result appendRunnerArgument(Vector<String>& arguments, StringView value)
+    {
+        String item = StringEncoding::Utf8;
+        SC_TRY(item.assign(value));
+        SC_TRY(arguments.push_back(move(item)));
+        return Result(true);
+    }
+
+    static Result appendRunnerArguments(Span<const String> source, Vector<String>& destination)
+    {
+        for (const String& argument : source)
+        {
+            SC_TRY(appendRunnerArgument(destination, argument.view()));
+        }
+        return Result(true);
+    }
+
+    static bool pathExists(StringView path)
+    {
+        FileSystem fs;
+        if (not fs.init("."))
+        {
+            return false;
+        }
+        return fs.exists(path);
+    }
+
+    static Result resolveWrappedRunnerExecutable(StringView configured, StringView primaryFallback,
+                                                 StringView secondaryFallback, String& output)
+    {
+        if (not configured.isEmpty())
+        {
+            SC_TRY(output.assign(configured));
+            return Result(true);
+        }
+        if (not primaryFallback.isEmpty() and probeExecutable(primaryFallback))
+        {
+            SC_TRY(output.assign(primaryFallback));
+            return Result(true);
+        }
+        if (not secondaryFallback.isEmpty() and probeExecutable(secondaryFallback))
+        {
+            SC_TRY(output.assign(secondaryFallback));
+            return Result(true);
+        }
+        return Result::Error("Cannot find runner executable");
+    }
+
+    static Result resolveAppleWineExecutable(const Parameters& parameters, StringView configured, String& output)
+    {
+        if (not configured.isEmpty())
+        {
+            SC_TRY(output.assign(configured));
+            return Result(true);
+        }
+
+        static constexpr StringView commonWinePaths[] = {
+            "/Applications/Wine Stable.app/Contents/Resources/wine/bin/wine",
+            "/Applications/Wine Devel.app/Contents/Resources/wine/bin/wine",
+            "/Applications/Wine Staging.app/Contents/Resources/wine/bin/wine",
+        };
+        for (const StringView candidate : commonWinePaths)
+        {
+            if (probeExecutable(candidate))
+            {
+                SC_TRY(output.assign(candidate));
+                return Result(true);
+            }
+        }
+
+        Tools::Package winePackage;
+        SC_TRY(Tools::installWineStableRunner(parameters.directories.packagesCacheDirectory.view(),
+                                              parameters.directories.packagesInstallDirectory.view(), winePackage));
+        SC_TRY(StringBuilder::format(output, "{}/Wine Stable.app/Contents/Resources/wine/bin/wine",
+                                     winePackage.installDirectoryLink));
+        return Result(true);
+    }
+
+    static Result resolveRunner(const Parameters& parameters, const ResolvedTargetContext& targetContext,
+                                ResolvedRunner& runner)
+    {
+        const RunnerSpec& runnerSpec = parameters.runner;
+        switch (runnerSpec.type)
+        {
+        case RunnerSpec::None:
+            SC_TRY_MSG(canRunDirectly(targetContext), "Runner is disabled for foreign targets");
+            runner.mode = ResolvedRunner::Direct;
+            return Result(true);
+        case RunnerSpec::Auto:
+            if (canRunDirectly(targetContext))
+            {
+                runner.mode = ResolvedRunner::Direct;
+                return Result(true);
+            }
+            if (isWindowsGNUTarget(targetContext))
+            {
+                SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
+                               targetContext.hostMachine.platform == Platform::Linux,
+                           "Wine auto-run is only supported on macOS and Linux hosts");
+                SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
+                           "Wine auto-run currently supports only x86_64 Windows GNU targets");
+                runner.mode = ResolvedRunner::Wrapped;
+                if (targetContext.hostMachine.platform == Platform::Apple)
+                {
+                    SC_TRY(resolveAppleWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
+                }
+                else
+                {
+                    SC_TRY(resolveWrappedRunnerExecutable(runnerSpec.executable.view(), "wine64", "wine",
+                                                          runner.executable));
+                }
+                SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
+                return Result(true);
+            }
+            return Result::Error("No auto runner is available for this host/target pair");
+        case RunnerSpec::Wine:
+            SC_TRY_MSG(isWindowsGNUTarget(targetContext), "Wine runner requires a Windows GNU target");
+            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
+                           targetContext.hostMachine.platform == Platform::Linux,
+                       "Wine runner is only supported on macOS and Linux hosts");
+            SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
+                       "Wine runner currently supports only x86_64 Windows GNU targets");
+            runner.mode = ResolvedRunner::Wrapped;
+            if (targetContext.hostMachine.platform == Platform::Apple)
+            {
+                SC_TRY(resolveAppleWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
+            }
+            else
+            {
+                SC_TRY(
+                    resolveWrappedRunnerExecutable(runnerSpec.executable.view(), "wine64", "wine", runner.executable));
+            }
+            SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
+            return Result(true);
+        case RunnerSpec::QEMU: return Result::Error("QEMU runner is not implemented yet");
+        case RunnerSpec::Custom:
+            SC_TRY_MSG(not runnerSpec.executable.isEmpty(), "Custom runner requires executable");
+            runner.mode = ResolvedRunner::Wrapped;
+            SC_TRY(runner.executable.assign(runnerSpec.executable.view()));
+            SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
+            return Result(true);
+        }
+        Assert::unreachable();
+    }
+
+    static Result configureWineProcess(Process& process, StringView prefixDirectory,
+                                       const ResolvedTargetContext& targetContext)
+    {
+        SC_TRY(process.setEnvironment("WINEPREFIX", prefixDirectory));
+        SC_TRY(process.setEnvironment("WINEDLLOVERRIDES", "winemenubuilder.exe=d"));
+        if (targetArchitecture(targetContext) == Architecture::Intel64)
+        {
+            SC_TRY(process.setEnvironment("WINEARCH", "win64"));
+        }
+        return Result(true);
+    }
+
+    static Result prepareWinePrefixHeadless(StringView runnerExecutable, StringView prefixDirectory,
+                                            const ResolvedTargetContext& targetContext)
+    {
+        Process process;
+        SC_TRY(configureWineProcess(process, prefixDirectory, targetContext));
+
+        String           stdOut                     = StringEncoding::Utf8;
+        String           stdErr                     = StringEncoding::Utf8;
+        const StringSpan showCrashDialogArguments[] = {
+            runnerExecutable,
+            "reg",
+            "add",
+            "HKEY_CURRENT_USER\\Software\\Wine\\WineDbg",
+            "/v",
+            "ShowCrashDialog",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "0",
+            "/f",
+        };
+        SC_TRY(process.exec(showCrashDialogArguments, stdOut, {}, stdErr));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Failed configuring WineDbg crash dialog");
+
+        Process process2;
+        SC_TRY(configureWineProcess(process2, prefixDirectory, targetContext));
+        const StringSpan breakOnFirstChanceArguments[] = {
+            runnerExecutable,
+            "reg",
+            "add",
+            "HKEY_CURRENT_USER\\Software\\Wine\\WineDbg",
+            "/v",
+            "BreakOnFirstChance",
+            "/t",
+            "REG_DWORD",
+            "/d",
+            "0",
+            "/f",
+        };
+        String stdOut2 = StringEncoding::Utf8;
+        String stdErr2 = StringEncoding::Utf8;
+        SC_TRY(process2.exec(breakOnFirstChanceArguments, stdOut2, {}, stdErr2));
+        SC_TRY_MSG(process2.getExitStatus() == 0, "Failed configuring WineDbg first-chance exceptions");
+
+        Process process3;
+        SC_TRY(configureWineProcess(process3, prefixDirectory, targetContext));
+        const StringSpan removeWinemenubuilderArguments[] = {
+            runnerExecutable,
+            "reg",
+            "delete",
+            "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+            "/v",
+            "winemenubuilder",
+            "/f",
+        };
+        String stdOut3 = StringEncoding::Utf8;
+        String stdErr3 = StringEncoding::Utf8;
+        SC_TRY(process3.exec(removeWinemenubuilderArguments, stdOut3, {}, stdErr3));
+        SC_TRY_MSG(process3.getExitStatus() == 0 or process3.getExitStatus() == 1,
+                   "Failed disabling Wine menu builder startup hook");
+        return Result(true);
     }
 
     static Result appendTargeting(CommandLine& commandLine, const ResolvedProject& resolvedProject, bool forCompiler)
