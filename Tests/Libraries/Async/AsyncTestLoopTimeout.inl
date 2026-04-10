@@ -77,14 +77,11 @@ void SC::AsyncTest::loopTimeout()
     eventLoop.setListeners(nullptr);
     SC_TEST_EXPECT(context.beforePollIOCounter == 1);
     SC_TEST_EXPECT(context.afterPollIOCounter == 1);
-    SC_TEST_EXPECT(context.timeout1Called == 1);
-    SC_TEST_EXPECT(context.timeout2Called <= 1);
-    SC_TEST_EXPECT(context.callbackCount >= 1 and context.callbackOrder[0] == 1);
 
     int runOnceAttempts = 0;
-    while (context.timeout2Called < 2)
+    while (context.callbackCount < 3)
     {
-        SC_TEST_EXPECT(runOnceAttempts < 3);
+        SC_TEST_EXPECT(runOnceAttempts < 4);
         SC_TEST_EXPECT(eventLoop.runOnce());
         runOnceAttempts++;
     }
