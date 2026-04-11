@@ -140,16 +140,26 @@ Named options are:
 - `-c`, `--config <NAME>`
 - `-g`, `--generator <NAME>`
 - `-a`, `--arch <NAME>`
+- `--target <PROFILE>` (`compile` / `run`)
+- `--runner <MODE>` (`run`)
+- `--runner-path <PATH>` (`run`)
 - `-o`, `--output <MODE>` (`compile` / `run`)
 - `-q`, `--quiet` (`compile` / `run`)
 - `--normal` (`compile` / `run`)
 - `-v`, `--verbose` (`compile` / `run`)
+
+Target profiles currently exposed by the CLI are `host`, `native`, `windows-gnu-x86_64`, and `windows-gnu-arm64`.
+
+Runner keywords currently exposed by the CLI are `auto`, `none`, `wine`, `qemu`, and `custom`.
 
 Current defaults:
 
 - Windows: `default` resolves to `vs2022`
 - macOS / Linux: `default` resolves to `make`
 - Native builds do not require a prior `configure` step
+- macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
+- `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
+- `windows-gnu-arm64` is currently build-only; Wine runner support is still `x86_64`-only
 - Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples
@@ -183,6 +193,21 @@ Build all projects
 Build through the native backend
 ```
 ./SC.sh build compile SCTest --config Debug --generator native
+```
+
+Cross-compile a Windows GNU executable through the native backend
+```
+./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
+```
+
+Cross-compile a Windows GNU arm64 executable
+```
+./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+```
+
+Smoke-run a Windows GNU `x86_64` executable through the shared runner model
+```
+./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test "BaseTest" --test-section "new/delete"
 ```
 
 Run a generated-backend executable and pass extra test arguments after `--`

@@ -913,6 +913,34 @@ static Build::Action makeNativeCompileAction(const Build::Directories& directori
 }
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+static constexpr StringView windowsGNUTargetTriple(Build::Architecture::Type architecture)
+{
+    switch (architecture)
+    {
+    case Build::Architecture::Intel64: return "x86_64-w64-windows-gnu";
+    case Build::Architecture::Arm64: return "aarch64-w64-windows-gnu";
+    case Build::Architecture::Intel32:
+    case Build::Architecture::Wasm:
+    case Build::Architecture::Any: return {};
+    }
+    Assert::unreachable();
+}
+
+static Result configureWindowsGNUAction(Build::Action& action, Build::Architecture::Type architecture)
+{
+    const StringView targetTriple = windowsGNUTargetTriple(architecture);
+    SC_TRY_MSG(not targetTriple.isEmpty(), "Unsupported Windows GNU fixture architecture");
+
+    action.parameters.platform                   = Build::Platform::Windows;
+    action.parameters.architecture               = architecture;
+    action.parameters.toolchain.family           = Build::Toolchain::LLVMMingw;
+    action.parameters.targetMachine.platform     = Build::Platform::Windows;
+    action.parameters.targetMachine.architecture = architecture;
+    action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsGNU;
+    SC_TRY(action.parameters.toolchain.targetTriple.assign(targetTriple));
+    return Result(true);
+}
+
 static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
                                                 StringView configurationName = "Debug")
 {
@@ -1040,7 +1068,7 @@ struct SCBuildFixtureTest : public SC::TestCase
         }
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
-        if (test_section("native backend cross compiles Windows fixture with llvm-mingw"))
+        if (test_section("native backend cross compiles Windows x86_64 fixture with llvm-mingw"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
@@ -1048,14 +1076,29 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Directories directories;
             SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
 
-            Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
-            action.parameters.platform                   = Build::Platform::Windows;
-            action.parameters.architecture               = Build::Architecture::Intel64;
-            action.parameters.toolchain.family           = Build::Toolchain::LLVMMingw;
-            action.parameters.targetMachine.platform     = Build::Platform::Windows;
-            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
-            action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsGNU;
-            SC_TRUST_RESULT(action.parameters.toolchain.targetTriple.assign("x86_64-w64-windows-gnu"));
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Intel64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+        }
+
+        if (test_section("native backend cross compiles Windows arm64 fixture with llvm-mingw"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
 
             SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
 
@@ -1093,16 +1136,10 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(
                 writeLoggingOnlyWrapperScript(fs, runnerConsole.view(), runnerConsoleLog.view(), "console"));
 
-            Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
-            action.action                                = Build::Action::Run;
-            action.parameters.platform                   = Build::Platform::Windows;
-            action.parameters.architecture               = Build::Architecture::Intel64;
-            action.parameters.toolchain.family           = Build::Toolchain::LLVMMingw;
-            action.parameters.targetMachine.platform     = Build::Platform::Windows;
-            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
-            action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsGNU;
-            action.parameters.runner.type                = Build::RunnerSpec::Wine;
-            SC_TRUST_RESULT(action.parameters.toolchain.targetTriple.assign("x86_64-w64-windows-gnu"));
+            Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
+            action.action                 = Build::Action::Run;
+            action.parameters.runner.type = Build::RunnerSpec::Wine;
+            SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Intel64));
             SC_TRUST_RESULT(action.parameters.runner.executable.assign(runnerPath.view()));
 
             StringView forwardedArguments[] = {"--fixture", "runner"};
@@ -1132,6 +1169,30 @@ struct SCBuildFixtureTest : public SC::TestCase
                 SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString(executablePath.view()));
                 SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("--fixture runner"));
             }
+        }
+
+        if (test_section("native backend reports Windows arm64 as build-only for Wine"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
+            action.action                 = Build::Action::Run;
+            action.parameters.runner.type = Build::RunnerSpec::Wine;
+            SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
+
+            Result runResult = Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName);
+            SC_TEST_EXPECT(not runResult);
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
         }
 #endif
 

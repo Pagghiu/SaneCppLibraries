@@ -49,6 +49,9 @@ Named options accepted by `compile`, `run`, and `coverage` are:
 - `-c`, `--config <NAME>`
 - `-g`, `--generator <NAME>`
 - `-a`, `--arch <NAME>`
+- `--target <PROFILE>` (`compile` and `run` only)
+- `--runner <MODE>` (`run` only)
+- `--runner-path <PATH>` (`run` only)
 - `-o`, `--output <MODE>` (`compile` and `run` only)
 - `-q`, `--quiet` (`compile` and `run` only)
 - `--normal` (`compile` and `run` only)
@@ -71,6 +74,21 @@ Architecture values accepted by the tool are:
 - `wasm`
 - `any`
 
+Target profiles accepted by the tool today are:
+
+- `host`
+- `native`
+- `windows-gnu-x86_64`
+- `windows-gnu-arm64`
+
+Runner values accepted by `build run` today are:
+
+- `auto`
+- `none`
+- `wine`
+- `qemu`
+- `custom`
+
 Current CLI behavior:
 
 - If no project is specified, `compile` builds the whole default workspace
@@ -79,6 +97,8 @@ Current CLI behavior:
 - Host-default generator selection is `vs2022` on Windows and `make` on macOS / Linux
 - `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
 - `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
+- `--target` selects a friendly host or cross target profile without requiring the caller to spell the toolchain triple manually
+- `build run` can use `--runner` / `--runner-path` to control how foreign executables are launched
 - Legacy positional compatibility is still supported after `target` as `[configuration] [generator] [architecture] [output-mode]`
 
 This is the repository `Tools/SC-build.cpp` file used to configure the default workspace:
@@ -89,9 +109,11 @@ This is the repository `Tools/SC-build.cpp` file used to configure the default w
 The public API in `Tools/SC-build/Build.h` currently exposes:
 
 - `Definition`, `Workspace`, `Project`, and `Configuration` for the build graph
+- `Machine` and `TargetEnvironment` for explicit host / target modeling
 - `TargetType::{ConsoleExecutable, GUIApplication, SharedLibrary, StaticLibrary}`
 - `Generator::{Native, XCode, VisualStudio2022, VisualStudio2019, Make}`
-- `Toolchain::{HostDefault, Clang, GCC, MSVC, ClangCL, ZigCC, CustomDriver}`
+- `Toolchain::{HostDefault, Clang, GCC, MSVC, ClangCL, LLVMMingw, CustomDriver}`
+- `RunnerSpec::{Auto, None, Wine, QEMU, Custom}`
 - `ExecutionOptions` for native-backend parallelism / verbosity knobs
 - `OutputMode::{Quiet, Normal, Verbose}` and `ExecutionOptions::outputMode` for native-backend presentation control
 - `Project::addSpecificFileFlags` for per-file flag groups
@@ -113,7 +135,7 @@ The standalone backend is selected through `SC::Build::Generator::Native`.
 Current implemented scope:
 
 - Host platforms: macOS, Linux and Windows
-- Toolchain families exposed by the API: `HostDefault`, `Clang`, `GCC`, `MSVC`, `ClangCL`, `ZigCC`, and `CustomDriver`
+- Toolchain families exposed by the API: `HostDefault`, `Clang`, `GCC`, `MSVC`, `ClangCL`, `LLVMMingw`, and `CustomDriver`
 - Target kinds: console executables, GUI applications, shared libraries, and static libraries
 - Dependency tracking: compiler-generated dependency files / dependency output
 - Incrementality: skips up-to-date compile and link steps
@@ -122,11 +144,21 @@ Current implemented scope:
 - Output modes: `quiet` hides progress lines and successful child output, `normal` shows progress plus grouped failures and summaries, and `verbose` also shows rebuild traces, skip lines, and successful compile output
 - Output layout: `_Build/_Outputs`, `_Build/_Intermediates`, and `_Build/_BuildCache`
 
+Current cross-compilation scope:
+
+- macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
+- `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
+- `windows-gnu-arm64` is currently build-supported but not yet smoke-run supported because the Wine runner path is still `x86_64`-only
+- Cross-target plugin tests remain out of scope for now because the current plugin test flow assumes MSVC-oriented Windows behavior
+
 Typical native commands:
 
 ```bash
 ./SC.sh build compile SCBuildTest --config Debug --generator native
 ./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
+./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
+./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test BaseTest --test-section new/delete
 ./SC.sh build run SCBuildTest --config Debug --generator native -- --test "BuildTest"
 SC.bat build compile SCTest Debug native
 ```

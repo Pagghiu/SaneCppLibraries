@@ -131,19 +131,47 @@ struct BuildCLIParseContext
            token.bytesWithoutTerminator()[1] == '-';
 }
 
-[[nodiscard]] inline Result printBuildActionHelp(const CommandLineSpec& spec, Build::Action::Type actionType,
-                                                 Console& console)
+[[nodiscard]] inline Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::Type actionType)
 {
-    StringFormatOutput output(StringEncoding::Utf8, console, true);
-    SC_TRY_MSG(spec.writeHelp(output), "Failed writing SC-build help");
+    if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
+    {
+        SC_TRY_MSG(output.append("\nTarget profiles:\n"
+                                 "  - host / native: build for the current host machine\n"
+                                 "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
+                                 "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
+                   "Failed writing SC-build help");
+        SC_TRY_MSG(
+            output.append("\nCurrent tested cross-target support:\n"
+                          "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
+                          "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
+                          "  - windows-gnu-arm64 is currently build-only; Wine runner support is still x86_64-only\n"),
+            "Failed writing SC-build help");
+    }
+
     if (actionType == Build::Action::Run)
     {
+        SC_TRY_MSG(output.append("\nRunner values:\n"
+                                 "  - auto: use a host-specific runner when the host/target pair supports it\n"
+                                 "  - none: disable foreign-runner wrapping\n"
+                                 "  - wine: force Wine for Windows GNU targets\n"
+                                 "  - qemu: reserved for future Linux-target runner support\n"
+                                 "  - custom: wrap execution with a custom executable\n"),
+                   "Failed writing SC-build help");
         SC_TRY_MSG(output.append("\nArguments after -- are forwarded to the built executable.\n"),
                    "Failed writing SC-build help");
     }
     SC_TRY_MSG(output.append("\nLegacy compatibility: after <target> you can still pass up to four positional "
                              "values in this order: <config> <generator> <arch> <output>.\n"),
                "Failed writing SC-build help");
+    return Result(true);
+}
+
+[[nodiscard]] inline Result printBuildActionHelp(const CommandLineSpec& spec, Build::Action::Type actionType,
+                                                 Console& console)
+{
+    StringFormatOutput output(StringEncoding::Utf8, console, true);
+    SC_TRY_MSG(spec.writeHelp(output), "Failed writing SC-build help");
+    SC_TRY(appendBuildActionHelpAddendum(output, actionType));
     console.flush();
     return Result(true);
 }
