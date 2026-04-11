@@ -50,6 +50,8 @@ Named options accepted by `compile`, `run`, and `coverage` are:
 - `-g`, `--generator <NAME>`
 - `-a`, `--arch <NAME>`
 - `--target <PROFILE>` (`compile` and `run` only)
+- `--triple <VALUE>`
+- `--sysroot <PATH>`
 - `--runner <MODE>` (`run` only)
 - `--runner-path <PATH>` (`run` only)
 - `-o`, `--output <MODE>` (`compile` and `run` only)
@@ -98,7 +100,10 @@ Current CLI behavior:
 - `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
 - `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
 - `--target` selects a friendly host or cross target profile without requiring the caller to spell the toolchain triple manually
+- `--triple` and `--sysroot` are raw escape hatches for advanced toolchain overrides
+- Raw overrides are applied after `--target`, so they win over the friendly profile defaults
 - `build run` can use `--runner` / `--runner-path` to control how foreign executables are launched
+- Contradictory explicit combinations such as mismatched `--generator`, `--arch`, `--runner`, or `--triple` values now fail early with concrete CLI errors
 - Legacy positional compatibility is still supported after `target` as `[configuration] [generator] [architecture] [output-mode]`
 
 This is the repository `Tools/SC-build.cpp` file used to configure the default workspace:
@@ -148,7 +153,7 @@ Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
-- `windows-gnu-arm64` is currently build-supported but not yet smoke-run supported because the Wine runner path is still `x86_64`-only
+- `windows-gnu-arm64` is currently build-supported but not yet smoke-run supported because the Wine runner path is still `x86_64`-only, and `build run` now reports that build-only state before entering the backend
 - Cross-target plugin tests remain out of scope for now because the current plugin test flow assumes MSVC-oriented Windows behavior
 
 Typical native commands:
@@ -158,6 +163,7 @@ Typical native commands:
 ./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+./SC.sh build compile SCTest --target windows-gnu-x86_64 --triple x86_64-custom-windows-gnu --sysroot /opt/sysroots/windows
 ./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test BaseTest --test-section new/delete
 ./SC.sh build run SCBuildTest --config Debug --generator native -- --test "BuildTest"
 SC.bat build compile SCTest Debug native

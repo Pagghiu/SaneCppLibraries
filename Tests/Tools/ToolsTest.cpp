@@ -155,6 +155,100 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.runner.executable == "/tmp/fake-wine");
             SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
         }
+        if (test_section("build cli parses raw target triple and sysroot overrides"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--triple";
+            args[2]             = "aarch64-linux-musl";
+            args[3]             = "--sysroot";
+            args[4]             = "/opt/sysroots/linux-musl";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "aarch64-linux-musl");
+            SC_TEST_EXPECT(action.parameters.toolchain.sysroot == "/opt/sysroots/linux-musl");
+        }
+        if (test_section("build cli raw triple override wins over target profile"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--triple";
+            args[4]             = "x86_64-custom-windows-gnu";
+            args[5]             = "--sysroot";
+            args[6]             = "/tmp/custom-windows-sysroot";
+            arguments.arguments = {args, 7};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::LLVMMingw);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsGNU);
+            SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "x86_64-custom-windows-gnu");
+            SC_TEST_EXPECT(action.parameters.toolchain.sysroot == "/tmp/custom-windows-sysroot");
+        }
+        if (test_section("build cli rejects incompatible generator for Windows GNU target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "make";
+            args[3]             = "--target";
+            args[4]             = "windows-gnu-x86_64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build cli rejects incompatible arch for Windows GNU target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-arm64";
+            args[3]             = "--arch";
+            args[4]             = "intel64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build cli rejects contradictory triples for Windows GNU target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--triple";
+            args[4]             = "aarch64-linux-musl";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
         if (test_section("build target profile selects native backend automatically"))
         {
             arguments.tool      = "build";
@@ -238,6 +332,53 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.additionalArguments[0] == "--test");
             SC_TEST_EXPECT(action.additionalArguments[1] == "BuildTest");
         }
+        if (test_section("build run rejects Wine for native targets"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--runner";
+            args[2]             = "wine";
+            arguments.arguments = {args, 3};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build run rejects auto-run for Windows GNU arm64"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-arm64";
+            arguments.arguments = {args, 3};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build run rejects custom runner without runner-path"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--runner";
+            args[4]             = "custom";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
         if (test_section("build cli help is handled without executing builds"))
         {
             arguments.tool      = "build";
@@ -257,6 +398,8 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, text));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-gnu-x86_64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-gnu-arm64"));
+            SC_TEST_EXPECT(
+                StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Wine runner support is still x86_64-only"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Arguments after -- are forwarded"));
         }

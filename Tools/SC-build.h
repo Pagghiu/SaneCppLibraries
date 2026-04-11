@@ -56,6 +56,8 @@ struct BuildCLIParseContext
     StringSpan configuration    = {};
     StringSpan generator        = {};
     StringSpan architecture     = {};
+    StringSpan targetTriple     = {};
+    StringSpan sysroot          = {};
     StringSpan runner           = {};
     StringSpan runnerPath       = {};
     StringSpan output           = {};
@@ -119,6 +121,38 @@ struct BuildCLIParseContext
                                      });
 }
 
+[[nodiscard]] inline bool containsAsciiIgnoreCase(StringView value, StringView needle)
+{
+    if (needle.isEmpty())
+    {
+        return true;
+    }
+    if (needle.sizeInBytes() > value.sizeInBytes())
+    {
+        return false;
+    }
+
+    const char* valueBytes  = value.bytesWithoutTerminator();
+    const char* needleBytes = needle.bytesWithoutTerminator();
+    for (size_t valueIndex = 0; valueIndex + needle.sizeInBytes() <= value.sizeInBytes(); ++valueIndex)
+    {
+        bool match = true;
+        for (size_t needleIndex = 0; needleIndex < needle.sizeInBytes(); ++needleIndex)
+        {
+            if (asciiToLower(valueBytes[valueIndex + needleIndex]) != asciiToLower(needleBytes[needleIndex]))
+            {
+                match = false;
+                break;
+            }
+        }
+        if (match)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 [[nodiscard]] inline bool isShortOptionToken(StringView token)
 {
     return token.sizeInBytes() >= 2 and token.bytesWithoutTerminator()[0] == '-' and
@@ -146,6 +180,12 @@ struct BuildCLIParseContext
                           "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
                           "  - windows-gnu-arm64 is currently build-only; Wine runner support is still x86_64-only\n"),
             "Failed writing SC-build help");
+        SC_TRY_MSG(output.append(
+                       "\nRaw override escape hatches:\n"
+                       "  - --triple overrides the resolved compiler target triple\n"
+                       "  - --sysroot overrides the resolved toolchain sysroot\n"
+                       "  - raw overrides apply after --target and therefore take precedence over friendly profiles\n"),
+                   "Failed writing SC-build help");
     }
 
     if (actionType == Build::Action::Run)
@@ -624,6 +664,155 @@ template <size_t N>
     return Result(true);
 }
 
+[[nodiscard]] inline Result printBuildActionCombinationError(Console& console, StringView message)
+{
+    console.printError("{}\n", message);
+    console.flushStdErr();
+    return Result::Error("Invalid SC-build option combination");
+}
+
+[[nodiscard]] inline Result resolveBuildGeneratorKeyword(StringView value, StringView& resolved, Console& console)
+{
+    static constexpr StringView generatorNames[] = {"default", "native", "make", "xcode", "vs2022", "vs2019"};
+    return resolveKeywordValue("--generator", value, generatorNames, resolved, console);
+}
+
+[[nodiscard]] inline Result resolveBuildArchitectureKeyword(StringView value, StringView& resolved, Console& console)
+{
+    static constexpr StringView architectureNames[] = {"arm64", "intel32", "intel64", "wasm", "any"};
+    return resolveKeywordValue("--arch", value, architectureNames, resolved, console);
+}
+
+[[nodiscard]] inline bool targetMachineCanRunDirectly(const Build::Machine& hostMachine, const Build::Machine& target)
+{
+    if (target.platform != hostMachine.platform)
+    {
+        return false;
+    }
+    if (target.environment != Build::TargetEnvironment::Native)
+    {
+        return false;
+    }
+    return target.architecture == Build::Architecture::Any or target.architecture == hostMachine.architecture;
+}
+
+[[nodiscard]] inline bool isWindowsGNUTargetMachine(const Build::Machine& target)
+{
+    return target.platform == Build::Platform::Windows and target.environment == Build::TargetEnvironment::WindowsGNU;
+}
+
+[[nodiscard]] inline bool tripleConflictsWithTargetArchitecture(StringView                triple,
+                                                                Build::Architecture::Type architecture)
+{
+    const bool isX86 = startsWithAsciiIgnoreCase(triple, "x86_64") or startsWithAsciiIgnoreCase(triple, "amd64") or
+                       startsWithAsciiIgnoreCase(triple, "i686") or startsWithAsciiIgnoreCase(triple, "i386");
+    const bool isArm = startsWithAsciiIgnoreCase(triple, "aarch64") or startsWithAsciiIgnoreCase(triple, "arm64");
+
+    switch (architecture)
+    {
+    case Build::Architecture::Intel64:
+    case Build::Architecture::Intel32: return isArm;
+    case Build::Architecture::Arm64: return isX86;
+    case Build::Architecture::Any:
+    case Build::Architecture::Wasm: return false;
+    }
+    Assert::unreachable();
+}
+
+[[nodiscard]] inline Result validateBuildActionCombination(Build::Action::Type         actionType,
+                                                           const BuildCLIParseContext& context,
+                                                           const Build::Action& action, Console& console)
+{
+    const bool windowsGNUTarget = isWindowsGNUTargetMachine(action.parameters.targetMachine);
+    if (windowsGNUTarget)
+    {
+        if (not context.generator.isEmpty())
+        {
+            StringView resolvedGenerator;
+            SC_TRY(resolveBuildGeneratorKeyword(context.generator, resolvedGenerator, console));
+            if (not(equalsAsciiIgnoreCase(resolvedGenerator, "default") or
+                    equalsAsciiIgnoreCase(resolvedGenerator, "native")))
+            {
+                return printBuildActionCombinationError(
+                    console, "Windows GNU target profiles require --generator native (or default)");
+            }
+        }
+
+        if (not context.architecture.isEmpty())
+        {
+            StringView resolvedArchitecture;
+            SC_TRY(resolveBuildArchitectureKeyword(context.architecture, resolvedArchitecture, console));
+            if ((action.parameters.targetMachine.architecture == Build::Architecture::Intel64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "intel64")) or
+                (action.parameters.targetMachine.architecture == Build::Architecture::Arm64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "arm64")))
+            {
+                return printBuildActionCombinationError(
+                    console, "Windows GNU target profiles require --arch to match the selected target profile");
+            }
+        }
+
+        if (not context.targetTriple.isEmpty())
+        {
+            if (not containsAsciiIgnoreCase(context.targetTriple, "windows") or
+                not containsAsciiIgnoreCase(context.targetTriple, "gnu"))
+            {
+                return printBuildActionCombinationError(
+                    console, "Windows GNU target profiles require a Windows GNU --triple override");
+            }
+            if (tripleConflictsWithTargetArchitecture(context.targetTriple,
+                                                      action.parameters.targetMachine.architecture))
+            {
+                return printBuildActionCombinationError(
+                    console, "The selected --triple conflicts with the architecture implied by --target");
+            }
+        }
+    }
+
+    if (actionType != Build::Action::Run)
+    {
+        return Result(true);
+    }
+
+    switch (action.parameters.runner.type)
+    {
+    case Build::RunnerSpec::Auto:
+        if (windowsGNUTarget and action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
+        {
+            return printBuildActionCombinationError(
+                console, "windows-gnu-arm64 is currently build-only; use build compile or a custom runner");
+        }
+        break;
+    case Build::RunnerSpec::None:
+        if (not targetMachineCanRunDirectly(action.parameters.hostMachine, action.parameters.targetMachine))
+        {
+            return printBuildActionCombinationError(
+                console, "--runner none cannot execute foreign targets directly; use compile or a supported runner");
+        }
+        break;
+    case Build::RunnerSpec::Wine:
+        if (not windowsGNUTarget)
+        {
+            return printBuildActionCombinationError(console, "Wine runner requires a Windows GNU target");
+        }
+        if (action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
+        {
+            return printBuildActionCombinationError(console,
+                                                    "Wine runner currently supports only x86_64 Windows GNU targets");
+        }
+        break;
+    case Build::RunnerSpec::QEMU:
+        return printBuildActionCombinationError(console, "QEMU runner is not implemented yet");
+    case Build::RunnerSpec::Custom:
+        if (action.parameters.runner.executable.isEmpty())
+        {
+            return printBuildActionCombinationError(console, "Custom runner requires --runner-path");
+        }
+        break;
+    }
+    return Result(true);
+}
+
 [[nodiscard]] inline Result scanNamedOutputMode(Span<const StringView> arguments, Build::OutputMode::Type& outputMode,
                                                 bool& wasProvided, Console& console)
 {
@@ -747,7 +936,7 @@ template <size_t N>
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[10];
+    CommandLineOption     options[12];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -778,6 +967,18 @@ template <size_t N>
     options[numOptions].help      = "Build architecture (arm64, intel64, intel32, wasm, any)";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.architecture);
+    numOptions++;
+
+    options[numOptions].longName  = "triple";
+    options[numOptions].help      = "Override the compiler target triple";
+    options[numOptions].valueName = "VALUE";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.targetTriple);
+    numOptions++;
+
+    options[numOptions].longName  = "sysroot";
+    options[numOptions].help      = "Override the toolchain sysroot";
+    options[numOptions].valueName = "PATH";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.sysroot);
     numOptions++;
 
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
@@ -904,6 +1105,14 @@ template <size_t N>
     {
         SC_TRY(applyTargetProfileValue(action, context.targetProfile, arguments.console));
     }
+    if (not context.targetTriple.isEmpty())
+    {
+        SC_TRY(action.parameters.toolchain.targetTriple.assign(context.targetTriple));
+    }
+    if (not context.sysroot.isEmpty())
+    {
+        SC_TRY(action.parameters.toolchain.sysroot.assign(context.sysroot));
+    }
     if (not context.runner.isEmpty())
     {
         SC_TRY(applyRunnerValue(action, context.runner, arguments.console));
@@ -912,6 +1121,7 @@ template <size_t N>
     {
         SC_TRY(action.parameters.runner.executable.assign(context.runnerPath));
     }
+    SC_TRY(validateBuildActionCombination(actionType, context, action, arguments.console));
 
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
     {
