@@ -172,11 +172,13 @@ struct BuildCLIParseContext
         SC_TRY_MSG(output.append("\nTarget profiles:\n"
                                  "  - host / native: build for the current host machine\n"
                                  "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
+                                 "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
                                  "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
                    "Failed writing SC-build help");
         SC_TRY_MSG(
             output.append("\nCurrent tested cross-target support:\n"
                           "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
+                          "  - macOS hosts can compile windows-msvc-x86_64 through portable MSVC + Wine\n"
                           "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
                           "  - windows-gnu-arm64 is currently build-only; Wine runner support is still x86_64-only\n"),
             "Failed writing SC-build help");
@@ -343,7 +345,12 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     {
         resolved = "windows-gnu-arm64";
     }
+    else if (equalsAsciiIgnoreCase(targetProfile, "windows-msvc-x64"))
+    {
+        resolved = "windows-msvc-x86_64";
+    }
     else if (not(equalsAsciiIgnoreCase(targetProfile, "host") or equalsAsciiIgnoreCase(targetProfile, "native") or
+                 equalsAsciiIgnoreCase(targetProfile, "windows-msvc-x86_64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-gnu-x86_64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-gnu-arm64")))
     {
@@ -360,10 +367,21 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
         return Result(true);
     }
 
-    action.parameters.targetMachine.platform    = Build::Platform::Windows;
+    action.parameters.targetMachine.platform = Build::Platform::Windows;
+    action.parameters.platform               = Build::Platform::Windows;
+    action.parameters.generator              = Build::Generator::Native;
+
+    if (equalsAsciiIgnoreCase(resolved, "windows-msvc-x86_64"))
+    {
+        action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsMSVC;
+        action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+        action.parameters.architecture               = Build::Architecture::Intel64;
+        action.parameters.toolchain.family           = Build::Toolchain::MSVC;
+        SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
+        return Result(true);
+    }
+
     action.parameters.targetMachine.environment = Build::TargetEnvironment::WindowsGNU;
-    action.parameters.platform                  = Build::Platform::Windows;
-    action.parameters.generator                 = Build::Generator::Native;
     action.parameters.toolchain.family          = Build::Toolchain::LLVMMingw;
 
     if (equalsAsciiIgnoreCase(resolved, "windows-gnu-arm64"))
@@ -701,6 +719,11 @@ template <size_t N>
     return target.platform == Build::Platform::Windows and target.environment == Build::TargetEnvironment::WindowsGNU;
 }
 
+[[nodiscard]] inline bool isWindowsMSVCTargetMachine(const Build::Machine& target)
+{
+    return target.platform == Build::Platform::Windows and target.environment == Build::TargetEnvironment::WindowsMSVC;
+}
+
 [[nodiscard]] inline bool tripleConflictsWithTargetArchitecture(StringView                triple,
                                                                 Build::Architecture::Type architecture)
 {
@@ -723,7 +746,8 @@ template <size_t N>
                                                            const BuildCLIParseContext& context,
                                                            const Build::Action& action, Console& console)
 {
-    const bool windowsGNUTarget = isWindowsGNUTargetMachine(action.parameters.targetMachine);
+    const bool windowsGNUTarget  = isWindowsGNUTargetMachine(action.parameters.targetMachine);
+    const bool windowsMSVCTarget = isWindowsMSVCTargetMachine(action.parameters.targetMachine);
     if (windowsGNUTarget)
     {
         if (not context.generator.isEmpty())
@@ -768,6 +792,42 @@ template <size_t N>
             }
         }
     }
+    if (windowsMSVCTarget)
+    {
+        if (not context.generator.isEmpty())
+        {
+            StringView resolvedGenerator;
+            SC_TRY(resolveBuildGeneratorKeyword(context.generator, resolvedGenerator, console));
+            if (not(equalsAsciiIgnoreCase(resolvedGenerator, "default") or
+                    equalsAsciiIgnoreCase(resolvedGenerator, "native")))
+            {
+                return printBuildActionCombinationError(
+                    console, "Windows MSVC target profiles require --generator native (or default)");
+            }
+        }
+
+        if (not context.architecture.isEmpty())
+        {
+            StringView resolvedArchitecture;
+            SC_TRY(resolveBuildArchitectureKeyword(context.architecture, resolvedArchitecture, console));
+            if (not equalsAsciiIgnoreCase(resolvedArchitecture, "intel64"))
+            {
+                return printBuildActionCombinationError(console,
+                                                        "windows-msvc-x86_64 currently requires --arch intel64");
+            }
+        }
+
+        if (not context.targetTriple.isEmpty())
+        {
+            return printBuildActionCombinationError(
+                console, "Windows MSVC target profiles do not accept --triple overrides yet");
+        }
+        if (not context.sysroot.isEmpty())
+        {
+            return printBuildActionCombinationError(
+                console, "Windows MSVC target profiles do not accept --sysroot overrides yet");
+        }
+    }
 
     if (actionType != Build::Action::Run)
     {
@@ -791,14 +851,14 @@ template <size_t N>
         }
         break;
     case Build::RunnerSpec::Wine:
-        if (not windowsGNUTarget)
+        if (not(windowsGNUTarget or windowsMSVCTarget))
         {
-            return printBuildActionCombinationError(console, "Wine runner requires a Windows GNU target");
+            return printBuildActionCombinationError(console, "Wine runner requires a Windows target");
         }
         if (action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
         {
             return printBuildActionCombinationError(console,
-                                                    "Wine runner currently supports only x86_64 Windows GNU targets");
+                                                    "Wine runner currently supports only x86_64 Windows targets");
         }
         break;
     case Build::RunnerSpec::QEMU:
@@ -950,7 +1010,8 @@ template <size_t N>
 
     options[numOptions].longName  = "target";
     options[numOptions].shortName = 't';
-    options[numOptions].help      = "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64)";
+    options[numOptions].help =
+        "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, windows-msvc-x86_64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;

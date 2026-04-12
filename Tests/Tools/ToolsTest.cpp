@@ -133,6 +133,30 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsGNU);
             SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "aarch64-w64-windows-gnu");
         }
+        if (test_section("build cli parses Windows MSVC target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "native";
+            args[3]             = "--target";
+            args[4]             = "windows-msvc-x86_64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+            SC_TEST_EXPECT(action.parameters.platform == Build::Platform::Windows);
+            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::MSVC);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsMSVC);
+        }
         if (test_section("build run parses runner selection"))
         {
             arguments.tool      = "build";
@@ -224,6 +248,23 @@ struct SupportToolsTest : public TestCase
             args[2]             = "windows-gnu-arm64";
             args[3]             = "--arch";
             args[4]             = "intel64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build cli rejects sysroot overrides for Windows MSVC target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-msvc-x86_64";
+            args[3]             = "--sysroot";
+            args[4]             = "/tmp/msvc";
             arguments.arguments = {args, 5};
 
             Build::Action           action;
@@ -398,6 +439,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, text));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-gnu-x86_64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-gnu-arm64"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("windows-msvc-x86_64"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Wine runner support is still x86_64-only"));

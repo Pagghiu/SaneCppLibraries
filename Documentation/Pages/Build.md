@@ -81,6 +81,7 @@ Target profiles accepted by the tool today are:
 - `host`
 - `native`
 - `windows-gnu-x86_64`
+- `windows-msvc-x86_64`
 - `windows-gnu-arm64`
 
 Runner values accepted by `build run` today are:
@@ -152,7 +153,9 @@ Current implemented scope:
 Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
+- macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` through the native backend
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
+- The current MSVC-via-Wine validation target is narrower than the Windows GNU path: macOS has a real compile, link, and tiny-start smoke for `windows-msvc-x86_64`, but larger test workloads and Linux-host validation are still in progress
 - `windows-gnu-arm64` is currently build-supported but not yet smoke-run supported because the Wine runner path is still `x86_64`-only, and `build run` now reports that build-only state before entering the backend
 - Cross-target plugin tests remain out of scope for now because the current plugin test flow assumes MSVC-oriented Windows behavior
 
@@ -163,6 +166,8 @@ Typical native commands:
 ./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+./SC.sh package install msvc
+./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --triple x86_64-custom-windows-gnu --sysroot /opt/sysroots/windows
 ./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test BaseTest --test-section new/delete
 ./SC.sh build run SCBuildTest --config Debug --generator native -- --test "BuildTest"

@@ -2353,6 +2353,20 @@ struct SC::Build::NativeBuild
                context.targetMachine.environment == TargetEnvironment::WindowsGNU;
     }
 
+    static constexpr bool isWindowsMSVCTarget(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.platform == Platform::Windows and
+               context.targetMachine.environment == TargetEnvironment::WindowsMSVC;
+    }
+
+    static constexpr bool isWineRunnableWindowsTarget(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.platform == Platform::Windows and
+               context.targetMachine.architecture == Architecture::Intel64 and
+               (context.targetMachine.environment == TargetEnvironment::WindowsGNU or
+                context.targetMachine.environment == TargetEnvironment::WindowsMSVC);
+    }
+
     static constexpr Platform::Type targetPlatform(const ResolvedTargetContext& context)
     {
         return context.targetMachine.platform;
@@ -2372,6 +2386,17 @@ struct SC::Build::NativeBuild
             case Architecture::Intel64: return "x86_64-w64-windows-gnu";
             case Architecture::Arm64: return "aarch64-w64-windows-gnu";
             case Architecture::Intel32:
+            case Architecture::Any:
+            case Architecture::Wasm: break;
+            }
+        }
+        if (isWindowsMSVCTarget(context))
+        {
+            switch (targetArchitecture(context))
+            {
+            case Architecture::Intel64: return "x86_64-pc-windows-msvc";
+            case Architecture::Arm64: return "aarch64-pc-windows-msvc";
+            case Architecture::Intel32: return "i686-pc-windows-msvc";
             case Architecture::Any:
             case Architecture::Wasm: break;
             }
@@ -2480,13 +2505,11 @@ struct SC::Build::NativeBuild
                 runner.mode = ResolvedRunner::Direct;
                 return Result(true);
             }
-            if (isWindowsGNUTarget(targetContext))
+            if (isWineRunnableWindowsTarget(targetContext))
             {
                 SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
                                targetContext.hostMachine.platform == Platform::Linux,
                            "Wine auto-run is only supported on macOS and Linux hosts");
-                SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
-                           "Wine auto-run currently supports only x86_64 Windows GNU targets");
                 runner.mode = ResolvedRunner::Wrapped;
                 if (targetContext.hostMachine.platform == Platform::Apple)
                 {
@@ -2502,12 +2525,13 @@ struct SC::Build::NativeBuild
             }
             return Result::Error("No auto runner is available for this host/target pair");
         case RunnerSpec::Wine:
-            SC_TRY_MSG(isWindowsGNUTarget(targetContext), "Wine runner requires a Windows GNU target");
+            SC_TRY_MSG(targetContext.targetMachine.platform == Platform::Windows,
+                       "Wine runner requires a Windows target");
             SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
                            targetContext.hostMachine.platform == Platform::Linux,
                        "Wine runner is only supported on macOS and Linux hosts");
-            SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
-                       "Wine runner currently supports only x86_64 Windows GNU targets");
+            SC_TRY_MSG(isWineRunnableWindowsTarget(targetContext),
+                       "Wine runner currently supports only x86_64 Windows targets");
             runner.mode = ResolvedRunner::Wrapped;
             if (targetContext.hostMachine.platform == Platform::Apple)
             {
@@ -2535,7 +2559,9 @@ struct SC::Build::NativeBuild
                                        const ResolvedTargetContext& targetContext)
     {
         SC_TRY(process.setEnvironment("WINEPREFIX", prefixDirectory));
-        SC_TRY(process.setEnvironment("WINEDLLOVERRIDES", "winemenubuilder.exe=d"));
+        SC_TRY(process.setEnvironment("WINEDLLOVERRIDES", "winemenubuilder.exe=d;winedbg.exe=d;vctip.exe=d"));
+        SC_TRY(process.setEnvironment("WINEDEBUG", "-all"));
+        SC_TRY(process.setEnvironment("MVK_CONFIG_LOG_LEVEL", "0"));
         if (targetArchitecture(targetContext) == Architecture::Intel64)
         {
             SC_TRY(process.setEnvironment("WINEARCH", "win64"));
@@ -2602,6 +2628,23 @@ struct SC::Build::NativeBuild
         String stdErr3 = StringEncoding::Utf8;
         SC_TRY(process3.exec(removeWinemenubuilderArguments, stdOut3, {}, stdErr3));
         SC_TRY_MSG(process3.getExitStatus() == 0 or process3.getExitStatus() == 1,
+                   "Failed disabling Wine menu builder startup hook");
+
+        Process process4;
+        SC_TRY(configureWineProcess(process4, prefixDirectory, targetContext));
+        const StringSpan removeWow64WinemenubuilderArguments[] = {
+            runnerExecutable,
+            "reg",
+            "delete",
+            "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+            "/v",
+            "winemenubuilder",
+            "/f",
+        };
+        String stdOut4 = StringEncoding::Utf8;
+        String stdErr4 = StringEncoding::Utf8;
+        SC_TRY(process4.exec(removeWow64WinemenubuilderArguments, stdOut4, {}, stdErr4));
+        SC_TRY_MSG(process4.getExitStatus() == 0 or process4.getExitStatus() == 1,
                    "Failed disabling Wine menu builder startup hook");
         return Result(true);
     }
@@ -3122,10 +3165,41 @@ struct SC::Build::NativeBuild
             SC_TRY(adapter.displayName.assign(Path::basename(adapter.executableCpp.view(), Path::AsNative)));
             break;
         case Toolchain::MSVC:
-            SC_TRY(resolveExecutable(toolchain.compilerC.view(), "cl", adapter.executableC));
-            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), adapter.executableC.view(), adapter.executableCpp));
-            SC_TRY(resolveExecutable(toolchain.linker.view(), "link", adapter.executableLink));
-            SC_TRY(resolveExecutable(toolchain.archiver.view(), "lib", adapter.executableArchive));
+            if (targetContext.hostMachine.platform != Platform::Windows and isWindowsMSVCTarget(targetContext))
+            {
+                SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
+                               targetContext.hostMachine.platform == Platform::Linux,
+                           "Portable MSVC cross compilation is only supported on macOS and Linux hosts");
+                SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
+                           "Portable MSVC currently supports only x86_64 Windows MSVC targets");
+
+                Tools::Package msvcPackage;
+                SC_TRY(Tools::installMSVCToolchain(parameters.directories.packagesCacheDirectory.view(),
+                                                   parameters.directories.packagesInstallDirectory.view(),
+                                                   msvcPackage));
+
+                String defaultCompilerC   = StringEncoding::Utf8;
+                String defaultCompilerCpp = StringEncoding::Utf8;
+                String defaultLinker      = StringEncoding::Utf8;
+                String defaultArchiver    = StringEncoding::Utf8;
+                SC_TRY(Path::join(defaultCompilerC, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "cl"}));
+                SC_TRY(Path::join(defaultCompilerCpp, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "cl"}));
+                SC_TRY(Path::join(defaultLinker, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "link"}));
+                SC_TRY(Path::join(defaultArchiver, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "lib"}));
+                SC_TRY(resolveExecutable(toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
+                SC_TRY(
+                    resolveExecutable(toolchain.compilerCpp.view(), defaultCompilerCpp.view(), adapter.executableCpp));
+                SC_TRY(resolveExecutable(toolchain.linker.view(), defaultLinker.view(), adapter.executableLink));
+                SC_TRY(resolveExecutable(toolchain.archiver.view(), defaultArchiver.view(), adapter.executableArchive));
+            }
+            else
+            {
+                SC_TRY(resolveExecutable(toolchain.compilerC.view(), "cl", adapter.executableC));
+                SC_TRY(
+                    resolveExecutable(toolchain.compilerCpp.view(), adapter.executableC.view(), adapter.executableCpp));
+                SC_TRY(resolveExecutable(toolchain.linker.view(), "link", adapter.executableLink));
+                SC_TRY(resolveExecutable(toolchain.archiver.view(), "lib", adapter.executableArchive));
+            }
             SC_TRY(adapter.displayName.assign("msvc"));
             break;
         case Toolchain::ClangCL:

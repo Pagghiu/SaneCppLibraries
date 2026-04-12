@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
+#include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "../Libraries/Memory/String.h"
+#include <stdlib.h>
 namespace SC
 {
 namespace Tools
@@ -43,6 +45,284 @@ static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView 
     SC_TRY(fs.removeDirectoryRecursive(destinationDirectory));
     SC_TRY(fs.rename(extractedRoot.view(), destinationDirectory));
     SC_TRY(fs.removeDirectoryRecursive(tempDirectory.view()));
+    return Result(true);
+}
+
+static Result resolveToolSupportPath(StringView fileName, String& output)
+{
+    String sourcePath = StringEncoding::Utf8;
+    SC_TRY(sourcePath.assign(__FILE__));
+    String toolsDirectory = StringEncoding::Utf8;
+    SC_TRY(toolsDirectory.assign(Path::dirname(sourcePath.view(), Path::AsNative)));
+    SC_TRY(Path::join(output, {toolsDirectory.view(), "Support", fileName}));
+    return Result(true);
+}
+
+static Result findFirstSubdirectory(StringView directory, String& output)
+{
+    FileSystemIterator::FolderState entries[1];
+    FileSystemIterator              iterator;
+    SC_TRY(iterator.init(directory, entries));
+    while (iterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry entry = iterator.get();
+        if (entry.isDirectory())
+        {
+            SC_TRY(output.assign(entry.name));
+            return Result(true);
+        }
+    }
+    return Result::Error("Missing package directory");
+}
+
+static Result resolveMSVCVersions(StringView packageRoot, String& msvcVersion, String& sdkVersion)
+{
+    String msvcDirectory = StringEncoding::Utf8;
+    String sdkDirectory  = StringEncoding::Utf8;
+    SC_TRY(Path::join(msvcDirectory, {packageRoot, "VC", "Tools", "MSVC"}));
+    SC_TRY(Path::join(sdkDirectory, {packageRoot, "Windows Kits", "10", "bin"}));
+    SC_TRY(findFirstSubdirectory(msvcDirectory.view(), msvcVersion));
+    SC_TRY(findFirstSubdirectory(sdkDirectory.view(), sdkVersion));
+    return Result(true);
+}
+
+static Result resolveLinuxWineExecutable(String& output)
+{
+    Process process;
+    String  version = StringEncoding::Utf8;
+    if (process.exec({"wine64", "--version"}, version) and process.getExitStatus() == 0)
+    {
+        SC_TRY(output.assign("wine64"));
+        return Result(true);
+    }
+    version = "";
+    if (process.exec({"wine", "--version"}, version) and process.getExitStatus() == 0)
+    {
+        SC_TRY(output.assign("wine"));
+        return Result(true);
+    }
+    return Result::Error("Cannot find wine executable");
+}
+
+static Result readEnvironmentVariable(StringView name, String& value, bool& found)
+{
+    found = false;
+#if SC_PLATFORM_WINDOWS
+    if (not name.isNullTerminated())
+    {
+        return Result::Error("Environment variable name must be null terminated");
+    }
+
+    char*   variableValue = nullptr;
+    size_t  variableSize  = 0;
+    errno_t result        = _dupenv_s(&variableValue, &variableSize, name.bytesWithoutTerminator());
+    if (result != 0 or variableValue == nullptr or variableSize == 0)
+    {
+        free(variableValue);
+        return Result(true);
+    }
+
+    found = true;
+    SC_TRY(value.assign(StringView::fromNullTerminated(variableValue, StringEncoding::Native)));
+    free(variableValue);
+    return Result(true);
+#else
+    if (not name.isNullTerminated())
+    {
+        return Result::Error("Environment variable name must be null terminated");
+    }
+
+    if (const char* variableValue = ::getenv(name.bytesWithoutTerminator()))
+    {
+        found = true;
+        SC_TRY(value.assign(StringView::fromNullTerminated(variableValue, StringEncoding::Native)));
+    }
+    return Result(true);
+#endif
+}
+
+static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                        String& wineExecutable)
+{
+    bool hasOverrideWine = false;
+    SC_TRY(readEnvironmentVariable("SC_MSVC_WINE", wineExecutable, hasOverrideWine));
+    if (hasOverrideWine)
+    {
+        return Result(true);
+    }
+
+    switch (HostPlatform)
+    {
+    case Platform::Apple: {
+        Package winePackage;
+        SC_TRY(installWineStableRunner(packagesCacheDirectory, packagesInstallDirectory, winePackage));
+        SC_TRY(StringBuilder::format(wineExecutable, "{}/Wine Stable.app/Contents/Resources/wine/bin/wine",
+                                     winePackage.installDirectoryLink));
+        return Result(true);
+    }
+    case Platform::Linux: return resolveLinuxWineExecutable(wineExecutable);
+    case Platform::Windows:
+    case Platform::Emscripten: return Result::Error("Portable MSVC is only supported on macOS and Linux hosts");
+    }
+    Assert::unreachable();
+}
+
+static Result writeMSVCPackageMetadata(StringView packageRoot, StringView wineExecutable)
+{
+    String msvcVersion = StringEncoding::Utf8;
+    String sdkVersion  = StringEncoding::Utf8;
+    SC_TRY(resolveMSVCVersions(packageRoot, msvcVersion, sdkVersion));
+
+    String metadata = StringEncoding::Utf8;
+    auto   builder  = StringBuilder::create(metadata);
+    SC_TRY(builder.append("{\n"));
+    SC_TRY(builder.append("  \"toolchain\": \"msvc\",\n"));
+    SC_TRY(builder.append("  \"host\": \"x64\",\n"));
+    SC_TRY(builder.append("  \"target\": \"x64\",\n"));
+    SC_TRY(builder.append("  \"msvcVersion\": \"{}\",\n", msvcVersion.view()));
+    SC_TRY(builder.append("  \"sdkVersion\": \"{}\",\n", sdkVersion.view()));
+    SC_TRY(builder.append("  \"wine\": \"{}\"\n", wineExecutable));
+    SC_TRY(builder.append("}\n"));
+    builder.finalize();
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    String metadataPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(metadataPath, {packageRoot, "sc-msvc-package.json"}));
+    SC_TRY(fs.writeString(metadataPath.view(), metadata.view()));
+    return Result(true);
+}
+
+static Result writeMSVCWrapperScripts(StringView packageRoot)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String binDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {packageRoot, "bin", "x64"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+
+    String sourceWrapper      = StringEncoding::Utf8;
+    String destinationWrapper = StringEncoding::Utf8;
+    SC_TRY(resolveToolSupportPath("PortableMSVCWrapper.py", sourceWrapper));
+    SC_TRY(Path::join(destinationWrapper, {binDirectory.view(), "msvc-wrapper.py"}));
+    String wrapperContents = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(sourceWrapper.view(), wrapperContents));
+    SC_TRY(fs.writeString(destinationWrapper.view(), wrapperContents.view()));
+    SC_TRY(fs.chmod(destinationWrapper.view(), 0755u));
+
+    static constexpr StringView toolNames[] = {"cl", "link", "lib"};
+    for (const StringView toolName : toolNames)
+    {
+        String scriptPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(scriptPath, {binDirectory.view(), toolName}));
+
+        String scriptContents = StringEncoding::Utf8;
+        auto   builder        = StringBuilder::create(scriptContents);
+        SC_TRY(builder.append("#!/bin/sh\n"));
+        SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$(dirname \"$0\")\" && pwd)\n"));
+        SC_TRY(builder.append("exec \"$SCRIPT_DIR/msvc-wrapper.py\" {} \"$@\"\n", toolName));
+        builder.finalize();
+
+        SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
+        SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+    }
+    return Result(true);
+}
+
+static Result finalizeInstalledPackage(Package& package)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+    if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+    {
+        if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+        {
+            SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+        }
+        SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+    }
+    return Result(true);
+}
+
+static Result testMSVCToolchain(const Package& package)
+{
+    String wrapper = StringEncoding::Utf8;
+    SC_TRY(Path::join(wrapper, {package.installDirectoryLink.view(), "bin", "x64", "cl"}));
+
+    String  output = StringEncoding::Utf8;
+    String  errors = StringEncoding::Utf8;
+    Process process;
+    SC_TRY(process.exec({wrapper.view(), "/?"}, output, Process::StdIn(), errors));
+    SC_TRY_MSG(process.getExitStatus() == 0, "MSVC wrapper returned error");
+    SC_COMPILER_UNUSED(output);
+    SC_COMPILER_UNUSED(errors);
+    return Result(true);
+}
+
+static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringView prefixDirectory)
+{
+    auto configureProcess = [&](Process& process) -> Result
+    {
+        SC_TRY(process.setEnvironment("WINEPREFIX", prefixDirectory));
+        SC_TRY(process.setEnvironment("WINEARCH", "win64"));
+        SC_TRY(process.setEnvironment("WINEDLLOVERRIDES", "winemenubuilder.exe=d;winedbg.exe=d;vctip.exe=d"));
+        SC_TRY(process.setEnvironment("WINEDEBUG", "-all"));
+        SC_TRY(process.setEnvironment("MVK_CONFIG_LOG_LEVEL", "0"));
+        return Result(true);
+    };
+
+    auto runRegCommand = [&](Span<const StringSpan> arguments, const char* errorMessage,
+                             int allowedExitStatus = 0) -> Result
+    {
+        Process process;
+        String  stdOut = StringEncoding::Utf8;
+        String  stdErr = StringEncoding::Utf8;
+        SC_TRY(configureProcess(process));
+        SC_TRY(process.exec(arguments, stdOut, {}, stdErr));
+        if (not(process.getExitStatus() == allowedExitStatus or process.getExitStatus() == 0))
+        {
+            return Result::FromStableCharPointer(errorMessage);
+        }
+        return Result(true);
+    };
+
+    const StringSpan showCrashDialogArguments[] = {
+        wineExecutable, "reg",
+        "add",          "HKEY_CURRENT_USER\\Software\\Wine\\WineDbg",
+        "/v",           "ShowCrashDialog",
+        "/t",           "REG_DWORD",
+        "/d",           "0",
+        "/f",
+    };
+    SC_TRY(runRegCommand(showCrashDialogArguments, "Failed configuring MSVC Wine crash dialog"));
+
+    const StringSpan breakOnFirstChanceArguments[] = {
+        wineExecutable, "reg",
+        "add",          "HKEY_CURRENT_USER\\Software\\Wine\\WineDbg",
+        "/v",           "BreakOnFirstChance",
+        "/t",           "REG_DWORD",
+        "/d",           "0",
+        "/f",
+    };
+    SC_TRY(runRegCommand(breakOnFirstChanceArguments, "Failed configuring MSVC Wine first-chance exceptions"));
+
+    const StringSpan removeWinemenubuilderArguments[] = {
+        wineExecutable, "reg",
+        "delete",       "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+        "/v",           "winemenubuilder",
+        "/f",
+    };
+    SC_TRY(runRegCommand(removeWinemenubuilderArguments, "Failed disabling MSVC Wine menu builder", 1));
+
+    const StringSpan removeWow64WinemenubuilderArguments[] = {
+        wineExecutable, "reg",
+        "delete",       "HKEY_LOCAL_MACHINE\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\RunServices",
+        "/v",           "winemenubuilder",
+        "/f",
+    };
+    SC_TRY(runRegCommand(removeWow64WinemenubuilderArguments, "Failed disabling MSVC Wine menu builder", 1));
     return Result(true);
 }
 
@@ -463,6 +743,128 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     return Result(true);
 }
 
+Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                            StringView importDirectory)
+{
+    package.packageFullName       = format("msvc-portable-{}", HostPlatform == Platform::Apple   ? "macos"
+                                                               : HostPlatform == Platform::Linux ? "linux"
+                                                                                                 : "host");
+    package.packageLocalDirectory = format("{}/msvc/portable-x64", packagesCacheDirectory);
+    package.packageLocalTxt       = format("{}/msvc/portable-x64.txt", packagesCacheDirectory);
+    package.installDirectoryLink  = format("{}/msvc_{}", packagesInstallDirectory,
+                                          HostPlatform == Platform::Apple   ? "macos"
+                                           : HostPlatform == Platform::Linux ? "linux"
+                                                                             : "host");
+
+    String resolvedImportDirectory = StringEncoding::Utf8;
+    if (not importDirectory.isEmpty())
+    {
+        SC_TRY(resolvedImportDirectory.assign(importDirectory));
+    }
+    else
+    {
+        bool hasImportedDirectory = false;
+        SC_TRY(readEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", resolvedImportDirectory, hasImportedDirectory));
+    }
+
+    String resolvedWine = StringEncoding::Utf8;
+    SC_TRY(resolveMSVCWineExecutable(packagesCacheDirectory, packagesInstallDirectory, resolvedWine));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+
+    bool needsInstall = true;
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(finalizeInstalledPackage(package));
+        String packageWinePrefix = StringEncoding::Utf8;
+        SC_TRY(Path::join(packageWinePrefix, {package.installDirectoryLink.view(), ".wine-prefix"}));
+        if (fs.existsAndIsDirectory(packageWinePrefix.view()))
+        {
+            SC_TRY(prepareMSVCWinePrefixHeadless(resolvedWine.view(), packageWinePrefix.view()));
+        }
+        if (testMSVCToolchain(package))
+        {
+            needsInstall = false;
+        }
+    }
+
+    if (needsInstall)
+    {
+        if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+        }
+
+        if (not resolvedImportDirectory.isEmpty())
+        {
+            SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalDirectory.view(), Path::AsNative)));
+            Process copyProcess;
+            SC_TRY(
+                copyProcess.exec({"cp", "-R", resolvedImportDirectory.view(), package.packageLocalDirectory.view()}));
+            SC_TRY_MSG(copyProcess.getExitStatus() == 0, "Failed copying imported MSVC toolchain");
+            SC_TRY(writeMSVCPackageMetadata(package.packageLocalDirectory.view(), resolvedWine.view()));
+        }
+        else
+        {
+            String downloaderScript = StringEncoding::Utf8;
+            SC_TRY(resolveToolSupportPath("PortableMSVCDownloader.py", downloaderScript));
+
+            String downloadCache = StringEncoding::Utf8;
+            String winePrefix    = StringEncoding::Utf8;
+            SC_TRY(Path::join(downloadCache, {packagesCacheDirectory, "msvc", "downloads"}));
+            SC_TRY(Path::join(winePrefix, {packagesCacheDirectory, "msvc", "wine-prefix"}));
+            SC_TRY(fs.makeDirectoryRecursive(downloadCache.view()));
+            SC_TRY(fs.makeDirectoryRecursive(winePrefix.view()));
+
+            Process process;
+            SC_TRY(process.exec({"python3", downloaderScript.view(), "--dest", package.packageLocalDirectory.view(),
+                                 "--cache-dir", downloadCache.view(), "--wine", resolvedWine.view(), "--wine-prefix",
+                                 winePrefix.view(), "--accept-license"}));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC download failed");
+
+            String packageWinePrefix = StringEncoding::Utf8;
+            SC_TRY(Path::join(packageWinePrefix, {package.packageLocalDirectory.view(), ".wine-prefix"}));
+            if (fs.existsAndIsDirectory(packageWinePrefix.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(packageWinePrefix.view()));
+            }
+            Process copyPrefixProcess;
+            SC_TRY(copyPrefixProcess.exec({"cp", "-R", winePrefix.view(), packageWinePrefix.view()}));
+            SC_TRY_MSG(copyPrefixProcess.getExitStatus() == 0, "Failed seeding portable MSVC Wine prefix");
+        }
+
+        SC_TRY(writeMSVCWrapperScripts(package.packageLocalDirectory.view()));
+        SC_TRY(finalizeInstalledPackage(package));
+        String packageWinePrefix = StringEncoding::Utf8;
+        SC_TRY(Path::join(packageWinePrefix, {package.installDirectoryLink.view(), ".wine-prefix"}));
+        if (fs.existsAndIsDirectory(packageWinePrefix.view()))
+        {
+            SC_TRY(prepareMSVCWinePrefixHeadless(resolvedWine.view(), packageWinePrefix.view()));
+        }
+        SC_TRY(testMSVCToolchain(package));
+
+        String packageTxt = StringEncoding::Utf8;
+        auto   builder    = StringBuilder::create(packageTxt);
+        if (not resolvedImportDirectory.isEmpty())
+        {
+            SC_TRY(builder.append("SC_PACKAGE_URL=import:{}\n", resolvedImportDirectory.view()));
+        }
+        else
+        {
+            SC_TRY(builder.append("SC_PACKAGE_URL=https://aka.ms/vs/17/release/channel\n"));
+        }
+        SC_TRY(builder.append("SC_PACKAGE_WINE={}\n", resolvedWine.view()));
+        builder.finalize();
+        SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalTxt.view(), Path::AsNative)));
+        SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    }
+
+    return Result(true);
+}
+
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
 {
     Console& console = arguments.console;
@@ -510,6 +912,13 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(Tools::installWineStableRunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
                                                   *package));
+        }
+        else if (packageName == "msvc")
+        {
+            const StringView importDirectory =
+                arguments.arguments.sizeInElements() > 1 ? arguments.arguments[1] : StringView();
+            SC_TRY(Tools::installMSVCToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                                               importDirectory));
         }
         else
         {
