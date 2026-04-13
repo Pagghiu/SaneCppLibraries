@@ -157,6 +157,8 @@ Current cross-compilation scope:
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
 - Linux hosts can exercise the same portable MSVC package path with an imported layout today, but they currently need either
   `wine64` / `wine` on `PATH` or `SC_MSVC_WINE` pointing at a Wine wrapper before `./SC.sh package install msvc`
+- `SC-package install msvc` also accepts explicit `--import-directory <path>` and `--wine <path>` overrides so imported
+  layouts and custom Wine wrappers no longer have to be driven only through environment variables
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
 - The current MSVC-via-Wine validation target is narrower than the Windows GNU path: macOS has a real compile, link, and tiny-start smoke for `windows-msvc-x86_64`, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through fixture coverage and a real `SCTest` compile
 - `build run` now routes Wine launches through `cmd /c` with Windows-style paths, which fixes real macOS Wine startup for `windows-gnu-x86_64`
@@ -171,6 +173,7 @@ Typical native commands:
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
 ./SC.sh package install msvc
+./SC.sh package install msvc --import-directory /opt/msvc-portable --wine /opt/bin/wine-wrapper
 ./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-msvc-arm64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --triple x86_64-custom-windows-gnu --sysroot /opt/sysroots/windows

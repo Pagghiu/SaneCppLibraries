@@ -150,8 +150,14 @@ static Result readEnvironmentVariable(StringView name, String& value, bool& foun
 }
 
 static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
-                                        String& wineExecutable)
+                                        StringView overrideWineExecutable, String& wineExecutable)
 {
+    if (not overrideWineExecutable.isEmpty())
+    {
+        SC_TRY(wineExecutable.assign(overrideWineExecutable));
+        return Result(true);
+    }
+
     bool hasOverrideWine = false;
     SC_TRY(readEnvironmentVariable("SC_MSVC_WINE", wineExecutable, hasOverrideWine));
     if (hasOverrideWine)
@@ -173,6 +179,50 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
     case Platform::Emscripten: return Result::Error("Portable MSVC is only supported on macOS and Linux hosts");
     }
     Assert::unreachable();
+}
+
+struct MSVCPackageInstallOptions
+{
+    StringView importDirectory;
+    StringView wineExecutable;
+};
+
+static Result parseMSVCPackageInstallOptions(Span<const StringView> arguments, MSVCPackageInstallOptions& options)
+{
+    options = {};
+    if (arguments.sizeInElements() <= 1)
+    {
+        return Result(true);
+    }
+
+    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments[idx];
+        if (argument == "--import-directory")
+        {
+            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            options.importDirectory = arguments[++idx];
+        }
+        else if (argument == "--wine")
+        {
+            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --wine");
+            options.wineExecutable = arguments[++idx];
+        }
+        else if (argument.startsWith("--"))
+        {
+            return Result::Error("Unknown option for SC-package install msvc");
+        }
+        else if (options.importDirectory.isEmpty())
+        {
+            // Legacy compatibility: keep accepting a positional import directory after "msvc".
+            options.importDirectory = argument;
+        }
+        else
+        {
+            return Result::Error("Unexpected extra argument for SC-package install msvc");
+        }
+    }
+    return Result(true);
 }
 
 static Result writeMSVCPackageMetadata(StringView packageRoot, StringView wineExecutable)
@@ -800,7 +850,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 }
 
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
-                            StringView importDirectory)
+                            StringView importDirectory, StringView wineExecutableOverride)
 {
     package.packageFullName       = format("msvc-portable-{}", HostPlatform == Platform::Apple   ? "macos"
                                                                : HostPlatform == Platform::Linux ? "linux"
@@ -824,7 +874,8 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
     }
 
     String resolvedWine = StringEncoding::Utf8;
-    SC_TRY(resolveMSVCWineExecutable(packagesCacheDirectory, packagesInstallDirectory, resolvedWine));
+    SC_TRY(resolveMSVCWineExecutable(packagesCacheDirectory, packagesInstallDirectory, wineExecutableOverride,
+                                     resolvedWine));
 
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -971,10 +1022,10 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         }
         else if (packageName == "msvc")
         {
-            const StringView importDirectory =
-                arguments.arguments.sizeInElements() > 1 ? arguments.arguments[1] : StringView();
+            MSVCPackageInstallOptions options;
+            SC_TRY(parseMSVCPackageInstallOptions(arguments.arguments, options));
             SC_TRY(Tools::installMSVCToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                                               importDirectory));
+                                               options.importDirectory, options.wineExecutable));
         }
         else
         {

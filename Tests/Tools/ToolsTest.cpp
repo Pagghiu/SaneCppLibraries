@@ -557,6 +557,25 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
+        if (test_section("install msvc rejects missing wine option value"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "msvc";
+            args[1]             = "--wine";
+            arguments.arguments = {args, 2};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("install msvc rejects unknown option"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "msvc";
+            args[1]             = "--unknown";
+            args[2]             = "value";
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
         if (test_section("clang-format execute"))
         {
             arguments.tool      = "format";

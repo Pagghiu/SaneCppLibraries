@@ -1464,6 +1464,61 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Ws2_32.lib"));
         }
 
+        if (test_section("package tool installs portable MSVC import from explicit arguments"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot = StringEncoding::Utf8;
+            String toolRoot   = StringEncoding::Utf8;
+            String wineLog    = StringEncoding::Utf8;
+            String winePath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-package-cli-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            StringPath toolDestination;
+            SC_TRUST_RESULT(toolDestination.assign(buildRoot.view()));
+
+            Tools::Tool::Arguments toolArguments{*globalConsole,
+                                                 report.libraryRootDirectory,
+                                                 report.libraryRootDirectory,
+                                                 toolDestination,
+                                                 "package",
+                                                 "install",
+                                                 {}};
+
+            StringView packageArgumentsStorage[] = {"msvc", "--import-directory", importRoot.view(), "--wine",
+                                                    winePath.view()};
+            toolArguments.arguments              = {packageArgumentsStorage, 5};
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::runPackageTool(toolArguments, &package));
+
+            String metadataPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(metadataPath, {package.installDirectoryLink.view(), "sc-msvc-package.json"}));
+            SC_TEST_EXPECT(fs.existsAndIsFile(metadataPath.view()));
+
+            String metadata = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(metadataPath.view(), metadata));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString(winePath.view()));
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
+        }
+
         if (test_section("native backend routes Windows runs through a Wine runner"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());

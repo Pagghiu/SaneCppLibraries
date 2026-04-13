@@ -450,7 +450,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
-                            StringView importDirectory = {});
+                            StringView importDirectory = {}, StringView wineExecutableOverride = {});
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
 
 } // namespace Tools

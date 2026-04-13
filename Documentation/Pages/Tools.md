@@ -171,6 +171,8 @@ Current defaults:
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
 - Linux hosts can also exercise the portable MSVC package path with an imported layout, but `./SC.sh package install msvc`
   currently expects either `wine64` / `wine` on `PATH` or `SC_MSVC_WINE` pointing at a Wine wrapper
+- `SC-package install msvc` now also accepts `--import-directory <path>` and `--wine <path>` so imported layouts and
+  custom Wine wrappers can be selected directly from the command line
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
 - The current `windows-msvc-x86_64` validation scope on macOS is a real compile, link, and tiny-start smoke through
   Wine, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through
