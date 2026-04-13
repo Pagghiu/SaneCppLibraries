@@ -1303,9 +1303,12 @@ struct SC::Build::NativeBuild
         StringSpan arguments[96];
         size_t     numArguments     = 0;
         String     normalizedTarget = StringEncoding::Utf8;
+        String     wineCommand      = StringEncoding::Utf8;
         SC_TRY(Path::normalize(normalizedTarget, StringView(executablePath).trimWhiteSpaces(), Path::AsNative));
         if (runner.mode == ResolvedRunner::Wrapped and StringView(runner.executable.view()).containsString("/wine"))
         {
+            SC_TRY_MSG(bundledWineHasWindowsLoader(runner.executable.view(), targetArchitecture(targetContext)),
+                       "Wine runner does not provide a Windows loader for the selected target architecture");
             String     prefixDirectory = StringEncoding::Utf8;
             StringView architectureName;
             switch (targetArchitecture(targetContext))
@@ -1343,6 +1346,8 @@ struct SC::Build::NativeBuild
                     SC_TRY(runner.arguments.insert(0, {"--backend=curses"}));
                 }
             }
+
+            SC_TRY(convertPosixPathToWindowsPath(normalizedTarget.view(), wineCommand));
         }
 
         if (runner.mode == ResolvedRunner::Wrapped)
@@ -1384,9 +1389,27 @@ struct SC::Build::NativeBuild
             }
         }
 
-        arguments[numArguments] = normalizedTarget.view();
-        globalConsole->print("COMMAND = {}\n", arguments[numArguments]);
-        numArguments++;
+        if (not wineCommand.isEmpty())
+        {
+            arguments[numArguments] = "cmd";
+            globalConsole->print("RUNNER_ARGS[{}] = {}\n", numArguments > 0 ? numArguments - 1 : 0,
+                                 arguments[numArguments]);
+            numArguments++;
+            arguments[numArguments] = "/c";
+            globalConsole->print("RUNNER_ARGS[{}] = {}\n", numArguments > 0 ? numArguments - 1 : 0,
+                                 arguments[numArguments]);
+            numArguments++;
+            arguments[numArguments] = wineCommand.view();
+            globalConsole->print("COMMAND = {}\n", normalizedTarget.view());
+            globalConsole->print("COMMAND_WIN = {}\n", arguments[numArguments]);
+            numArguments++;
+        }
+        else
+        {
+            arguments[numArguments] = normalizedTarget.view();
+            globalConsole->print("COMMAND = {}\n", arguments[numArguments]);
+            numArguments++;
+        }
         for (size_t idx = 0; idx < action.additionalArguments.sizeInElements(); ++idx)
         {
             if (numArguments == sizeof(arguments) / sizeof(arguments[0]))
@@ -2375,7 +2398,6 @@ struct SC::Build::NativeBuild
     static constexpr bool isWineRunnableWindowsTarget(const ResolvedTargetContext& context)
     {
         return context.targetMachine.platform == Platform::Windows and
-               context.targetMachine.architecture == Architecture::Intel64 and
                (context.targetMachine.environment == TargetEnvironment::WindowsGNU or
                 context.targetMachine.environment == TargetEnvironment::WindowsMSVC);
     }
@@ -2543,8 +2565,7 @@ struct SC::Build::NativeBuild
             SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
                            targetContext.hostMachine.platform == Platform::Linux,
                        "Wine runner is only supported on macOS and Linux hosts");
-            SC_TRY_MSG(isWineRunnableWindowsTarget(targetContext),
-                       "Wine runner currently supports only x86_64 Windows targets");
+            SC_TRY_MSG(isWineRunnableWindowsTarget(targetContext), "Wine runner requires a Windows GNU or MSVC target");
             runner.mode = ResolvedRunner::Wrapped;
             if (targetContext.hostMachine.platform == Platform::Apple)
             {
@@ -2575,11 +2596,77 @@ struct SC::Build::NativeBuild
         SC_TRY(process.setEnvironment("WINEDLLOVERRIDES", "winemenubuilder.exe=d;winedbg.exe=d;vctip.exe=d"));
         SC_TRY(process.setEnvironment("WINEDEBUG", "-all"));
         SC_TRY(process.setEnvironment("MVK_CONFIG_LOG_LEVEL", "0"));
-        if (targetArchitecture(targetContext) == Architecture::Intel64)
+        if (targetArchitecture(targetContext) == Architecture::Intel64 or
+            targetArchitecture(targetContext) == Architecture::Arm64)
         {
             SC_TRY(process.setEnvironment("WINEARCH", "win64"));
         }
         return Result(true);
+    }
+
+    static Result convertPosixPathToWindowsPath(StringView posixPath, String& windowsPath)
+    {
+        String normalizedPath = StringEncoding::Utf8;
+        SC_TRY(Path::normalize(normalizedPath, posixPath, Path::AsNative));
+
+        auto builder = StringBuilder::create(windowsPath);
+        SC_TRY(builder.append("Z:"));
+        for (size_t idx = 0; idx < normalizedPath.view().sizeInBytes(); ++idx)
+        {
+            const char character = normalizedPath.view().bytesWithoutTerminator()[idx];
+            if (character == '/')
+            {
+                SC_TRY(builder.append("\\"));
+            }
+            else
+            {
+                const char singleCharacter[] = {character, '\0'};
+                SC_TRY(builder.append(StringView::fromNullTerminated(singleCharacter, StringEncoding::Ascii)));
+            }
+        }
+        builder.finalize();
+        return Result(true);
+    }
+
+    static Result bundledWineLoaderDirectory(StringView runnerExecutable, StringView loaderDirectory, String& output)
+    {
+        SC_TRY(output.assign(Path::dirname(runnerExecutable, Path::AsNative)));
+        SC_TRY(Path::append(output, {"..", "lib", "wine", loaderDirectory}, Path::AsNative));
+        String normalized = StringEncoding::Utf8;
+        SC_TRY(Path::normalize(normalized, output.view(), Path::AsNative));
+        SC_TRY(output.assign(normalized.view()));
+        return Result(true);
+    }
+
+    static bool bundledWineHasWindowsLoader(StringView runnerExecutable, Architecture::Type architecture)
+    {
+        String wineLibraryRoot = StringEncoding::Utf8;
+        if (not bundledWineLoaderDirectory(runnerExecutable, ".", wineLibraryRoot))
+        {
+            return true;
+        }
+
+        if (not pathExists(wineLibraryRoot.view()))
+        {
+            return true;
+        }
+
+        auto hasLoader = [&](StringView loaderDirectory) -> bool
+        {
+            String candidate = StringEncoding::Utf8;
+            return bundledWineLoaderDirectory(runnerExecutable, loaderDirectory, candidate) and
+                   pathExists(candidate.view());
+        };
+
+        switch (architecture)
+        {
+        case Architecture::Intel64: return hasLoader("x86_64-windows");
+        case Architecture::Arm64: return hasLoader("arm64-windows") or hasLoader("aarch64-windows");
+        case Architecture::Intel32: return hasLoader("i386-windows");
+        case Architecture::Any:
+        case Architecture::Wasm: return false;
+        }
+        Assert::unreachable();
     }
 
     static Result prepareWinePrefixHeadless(StringView runnerExecutable, StringView prefixDirectory,

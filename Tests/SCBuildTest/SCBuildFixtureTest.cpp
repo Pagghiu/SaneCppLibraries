@@ -11,6 +11,7 @@
 #include "Libraries/Threading/Threading.h"
 #include "Libraries/Time/Time.h"
 #include "Tools/SC-build/Build.h"
+#include "Tools/SC-package.h"
 #include <stdlib.h>
 
 #if SC_PLATFORM_WINDOWS
@@ -324,6 +325,41 @@ static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, Str
     builder.finalize();
     SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
     SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
+static Result createFakeWineBundle(FileSystem& fs, StringView bundleRoot, StringView logPath, bool supportsX64,
+                                   bool supportsArm64, StringView consoleLogPath = {},
+                                   StringView stdOutText = "wrapped")
+{
+    String wineBinDirectory = StringEncoding::Utf8;
+    String wineLibraryRoot  = StringEncoding::Utf8;
+    String winePath         = StringEncoding::Utf8;
+    SC_TRY(Path::join(wineBinDirectory, {bundleRoot, "wine", "bin"}));
+    SC_TRY(Path::join(wineLibraryRoot, {bundleRoot, "wine", "lib", "wine"}));
+    SC_TRY(Path::join(winePath, {wineBinDirectory.view(), "wine"}));
+    SC_TRY(fs.makeDirectoryRecursive(wineBinDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(wineLibraryRoot.view()));
+    if (supportsX64)
+    {
+        String x64Loader = StringEncoding::Utf8;
+        SC_TRY(Path::join(x64Loader, {wineLibraryRoot.view(), "x86_64-windows"}));
+        SC_TRY(fs.makeDirectoryRecursive(x64Loader.view()));
+    }
+    if (supportsArm64)
+    {
+        String arm64Loader = StringEncoding::Utf8;
+        SC_TRY(Path::join(arm64Loader, {wineLibraryRoot.view(), "arm64-windows"}));
+        SC_TRY(fs.makeDirectoryRecursive(arm64Loader.view()));
+    }
+    SC_TRY(writeLoggingOnlyWrapperScript(fs, winePath.view(), logPath, stdOutText));
+
+    if (not consoleLogPath.isEmpty())
+    {
+        String wineConsole = StringEncoding::Utf8;
+        SC_TRY(Path::join(wineConsole, {wineBinDirectory.view(), "wineconsole"}));
+        SC_TRY(writeLoggingOnlyWrapperScript(fs, wineConsole.view(), consoleLogPath, "console"));
+    }
     return Result(true);
 }
 
@@ -1364,6 +1400,70 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\link.exe"));
         }
 
+        if (test_section("package install imports portable MSVC for x64 and arm64"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot = StringEncoding::Utf8;
+            String toolRoot   = StringEncoding::Utf8;
+            String wineLog    = StringEncoding::Utf8;
+            String winePath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-package-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            ScopedEnvironmentVariable importVariable;
+            ScopedEnvironmentVariable wineVariable;
+            SC_TRUST_RESULT(
+                setScopedEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", importRoot.view(), importVariable));
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), package));
+
+            String metadataPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(metadataPath, {package.installDirectoryLink.view(), "sc-msvc-package.json"}));
+            SC_TEST_EXPECT(fs.existsAndIsFile(metadataPath.view()));
+
+            String metadata = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(metadataPath.view(), metadata));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString("\"targets\": [\"x64\", \"arm64\"]"));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString(winePath.view()));
+
+            static constexpr StringView targetArchitectures[] = {"x64", "arm64"};
+            static constexpr StringView toolNames[]           = {"cl", "link", "lib"};
+            for (const StringView targetArchitecture : targetArchitectures)
+            {
+                for (const StringView toolName : toolNames)
+                {
+                    String wrapperPath = StringEncoding::Utf8;
+                    SC_TRUST_RESULT(Path::join(
+                        wrapperPath, {package.installDirectoryLink.view(), "bin", targetArchitecture, toolName}));
+                    SC_TEST_EXPECT(fs.existsAndIsFile(wrapperPath.view()));
+                }
+            }
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\link.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\link.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Ws2_32.lib"));
+        }
+
         if (test_section("native backend routes Windows runs through a Wine runner"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
@@ -1379,16 +1479,13 @@ struct SCBuildFixtureTest : public SC::TestCase
             String runnerLog        = StringEncoding::Utf8;
             String runnerConsoleLog = StringEncoding::Utf8;
             String runnerPath       = StringEncoding::Utf8;
-            String runnerConsole    = StringEncoding::Utf8;
             SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
             SC_TRUST_RESULT(Path::join(runnerLog, {toolRoot.view(), "wine.log"}));
             SC_TRUST_RESULT(Path::join(runnerConsoleLog, {toolRoot.view(), "wineconsole.log"}));
-            SC_TRUST_RESULT(Path::join(runnerPath, {toolRoot.view(), "wine"}));
-            SC_TRUST_RESULT(Path::join(runnerConsole, {toolRoot.view(), "wineconsole"}));
+            SC_TRUST_RESULT(Path::join(runnerPath, {toolRoot.view(), "wine", "bin", "wine"}));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
-            SC_TRUST_RESULT(writeLoggingOnlyWrapperScript(fs, runnerPath.view(), runnerLog.view(), "wrapped"));
             SC_TRUST_RESULT(
-                writeLoggingOnlyWrapperScript(fs, runnerConsole.view(), runnerConsoleLog.view(), "console"));
+                createFakeWineBundle(fs, toolRoot.view(), runnerLog.view(), true, false, runnerConsoleLog.view()));
 
             Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
             action.action                 = Build::Action::Run;
@@ -1415,17 +1512,19 @@ struct SCBuildFixtureTest : public SC::TestCase
                 String runnerConsoleInvocation = StringEncoding::Utf8;
                 SC_TRUST_RESULT(fs.read(runnerConsoleLog.view(), runnerConsoleInvocation));
                 SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("--backend=curses"));
-                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString(executablePath.view()));
+                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("cmd /c Z:\\"));
+                SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("TinyConsoleProgram.exe"));
                 SC_TEST_EXPECT(StringView(runnerConsoleInvocation.view()).containsString("--fixture runner"));
             }
             else
             {
-                SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString(executablePath.view()));
+                SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("cmd /c Z:\\"));
+                SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("TinyConsoleProgram.exe"));
                 SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("--fixture runner"));
             }
         }
 
-        if (test_section("native backend reports Windows arm64 as build-only for Wine"))
+        if (test_section("native backend reports missing Windows arm64 loader in bundled Wine"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
 
@@ -1433,10 +1532,23 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Directories directories;
             SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
 
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String toolRoot   = StringEncoding::Utf8;
+            String runnerLog  = StringEncoding::Utf8;
+            String runnerPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(runnerLog, {toolRoot.view(), "wine.log"}));
+            SC_TRUST_RESULT(Path::join(runnerPath, {toolRoot.view(), "wine", "bin", "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createFakeWineBundle(fs, toolRoot.view(), runnerLog.view(), true, false));
+
             Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
             action.action                 = Build::Action::Run;
             action.parameters.runner.type = Build::RunnerSpec::Wine;
             SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
+            SC_TRUST_RESULT(action.parameters.runner.executable.assign(runnerPath.view()));
 
             Result runResult = Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName);
             SC_TEST_EXPECT(not runResult);
@@ -1444,9 +1556,46 @@ struct SCBuildFixtureTest : public SC::TestCase
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
 
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+            SC_TEST_EXPECT(not fs.existsAndIsFile(runnerLog.view()));
+        }
+
+        if (test_section("native backend routes Windows arm64 runs through an arm64-capable Wine runner"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String toolRoot   = StringEncoding::Utf8;
+            String runnerLog  = StringEncoding::Utf8;
+            String runnerPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(runnerLog, {toolRoot.view(), "wine.log"}));
+            SC_TRUST_RESULT(Path::join(runnerPath, {toolRoot.view(), "wine", "bin", "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createFakeWineBundle(fs, toolRoot.view(), runnerLog.view(), true, true));
+
+            Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
+            action.action                 = Build::Action::Run;
+            action.parameters.runner.type = Build::RunnerSpec::Wine;
+            SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
+            SC_TRUST_RESULT(action.parameters.runner.executable.assign(runnerPath.view()));
+
+            StringView forwardedArguments[] = {"--fixture", "runner"};
+            action.additionalArguments      = forwardedArguments;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String runnerInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(runnerLog.view(), runnerInvocation));
+            SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("cmd /c Z:\\"));
+            SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("TinyConsoleProgram.exe"));
+            SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("--fixture runner"));
         }
 #endif
 

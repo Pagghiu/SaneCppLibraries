@@ -181,9 +181,9 @@ struct BuildCLIParseContext
                 "\nCurrent tested cross-target support:\n"
                 "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
                 "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
-                "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
-                "  - windows-gnu-arm64 and windows-msvc-arm64 are currently build-only; Wine runner support is still "
-                "x86_64-only\n"),
+                "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
+                "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
+                "macOS runner does not yet\n"),
             "Failed writing SC-build help");
         SC_TRY_MSG(output.append(
                        "\nRaw override escape hatches:\n"
@@ -855,18 +855,7 @@ template <size_t N>
 
     switch (action.parameters.runner.type)
     {
-    case Build::RunnerSpec::Auto:
-        if (windowsGNUTarget and action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
-        {
-            return printBuildActionCombinationError(
-                console, "windows-gnu-arm64 is currently build-only; use build compile or a custom runner");
-        }
-        if (windowsMSVCTarget and action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
-        {
-            return printBuildActionCombinationError(
-                console, "windows-msvc-arm64 is currently build-only; use build compile or a custom runner");
-        }
-        break;
+    case Build::RunnerSpec::Auto: break;
     case Build::RunnerSpec::None:
         if (not targetMachineCanRunDirectly(action.parameters.hostMachine, action.parameters.targetMachine))
         {
@@ -878,11 +867,6 @@ template <size_t N>
         if (not(windowsGNUTarget or windowsMSVCTarget))
         {
             return printBuildActionCombinationError(console, "Wine runner requires a Windows target");
-        }
-        if (action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
-        {
-            return printBuildActionCombinationError(console,
-                                                    "Wine runner currently supports only x86_64 Windows targets");
         }
         break;
     case Build::RunnerSpec::QEMU:

@@ -101,7 +101,15 @@ static Result resolveLinuxWineExecutable(String& output)
         SC_TRY(output.assign("wine"));
         return Result(true);
     }
-    return Result::Error("Cannot find wine executable");
+
+    if (HostInstructionSet == InstructionSet::ARM64)
+    {
+        return Result::Error("Cannot find wine executable. Install wine64/wine or set SC_MSVC_WINE to a Wine "
+                             "wrapper path. On Linux arm64 hosts portable MSVC also needs a runner that can launch "
+                             "the Windows x64 MSVC tools.");
+    }
+    return Result::Error(
+        "Cannot find wine executable. Install wine64/wine or set SC_MSVC_WINE to a Wine wrapper path.");
 }
 
 static Result readEnvironmentVariable(StringView name, String& value, bool& found)

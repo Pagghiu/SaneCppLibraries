@@ -169,12 +169,16 @@ Current defaults:
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
+- Linux hosts can also exercise the portable MSVC package path with an imported layout, but `./SC.sh package install msvc`
+  currently expects either `wine64` / `wine` on `PATH` or `SC_MSVC_WINE` pointing at a Wine wrapper
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
 - The current `windows-msvc-x86_64` validation scope on macOS is a real compile, link, and tiny-start smoke through
-  Wine, while `windows-msvc-arm64` is currently validated as a build-only target through fixture coverage and a real
-  `SCTest` compile
-- `windows-gnu-arm64` and `windows-msvc-arm64` are currently build-only; Wine runner support is still `x86_64`-only,
-  and `build run` now reports that state immediately unless a custom runner is supplied
+  Wine, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through
+  fixture coverage and a real `SCTest` compile
+- `build run` now launches Wine through `cmd /c` with a Windows-style target path, which fixes real macOS startup for
+  `windows-gnu-x86_64`
+- `windows-gnu-arm64` and `windows-msvc-arm64` are no longer rejected by a hardcoded CLI rule, but the packaged macOS
+  Wine runner still lacks an ARM64 Windows loader, so real arm64 runs still need an arm64-capable Wine runtime
 - Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples

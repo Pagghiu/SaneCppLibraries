@@ -155,9 +155,12 @@ Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
+- Linux hosts can exercise the same portable MSVC package path with an imported layout today, but they currently need either
+  `wine64` / `wine` on `PATH` or `SC_MSVC_WINE` pointing at a Wine wrapper before `./SC.sh package install msvc`
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
-- The current MSVC-via-Wine validation target is narrower than the Windows GNU path: macOS has a real compile, link, and tiny-start smoke for `windows-msvc-x86_64`, while `windows-msvc-arm64` is currently validated as a build-only target through fixture coverage plus a real `SCTest` compile
-- `windows-gnu-arm64` and `windows-msvc-arm64` are currently build-supported but not yet smoke-run supported because the Wine runner path is still `x86_64`-only, and `build run` now reports that build-only state before entering the backend
+- The current MSVC-via-Wine validation target is narrower than the Windows GNU path: macOS has a real compile, link, and tiny-start smoke for `windows-msvc-x86_64`, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through fixture coverage and a real `SCTest` compile
+- `build run` now routes Wine launches through `cmd /c` with Windows-style paths, which fixes real macOS Wine startup for `windows-gnu-x86_64`
+- `windows-gnu-arm64` and `windows-msvc-arm64` are no longer blocked by a hardcoded CLI rule, but the packaged macOS Wine runner still does not ship an ARM64 Windows loader, so real arm64 runs still need an arm64-capable Wine runtime
 - Cross-target plugin tests remain out of scope for now because the current plugin test flow assumes MSVC-oriented Windows behavior
 
 Typical native commands:

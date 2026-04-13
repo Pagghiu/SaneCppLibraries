@@ -412,7 +412,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
-        if (test_section("build run rejects auto-run for Windows GNU arm64"))
+        if (test_section("build run accepts auto-run for Windows GNU arm64"))
         {
             arguments.tool      = "build";
             arguments.action    = "run";
@@ -424,7 +424,7 @@ struct SupportToolsTest : public TestCase
             Build::Action           action;
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Ready;
-            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
         if (test_section("build run rejects custom runner without runner-path"))
@@ -467,7 +467,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-msvc-arm64"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
-            SC_TEST_EXPECT(StringView(text.view()).containsString("Wine runner support is still x86_64-only"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("Wine runtime that ships an arm64 Windows loader"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Arguments after -- are forwarded"));
         }
         if (test_section("build cli rejects unknown options"))
