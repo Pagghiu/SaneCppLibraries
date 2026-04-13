@@ -2359,6 +2359,19 @@ struct SC::Build::NativeBuild
                context.targetMachine.environment == TargetEnvironment::WindowsMSVC;
     }
 
+    static Result windowsMSVCTargetArchitectureDirectory(Architecture::Type architecture, StringView& directoryName)
+    {
+        switch (architecture)
+        {
+        case Architecture::Intel64: directoryName = "x64"; return Result(true);
+        case Architecture::Arm64: directoryName = "arm64"; return Result(true);
+        case Architecture::Intel32:
+        case Architecture::Any:
+        case Architecture::Wasm: return Result::Error("Portable MSVC only supports x86_64 and arm64 targets");
+        }
+        Assert::unreachable();
+    }
+
     static constexpr bool isWineRunnableWindowsTarget(const ResolvedTargetContext& context)
     {
         return context.targetMachine.platform == Platform::Windows and
@@ -3170,22 +3183,26 @@ struct SC::Build::NativeBuild
                 SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Apple or
                                targetContext.hostMachine.platform == Platform::Linux,
                            "Portable MSVC cross compilation is only supported on macOS and Linux hosts");
-                SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
-                           "Portable MSVC currently supports only x86_64 Windows MSVC targets");
 
                 Tools::Package msvcPackage;
                 SC_TRY(Tools::installMSVCToolchain(parameters.directories.packagesCacheDirectory.view(),
                                                    parameters.directories.packagesInstallDirectory.view(),
                                                    msvcPackage));
 
-                String defaultCompilerC   = StringEncoding::Utf8;
-                String defaultCompilerCpp = StringEncoding::Utf8;
-                String defaultLinker      = StringEncoding::Utf8;
-                String defaultArchiver    = StringEncoding::Utf8;
-                SC_TRY(Path::join(defaultCompilerC, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "cl"}));
-                SC_TRY(Path::join(defaultCompilerCpp, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "cl"}));
-                SC_TRY(Path::join(defaultLinker, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "link"}));
-                SC_TRY(Path::join(defaultArchiver, {msvcPackage.installDirectoryLink.view(), "bin", "x64", "lib"}));
+                String     defaultCompilerC   = StringEncoding::Utf8;
+                String     defaultCompilerCpp = StringEncoding::Utf8;
+                String     defaultLinker      = StringEncoding::Utf8;
+                String     defaultArchiver    = StringEncoding::Utf8;
+                StringView targetDirectory;
+                SC_TRY(windowsMSVCTargetArchitectureDirectory(targetArchitecture(targetContext), targetDirectory));
+                SC_TRY(Path::join(defaultCompilerC,
+                                  {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "cl"}));
+                SC_TRY(Path::join(defaultCompilerCpp,
+                                  {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "cl"}));
+                SC_TRY(Path::join(defaultLinker,
+                                  {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "link"}));
+                SC_TRY(Path::join(defaultArchiver,
+                                  {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "lib"}));
                 SC_TRY(resolveExecutable(toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
                 SC_TRY(
                     resolveExecutable(toolchain.compilerCpp.view(), defaultCompilerCpp.view(), adapter.executableCpp));

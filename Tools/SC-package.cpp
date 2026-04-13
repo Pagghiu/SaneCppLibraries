@@ -178,7 +178,8 @@ static Result writeMSVCPackageMetadata(StringView packageRoot, StringView wineEx
     SC_TRY(builder.append("{\n"));
     SC_TRY(builder.append("  \"toolchain\": \"msvc\",\n"));
     SC_TRY(builder.append("  \"host\": \"x64\",\n"));
-    SC_TRY(builder.append("  \"target\": \"x64\",\n"));
+    SC_TRY(builder.append("  \"target\": \"multi\",\n"));
+    SC_TRY(builder.append("  \"targets\": [\"x64\", \"arm64\"],\n"));
     SC_TRY(builder.append("  \"msvcVersion\": \"{}\",\n", msvcVersion.view()));
     SC_TRY(builder.append("  \"sdkVersion\": \"{}\",\n", sdkVersion.view()));
     SC_TRY(builder.append("  \"wine\": \"{}\"\n", wineExecutable));
@@ -198,34 +199,39 @@ static Result writeMSVCWrapperScripts(StringView packageRoot)
     FileSystem fs;
     SC_TRY(fs.init("."));
 
-    String binDirectory = StringEncoding::Utf8;
-    SC_TRY(Path::join(binDirectory, {packageRoot, "bin", "x64"}));
-    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
-
-    String sourceWrapper      = StringEncoding::Utf8;
-    String destinationWrapper = StringEncoding::Utf8;
+    String sourceWrapper = StringEncoding::Utf8;
     SC_TRY(resolveToolSupportPath("PortableMSVCWrapper.py", sourceWrapper));
-    SC_TRY(Path::join(destinationWrapper, {binDirectory.view(), "msvc-wrapper.py"}));
     String wrapperContents = StringEncoding::Utf8;
     SC_TRY(readFileIntoString(sourceWrapper.view(), wrapperContents));
-    SC_TRY(fs.writeString(destinationWrapper.view(), wrapperContents.view()));
-    SC_TRY(fs.chmod(destinationWrapper.view(), 0755u));
 
-    static constexpr StringView toolNames[] = {"cl", "link", "lib"};
-    for (const StringView toolName : toolNames)
+    static constexpr StringView targetArchitectures[] = {"x64", "arm64"};
+    static constexpr StringView toolNames[]           = {"cl", "link", "lib"};
+    for (const StringView targetArchitecture : targetArchitectures)
     {
-        String scriptPath = StringEncoding::Utf8;
-        SC_TRY(Path::join(scriptPath, {binDirectory.view(), toolName}));
+        String binDirectory = StringEncoding::Utf8;
+        SC_TRY(Path::join(binDirectory, {packageRoot, "bin", targetArchitecture}));
+        SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
 
-        String scriptContents = StringEncoding::Utf8;
-        auto   builder        = StringBuilder::create(scriptContents);
-        SC_TRY(builder.append("#!/bin/sh\n"));
-        SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$(dirname \"$0\")\" && pwd)\n"));
-        SC_TRY(builder.append("exec \"$SCRIPT_DIR/msvc-wrapper.py\" {} \"$@\"\n", toolName));
-        builder.finalize();
+        String destinationWrapper = StringEncoding::Utf8;
+        SC_TRY(Path::join(destinationWrapper, {binDirectory.view(), "msvc-wrapper.py"}));
+        SC_TRY(fs.writeString(destinationWrapper.view(), wrapperContents.view()));
+        SC_TRY(fs.chmod(destinationWrapper.view(), 0755u));
 
-        SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
-        SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+        for (const StringView toolName : toolNames)
+        {
+            String scriptPath = StringEncoding::Utf8;
+            SC_TRY(Path::join(scriptPath, {binDirectory.view(), toolName}));
+
+            String scriptContents = StringEncoding::Utf8;
+            auto   builder        = StringBuilder::create(scriptContents);
+            SC_TRY(builder.append("#!/bin/sh\n"));
+            SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$(dirname \"$0\")\" && pwd)\n"));
+            SC_TRY(builder.append("exec \"$SCRIPT_DIR/msvc-wrapper.py\" {} \"$@\"\n", toolName));
+            builder.finalize();
+
+            SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
+            SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+        }
     }
     return Result(true);
 }
@@ -248,16 +254,58 @@ static Result finalizeInstalledPackage(Package& package)
 
 static Result testMSVCToolchain(const Package& package)
 {
-    String wrapper = StringEncoding::Utf8;
-    SC_TRY(Path::join(wrapper, {package.installDirectoryLink.view(), "bin", "x64", "cl"}));
+    FileSystem fs;
+    SC_TRY(fs.init("."));
 
-    String  output = StringEncoding::Utf8;
-    String  errors = StringEncoding::Utf8;
-    Process process;
-    SC_TRY(process.exec({wrapper.view(), "/?"}, output, Process::StdIn(), errors));
-    SC_TRY_MSG(process.getExitStatus() == 0, "MSVC wrapper returned error");
-    SC_COMPILER_UNUSED(output);
-    SC_COMPILER_UNUSED(errors);
+    static constexpr StringView targetArchitectures[] = {"x64", "arm64"};
+    for (const StringView targetArchitecture : targetArchitectures)
+    {
+        String testDirectory = StringEncoding::Utf8;
+        SC_TRY(Path::join(testDirectory, {package.packageLocalDirectory.view(), "tmp", targetArchitecture}));
+        SC_TRY(fs.makeDirectoryRecursive(testDirectory.view()));
+
+        String sourcePath = StringEncoding::Utf8;
+        String objectPath = StringEncoding::Utf8;
+        String outputPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(sourcePath, {testDirectory.view(), "toolchain-smoke.cpp"}));
+        SC_TRY(Path::join(objectPath, {testDirectory.view(), "toolchain-smoke.obj"}));
+        SC_TRY(Path::join(outputPath, {testDirectory.view(), "toolchain-smoke.exe"}));
+
+        SC_TRY(fs.writeString(sourcePath.view(), "#define WIN32_LEAN_AND_MEAN\n"
+                                                 "#include <WinSock2.h>\n"
+                                                 "int main()\n"
+                                                 "{\n"
+                                                 "    WSADATA data = {};\n"
+                                                 "    return WSAStartup(MAKEWORD(2, 2), &data);\n"
+                                                 "}\n"));
+
+        String compilerWrapper = StringEncoding::Utf8;
+        String linkerWrapper   = StringEncoding::Utf8;
+        SC_TRY(Path::join(compilerWrapper, {package.installDirectoryLink.view(), "bin", targetArchitecture, "cl"}));
+        SC_TRY(Path::join(linkerWrapper, {package.installDirectoryLink.view(), "bin", targetArchitecture, "link"}));
+
+        {
+            String  output = StringEncoding::Utf8;
+            String  errors = StringEncoding::Utf8;
+            Process process;
+            SC_TRY(process.exec({compilerWrapper.view(), "/nologo", "/EHsc", "/MTd", "/Z7", "/c", sourcePath.view(),
+                                 format("/Fo{}", objectPath.view()).view()},
+                                output, Process::StdIn(), errors));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC compile smoke test failed");
+        }
+        SC_TRY_MSG(fs.existsAndIsFile(objectPath.view()), "Portable MSVC compile smoke output is missing");
+
+        {
+            String  output = StringEncoding::Utf8;
+            String  errors = StringEncoding::Utf8;
+            Process process;
+            SC_TRY(process.exec({linkerWrapper.view(), "/nologo", objectPath.view(), "Ws2_32.lib",
+                                 format("/OUT:{}", outputPath.view()).view()},
+                                output, Process::StdIn(), errors));
+            SC_TRY_MSG(process.getExitStatus() == 0, "Portable MSVC link smoke test failed");
+        }
+        SC_TRY_MSG(fs.existsAndIsFile(outputPath.view()), "Portable MSVC link smoke output is missing");
+    }
     return Result(true);
 }
 

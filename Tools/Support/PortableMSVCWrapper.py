@@ -79,6 +79,17 @@ def resolve_layout(root: Path):
     return metadata, wine, msvc_root, sdk_root, sdk_version
 
 
+def resolve_target_arch(script_path: Path):
+    target_arch = script_path.parent.name.lower()
+    if target_arch not in ("x64", "arm64"):
+        raise RuntimeError(f"Unsupported MSVC wrapper target directory: {target_arch}")
+    return target_arch
+
+
+def resolve_sdk_tool_arch(target_arch: str):
+    return "x64"
+
+
 def prepare_prefix_headless(root: Path, wine: str, environment):
     stamp_path = root / ".wine-prefix" / ".sc-headless-ready"
     if stamp_path.exists():
@@ -133,7 +144,7 @@ def prepare_prefix_headless(root: Path, wine: str, environment):
     stamp_path.write_text("ready\n", encoding="utf-8")
 
 
-def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path, sdk_root: Path, sdk_version: str):
+def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path, sdk_root: Path, sdk_version: str, target_arch: str):
     environment = os.environ.copy()
     environment["WINEPREFIX"] = str(wine_prefix)
     environment["WINEARCH"] = "win64"
@@ -147,13 +158,15 @@ def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path,
 
     msvc_root_win = posix_to_windows(str(msvc_root))
     sdk_root_win = posix_to_windows(str(sdk_root))
+    host_bin_win = f"{msvc_root_win}\\bin\\Hostx64\\{target_arch}"
+    sdk_host_arch = resolve_sdk_tool_arch(target_arch)
     sdk_bin_root_win = f"{sdk_root_win}\\bin\\{sdk_version}"
 
     environment["PATH"] = ";".join(
         (
-            f"{msvc_root_win}\\bin\\Hostx64\\x64",
-            f"{sdk_bin_root_win}\\x64",
-            f"{sdk_bin_root_win}\\x64\\ucrt",
+            host_bin_win,
+            f"{sdk_bin_root_win}\\{sdk_host_arch}",
+            f"{sdk_bin_root_win}\\{sdk_host_arch}\\ucrt",
             "C:\\windows\\system32",
         )
     )
@@ -169,9 +182,9 @@ def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path,
     )
     environment["LIB"] = ";".join(
         (
-            f"{msvc_root_win}\\lib\\x64",
-            f"{sdk_root_win}\\Lib\\{sdk_version}\\ucrt\\x64",
-            f"{sdk_root_win}\\Lib\\{sdk_version}\\um\\x64",
+            f"{msvc_root_win}\\lib\\{target_arch}",
+            f"{sdk_root_win}\\Lib\\{sdk_version}\\ucrt\\{target_arch}",
+            f"{sdk_root_win}\\Lib\\{sdk_version}\\um\\{target_arch}",
         )
     )
     environment["TMP"] = temp_win
@@ -179,8 +192,8 @@ def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path,
     return environment
 
 
-def tool_executable(msvc_root: Path, tool_name: str):
-    return msvc_root / "bin" / "Hostx64" / "x64" / f"{tool_name}.exe"
+def tool_executable(msvc_root: Path, target_arch: str, tool_name: str):
+    return msvc_root / "bin" / "Hostx64" / target_arch / f"{tool_name}.exe"
 
 
 def main():
@@ -198,12 +211,13 @@ def main():
     root = script_path.parents[2]
     wine_prefix = root / ".wine-prefix"
     wine_prefix.mkdir(parents=True, exist_ok=True)
+    target_arch = resolve_target_arch(script_path)
 
     _, wine, msvc_root, sdk_root, sdk_version = resolve_layout(root)
-    environment = build_environment(root, wine_prefix, wine, msvc_root, sdk_root, sdk_version)
+    environment = build_environment(root, wine_prefix, wine, msvc_root, sdk_root, sdk_version, target_arch)
     prepare_prefix_headless(root, wine, environment)
 
-    executable = posix_to_windows(str(tool_executable(msvc_root, tool_name)))
+    executable = posix_to_windows(str(tool_executable(msvc_root, target_arch, tool_name)))
     converted_arguments = [convert_argument(argument) for argument in arguments]
     return subprocess.call([wine, executable, *converted_arguments], env=environment)
 

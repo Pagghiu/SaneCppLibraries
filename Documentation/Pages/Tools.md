@@ -150,8 +150,8 @@ Named options are:
 - `--normal` (`compile` / `run`)
 - `-v`, `--verbose` (`compile` / `run`)
 
-Target profiles currently exposed by the CLI are `host`, `native`, `windows-gnu-x86_64`, `windows-msvc-x86_64`, and
-`windows-gnu-arm64`.
+Target profiles currently exposed by the CLI are `host`, `native`, `windows-gnu-x86_64`, `windows-msvc-x86_64`,
+`windows-msvc-arm64`, and `windows-gnu-arm64`.
 
 Runner keywords currently exposed by the CLI are `auto`, `none`, `wine`, `qemu`, and `custom`.
 
@@ -168,12 +168,13 @@ Current defaults:
 - Native builds do not require a prior `configure` step
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
-  compile `windows-msvc-x86_64`
+  compile `windows-msvc-x86_64` and `windows-msvc-arm64`
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
 - The current `windows-msvc-x86_64` validation scope on macOS is a real compile, link, and tiny-start smoke through
-  Wine; broader test-suite execution and Linux-host validation are still in progress
-- `windows-gnu-arm64` is currently build-only; Wine runner support is still `x86_64`-only, and `build run` now
-  reports that state immediately unless a custom runner is supplied
+  Wine, while `windows-msvc-arm64` is currently validated as a build-only target through fixture coverage and a real
+  `SCTest` compile
+- `windows-gnu-arm64` and `windows-msvc-arm64` are currently build-only; Wine runner support is still `x86_64`-only,
+  and `build run` now reports that state immediately unless a custom runner is supplied
 - Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples
@@ -218,6 +219,12 @@ Acquire the portable MSVC package and cross-compile a Windows MSVC executable on
 ```
 ./SC.sh package install msvc
 ./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
+```
+
+Cross-compile a Windows MSVC arm64 executable on macOS
+```
+./SC.sh package install msvc
+./SC.sh build compile SCTest --target windows-msvc-arm64 --output quiet
 ```
 
 Cross-compile a Windows GNU arm64 executable

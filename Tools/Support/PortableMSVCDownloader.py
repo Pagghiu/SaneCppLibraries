@@ -18,11 +18,34 @@ MANIFEST_URL = "https://aka.ms/vs/17/release/channel"
 WINDOWS_SDK_MSI_NAMES = (
     "Windows SDK for Windows Store Apps Tools-x86_en-us.msi",
     "Windows SDK for Windows Store Apps Headers-x86_en-us.msi",
+    "Windows SDK for Windows Store Apps Headers OnecoreUap-x86_en-us.msi",
     "Windows SDK Desktop Headers x86-x86_en-us.msi",
+    "Windows SDK Desktop Headers x64-x86_en-us.msi",
+    "Windows SDK Desktop Headers arm64-x86_en-us.msi",
+    "Windows SDK OnecoreUap Headers x86-x86_en-us.msi",
+    "Windows SDK OnecoreUap Headers x64-x86_en-us.msi",
+    "Windows SDK OnecoreUap Headers arm64-x86_en-us.msi",
     "Windows SDK for Windows Store Apps Libs-x86_en-us.msi",
     "Windows SDK Desktop Libs x64-x86_en-us.msi",
+    "Windows SDK Desktop Libs arm64-x86_en-us.msi",
     "Universal CRT Headers Libraries and Sources-x86_en-us.msi",
 )
+
+MSVC_TARGET_PACKAGE_NAMES = {
+    "x64": (
+        "microsoft.vc.{version}.tools.hostx64.targetx64.base",
+        "microsoft.vc.{version}.tools.hostx64.targetx64.res.base",
+        "microsoft.vc.{version}.crt.x64.desktop.base",
+        "microsoft.vc.{version}.crt.x64.store.base",
+    ),
+    "arm64": (
+        "microsoft.vc.{version}.tools.hostx64.targetarm64.base",
+        "microsoft.vc.{version}.tools.hostx64.targetarm64.res.base",
+        "microsoft.vc.{version}.crt.arm64.desktop.base",
+        "microsoft.vc.{version}.crt.arm64.desktop.debug.base",
+        "microsoft.vc.{version}.crt.arm64.store.base",
+    ),
+}
 
 
 def download_json(url: str):
@@ -125,16 +148,14 @@ def resolve_versions(channel_manifest, packages, requested_msvc, requested_sdk):
 
 
 def extract_msvc(packages, cache_dir: Path, destination: Path, msvc_version: str):
-    package_names = (
-        f"microsoft.vc.{msvc_version}.tools.hostx64.targetx64.base",
-        f"microsoft.vc.{msvc_version}.tools.hostx64.targetx64.res.base",
+    package_names = [
         f"microsoft.vc.{msvc_version}.crt.headers.base",
-        f"microsoft.vc.{msvc_version}.crt.x64.desktop.base",
-        f"microsoft.vc.{msvc_version}.crt.x64.store.base",
         f"microsoft.vc.{msvc_version}.crt.source.base",
         f"microsoft.vc.{msvc_version}.asan.headers.base",
         f"microsoft.vc.{msvc_version}.asan.x64.base",
-    )
+    ]
+    for target_packages in MSVC_TARGET_PACKAGE_NAMES.values():
+        package_names.extend(package_name.format(version=msvc_version) for package_name in target_packages)
 
     for package_name in package_names:
         package = first(packages[package_name], lambda item: item.get("language") in (None, "en-US"))
@@ -150,15 +171,18 @@ def extract_msvc(packages, cache_dir: Path, destination: Path, msvc_version: str
 
 
 def extract_sdk(packages, cache_dir: Path, destination: Path, sdk_package_id: str, wine: str, wine_prefix: Path):
-    sdk_package = packages[sdk_package_id][0]
-    sdk_package = packages[first(sdk_package["dependencies"], lambda _: True).lower()][0]
+    sdk_component = packages[sdk_package_id][0]
+    sdk_package = packages[first(sdk_component["dependencies"], lambda _: True).lower()][0]
+    payloads = {payload["fileName"].lower(): payload for payload in sdk_package["payloads"]}
 
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
         msi_paths = []
         cab_names = []
         for msi_name in WINDOWS_SDK_MSI_NAMES:
-            payload = first(sdk_package["payloads"], lambda item: item["fileName"] == f"Installers\\{msi_name}")
+            payload = payloads.get(f"Installers\\{msi_name}".lower())
+            if payload is None:
+                raise RuntimeError(f"Missing Windows SDK payload: {msi_name}")
             msi_path = temporary_path / msi_name
             shutil.copyfile(cache_download(cache_dir, payload["url"], payload["sha256"], msi_name), msi_path)
             msi_paths.append(msi_path)
@@ -166,7 +190,9 @@ def extract_sdk(packages, cache_dir: Path, destination: Path, sdk_package_id: st
 
         unique_cabs = sorted(set(cab_names))
         for cab_name in unique_cabs:
-            payload = first(sdk_package["payloads"], lambda item: item["fileName"] == f"Installers\\{cab_name}")
+            payload = payloads.get(f"Installers\\{cab_name}".lower())
+            if payload is None:
+                continue
             shutil.copyfile(cache_download(cache_dir, payload["url"], payload["sha256"], cab_name), temporary_path / cab_name)
 
         environment = os.environ.copy()
@@ -264,7 +290,8 @@ def write_metadata(destination: Path, msvc_version: str, sdk_version: str, licen
     metadata = {
         "toolchain": "msvc",
         "host": "x64",
-        "target": "x64",
+        "target": "multi",
+        "targets": ["x64", "arm64"],
         "msvcVersion": msvc_version,
         "sdkVersion": sdk_version,
         "license": license_url,

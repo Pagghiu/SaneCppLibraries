@@ -173,14 +173,17 @@ struct BuildCLIParseContext
                                  "  - host / native: build for the current host machine\n"
                                  "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
                                  "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
+                                 "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
                                  "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
                    "Failed writing SC-build help");
         SC_TRY_MSG(
-            output.append("\nCurrent tested cross-target support:\n"
-                          "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
-                          "  - macOS hosts can compile windows-msvc-x86_64 through portable MSVC + Wine\n"
-                          "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
-                          "  - windows-gnu-arm64 is currently build-only; Wine runner support is still x86_64-only\n"),
+            output.append(
+                "\nCurrent tested cross-target support:\n"
+                "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
+                "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
+                "  - build run can auto-route windows-gnu-x86_64 through Wine on macOS and Linux\n"
+                "  - windows-gnu-arm64 and windows-msvc-arm64 are currently build-only; Wine runner support is still "
+                "x86_64-only\n"),
             "Failed writing SC-build help");
         SC_TRY_MSG(output.append(
                        "\nRaw override escape hatches:\n"
@@ -349,8 +352,13 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     {
         resolved = "windows-msvc-x86_64";
     }
+    else if (equalsAsciiIgnoreCase(targetProfile, "windows-msvc-aarch64"))
+    {
+        resolved = "windows-msvc-arm64";
+    }
     else if (not(equalsAsciiIgnoreCase(targetProfile, "host") or equalsAsciiIgnoreCase(targetProfile, "native") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-msvc-x86_64") or
+                 equalsAsciiIgnoreCase(targetProfile, "windows-msvc-arm64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-gnu-x86_64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-gnu-arm64")))
     {
@@ -371,12 +379,20 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     action.parameters.platform               = Build::Platform::Windows;
     action.parameters.generator              = Build::Generator::Native;
 
-    if (equalsAsciiIgnoreCase(resolved, "windows-msvc-x86_64"))
+    if (equalsAsciiIgnoreCase(resolved, "windows-msvc-x86_64") or equalsAsciiIgnoreCase(resolved, "windows-msvc-arm64"))
     {
-        action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsMSVC;
-        action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
-        action.parameters.architecture               = Build::Architecture::Intel64;
-        action.parameters.toolchain.family           = Build::Toolchain::MSVC;
+        action.parameters.targetMachine.environment = Build::TargetEnvironment::WindowsMSVC;
+        if (equalsAsciiIgnoreCase(resolved, "windows-msvc-arm64"))
+        {
+            action.parameters.targetMachine.architecture = Build::Architecture::Arm64;
+            action.parameters.architecture               = Build::Architecture::Arm64;
+        }
+        else
+        {
+            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.architecture               = Build::Architecture::Intel64;
+        }
+        action.parameters.toolchain.family = Build::Toolchain::MSVC;
         SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
         return Result(true);
     }
@@ -810,10 +826,13 @@ template <size_t N>
         {
             StringView resolvedArchitecture;
             SC_TRY(resolveBuildArchitectureKeyword(context.architecture, resolvedArchitecture, console));
-            if (not equalsAsciiIgnoreCase(resolvedArchitecture, "intel64"))
+            if ((action.parameters.targetMachine.architecture == Build::Architecture::Intel64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "intel64")) or
+                (action.parameters.targetMachine.architecture == Build::Architecture::Arm64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "arm64")))
             {
-                return printBuildActionCombinationError(console,
-                                                        "windows-msvc-x86_64 currently requires --arch intel64");
+                return printBuildActionCombinationError(
+                    console, "Windows MSVC target profiles require --arch to match the selected target profile");
             }
         }
 
@@ -841,6 +860,11 @@ template <size_t N>
         {
             return printBuildActionCombinationError(
                 console, "windows-gnu-arm64 is currently build-only; use build compile or a custom runner");
+        }
+        if (windowsMSVCTarget and action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
+        {
+            return printBuildActionCombinationError(
+                console, "windows-msvc-arm64 is currently build-only; use build compile or a custom runner");
         }
         break;
     case Build::RunnerSpec::None:
@@ -1010,8 +1034,8 @@ template <size_t N>
 
     options[numOptions].longName  = "target";
     options[numOptions].shortName = 't';
-    options[numOptions].help =
-        "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, windows-msvc-x86_64)";
+    options[numOptions].help      = "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, "
+                                    "windows-msvc-x86_64, windows-msvc-arm64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;

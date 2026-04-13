@@ -332,48 +332,57 @@ static Result createPortableMSVCImportFixture(FileSystem& fs, StringView rootDir
     static constexpr StringView msvcVersion = "14.40.33807";
     static constexpr StringView sdkVersion  = "10.0.26100.0";
 
-    String msvcBinDirectory = StringEncoding::Utf8;
     String msvcInclude      = StringEncoding::Utf8;
-    String msvcLibrary      = StringEncoding::Utf8;
     String sdkBinDirectory  = StringEncoding::Utf8;
     String sdkIncludeUM     = StringEncoding::Utf8;
     String sdkIncludeShared = StringEncoding::Utf8;
     String sdkIncludeUCRT   = StringEncoding::Utf8;
     String sdkIncludeWinRT  = StringEncoding::Utf8;
     String sdkIncludeCpp    = StringEncoding::Utf8;
-    String sdkLibUM         = StringEncoding::Utf8;
-    String sdkLibUCRT       = StringEncoding::Utf8;
 
-    SC_TRY(Path::join(msvcBinDirectory, {rootDirectory, "VC", "Tools", "MSVC", msvcVersion, "bin", "Hostx64", "x64"}));
     SC_TRY(Path::join(msvcInclude, {rootDirectory, "VC", "Tools", "MSVC", msvcVersion, "include"}));
-    SC_TRY(Path::join(msvcLibrary, {rootDirectory, "VC", "Tools", "MSVC", msvcVersion, "lib", "x64"}));
     SC_TRY(Path::join(sdkBinDirectory, {rootDirectory, "Windows Kits", "10", "bin", sdkVersion, "x64"}));
     SC_TRY(Path::join(sdkIncludeUM, {rootDirectory, "Windows Kits", "10", "Include", sdkVersion, "um"}));
     SC_TRY(Path::join(sdkIncludeShared, {rootDirectory, "Windows Kits", "10", "Include", sdkVersion, "shared"}));
     SC_TRY(Path::join(sdkIncludeUCRT, {rootDirectory, "Windows Kits", "10", "Include", sdkVersion, "ucrt"}));
     SC_TRY(Path::join(sdkIncludeWinRT, {rootDirectory, "Windows Kits", "10", "Include", sdkVersion, "winrt"}));
     SC_TRY(Path::join(sdkIncludeCpp, {rootDirectory, "Windows Kits", "10", "Include", sdkVersion, "cppwinrt"}));
-    SC_TRY(Path::join(sdkLibUM, {rootDirectory, "Windows Kits", "10", "Lib", sdkVersion, "um", "x64"}));
-    SC_TRY(Path::join(sdkLibUCRT, {rootDirectory, "Windows Kits", "10", "Lib", sdkVersion, "ucrt", "x64"}));
 
-    SC_TRY(fs.makeDirectoryRecursive(msvcBinDirectory.view()));
     SC_TRY(fs.makeDirectoryRecursive(msvcInclude.view()));
-    SC_TRY(fs.makeDirectoryRecursive(msvcLibrary.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkBinDirectory.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkIncludeUM.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkIncludeShared.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkIncludeUCRT.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkIncludeWinRT.view()));
     SC_TRY(fs.makeDirectoryRecursive(sdkIncludeCpp.view()));
-    SC_TRY(fs.makeDirectoryRecursive(sdkLibUM.view()));
-    SC_TRY(fs.makeDirectoryRecursive(sdkLibUCRT.view()));
 
-    static constexpr StringView toolNames[] = {"cl.exe", "link.exe", "lib.exe"};
-    for (const StringView toolName : toolNames)
+    static constexpr StringView targetArchitectures[] = {"x64", "arm64"};
+    static constexpr StringView toolNames[]           = {"cl.exe", "link.exe", "lib.exe"};
+    for (const StringView targetArchitecture : targetArchitectures)
     {
-        String toolPath = StringEncoding::Utf8;
-        SC_TRY(Path::join(toolPath, {msvcBinDirectory.view(), toolName}));
-        SC_TRY(fs.writeString(toolPath.view(), ""));
+        String msvcBinDirectory = StringEncoding::Utf8;
+        String msvcLibrary      = StringEncoding::Utf8;
+        String sdkLibUM         = StringEncoding::Utf8;
+        String sdkLibUCRT       = StringEncoding::Utf8;
+        SC_TRY(Path::join(msvcBinDirectory,
+                          {rootDirectory, "VC", "Tools", "MSVC", msvcVersion, "bin", "Hostx64", targetArchitecture}));
+        SC_TRY(Path::join(msvcLibrary, {rootDirectory, "VC", "Tools", "MSVC", msvcVersion, "lib", targetArchitecture}));
+        SC_TRY(
+            Path::join(sdkLibUM, {rootDirectory, "Windows Kits", "10", "Lib", sdkVersion, "um", targetArchitecture}));
+        SC_TRY(Path::join(sdkLibUCRT,
+                          {rootDirectory, "Windows Kits", "10", "Lib", sdkVersion, "ucrt", targetArchitecture}));
+
+        SC_TRY(fs.makeDirectoryRecursive(msvcBinDirectory.view()));
+        SC_TRY(fs.makeDirectoryRecursive(msvcLibrary.view()));
+        SC_TRY(fs.makeDirectoryRecursive(sdkLibUM.view()));
+        SC_TRY(fs.makeDirectoryRecursive(sdkLibUCRT.view()));
+
+        for (const StringView toolName : toolNames)
+        {
+            String toolPath = StringEncoding::Utf8;
+            SC_TRY(Path::join(toolPath, {msvcBinDirectory.view(), toolName}));
+            SC_TRY(fs.writeString(toolPath.view(), ""));
+        }
     }
     return Result(true);
 }
@@ -1084,13 +1093,13 @@ static Result configureWindowsGNUAction(Build::Action& action, Build::Architectu
     return Result(true);
 }
 
-static Result configureWindowsMSVCAction(Build::Action& action)
+static Result configureWindowsMSVCAction(Build::Action& action, Build::Architecture::Type architecture)
 {
     action.parameters.platform                   = Build::Platform::Windows;
-    action.parameters.architecture               = Build::Architecture::Intel64;
+    action.parameters.architecture               = architecture;
     action.parameters.toolchain.family           = Build::Toolchain::MSVC;
     action.parameters.targetMachine.platform     = Build::Platform::Windows;
-    action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+    action.parameters.targetMachine.architecture = architecture;
     action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsMSVC;
     SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
     return Result(true);
@@ -1295,7 +1304,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
 
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
-            SC_TRUST_RESULT(configureWindowsMSVCAction(action));
+            SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Intel64));
 
             SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
 
@@ -1309,6 +1318,50 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("link.exe"));
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("/Fo"));
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("/OUT:"));
+        }
+
+        if (test_section("native backend cross compiles Windows arm64 fixture with portable MSVC import"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot = StringEncoding::Utf8;
+            String toolRoot   = StringEncoding::Utf8;
+            String wineLog    = StringEncoding::Utf8;
+            String winePath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-arm64-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            ScopedEnvironmentVariable importVariable;
+            ScopedEnvironmentVariable wineVariable;
+            SC_TRUST_RESULT(
+                setScopedEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", importRoot.view(), importVariable));
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Arm64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\link.exe"));
         }
 
         if (test_section("native backend routes Windows runs through a Wine runner"))
