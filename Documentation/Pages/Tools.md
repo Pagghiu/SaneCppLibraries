@@ -175,6 +175,9 @@ Current defaults:
 - `SC-package install msvc` now also accepts `--import-directory <path>` and `--wine <path>` so imported layouts and
   custom Wine wrappers can be selected directly from the command line
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
+- On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host
+  tools are available, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it is
+  present
 - The current `windows-msvc-x86_64` validation scope on macOS is a real compile, link, and tiny-start smoke through
   Wine, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through
   fixture coverage and a real `SCTest` compile

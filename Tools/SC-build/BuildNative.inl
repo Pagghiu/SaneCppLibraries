@@ -2473,6 +2473,112 @@ struct SC::Build::NativeBuild
         return fs.exists(path);
     }
 
+    static Result resolveHostCommandPath(StringView executable, String& output)
+    {
+        if (StringView(executable).containsString("/") or StringView(executable).containsString("\\"))
+        {
+            SC_TRY(output.assign(executable));
+            return Result(true);
+        }
+
+        Process process;
+        String  commandPath = StringEncoding::Utf8;
+        SC_TRY(process.exec({"which", executable}, commandPath));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
+        SC_TRY(output.assign(StringView(commandPath.view()).trimWhiteSpaces()));
+        return Result(true);
+    }
+
+    static bool resolveRunnableHostCommand(StringView executable, String& output)
+    {
+        if (not resolveHostCommandPath(executable, output))
+        {
+            return false;
+        }
+        return probeExecutable(output.view());
+    }
+
+    static Result writeLinuxWrappedRunnerExecutable(StringView packagesCacheDirectory, StringView wrapperDirectoryName,
+                                                    StringView executableName, StringView firstStage,
+                                                    StringView secondStage, String& output)
+    {
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+
+        String wrapperDirectory = StringEncoding::Utf8;
+        SC_TRY(Path::join(wrapperDirectory, {packagesCacheDirectory, "runners", wrapperDirectoryName}));
+        SC_TRY(fs.makeDirectoryRecursive(wrapperDirectory.view()));
+
+        SC_TRY(Path::join(output, {wrapperDirectory.view(), executableName}));
+
+        String scriptContents = StringEncoding::Utf8;
+        auto   builder        = StringBuilder::create(scriptContents);
+        SC_TRY(builder.append("#!/bin/sh\n"));
+        SC_TRY(builder.append("exec \"{}\" \"{}\" \"$@\"\n", firstStage, secondStage));
+        builder.finalize();
+
+        SC_TRY(fs.writeString(output.view(), scriptContents.view()));
+        SC_TRY(fs.chmod(output.view(), 0755u));
+        return Result(true);
+    }
+
+    static Result resolveLinuxWineExecutable(const Parameters& parameters, StringView configured, String& output)
+    {
+        if (not configured.isEmpty())
+        {
+            SC_TRY(resolveHostCommandPath(configured, output));
+            return Result(true);
+        }
+
+        String wine64Path      = StringEncoding::Utf8;
+        String winePath        = StringEncoding::Utf8;
+        String wineConsolePath = StringEncoding::Utf8;
+        String box64Path       = StringEncoding::Utf8;
+
+        const bool hasWine64      = resolveRunnableHostCommand("wine64", wine64Path);
+        const bool hasWine        = resolveRunnableHostCommand("wine", winePath);
+        const bool hasWineConsole = resolveRunnableHostCommand("wineconsole", wineConsolePath);
+        const bool hasBox64       = resolveRunnableHostCommand("box64", box64Path);
+
+        if (HostInstructionSet == InstructionSet::ARM64 and hasBox64)
+        {
+            StringView wineStage       = hasWine64 ? wine64Path.view() : winePath.view();
+            StringView wrapperRootName = hasWine64 ? "linux-box64-wine64"_a8 : "linux-box64-wine"_a8;
+            if (not wineStage.isEmpty())
+            {
+                SC_TRY(writeLinuxWrappedRunnerExecutable(parameters.directories.packagesCacheDirectory.view(),
+                                                         wrapperRootName, "wine", box64Path.view(), wineStage, output));
+                if (hasWineConsole)
+                {
+                    String unused = StringEncoding::Utf8;
+                    SC_TRY(writeLinuxWrappedRunnerExecutable(parameters.directories.packagesCacheDirectory.view(),
+                                                             wrapperRootName, "wineconsole", box64Path.view(),
+                                                             wineConsolePath.view(), unused));
+                }
+                return Result(true);
+            }
+        }
+
+        if (hasWine64)
+        {
+            SC_TRY(output.assign(wine64Path.view()));
+            return Result(true);
+        }
+        if (hasWine)
+        {
+            SC_TRY(output.assign(winePath.view()));
+            return Result(true);
+        }
+
+        if (HostInstructionSet == InstructionSet::ARM64)
+        {
+            return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
+                                 "wine64/wine, or pass --runner-path with a wrapper path. Linux arm64 hosts need "
+                                 "a runner that can launch the Windows x64 tools and binaries.");
+        }
+        return Result::Error("Cannot find runner executable");
+    }
+
     static Result resolveWrappedRunnerExecutable(StringView configured, StringView primaryFallback,
                                                  StringView secondaryFallback, String& output)
     {
@@ -2552,8 +2658,7 @@ struct SC::Build::NativeBuild
                 }
                 else
                 {
-                    SC_TRY(resolveWrappedRunnerExecutable(runnerSpec.executable.view(), "wine64", "wine",
-                                                          runner.executable));
+                    SC_TRY(resolveLinuxWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
                 }
                 SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
                 return Result(true);
@@ -2573,8 +2678,7 @@ struct SC::Build::NativeBuild
             }
             else
             {
-                SC_TRY(
-                    resolveWrappedRunnerExecutable(runnerSpec.executable.view(), "wine64", "wine", runner.executable));
+                SC_TRY(resolveLinuxWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
             }
             SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
             return Result(true);

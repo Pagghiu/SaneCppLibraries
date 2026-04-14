@@ -6,7 +6,7 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 
 - Describe builds imperatively in `SC-build.cpp`.
 - Generate Xcode, Visual Studio, or Make projects.
-- Run a native backend directly on macOS and Linux.
+- Run a native backend directly on macOS and Linux, including supported cross-target workflows.
 
 ## Recommended Workflow
 
@@ -20,7 +20,17 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 
 - Select `SC::Build::Generator::Native` when the user wants direct builds without generated IDE files.
 - The native backend is available on macOS and Linux.
-- It launches compiler, linker, and archiver processes itself.
+- It launches compiler, linker, archiver, and supported runner processes itself.
+- It now resolves build, host, target, and runner roles up front.
+- Friendly target profiles should be the default explanation surface:
+  - `windows-gnu-x86_64`
+  - `windows-gnu-arm64`
+  - `windows-msvc-x86_64`
+  - `windows-msvc-arm64`
+- `build run` can use `--runner` and `--runner-path` for foreign executables.
+- On macOS and Linux, supported Windows targets can route through Wine. On Linux console targets, the runner prefers `wineconsole --backend=curses` when that sibling executable exists.
+- Portable MSVC acquisition is part of the native-backend story now: `SC-package install msvc` can acquire or import the hosted `cl/link/lib` toolchain plus Windows SDK, and accepts `--import-directory` / `--wine` overrides for imported layouts.
+- On Linux arm64, both portable MSVC installation and native Wine execution can auto-generate `box64 + wine64` wrappers when those host tools are present.
 
 ## Plugin Export Notes
 
@@ -38,4 +48,5 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 
 - Do not oversell `SC::Build` as the only way to consume the libraries.
 - Do not confuse generated-project backends with the native backend.
+- Do not flatten build support and run support into one statement; the support matrix is intentionally narrower for some runner and architecture pairs.
 - Keep host export rules on the executable target.

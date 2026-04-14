@@ -182,6 +182,7 @@ struct BuildCLIParseContext
                 "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
                 "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
+                "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
                 "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
                 "macOS runner does not yet\n"),
             "Failed writing SC-build help");

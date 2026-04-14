@@ -161,6 +161,9 @@ Current cross-compilation scope:
 - `SC-package install msvc` also accepts explicit `--import-directory <path>` and `--wine <path>` overrides so imported
   layouts and custom Wine wrappers no longer have to be driven only through environment variables
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
+- On Linux arm64, that same native `build run` path now auto-prefers generated `box64 + wine64` wrappers when the host
+  provides those commands, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it
+  is available
 - The current MSVC-via-Wine validation target is narrower than the Windows GNU path: macOS has a real compile, link, and tiny-start smoke for `windows-msvc-x86_64`, while `windows-msvc-arm64` is currently validated as a build target plus a runner-capability path through fixture coverage and a real `SCTest` compile
 - `build run` now routes Wine launches through `cmd /c` with Windows-style paths, which fixes real macOS Wine startup for `windows-gnu-x86_64`
 - `windows-gnu-arm64` and `windows-msvc-arm64` are no longer blocked by a hardcoded CLI rule, but the packaged macOS Wine runner still does not ship an ARM64 Windows loader, so real arm64 runs still need an arm64-capable Wine runtime

@@ -10,7 +10,17 @@
 1. Inspect `Tools/SC-build.cpp` for real project setup patterns.
 2. Inspect `Tests/Libraries/Build/BuildTest.cpp` for backend and generator coverage.
 3. Model your workspace, projects, and configurations in `SC-build.cpp`.
-4. Pick a backend: generated projects for IDE workflows or `SC::Build::Generator::Native` for direct builds on macOS and Linux.
+4. Pick a backend: generated projects for IDE workflows or `SC::Build::Generator::Native` for direct builds and cross-target native-backend flows on macOS and Linux.
+
+## Cross-Target Notes
+
+- The native backend now models build machine, host machine, target machine, and runner explicitly instead of treating every build as host-native.
+- Prefer friendly `build --target` profiles before raw overrides. Current public profiles include `windows-gnu-x86_64`, `windows-gnu-arm64`, `windows-msvc-x86_64`, and `windows-msvc-arm64`.
+- Use raw `--triple` and `--sysroot` only as escape hatches; they intentionally override friendly profile defaults.
+- Use `build run --runner <mode>` when the target is foreign. Current runner keywords are `auto`, `none`, `wine`, `qemu`, and `custom`.
+- On macOS and Linux, Windows GNU executables can be smoke-run through the shared Wine runner path. Wine launches are shaped through `cmd /c` with Windows-style target paths.
+- `SC-package install msvc` is the entry point for portable MSVC + Windows SDK acquisition. It now accepts `--import-directory <path>` and `--wine <path>` for imported layouts and custom runner wrappers.
+- On Linux arm64, both the package-install flow and the native Wine runner can auto-prefer generated `box64 + wine64` wrappers when those host tools are installed. Console runs still prefer a sibling `wineconsole --backend=curses` wrapper when available.
 
 ## Plugin Integration
 
@@ -23,6 +33,7 @@
 
 - Do not treat `SC::Build` as a mandatory replacement for the user’s build system.
 - Do not forget that the native backend is only available on macOS and Linux.
+- Do not describe cross-target support as "run anything anywhere". Build support and run support still differ by host, target family, architecture, and available runner assets.
 - Keep export-symbol decisions on the host executable, not on the plugin target.
 
 ## References
