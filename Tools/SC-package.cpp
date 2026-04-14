@@ -86,30 +86,104 @@ static Result resolveMSVCVersions(StringView packageRoot, String& msvcVersion, S
     return Result(true);
 }
 
-static Result resolveLinuxWineExecutable(String& output)
+static Result resolveHostCommandPath(StringView executable, String& output)
+{
+    if (StringView(executable).containsString("/") or StringView(executable).containsString("\\"))
+    {
+        SC_TRY(output.assign(executable));
+        return Result(true);
+    }
+
+    Process process;
+    String  commandPath = StringEncoding::Utf8;
+    SC_TRY(process.exec({"which", executable}, commandPath));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
+    SC_TRY(output.assign(StringView(commandPath.view()).trimWhiteSpaces()));
+    return Result(true);
+}
+
+static bool probeCommandVersion(StringView executable)
 {
     Process process;
     String  version = StringEncoding::Utf8;
-    if (process.exec({"wine64", "--version"}, version) and process.getExitStatus() == 0)
+    return process.exec({executable, "--version"}, version) and process.getExitStatus() == 0;
+}
+
+static bool resolveRunnableHostCommand(StringView executable, String& output)
+{
+    if (not resolveHostCommandPath(executable, output))
     {
-        SC_TRY(output.assign("wine64"));
+        return false;
+    }
+    return probeCommandVersion(output.view());
+}
+
+static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringView wrapperName, StringView firstStage,
+                                    StringView secondStage, String& output)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String wrapperDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(wrapperDirectory, {packagesCacheDirectory, "msvc"}));
+    SC_TRY(fs.makeDirectoryRecursive(wrapperDirectory.view()));
+
+    SC_TRY(Path::join(output, {wrapperDirectory.view(), wrapperName}));
+
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("exec \"{}\" \"{}\" \"$@\"\n", firstStage, secondStage));
+    builder.finalize();
+
+    SC_TRY(fs.writeString(output.view(), scriptContents.view()));
+    SC_TRY(fs.chmod(output.view(), 0755u));
+    return Result(true);
+}
+
+static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, String& output)
+{
+    String wine64Path = StringEncoding::Utf8;
+    String winePath   = StringEncoding::Utf8;
+    String box64Path  = StringEncoding::Utf8;
+
+    const bool hasWine64 = resolveRunnableHostCommand("wine64", wine64Path);
+    const bool hasWine   = resolveRunnableHostCommand("wine", winePath);
+    const bool hasBox64  = resolveRunnableHostCommand("box64", box64Path);
+
+    if (HostInstructionSet == InstructionSet::ARM64 and hasBox64)
+    {
+        if (hasWine64)
+        {
+            return writeLinuxWineWrapper(packagesCacheDirectory, "box64-wine64-wrapper.sh", box64Path.view(),
+                                         wine64Path.view(), output);
+        }
+        if (hasWine)
+        {
+            return writeLinuxWineWrapper(packagesCacheDirectory, "box64-wine-wrapper.sh", box64Path.view(),
+                                         winePath.view(), output);
+        }
+    }
+
+    if (hasWine64)
+    {
+        SC_TRY(output.assign(wine64Path.view()));
         return Result(true);
     }
-    version = "";
-    if (process.exec({"wine", "--version"}, version) and process.getExitStatus() == 0)
+    if (hasWine)
     {
-        SC_TRY(output.assign("wine"));
+        SC_TRY(output.assign(winePath.view()));
         return Result(true);
     }
 
     if (HostInstructionSet == InstructionSet::ARM64)
     {
-        return Result::Error("Cannot find wine executable. Install wine64/wine or set SC_MSVC_WINE to a Wine "
-                             "wrapper path. On Linux arm64 hosts portable MSVC also needs a runner that can launch "
-                             "the Windows x64 MSVC tools.");
+        return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
+                             "wine64/wine, or pass --wine/SC_MSVC_WINE with a wrapper path. Linux arm64 hosts need "
+                             "a runner that can launch the Windows x64 MSVC tools.");
     }
     return Result::Error(
-        "Cannot find wine executable. Install wine64/wine or set SC_MSVC_WINE to a Wine wrapper path.");
+        "Cannot find wine executable. Install wine64/wine or pass --wine/SC_MSVC_WINE with a Wine wrapper path.");
 }
 
 static Result readEnvironmentVariable(StringView name, String& value, bool& found)
@@ -154,7 +228,7 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
 {
     if (not overrideWineExecutable.isEmpty())
     {
-        SC_TRY(wineExecutable.assign(overrideWineExecutable));
+        SC_TRY(resolveHostCommandPath(overrideWineExecutable, wineExecutable));
         return Result(true);
     }
 
@@ -162,6 +236,9 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
     SC_TRY(readEnvironmentVariable("SC_MSVC_WINE", wineExecutable, hasOverrideWine));
     if (hasOverrideWine)
     {
+        String resolvedWine = StringEncoding::Utf8;
+        SC_TRY(resolveHostCommandPath(wineExecutable.view(), resolvedWine));
+        SC_TRY(wineExecutable.assign(resolvedWine.view()));
         return Result(true);
     }
 
@@ -174,7 +251,7 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
                                      winePackage.installDirectoryLink));
         return Result(true);
     }
-    case Platform::Linux: return resolveLinuxWineExecutable(wineExecutable);
+    case Platform::Linux: return resolveLinuxWineExecutable(packagesCacheDirectory, wineExecutable);
     case Platform::Windows:
     case Platform::Emscripten: return Result::Error("Portable MSVC is only supported on macOS and Linux hosts");
     }

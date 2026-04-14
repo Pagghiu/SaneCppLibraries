@@ -169,8 +169,9 @@ Current defaults:
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
-- Linux hosts can also exercise the portable MSVC package path with an imported layout, but `./SC.sh package install msvc`
-  currently expects either `wine64` / `wine` on `PATH` or `SC_MSVC_WINE` pointing at a Wine wrapper
+- Linux hosts can also exercise the portable MSVC package path with an imported layout; on Linux arm64
+  `./SC.sh package install msvc` now auto-prefers a generated `box64 + wine64` wrapper when those tools are available,
+  and it still accepts plain `wine64` / `wine` or an explicit `--wine` / `SC_MSVC_WINE` override
 - `SC-package install msvc` now also accepts `--import-directory <path>` and `--wine <path>` so imported layouts and
   custom Wine wrappers can be selected directly from the command line
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
