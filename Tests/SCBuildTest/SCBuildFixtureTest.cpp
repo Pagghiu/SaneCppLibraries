@@ -1605,8 +1605,15 @@ struct SCBuildFixtureTest : public SC::TestCase
             String toolRoot    = StringEncoding::Utf8;
             String wineLog     = StringEncoding::Utf8;
             String winePath    = StringEncoding::Utf8;
-            SC_TRUST_RESULT(
-                Path::join(packageRoot, {directories.packagesCacheDirectory.view(), "msvc", "portable-x64"}));
+            SC_TRUST_RESULT(Path::join(packageRoot, {directories.packagesCacheDirectory.view(), "msvc",
+#if SC_PLATFORM_APPLE
+                                                     "portable-macos"
+#elif SC_PLATFORM_LINUX
+                                                     "portable-linux"
+#else
+                                                     "portable-host"
+#endif
+                                                    }));
             SC_TRUST_RESULT(Path::join(sdkBinRoot, {packageRoot.view(), "Windows Kits", "10", "bin"}));
             SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
             SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-legacy-repair-wine.log"}));
@@ -1622,6 +1629,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Tools::Package package;
             SC_TEST_EXPECT(Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
                                                        directories.packagesInstallDirectory.view(), package));
+            SC_TEST_EXPECT(package.packageLocalDirectory.view() == packageRoot.view());
 
             String metadataPath = StringEncoding::Utf8;
             SC_TRUST_RESULT(Path::join(metadataPath, {package.installDirectoryLink.view(), "sc-msvc-package.json"}));

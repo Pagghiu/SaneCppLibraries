@@ -178,6 +178,8 @@ Current defaults:
   `sc-msvc-package.json` instead of depending on `SC_MSVC_WINE` or host Wine discovery again
 - Existing portable MSVC layouts can now repair missing `sc-msvc-package.json` metadata and wrapper scripts in place,
   and SDK version detection now falls back from `Windows Kits/10/bin` to `Include` or `Lib` when SDK tools are absent
+- Portable MSVC caches are now host-specific (`macOS` vs `Linux`) so shared workspaces do not reuse the wrong recorded
+  Wine runner path across hosts
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
 - On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host
   tools are available, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it is

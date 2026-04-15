@@ -117,6 +117,13 @@ static Result resolveMSVCVersions(StringView packageRoot, String& msvcVersion, S
     return Result(true);
 }
 
+static constexpr StringView portableMSVCCacheLeafName()
+{
+    return HostPlatform == Platform::Apple   ? StringView::fromNullTerminated("portable-macos", StringEncoding::Ascii)
+           : HostPlatform == Platform::Linux ? StringView::fromNullTerminated("portable-linux", StringEncoding::Ascii)
+                                             : StringView::fromNullTerminated("portable-host", StringEncoding::Ascii);
+}
+
 static Result resolveHostCommandPath(StringView executable, String& output)
 {
     if (StringView(executable).containsString("/") or StringView(executable).containsString("\\"))
@@ -326,8 +333,13 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
     SC_TRY(readMSVCPackageMetadataWine(installedPackageRoot.view(), metadataWine, hasMetadataWine));
     if (not hasMetadataWine)
     {
-        String cachedPackageRoot = format("{}/msvc/portable-x64", packagesCacheDirectory);
+        String cachedPackageRoot = format("{}/msvc/{}", packagesCacheDirectory, portableMSVCCacheLeafName());
         SC_TRY(readMSVCPackageMetadataWine(cachedPackageRoot.view(), metadataWine, hasMetadataWine));
+        if (not hasMetadataWine)
+        {
+            String legacyCachedPackageRoot = format("{}/msvc/portable-x64", packagesCacheDirectory);
+            SC_TRY(readMSVCPackageMetadataWine(legacyCachedPackageRoot.view(), metadataWine, hasMetadataWine));
+        }
     }
     if (hasMetadataWine)
     {
@@ -1051,8 +1063,8 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
     package.packageFullName       = format("msvc-portable-{}", HostPlatform == Platform::Apple   ? "macos"
                                                                : HostPlatform == Platform::Linux ? "linux"
                                                                                                  : "host");
-    package.packageLocalDirectory = format("{}/msvc/portable-x64", packagesCacheDirectory);
-    package.packageLocalTxt       = format("{}/msvc/portable-x64.txt", packagesCacheDirectory);
+    package.packageLocalDirectory = format("{}/msvc/{}", packagesCacheDirectory, portableMSVCCacheLeafName());
+    package.packageLocalTxt       = format("{}/msvc/{}.txt", packagesCacheDirectory, portableMSVCCacheLeafName());
     package.installDirectoryLink  = format("{}/msvc_{}", packagesInstallDirectory,
                                           HostPlatform == Platform::Apple   ? "macos"
                                            : HostPlatform == Platform::Linux ? "linux"
