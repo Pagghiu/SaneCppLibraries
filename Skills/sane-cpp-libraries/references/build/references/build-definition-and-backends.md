@@ -31,6 +31,7 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 - On macOS and Linux, supported Windows targets can route through Wine. On Linux console targets, the runner prefers `wineconsole --backend=curses` when that sibling executable exists.
 - Portable MSVC acquisition is part of the native-backend story now: `SC-package install msvc` can acquire or import the hosted `cl/link/lib` toolchain plus Windows SDK, and accepts `--import-directory` / `--wine` overrides for imported layouts.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of depending on `SC_MSVC_WINE` again.
+- Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when SDK tools are absent.
 - On Linux arm64, both portable MSVC installation and native Wine execution can auto-generate `box64 + wine64` wrappers when those host tools are present.
 
 ## Plugin Export Notes

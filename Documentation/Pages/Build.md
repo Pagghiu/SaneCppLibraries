@@ -162,6 +162,9 @@ Current cross-compilation scope:
   layouts and custom Wine wrappers no longer have to be driven only through environment variables
 - Once a portable MSVC package is installed, later native-backend Windows MSVC builds can reuse the recorded wrapper path
   from `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` or host Wine discovery again
+- Existing portable MSVC layouts can now repair missing `sc-msvc-package.json` metadata and wrapper scripts in place, and
+  SDK version detection now falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is
+  absent
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
 - On Linux arm64, that same native `build run` path now auto-prefers generated `box64 + wine64` wrappers when the host
   provides those commands, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it

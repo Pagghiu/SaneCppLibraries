@@ -162,14 +162,16 @@ def build_environment(root: Path, wine_prefix: Path, wine: str, msvc_root: Path,
     sdk_host_arch = resolve_sdk_tool_arch(target_arch)
     sdk_bin_root_win = f"{sdk_root_win}\\bin\\{sdk_version}"
 
-    environment["PATH"] = ";".join(
-        (
-            host_bin_win,
-            f"{sdk_bin_root_win}\\{sdk_host_arch}",
-            f"{sdk_bin_root_win}\\{sdk_host_arch}\\ucrt",
-            "C:\\windows\\system32",
-        )
-    )
+    path_entries = [host_bin_win]
+    sdk_tool_root = sdk_root / "bin" / sdk_version / sdk_host_arch
+    if sdk_tool_root.is_dir():
+        path_entries.append(f"{sdk_bin_root_win}\\{sdk_host_arch}")
+    sdk_ucrt_root = sdk_tool_root / "ucrt"
+    if sdk_ucrt_root.is_dir():
+        path_entries.append(f"{sdk_bin_root_win}\\{sdk_host_arch}\\ucrt")
+    path_entries.append("C:\\windows\\system32")
+
+    environment["PATH"] = ";".join(path_entries)
     environment["INCLUDE"] = ";".join(
         (
             f"{msvc_root_win}\\include",

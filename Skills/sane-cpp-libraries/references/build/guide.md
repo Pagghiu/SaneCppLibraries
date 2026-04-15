@@ -21,6 +21,7 @@
 - On macOS and Linux, Windows GNU executables can be smoke-run through the shared Wine runner path. Wine launches are shaped through `cmd /c` with Windows-style target paths.
 - `SC-package install msvc` is the entry point for portable MSVC + Windows SDK acquisition. It now accepts `--import-directory <path>` and `--wine <path>` for imported layouts and custom runner wrappers.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` again.
+- Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is absent.
 - On Linux arm64, both the package-install flow and the native Wine runner can auto-prefer generated `box64 + wine64` wrappers when those host tools are installed. Console runs still prefer a sibling `wineconsole --backend=curses` wrapper when available.
 
 ## Plugin Integration

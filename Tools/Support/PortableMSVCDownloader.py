@@ -240,16 +240,29 @@ def cleanup_layout(destination: Path):
             shutil.rmtree(path, ignore_errors=True)
 
 
+def resolve_first_subdirectory(path: Path):
+    if not path.is_dir():
+        return None
+    directories = sorted(entry for entry in path.iterdir() if entry.is_dir())
+    if not directories:
+        return None
+    return directories[0].name
+
+
 def resolve_layout_versions(destination: Path):
     msvc_roots = sorted((destination / "VC" / "Tools" / "MSVC").glob("*"))
     if not msvc_roots:
         raise RuntimeError("Extracted MSVC toolset directory is missing")
 
-    sdk_roots = sorted((destination / "Windows Kits" / "10" / "bin").glob("*"))
-    if not sdk_roots:
+    sdk_version = (
+        resolve_first_subdirectory(destination / "Windows Kits" / "10" / "bin")
+        or resolve_first_subdirectory(destination / "Windows Kits" / "10" / "Include")
+        or resolve_first_subdirectory(destination / "Windows Kits" / "10" / "Lib")
+    )
+    if sdk_version is None:
         raise RuntimeError("Extracted Windows SDK directory is missing")
 
-    return msvc_roots[0].name, sdk_roots[0].name
+    return msvc_roots[0].name, sdk_version
 
 
 def prepare_prefix_headless(wine: str, wine_prefix: Path, environment):

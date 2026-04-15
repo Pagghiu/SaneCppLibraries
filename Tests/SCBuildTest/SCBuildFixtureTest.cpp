@@ -1589,6 +1589,63 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
         }
 
+        if (test_section("package install repairs legacy portable MSVC layout without SDK bin metadata"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String packageRoot = StringEncoding::Utf8;
+            String sdkBinRoot  = StringEncoding::Utf8;
+            String toolRoot    = StringEncoding::Utf8;
+            String wineLog     = StringEncoding::Utf8;
+            String winePath    = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                Path::join(packageRoot, {directories.packagesCacheDirectory.view(), "msvc", "portable-x64"}));
+            SC_TRUST_RESULT(Path::join(sdkBinRoot, {packageRoot.view(), "Windows Kits", "10", "bin"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-legacy-repair-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, packageRoot.view()));
+            SC_TRUST_RESULT(fs.removeDirectoriesRecursive(sdkBinRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            ScopedEnvironmentVariable wineVariable;
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), package));
+
+            String metadataPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(metadataPath, {package.installDirectoryLink.view(), "sc-msvc-package.json"}));
+            SC_TEST_EXPECT(fs.existsAndIsFile(metadataPath.view()));
+
+            String metadata = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(metadataPath.view(), metadata));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString("\"sdkVersion\": \"10.0.26100.0\""));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString(winePath.view()));
+
+            String x64CompilerWrapper   = StringEncoding::Utf8;
+            String arm64CompilerWrapper = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(x64CompilerWrapper, {package.installDirectoryLink.view(), "bin", "x64", "cl"}));
+            SC_TRUST_RESULT(
+                Path::join(arm64CompilerWrapper, {package.installDirectoryLink.view(), "bin", "arm64", "cl"}));
+            SC_TEST_EXPECT(fs.existsAndIsFile(x64CompilerWrapper.view()));
+            SC_TEST_EXPECT(fs.existsAndIsFile(arm64CompilerWrapper.view()));
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\link.exe"));
+        }
+
 #if SC_PLATFORM_LINUX
         if (test_section("native backend reuses installed portable MSVC metadata without Wine env"))
         {
