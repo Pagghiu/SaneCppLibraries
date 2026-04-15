@@ -160,6 +160,8 @@ Current cross-compilation scope:
   accepts plain `wine64` / `wine` or an explicit `--wine` / `SC_MSVC_WINE` override
 - `SC-package install msvc` also accepts explicit `--import-directory <path>` and `--wine <path>` overrides so imported
   layouts and custom Wine wrappers no longer have to be driven only through environment variables
+- Once a portable MSVC package is installed, later native-backend Windows MSVC builds can reuse the recorded wrapper path
+  from `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` or host Wine discovery again
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
 - On Linux arm64, that same native `build run` path now auto-prefers generated `box64 + wine64` wrappers when the host
   provides those commands, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it

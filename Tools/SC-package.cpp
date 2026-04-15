@@ -223,6 +223,50 @@ static Result readEnvironmentVariable(StringView name, String& value, bool& foun
 #endif
 }
 
+static Result readMSVCPackageMetadataWine(StringView packageRoot, String& wineExecutable, bool& found)
+{
+    found = false;
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String metadataPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(metadataPath, {packageRoot, "sc-msvc-package.json"}));
+    if (not fs.existsAndIsFile(metadataPath.view()))
+    {
+        return Result(true);
+    }
+
+    String metadata = StringEncoding::Utf8;
+    SC_TRY(fs.read(metadataPath.view(), metadata));
+
+    StringView remainder;
+    if (not StringView(metadata.view()).splitAfter("\"wine\":", remainder))
+    {
+        return Result(true);
+    }
+
+    remainder = remainder.trimWhiteSpaces();
+
+    StringView afterQuote;
+    if (not remainder.splitAfter("\"", afterQuote))
+    {
+        return Result(true);
+    }
+
+    StringView parsedWine;
+    if (not afterQuote.splitBefore("\"", parsedWine))
+    {
+        return Result(true);
+    }
+
+    String resolvedWine = StringEncoding::Utf8;
+    SC_TRY(resolveHostCommandPath(parsedWine, resolvedWine));
+    SC_TRY(wineExecutable.assign(resolvedWine.view()));
+    found = true;
+    return Result(true);
+}
+
 static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                         StringView overrideWineExecutable, String& wineExecutable)
 {
@@ -239,6 +283,24 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
         String resolvedWine = StringEncoding::Utf8;
         SC_TRY(resolveHostCommandPath(wineExecutable.view(), resolvedWine));
         SC_TRY(wineExecutable.assign(resolvedWine.view()));
+        return Result(true);
+    }
+
+    String metadataWine         = StringEncoding::Utf8;
+    bool   hasMetadataWine      = false;
+    String installedPackageRoot = format("{}/msvc_{}", packagesInstallDirectory,
+                                         HostPlatform == Platform::Apple   ? "macos"
+                                         : HostPlatform == Platform::Linux ? "linux"
+                                                                           : "host");
+    SC_TRY(readMSVCPackageMetadataWine(installedPackageRoot.view(), metadataWine, hasMetadataWine));
+    if (not hasMetadataWine)
+    {
+        String cachedPackageRoot = format("{}/msvc/portable-x64", packagesCacheDirectory);
+        SC_TRY(readMSVCPackageMetadataWine(cachedPackageRoot.view(), metadataWine, hasMetadataWine));
+    }
+    if (hasMetadataWine)
+    {
+        SC_TRY(wineExecutable.assign(metadataWine.view()));
         return Result(true);
     }
 

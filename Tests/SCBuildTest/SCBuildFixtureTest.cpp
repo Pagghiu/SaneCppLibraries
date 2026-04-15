@@ -335,6 +335,33 @@ static Result setScopedEnvironmentVariable(StringView name, StringView value, Sc
     return Result(true);
 }
 
+#if SC_PLATFORM_LINUX
+static Result unsetScopedEnvironmentVariable(StringView name, ScopedEnvironmentVariable& scoped)
+{
+    SC_TRY(scoped.name.assign(name));
+    scoped.restoreValue = true;
+#if SC_PLATFORM_WINDOWS
+    const char* existing = ::getenv(scoped.name.bytesIncludingTerminator());
+    if (existing)
+    {
+        scoped.hadPrevious = true;
+        SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
+    }
+    SC_TRY_MSG(::SetEnvironmentVariableA(scoped.name.bytesIncludingTerminator(), nullptr) != 0,
+               "Failed clearing environment variable");
+#else
+    const char* existing = ::getenv(scoped.name.bytesIncludingTerminator());
+    if (existing)
+    {
+        scoped.hadPrevious = true;
+        SC_TRY(scoped.previous.assign(StringView::fromNullTerminated(existing, StringEncoding::Native)));
+    }
+    SC_TRY_MSG(::unsetenv(scoped.name.bytesIncludingTerminator()) == 0, "Failed clearing environment variable");
+#endif
+    return Result(true);
+}
+#endif
+
 static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, StringView logPath)
 {
     String scriptContents = StringEncoding::Utf8;
@@ -1561,6 +1588,72 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
         }
+
+#if SC_PLATFORM_LINUX
+        if (test_section("native backend reuses installed portable MSVC metadata without Wine env"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot = StringEncoding::Utf8;
+            String toolRoot   = StringEncoding::Utf8;
+            String wineLog    = StringEncoding::Utf8;
+            String winePath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-installed-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            StringPath toolDestination;
+            SC_TRUST_RESULT(toolDestination.assign(buildRoot.view()));
+
+            Tools::Tool::Arguments toolArguments{*globalConsole,
+                                                 report.libraryRootDirectory,
+                                                 report.libraryRootDirectory,
+                                                 toolDestination,
+                                                 "package",
+                                                 "install",
+                                                 {}};
+
+            StringView packageArgumentsStorage[] = {"msvc", "--import-directory", importRoot.view(), "--wine",
+                                                    winePath.view()};
+            toolArguments.arguments              = {packageArgumentsStorage, 5};
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::runPackageTool(toolArguments, &package));
+
+            ScopedEnvironmentVariable clearedImportVariable;
+            ScopedEnvironmentVariable clearedWineVariable;
+            SC_TRUST_RESULT(unsetScopedEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", clearedImportVariable));
+            SC_TRUST_RESULT(unsetScopedEnvironmentVariable("SC_MSVC_WINE", clearedWineVariable));
+
+            ScopedEnvironmentVariable pathVariable;
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("PATH", "/usr/bin:/bin", pathVariable));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Intel64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("link.exe"));
+        }
+#endif
 
         if (test_section("native backend routes Windows runs through a Wine runner"))
         {
