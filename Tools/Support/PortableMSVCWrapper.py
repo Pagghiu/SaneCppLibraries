@@ -33,6 +33,27 @@ def strip_outer_quotes(value: str):
     return value
 
 
+def looks_like_posix_option(argument: str):
+    if not argument.startswith("/") or looks_like_windows_path(argument):
+        return False
+
+    first_value_separator = len(argument)
+    for separator in (":", "="):
+        index = argument.find(separator, 1)
+        if index != -1 and index < first_value_separator:
+            first_value_separator = index
+
+    first_path_separator = len(argument)
+    for separator in ("/", "\\"):
+        index = argument.find(separator, 1)
+        if index != -1 and index < first_path_separator:
+            first_path_separator = index
+
+    if first_value_separator < first_path_separator:
+        return True
+    return first_path_separator == len(argument)
+
+
 def convert_response_file(response_path: Path):
     output_path = response_path.with_suffix(response_path.suffix + ".windows.rsp")
     lines = []
@@ -56,9 +77,8 @@ def convert_argument(argument: str):
         response_path = Path(argument[1:])
         if response_path.exists():
             return "@" + posix_to_windows(str(convert_response_file(response_path)))
-    if argument.startswith("/") and not looks_like_windows_path(argument):
-        if "/" not in argument[1:]:
-            return argument
+    if looks_like_posix_option(argument):
+        return argument
     if argument.startswith("/") and len(argument) > 2 and argument[1].isalpha() and argument[2] == ":":
         return argument
     if Path(argument).is_absolute():

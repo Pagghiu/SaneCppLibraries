@@ -196,6 +196,12 @@ static Result getDirectoryName(StringSpan path, StringPath& directory)
     return Result::Error("Missing directory separator");
 }
 
+static bool pathViewEquals(StringSpan lhs, StringSpan rhs)
+{
+    return lhs.sizeInBytes() == rhs.sizeInBytes() and
+           ::memcmp(lhs.bytesWithoutTerminator(), rhs.bytesWithoutTerminator(), lhs.sizeInBytes()) == 0;
+}
+
 static bool repoHasMarkers(StringSpan path)
 {
     if (!isAbsoluteNative(path) || !pathExistsDirectory(path))
@@ -224,6 +230,37 @@ static void recordAttempt(StartupAttempt* attempts, size_t maxAttempts, size_t& 
 }
 
 static bool validateLibraryRoot(StringSpan path) { return repoHasMarkers(path); }
+
+static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory);
+
+static bool resolveLibraryRootByWalkingParents(StringSpan startPath, const char* source, StringPath& libraryRoot,
+                                               StartupAttempt* attempts, size_t maxAttempts, size_t& numAttempts)
+{
+    if (!isAbsoluteNative(startPath) or !pathExistsDirectory(startPath))
+        return false;
+
+    StringPath candidate;
+    if (!candidate.assign(startPath))
+        return false;
+    trimTrailingSeparators(candidate);
+
+    for (;;)
+    {
+        recordAttempt(attempts, maxAttempts, numAttempts, source, candidate.view());
+        if (validateLibraryRoot(candidate.view()))
+        {
+            return libraryRoot.assign(candidate.view()) ? true : false;
+        }
+
+        StringPath parent;
+        if (!getDirectoryName(candidate.view(), parent))
+            return false;
+        trimTrailingSeparators(parent);
+        if (!isAbsoluteNative(parent.view()) or pathViewEquals(parent.view(), candidate.view()))
+            return false;
+        candidate = move(parent);
+    }
+}
 
 static bool resolveCompiledLibraryRoot(StringSpan executablePath, StringPath& libraryRoot, StartupAttempt* attempts,
                                        size_t maxAttempts, size_t& numAttempts)
@@ -313,6 +350,28 @@ static bool resolveLibraryRoot(TestReport::IOutput& console, StringSpan explicit
     if (resolveCompiledLibraryRoot(executablePath, libraryRoot, attempts, 16, numAttempts))
         return true;
 
+    if (resolveLibraryRootByWalkingParents(applicationRoot, "application root parent", libraryRoot, attempts, 16,
+                                           numAttempts))
+    {
+        return true;
+    }
+
+    StringPath executableDirectory;
+    if (getDirectoryName(executablePath, executableDirectory) and
+        resolveLibraryRootByWalkingParents(executableDirectory.view(), "executable directory parent", libraryRoot,
+                                           attempts, 16, numAttempts))
+    {
+        return true;
+    }
+
+    StringPath currentWorkingDirectory;
+    if (!getCurrentWorkingDirectory(currentWorkingDirectory).isEmpty() and
+        resolveLibraryRootByWalkingParents(currentWorkingDirectory.view(), "working directory parent", libraryRoot,
+                                           attempts, 16, numAttempts))
+    {
+        return true;
+    }
+
     reportLibraryRootFailure(console, applicationRoot, attempts, numAttempts, explicitOverride, false,
                              compiledLibraryRoot);
     return false;
@@ -345,6 +404,28 @@ static StringSpan getExecutablePath(StringPath& executablePath)
     {
         (void)executablePath.resize(static_cast<size_t>(pathLength));
         return executablePath.view();
+    }
+    return {};
+#endif
+}
+
+static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
+{
+#if SC_PLATFORM_WINDOWS
+    DWORD length =
+        ::GetCurrentDirectoryW(static_cast<DWORD>(StringPath::MaxPath), currentWorkingDirectory.writableSpan().data());
+    if (length == 0 || length >= StringPath::MaxPath)
+    {
+        (void)currentWorkingDirectory.resize(0);
+        return {};
+    }
+    (void)currentWorkingDirectory.resize(length);
+    return currentWorkingDirectory.view();
+#else
+    if (::getcwd(currentWorkingDirectory.writableSpan().data(), StringPath::MaxPath) != nullptr)
+    {
+        (void)currentWorkingDirectory.resize(::strlen(currentWorkingDirectory.view().bytesIncludingTerminator()));
+        return currentWorkingDirectory.view();
     }
     return {};
 #endif

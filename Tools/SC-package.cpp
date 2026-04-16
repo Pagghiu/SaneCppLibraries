@@ -156,6 +156,8 @@ static bool resolveRunnableHostCommand(StringView executable, String& output)
     return probeCommandVersion(output.view());
 }
 
+static bool isArm64HostInstructionSet() { return HostInstructionSet == InstructionSet::ARM64; }
+
 static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringView wrapperName, StringView firstStage,
                                     StringView secondStage, String& output)
 {
@@ -349,6 +351,99 @@ static Result writeLinuxBox64WineScript(StringView packageRoot, StringView execu
     SC_TRY(fs.chmod(scriptPath.view(), 0755u));
     return Result(true);
 }
+
+static Result writeLinuxNativeWineScript(StringView packageRoot, StringView executableName)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String binDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {packageRoot, "bin"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+
+    String scriptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(scriptPath, {binDirectory.view(), executableName}));
+
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("case \"$0\" in\n"));
+    SC_TRY(builder.append("  */*) SCRIPT_DIR=${0%/*} ;;\n"));
+    SC_TRY(builder.append("  *) SCRIPT_DIR=. ;;\n"));
+    SC_TRY(builder.append("esac\n"));
+    SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
+    SC_TRY(builder.append("RUNNER_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/..\" && pwd)\n"));
+    SC_TRY(builder.append("WINE_ROOT=\"$RUNNER_ROOT/root\"\n"));
+    SC_TRY(builder.append("WINE_BIN=\"$WINE_ROOT/usr/lib/wine/wine64\"\n"));
+    SC_TRY(builder.append("WINE_LIB_ROOT=\"$WINE_ROOT/usr/lib/aarch64-linux-gnu\"\n"));
+    SC_TRY(builder.append("export LD_LIBRARY_PATH=\"$WINE_LIB_ROOT${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}\"\n"));
+    SC_TRY(builder.append("export PATH=\"$WINE_ROOT/usr/lib/wine:$WINE_ROOT/usr/bin${PATH:+:$PATH}\"\n"));
+    SC_TRY(builder.append("export WINEDLLPATH=\"$WINE_LIB_ROOT/wine\"\n"));
+    SC_TRY(builder.append("exec \"$WINE_BIN\" \"$@\"\n"));
+    builder.finalize();
+
+    SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+    return Result(true);
+}
+
+static Result patchLinuxNativeWineserverScript(StringView packageRoot)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String wineserverPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(wineserverPath, {packageRoot, "root", "usr", "lib", "wine", "wineserver"}));
+    SC_TRY_MSG(fs.existsAndIsFile(wineserverPath.view()), "Missing native Wine wineserver script");
+
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh -e\n"));
+    SC_TRY(builder.append("case \"$0\" in\n"));
+    SC_TRY(builder.append("  */*) SCRIPT_DIR=${0%/*} ;;\n"));
+    SC_TRY(builder.append("  *) SCRIPT_DIR=. ;;\n"));
+    SC_TRY(builder.append("esac\n"));
+    SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
+    SC_TRY(builder.append("exec \"$SCRIPT_DIR/wineserver64\" -p0 \"$@\"\n"));
+    builder.finalize();
+
+    SC_TRY(fs.writeString(wineserverPath.view(), scriptContents.view()));
+    SC_TRY(fs.chmod(wineserverPath.view(), 0755u));
+    return Result(true);
+}
+
+static Result ensureLinuxNativeWineLoaderAlias(StringView packageRoot, StringView aliasName)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String aliasesRoot = StringEncoding::Utf8;
+    String targetRoot  = StringEncoding::Utf8;
+    String aliasPath   = StringEncoding::Utf8;
+    SC_TRY(Path::join(aliasesRoot, {packageRoot, "lib", "wine"}));
+    SC_TRY(Path::join(targetRoot, {packageRoot, "root", "usr", "lib", "aarch64-linux-gnu", "wine"}));
+    SC_TRY(Path::join(aliasPath, {aliasesRoot.view(), aliasName}));
+    SC_TRY(fs.makeDirectoryRecursive(aliasesRoot.view()));
+    SC_TRY(fs.removeLinkIfExists(aliasPath.view()));
+    if (fs.existsAndIsDirectory(aliasPath.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(aliasPath.view()));
+    }
+    if (not createLink(targetRoot.view(), aliasPath.view()))
+    {
+        SC_TRY(fs.makeDirectoryRecursive(aliasPath.view()));
+    }
+    return Result(true);
+}
+
+static Result repairLinuxNativeWineRunnerLayout(StringView packageRoot)
+{
+    SC_TRY(writeLinuxNativeWineScript(packageRoot, "wine"));
+    SC_TRY(patchLinuxNativeWineserverScript(packageRoot));
+    SC_TRY(ensureLinuxNativeWineLoaderAlias(packageRoot, "arm64-windows"));
+    SC_TRY(ensureLinuxNativeWineLoaderAlias(packageRoot, "aarch64-windows"));
+    return Result(true);
+}
 #endif
 
 static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
@@ -362,7 +457,7 @@ static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, Stri
     const bool hasWine   = resolveRunnableHostCommand("wine", winePath);
     const bool hasBox64  = resolveRunnableHostCommand("box64", box64Path);
 
-    if (HostInstructionSet == InstructionSet::ARM64 and hasBox64)
+    if (isArm64HostInstructionSet() and hasBox64)
     {
         if (hasWine64)
         {
@@ -387,7 +482,7 @@ static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, Stri
         return Result(true);
     }
 
-    if (HostInstructionSet == InstructionSet::ARM64)
+    if (isArm64HostInstructionSet())
     {
         Package winePackage;
         if (installLinuxWineRunner(packagesCacheDirectory, packagesInstallDirectory, winePackage))
@@ -628,14 +723,7 @@ static Result repairMSVCPackageLayout(StringView packageRoot, StringView wineExe
         SC_TRY(writeMSVCPackageMetadata(packageRoot, wineExecutable));
     }
 
-    String compilerWrapper = StringEncoding::Utf8;
-    SC_TRY(Path::join(compilerWrapper, {packageRoot, "bin", "x64", "cl"}));
-    String arm64CompilerWrapper = StringEncoding::Utf8;
-    SC_TRY(Path::join(arm64CompilerWrapper, {packageRoot, "bin", "arm64", "cl"}));
-    if (not fs.existsAndIsFile(compilerWrapper.view()) or not fs.existsAndIsFile(arm64CompilerWrapper.view()))
-    {
-        SC_TRY(writeMSVCWrapperScripts(packageRoot));
-    }
+    SC_TRY(writeMSVCWrapperScripts(packageRoot));
 
     return Result(true);
 }
@@ -1331,6 +1419,140 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     (void)packagesInstallDirectory;
     (void)package;
     return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
+#endif
+}
+
+Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                         Package& package)
+{
+#if SC_PLATFORM_LINUX
+    static constexpr StringView wineURL    = "http://launchpadlibrarian.net/590592808/wine_6.0.3~repack-1_all.deb";
+    static constexpr StringView wineHash   = "1d940593266e346700a0951b71808b2cc2a7a472c4bf00641fae26a39bb756cb";
+    static constexpr StringView wine64URL  = "http://launchpadlibrarian.net/590597908/wine64_6.0.3~repack-1_arm64.deb";
+    static constexpr StringView wine64Hash = "f064a30541673cf2f98e45cdc13dce56ca3c253267177af7e5aa5d4b724c6164";
+    static constexpr StringView wine64PreloaderURL =
+        "http://launchpadlibrarian.net/590597906/wine64-preloader_6.0.3~repack-1_arm64.deb";
+    static constexpr StringView wine64PreloaderHash =
+        "6c9feb4f657d1758e851708865ecbcef1cd171bf20c6f5165614b003cc1330bb";
+    static constexpr StringView libwineURL = "http://launchpadlibrarian.net/590597905/libwine_6.0.3~repack-1_arm64.deb";
+    static constexpr StringView libwineHash = "f66d74708c57f6f168400932e50ab3699161aa92d17e437154c755d775ad76c1";
+    static constexpr StringView fontsWineURL =
+        "http://launchpadlibrarian.net/590592798/fonts-wine_6.0.3~repack-1_all.deb";
+    static constexpr StringView fontsWineHash = "9c14ea5e3cdaf1253165cfad3293c217620bd179c783b05426878c22cb221873";
+
+    switch (HostPlatform)
+    {
+    case Platform::Linux: break;
+    case Platform::Apple:
+    case Platform::Windows:
+    case Platform::Emscripten:
+        return Result::Error("Automatic Linux ARM64 Wine install is only supported on Linux hosts");
+    }
+    SC_TRY_MSG(HostInstructionSet == InstructionSet::ARM64,
+               "Automatic Linux ARM64 Wine install is only supported on Linux ARM64 hosts");
+
+    package.packageFullName       = "wine-stable-linux-arm64-native";
+    package.packageLocalDirectory = format("{}/wine-stable/linux-arm64-native", packagesCacheDirectory);
+    package.packageLocalTxt       = format("{}/wine-stable/linux-arm64-native.txt", packagesCacheDirectory);
+    package.installDirectoryLink  = format("{}/wine-stable_linux_arm64_native", packagesInstallDirectory);
+
+    auto finalizePackage = [&](FileSystem& fs) -> Result
+    {
+        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+        if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        {
+            if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+            }
+            SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+        }
+        return Result(true);
+    };
+
+    auto testPackage = [&](const Package& installedPackage) -> Result
+    {
+        String executable = StringEncoding::Utf8;
+        String version    = StringEncoding::Utf8;
+        SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
+        Process process;
+        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Linux ARM64 Wine runner returned error");
+        SC_TRY_MSG(StringView(version.view()).containsString("wine-6.0"),
+                   "Linux ARM64 Wine runner version doesn't match");
+        return Result(true);
+    };
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        if (repairLinuxNativeWineRunnerLayout(package.packageLocalDirectory.view()) and finalizePackage(fs) and
+            testPackage(package))
+        {
+            return Result(true);
+        }
+    }
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
+
+    String downloadsDirectory = StringEncoding::Utf8;
+    String extractRoot        = StringEncoding::Utf8;
+    SC_TRY(Path::join(downloadsDirectory, {packagesCacheDirectory, "wine-stable", "downloads"}));
+    SC_TRY(Path::join(extractRoot, {package.packageLocalDirectory.view(), "root"}));
+    SC_TRY(fs.makeDirectoryRecursive(downloadsDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(extractRoot.view()));
+
+    String wineDeb            = StringEncoding::Utf8;
+    String wine64Deb          = StringEncoding::Utf8;
+    String wine64PreloaderDeb = StringEncoding::Utf8;
+    String libwineDeb         = StringEncoding::Utf8;
+    String fontsWineDeb       = StringEncoding::Utf8;
+    SC_TRY(Path::join(wineDeb, {downloadsDirectory.view(), "wine_6.0.3~repack-1_all.deb"}));
+    SC_TRY(Path::join(wine64Deb, {downloadsDirectory.view(), "wine64_6.0.3~repack-1_arm64.deb"}));
+    SC_TRY(Path::join(wine64PreloaderDeb, {downloadsDirectory.view(), "wine64-preloader_6.0.3~repack-1_arm64.deb"}));
+    SC_TRY(Path::join(libwineDeb, {downloadsDirectory.view(), "libwine_6.0.3~repack-1_arm64.deb"}));
+    SC_TRY(Path::join(fontsWineDeb, {downloadsDirectory.view(), "fonts-wine_6.0.3~repack-1_all.deb"}));
+
+    SC_TRY(downloadFileHash(wineURL, wineDeb.view(), Hashing::TypeSHA256, wineHash));
+    SC_TRY(downloadFileHash(wine64URL, wine64Deb.view(), Hashing::TypeSHA256, wine64Hash));
+    SC_TRY(downloadFileHash(wine64PreloaderURL, wine64PreloaderDeb.view(), Hashing::TypeSHA256, wine64PreloaderHash));
+    SC_TRY(downloadFileHash(libwineURL, libwineDeb.view(), Hashing::TypeSHA256, libwineHash));
+    SC_TRY(downloadFileHash(fontsWineURL, fontsWineDeb.view(), Hashing::TypeSHA256, fontsWineHash));
+
+    SC_TRY(extractDebArchive(wineDeb.view(), extractRoot.view()));
+    SC_TRY(extractDebArchive(wine64Deb.view(), extractRoot.view()));
+    SC_TRY(extractDebArchive(wine64PreloaderDeb.view(), extractRoot.view()));
+    SC_TRY(extractDebArchive(libwineDeb.view(), extractRoot.view()));
+    SC_TRY(extractDebArchive(fontsWineDeb.view(), extractRoot.view()));
+    SC_TRY(repairLinuxNativeWineRunnerLayout(package.packageLocalDirectory.view()));
+
+    SC_TRY(finalizePackage(fs));
+    SC_TRY(testPackage(package));
+
+    String packageTxt = StringEncoding::Utf8;
+    auto   builder    = StringBuilder::create(packageTxt);
+    SC_TRY(builder.append("SC_PACKAGE_URL={}\n", wine64URL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA={}\n", wineURL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA2={}\n", wine64PreloaderURL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA3={}\n", libwineURL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA4={}\n", fontsWineURL));
+    builder.finalize();
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+
+    return Result(true);
+#else
+    (void)packagesCacheDirectory;
+    (void)packagesInstallDirectory;
+    (void)package;
+    return Result::Error("Automatic Linux ARM64 Wine install is only supported on Linux hosts");
 #endif
 }
 

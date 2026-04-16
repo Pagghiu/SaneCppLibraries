@@ -24,8 +24,8 @@
 - Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is absent.
 - Existing packaged Linux Wine runners now also repair their launcher scripts in place, so portable MSVC wrapper updates do not require deleting the cached runner package first.
 - Portable MSVC caches are now host-specific, so shared macOS/Linux workspaces do not reuse the wrong recorded Wine wrapper path across hosts.
-- On Linux arm64, both the package-install flow and the native Wine runner can auto-prefer generated `box64 + wine64` wrappers when those host tools are installed. Linux x64 console runs still prefer a sibling `wineconsole --backend=curses` wrapper when available, but Linux arm64 now stays on plain `wine` because it is more reliable on the current Box64 stack.
-- When Linux arm64 does not have a usable system `box64`, the packaged Wine runner can now resolve a maintained generic-arm `box64` package automatically; that path now validates real native-backend `SCTest` compiles for both `windows-msvc-x86_64` and `windows-msvc-arm64`, plus a real `windows-msvc-x86_64` start, while broader ARM64-target validation is still in progress.
+- On Linux arm64, the portable-MSVC install flow can auto-prefer generated `box64 + wine64` wrappers for the hosted x64 MSVC tools, while native `build run` now selects a separate ARM64 Wine runner for `windows-*-arm64` executables. Linux x64 console runs still prefer a sibling `wineconsole --backend=curses` wrapper when available, but Linux arm64 stays on plain `wine`.
+- When Linux arm64 does not have a usable system `box64`, the packaged Wine runner can now resolve a maintained generic-arm `box64` package automatically; together with the packaged native ARM64 Wine runner, that path now validates clean native-backend `SCTest` compiles for both `windows-msvc-x86_64` and `windows-msvc-arm64`, plus targeted `BaseTest/new-delete` runs for both targets.
 
 ## Plugin Integration
 

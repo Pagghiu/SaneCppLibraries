@@ -28,17 +28,10 @@ bool SC::Process::isWindowsEmulatedProcess()
     ::IsWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine);
     if (processMachine == IMAGE_FILE_MACHINE_UNKNOWN)
     {
-        // I am not sure why Windows returns IMAGE_FILE_MACHINE_UNKNOWN but we can dig deeper for it
-        PROCESS_MACHINE_INFORMATION processMachineInfo;
-        if (::GetProcessInformation(::GetCurrentProcess(), ProcessMachineTypeInfo, &processMachineInfo,
-                                    sizeof(PROCESS_MACHINE_INFORMATION)))
-        {
-            processMachine = processMachineInfo.ProcessMachine;
-        }
-        else
-        {
-            processMachine = nativeMachine;
-        }
+        // Older Wine ARM64 builds still stub GetProcessInformation(ProcessMachineTypeInfo).
+        // Falling back to the native machine keeps emulation detection conservative and avoids
+        // aborting process teardown when the API exists only as an unimplemented stub.
+        processMachine = nativeMachine;
     }
     return processMachine != nativeMachine;
 #endif

@@ -2528,7 +2528,8 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result resolveLinuxWineExecutable(const Parameters& parameters, StringView configured, String& output)
+    static Result resolveLinuxWineExecutable(const Parameters& parameters, const ResolvedTargetContext& targetContext,
+                                             StringView configured, String& output)
     {
         if (not configured.isEmpty())
         {
@@ -2546,7 +2547,33 @@ struct SC::Build::NativeBuild
         const bool hasWineConsole = resolveRunnableHostCommand("wineconsole", wineConsolePath);
         const bool hasBox64       = resolveRunnableHostCommand("box64", box64Path);
 
-        if (HostInstructionSet == InstructionSet::ARM64 and hasBox64)
+        if (parameters.hostMachine.architecture == Architecture::Arm64 and
+            targetArchitecture(targetContext) == Architecture::Arm64)
+        {
+            if (hasWine64)
+            {
+                SC_TRY(output.assign(wine64Path.view()));
+                return Result(true);
+            }
+            if (hasWine)
+            {
+                SC_TRY(output.assign(winePath.view()));
+                return Result(true);
+            }
+
+            Tools::Package winePackage;
+            if (Tools::installLinuxNativeArm64WineRunner(parameters.directories.packagesCacheDirectory.view(),
+                                                         parameters.directories.packagesInstallDirectory.view(),
+                                                         winePackage))
+            {
+                SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
+                return Result(true);
+            }
+            return Result::Error("Cannot find a usable Windows ARM64 Wine runner. Install wine64/wine for Linux arm64, "
+                                 "or pass --runner-path with an ARM64-capable Wine wrapper.");
+        }
+
+        if (parameters.hostMachine.architecture == Architecture::Arm64 and hasBox64)
         {
             StringView wineStage       = hasWine64 ? wine64Path.view() : winePath.view();
             StringView wrapperRootName = hasWine64 ? "linux-box64-wine64"_a8 : "linux-box64-wine"_a8;
@@ -2576,7 +2603,7 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        if (HostInstructionSet == InstructionSet::ARM64)
+        if (parameters.hostMachine.architecture == Architecture::Arm64)
         {
             Tools::Package winePackage;
             if (Tools::installWineStableRunner(parameters.directories.packagesCacheDirectory.view(),
@@ -2671,7 +2698,8 @@ struct SC::Build::NativeBuild
                 }
                 else
                 {
-                    SC_TRY(resolveLinuxWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
+                    SC_TRY(resolveLinuxWineExecutable(parameters, targetContext, runnerSpec.executable.view(),
+                                                      runner.executable));
                 }
                 SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
                 return Result(true);
@@ -2691,7 +2719,8 @@ struct SC::Build::NativeBuild
             }
             else
             {
-                SC_TRY(resolveLinuxWineExecutable(parameters, runnerSpec.executable.view(), runner.executable));
+                SC_TRY(resolveLinuxWineExecutable(parameters, targetContext, runnerSpec.executable.view(),
+                                                  runner.executable));
             }
             SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
             return Result(true);

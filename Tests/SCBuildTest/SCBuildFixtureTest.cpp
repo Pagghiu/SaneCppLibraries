@@ -1001,7 +1001,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     return Result(true);
 }
 
-#if SC_PLATFORM_APPLE
+#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 static Result captureRepositoryBuildCommand(TestReport& report, Span<const StringSpan> arguments,
                                             CapturedProcessOutput& capturedOutput)
 {
@@ -1590,6 +1590,64 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Ws2_32.lib"));
         }
 
+        if (test_section("portable MSVC wrapper preserves slash defines"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot = StringEncoding::Utf8;
+            String toolRoot   = StringEncoding::Utf8;
+            String wineLog    = StringEncoding::Utf8;
+            String winePath   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-define-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            ScopedEnvironmentVariable importVariable;
+            ScopedEnvironmentVariable wineVariable;
+            SC_TRUST_RESULT(
+                setScopedEnvironmentVariable("SC_MSVC_IMPORT_DIRECTORY", importRoot.view(), importVariable));
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("SC_MSVC_WINE", winePath.view(), wineVariable));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), package));
+
+            String sourceFile     = StringEncoding::Utf8;
+            String objectFile     = StringEncoding::Utf8;
+            String objectArgument = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceFile, {buildRoot.view(), "define-fixture.cpp"}));
+            SC_TRUST_RESULT(Path::join(objectFile, {buildRoot.view(), "define-fixture.obj"}));
+            SC_TRUST_RESULT(StringBuilder::format(objectArgument, "/Fo{}", objectFile.view()));
+            SC_TRUST_RESULT(fs.writeString(sourceFile.view(), "int main() { return 0; }\n"));
+
+            String compilerWrapper = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {package.installDirectoryLink.view(), "bin", "x64", "cl"}));
+
+            Process process;
+            String  stdOut = StringEncoding::Utf8;
+            String  stdErr = StringEncoding::Utf8;
+            SC_TRUST_RESULT(process.exec({compilerWrapper.view(), "/nologo", "/DDEBUG=1", "/DSC_LIBRARY_ROOT=../../..",
+                                          sourceFile.view(), objectArgument.view(), "/c"},
+                                         stdOut, {}, stdErr));
+            SC_TEST_EXPECT(process.getExitStatus() == 0);
+
+            String wineInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+            SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("/DSC_LIBRARY_ROOT=../../.."));
+            SC_TEST_EXPECT(not StringView(wineInvocation.view()).containsString(" Z:\\ /"));
+        }
+
         if (test_section("package tool installs portable MSVC import from explicit arguments"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
@@ -2086,6 +2144,97 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
                                .containsString("TestReport::Running single section \"new/delete\""));
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
+        }
+#endif
+
+#if SC_PLATFORM_LINUX
+        if (test_section("native backend smoke-starts SCTest through portable MSVC Wine on Linux arm64"))
+        {
+            if (HostInstructionSet == InstructionSet::ARM64)
+            {
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+                String repositoryIntermediates = StringEncoding::Utf8;
+                String repositoryOutputs       = StringEncoding::Utf8;
+                SC_TRUST_RESULT(
+                    Path::join(repositoryIntermediates, {report.libraryRootDirectory.view(), "_Build", "_Intermediates",
+                                                         "SCTest", "windows-x86_64-Native-msvc-Debug"}));
+                SC_TRUST_RESULT(Path::join(repositoryOutputs, {report.libraryRootDirectory.view(), "_Build", "_Outputs",
+                                                               "windows-x86_64-Native-msvc-Debug"}));
+                if (fs.existsAndIsDirectory(repositoryIntermediates.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryIntermediates.view()));
+                }
+                if (fs.existsAndIsDirectory(repositoryOutputs.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryOutputs.view()));
+                }
+
+                CapturedProcessOutput capturedOutput;
+                const StringSpan      arguments[] = {
+                    "build", "run", "SCTest", "--target", "windows-msvc-x86_64", "--runner",  "auto", "--output",
+                    "quiet", "--",  "--test", "BaseTest", "--test-section",      "new/delete"};
+                SC_TRUST_RESULT(captureRepositoryBuildCommand(report, arguments, capturedOutput));
+
+                SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("RUNNER = "));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("SCTest.exe"));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single test \"BaseTest\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single section \"new/delete\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
+            }
+        }
+
+        if (test_section("native backend smoke-starts SCTest through native ARM64 Wine on Linux arm64"))
+        {
+            if (HostInstructionSet == InstructionSet::ARM64)
+            {
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+                String repositoryIntermediates = StringEncoding::Utf8;
+                String repositoryOutputs       = StringEncoding::Utf8;
+                String repositoryPrefix        = StringEncoding::Utf8;
+                SC_TRUST_RESULT(
+                    Path::join(repositoryIntermediates, {report.libraryRootDirectory.view(), "_Build", "_Intermediates",
+                                                         "SCTest", "windows-arm64-Native-msvc-Debug"}));
+                SC_TRUST_RESULT(Path::join(repositoryOutputs, {report.libraryRootDirectory.view(), "_Build", "_Outputs",
+                                                               "windows-arm64-Native-msvc-Debug"}));
+                SC_TRUST_RESULT(Path::join(repositoryPrefix, {report.libraryRootDirectory.view(), "_Build",
+                                                              "_BuildCache", "wine-prefix-arm64"}));
+                if (fs.existsAndIsDirectory(repositoryIntermediates.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryIntermediates.view()));
+                }
+                if (fs.existsAndIsDirectory(repositoryOutputs.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryOutputs.view()));
+                }
+                if (fs.existsAndIsDirectory(repositoryPrefix.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryPrefix.view()));
+                }
+
+                CapturedProcessOutput capturedOutput;
+                const StringSpan      arguments[] = {
+                    "build",    "run",   "SCTest", "--target", "windows-msvc-arm64", "--runner",       "auto",
+                    "--output", "quiet", "--",     "--test",   "BaseTest",           "--test-section", "new/delete"};
+                SC_TRUST_RESULT(captureRepositoryBuildCommand(report, arguments, capturedOutput));
+
+                SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("RUNNER = "));
+                SC_TEST_EXPECT(
+                    StringView(capturedOutput.stdOut.view()).containsString("wine-stable_linux_arm64_native/bin/wine"));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("SCTest.exe"));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single test \"BaseTest\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single section \"new/delete\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
+            }
         }
 #endif
 
