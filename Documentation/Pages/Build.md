@@ -155,9 +155,10 @@ Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
-- Linux hosts can exercise the same portable MSVC package path with an imported layout today; on Linux arm64 the
-  package tool now auto-prefers a generated `box64 + wine64` wrapper when those host tools are installed, and it still
-  accepts plain `wine64` / `wine` or an explicit `--wine` / `SC_MSVC_WINE` override
+- Linux arm64 hosts can now validate the same portable MSVC path end-to-end for `windows-msvc-x86_64`; the package
+  tool auto-prefers a generated `box64 + wine64` wrapper when those host tools are installed, can fall back to an
+  auto-installed packaged Linux Wine runner that resolves a maintained generic-arm `box64` build when system `box64` is
+  absent, and it still accepts plain `wine64` / `wine` or an explicit `--wine` / `SC_MSVC_WINE` override
 - `SC-package install msvc` also accepts explicit `--import-directory <path>` and `--wine <path>` overrides so imported
   layouts and custom Wine wrappers no longer have to be driven only through environment variables
 - Once a portable MSVC package is installed, later native-backend Windows MSVC builds can reuse the recorded wrapper path
@@ -165,8 +166,13 @@ Current cross-compilation scope:
 - Existing portable MSVC layouts can now repair missing `sc-msvc-package.json` metadata and wrapper scripts in place, and
   SDK version detection now falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is
   absent
+- Existing packaged Linux Wine runners now also repair their launcher scripts in place, so later portable MSVC wrapper
+  updates do not require deleting the cached runner package first
 - Portable MSVC caches are now host-specific (`macOS` vs `Linux`) so shared workspaces do not reuse the wrong recorded
   Wine runner path across hosts
+- On Linux arm64, the packaged MSVC validation story is still narrower than the macOS path: `windows-msvc-x86_64` now
+  has a real native-backend `SCTest` compile validation through the maintained packaged Box64 runner, while run support
+  and broader ARM64-target validation are still open
 - `build run` can auto-route `windows-gnu-x86_64` executables through Wine on macOS and Linux
 - On Linux arm64, that same native `build run` path now auto-prefers generated `box64 + wine64` wrappers when the host
   provides those commands, and console targets still switch to a sibling `wineconsole --backend=curses` wrapper when it

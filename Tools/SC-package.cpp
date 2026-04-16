@@ -179,7 +179,180 @@ static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringVie
     return Result(true);
 }
 
-static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, String& output)
+#if SC_PLATFORM_LINUX
+static Result extractDebArchive(StringView sourceFile, StringView destinationDirectory)
+{
+    Process process;
+    SC_TRY(process.exec({"dpkg-deb", "-x", sourceFile, destinationDirectory}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb archive");
+    return Result(true);
+}
+
+static Result downloadTextFile(StringView url, StringView destinationFile)
+{
+    Process process;
+    String  stdErr = StringEncoding::Utf8;
+    SC_TRY(process.exec({"curl", "-L", "-o", destinationFile, url}, {}, {}, stdErr));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed downloading text file");
+    return Result(true);
+}
+
+static bool isLexicographicallyAfter(StringView candidate, StringView current)
+{
+    const size_t minSize =
+        candidate.sizeInBytes() < current.sizeInBytes() ? candidate.sizeInBytes() : current.sizeInBytes();
+    for (size_t idx = 0; idx < minSize; ++idx)
+    {
+        const auto lhs = candidate.bytesWithoutTerminator()[idx];
+        const auto rhs = current.bytesWithoutTerminator()[idx];
+        if (lhs == rhs)
+        {
+            continue;
+        }
+        return lhs > rhs;
+    }
+    return candidate.sizeInBytes() > current.sizeInBytes();
+}
+
+static Result extractPackageIndexField(StringView stanza, StringView fieldName, String& output)
+{
+    size_t searchIndex = 0;
+    while (searchIndex < stanza.sizeInBytes())
+    {
+        size_t lineEnd = searchIndex;
+        while (lineEnd < stanza.sizeInBytes() and stanza.bytesWithoutTerminator()[lineEnd] != '\n')
+        {
+            lineEnd++;
+        }
+        const StringView line = stanza.sliceStartLength(searchIndex, lineEnd - searchIndex);
+        if (line.startsWith(fieldName))
+        {
+            SC_TRY(output.assign(line.sliceStart(fieldName.sizeInBytes()).trimWhiteSpaces()));
+            return Result(true);
+        }
+        searchIndex = lineEnd + 1;
+    }
+    return Result::Error("Missing package index field");
+}
+
+struct LinuxBox64PackageMetadata
+{
+    String version = StringEncoding::Utf8;
+    String url     = StringEncoding::Utf8;
+    String sha256  = StringEncoding::Utf8;
+};
+
+static Result resolveLinuxBox64PackageMetadata(StringView downloadsDirectory, LinuxBox64PackageMetadata& metadata)
+{
+    static constexpr StringView packageIndexURL =
+        "https://raw.githubusercontent.com/Pi-Apps-Coders/box64-debs/master/debian/Packages";
+    static constexpr StringView packageBaseURL =
+        "https://raw.githubusercontent.com/Pi-Apps-Coders/box64-debs/master/debian";
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String packageIndexPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(packageIndexPath, {downloadsDirectory, "box64-packages-index.txt"}));
+    SC_TRY(downloadTextFile(packageIndexURL, packageIndexPath.view()));
+
+    String packageIndex = StringEncoding::Utf8;
+    SC_TRY(fs.read(packageIndexPath.view(), packageIndex));
+
+    const StringView indexView = packageIndex.view();
+    size_t           stanzaPos = 0;
+    while (stanzaPos < indexView.sizeInBytes())
+    {
+        size_t stanzaEnd = stanzaPos;
+        while (stanzaEnd + 1 < indexView.sizeInBytes())
+        {
+            if (indexView.bytesWithoutTerminator()[stanzaEnd] == '\n' and
+                indexView.bytesWithoutTerminator()[stanzaEnd + 1] == '\n')
+            {
+                break;
+            }
+            stanzaEnd++;
+        }
+
+        const StringView stanza      = indexView.sliceStartLength(stanzaPos, stanzaEnd - stanzaPos);
+        String           packageName = StringEncoding::Utf8;
+        if (extractPackageIndexField(stanza, "Package:", packageName) and packageName.view() == "box64-generic-arm")
+        {
+            String version  = StringEncoding::Utf8;
+            String filename = StringEncoding::Utf8;
+            String sha256   = StringEncoding::Utf8;
+            SC_TRY(extractPackageIndexField(stanza, "Version:", version));
+            SC_TRY(extractPackageIndexField(stanza, "Filename:", filename));
+            SC_TRY(extractPackageIndexField(stanza, "SHA256:", sha256));
+
+            if (metadata.version.isEmpty() or isLexicographicallyAfter(version.view(), metadata.version.view()))
+            {
+                String           normalizedFilename = StringEncoding::Utf8;
+                const StringView filenameView       = filename.view();
+                if (filenameView.startsWith("./"))
+                {
+                    SC_TRY(normalizedFilename.assign(filenameView.sliceStartLength(2, filenameView.sizeInBytes() - 2)));
+                }
+                else
+                {
+                    SC_TRY(normalizedFilename.assign(filenameView));
+                }
+
+                SC_TRY(metadata.version.assign(version.view()));
+                SC_TRY(metadata.sha256.assign(sha256.view()));
+                SC_TRY(Path::join(metadata.url, {packageBaseURL, normalizedFilename.view()}));
+            }
+        }
+
+        stanzaPos = stanzaEnd + 2;
+    }
+
+    SC_TRY_MSG(not metadata.url.isEmpty(), "Cannot resolve Linux ARM64 Box64 package metadata");
+    SC_TRY_MSG(not metadata.sha256.isEmpty(), "Cannot resolve Linux ARM64 Box64 package hash");
+    return Result(true);
+}
+
+static Result writeLinuxBox64WineScript(StringView packageRoot, StringView executableName, StringView wineCommand)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String binDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {packageRoot, "bin"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+
+    String scriptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(scriptPath, {binDirectory.view(), executableName}));
+
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("case \"$0\" in\n"));
+    SC_TRY(builder.append("  */*) SCRIPT_DIR=${0%/*} ;;\n"));
+    SC_TRY(builder.append("  *) SCRIPT_DIR=. ;;\n"));
+    SC_TRY(builder.append("esac\n"));
+    SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
+    SC_TRY(builder.append("RUNNER_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/..\" && pwd)\n"));
+    SC_TRY(builder.append("BOX64_BIN=\"$RUNNER_ROOT/box64/usr/bin/box64\"\n"));
+    SC_TRY(builder.append("WINE_BIN=\"$RUNNER_ROOT/wine/opt/wine-stable/bin/{}\"\n", wineCommand));
+    SC_TRY(builder.append("LIB_PATH=\"$RUNNER_ROOT/amd64-libs/usr/lib/x86_64-linux-gnu\"\n"));
+    SC_TRY(builder.append("export BOX64_NOBANNER=1\n"));
+    SC_TRY(builder.append("if [ -n \"$BOX64_LD_LIBRARY_PATH\" ]; then\n"));
+    SC_TRY(builder.append("  export BOX64_LD_LIBRARY_PATH=\"$LIB_PATH:$BOX64_LD_LIBRARY_PATH\"\n"));
+    SC_TRY(builder.append("else\n"));
+    SC_TRY(builder.append("  export BOX64_LD_LIBRARY_PATH=\"$LIB_PATH\"\n"));
+    SC_TRY(builder.append("fi\n"));
+    SC_TRY(builder.append("exec \"$BOX64_BIN\" \"$WINE_BIN\" \"$@\"\n"));
+    builder.finalize();
+
+    SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+    return Result(true);
+}
+#endif
+
+static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                         String& output)
 {
     String wine64Path = StringEncoding::Utf8;
     String winePath   = StringEncoding::Utf8;
@@ -216,6 +389,12 @@ static Result resolveLinuxWineExecutable(StringView packagesCacheDirectory, Stri
 
     if (HostInstructionSet == InstructionSet::ARM64)
     {
+        Package winePackage;
+        if (installLinuxWineRunner(packagesCacheDirectory, packagesInstallDirectory, winePackage))
+        {
+            SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
+            return Result(true);
+        }
         return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
                              "wine64/wine, or pass --wine/SC_MSVC_WINE with a wrapper path. Linux arm64 hosts need "
                              "a runner that can launch the Windows x64 MSVC tools.");
@@ -356,7 +535,8 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
                                      winePackage.installDirectoryLink));
         return Result(true);
     }
-    case Platform::Linux: return resolveLinuxWineExecutable(packagesCacheDirectory, wineExecutable);
+    case Platform::Linux:
+        return resolveLinuxWineExecutable(packagesCacheDirectory, packagesInstallDirectory, wineExecutable);
     case Platform::Windows:
     case Platform::Emscripten: return Result::Error("Portable MSVC is only supported on macOS and Linux hosts");
     }
@@ -491,7 +671,11 @@ static Result writeMSVCWrapperScripts(StringView packageRoot)
             String scriptContents = StringEncoding::Utf8;
             auto   builder        = StringBuilder::create(scriptContents);
             SC_TRY(builder.append("#!/bin/sh\n"));
-            SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$(dirname \"$0\")\" && pwd)\n"));
+            SC_TRY(builder.append("case \"$0\" in\n"));
+            SC_TRY(builder.append("  */*) SCRIPT_DIR=${0%/*} ;;\n"));
+            SC_TRY(builder.append("  *) SCRIPT_DIR=. ;;\n"));
+            SC_TRY(builder.append("esac\n"));
+            SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
             SC_TRY(builder.append("exec \"$SCRIPT_DIR/msvc-wrapper.py\" {} \"$@\"\n", toolName));
             builder.finalize();
 
@@ -1012,6 +1196,144 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     return Result(true);
 }
 
+Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
+{
+#if SC_PLATFORM_LINUX
+    static constexpr StringView libunwindURL =
+        "https://archive.ubuntu.com/ubuntu/pool/main/libu/libunwind/libunwind8_1.6.2-3build1_amd64.deb";
+    static constexpr StringView libunwindHash = "658977d18976149b75391850ba0ccacaf7bde3201f0284189da50cd634334d17";
+    static constexpr StringView wineBinaryURL =
+        "https://dl.winehq.org/wine-builds/ubuntu/pool/main/w/wine/wine-stable-amd64_11.0.0.0~noble-1_amd64.deb";
+    static constexpr StringView wineBinaryHash = "6cb835e2171b5572b17f1c06729735c2c7e40178239d7fa6c29ef14bd9b40d16";
+    static constexpr StringView wineSupportURL =
+        "https://dl.winehq.org/wine-builds/ubuntu/pool/main/w/wine/wine-stable_11.0.0.0~noble-1_amd64.deb";
+    static constexpr StringView wineSupportHash = "04e7b4b995262c734019099d93277d8f219f7d180ebb65b5ccb3df7f97be1078";
+
+    switch (HostPlatform)
+    {
+    case Platform::Linux: break;
+    case Platform::Apple:
+    case Platform::Windows:
+    case Platform::Emscripten: return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
+    }
+    SC_TRY_MSG(HostInstructionSet == InstructionSet::ARM64,
+               "Automatic Linux Wine install is only supported on Linux ARM64 hosts");
+
+    package.packageFullName       = "wine-stable-linux-arm64-box64";
+    package.packageLocalDirectory = format("{}/wine-stable/linux-arm64-box64", packagesCacheDirectory);
+    package.packageLocalTxt       = format("{}/wine-stable/linux-arm64-box64.txt", packagesCacheDirectory);
+    package.installDirectoryLink  = format("{}/wine-stable_linux_arm64_box64", packagesInstallDirectory);
+
+    auto finalizePackage = [&](FileSystem& fs) -> Result
+    {
+        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+        if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        {
+            if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+            }
+            SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+        }
+        return Result(true);
+    };
+
+    auto testPackage = [&](const Package& installedPackage) -> Result
+    {
+        String executable = StringEncoding::Utf8;
+        String version    = StringEncoding::Utf8;
+        SC_TRY(Path::join(executable, {installedPackage.installDirectoryLink.view(), "bin", "wine"}));
+        Process process;
+        SC_TRY(process.exec({executable.view(), "--version"}, version));
+        SC_TRY_MSG(process.getExitStatus() == 0, "Linux Wine runner returned error");
+        SC_TRY_MSG(StringView(version.view()).containsString("wine-11.0"), "Linux Wine runner version doesn't match");
+        return Result(true);
+    };
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(writeLinuxBox64WineScript(package.packageLocalDirectory.view(), "wine", "wine"));
+        SC_TRY(writeLinuxBox64WineScript(package.packageLocalDirectory.view(), "wineconsole", "wineconsole"));
+        SC_TRY(finalizePackage(fs));
+        if (testPackage(package))
+        {
+            return Result(true);
+        }
+    }
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
+
+    String downloadsDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(downloadsDirectory, {packagesCacheDirectory, "wine-stable", "downloads"}));
+    SC_TRY(fs.makeDirectoryRecursive(downloadsDirectory.view()));
+
+    LinuxBox64PackageMetadata box64Package;
+    SC_TRY(resolveLinuxBox64PackageMetadata(downloadsDirectory.view(), box64Package));
+
+    String box64Deb       = StringEncoding::Utf8;
+    String libunwindDeb   = StringEncoding::Utf8;
+    String wineBinaryDeb  = StringEncoding::Utf8;
+    String wineSupportDeb = StringEncoding::Utf8;
+    String box64Filename  = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(box64Filename, "box64-generic-arm_{}_arm64.deb", box64Package.version.view()));
+    SC_TRY(Path::join(box64Deb, {downloadsDirectory.view(), box64Filename.view()}));
+    SC_TRY(Path::join(libunwindDeb, {downloadsDirectory.view(), "libunwind8_1.6.2-3build1_amd64.deb"}));
+    SC_TRY(Path::join(wineBinaryDeb, {downloadsDirectory.view(), "wine-stable-amd64_11.0.0.0~noble-1_amd64.deb"}));
+    SC_TRY(Path::join(wineSupportDeb, {downloadsDirectory.view(), "wine-stable_11.0.0.0~noble-1_amd64.deb"}));
+
+    SC_TRY(downloadFileHash(box64Package.url.view(), box64Deb.view(), Hashing::TypeSHA256, box64Package.sha256.view()));
+    SC_TRY(downloadFileHash(libunwindURL, libunwindDeb.view(), Hashing::TypeSHA256, libunwindHash));
+    SC_TRY(downloadFileHash(wineBinaryURL, wineBinaryDeb.view(), Hashing::TypeSHA256, wineBinaryHash));
+    SC_TRY(downloadFileHash(wineSupportURL, wineSupportDeb.view(), Hashing::TypeSHA256, wineSupportHash));
+
+    String box64Root    = StringEncoding::Utf8;
+    String amd64LibRoot = StringEncoding::Utf8;
+    String wineRoot     = StringEncoding::Utf8;
+    SC_TRY(Path::join(box64Root, {package.packageLocalDirectory.view(), "box64"}));
+    SC_TRY(Path::join(amd64LibRoot, {package.packageLocalDirectory.view(), "amd64-libs"}));
+    SC_TRY(Path::join(wineRoot, {package.packageLocalDirectory.view(), "wine"}));
+    SC_TRY(fs.makeDirectoryRecursive(box64Root.view()));
+    SC_TRY(fs.makeDirectoryRecursive(amd64LibRoot.view()));
+    SC_TRY(fs.makeDirectoryRecursive(wineRoot.view()));
+
+    SC_TRY(extractDebArchive(box64Deb.view(), box64Root.view()));
+    SC_TRY(extractDebArchive(libunwindDeb.view(), amd64LibRoot.view()));
+    SC_TRY(extractDebArchive(wineBinaryDeb.view(), wineRoot.view()));
+    SC_TRY(extractDebArchive(wineSupportDeb.view(), wineRoot.view()));
+
+    SC_TRY(writeLinuxBox64WineScript(package.packageLocalDirectory.view(), "wine", "wine"));
+    SC_TRY(writeLinuxBox64WineScript(package.packageLocalDirectory.view(), "wineconsole", "wineconsole"));
+
+    SC_TRY(finalizePackage(fs));
+    SC_TRY(testPackage(package));
+
+    String packageTxt = StringEncoding::Utf8;
+    auto   builder    = StringBuilder::create(packageTxt);
+    SC_TRY(builder.append("SC_PACKAGE_URL={}\n", wineBinaryURL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA={}\n", wineSupportURL));
+    SC_TRY(builder.append("SC_PACKAGE_URL_BOX64={}\n", box64Package.url.view()));
+    SC_TRY(builder.append("SC_PACKAGE_URL_LIBUNWIND={}\n", libunwindURL));
+    builder.finalize();
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+
+    return Result(true);
+#else
+    (void)packagesCacheDirectory;
+    (void)packagesInstallDirectory;
+    (void)package;
+    return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
+#endif
+}
+
 Result installWineStableRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     static constexpr StringView packageVersion = "11.0";
@@ -1022,7 +1344,7 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     switch (HostPlatform)
     {
     case Platform::Apple: break;
-    case Platform::Linux:
+    case Platform::Linux: return installLinuxWineRunner(packagesCacheDirectory, packagesInstallDirectory, package);
     case Platform::Windows:
     case Platform::Emscripten: return Result::Error("Automatic Wine install is only supported on macOS hosts yet");
     }

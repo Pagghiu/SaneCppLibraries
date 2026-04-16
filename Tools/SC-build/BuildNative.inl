@@ -2572,6 +2572,13 @@ struct SC::Build::NativeBuild
 
         if (HostInstructionSet == InstructionSet::ARM64)
         {
+            Tools::Package winePackage;
+            if (Tools::installWineStableRunner(parameters.directories.packagesCacheDirectory.view(),
+                                               parameters.directories.packagesInstallDirectory.view(), winePackage))
+            {
+                SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
+                return Result(true);
+            }
             return Result::Error("Cannot find a usable Wine runner. Install wine64/wine, or install box64 plus "
                                  "wine64/wine, or pass --runner-path with a wrapper path. Linux arm64 hosts need "
                                  "a runner that can launch the Windows x64 tools and binaries.");

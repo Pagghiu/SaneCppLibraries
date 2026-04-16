@@ -246,7 +246,14 @@ static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView 
     SC_TRY(builder.append("#!/bin/sh\n"));
     SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
     SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
-    SC_TRY(builder.append("  printf '%s\\n' 'fake version'\n"));
+    if (stdOutText.isEmpty())
+    {
+        SC_TRY(builder.append("  printf '%s\\n' 'fake version'\n"));
+    }
+    else
+    {
+        SC_TRY(builder.append("  printf '%s\\n' '{}'\n", stdOutText));
+    }
     SC_TRY(builder.append("  exit 0\n"));
     SC_TRY(builder.append("fi\n"));
     if (not stdOutText.isEmpty())
@@ -276,6 +283,55 @@ static Result writeBox64ForwardingWrapperScript(FileSystem& fs, StringView scrip
     builder.finalize();
     SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
     SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
+static Result createFakePackagedLinuxWineRunner(FileSystem& fs, StringView runnerRoot, StringView box64Log,
+                                                StringView wineLog, StringView wineConsoleLog)
+{
+    String box64Path         = StringEncoding::Utf8;
+    String amd64LibDirectory = StringEncoding::Utf8;
+    String winePath          = StringEncoding::Utf8;
+    String wineConsolePath   = StringEncoding::Utf8;
+    SC_TRY(Path::join(box64Path, {runnerRoot, "box64", "usr", "bin", "box64"}));
+    SC_TRY(Path::join(amd64LibDirectory, {runnerRoot, "amd64-libs", "usr", "lib", "x86_64-linux-gnu"}));
+    SC_TRY(Path::join(winePath, {runnerRoot, "wine", "opt", "wine-stable", "bin", "wine"}));
+    SC_TRY(Path::join(wineConsolePath, {runnerRoot, "wine", "opt", "wine-stable", "bin", "wineconsole"}));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(box64Path.view(), Path::AsNative)));
+    SC_TRY(fs.makeDirectoryRecursive(amd64LibDirectory.view()));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(winePath.view(), Path::AsNative)));
+    SC_TRY(writeBox64ForwardingWrapperScript(fs, box64Path.view(), box64Log));
+    SC_TRY(writeVersionedLoggingOnlyWrapperScript(fs, winePath.view(), wineLog, "wine-11.0"));
+    SC_TRY(writeVersionedLoggingOnlyWrapperScript(fs, wineConsolePath.view(), wineConsoleLog, "console"));
+
+    String binDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {runnerRoot, "bin"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+
+    auto writeWrapper = [&](StringView executableName, StringView targetPath) -> Result
+    {
+        String scriptPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(scriptPath, {binDirectory.view(), executableName}));
+
+        String scriptContents = StringEncoding::Utf8;
+        auto   builder        = StringBuilder::create(scriptContents);
+        SC_TRY(builder.append("#!/bin/sh\n"));
+        SC_TRY(builder.append("case \"$0\" in\n"));
+        SC_TRY(builder.append("  */*) SCRIPT_DIR=${0%/*} ;;\n"));
+        SC_TRY(builder.append("  *) SCRIPT_DIR=. ;;\n"));
+        SC_TRY(builder.append("esac\n"));
+        SC_TRY(builder.append("SCRIPT_DIR=$(CDPATH= cd -- \"$SCRIPT_DIR\" && pwd)\n"));
+        SC_TRY(builder.append("RUNNER_ROOT=$(CDPATH= cd -- \"$SCRIPT_DIR/..\" && pwd)\n"));
+        SC_TRY(builder.append("exec \"$RUNNER_ROOT/box64/usr/bin/box64\" \"$RUNNER_ROOT/{}\" \"$@\"\n", targetPath));
+        builder.finalize();
+
+        SC_TRY(fs.writeString(scriptPath.view(), scriptContents.view()));
+        SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+        return Result(true);
+    };
+
+    SC_TRY(writeWrapper("wine", "wine/opt/wine-stable/bin/wine"));
+    SC_TRY(writeWrapper("wineconsole", "wine/opt/wine-stable/bin/wineconsole"));
     return Result(true);
 }
 #endif
@@ -1862,6 +1918,61 @@ struct SCBuildFixtureTest : public SC::TestCase
                 SC_TEST_EXPECT(StringView(wineConsoleInvocation.view()).containsString("--fixture runner"));
             }
         }
+
+        if (test_section("package install reuses packaged Linux Wine runner on arm64"))
+        {
+            if (HostInstructionSet == InstructionSet::ARM64)
+            {
+                String             buildRoot = StringEncoding::Utf8;
+                Build::Directories directories;
+                SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+                String runnerRoot      = StringEncoding::Utf8;
+                String toolRoot        = StringEncoding::Utf8;
+                String box64Log        = StringEncoding::Utf8;
+                String wineLog         = StringEncoding::Utf8;
+                String wineConsoleLog  = StringEncoding::Utf8;
+                String installedRunner = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(
+                    runnerRoot, {directories.packagesCacheDirectory.view(), "wine-stable", "linux-arm64-box64"}));
+                SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+                SC_TRUST_RESULT(Path::join(box64Log, {toolRoot.view(), "packaged-box64.log"}));
+                SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "packaged-wine.log"}));
+                SC_TRUST_RESULT(Path::join(wineConsoleLog, {toolRoot.view(), "packaged-wineconsole.log"}));
+                SC_TRUST_RESULT(Path::join(
+                    installedRunner, {directories.packagesInstallDirectory.view(), "wine-stable_linux_arm64_box64"}));
+                SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+                SC_TRUST_RESULT(createFakePackagedLinuxWineRunner(fs, runnerRoot.view(), box64Log.view(),
+                                                                  wineLog.view(), wineConsoleLog.view()));
+
+                Tools::Package package;
+                SC_TEST_EXPECT(Tools::installLinuxWineRunner(directories.packagesCacheDirectory.view(),
+                                                             directories.packagesInstallDirectory.view(), package));
+                SC_TEST_EXPECT(package.installDirectoryLink == installedRunner.view());
+                SC_TEST_EXPECT(fs.existsAndIsDirectory(installedRunner.view()));
+
+                String box64Invocation = StringEncoding::Utf8;
+                SC_TRUST_RESULT(fs.read(box64Log.view(), box64Invocation));
+                SC_TEST_EXPECT(StringView(box64Invocation.view()).containsString("wine/opt/wine-stable/bin/wine"));
+                SC_TEST_EXPECT(StringView(box64Invocation.view()).containsString("--version"));
+
+                String wineInvocation = StringEncoding::Utf8;
+                SC_TRUST_RESULT(fs.read(wineLog.view(), wineInvocation));
+                SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("--version"));
+
+                String installedWine = StringEncoding::Utf8;
+                SC_TRUST_RESULT(Path::join(installedWine, {installedRunner.view(), "bin", "wine"}));
+                Process process;
+                String  version = StringEncoding::Utf8;
+                SC_TRUST_RESULT(process.setEnvironment("PATH", "Z:\\portable-msvc\\bin;C:\\windows\\system32"));
+                SC_TRUST_RESULT(process.exec({installedWine.view(), "--version"}, version));
+                SC_TEST_EXPECT(process.getExitStatus() == 0);
+                SC_TEST_EXPECT(StringView(version.view()).containsString("wine-11.0"));
+            }
+        }
 #endif
 
         if (test_section("native backend reports missing Windows arm64 loader in bundled Wine"))
@@ -1942,6 +2053,25 @@ struct SCBuildFixtureTest : public SC::TestCase
 #if SC_PLATFORM_APPLE
         if (test_section("native backend smoke-starts SCTest through Wine on macOS"))
         {
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String repositoryIntermediates = StringEncoding::Utf8;
+            String repositoryOutputs       = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                Path::join(repositoryIntermediates, {report.libraryRootDirectory.view(), "_Build", "_Intermediates",
+                                                     "SCTest", "windows-x86_64-Native-llvm-mingw-Debug"}));
+            SC_TRUST_RESULT(Path::join(repositoryOutputs, {report.libraryRootDirectory.view(), "_Build", "_Outputs",
+                                                           "windows-x86_64-Native-llvm-mingw-Debug"}));
+            if (fs.existsAndIsDirectory(repositoryIntermediates.view()))
+            {
+                SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryIntermediates.view()));
+            }
+            if (fs.existsAndIsDirectory(repositoryOutputs.view()))
+            {
+                SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryOutputs.view()));
+            }
+
             CapturedProcessOutput capturedOutput;
             const StringSpan      arguments[] = {
                 "build",    "run",   "SCTest", "--target", "windows-gnu-x86_64", "--runner",       "auto",

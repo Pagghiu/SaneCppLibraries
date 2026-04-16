@@ -447,6 +447,7 @@ constexpr StringView PackagesInstallDirectory = "_Packages";
 
 Result installWineStableRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                Package& package);
+Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
