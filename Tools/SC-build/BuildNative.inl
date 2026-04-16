@@ -1335,7 +1335,7 @@ struct SC::Build::NativeBuild
                 SC_TRY(process.setWorkingDirectory(workingDirectory.view()));
             }
 
-            if (targetType == TargetType::ConsoleExecutable and targetContext.hostMachine.platform == Platform::Linux)
+            if (targetType == TargetType::ConsoleExecutable and shouldPreferWineConsole(targetContext))
             {
                 String wineConsole = StringEncoding::Utf8;
                 SC_TRY(wineConsole.assign(Path::dirname(runner.executable.view(), Path::AsNative)));
@@ -2444,6 +2444,12 @@ struct SC::Build::NativeBuild
         return targetPlatform(context) == context.hostMachine.platform and
                targetArchitecture(context) == context.hostMachine.architecture and
                context.targetMachine.environment == TargetEnvironment::Native;
+    }
+
+    static constexpr bool shouldPreferWineConsole(const ResolvedTargetContext& context)
+    {
+        return context.hostMachine.platform == Platform::Linux and
+               context.hostMachine.architecture != Architecture::Arm64;
     }
 
     static Result appendRunnerArgument(Vector<String>& arguments, StringView value)

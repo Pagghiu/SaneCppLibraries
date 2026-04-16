@@ -35,7 +35,8 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 - Existing packaged Linux Wine runners now also repair their launcher scripts in place, so portable MSVC wrapper updates do not require deleting the cached runner package first.
 - Portable MSVC caches are now host-specific, so shared macOS/Linux workspaces do not reuse the wrong recorded Wine wrapper path across hosts.
 - On Linux arm64, both portable MSVC installation and native Wine execution can auto-generate `box64 + wine64` wrappers when those host tools are present.
-- When Linux arm64 lacks a usable system `box64`, the packaged Wine runner can now resolve a maintained generic-arm `box64` package automatically; that path now validates a real native-backend `windows-msvc-x86_64` `SCTest` compile, while run support and broader ARM64-target validation are still being finished.
+- On Linux x64, console targets can still prefer `wineconsole --backend=curses`; on Linux arm64, the native runner now stays on plain `wine` because that is more reliable on the current Box64 Wine stack.
+- When Linux arm64 lacks a usable system `box64`, the packaged Wine runner can now resolve a maintained generic-arm `box64` package automatically; that path now validates real native-backend `SCTest` compiles for both `windows-msvc-x86_64` and `windows-msvc-arm64`, plus a real `windows-msvc-x86_64` start, while broader ARM64-target validation is still being finished.
 
 ## Plugin Export Notes
 

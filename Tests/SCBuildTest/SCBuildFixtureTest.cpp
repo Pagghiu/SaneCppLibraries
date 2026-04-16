@@ -1819,7 +1819,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("reg add"));
             SC_TEST_EXPECT(StringView(runnerInvocation.view()).containsString("reg delete"));
 
-            if (HostPlatform == SC::Platform::Linux)
+            if (HostPlatform == SC::Platform::Linux and HostInstructionSet != InstructionSet::ARM64)
             {
                 String runnerConsoleInvocation = StringEncoding::Utf8;
                 SC_TRUST_RESULT(fs.read(runnerConsoleLog.view(), runnerConsoleInvocation));
@@ -1908,14 +1908,13 @@ struct SCBuildFixtureTest : public SC::TestCase
 
                 String box64Invocation = StringEncoding::Utf8;
                 SC_TRUST_RESULT(fs.read(box64Log.view(), box64Invocation));
-                SC_TEST_EXPECT(StringView(box64Invocation.view()).containsString("wineconsole"));
+                SC_TEST_EXPECT(StringView(box64Invocation.view()).containsString("wine64"));
 
-                String wineConsoleInvocation = StringEncoding::Utf8;
-                SC_TRUST_RESULT(fs.read(wineConsoleLog.view(), wineConsoleInvocation));
-                SC_TEST_EXPECT(StringView(wineConsoleInvocation.view()).containsString("--backend=curses"));
-                SC_TEST_EXPECT(StringView(wineConsoleInvocation.view()).containsString("cmd /c Z:\\"));
-                SC_TEST_EXPECT(StringView(wineConsoleInvocation.view()).containsString("TinyConsoleProgram.exe"));
-                SC_TEST_EXPECT(StringView(wineConsoleInvocation.view()).containsString("--fixture runner"));
+                String wineInvocation = StringEncoding::Utf8;
+                SC_TRUST_RESULT(fs.read(wine64Log.view(), wineInvocation));
+                SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("cmd /c Z:\\"));
+                SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("TinyConsoleProgram.exe"));
+                SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("--fixture runner"));
             }
         }
 
