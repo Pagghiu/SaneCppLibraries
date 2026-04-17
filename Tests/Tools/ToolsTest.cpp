@@ -133,6 +133,56 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::WindowsGNU);
             SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "aarch64-w64-windows-gnu");
         }
+        if (test_section("build cli parses Linux glibc target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "native";
+            args[3]             = "--target";
+            args[4]             = "linux-glibc-x86_64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+            SC_TEST_EXPECT(action.parameters.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::Clang);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::LinuxGlibc);
+            SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "x86_64-unknown-linux-gnu");
+        }
+        if (test_section("build cli parses Linux musl arm64 target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "native";
+            args[3]             = "--target";
+            args[4]             = "linux-musl-arm64";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+            SC_TEST_EXPECT(action.parameters.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Arm64);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::Clang);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == Build::Architecture::Arm64);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::LinuxMusl);
+            SC_TEST_EXPECT(action.parameters.toolchain.targetTriple == "aarch64-unknown-linux-musl");
+        }
         if (test_section("build cli parses Windows MSVC target profiles"))
         {
             arguments.tool      = "build";
@@ -314,6 +364,23 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
+        if (test_section("build cli rejects contradictory triples for Linux musl target profiles"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "linux-musl-arm64";
+            args[3]             = "--triple";
+            args[4]             = "aarch64-unknown-linux-gnu";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
         if (test_section("build target profile selects native backend automatically"))
         {
             arguments.tool      = "build";
@@ -465,9 +532,11 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-gnu-arm64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-msvc-x86_64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-msvc-arm64"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("linux-glibc-x86_64"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("linux-musl-arm64"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
-            SC_TEST_EXPECT(StringView(text.view()).containsString("Wine runtime that ships an arm64 Windows loader"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("packaged Linux sysroots are still pending"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Arguments after -- are forwarded"));
         }
         if (test_section("build cli rejects unknown options"))

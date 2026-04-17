@@ -237,6 +237,35 @@ static Result writeLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPat
     return Result(true);
 }
 
+static Result writeOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath)
+{
+    String scriptContents = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(scriptContents,
+                                 "#!/bin/sh\n"
+                                 "printf '%s\\n' \"$*\" >> \"{}\"\n"
+                                 "out=''\n"
+                                 "prev=''\n"
+                                 "for arg in \"$@\"; do\n"
+                                 "  if [ \"$prev\" = '-o' ]; then\n"
+                                 "    out=\"$arg\"\n"
+                                 "    prev=''\n"
+                                 "    continue\n"
+                                 "  fi\n"
+                                 "  case \"$arg\" in\n"
+                                 "    -o) prev='-o' ;;\n"
+                                 "  esac\n"
+                                 "done\n"
+                                 "if [ -n \"$out\" ]; then\n"
+                                 "  /bin/mkdir -p \"$(/usr/bin/dirname \"$out\")\"\n"
+                                 "  : > \"$out\"\n"
+                                 "fi\n"
+                                 "exit 0\n",
+                                 logPath));
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
 #if SC_PLATFORM_LINUX
 static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
                                                      StringView stdOutText = {})
@@ -1264,6 +1293,55 @@ static Result configureWindowsMSVCAction(Build::Action& action, Build::Architect
     action.parameters.targetMachine.architecture = architecture;
     action.parameters.targetMachine.environment  = Build::TargetEnvironment::WindowsMSVC;
     SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
+    return Result(true);
+}
+
+static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnvironment::Type environment,
+                                         Build::Architecture::Type architecture, StringView sysroot = {})
+{
+    action.parameters.platform                   = Build::Platform::Linux;
+    action.parameters.architecture               = architecture;
+    action.parameters.toolchain.family           = Build::Toolchain::Clang;
+    action.parameters.targetMachine.platform     = Build::Platform::Linux;
+    action.parameters.targetMachine.architecture = architecture;
+    action.parameters.targetMachine.environment  = environment;
+
+    switch (environment)
+    {
+    case Build::TargetEnvironment::LinuxGlibc:
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64:
+            SC_TRY(action.parameters.toolchain.targetTriple.assign("x86_64-unknown-linux-gnu"));
+            break;
+        case Build::Architecture::Arm64:
+            SC_TRY(action.parameters.toolchain.targetTriple.assign("aarch64-unknown-linux-gnu"));
+            break;
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return Result::Error("Unsupported Linux glibc fixture architecture");
+        }
+        break;
+    case Build::TargetEnvironment::LinuxMusl:
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64:
+            SC_TRY(action.parameters.toolchain.targetTriple.assign("x86_64-unknown-linux-musl"));
+            break;
+        case Build::Architecture::Arm64:
+            SC_TRY(action.parameters.toolchain.targetTriple.assign("aarch64-unknown-linux-musl"));
+            break;
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return Result::Error("Unsupported Linux musl fixture architecture");
+        }
+        break;
+    case Build::TargetEnvironment::Native:
+    case Build::TargetEnvironment::WindowsGNU:
+    case Build::TargetEnvironment::WindowsMSVC: return Result::Error("Unsupported Linux fixture target environment");
+    }
+
+    SC_TRY(action.parameters.toolchain.sysroot.assign(sysroot));
     return Result(true);
 }
 
@@ -3038,6 +3116,106 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(compilerCppLog.view()).containsString("library.cpp"));
             SC_TEST_EXPECT(StringView(compilerCppLog.view()).containsString("main.cpp"));
             SC_TEST_EXPECT(StringView(archiverLog.view()).containsString("libWorkspaceStaticLibrary.a"));
+        }
+
+        if (test_section("native backend shapes Linux musl target profiles for custom driver toolchains"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String toolchainRoot   = StringEncoding::Utf8;
+            String compilerLogPath = StringEncoding::Utf8;
+            String compilerWrapper = StringEncoding::Utf8;
+            String linkerLogPath   = StringEncoding::Utf8;
+            String linkerWrapper   = StringEncoding::Utf8;
+            String sysroot         = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {buildRoot.view(), "LinuxMuslToolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+            SC_TRUST_RESULT(Path::join(linkerLogPath, {toolchainRoot.view(), "linker.log"}));
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+            SC_TRUST_RESULT(Path::join(linkerWrapper, {toolchainRoot.view(), "linker.sh"}));
+            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-musl"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
+            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
+            SC_TRUST_RESULT(fs.writeString(linkerLogPath.view(), ""));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view()));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, linkerWrapper.view(), linkerLogPath.view()));
+
+            Build::Action action               = makeNativeCompileAction(directories, FixtureProjectName);
+            action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(linkerWrapper.view()));
+            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl,
+                                                       Build::Architecture::Arm64, sysroot.view()));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String compilerLog = StringEncoding::Utf8;
+            String linkerLog   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
+            SC_TRUST_RESULT(fs.read(linkerLogPath.view(), linkerLog));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("-target aarch64-unknown-linux-musl"));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("--sysroot"));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("-target aarch64-unknown-linux-musl"));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
+        }
+
+        if (test_section("native backend shapes Linux glibc target profiles for custom driver toolchains"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String toolchainRoot   = StringEncoding::Utf8;
+            String compilerLogPath = StringEncoding::Utf8;
+            String compilerWrapper = StringEncoding::Utf8;
+            String linkerLogPath   = StringEncoding::Utf8;
+            String linkerWrapper   = StringEncoding::Utf8;
+            String sysroot         = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(toolchainRoot, {buildRoot.view(), "LinuxGlibcToolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerLogPath, {toolchainRoot.view(), "compiler.log"}));
+            SC_TRUST_RESULT(Path::join(linkerLogPath, {toolchainRoot.view(), "linker.log"}));
+            SC_TRUST_RESULT(Path::join(compilerWrapper, {toolchainRoot.view(), "compiler.sh"}));
+            SC_TRUST_RESULT(Path::join(linkerWrapper, {toolchainRoot.view(), "linker.sh"}));
+            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-glibc"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolchainRoot.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
+            SC_TRUST_RESULT(fs.writeString(compilerLogPath.view(), ""));
+            SC_TRUST_RESULT(fs.writeString(linkerLogPath.view(), ""));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, compilerWrapper.view(), compilerLogPath.view()));
+            SC_TRUST_RESULT(writeOutputProducingWrapperScript(fs, linkerWrapper.view(), linkerLogPath.view()));
+
+            Build::Action action               = makeNativeCompileAction(directories, FixtureProjectName);
+            action.parameters.toolchain.family = Build::Toolchain::CustomDriver;
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerC.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.compilerCpp.assign(compilerWrapper.view()));
+            SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(linkerWrapper.view()));
+            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
+                                                       Build::Architecture::Intel64, sysroot.view()));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String compilerLog = StringEncoding::Utf8;
+            String linkerLog   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
+            SC_TRUST_RESULT(fs.read(linkerLogPath.view(), linkerLog));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("-target x86_64-unknown-linux-gnu"));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("--sysroot"));
+            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("-target x86_64-unknown-linux-gnu"));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
+            SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
         }
 #endif
     }

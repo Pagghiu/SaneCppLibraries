@@ -172,6 +172,10 @@ struct BuildCLIParseContext
         SC_TRY_MSG(output.append("\nTarget profiles:\n"
                                  "  - host / native: build for the current host machine\n"
                                  "  - windows-gnu-x86_64: Windows GNU target through llvm-mingw\n"
+                                 "  - linux-glibc-x86_64: Linux glibc target profile\n"
+                                 "  - linux-glibc-arm64: Linux glibc arm64 target profile\n"
+                                 "  - linux-musl-x86_64: Linux musl target profile\n"
+                                 "  - linux-musl-arm64: Linux musl arm64 target profile\n"
                                  "  - windows-msvc-x86_64: Windows MSVC target through portable MSVC + Wine\n"
                                  "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
                                  "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
@@ -181,6 +185,8 @@ struct BuildCLIParseContext
                 "\nCurrent tested cross-target support:\n"
                 "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
                 "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
+                "  - linux-glibc-* and linux-musl-* profiles now shape canonical target triples and sysroot flags, but "
+                "packaged Linux sysroots are still pending\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
                 "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
                 "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
@@ -349,6 +355,22 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     {
         resolved = "windows-gnu-arm64";
     }
+    else if (equalsAsciiIgnoreCase(targetProfile, "linux-glibc-x64"))
+    {
+        resolved = "linux-glibc-x86_64";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "linux-glibc-aarch64"))
+    {
+        resolved = "linux-glibc-arm64";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "linux-musl-x64"))
+    {
+        resolved = "linux-musl-x86_64";
+    }
+    else if (equalsAsciiIgnoreCase(targetProfile, "linux-musl-aarch64"))
+    {
+        resolved = "linux-musl-arm64";
+    }
     else if (equalsAsciiIgnoreCase(targetProfile, "windows-msvc-x64"))
     {
         resolved = "windows-msvc-x86_64";
@@ -358,6 +380,10 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
         resolved = "windows-msvc-arm64";
     }
     else if (not(equalsAsciiIgnoreCase(targetProfile, "host") or equalsAsciiIgnoreCase(targetProfile, "native") or
+                 equalsAsciiIgnoreCase(targetProfile, "linux-glibc-x86_64") or
+                 equalsAsciiIgnoreCase(targetProfile, "linux-glibc-arm64") or
+                 equalsAsciiIgnoreCase(targetProfile, "linux-musl-x86_64") or
+                 equalsAsciiIgnoreCase(targetProfile, "linux-musl-arm64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-msvc-x86_64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-msvc-arm64") or
                  equalsAsciiIgnoreCase(targetProfile, "windows-gnu-x86_64") or
@@ -379,6 +405,31 @@ inline void applyHostDefaultBuildParameters(Build::Action& action)
     action.parameters.targetMachine.platform = Build::Platform::Windows;
     action.parameters.platform               = Build::Platform::Windows;
     action.parameters.generator              = Build::Generator::Native;
+
+    if (equalsAsciiIgnoreCase(resolved, "linux-glibc-x86_64") or equalsAsciiIgnoreCase(resolved, "linux-glibc-arm64") or
+        equalsAsciiIgnoreCase(resolved, "linux-musl-x86_64") or equalsAsciiIgnoreCase(resolved, "linux-musl-arm64"))
+    {
+        action.parameters.targetMachine.platform = Build::Platform::Linux;
+        action.parameters.platform               = Build::Platform::Linux;
+        action.parameters.generator              = Build::Generator::Native;
+        action.parameters.toolchain.family       = Build::Toolchain::Clang;
+
+        const bool isArm64 =
+            equalsAsciiIgnoreCase(resolved, "linux-glibc-arm64") or equalsAsciiIgnoreCase(resolved, "linux-musl-arm64");
+        const bool isMusl =
+            equalsAsciiIgnoreCase(resolved, "linux-musl-x86_64") or equalsAsciiIgnoreCase(resolved, "linux-musl-arm64");
+
+        action.parameters.targetMachine.architecture =
+            isArm64 ? Build::Architecture::Arm64 : Build::Architecture::Intel64;
+        action.parameters.architecture = action.parameters.targetMachine.architecture;
+        action.parameters.targetMachine.environment =
+            isMusl ? Build::TargetEnvironment::LinuxMusl : Build::TargetEnvironment::LinuxGlibc;
+        const StringView targetTriple =
+            isArm64 ? (isMusl ? "aarch64-unknown-linux-musl"_a8 : "aarch64-unknown-linux-gnu"_a8)
+                    : (isMusl ? "x86_64-unknown-linux-musl"_a8 : "x86_64-unknown-linux-gnu"_a8);
+        SC_TRY(action.parameters.toolchain.targetTriple.assign(targetTriple));
+        return Result(true);
+    }
 
     if (equalsAsciiIgnoreCase(resolved, "windows-msvc-x86_64") or equalsAsciiIgnoreCase(resolved, "windows-msvc-arm64"))
     {
@@ -741,6 +792,16 @@ template <size_t N>
     return target.platform == Build::Platform::Windows and target.environment == Build::TargetEnvironment::WindowsMSVC;
 }
 
+[[nodiscard]] inline bool isLinuxGlibcTargetMachine(const Build::Machine& target)
+{
+    return target.platform == Build::Platform::Linux and target.environment == Build::TargetEnvironment::LinuxGlibc;
+}
+
+[[nodiscard]] inline bool isLinuxMuslTargetMachine(const Build::Machine& target)
+{
+    return target.platform == Build::Platform::Linux and target.environment == Build::TargetEnvironment::LinuxMusl;
+}
+
 [[nodiscard]] inline bool tripleConflictsWithTargetArchitecture(StringView                triple,
                                                                 Build::Architecture::Type architecture)
 {
@@ -765,6 +826,8 @@ template <size_t N>
 {
     const bool windowsGNUTarget  = isWindowsGNUTargetMachine(action.parameters.targetMachine);
     const bool windowsMSVCTarget = isWindowsMSVCTargetMachine(action.parameters.targetMachine);
+    const bool linuxGlibcTarget  = isLinuxGlibcTargetMachine(action.parameters.targetMachine);
+    const bool linuxMuslTarget   = isLinuxMuslTargetMachine(action.parameters.targetMachine);
     if (windowsGNUTarget)
     {
         if (not context.generator.isEmpty())
@@ -846,6 +909,59 @@ template <size_t N>
         {
             return printBuildActionCombinationError(
                 console, "Windows MSVC target profiles do not accept --sysroot overrides yet");
+        }
+    }
+    if (linuxGlibcTarget or linuxMuslTarget)
+    {
+        if (not context.generator.isEmpty())
+        {
+            StringView resolvedGenerator;
+            SC_TRY(resolveBuildGeneratorKeyword(context.generator, resolvedGenerator, console));
+            if (not(equalsAsciiIgnoreCase(resolvedGenerator, "default") or
+                    equalsAsciiIgnoreCase(resolvedGenerator, "native")))
+            {
+                return printBuildActionCombinationError(
+                    console, "Linux target profiles require --generator native (or default)");
+            }
+        }
+
+        if (not context.architecture.isEmpty())
+        {
+            StringView resolvedArchitecture;
+            SC_TRY(resolveBuildArchitectureKeyword(context.architecture, resolvedArchitecture, console));
+            if ((action.parameters.targetMachine.architecture == Build::Architecture::Intel64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "intel64")) or
+                (action.parameters.targetMachine.architecture == Build::Architecture::Arm64 and
+                 not equalsAsciiIgnoreCase(resolvedArchitecture, "arm64")))
+            {
+                return printBuildActionCombinationError(
+                    console, "Linux target profiles require --arch to match the selected target profile");
+            }
+        }
+
+        if (not context.targetTriple.isEmpty())
+        {
+            if (not containsAsciiIgnoreCase(context.targetTriple, "linux"))
+            {
+                return printBuildActionCombinationError(console,
+                                                        "Linux target profiles require a Linux --triple override");
+            }
+            if (linuxMuslTarget and not containsAsciiIgnoreCase(context.targetTriple, "musl"))
+            {
+                return printBuildActionCombinationError(console,
+                                                        "Linux musl target profiles require a musl --triple override");
+            }
+            if (linuxGlibcTarget and containsAsciiIgnoreCase(context.targetTriple, "musl"))
+            {
+                return printBuildActionCombinationError(
+                    console, "Linux glibc target profiles require a glibc/GNU --triple override");
+            }
+            if (tripleConflictsWithTargetArchitecture(context.targetTriple,
+                                                      action.parameters.targetMachine.architecture))
+            {
+                return printBuildActionCombinationError(
+                    console, "The selected --triple conflicts with the architecture implied by --target");
+            }
         }
     }
 
@@ -1019,8 +1135,9 @@ template <size_t N>
 
     options[numOptions].longName  = "target";
     options[numOptions].shortName = 't';
-    options[numOptions].help      = "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, "
-                                    "windows-msvc-x86_64, windows-msvc-arm64)";
+    options[numOptions].help =
+        "Build target profile (host, native, windows-gnu-x86_64, windows-gnu-arm64, windows-msvc-x86_64, "
+        "windows-msvc-arm64, linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, linux-musl-arm64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
     numOptions++;

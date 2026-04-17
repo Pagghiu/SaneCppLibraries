@@ -2436,6 +2436,35 @@ struct SC::Build::NativeBuild
             case Architecture::Wasm: break;
             }
         }
+        if (targetPlatform(context) == Platform::Linux)
+        {
+            switch (context.targetMachine.environment)
+            {
+            case TargetEnvironment::LinuxGlibc:
+                switch (targetArchitecture(context))
+                {
+                case Architecture::Intel64: return "x86_64-unknown-linux-gnu";
+                case Architecture::Arm64: return "aarch64-unknown-linux-gnu";
+                case Architecture::Intel32:
+                case Architecture::Any:
+                case Architecture::Wasm: break;
+                }
+                break;
+            case TargetEnvironment::LinuxMusl:
+                switch (targetArchitecture(context))
+                {
+                case Architecture::Intel64: return "x86_64-unknown-linux-musl";
+                case Architecture::Arm64: return "aarch64-unknown-linux-musl";
+                case Architecture::Intel32:
+                case Architecture::Any:
+                case Architecture::Wasm: break;
+                }
+                break;
+            case TargetEnvironment::Native:
+            case TargetEnvironment::WindowsGNU:
+            case TargetEnvironment::WindowsMSVC: break;
+            }
+        }
         return {};
     }
 
