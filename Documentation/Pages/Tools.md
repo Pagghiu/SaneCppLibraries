@@ -188,7 +188,8 @@ Current defaults:
 - On Linux arm64, the real portable MSVC path now reaches clean native-backend `SCTest` compiles for both
   `windows-msvc-x86_64` and `windows-msvc-arm64`, plus targeted `BaseTest/new-delete` runs for both targets through
   the maintained packaged Box64 runner (`x86_64`) and the packaged native ARM64 Wine runner (`arm64`)
-- `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux
+- `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux, and Linux arm64 now also
+  smoke-runs `windows-gnu-arm64` through the packaged native ARM64 Wine runner
 - On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host
   tools are available; Linux x64 console targets still switch to a sibling `wineconsole --backend=curses` wrapper when
   it is present, while Linux arm64 now stays on plain packaged `wine` because that is more reliable than `wineconsole`
@@ -197,8 +198,9 @@ Current defaults:
   Linux arm64 now also has targeted `SCTest` smokes for both `windows-msvc-x86_64` and `windows-msvc-arm64`
 - `build run` now launches Wine through `cmd /c` with a Windows-style target path, which fixes real macOS startup for
   `windows-gnu-x86_64`
-- `windows-gnu-arm64` and `windows-msvc-arm64` are no longer rejected by a hardcoded CLI rule, but the packaged macOS
-  Wine runner still lacks an ARM64 Windows loader, so real arm64 runs still need an arm64-capable Wine runtime
+- `windows-gnu-arm64` and `windows-msvc-arm64` are no longer rejected by a hardcoded CLI rule; Linux arm64 now has a
+  real ARM64-capable Wine runtime for targeted smokes, while the packaged macOS Wine runner still lacks an ARM64
+  Windows loader
 - Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples

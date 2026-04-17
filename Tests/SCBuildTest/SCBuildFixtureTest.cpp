@@ -2148,6 +2148,56 @@ struct SCBuildFixtureTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_LINUX
+        if (test_section(
+                "native backend smoke-starts Windows GNU arm64 SCTest through native ARM64 Wine on Linux arm64"))
+        {
+            if (HostInstructionSet == InstructionSet::ARM64)
+            {
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+                String repositoryIntermediates = StringEncoding::Utf8;
+                String repositoryOutputs       = StringEncoding::Utf8;
+                String repositoryPrefix        = StringEncoding::Utf8;
+                SC_TRUST_RESULT(
+                    Path::join(repositoryIntermediates, {report.libraryRootDirectory.view(), "_Build", "_Intermediates",
+                                                         "SCTest", "windows-arm64-Native-llvm-mingw-Debug"}));
+                SC_TRUST_RESULT(Path::join(repositoryOutputs, {report.libraryRootDirectory.view(), "_Build", "_Outputs",
+                                                               "windows-arm64-Native-llvm-mingw-Debug"}));
+                SC_TRUST_RESULT(Path::join(repositoryPrefix, {report.libraryRootDirectory.view(), "_Build",
+                                                              "_BuildCache", "wine-prefix-arm64"}));
+                if (fs.existsAndIsDirectory(repositoryIntermediates.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryIntermediates.view()));
+                }
+                if (fs.existsAndIsDirectory(repositoryOutputs.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryOutputs.view()));
+                }
+                if (fs.existsAndIsDirectory(repositoryPrefix.view()))
+                {
+                    SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryPrefix.view()));
+                }
+
+                CapturedProcessOutput capturedOutput;
+                const StringSpan      arguments[] = {
+                    "build",    "run",   "SCTest", "--target", "windows-gnu-arm64", "--runner",       "auto",
+                    "--output", "quiet", "--",     "--test",   "BaseTest",          "--test-section", "new/delete"};
+                SC_TRUST_RESULT(captureRepositoryBuildCommand(report, arguments, capturedOutput));
+
+                SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("RUNNER = "));
+                SC_TEST_EXPECT(
+                    StringView(capturedOutput.stdOut.view()).containsString("wine-stable_linux_arm64_native/bin/wine"));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("SCTest.exe"));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single test \"BaseTest\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
+                                   .containsString("TestReport::Running single section \"new/delete\""));
+                SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
+            }
+        }
+
         if (test_section("native backend smoke-starts SCTest through portable MSVC Wine on Linux arm64"))
         {
             if (HostInstructionSet == InstructionSet::ARM64)
