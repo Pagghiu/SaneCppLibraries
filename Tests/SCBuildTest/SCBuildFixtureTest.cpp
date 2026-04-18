@@ -266,6 +266,40 @@ static Result writeOutputProducingWrapperScript(FileSystem& fs, StringView scrip
     return Result(true);
 }
 
+static Result writeVersionedOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                                         StringView versionText)
+{
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
+    SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
+    SC_TRY(builder.append("  printf '%s\\n' '{}'\n", versionText));
+    SC_TRY(builder.append("  exit 0\n"));
+    SC_TRY(builder.append("fi\n"));
+    SC_TRY(builder.append("out=''\n"));
+    SC_TRY(builder.append("prev=''\n"));
+    SC_TRY(builder.append("for arg in \"$@\"; do\n"));
+    SC_TRY(builder.append("  if [ \"$prev\" = '-o' ]; then\n"));
+    SC_TRY(builder.append("    out=\"$arg\"\n"));
+    SC_TRY(builder.append("    prev=''\n"));
+    SC_TRY(builder.append("    continue\n"));
+    SC_TRY(builder.append("  fi\n"));
+    SC_TRY(builder.append("  case \"$arg\" in\n"));
+    SC_TRY(builder.append("    -o) prev='-o' ;;\n"));
+    SC_TRY(builder.append("  esac\n"));
+    SC_TRY(builder.append("done\n"));
+    SC_TRY(builder.append("if [ -n \"$out\" ]; then\n"));
+    SC_TRY(builder.append("  /bin/mkdir -p \"$(/usr/bin/dirname \"$out\")\"\n"));
+    SC_TRY(builder.append("  : > \"$out\"\n"));
+    SC_TRY(builder.append("fi\n"));
+    SC_TRY(builder.append("exit 0\n"));
+    builder.finalize();
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
 #if SC_PLATFORM_LINUX
 static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
                                                      StringView stdOutText = {})
@@ -1343,6 +1377,19 @@ static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnv
 
     SC_TRY(action.parameters.toolchain.sysroot.assign(sysroot));
     return Result(true);
+}
+
+static constexpr StringView hostLLVMInstallDirectoryName()
+{
+#if SC_PLATFORM_APPLE
+    return "llvm_macos_arm64";
+#elif SC_PLATFORM_LINUX
+    return HostInstructionSet == InstructionSet::ARM64 ? "llvm_linux_arm64"_a8 : "llvm_linux_intel64"_a8;
+#elif SC_PLATFORM_WINDOWS
+    return HostInstructionSet == InstructionSet::ARM64 ? "llvm_windows_arm64"_a8 : "llvm_windows_intel64"_a8;
+#else
+    return {};
+#endif
 }
 
 static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
@@ -3217,6 +3264,55 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
         }
+
+#if SC_PLATFORM_APPLE
+        if (test_section("native backend auto-selects packaged LLVM toolchain for Linux target profiles on macOS"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String llvmRoot     = StringEncoding::Utf8;
+            String llvmBin      = StringEncoding::Utf8;
+            String clangLogPath = StringEncoding::Utf8;
+            String clangPath    = StringEncoding::Utf8;
+            String clangCppPath = StringEncoding::Utf8;
+            String llvmArPath   = StringEncoding::Utf8;
+            String sysroot      = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
+            SC_TRUST_RESULT(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
+            SC_TRUST_RESULT(Path::join(clangLogPath, {llvmRoot.view(), "clang.log"}));
+            SC_TRUST_RESULT(Path::join(clangPath, {llvmBin.view(), "clang"}));
+            SC_TRUST_RESULT(Path::join(clangCppPath, {llvmBin.view(), "clang++"}));
+            SC_TRUST_RESULT(Path::join(llvmArPath, {llvmBin.view(), "llvm-ar"}));
+            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-glibc"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(llvmBin.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
+            SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
+                                                                       "LLVM archive tool"));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
+                                                       Build::Architecture::Arm64, sysroot.view()));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String clangLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-target aarch64-unknown-linux-gnu"));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("--sysroot"));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString(sysroot.view()));
+        }
+#endif
 #endif
     }
 };

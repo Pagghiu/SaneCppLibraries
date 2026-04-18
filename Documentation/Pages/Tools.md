@@ -150,8 +150,9 @@ Named options are:
 - `--normal` (`compile` / `run`)
 - `-v`, `--verbose` (`compile` / `run`)
 
-Target profiles currently exposed by the CLI are `host`, `native`, `windows-gnu-x86_64`, `windows-msvc-x86_64`,
-`windows-msvc-arm64`, and `windows-gnu-arm64`.
+Target profiles currently exposed by the CLI are `host`, `native`, `linux-glibc-x86_64`, `linux-glibc-arm64`,
+`linux-musl-x86_64`, `linux-musl-arm64`, `windows-gnu-x86_64`, `windows-msvc-x86_64`, `windows-msvc-arm64`, and
+`windows-gnu-arm64`.
 
 Runner keywords currently exposed by the CLI are `auto`, `none`, `wine`, `qemu`, and `custom`.
 
@@ -166,6 +167,9 @@ Current defaults:
 - Windows: `default` resolves to `vs2022`
 - macOS / Linux: `default` resolves to `make`
 - Native builds do not require a prior `configure` step
+- Linux `glibc` and `musl` target profiles now shape canonical target triples and sysroot flags; macOS and Windows
+  hosts auto-select a packaged LLVM toolchain for those profiles when the caller does not provide explicit compiler
+  paths, but real cross-host Linux builds still need an explicit `--sysroot`
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
@@ -234,6 +238,21 @@ Build all projects
 Build through the native backend
 ```
 ./SC.sh build compile SCTest --config Debug --generator native
+```
+
+Prepare the packaged host LLVM toolchain for Linux targets
+```
+./SC.sh package install llvm
+```
+
+Cross-compile a Linux glibc executable through the native backend using an explicit sysroot
+```
+./SC.sh build compile SCTest --target linux-glibc-arm64 --sysroot /opt/sysroots/linux-glibc-arm64 --output quiet
+```
+
+Cross-compile a Linux musl executable through the native backend using an explicit sysroot
+```
+./SC.sh build compile SCTest --target linux-musl-x86_64 --sysroot /opt/sysroots/linux-musl-x86_64 --output quiet
 ```
 
 Cross-compile a Windows GNU executable through the native backend
@@ -332,6 +351,8 @@ This happens during regular development, where new code is frequently tested in 
 These are the packages that are currently downloaded and extracted / symlinked by `SC-package.cpp`:
 
 - `LLVM 20.1.8`: Downloads `clang-format` from the official LLVM github repository using SHA256 pinned archives
+- `LLVM toolchain 20.1.8`: Downloads the full host LLVM toolchain (`clang`, `clang++`, `llvm-ar`, `lld`) for
+  Linux-target native-backend flows on supported hosts
 - `doxygen`: Doxygen documentation generator
 - `doxygen-awesome-css`: Doxygen awesome css (Doxygen theme)
 

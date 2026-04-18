@@ -1113,19 +1113,79 @@ Result findSystemClangFormat(Console& console, StringView wantedVersion, String&
     return Result::Error("No matching system clang-format found");
 }
 
+static constexpr StringView hostLLVMExecutableName(StringView baseName);
+static Result               resolveHostLLVMArchive(StringView packageName, StringView packagesCacheDirectory,
+                                                   StringView packagesInstallDirectory, Download& download, Package& package,
+                                                   StringView& archiveRoot);
+
 Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     CustomFunctions functions;
+    Download        download;
+    StringView      archiveRoot = {};
+    SC_TRY(resolveHostLLVMArchive("clang-binaries"_a8, packagesCacheDirectory, packagesInstallDirectory, download,
+                                  package, archiveRoot));
 
-    Download download;
+    static constexpr StringView wantedVersion            = "20.1.8";
+    String                      clangFormatPathInArchive = StringEncoding::Utf8;
+    SC_TRY(Path::join(clangFormatPathInArchive, {archiveRoot, "bin", hostLLVMExecutableName("clang-format"_a8)}));
+
+    functions.extractFunction = [&clangFormatPathInArchive](StringView sourceFile, StringView destinationDirectory)
+    { return tarExpandSingleFileTo(sourceFile, destinationDirectory, clangFormatPathInArchive.view(), 1); };
+
+    functions.testFunction = [](const Download&, const Package& package)
+    {
+        String  result;
+        String  formatExecutable;
+        Process process;
+        SC_TRY(Path::join(formatExecutable,
+                          {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang-format"_a8)}));
+        SC_TRY(process.exec({formatExecutable.view(), "--version"}, result));
+        SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
+        return clangFormatMatchesVersion(result.view(), wantedVersion);
+    };
+    SC_TRY(packageInstall(download, package, functions));
+    return Result(true);
+}
+
+static constexpr StringView hostLLVMExecutableName(StringView baseName)
+{
+#if SC_PLATFORM_WINDOWS
+    if (baseName == "clang"_a8)
+    {
+        return "clang.exe"_a8;
+    }
+    if (baseName == "clang++"_a8)
+    {
+        return "clang++.exe"_a8;
+    }
+    if (baseName == "clang-format"_a8)
+    {
+        return "clang-format.exe"_a8;
+    }
+    if (baseName == "lld"_a8)
+    {
+        return "lld.exe"_a8;
+    }
+    if (baseName == "llvm-ar"_a8)
+    {
+        return "llvm-ar.exe"_a8;
+    }
+#endif
+    return baseName;
+}
+
+static Result resolveHostLLVMArchive(StringView packageName, StringView packagesCacheDirectory,
+                                     StringView packagesInstallDirectory, Download& download, Package& package,
+                                     StringView& archiveRoot)
+{
+    download                          = {};
     download.packagesCacheDirectory   = packagesCacheDirectory;
     download.packagesInstallDirectory = packagesInstallDirectory;
-    download.packageName              = "clang-binaries";
+    download.packageName              = packageName;
     download.packageVersion           = "20.1.8";
     download.hashType                 = Hashing::TypeSHA256;
 
-    StringView wantedVersion            = "20.1.8";
-    StringView clangFormatPathInArchive = {};
     switch (HostPlatform)
     {
     case Platform::Apple: {
@@ -1137,17 +1197,15 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
                                        "LLVM-20.1.8-macOS-ARM64.tar.xz";
             download.expectedHash    = "a9a22f450d35f1f73cd61ab6a17c6f27d8f6051d56197395c1eb397f0c9bbec4";
             package.packageBaseName  = "LLVM-20.1.8-macOS-ARM64.tar.xz";
-            clangFormatPathInArchive = "LLVM-20.1.8-macOS-ARM64/bin/clang-format";
-            break;
+            archiveRoot              = "LLVM-20.1.8-macOS-ARM64";
+            return Result(true);
         case InstructionSet::Intel64:
-            return Result::Error("Automatic clang-format install is unavailable on Intel macOS because recent official "
-                                 "LLVM releases no longer ship Intel macOS archives. Install llvm@20 with Homebrew "
-                                 "and use $(brew --prefix llvm@20)/bin/clang-format");
+            return Result::Error("Automatic LLVM install is unavailable on Intel macOS because recent official LLVM "
+                                 "releases no longer ship Intel macOS archives. Install llvm@20 with Homebrew.");
         case InstructionSet::Intel32: return Result::Error("Unsupported platform");
         }
         break;
     }
-
     case Platform::Linux: {
         switch (HostInstructionSet)
         {
@@ -1157,21 +1215,20 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
                                        "LLVM-20.1.8-Linux-ARM64.tar.xz";
             download.expectedHash    = "b855cc17d935fdd83da82206b7a7cfc680095efd1e9e8182c4a05e761958bef8";
             package.packageBaseName  = "LLVM-20.1.8-Linux-ARM64.tar.xz";
-            clangFormatPathInArchive = "LLVM-20.1.8-Linux-ARM64/bin/clang-format";
-            break;
+            archiveRoot              = "LLVM-20.1.8-Linux-ARM64";
+            return Result(true);
         case InstructionSet::Intel64:
             download.packagePlatform = "linux_intel64";
             download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/"
                                        "LLVM-20.1.8-Linux-X64.tar.xz";
             download.expectedHash    = "1ead36b3dfcb774b57be530df42bec70ab2d239fbce9889447c7a29a4ddc1ae6";
             package.packageBaseName  = "LLVM-20.1.8-Linux-X64.tar.xz";
-            clangFormatPathInArchive = "LLVM-20.1.8-Linux-X64/bin/clang-format";
-            break;
+            archiveRoot              = "LLVM-20.1.8-Linux-X64";
+            return Result(true);
         case InstructionSet::Intel32: return Result::Error("Unsupported platform");
         }
         break;
     }
-
     case Platform::Windows: {
         switch (HostInstructionSet)
         {
@@ -1181,36 +1238,57 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
                                        "clang%2Bllvm-20.1.8-aarch64-pc-windows-msvc.tar.xz";
             download.expectedHash    = "0df3e81e8fe26370dd2b60b9e009d81cd130d3fdc41b257434aa663c5d9f0c13";
             package.packageBaseName  = "clang+llvm-20.1.8-aarch64-pc-windows-msvc.tar.xz";
-            clangFormatPathInArchive = "clang+llvm-20.1.8-aarch64-pc-windows-msvc/bin/clang-format.exe";
-            break;
+            archiveRoot              = "clang+llvm-20.1.8-aarch64-pc-windows-msvc";
+            return Result(true);
         case InstructionSet::Intel64:
             download.packagePlatform = "windows_intel64";
             download.url             = "https://github.com/llvm/llvm-project/releases/download/llvmorg-20.1.8/"
                                        "clang%2Bllvm-20.1.8-x86_64-pc-windows-msvc.tar.xz";
             download.expectedHash    = "f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f";
             package.packageBaseName  = "clang+llvm-20.1.8-x86_64-pc-windows-msvc.tar.xz";
-            clangFormatPathInArchive = "clang+llvm-20.1.8-x86_64-pc-windows-msvc/bin/clang-format.exe";
-            break;
+            archiveRoot              = "clang+llvm-20.1.8-x86_64-pc-windows-msvc";
+            return Result(true);
         case InstructionSet::Intel32: return Result::Error("Unsupported platform");
         }
         break;
     }
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
+    Assert::unreachable();
+}
 
-    functions.extractFunction = [&clangFormatPathInArchive](StringView sourceFile, StringView destinationDirectory)
-    { return tarExpandSingleFileTo(sourceFile, destinationDirectory, clangFormatPathInArchive, 1); };
+Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
+{
+    CustomFunctions functions;
+    Download        download;
+    StringView      archiveRoot = {};
+    SC_TRY(resolveHostLLVMArchive("llvm"_a8, packagesCacheDirectory, packagesInstallDirectory, download, package,
+                                  archiveRoot));
 
-    // To verify the successful extraction we try to format some stdin with clang-format
-    functions.testFunction = [&wantedVersion](const Download&, const Package& package)
+    static constexpr StringView wantedVersion = "20.1.8";
+    functions.extractFunction                 = [](StringView sourceFile, StringView destinationDirectory)
+    { return extractTarArchiveFlatteningRoot(sourceFile, destinationDirectory); };
+
+    functions.testFunction = [](const Download&, const Package& package)
     {
-        String  result;
-        String  formatExecutable;
+        String  clangExecutable  = StringEncoding::Utf8;
+        String  llvmArExecutable = StringEncoding::Utf8;
+        String  result           = StringEncoding::Utf8;
         Process process;
-        formatExecutable = format("{}/bin/clang-format", package.installDirectoryLink);
-        SC_TRY(process.exec({formatExecutable.view(), "--version"}, result));
-        SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
-        return clangFormatMatchesVersion(result.view(), wantedVersion);
+        SC_TRY(Path::join(clangExecutable,
+                          {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang"_a8)}));
+        SC_TRY(process.exec({clangExecutable.view(), "--version"}, result));
+        SC_TRY_MSG(process.getExitStatus() == 0, "LLVM clang returned error");
+        SC_TRY_MSG(StringView(result.view()).containsString("clang version"), "LLVM clang version missing");
+        SC_TRY_MSG(StringView(result.view()).containsString(wantedVersion), "LLVM clang version doesn't match");
+
+        result = "";
+        Process process2;
+        SC_TRY(Path::join(llvmArExecutable,
+                          {package.installDirectoryLink.view(), "bin", hostLLVMExecutableName("llvm-ar"_a8)}));
+        SC_TRY(process2.exec({llvmArExecutable.view(), "--version"}, result));
+        SC_TRY_MSG(process2.getExitStatus() == 0, "LLVM archiver returned error");
+        return Result(true);
     };
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
@@ -1779,6 +1857,11 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(
                 Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else if (packageName == "llvm")
+        {
+            SC_TRY(
+                Tools::installLLVMToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
         }
         else if (packageName == "llvm-mingw")
         {

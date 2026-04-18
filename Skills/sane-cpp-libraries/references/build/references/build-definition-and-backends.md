@@ -23,14 +23,20 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
 - It launches compiler, linker, archiver, and supported runner processes itself.
 - It now resolves build, host, target, and runner roles up front.
 - Friendly target profiles should be the default explanation surface:
+  - `linux-glibc-x86_64`
+  - `linux-glibc-arm64`
+  - `linux-musl-x86_64`
+  - `linux-musl-arm64`
   - `windows-gnu-x86_64`
   - `windows-gnu-arm64`
   - `windows-msvc-x86_64`
   - `windows-msvc-arm64`
 - `build run` can use `--runner` and `--runner-path` for foreign executables.
+- Linux target profiles now shape canonical target triples and sysroot flags, and macOS / Windows hosts auto-select a packaged LLVM toolchain for them when explicit compiler paths are absent. Packaged Linux sysroots are still pending, so real cross-host Linux builds still need `--sysroot`.
 - On macOS and Linux, supported Windows targets can route through Wine. On Linux x64 console targets, the runner still prefers `wineconsole --backend=curses` when that sibling executable exists, while Linux arm64 stays on plain `wine`.
 - Linux arm64 now also has a real targeted `windows-gnu-arm64` smoke path through the packaged native ARM64 Wine runner.
 - Portable MSVC acquisition is part of the native-backend story now: `SC-package install msvc` can acquire or import the hosted `cl/link/lib` toolchain plus Windows SDK, and accepts `--import-directory` / `--wine` overrides for imported layouts.
+- `SC-package install llvm` is now the packaged host-toolchain entry point for Linux-target native-backend work on non-Linux hosts.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of depending on `SC_MSVC_WINE` again.
 - Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when SDK tools are absent.
 - Existing packaged Linux Wine runners now also repair their launcher scripts in place, so portable MSVC wrapper updates do not require deleting the cached runner package first.

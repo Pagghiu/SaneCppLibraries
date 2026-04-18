@@ -536,7 +536,8 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(text.view()).containsString("linux-musl-arm64"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
-            SC_TEST_EXPECT(StringView(text.view()).containsString("packaged Linux sysroots are still pending"));
+            SC_TEST_EXPECT(
+                StringView(text.view()).containsString("non-Linux hosts auto-select a packaged LLVM toolchain"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Arguments after -- are forwarded"));
         }
         if (test_section("build cli rejects unknown options"))

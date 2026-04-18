@@ -15,12 +15,14 @@
 ## Cross-Target Notes
 
 - The native backend now models build machine, host machine, target machine, and runner explicitly instead of treating every build as host-native.
-- Prefer friendly `build --target` profiles before raw overrides. Current public profiles include `windows-gnu-x86_64`, `windows-gnu-arm64`, `windows-msvc-x86_64`, and `windows-msvc-arm64`.
+- Prefer friendly `build --target` profiles before raw overrides. Current public profiles include `linux-glibc-x86_64`, `linux-glibc-arm64`, `linux-musl-x86_64`, `linux-musl-arm64`, `windows-gnu-x86_64`, `windows-gnu-arm64`, `windows-msvc-x86_64`, and `windows-msvc-arm64`.
 - Use raw `--triple` and `--sysroot` only as escape hatches; they intentionally override friendly profile defaults.
 - Use `build run --runner <mode>` when the target is foreign. Current runner keywords are `auto`, `none`, `wine`, `qemu`, and `custom`.
 - On macOS and Linux, Windows GNU executables can be smoke-run through the shared Wine runner path. Wine launches are shaped through `cmd /c` with Windows-style target paths.
 - On Linux arm64, that now includes targeted `windows-gnu-arm64` smokes through the packaged native ARM64 Wine runner.
+- For Linux-target profiles on macOS and Windows, the native backend now auto-selects a packaged LLVM toolchain when explicit compiler paths are not provided. Real cross-host Linux builds still need an explicit `--sysroot`.
 - `SC-package install msvc` is the entry point for portable MSVC + Windows SDK acquisition. It now accepts `--import-directory <path>` and `--wine <path>` for imported layouts and custom runner wrappers.
+- `SC-package install llvm` is now the packaged host-toolchain prerequisite for Linux-target native-backend work on non-Linux hosts.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` again.
 - Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is absent.
 - Existing packaged Linux Wine runners now also repair their launcher scripts in place, so portable MSVC wrapper updates do not require deleting the cached runner package first.

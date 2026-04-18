@@ -2382,6 +2382,63 @@ struct SC::Build::NativeBuild
                context.targetMachine.environment == TargetEnvironment::WindowsMSVC;
     }
 
+    static constexpr bool isLinuxTarget(const ResolvedTargetContext& context)
+    {
+        return context.targetMachine.platform == Platform::Linux and
+               (context.targetMachine.environment == TargetEnvironment::LinuxGlibc or
+                context.targetMachine.environment == TargetEnvironment::LinuxMusl);
+    }
+
+    static constexpr bool shouldUsePackagedLLVMToolchain(const ResolvedTargetContext& context)
+    {
+        return isLinuxTarget(context) and context.hostMachine.platform != Platform::Linux;
+    }
+
+    static constexpr StringView hostLLVMExecutableName(StringView baseName)
+    {
+#if SC_PLATFORM_WINDOWS
+        if (baseName == "clang"_a8)
+        {
+            return "clang.exe"_a8;
+        }
+        if (baseName == "clang++"_a8)
+        {
+            return "clang++.exe"_a8;
+        }
+        if (baseName == "llvm-ar"_a8)
+        {
+            return "llvm-ar.exe"_a8;
+        }
+#endif
+        return baseName;
+    }
+
+    static Result resolvePackagedLLVMToolchain(const Parameters& parameters, CompilerAdapter& adapter)
+    {
+        Tools::Package llvmPackage;
+        SC_TRY(Tools::installLLVMToolchain(parameters.directories.packagesCacheDirectory.view(),
+                                           parameters.directories.packagesInstallDirectory.view(), llvmPackage));
+
+        String defaultCompilerC   = StringEncoding::Utf8;
+        String defaultCompilerCpp = StringEncoding::Utf8;
+        String defaultArchiver    = StringEncoding::Utf8;
+        SC_TRY(Path::join(defaultCompilerC,
+                          {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang"_a8)}));
+        SC_TRY(Path::join(defaultCompilerCpp,
+                          {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang++"_a8)}));
+        SC_TRY(Path::join(defaultArchiver,
+                          {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("llvm-ar"_a8)}));
+
+        SC_TRY(resolveExecutable(parameters.toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
+        SC_TRY(resolveExecutable(parameters.toolchain.compilerCpp.view(), defaultCompilerCpp.view(),
+                                 adapter.executableCpp));
+        SC_TRY(resolveExecutable(parameters.toolchain.linker.view(), adapter.executableCpp.view(),
+                                 adapter.executableLink));
+        SC_TRY(
+            resolveExecutable(parameters.toolchain.archiver.view(), defaultArchiver.view(), adapter.executableArchive));
+        return Result(true);
+    }
+
     static Result windowsMSVCTargetArchitectureDirectory(Architecture::Type architecture, StringView& directoryName)
     {
         switch (architecture)
@@ -3380,10 +3437,18 @@ struct SC::Build::NativeBuild
         switch (adapter.family)
         {
         case Toolchain::Clang:
-            SC_TRY(resolveExecutable(toolchain.compilerC.view(), "clang", adapter.executableC));
-            SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), "clang++", adapter.executableCpp));
-            SC_TRY(resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
-            SC_TRY(resolveExecutable(toolchain.archiver.view(), "ar", adapter.executableArchive));
+            if (shouldUsePackagedLLVMToolchain(targetContext))
+            {
+                SC_TRY(resolvePackagedLLVMToolchain(parameters, adapter));
+            }
+            else
+            {
+                SC_TRY(resolveExecutable(toolchain.compilerC.view(), "clang", adapter.executableC));
+                SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), "clang++", adapter.executableCpp));
+                SC_TRY(
+                    resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
+                SC_TRY(resolveExecutable(toolchain.archiver.view(), "ar", adapter.executableArchive));
+            }
             SC_TRY(adapter.displayName.assign("clang"));
             break;
         case Toolchain::GCC:
