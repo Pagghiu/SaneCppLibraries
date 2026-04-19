@@ -1713,7 +1713,8 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append("-fuse-ld=lld"));
         }
-        if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike())
+        if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike() and
+            targetPlatform(resolvedProject.targetContext) != Platform::Linux)
         {
             SC_TRY(commandLine.append("-nostdlib++"));
         }

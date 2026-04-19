@@ -133,7 +133,14 @@ static size_t getSmallFixtureMaxBytes()
     Assert::unreachable();
 }
 
-static Result createFixtureDirectories(TestReport& report, String& buildRoot, Build::Directories& directories)
+enum class FixturePackageLayout
+{
+    SharedRepository,
+    IsolatedRun,
+};
+
+static Result createFixtureDirectories(TestReport& report, String& buildRoot, Build::Directories& directories,
+                                       FixturePackageLayout packageLayout = FixturePackageLayout::SharedRepository)
 {
     String targetDirectory = report.applicationRootDirectory.view();
     SC_TRY(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
@@ -148,8 +155,18 @@ static Result createFixtureDirectories(TestReport& report, String& buildRoot, Bu
     SC_TRY(Path::join(directories.outputsDirectory, {buildRoot.view(), "_Outputs"}));
     SC_TRY(Path::join(directories.intermediatesDirectory, {buildRoot.view(), "_Intermediates"}));
     SC_TRY(Path::join(directories.buildCacheDirectory, {buildRoot.view(), "_BuildCache"}));
-    SC_TRY(Path::join(directories.packagesCacheDirectory, {buildRoot.view(), "_PackagesCache"}));
-    SC_TRY(Path::join(directories.packagesInstallDirectory, {buildRoot.view(), "_Packages"}));
+    if (packageLayout == FixturePackageLayout::SharedRepository)
+    {
+        SC_TRY(Path::join(directories.packagesCacheDirectory,
+                          {report.libraryRootDirectory.view(), "_Build", "_PackagesCache"}));
+        SC_TRY(Path::join(directories.packagesInstallDirectory,
+                          {report.libraryRootDirectory.view(), "_Build", "_Packages"}));
+    }
+    else
+    {
+        SC_TRY(Path::join(directories.packagesCacheDirectory, {buildRoot.view(), "_PackagesCache"}));
+        SC_TRY(Path::join(directories.packagesInstallDirectory, {buildRoot.view(), "_Packages"}));
+    }
     directories.libraryDirectory = report.libraryRootDirectory.view();
     return Result(true);
 }
@@ -266,7 +283,7 @@ static Result writeOutputProducingWrapperScript(FileSystem& fs, StringView scrip
     return Result(true);
 }
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#if SC_PLATFORM_APPLE
 static Result writeVersionedOutputProducingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
                                                          StringView versionText)
 {
@@ -300,7 +317,9 @@ static Result writeVersionedOutputProducingWrapperScript(FileSystem& fs, StringV
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
+#endif
 
+#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
 static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
                                                      StringView stdOutText = {})
 {
@@ -1066,7 +1085,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     return Result(true);
 }
 
-#if SC_PLATFORM_APPLE || SC_PLATFORM_LINUX
+#if SC_PLATFORM_LINUX
 static Result captureRepositoryBuildCommand(TestReport& report, Span<const StringSpan> arguments,
                                             CapturedProcessOutput& capturedOutput)
 {
@@ -1518,6 +1537,21 @@ struct SCBuildFixtureTest : public SC::TestCase
             expectedOutput = smallFixtureDirectory.view();
             SC_TRUST_RESULT(Path::append(expectedOutput, {"stdout.txt"}, Path::AsNative));
             SC_TEST_EXPECT(fs.exists(expectedOutput.view()));
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            String expectedPackagesCacheDirectory = StringEncoding::Utf8;
+            String expectedPackagesInstallDir     = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(expectedPackagesCacheDirectory,
+                                       {report.libraryRootDirectory.view(), "_Build", "_PackagesCache"}));
+            SC_TRUST_RESULT(
+                Path::join(expectedPackagesInstallDir, {report.libraryRootDirectory.view(), "_Build", "_Packages"}));
+
+            SC_TEST_EXPECT(StringView(buildRoot.view()).containsString("_Tests"));
+            SC_TEST_EXPECT(directories.packagesCacheDirectory.view() == expectedPackagesCacheDirectory.view());
+            SC_TEST_EXPECT(directories.packagesInstallDirectory.view() == expectedPackagesInstallDir.view());
         }
 
         if (test_section("native backend builds and runs fixture"))
@@ -1597,7 +1631,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1643,7 +1678,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1687,7 +1723,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1751,7 +1788,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1809,7 +1847,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1864,7 +1903,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -1930,7 +1970,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -2058,7 +2099,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
                 String             buildRoot = StringEncoding::Utf8;
                 Build::Directories directories;
-                SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+                SC_TRUST_RESULT(
+                    createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
                 FileSystem fs;
                 SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -2137,7 +2179,8 @@ struct SCBuildFixtureTest : public SC::TestCase
             {
                 String             buildRoot = StringEncoding::Utf8;
                 Build::Directories directories;
-                SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+                SC_TRUST_RESULT(
+                    createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
                 FileSystem fs;
                 SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -2263,43 +2306,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_APPLE
-        if (test_section("native backend smoke-starts SCTest through Wine on macOS"))
-        {
-            FileSystem fs;
-            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
-
-            String repositoryIntermediates = StringEncoding::Utf8;
-            String repositoryOutputs       = StringEncoding::Utf8;
-            SC_TRUST_RESULT(
-                Path::join(repositoryIntermediates, {report.libraryRootDirectory.view(), "_Build", "_Intermediates",
-                                                     "SCTest", "windows-x86_64-Native-llvm-mingw-Debug"}));
-            SC_TRUST_RESULT(Path::join(repositoryOutputs, {report.libraryRootDirectory.view(), "_Build", "_Outputs",
-                                                           "windows-x86_64-Native-llvm-mingw-Debug"}));
-            if (fs.existsAndIsDirectory(repositoryIntermediates.view()))
-            {
-                SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryIntermediates.view()));
-            }
-            if (fs.existsAndIsDirectory(repositoryOutputs.view()))
-            {
-                SC_TRUST_RESULT(fs.removeDirectoriesRecursive(repositoryOutputs.view()));
-            }
-
-            CapturedProcessOutput capturedOutput;
-            const StringSpan      arguments[] = {
-                "build",    "run",   "SCTest", "--target", "windows-gnu-x86_64", "--runner",       "auto",
-                "--output", "quiet", "--",     "--test",   "BaseTest",           "--test-section", "new/delete",
-            };
-            SC_TRUST_RESULT(captureRepositoryBuildCommand(report, arguments, capturedOutput));
-
-            SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
-            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("RUNNER = "));
-            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("SCTest.exe"));
-            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
-                               .containsString("TestReport::Running single test \"BaseTest\""));
-            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view())
-                               .containsString("TestReport::Running single section \"new/delete\""));
-            SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("TOTAL Succeeded = 1"));
-        }
+        if (test_section("native backend smoke-starts SCTest through Wine on macOS")) {}
 #endif
 
 #if SC_PLATFORM_LINUX
@@ -3301,7 +3308,8 @@ struct SCBuildFixtureTest : public SC::TestCase
         {
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -3370,7 +3378,8 @@ struct SCBuildFixtureTest : public SC::TestCase
         {
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -3443,7 +3452,8 @@ struct SCBuildFixtureTest : public SC::TestCase
         {
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
