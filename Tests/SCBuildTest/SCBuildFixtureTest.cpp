@@ -1354,9 +1354,12 @@ static Result configureWindowsMSVCAction(Build::Action& action, Build::Architect
 static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnvironment::Type environment,
                                          Build::Architecture::Type architecture, StringView sysroot = {})
 {
-    action.parameters.platform                   = Build::Platform::Linux;
-    action.parameters.architecture               = architecture;
-    action.parameters.toolchain.family           = Build::Toolchain::Clang;
+    action.parameters.platform     = Build::Platform::Linux;
+    action.parameters.architecture = architecture;
+    if (action.parameters.toolchain.family != Build::Toolchain::CustomDriver)
+    {
+        action.parameters.toolchain.family = Build::Toolchain::Clang;
+    }
     action.parameters.targetMachine.platform     = Build::Platform::Linux;
     action.parameters.targetMachine.architecture = architecture;
     action.parameters.targetMachine.environment  = environment;
