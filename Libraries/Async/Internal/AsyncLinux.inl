@@ -8,11 +8,11 @@
 
 #include <arpa/inet.h>    // sockaddr_in
 #include <errno.h>        // errno
+#include <poll.h>         // POLLIN
 #include <signal.h>       // sigset_t
 #include <stdint.h>       // uint32_t
 #include <stdio.h>        // snprintf
 #include <sys/eventfd.h>  // eventfd
-#include <sys/poll.h>     // POLLIN
 #include <sys/sendfile.h> // sendfile
 #include <sys/signalfd.h> // signalfd
 #include <sys/syscall.h>  // SYS_pidfd_open

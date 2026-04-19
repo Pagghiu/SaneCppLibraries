@@ -119,7 +119,7 @@ struct SC::FileSystem::Internal
 
     static bool formatError(int errorNumber, Span<native_char_t> buffer)
     {
-#if SC_PLATFORM_APPLE
+#if SC_PLATFORM_APPLE || (SC_PLATFORM_LINUX && !defined(__GLIBC__))
         const int res = ::strerror_r(errorNumber, buffer.data(), buffer.sizeInBytes());
         return res == 0;
 #else

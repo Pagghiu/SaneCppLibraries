@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Assert.h"
 
+#if SC_PLATFORM_LINUX
+#if defined(__has_include)
+#if __has_include(<features.h>)
+#include <features.h>
+#endif
+#endif
+#endif
+
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
@@ -10,9 +18,11 @@
 #endif
 #include <DbgHelp.h> // For stack trace symbol resolution
 #else
+#if !SC_PLATFORM_LINUX || defined(__GLIBC__)
 #include <execinfo.h> // backtrace
-#include <string.h>   // strlen
-#include <unistd.h>   // _exit
+#endif
+#include <string.h> // strlen
+#include <unistd.h> // _exit
 #endif
 
 #include <stdio.h>  // fwrite (posix), snprintf (windows)
@@ -79,6 +89,12 @@ struct Assert::Internal
         ::SymCleanup(process);
         return true;
 #else
+#if SC_PLATFORM_LINUX && !defined(__GLIBC__)
+        SC_COMPILER_UNUSED(backtraceBuffer);
+        SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
+        printAscii("Backtrace unavailable on this Linux libc/runtime.\n");
+        return false;
+#else
         const size_t framesToSkip    = 2;
         const size_t framesToCapture = backtraceBufferSizeInBytes / sizeof(void*);
         int          numFrames       = ::backtrace(backtraceBuffer, static_cast<int>(framesToCapture));
@@ -104,6 +120,7 @@ struct Assert::Internal
         }
         ::free(strs);
         return true;
+#endif
 #endif
     }
 };

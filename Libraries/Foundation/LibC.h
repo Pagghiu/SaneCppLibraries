@@ -2,6 +2,13 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
+#if SC_PLATFORM_LINUX
+#if defined(__has_include)
+#if __has_include(<features.h>)
+#include <features.h>
+#endif
+#endif
+#endif
 #if SC_COMPILER_ENABLE_STD_CPP || SC_LANGUAGE_EXCEPTIONS ||                                                            \
     (SC_PLATFORM_WINDOWS && not SC_COMPILER_MSVC and not SC_COMPILER_CLANG_CL)
 #include <memory.h>
@@ -40,10 +47,17 @@ extern "C"
 
     SC::size_t strlen(const char* s);
 }
+#if defined(__GLIBC__)
 extern "C++"
 {
     extern const void* memchr(const void* __s, int __c, SC::size_t __n) __asm("memchr");
 }
+#else
+extern "C"
+{
+    void* memchr(const void* __s, int __c, SC::size_t __n);
+}
+#endif
 #elif SC_PLATFORM_EMSCRIPTEN
 #else
 #error "Unsupported platform"
