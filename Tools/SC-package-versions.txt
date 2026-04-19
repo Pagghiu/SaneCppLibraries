@@ -1,0 +1,34 @@
+Package cache version manifest for GitHub Actions workflow keys.
+Update this file whenever a packaged third-party dependency version, archive URL,
+git revision, or package layout contract changes in Tools/SC-package.cpp.
+
+clang-binaries:
+- llvm 20.1.8
+
+llvm:
+- llvm 20.1.8
+
+llvm-mingw:
+- release 20260324
+- llvm 22.1.2
+
+doxygen:
+- version 1.12.0
+
+doxygen-awesome-css:
+- git 568f56c
+
+linux-sysroot:
+- glibc arm64 ubuntu-ports jammy
+- glibc x86_64 ubuntu jammy
+- musl arm64 alpine edge
+- musl x86_64 alpine edge
+
+wine-stable:
+- macOS 11.0
+- linux box64 noble 11.0.0.0
+- linux native arm64 11.0
+
+msvc:
+- Visual Studio 2022 Build Tools 14.44.35211
+- Windows SDK 10.0.26100.0

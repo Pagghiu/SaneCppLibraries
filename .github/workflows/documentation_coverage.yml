@@ -31,14 +31,30 @@ jobs:
     timeout-minutes: 40
     steps:
     - uses: actions/checkout@v4
-    - name: Restore package cache
-      id: packages-cache
+    - name: Restore clang-binaries cache
+      id: clang-binaries-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache
-        key: sc-packages-docs-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        path: _Build/_PackagesCache/clang-binaries
+        key: sc-packages-docs-clang-binaries-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-docs-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-docs-clang-binaries-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore doxygen cache
+      id: doxygen-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/doxygen
+        key: sc-packages-docs-doxygen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-docs-doxygen-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore doxygen-awesome-css cache
+      id: doxygen-awesome-css-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/doxygen-awesome-css
+        key: sc-packages-docs-doxygen-awesome-css-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-docs-doxygen-awesome-css-${{ runner.os }}-${{ runner.arch }}-
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: Generate Single File Libs (Javascript)
@@ -73,12 +89,24 @@ jobs:
       run: chmod -v -R +rX "_Build/_Documentation/docs"
     - name: build SCExample
       run: ./SC.sh build compile SCExample
-    - name: Save package cache
-      if: always() && steps.packages-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/**') != ''
+    - name: Save clang-binaries cache
+      if: always() && steps.clang-binaries-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/clang-binaries/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache
-        key: ${{ steps.packages-cache.outputs.cache-primary-key }}
+        path: _Build/_PackagesCache/clang-binaries
+        key: ${{ steps.clang-binaries-cache.outputs.cache-primary-key }}
+    - name: Save doxygen cache
+      if: always() && steps.doxygen-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/doxygen/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/doxygen
+        key: ${{ steps.doxygen-cache.outputs.cache-primary-key }}
+    - name: Save doxygen-awesome-css cache
+      if: always() && steps.doxygen-awesome-css-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/doxygen-awesome-css/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/doxygen-awesome-css
+        key: ${{ steps.doxygen-awesome-css-cache.outputs.cache-primary-key }}
     - name: Setup Pages
       # Skip documentation deployment step on forks
       # This may fail because forks may not have enabled pages.

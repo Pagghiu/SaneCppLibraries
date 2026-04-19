@@ -19,14 +19,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Restore package cache
-      id: packages-cache
+    - name: Restore llvm-mingw cache
+      id: llvm-mingw-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache
-        key: sc-packages-posix-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        path: _Build/_PackagesCache/llvm-mingw
+        key: sc-packages-posix-llvm-mingw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-posix-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-llvm-mingw-${{ runner.os }}-${{ runner.arch }}-
     - name: install
       run:  |
         sudo apt-get update
@@ -62,12 +62,12 @@ jobs:
     - name: test SCTest xcode
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-    - name: Save package cache
-      if: always() && steps.packages-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/**') != ''
+    - name: Save llvm-mingw cache
+      if: always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache
-        key: ${{ steps.packages-cache.outputs.cache-primary-key }}
+        path: _Build/_PackagesCache/llvm-mingw
+        key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb
