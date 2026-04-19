@@ -163,6 +163,9 @@ Current cross-compilation scope:
   for them when the caller has not provided explicit compiler paths
 - macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
   `linux-musl-x86_64`, and `linux-musl-arm64`
+- `build run` can now wrap foreign Linux targets through `qemu-user`; on macOS this can auto-resolve host `qemu-*`
+  executables from `PATH`, and the runner passes `-L <sysroot>` so dynamically linked Linux targets can find their
+  loader and libraries
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
 - Linux arm64 hosts can now validate the same portable MSVC path end-to-end for `windows-msvc-x86_64` and
   `windows-msvc-arm64`; the package tool auto-prefers a generated `box64 + wine64` wrapper when those host tools are
@@ -224,8 +227,9 @@ SC.bat build compile SCTest Debug native
 Important current limits:
 
 - macOS is the only non-Linux host with a validated packaged Linux sysroot path today
+- The QEMU runner path is implemented, but real repository-side QEMU execution is not yet validated in CI against a
+  host-installed `qemu-user` package
 - Windows-host Linux-target packaging and validation are still pending
-- Linux-target run support is still deferred to the future QEMU runner work
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
 - The repository `build configure` command does not rely on a Windows-native generation pass because native builds do

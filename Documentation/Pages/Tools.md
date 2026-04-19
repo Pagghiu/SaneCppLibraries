@@ -194,6 +194,9 @@ Current defaults:
 - On Linux arm64, the real portable MSVC path now reaches clean native-backend `SCTest` compiles for both
   `windows-msvc-x86_64` and `windows-msvc-arm64`, plus targeted `BaseTest/new-delete` runs for both targets through
   the maintained packaged Box64 runner (`x86_64`) and the packaged native ARM64 Wine runner (`arm64`)
+- Foreign Linux targets can now use `--runner qemu` or `--runner auto` to wrap `build run` through a host
+  `qemu-user` executable; the runner passes `-L <sysroot>` so the Linux loader and runtime libraries resolve from the
+  selected sysroot
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux, and Linux arm64 now also
   smoke-runs `windows-gnu-arm64` through the packaged native ARM64 Wine runner
 - On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host

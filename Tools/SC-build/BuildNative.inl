@@ -2595,6 +2595,13 @@ struct SC::Build::NativeBuild
                context.hostMachine.architecture != Architecture::Arm64;
     }
 
+    static constexpr bool isQEMURunnableLinuxTarget(const ResolvedTargetContext& context)
+    {
+        return targetPlatform(context) == Platform::Linux and
+               (context.hostMachine.platform != Platform::Linux or
+                targetArchitecture(context) != context.hostMachine.architecture);
+    }
+
     static Result appendRunnerArgument(Vector<String>& arguments, StringView value)
     {
         String item = StringEncoding::Utf8;
@@ -2762,6 +2769,48 @@ struct SC::Build::NativeBuild
         return Result::Error("Cannot find runner executable");
     }
 
+    static Result resolveLinuxQEMUExecutable(StringView configured, const ResolvedTargetContext& targetContext,
+                                             String& output)
+    {
+        if (not configured.isEmpty())
+        {
+            SC_TRY(resolveHostCommandPath(configured, output));
+            return Result(true);
+        }
+
+        static constexpr StringView x86_64Candidates[] = {"qemu-x86_64", "qemu-x86_64-static"};
+        static constexpr StringView arm64Candidates[]  = {"qemu-aarch64", "qemu-aarch64-static"};
+
+        const Span<const StringView> candidates =
+            targetArchitecture(targetContext) == Architecture::Intel64
+                ? Span<const StringView>(x86_64Candidates, sizeof(x86_64Candidates) / sizeof(x86_64Candidates[0]))
+                : Span<const StringView>(arm64Candidates, sizeof(arm64Candidates) / sizeof(arm64Candidates[0]));
+
+        for (const StringView candidate : candidates)
+        {
+            if (resolveRunnableHostCommand(candidate, output))
+            {
+                return Result(true);
+            }
+        }
+        return Result::Error("Cannot find runner executable");
+    }
+
+    static Result resolveLinuxRunnerSysroot(const Parameters& parameters, const ResolvedTargetContext& targetContext,
+                                            String& sysroot)
+    {
+        if (not parameters.toolchain.sysroot.isEmpty())
+        {
+            SC_TRY(sysroot.assign(parameters.toolchain.sysroot.view()));
+            return Result(true);
+        }
+        if (shouldUsePackagedLinuxSysroot(targetContext))
+        {
+            return resolvePackagedLinuxSysroot(parameters, targetContext, sysroot);
+        }
+        return Result::Error("QEMU runner requires --sysroot for this host/target pair");
+    }
+
     static Result resolveWrappedRunnerExecutable(StringView configured, StringView primaryFallback,
                                                  StringView secondaryFallback, String& output)
     {
@@ -2847,6 +2896,17 @@ struct SC::Build::NativeBuild
                 SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
                 return Result(true);
             }
+            if (isQEMURunnableLinuxTarget(targetContext))
+            {
+                String sysroot = StringEncoding::Utf8;
+                runner.mode    = ResolvedRunner::Wrapped;
+                SC_TRY(resolveLinuxQEMUExecutable(runnerSpec.executable.view(), targetContext, runner.executable));
+                SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
+                SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
+                SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));
+                SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
+                return Result(true);
+            }
             return Result::Error("No auto runner is available for this host/target pair");
         case RunnerSpec::Wine:
             SC_TRY_MSG(targetContext.targetMachine.platform == Platform::Windows,
@@ -2867,7 +2927,20 @@ struct SC::Build::NativeBuild
             }
             SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
             return Result(true);
-        case RunnerSpec::QEMU: return Result::Error("QEMU runner is not implemented yet");
+        case RunnerSpec::QEMU: {
+            SC_TRY_MSG(targetPlatform(targetContext) == Platform::Linux, "QEMU runner requires a Linux target");
+            SC_TRY_MSG(isQEMURunnableLinuxTarget(targetContext),
+                       "QEMU runner requires a foreign Linux target architecture or host platform");
+
+            String sysroot = StringEncoding::Utf8;
+            runner.mode    = ResolvedRunner::Wrapped;
+            SC_TRY(resolveLinuxQEMUExecutable(runnerSpec.executable.view(), targetContext, runner.executable));
+            SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
+            SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
+            SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));
+            SC_TRY(appendRunnerArguments(runnerSpec.arguments.toSpanConst(), runner.arguments));
+            return Result(true);
+        }
         case RunnerSpec::Custom:
             SC_TRY_MSG(not runnerSpec.executable.isEmpty(), "Custom runner requires executable");
             runner.mode = ResolvedRunner::Wrapped;

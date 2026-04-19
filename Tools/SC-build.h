@@ -188,8 +188,9 @@ struct BuildCLIParseContext
                 "  - macOS hosts can compile linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, and "
                 "linux-musl-arm64 through packaged LLVM + packaged sysroots\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
+                "  - build run can also wrap foreign Linux targets through qemu-user when a suitable qemu "
+                "executable and sysroot are available\n"
                 "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
-                "  - Linux-target run support still depends on future QEMU runner work\n"
                 "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
                 "macOS runner does not yet\n"),
             "Failed writing SC-build help");
@@ -207,7 +208,7 @@ struct BuildCLIParseContext
                                  "  - auto: use a host-specific runner when the host/target pair supports it\n"
                                  "  - none: disable foreign-runner wrapping\n"
                                  "  - wine: force Wine for Windows GNU targets\n"
-                                 "  - qemu: reserved for future Linux-target runner support\n"
+                                 "  - qemu: wrap foreign Linux targets through qemu-user\n"
                                  "  - custom: wrap execution with a custom executable\n"),
                    "Failed writing SC-build help");
         SC_TRY_MSG(output.append("\nArguments after -- are forwarded to the built executable.\n"),
@@ -988,7 +989,11 @@ template <size_t N>
         }
         break;
     case Build::RunnerSpec::QEMU:
-        return printBuildActionCombinationError(console, "QEMU runner is not implemented yet");
+        if (not(linuxGlibcTarget or linuxMuslTarget))
+        {
+            return printBuildActionCombinationError(console, "QEMU runner requires a Linux target");
+        }
+        break;
     case Build::RunnerSpec::Custom:
         if (action.parameters.runner.executable.isEmpty())
         {

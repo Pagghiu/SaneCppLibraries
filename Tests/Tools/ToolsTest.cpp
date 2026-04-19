@@ -253,6 +253,29 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.runner.executable == "/tmp/fake-wine");
             SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Windows);
         }
+        if (test_section("build run parses qemu runner selection"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "linux-glibc-arm64";
+            args[3]             = "--runner";
+            args[4]             = "qemu";
+            args[5]             = "--runner-path";
+            args[6]             = "/tmp/fake-qemu-aarch64";
+            arguments.arguments = {args, 7};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.runner.type == Build::RunnerSpec::QEMU);
+            SC_TEST_EXPECT(action.parameters.runner.executable == "/tmp/fake-qemu-aarch64");
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::LinuxGlibc);
+        }
         if (test_section("build cli parses raw target triple and sysroot overrides"))
         {
             arguments.tool      = "build";
@@ -492,6 +515,40 @@ struct SupportToolsTest : public TestCase
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Ready;
             SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build run accepts qemu for Linux arm64 targets"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "linux-musl-arm64";
+            args[3]             = "--runner";
+            args[4]             = "qemu";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build run rejects qemu for Windows targets"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--runner";
+            args[4]             = "qemu";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
         if (test_section("build run rejects custom runner without runner-path"))

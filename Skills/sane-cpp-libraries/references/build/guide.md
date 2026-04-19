@@ -18,6 +18,7 @@
 - Prefer friendly `build --target` profiles before raw overrides. Current public profiles include `linux-glibc-x86_64`, `linux-glibc-arm64`, `linux-musl-x86_64`, `linux-musl-arm64`, `windows-gnu-x86_64`, `windows-gnu-arm64`, `windows-msvc-x86_64`, and `windows-msvc-arm64`.
 - Use raw `--triple` and `--sysroot` only as escape hatches; they intentionally override friendly profile defaults.
 - Use `build run --runner <mode>` when the target is foreign. Current runner keywords are `auto`, `none`, `wine`, `qemu`, and `custom`.
+- Foreign Linux targets can now run through `qemu-user` via `--runner qemu` or `--runner auto`; when that path is used the backend passes `-L <sysroot>` so dynamic Linux binaries resolve against the selected sysroot.
 - On macOS and Linux, Windows GNU executables can be smoke-run through the shared Wine runner path. Wine launches are shaped through `cmd /c` with Windows-style target paths.
 - On Linux arm64, that now includes targeted `windows-gnu-arm64` smokes through the packaged native ARM64 Wine runner.
 - For Linux-target profiles on macOS and Windows, the native backend now auto-selects a packaged LLVM toolchain when explicit compiler paths are not provided. On macOS, the packaged Linux glibc and musl sysroots are now first-class too, so `linux-glibc-*` and `linux-musl-*` can compile without an explicit `--sysroot`.
