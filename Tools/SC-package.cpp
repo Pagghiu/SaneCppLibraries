@@ -1107,6 +1107,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     SC_TRY(StringBuilder::format(download.url, "{0}/Release_{1}/", baseURL, packageVersionDash));
 
     CustomFunctions functions;
+    functions.keepDownloadedArchive = false;
     switch (HostPlatform)
     {
     case Platform::Apple: {
@@ -1298,8 +1299,9 @@ static Result               resolveHostLLVMArchive(StringView packageName, Strin
 Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     CustomFunctions functions;
-    Download        download;
-    StringView      archiveRoot = {};
+    functions.keepDownloadedArchive = false;
+    Download   download;
+    StringView archiveRoot = {};
     SC_TRY(resolveHostLLVMArchive("clang-binaries"_a8, packagesCacheDirectory, packagesInstallDirectory, download,
                                   package, archiveRoot));
 

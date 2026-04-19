@@ -66,6 +66,7 @@ struct CustomFunctions
 {
     Function<Result(const Download&, const Package&)> testFunction;
     Function<Result(StringView, StringView)>          extractFunction;
+    bool                                              keepDownloadedArchive = true;
 };
 
 [[nodiscard]] inline Result createLink(StringView sourceFileOrDirectory, StringView linkFile)
@@ -307,6 +308,19 @@ struct CustomFunctions
         }
     }
 
+    auto pruneDownloadedArchiveIfNeeded = [&]() -> Result
+    {
+        if (functions.keepDownloadedArchive or download.isGitClone)
+        {
+            return Result(true);
+        }
+        if (fs.existsAndIsFile(package.packageLocalFile.view()))
+        {
+            SC_TRY(fs.removeFile(package.packageLocalFile.view()));
+        }
+        return Result(true);
+    };
+
     // If it's still failed let's re-download and extract + link everything
     if (not testSucceeded)
     {
@@ -414,6 +428,13 @@ struct CustomFunctions
             SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
         }
     }
+    else
+    {
+        SC_TRY(pruneDownloadedArchiveIfNeeded());
+        return Result(true);
+    }
+
+    SC_TRY(pruneDownloadedArchiveIfNeeded());
     return Result(true);
 }
 

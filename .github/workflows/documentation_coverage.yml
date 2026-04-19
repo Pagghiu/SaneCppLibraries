@@ -36,17 +36,17 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/clang-binaries
-        key: sc-packages-docs-clang-binaries-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-docs-clang-binaries-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-docs-clang-binaries-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-docs-clang-binaries-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore doxygen cache
       id: doxygen-cache
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/doxygen
-        key: sc-packages-docs-doxygen-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-docs-doxygen-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-docs-doxygen-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-docs-doxygen-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore doxygen-awesome-css cache
       id: doxygen-awesome-css-cache
       uses: actions/cache/restore@v4
