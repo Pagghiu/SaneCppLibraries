@@ -32,7 +32,7 @@ Use this reference when a user needs to configure `SC::Build`, understand backen
   - `windows-msvc-x86_64`
   - `windows-msvc-arm64`
 - `build run` can use `--runner` and `--runner-path` for foreign executables.
-- Linux target profiles now shape canonical target triples and sysroot flags, and macOS / Windows hosts auto-select a packaged LLVM toolchain for them when explicit compiler paths are absent. Packaged Linux sysroots are still pending, so real cross-host Linux builds still need `--sysroot`.
+- Linux target profiles now shape canonical target triples and sysroot flags, and macOS / Windows hosts auto-select a packaged LLVM toolchain for them when explicit compiler paths are absent. On macOS, packaged Linux glibc and musl sysroots are now part of that first-class path too, so `linux-glibc-*` and `linux-musl-*` can compile without an explicit `--sysroot`.
 - On macOS and Linux, supported Windows targets can route through Wine. On Linux x64 console targets, the runner still prefers `wineconsole --backend=curses` when that sibling executable exists, while Linux arm64 stays on plain `wine`.
 - Linux arm64 now also has a real targeted `windows-gnu-arm64` smoke path through the packaged native ARM64 Wine runner.
 - Portable MSVC acquisition is part of the native-backend story now: `SC-package install msvc` can acquire or import the hosted `cl/link/lib` toolchain plus Windows SDK, and accepts `--import-directory` / `--wine` overrides for imported layouts.

@@ -185,10 +185,11 @@ struct BuildCLIParseContext
                 "\nCurrent tested cross-target support:\n"
                 "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
                 "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
-                "  - linux-glibc-* and linux-musl-* profiles now shape canonical target triples and sysroot flags, and "
-                "non-Linux hosts auto-select a packaged LLVM toolchain, but packaged Linux sysroots are still pending\n"
+                "  - macOS hosts can compile linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, and "
+                "linux-musl-arm64 through packaged LLVM + packaged sysroots\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
                 "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
+                "  - Linux-target run support still depends on future QEMU runner work\n"
                 "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
                 "macOS runner does not yet\n"),
             "Failed writing SC-build help");

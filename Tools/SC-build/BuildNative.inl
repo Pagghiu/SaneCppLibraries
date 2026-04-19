@@ -102,6 +102,7 @@ struct SC::Build::NativeBuild
         String workspaceCompileCommandsPath;
         String exportedSymbolsPath;
         String exportedSymbolsLinkerPath;
+        String resolvedSysroot;
 
         Vector<const Project*> workspaceDependencies;
         Vector<String>         workspaceDependencyArtifacts;
@@ -1473,13 +1474,23 @@ struct SC::Build::NativeBuild
                                  const Configuration& configuration, const FilePathsResolver& filePathsResolver,
                                  ResolvedProject& resolvedProject)
     {
-        resolvedProject.parameters    = &parameters;
-        resolvedProject.workspace     = &workspace;
-        resolvedProject.project       = &project;
-        resolvedProject.configuration = &configuration;
+        resolvedProject.parameters      = &parameters;
+        resolvedProject.workspace       = &workspace;
+        resolvedProject.project         = &project;
+        resolvedProject.configuration   = &configuration;
+        resolvedProject.resolvedSysroot = String(StringEncoding::Utf8);
+        if (not parameters.toolchain.sysroot.isEmpty())
+        {
+            SC_TRY(resolvedProject.resolvedSysroot.assign(parameters.toolchain.sysroot.view()));
+        }
 
         SC_TRY(resolveTargetContext(parameters, resolvedProject.targetContext));
         SC_TRY(resolveCompilerAdapter(parameters, resolvedProject.targetContext, resolvedProject.adapter));
+        if (resolvedProject.resolvedSysroot.isEmpty() and shouldUsePackagedLinuxSysroot(resolvedProject.targetContext))
+        {
+            SC_TRY(resolvePackagedLinuxSysroot(parameters, resolvedProject.targetContext,
+                                               resolvedProject.resolvedSysroot));
+        }
         SC_TRY(fillVariables(parameters, project, configuration, resolvedProject.targetContext,
                              resolvedProject.adapter.displayName.view(), resolvedProject.variables));
 
@@ -1690,12 +1701,19 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-fprofile-instr-generate"));
             SC_TRY(commandLine.append("-fcoverage-mapping"));
         }
-        if (resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN)
+        const bool supportsSanitizers =
+            not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
+                resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
+        if ((resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers)
         {
             SC_TRY(commandLine.append("-fsanitize=address,undefined"));
         }
-        if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike() and
-            targetPlatform(resolvedProject.targetContext) != Platform::Linux)
+        if (isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
+            resolvedProject.targetContext.hostMachine.platform != Platform::Linux)
+        {
+            SC_TRY(commandLine.append("-fuse-ld=lld"));
+        }
+        if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike())
         {
             SC_TRY(commandLine.append("-nostdlib++"));
         }
@@ -1879,7 +1897,10 @@ struct SC::Build::NativeBuild
             break;
         }
 
-        if (flags.enableASAN)
+        const bool supportsSanitizers =
+            not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
+                resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
+        if (flags.enableASAN and supportsSanitizers)
         {
             SC_TRY(commandLine.append("-fsanitize=address,undefined"));
             SC_TRY(commandLine.append("-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"));
@@ -2394,6 +2415,11 @@ struct SC::Build::NativeBuild
         return isLinuxTarget(context) and context.hostMachine.platform != Platform::Linux;
     }
 
+    static constexpr bool shouldUsePackagedLinuxSysroot(const ResolvedTargetContext& context)
+    {
+        return isLinuxTarget(context) and context.hostMachine.platform == Platform::Apple;
+    }
+
     static constexpr StringView hostLLVMExecutableName(StringView baseName)
     {
 #if SC_PLATFORM_WINDOWS
@@ -2436,6 +2462,37 @@ struct SC::Build::NativeBuild
                                  adapter.executableLink));
         SC_TRY(
             resolveExecutable(parameters.toolchain.archiver.view(), defaultArchiver.view(), adapter.executableArchive));
+        return Result(true);
+    }
+
+    static Result resolvePackagedLinuxSysroot(const Parameters& parameters, const ResolvedTargetContext& context,
+                                              String& sysroot)
+    {
+        Tools::LinuxSysrootSpec spec;
+        switch (context.targetMachine.environment)
+        {
+        case TargetEnvironment::LinuxGlibc: spec.environment = Tools::LinuxSysrootSpec::Glibc; break;
+        case TargetEnvironment::LinuxMusl: spec.environment = Tools::LinuxSysrootSpec::Musl; break;
+        case TargetEnvironment::Native:
+        case TargetEnvironment::WindowsGNU:
+        case TargetEnvironment::WindowsMSVC:
+            return Result::Error("Packaged Linux sysroots require a Linux glibc or musl target");
+        }
+
+        switch (targetArchitecture(context))
+        {
+        case Architecture::Intel64: spec.architecture = InstructionSet::Intel64; break;
+        case Architecture::Arm64: spec.architecture = InstructionSet::ARM64; break;
+        case Architecture::Intel32:
+        case Architecture::Any:
+        case Architecture::Wasm: return Result::Error("Packaged Linux sysroots only support x86_64 and arm64");
+        }
+
+        Tools::Package sysrootPackage;
+        SC_TRY(Tools::installLinuxSysroot(parameters.directories.packagesCacheDirectory.view(),
+                                          parameters.directories.packagesInstallDirectory.view(), spec,
+                                          sysrootPackage));
+        SC_TRY(sysroot.assign(sysrootPackage.installDirectoryLink.view()));
         return Result(true);
     }
 
@@ -2997,7 +3054,7 @@ struct SC::Build::NativeBuild
                 case Architecture::Wasm: break;
                 }
             }
-            if (not resolvedProject.parameters->toolchain.sysroot.isEmpty())
+            if (not resolvedProject.resolvedSysroot.isEmpty())
             {
                 return Result::Error("Windows native sysroot selection is not implemented yet");
             }
@@ -3042,17 +3099,17 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(targetTriple));
         }
 
-        if (not resolvedProject.parameters->toolchain.sysroot.isEmpty())
+        if (not resolvedProject.resolvedSysroot.isEmpty())
         {
             if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
             {
                 SC_TRY(commandLine.append("-isysroot"));
-                SC_TRY(commandLine.append(resolvedProject.parameters->toolchain.sysroot.view()));
+                SC_TRY(commandLine.append(resolvedProject.resolvedSysroot.view()));
             }
             else
             {
                 SC_TRY(commandLine.append("--sysroot"));
-                SC_TRY(commandLine.append(resolvedProject.parameters->toolchain.sysroot.view()));
+                SC_TRY(commandLine.append(resolvedProject.resolvedSysroot.view()));
             }
         }
         SC_COMPILER_UNUSED(forCompiler);
@@ -3388,7 +3445,14 @@ struct SC::Build::NativeBuild
     {
         SC_TRY(variables.projectName.assign(project.name.view()));
         SC_TRY(variables.projectRoot.assign(project.rootDirectory.view()));
-        SC_TRY(variables.targetOS.assign(platformName(targetPlatform(targetContext))));
+        if (isLinuxTarget(targetContext))
+        {
+            SC_TRY(variables.targetOS.assign(TargetEnvironment::toString(targetContext.targetMachine.environment)));
+        }
+        else
+        {
+            SC_TRY(variables.targetOS.assign(platformName(targetPlatform(targetContext))));
+        }
         SC_TRY(variables.targetArchitectures.assign(architectureName(targetArchitecture(targetContext))));
         SC_TRY(variables.buildSystem.assign(Generator::toString(parameters.generator)));
         SC_TRY(variables.compiler.assign(compilerName));
@@ -3699,11 +3763,11 @@ struct SC::Build::NativeBuild
                              platformName(targetPlatform(resolvedProject.targetContext)),
                              TargetEnvironment::toString(resolvedProject.targetContext.targetMachine.environment));
         if (not resolvedProject.parameters->toolchain.targetTriple.isEmpty() or
-            not resolvedProject.parameters->toolchain.sysroot.isEmpty())
+            not resolvedProject.resolvedSysroot.isEmpty())
         {
             globalConsole->print("[trace] target triple={} sysroot={}\n",
                                  resolvedProject.parameters->toolchain.targetTriple.view(),
-                                 resolvedProject.parameters->toolchain.sysroot.view());
+                                 resolvedProject.resolvedSysroot.view());
         }
     }
 

@@ -169,7 +169,9 @@ Current defaults:
 - Native builds do not require a prior `configure` step
 - Linux `glibc` and `musl` target profiles now shape canonical target triples and sysroot flags; macOS and Windows
   hosts auto-select a packaged LLVM toolchain for those profiles when the caller does not provide explicit compiler
-  paths, but real cross-host Linux builds still need an explicit `--sysroot`
+  paths, and macOS now also auto-selects packaged Linux glibc/musl sysroots for them
+- macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
+  `linux-musl-x86_64`, and `linux-musl-arm64`
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
@@ -245,14 +247,14 @@ Prepare the packaged host LLVM toolchain for Linux targets
 ./SC.sh package install llvm
 ```
 
-Cross-compile a Linux glibc executable through the native backend using an explicit sysroot
+Cross-compile a Linux glibc executable through the native backend with the packaged macOS sysroot path
 ```
-./SC.sh build compile SCTest --target linux-glibc-arm64 --sysroot /opt/sysroots/linux-glibc-arm64 --output quiet
+./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
 ```
 
-Cross-compile a Linux musl executable through the native backend using an explicit sysroot
+Cross-compile a Linux musl executable through the native backend with the packaged macOS sysroot path
 ```
-./SC.sh build compile SCTest --target linux-musl-x86_64 --sysroot /opt/sysroots/linux-musl-x86_64 --output quiet
+./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
 ```
 
 Cross-compile a Windows GNU executable through the native backend

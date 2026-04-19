@@ -445,6 +445,18 @@ inline Result verifyGitCommitHashInstall(const Download& download, const Package
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
 
+struct LinuxSysrootSpec
+{
+    enum Environment
+    {
+        Glibc,
+        Musl,
+    };
+
+    Environment    environment  = Glibc;
+    InstructionSet architecture = InstructionSet::Intel64;
+};
+
 Result installWineStableRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                Package& package);
 Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
@@ -453,6 +465,8 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
+Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                           const LinuxSysrootSpec& spec, Package& package);
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                             StringView importDirectory = {}, StringView wineExecutableOverride = {});
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);

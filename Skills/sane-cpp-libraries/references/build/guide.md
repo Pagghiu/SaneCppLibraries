@@ -20,7 +20,7 @@
 - Use `build run --runner <mode>` when the target is foreign. Current runner keywords are `auto`, `none`, `wine`, `qemu`, and `custom`.
 - On macOS and Linux, Windows GNU executables can be smoke-run through the shared Wine runner path. Wine launches are shaped through `cmd /c` with Windows-style target paths.
 - On Linux arm64, that now includes targeted `windows-gnu-arm64` smokes through the packaged native ARM64 Wine runner.
-- For Linux-target profiles on macOS and Windows, the native backend now auto-selects a packaged LLVM toolchain when explicit compiler paths are not provided. Real cross-host Linux builds still need an explicit `--sysroot`.
+- For Linux-target profiles on macOS and Windows, the native backend now auto-selects a packaged LLVM toolchain when explicit compiler paths are not provided. On macOS, the packaged Linux glibc and musl sysroots are now first-class too, so `linux-glibc-*` and `linux-musl-*` can compile without an explicit `--sysroot`.
 - `SC-package install msvc` is the entry point for portable MSVC + Windows SDK acquisition. It now accepts `--import-directory <path>` and `--wine <path>` for imported layouts and custom runner wrappers.
 - `SC-package install llvm` is now the packaged host-toolchain prerequisite for Linux-target native-backend work on non-Linux hosts.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` again.

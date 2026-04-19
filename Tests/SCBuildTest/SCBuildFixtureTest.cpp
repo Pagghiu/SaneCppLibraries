@@ -1392,6 +1392,34 @@ static constexpr StringView hostLLVMInstallDirectoryName()
 #endif
 }
 
+static constexpr StringView packagedLinuxSysrootInstallDirectoryName(Build::TargetEnvironment::Type environment,
+                                                                     Build::Architecture::Type      architecture)
+{
+    if (environment == Build::TargetEnvironment::LinuxGlibc)
+    {
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64: return "linux-sysroot_glibc_x86_64";
+        case Build::Architecture::Arm64: return "linux-sysroot_glibc_arm64";
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return {};
+        }
+    }
+    if (environment == Build::TargetEnvironment::LinuxMusl)
+    {
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64: return "linux-sysroot_musl_x86_64";
+        case Build::Architecture::Arm64: return "linux-sysroot_musl_arm64";
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return {};
+        }
+    }
+    return {};
+}
+
 static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
                                                 StringView configurationName = "Debug")
 {
@@ -3266,7 +3294,8 @@ struct SCBuildFixtureTest : public SC::TestCase
         }
 
 #if SC_PLATFORM_APPLE
-        if (test_section("native backend auto-selects packaged LLVM toolchain for Linux target profiles on macOS"))
+        if (test_section("native backend auto-selects packaged LLVM toolchain and glibc sysroot for Linux target "
+                         "profiles on macOS"))
         {
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -3281,7 +3310,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             String clangPath    = StringEncoding::Utf8;
             String clangCppPath = StringEncoding::Utf8;
             String llvmArPath   = StringEncoding::Utf8;
-            String sysroot      = StringEncoding::Utf8;
+            String sysrootRoot  = StringEncoding::Utf8;
             SC_TRUST_RESULT(
                 Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
             SC_TRUST_RESULT(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
@@ -3289,9 +3318,28 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(clangPath, {llvmBin.view(), "clang"}));
             SC_TRUST_RESULT(Path::join(clangCppPath, {llvmBin.view(), "clang++"}));
             SC_TRUST_RESULT(Path::join(llvmArPath, {llvmBin.view(), "llvm-ar"}));
-            SC_TRUST_RESULT(Path::join(sysroot, {buildRoot.view(), "sysroots", "linux-glibc"}));
+            SC_TRUST_RESULT(
+                Path::join(sysrootRoot, {directories.packagesInstallDirectory.view(),
+                                         packagedLinuxSysrootInstallDirectoryName(Build::TargetEnvironment::LinuxGlibc,
+                                                                                  Build::Architecture::Arm64)}));
+            auto makeSysrootPath = [&](StringView pattern, String& path) -> Result
+            { return Result(StringBuilder::format(path, pattern, sysrootRoot.view())); };
+            auto makeSysrootDirectory = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.makeDirectoryRecursive(path.view());
+            };
+            auto writeSysrootFile = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.writeString(path.view(), "");
+            };
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(llvmBin.view()));
-            SC_TRUST_RESULT(fs.makeDirectoryRecursive(sysroot.view()));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/include"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
             SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
             SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
                                                                        "clang version 20.1.8"));
@@ -3299,18 +3347,94 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                                        "clang version 20.1.8"));
             SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
                                                                        "LLVM archive tool"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a"));
 
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
-            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
-                                                       Build::Architecture::Arm64, sysroot.view()));
+            SC_TRUST_RESULT(
+                configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc, Build::Architecture::Arm64));
 
             SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
 
             String clangLog = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
             SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-target aarch64-unknown-linux-gnu"));
-            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("--sysroot"));
-            SC_TEST_EXPECT(StringView(clangLog.view()).containsString(sysroot.view()));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-fuse-ld=lld"));
+        }
+
+        if (test_section("native backend auto-selects packaged musl sysroot for Linux target profiles on macOS"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String llvmRoot     = StringEncoding::Utf8;
+            String llvmBin      = StringEncoding::Utf8;
+            String clangLogPath = StringEncoding::Utf8;
+            String clangPath    = StringEncoding::Utf8;
+            String clangCppPath = StringEncoding::Utf8;
+            String llvmArPath   = StringEncoding::Utf8;
+            String sysrootRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
+            SC_TRUST_RESULT(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
+            SC_TRUST_RESULT(Path::join(clangLogPath, {llvmRoot.view(), "clang.log"}));
+            SC_TRUST_RESULT(Path::join(clangPath, {llvmBin.view(), "clang"}));
+            SC_TRUST_RESULT(Path::join(clangCppPath, {llvmBin.view(), "clang++"}));
+            SC_TRUST_RESULT(Path::join(llvmArPath, {llvmBin.view(), "llvm-ar"}));
+            SC_TRUST_RESULT(
+                Path::join(sysrootRoot, {directories.packagesInstallDirectory.view(),
+                                         packagedLinuxSysrootInstallDirectoryName(Build::TargetEnvironment::LinuxMusl,
+                                                                                  Build::Architecture::Intel64)}));
+            auto makeSysrootPath = [&](StringView pattern, String& path) -> Result
+            { return Result(StringBuilder::format(path, pattern, sysrootRoot.view())); };
+            auto makeSysrootDirectory = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.makeDirectoryRecursive(path.view());
+            };
+            auto writeSysrootFile = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.writeString(path.view(), "");
+            };
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(llvmBin.view()));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/lib"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/include"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/include/linux"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib"));
+            SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
+                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/lib/ld-musl-x86_64.so.1"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/include/stdio.h"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/crt1.o"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtbeginS.o"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/libgcc.a"));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            SC_TRUST_RESULT(
+                configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl, Build::Architecture::Intel64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String clangLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-target x86_64-unknown-linux-musl"));
+            SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-fuse-ld=lld"));
         }
 #endif
 #endif

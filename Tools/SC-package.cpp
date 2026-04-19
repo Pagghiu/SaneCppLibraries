@@ -157,6 +157,10 @@ static bool resolveRunnableHostCommand(StringView executable, String& output)
 }
 
 static bool isArm64HostInstructionSet() { return HostInstructionSet == InstructionSet::ARM64; }
+static bool supportsAutomaticLinuxSysrootInstall()
+{
+    return HostPlatform == Platform::Apple or HostPlatform == Platform::Linux;
+}
 
 static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringView wrapperName, StringView firstStage,
                                     StringView secondStage, String& output)
@@ -181,12 +185,64 @@ static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringVie
     return Result(true);
 }
 
-#if SC_PLATFORM_LINUX
 static Result extractDebArchive(StringView sourceFile, StringView destinationDirectory)
 {
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String extractDirectory = format("{}-deb-extract", destinationDirectory);
+    if (fs.existsAndIsDirectory(extractDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(extractDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(extractDirectory.view()));
+
     Process process;
-    SC_TRY(process.exec({"dpkg-deb", "-x", sourceFile, destinationDirectory}));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb archive");
+    SC_TRY(process.setWorkingDirectory(extractDirectory.view()));
+    SC_TRY(process.exec({"ar", "-x", sourceFile}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb ar archive");
+
+    String archivePath   = StringEncoding::Utf8;
+    auto   expandArchive = [&](StringView archiveName, bool& expanded) -> Result
+    {
+        expanded = false;
+        SC_TRY(Path::join(archivePath, {extractDirectory.view(), archiveName}));
+        if (not fs.existsAndIsFile(archivePath.view()))
+        {
+            return Result(true);
+        }
+
+        Process tarProcess;
+        SC_TRY(tarProcess.exec({"tar", "-xf", archivePath.view(), "-C", destinationDirectory}));
+        SC_TRY_MSG(tarProcess.getExitStatus() == 0, "Failed extracting .deb payload");
+        expanded = true;
+        return Result(true);
+    };
+
+    bool expanded = false;
+    SC_TRY(expandArchive("data.tar.xz", expanded));
+    if (not expanded)
+    {
+        SC_TRY(expandArchive("data.tar.zst", expanded));
+    }
+    if (not expanded)
+    {
+        SC_TRY(expandArchive("data.tar.gz", expanded));
+    }
+    if (not expanded)
+    {
+        SC_TRY(expandArchive("data.tar", expanded));
+    }
+    SC_TRY_MSG(expanded, "Unsupported .deb payload archive");
+    SC_TRY(fs.removeDirectoriesRecursive(extractDirectory.view()));
+    return Result(true);
+}
+
+static Result extractApkArchive(StringView sourceFile, StringView destinationDirectory)
+{
+    Process process;
+    SC_TRY(process.exec({"tar", "-xzf", sourceFile, "-C", destinationDirectory}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .apk archive");
     return Result(true);
 }
 
@@ -199,6 +255,23 @@ static Result downloadTextFile(StringView url, StringView destinationFile)
     return Result(true);
 }
 
+static Result downloadGzipTextFile(StringView url, StringView destinationFile)
+{
+    String compressedPath = format("{}.gz", destinationFile);
+    SC_TRY(downloadTextFile(url, compressedPath.view()));
+
+    Process process;
+    String  output = StringEncoding::Utf8;
+    SC_TRY(process.exec({"gzip", "-dc", compressedPath.view()}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed decompressing gzip metadata");
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.writeString(destinationFile, output.view()));
+    return Result(true);
+}
+
+#if SC_PLATFORM_LINUX
 static bool isLexicographicallyAfter(StringView candidate, StringView current)
 {
     const size_t minSize =
@@ -215,6 +288,7 @@ static bool isLexicographicallyAfter(StringView candidate, StringView current)
     }
     return candidate.sizeInBytes() > current.sizeInBytes();
 }
+#endif
 
 static Result extractPackageIndexField(StringView stanza, StringView fieldName, String& output)
 {
@@ -226,7 +300,8 @@ static Result extractPackageIndexField(StringView stanza, StringView fieldName, 
         {
             lineEnd++;
         }
-        const StringView line = stanza.sliceStartLength(searchIndex, lineEnd - searchIndex);
+        const StringView line = {
+            {stanza.bytesWithoutTerminator() + searchIndex, lineEnd - searchIndex}, false, StringEncoding::Ascii};
         if (line.startsWith(fieldName))
         {
             SC_TRY(output.assign(line.sliceStart(fieldName.sizeInBytes()).trimWhiteSpaces()));
@@ -237,6 +312,108 @@ static Result extractPackageIndexField(StringView stanza, StringView fieldName, 
     return Result::Error("Missing package index field");
 }
 
+struct UbuntuPackageMetadata
+{
+    String version  = StringEncoding::Utf8;
+    String filename = StringEncoding::Utf8;
+    String sha256   = StringEncoding::Utf8;
+};
+
+static Result resolveUbuntuPackageMetadata(StringView packageIndex, StringView packageName,
+                                           UbuntuPackageMetadata& metadata)
+{
+    const StringView indexView = packageIndex;
+    size_t           stanzaPos = 0;
+    while (stanzaPos < indexView.sizeInBytes())
+    {
+        size_t stanzaEnd = stanzaPos;
+        while (stanzaEnd + 1 < indexView.sizeInBytes())
+        {
+            if (indexView.bytesWithoutTerminator()[stanzaEnd] == '\n' and
+                indexView.bytesWithoutTerminator()[stanzaEnd + 1] == '\n')
+            {
+                break;
+            }
+            stanzaEnd++;
+        }
+
+        const StringView stanza = {
+            {indexView.bytesWithoutTerminator() + stanzaPos, stanzaEnd - stanzaPos}, false, StringEncoding::Ascii};
+        String stanzaPackageName = StringEncoding::Utf8;
+        if (extractPackageIndexField(stanza, "Package:", stanzaPackageName) and stanzaPackageName.view() == packageName)
+        {
+            SC_TRY(extractPackageIndexField(stanza, "Version:", metadata.version));
+            SC_TRY(extractPackageIndexField(stanza, "Filename:", metadata.filename));
+            SC_TRY(extractPackageIndexField(stanza, "SHA256:", metadata.sha256));
+            return Result(true);
+        }
+        stanzaPos = stanzaEnd + 2;
+    }
+    return Result::Error("Cannot resolve Ubuntu package metadata");
+}
+
+struct AlpinePackageMetadata
+{
+    String version = StringEncoding::Utf8;
+};
+
+static Result resolveAlpinePackageMetadata(StringView packageIndex, StringView packageName,
+                                           AlpinePackageMetadata& metadata)
+{
+    const StringView indexView = packageIndex;
+    size_t           recordPos = 0;
+    while (recordPos < indexView.sizeInBytes())
+    {
+        size_t recordEnd = recordPos;
+        while (recordEnd + 1 < indexView.sizeInBytes())
+        {
+            if (indexView.bytesWithoutTerminator()[recordEnd] == '\n' and
+                indexView.bytesWithoutTerminator()[recordEnd + 1] == '\n')
+            {
+                break;
+            }
+            recordEnd++;
+        }
+
+        const StringView record = {
+            {indexView.bytesWithoutTerminator() + recordPos, recordEnd - recordPos}, false, StringEncoding::Ascii};
+        StringView currentPackageName;
+        StringView currentVersion;
+
+        size_t lineStart = 0;
+        while (lineStart < record.sizeInBytes())
+        {
+            size_t lineEnd = lineStart;
+            while (lineEnd < record.sizeInBytes() and record.bytesWithoutTerminator()[lineEnd] != '\n')
+            {
+                lineEnd++;
+            }
+            const StringView line = StringView({record.bytesWithoutTerminator() + lineStart, lineEnd - lineStart},
+                                               false, StringEncoding::Ascii)
+                                        .trimWhiteSpaces();
+            if (line.startsWith("P:"))
+            {
+                currentPackageName = line.sliceStart(2);
+            }
+            else if (line.startsWith("V:"))
+            {
+                currentVersion = line.sliceStart(2);
+            }
+            lineStart = lineEnd + 1;
+        }
+
+        if (currentPackageName == packageName)
+        {
+            SC_TRY(metadata.version.assign(currentVersion));
+            return Result(true);
+        }
+
+        recordPos = recordEnd + 2;
+    }
+    return Result::Error("Cannot resolve Alpine package metadata");
+}
+
+#if SC_PLATFORM_LINUX
 struct LinuxBox64PackageMetadata
 {
     String version = StringEncoding::Utf8;
@@ -1362,6 +1539,379 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     return Result(true);
 }
 
+static constexpr StringView linuxSysrootArchitectureName(InstructionSet architecture)
+{
+    switch (architecture)
+    {
+    case InstructionSet::Intel64: return "x86_64"_a8;
+    case InstructionSet::ARM64: return "arm64"_a8;
+    case InstructionSet::Intel32: return "intel32"_a8;
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView linuxSysrootAlpineArchitectureName(InstructionSet architecture)
+{
+    switch (architecture)
+    {
+    case InstructionSet::Intel64: return "x86_64"_a8;
+    case InstructionSet::ARM64: return "aarch64"_a8;
+    case InstructionSet::Intel32: return {};
+    }
+    Assert::unreachable();
+}
+
+static Result linuxSysrootPackagePathExists(StringView packageRoot, StringView relativePath)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    String absolutePath = StringEncoding::Utf8;
+    SC_TRY(Path::join(absolutePath, {packageRoot, relativePath}));
+    SC_TRY_MSG(fs.exists(absolutePath.view()), "Linux sysroot package is incomplete");
+    return Result(true);
+}
+
+static Result repairLinuxGlibcSysrootLayout(StringView packageRoot, InstructionSet architecture)
+{
+    if (architecture != InstructionSet::Intel64)
+    {
+        return Result(true);
+    }
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String loaderDirectory = StringEncoding::Utf8;
+    String loaderAlias     = StringEncoding::Utf8;
+    SC_TRY(Path::join(loaderDirectory, {packageRoot, "lib64"}));
+    SC_TRY(Path::join(loaderAlias, {loaderDirectory.view(), "ld-linux-x86-64.so.2"}));
+    SC_TRY(fs.makeDirectoryRecursive(loaderDirectory.view()));
+    SC_TRY(fs.removeLinkIfExists(loaderAlias.view()));
+    if (not createLink("../lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", loaderAlias.view()))
+    {
+        String targetLoader = StringEncoding::Utf8;
+        SC_TRY(Path::join(targetLoader, {packageRoot, "lib", "x86_64-linux-gnu", "ld-linux-x86-64.so.2"}));
+        if (fs.existsAndIsFile(targetLoader.view()))
+        {
+            SC_TRY(fs.copyFile(targetLoader.view(), loaderAlias.view(), FileSystem::CopyFlags().setOverwrite(true)));
+        }
+    }
+    return Result(true);
+}
+
+static Result repairLinuxSysrootLayout(StringView packageRoot, const Tools::LinuxSysrootSpec& spec)
+{
+    if (spec.environment == Tools::LinuxSysrootSpec::Glibc)
+    {
+        SC_TRY(repairLinuxGlibcSysrootLayout(packageRoot, spec.architecture));
+    }
+    return Result(true);
+}
+
+static Result validateLinuxSysrootPackage(StringView packageRoot, const Tools::LinuxSysrootSpec& spec)
+{
+    switch (spec.environment)
+    {
+    case Tools::LinuxSysrootSpec::Glibc:
+        if (spec.architecture == InstructionSet::Intel64)
+        {
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/include/stdio.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/x86_64-linux-gnu/Scrt1.o"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "lib64/ld-linux-x86-64.so.2"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/x86_64-linux-gnu/11/libgcc.a"));
+        }
+        else if (spec.architecture == InstructionSet::ARM64)
+        {
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/aarch64-linux-gnu/include/stdio.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a"));
+        }
+        else
+        {
+            return Result::Error("Unsupported Linux glibc sysroot architecture");
+        }
+        break;
+    case Tools::LinuxSysrootSpec::Musl:
+        if (spec.architecture == InstructionSet::Intel64)
+        {
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "lib/ld-musl-x86_64.so.1"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/include/stdio.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/include/linux/io_uring.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/crt1.o"));
+            SC_TRY(
+                linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtbeginS.o"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/libgcc.a"));
+        }
+        else if (spec.architecture == InstructionSet::ARM64)
+        {
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "lib/ld-musl-aarch64.so.1"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/include/stdio.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/include/linux/io_uring.h"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/crt1.o"));
+            SC_TRY(
+                linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/crtbeginS.o"));
+            SC_TRY(linuxSysrootPackagePathExists(packageRoot, "usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/libgcc.a"));
+        }
+        else
+        {
+            return Result::Error("Unsupported Linux musl sysroot architecture");
+        }
+        break;
+    }
+    return Result(true);
+}
+
+static Result resolveUbuntuPackagesIndex(StringView downloadsDirectory, StringView indexURL, String& output)
+{
+    String packageIndexPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(packageIndexPath, {downloadsDirectory, "ubuntu-packages.txt"}));
+    SC_TRY(downloadGzipTextFile(indexURL, packageIndexPath.view()));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.read(packageIndexPath.view(), output));
+    return Result(true);
+}
+
+static Result resolveAlpinePackagesIndex(StringView downloadsDirectory, StringView architecture, String& output)
+{
+    String indexPath = StringEncoding::Utf8;
+    String indexURL  = format("https://dl-cdn.alpinelinux.org/alpine/v3.23/main/{}/APKINDEX.tar.gz", architecture);
+    SC_TRY(Path::join(indexPath, {downloadsDirectory, "APKINDEX.tar.gz"}));
+    SC_TRY(downloadTextFile(indexURL.view(), indexPath.view()));
+
+    Process process;
+    String  indexContents = StringEncoding::Utf8;
+    SC_TRY(process.exec({"tar", "-xOzf", indexPath.view(), "APKINDEX"}, indexContents));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting Alpine APKINDEX");
+    SC_TRY(output.assign(indexContents.view()));
+    return Result(true);
+}
+
+static Result installLinuxGlibcSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                       const Tools::LinuxSysrootSpec& spec, Package& package)
+{
+    SC_TRY_MSG(spec.architecture == InstructionSet::Intel64 or spec.architecture == InstructionSet::ARM64,
+               "Linux glibc sysroots only support x86_64 and arm64");
+    SC_TRY_MSG(supportsAutomaticLinuxSysrootInstall(),
+               "Automatic Linux glibc sysroot install is only supported on macOS and Linux hosts");
+
+    const StringView targetArchitecture = linuxSysrootArchitectureName(spec.architecture);
+    package.packageFullName             = format("linux-sysroot-glibc-{}", targetArchitecture);
+    package.packageLocalDirectory = format("{}/linux-sysroot/glibc-{}", packagesCacheDirectory, targetArchitecture);
+    package.packageLocalTxt       = format("{}/linux-sysroot/glibc-{}.txt", packagesCacheDirectory, targetArchitecture);
+    package.installDirectoryLink  = format("{}/linux-sysroot_glibc_{}", packagesInstallDirectory, targetArchitecture);
+
+    auto finalizePackage = [&](FileSystem& fs) -> Result
+    {
+        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+        if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        {
+            if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+            }
+            SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+        }
+        return Result(true);
+    };
+
+    auto testPackage = [&](const Package& installedPackage) -> Result
+    {
+        SC_TRY(repairLinuxSysrootLayout(installedPackage.installDirectoryLink.view(), spec));
+        return validateLinuxSysrootPackage(installedPackage.installDirectoryLink.view(), spec);
+    };
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        if (repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec) and finalizePackage(fs) and
+            testPackage(package))
+        {
+            return Result(true);
+        }
+    }
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
+
+    String downloadsDirectory = StringEncoding::Utf8;
+    String downloadsLeaf      = format("glibc-{}", targetArchitecture);
+    SC_TRY(
+        Path::join(downloadsDirectory, {packagesCacheDirectory, "linux-sysroot", "downloads", downloadsLeaf.view()}));
+    SC_TRY(fs.makeDirectoryRecursive(downloadsDirectory.view()));
+
+    const StringView packageBaseURL = spec.architecture == InstructionSet::Intel64
+                                          ? "https://archive.ubuntu.com/ubuntu"_a8
+                                          : "https://ports.ubuntu.com/ubuntu-ports"_a8;
+    const StringView packageIndexURL =
+        spec.architecture == InstructionSet::Intel64
+            ? "https://archive.ubuntu.com/ubuntu/dists/jammy/main/binary-amd64/Packages.gz"_a8
+            : "https://ports.ubuntu.com/ubuntu-ports/dists/jammy/main/binary-arm64/Packages.gz"_a8;
+
+    String packagesIndex = StringEncoding::Utf8;
+    SC_TRY(resolveUbuntuPackagesIndex(downloadsDirectory.view(), packageIndexURL, packagesIndex));
+
+    static constexpr StringView x64PackageNames[] = {
+        "libc6"_a8,         "libc6-dev"_a8,  "linux-libc-dev"_a8,   "libgcc-s1"_a8,
+        "libgcc-11-dev"_a8, "libstdc++6"_a8, "libstdc++-11-dev"_a8,
+    };
+    static constexpr StringView arm64PackageNames[] = {
+        "libc6-arm64-cross"_a8,
+        "libc6-dev-arm64-cross"_a8,
+        "linux-libc-dev-arm64-cross"_a8,
+        "libgcc-s1-arm64-cross"_a8,
+        "libgcc-11-dev-arm64-cross"_a8,
+        "libstdc++6-arm64-cross"_a8,
+        "libstdc++-11-dev-arm64-cross"_a8,
+    };
+
+    const Span<const StringView> packageNames = spec.architecture == InstructionSet::Intel64
+                                                    ? Span<const StringView>(x64PackageNames)
+                                                    : Span<const StringView>(arm64PackageNames);
+
+    String packageTxt      = StringEncoding::Utf8;
+    auto   metadataBuilder = StringBuilder::create(packageTxt);
+    for (size_t idx = 0; idx < packageNames.sizeInElements(); ++idx)
+    {
+        UbuntuPackageMetadata metadata;
+        SC_TRY(resolveUbuntuPackageMetadata(packagesIndex.view(), packageNames[idx], metadata));
+
+        String packageURL  = StringEncoding::Utf8;
+        String packageFile = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(packageURL, "{}/{}", packageBaseURL, metadata.filename.view()));
+        SC_TRY(Path::join(packageFile,
+                          {downloadsDirectory.view(), Path::basename(metadata.filename.view(), Path::AsPosix)}));
+        SC_TRY(downloadFileHash(packageURL.view(), packageFile.view(), Hashing::TypeSHA256, metadata.sha256.view()));
+        SC_TRY(extractDebArchive(packageFile.view(), package.packageLocalDirectory.view()));
+        SC_TRY(metadataBuilder.append("SC_PACKAGE_URL_{}={}\n", idx, packageURL.view()));
+    }
+    metadataBuilder.finalize();
+
+    SC_TRY(repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec));
+    SC_TRY(finalizePackage(fs));
+    SC_TRY(testPackage(package));
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    return Result(true);
+}
+
+static Result installLinuxMuslSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                      const Tools::LinuxSysrootSpec& spec, Package& package)
+{
+    SC_TRY_MSG(spec.architecture == InstructionSet::Intel64 or spec.architecture == InstructionSet::ARM64,
+               "Linux musl sysroots only support x86_64 and arm64");
+    SC_TRY_MSG(supportsAutomaticLinuxSysrootInstall(),
+               "Automatic Linux musl sysroot install is only supported on macOS and Linux hosts");
+
+    const StringView targetArchitecture = linuxSysrootArchitectureName(spec.architecture);
+    const StringView alpineArchitecture = linuxSysrootAlpineArchitectureName(spec.architecture);
+    package.packageFullName             = format("linux-sysroot-musl-{}", targetArchitecture);
+    package.packageLocalDirectory = format("{}/linux-sysroot/musl-{}", packagesCacheDirectory, targetArchitecture);
+    package.packageLocalTxt       = format("{}/linux-sysroot/musl-{}.txt", packagesCacheDirectory, targetArchitecture);
+    package.installDirectoryLink  = format("{}/linux-sysroot_musl_{}", packagesInstallDirectory, targetArchitecture);
+
+    auto finalizePackage = [&](FileSystem& fs) -> Result
+    {
+        SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+        if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+        {
+            if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+            }
+            SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+        }
+        return Result(true);
+    };
+
+    auto testPackage = [&](const Package& installedPackage) -> Result
+    {
+        SC_TRY(repairLinuxSysrootLayout(installedPackage.installDirectoryLink.view(), spec));
+        return validateLinuxSysrootPackage(installedPackage.installDirectoryLink.view(), spec);
+    };
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        if (repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec) and finalizePackage(fs) and
+            testPackage(package))
+        {
+            return Result(true);
+        }
+    }
+
+    if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(package.packageLocalDirectory.view()));
+
+    String downloadsDirectory = StringEncoding::Utf8;
+    String downloadsLeaf      = format("musl-{}", targetArchitecture);
+    SC_TRY(
+        Path::join(downloadsDirectory, {packagesCacheDirectory, "linux-sysroot", "downloads", downloadsLeaf.view()}));
+    SC_TRY(fs.makeDirectoryRecursive(downloadsDirectory.view()));
+
+    String packagesIndex = StringEncoding::Utf8;
+    SC_TRY(resolveAlpinePackagesIndex(downloadsDirectory.view(), alpineArchitecture, packagesIndex));
+
+    static constexpr StringView packageNames[] = {
+        "musl"_a8, "musl-dev"_a8, "linux-headers"_a8, "libgcc"_a8, "gcc"_a8, "libstdc++"_a8, "libstdc++-dev"_a8,
+    };
+
+    String packageBaseURL = format("https://dl-cdn.alpinelinux.org/alpine/v3.23/main/{}", alpineArchitecture);
+
+    String packageTxt      = StringEncoding::Utf8;
+    auto   metadataBuilder = StringBuilder::create(packageTxt);
+    for (size_t idx = 0; idx < Span<const StringView>(packageNames).sizeInElements(); ++idx)
+    {
+        AlpinePackageMetadata metadata;
+        SC_TRY(resolveAlpinePackageMetadata(packagesIndex.view(), packageNames[idx], metadata));
+
+        String packageURL  = StringEncoding::Utf8;
+        String packageFile = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(packageURL, "{}/{}-{}.apk", packageBaseURL, packageNames[idx],
+                                     metadata.version.view()));
+        SC_TRY(Path::join(packageFile, {downloadsDirectory.view(), Path::basename(packageURL.view(), Path::AsPosix)}));
+        SC_TRY(downloadTextFile(packageURL.view(), packageFile.view()));
+        SC_TRY(extractApkArchive(packageFile.view(), package.packageLocalDirectory.view()));
+        SC_TRY(metadataBuilder.append("SC_PACKAGE_URL_{}={}\n", idx, packageURL.view()));
+    }
+    metadataBuilder.finalize();
+
+    SC_TRY(repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec));
+    SC_TRY(finalizePackage(fs));
+    SC_TRY(testPackage(package));
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    return Result(true);
+}
+
+Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                           const Tools::LinuxSysrootSpec& spec, Package& package)
+{
+    switch (spec.environment)
+    {
+    case Tools::LinuxSysrootSpec::Glibc:
+        return installLinuxGlibcSysroot(packagesCacheDirectory, packagesInstallDirectory, spec, package);
+    case Tools::LinuxSysrootSpec::Musl:
+        return installLinuxMuslSysroot(packagesCacheDirectory, packagesInstallDirectory, spec, package);
+    }
+    Assert::unreachable();
+}
+
 Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
 #if SC_PLATFORM_LINUX
@@ -1382,8 +1932,7 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     case Platform::Windows:
     case Platform::Emscripten: return Result::Error("Automatic Linux Wine install is only supported on Linux hosts");
     }
-    SC_TRY_MSG(HostInstructionSet == InstructionSet::ARM64,
-               "Automatic Linux Wine install is only supported on Linux ARM64 hosts");
+    SC_TRY_MSG(isArm64HostInstructionSet(), "Automatic Linux Wine install is only supported on Linux ARM64 hosts");
 
     package.packageFullName       = "wine-stable-linux-arm64-box64";
     package.packageLocalDirectory = format("{}/wine-stable/linux-arm64-box64", packagesCacheDirectory);
@@ -1526,7 +2075,7 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     case Platform::Emscripten:
         return Result::Error("Automatic Linux ARM64 Wine install is only supported on Linux hosts");
     }
-    SC_TRY_MSG(HostInstructionSet == InstructionSet::ARM64,
+    SC_TRY_MSG(isArm64HostInstructionSet(),
                "Automatic Linux ARM64 Wine install is only supported on Linux ARM64 hosts");
 
     package.packageFullName       = "wine-stable-linux-arm64-native";
@@ -1867,6 +2416,38 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(Tools::installLLVMMingwToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
                                                     *package));
+        }
+        else if (packageName == "linux-sysroot-glibc-x86_64")
+        {
+            Tools::LinuxSysrootSpec spec;
+            spec.environment  = Tools::LinuxSysrootSpec::Glibc;
+            spec.architecture = InstructionSet::Intel64;
+            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
+                                              *package));
+        }
+        else if (packageName == "linux-sysroot-glibc-arm64")
+        {
+            Tools::LinuxSysrootSpec spec;
+            spec.environment  = Tools::LinuxSysrootSpec::Glibc;
+            spec.architecture = InstructionSet::ARM64;
+            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
+                                              *package));
+        }
+        else if (packageName == "linux-sysroot-musl-x86_64")
+        {
+            Tools::LinuxSysrootSpec spec;
+            spec.environment  = Tools::LinuxSysrootSpec::Musl;
+            spec.architecture = InstructionSet::Intel64;
+            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
+                                              *package));
+        }
+        else if (packageName == "linux-sysroot-musl-arm64")
+        {
+            Tools::LinuxSysrootSpec spec;
+            spec.environment  = Tools::LinuxSysrootSpec::Musl;
+            spec.architecture = InstructionSet::ARM64;
+            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
+                                              *package));
         }
         else if (packageName == "wine")
         {

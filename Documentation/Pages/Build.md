@@ -159,8 +159,10 @@ Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
 - Linux `glibc` and `musl` target profiles now exist as first-class native-backend profiles; they shape canonical target
-  triples and sysroot flags, and macOS / Windows hosts now auto-select a packaged LLVM toolchain for them when the
-  caller has not provided explicit compiler paths
+  triples and sysroot flags, and macOS hosts now auto-select both a packaged LLVM toolchain and packaged Linux sysroots
+  for them when the caller has not provided explicit compiler paths
+- macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
+  `linux-musl-x86_64`, and `linux-musl-arm64`
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
 - Linux arm64 hosts can now validate the same portable MSVC path end-to-end for `windows-msvc-x86_64` and
   `windows-msvc-arm64`; the package tool auto-prefers a generated `box64 + wine64` wrapper when those host tools are
@@ -205,8 +207,8 @@ Typical native commands:
 ./SC.sh build compile SCBuildTest --config Debug --generator native
 ./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
 ./SC.sh package install llvm
-./SC.sh build compile SCTest --target linux-glibc-arm64 --sysroot /opt/sysroots/linux-glibc-arm64 --output quiet
-./SC.sh build compile SCTest --target linux-musl-x86_64 --sysroot /opt/sysroots/linux-musl-x86_64 --output quiet
+./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
+./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
 ./SC.sh package install msvc
@@ -221,10 +223,9 @@ SC.bat build compile SCTest Debug native
 
 Important current limits:
 
-- Packaged Linux sysroots are still pending, so Linux target profiles still need an explicit `--sysroot` for real
-  cross-host builds
-- macOS and Windows Linux-target flows now auto-select a packaged LLVM toolchain, but they do not yet claim end-to-end
-  Linux fixture support until the sysroot path is packaged too
+- macOS is the only non-Linux host with a validated packaged Linux sysroot path today
+- Windows-host Linux-target packaging and validation are still pending
+- Linux-target run support is still deferred to the future QEMU runner work
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
 - The repository `build configure` command does not rely on a Windows-native generation pass because native builds do
