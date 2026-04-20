@@ -163,6 +163,7 @@ struct Toolchain
     {
         HostDefault,
         Clang,
+        FilC,
         GCC,
         MSVC,
         ClangCL,

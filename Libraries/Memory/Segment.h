@@ -4,6 +4,9 @@
 #include "../Foundation/Assert.h"
 #include "../Foundation/Span.h"
 #include "../Memory/Memory.h"
+#if SC_COMPILER_FILC
+#include <stdfil.h>
+#endif
 
 namespace SC
 {
@@ -42,13 +45,55 @@ struct SC_MEMORY_EXPORT SegmentHeaderOffset
     PtrOffset     offset = 0; // memory offset representing relative pointer to data from "this"
 };
 
+#if SC_COMPILER_FILC
+inline zexact_ptrtable* filcExactPtrTable() noexcept
+{
+    static zexact_ptrtable* table = zexact_ptrtable_new();
+    return table;
+}
+
+template <typename T>
+inline T* filcResolveRelativePointer(const void* self, size_t address) noexcept
+{
+    const size_t lower = reinterpret_cast<size_t>(zgetlower(const_cast<void*>(self)));
+    const size_t upper = reinterpret_cast<size_t>(zgetupper(const_cast<void*>(self)));
+    if (address >= lower and address < upper)
+        return static_cast<T*>(zmkptr(const_cast<void*>(self), static_cast<unsigned long>(address)));
+    return static_cast<T*>(zexact_ptrtable_decode(filcExactPtrTable(), address));
+}
+#endif
+
 template <typename T>
 struct SC_MEMORY_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOffset
 {
     // clang-format off
-    SC_COMPILER_FORCE_INLINE T*       data() noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
-    SC_COMPILER_FORCE_INLINE const T* data() const noexcept { return offset == 0 ? nullptr : toPtr(toOffset(this) + offset); }
-    SC_COMPILER_FORCE_INLINE bool isInline() const noexcept { return (offset == sizeof(SegmentHeaderOffset) + sizeof(uint64_t)) and header.hasInlineData; }
+    SC_COMPILER_FORCE_INLINE T*       data() noexcept
+    {
+#if SC_COMPILER_FILC
+        if (offset == 0)
+            return nullptr;
+        const auto address = toOffset(this) + offset;
+        if (header.hasInlineData and offset == inlineDataOffset())
+            return static_cast<T*>(zmkptr(this, static_cast<unsigned long>(address)));
+        return filcResolveRelativePointer<T>(this, address);
+#else
+        return offset == 0 ? nullptr : toPtr(toOffset(this) + offset);
+#endif
+    }
+    SC_COMPILER_FORCE_INLINE const T* data() const noexcept
+    {
+#if SC_COMPILER_FILC
+        if (offset == 0)
+            return nullptr;
+        const auto address = toOffset(this) + offset;
+        if (header.hasInlineData and offset == inlineDataOffset())
+            return static_cast<const T*>(zmkptr(const_cast<SegmentSelfRelativePointer*>(this), static_cast<unsigned long>(address)));
+        return filcResolveRelativePointer<const T>(this, address);
+#else
+        return offset == 0 ? nullptr : toPtr(toOffset(this) + offset);
+#endif
+    }
+    SC_COMPILER_FORCE_INLINE bool     isInline() const noexcept { return (offset == inlineDataOffset()) and header.hasInlineData; }
 
   protected:
     struct InlineData : public SegmentHeaderOffset // Data layout corresponds to SmallBuffer, SmallVector etc.
@@ -60,9 +105,17 @@ struct SC_MEMORY_EXPORT SegmentSelfRelativePointer : protected SegmentHeaderOffs
             T data[1]; // Accessing the whole class through volatile cast anyway so array size can be whatever
         };
     };
+    SC_COMPILER_FORCE_INLINE static constexpr PtrOffset inlineDataOffset() noexcept { return sizeof(SegmentHeaderOffset) + sizeof(uint64_t); }
     SC_COMPILER_FORCE_INLINE static auto toOffset(const volatile void* src) noexcept { return reinterpret_cast<PtrOffset>(src); }
     SC_COMPILER_FORCE_INLINE static T*   toPtr(PtrOffset src) noexcept { return reinterpret_cast<T*>(src); }
-    SC_COMPILER_FORCE_INLINE void setData(T* mem) noexcept { offset = mem == nullptr ? 0 : toOffset(mem) - toOffset(this); }
+    SC_COMPILER_FORCE_INLINE void setData(T* mem) noexcept
+    {
+        offset = mem == nullptr ? 0 : toOffset(mem) - toOffset(this);
+#if SC_COMPILER_FILC
+        if (mem != nullptr and not (header.hasInlineData and mem == getInlineData()))
+            (void)zexact_ptrtable_encode(filcExactPtrTable(), mem);
+#endif
+    }
     SC_COMPILER_FORCE_INLINE T*   getInlineData() noexcept { return (T*)reinterpret_cast<volatile InlineData*>(this)->data; }
     SC_COMPILER_FORCE_INLINE auto getInlineCapacity() noexcept { return reinterpret_cast<volatile InlineData*>(this)->capacity; }
     // clang-format on

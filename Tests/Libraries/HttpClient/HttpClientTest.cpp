@@ -31,6 +31,13 @@ struct SC::HttpClientTest : public SC::TestCase
 {
     HttpClientTest(SC::TestReport& report) : TestCase(report, "HttpClientTest")
     {
+#if SC_COMPILER_FILC
+        if (not report.quietMode)
+        {
+            report.console.printLine("HttpClientTest - Skipping under Fil-C: Linux backend depends on host libcurl "
+                                     "ABI");
+        }
+#else
         if (test_section("init and close"))
         {
             initAndClose();
@@ -75,6 +82,7 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             asyncUploadPipeline();
         }
+#endif
     }
 
     struct TestServer

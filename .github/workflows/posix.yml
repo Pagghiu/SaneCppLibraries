@@ -74,3 +74,32 @@ jobs:
     #   run: gdb --batch -ex "run" -ex "quit" --args _Build/_Outputs/linux-x86_64-make-gcc-Debug/SCTest
     # - name: test in lldb
     #   run: lldb -o "run" -o "quit" -- _Build/_Outputs/macOS-x86_64-make-clang-Debug/SCTest
+
+  filc-linux-experimental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore Fil-C cache
+      id: filc-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/filc
+        key: sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        restore-keys: |
+          sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
+    - name: Generate Single File Libs (Python)
+      run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+    - name: install Fil-C
+      run: ./SC.sh package install filc
+    - name: compile SaneHttpGet with Fil-C
+      run: ./SC.sh build compile SaneHttpGet Debug native --toolchain filc
+    - name: compile SCTest with Fil-C
+      run: ./SC.sh build compile SCTest Debug native --toolchain filc
+    - name: Save Fil-C cache
+      if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/filc
+        key: ${{ steps.filc-cache.outputs.cache-primary-key }}

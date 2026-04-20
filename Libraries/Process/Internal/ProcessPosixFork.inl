@@ -37,6 +37,11 @@ struct SC::Process::InternalFork
 
     static Result resetInheritedSignalHandlers()
     {
+#if SC_COMPILER_FILC
+        // Fil-C currently does not support the full pre-exec signal reset sequence we use on native libc builds.
+        // Child processes still exec immediately afterwards, so skip this best-effort cleanup for now.
+        return Result(true);
+#else
         // For every signal, we restore the default action
         struct sigaction action;
         memset(&action, 0, sizeof(action));
@@ -80,6 +85,7 @@ struct SC::Process::InternalFork
         }
 
         return Result(true);
+#endif
     }
 };
 
@@ -87,6 +93,9 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
 {
     // If execvpe doesn't take control, we exit with failure code on error
     auto exitDeferred = MakeDeferred([&] { _exit(EXIT_FAILURE); });
+    int  childErrno   = -1;
+    auto reportDeferred =
+        MakeDeferred([&] { (void)pipe.writePipe.write({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)}); });
 
     // Try restoring default signal handlers
     SC_TRY(InternalFork::resetInheritedSignalHandlers());
@@ -154,11 +163,21 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
     // side before the read side is used for actual read.
     //
     // If execvp fails, the deferred on top of this branch will _exit(EXIT_FAILURE)
-    int childErrno;
-
     const size_t     cmdLen = commandArgumentsNumber > 1 ? commandArgumentsByteOffset[1] : command.view().sizeInBytes();
     const StringSpan cmd({command.view().getNullTerminatedNative(), cmdLen}, true, StringEncoding::Ascii);
-    if (cmd.getNullTerminatedNative()[0] == '/')
+    const bool       usesParentEnvironment = inheritEnv and environment.view().isEmpty();
+    if (usesParentEnvironment)
+    {
+        if (cmd.getNullTerminatedNative()[0] == '/')
+        {
+            childErrno = ::execv(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
+        }
+        else
+        {
+            childErrno = ::execvp(cmd.getNullTerminatedNative(), const_cast<char* const*>(argv));
+        }
+    }
+    else if (cmd.getNullTerminatedNative()[0] == '/')
     {
         // cmd holds an absolute path, let's call execve directly
         childErrno = ::execve(cmd.getNullTerminatedNative(),               // command
@@ -208,12 +227,7 @@ SC::Result SC::Process::launchForkChild(PipeDescriptor& pipe)
         }
     }
 
-    // execvp failed, let's communicate errno back to parent before _exit(EXIT_FAILURE)
+    // execvp failed, the deferred above will communicate errno back to the parent before _exit(EXIT_FAILURE).
     childErrno = errno;
-    // TODO: Add a write or Span overload that will not need to be called with a reinterpret_cast
-    (void)pipe.writePipe.write({reinterpret_cast<char*>(&childErrno), sizeof(childErrno)});
-    // We should not close the writePipe because if this happens before readPipe has been read, it will read 0
-    // bytes thinking incorrectly that the process has succeeded.
-    // (void)pipe.close();
-    return Result(true);
+    return Result::Error("execve failed");
 }

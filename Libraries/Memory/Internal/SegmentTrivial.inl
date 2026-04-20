@@ -12,11 +12,24 @@ template <typename T> [[nodiscard]] constexpr T* launder(T* p) noexcept { return
 #endif
 // TODO: Not a fully compliant implementation, replace it with a proper one under C++23
 // https://stackoverflow.com/questions/79164176/emulate-stdstart-lifetime-as-array-in-c20
-template <typename T> [[nodiscard]] T* start_lifetime_as_array(Span<T> span) noexcept { return span.empty() ? static_cast<T*>(span.data()) : launder(static_cast<T*>(::memmove(span.data(), span.data(), sizeof(T) * span.sizeInElements()))); }
+template <typename T> [[nodiscard]] T* start_lifetime_as_array(Span<T> span) noexcept
+{
+    return span.empty() ? static_cast<T*>(span.data()) : launder(static_cast<T*>(static_cast<void*>(span.data())));
+}
 
-template <typename T, typename U> [[nodiscard]] const T* start_lifetime_as(Span<const U> span) noexcept { void* p = const_cast<void*>(static_cast<const void*>(span.data())); return launder(static_cast<const T*>(::memmove(p, p, sizeof(T)))); }
+template <typename T, typename U> [[nodiscard]] const T* start_lifetime_as(Span<const U> span) noexcept
+{
+    void* p = const_cast<void*>(static_cast<const void*>(span.data()));
+    return launder(static_cast<const T*>(p));
+}
+
+template <typename T> [[nodiscard]] T* prepare_byte_storage_destination(Span<T> data) noexcept
+{
+    return start_lifetime_as_array(data);
+}
 // clang-format on
 } // namespace SC
+
 template <typename T>
 inline void SC::detail::SegmentTrivial<T>::destruct(Span<T>) noexcept
 {}
@@ -26,7 +39,7 @@ template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<const U> value) noexcept
 {
     const size_t numElements = data.sizeInElements();
-    T*           destData    = start_lifetime_as_array(data);
+    T*           destData    = prepare_byte_storage_destination(data);
     if (value.sizeInBytes() == 1)
     {
         int intValue = 0;
@@ -48,7 +61,7 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstruct(Span<T> data, const U* src) noexcept
 {
-    ::memmove(start_lifetime_as_array(data), src, data.sizeInBytes());
+    ::memmove(prepare_byte_storage_destination(data), src, data.sizeInBytes());
 }
 
 template <typename T>
@@ -71,7 +84,7 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveConstruct(Span<T> data, U* src) noexcept
 {
-    ::memcpy(start_lifetime_as_array(data), src, data.sizeInBytes());
+    ::memcpy(prepare_byte_storage_destination(data), src, data.sizeInBytes());
 }
 
 template <typename T>

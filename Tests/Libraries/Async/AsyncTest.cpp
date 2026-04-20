@@ -21,6 +21,29 @@
 #include "Libraries/Time/Time.h"
 #include <signal.h>
 
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+namespace
+{
+static void printAsyncProcessExitSkip(SC::TestReport& report)
+{
+    if (not report.quietMode)
+    {
+        report.console.printLine("AsyncTest - Skipping AsyncProcessExit under Fil-C: Linux backend depends on "
+                                 "pidfd_open support");
+    }
+}
+
+static void printAsyncSerialSkip(SC::TestReport& report)
+{
+    if (not report.quietMode)
+    {
+        report.console.printLine("AsyncTest - Skipping POSIX serial loopback under Fil-C: PTY name resolution is "
+                                 "not yet supported");
+    }
+}
+} // namespace
+#endif
+
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {
     int numTestsToRun = 1;
@@ -74,15 +97,27 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         }
         if (test_section("process exit"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncProcessExitSkip(report);
+#else
             processExit();
+#endif
         }
         if (test_section("process exit stop before completion"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncProcessExitSkip(report);
+#else
             processExitStopBeforeCompletion();
+#endif
         }
         if (test_section("process exit tracked and untracked"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncProcessExitSkip(report);
+#else
             processExitTrackedAndUntracked();
+#endif
         }
         if (test_section("signal"))
         {
@@ -153,15 +188,27 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         }
         if (test_section("serial read/write"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncSerialSkip(report);
+#else
             serialReadWrite();
+#endif
         }
         if (test_section("serial stop"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncSerialSkip(report);
+#else
             serialStop();
+#endif
         }
         if (test_section("serial sequence ordering"))
         {
+#if SC_COMPILER_FILC && SC_PLATFORM_LINUX
+            printAsyncSerialSkip(report);
+#else
             serialSequenceOrdering();
+#endif
         }
 #if SC_PLATFORM_WINDOWS
         if (test_section("serial com0com read/write"))

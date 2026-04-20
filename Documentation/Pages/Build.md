@@ -50,6 +50,7 @@ Named options accepted by `compile`, `run`, and `coverage` are:
 - `-g`, `--generator <NAME>`
 - `-a`, `--arch <NAME>`
 - `--target <PROFILE>` (`compile` and `run` only)
+- `--toolchain <NAME>`
 - `--triple <VALUE>`
 - `--sysroot <PATH>`
 - `--runner <MODE>` (`run` only)
@@ -97,6 +98,17 @@ Runner values accepted by `build run` today are:
 - `qemu`
 - `custom`
 
+Toolchain values accepted by `compile` and `run` today are:
+
+- `default`
+- `host-default`
+- `clang`
+- `filc`
+- `gcc`
+- `msvc`
+- `clang-cl`
+- `llvm-mingw`
+
 Current CLI behavior:
 
 - If no project is specified, `compile` builds the whole default workspace
@@ -106,6 +118,7 @@ Current CLI behavior:
 - `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
 - `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
 - `--target` selects a friendly host or cross target profile without requiring the caller to spell the toolchain triple manually
+- `--toolchain` selects the compiler family orthogonally to `--target`
 - `--triple` and `--sysroot` are raw escape hatches for advanced toolchain overrides
 - Raw overrides are applied after `--target`, so they win over the friendly profile defaults
 - `build run` can use `--runner` / `--runner-path` to control how foreign executables are launched
@@ -123,7 +136,7 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `Machine` and `TargetEnvironment` for explicit host / target modeling
 - `TargetType::{ConsoleExecutable, GUIApplication, SharedLibrary, StaticLibrary}`
 - `Generator::{Native, XCode, VisualStudio2022, VisualStudio2019, Make}`
-- `Toolchain::{HostDefault, Clang, GCC, MSVC, ClangCL, LLVMMingw, CustomDriver}`
+- `Toolchain::{HostDefault, Clang, FilC, GCC, MSVC, ClangCL, LLVMMingw, CustomDriver}`
 - `RunnerSpec::{Auto, None, Wine, QEMU, Custom}`
 - `ExecutionOptions` for native-backend parallelism / verbosity knobs
 - `OutputMode::{Quiet, Normal, Verbose}` and `ExecutionOptions::outputMode` for native-backend presentation control
@@ -146,7 +159,8 @@ The standalone backend is selected through `SC::Build::Generator::Native`.
 Current implemented scope:
 
 - Host platforms: macOS, Linux and Windows
-- Toolchain families exposed by the API: `HostDefault`, `Clang`, `GCC`, `MSVC`, `ClangCL`, `LLVMMingw`, and `CustomDriver`
+- Toolchain families exposed by the API: `HostDefault`, `Clang`, `FilC`, `GCC`, `MSVC`, `ClangCL`, `LLVMMingw`, and `CustomDriver`
+- Experimental compiler-first track: `FilC` is now exposed by the API and CLI through `--toolchain filc`, but it is Linux-only, compiler-first, and not a public target-profile row yet
 - Target kinds: console executables, GUI applications, shared libraries, and static libraries
 - Dependency tracking: compiler-generated dependency files / dependency output
 - Incrementality: skips up-to-date compile and link steps
@@ -158,6 +172,7 @@ Current implemented scope:
 Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
+- Linux hosts can now experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is currently limited to native Linux `x86_64` output and is still outside the public support matrix while compile/start validation hardens
 - Linux `glibc` and `musl` target profiles now exist as first-class native-backend profiles; they shape canonical target
   triples and sysroot flags, and macOS hosts now auto-select both a packaged LLVM toolchain and packaged Linux sysroots
   for them when the caller has not provided explicit compiler paths
@@ -214,6 +229,8 @@ Typical native commands:
 ./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
+./SC.sh build compile SaneHttpGet --generator native --toolchain filc --output quiet
 ./SC.sh package install msvc
 ./SC.sh package install msvc --import-directory /opt/msvc-portable --wine /opt/bin/wine-wrapper
 ./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
@@ -230,6 +247,7 @@ Important current limits:
 - The QEMU runner path is implemented, but real repository-side QEMU execution is not yet validated in CI against a
   host-installed `qemu-user` package
 - Windows-host Linux-target packaging and validation are still pending
+- Fil-C is still an experimental compiler-first Linux track: no public `linux-filc-*` target profile exists yet, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
 - The repository `build configure` command does not rely on a Windows-native generation pass because native builds do

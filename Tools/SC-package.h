@@ -484,6 +484,8 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
 Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package);
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
+Result installFilCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                            StringView importDirectory = {});
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,

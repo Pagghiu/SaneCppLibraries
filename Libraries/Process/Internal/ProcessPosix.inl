@@ -103,6 +103,9 @@ SC::Result SC::Process::launchForkParent(PipeDescriptor& pipe, const void* previ
     if (actuallyRead.sizeInBytes() != 0)
     {
         // Error received inside childErrno
+        int ignoredStatus = -1;
+        (void)Internal::waitForPid(processID.pid, ignoredStatus);
+        (void)childErrno;
         return Result::Error("Process::launchImplementation - execve failed");
     }
     handle = processID.pid;

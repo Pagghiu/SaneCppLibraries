@@ -32,6 +32,7 @@ struct SC::Build::NativeBuild
         String executableCpp;
         String executableLink;
         String executableArchive;
+        String linkerToolDirectory;
 
         StringView subcommandC;
         StringView subcommandCpp;
@@ -40,7 +41,10 @@ struct SC::Build::NativeBuild
 
         String displayName;
 
-        [[nodiscard]] bool isClangLike() const { return family == Toolchain::Clang or family == Toolchain::LLVMMingw; }
+        [[nodiscard]] bool isClangLike() const
+        {
+            return family == Toolchain::Clang or family == Toolchain::FilC or family == Toolchain::LLVMMingw;
+        }
         [[nodiscard]] bool isMSVCStyle() const { return family == Toolchain::MSVC or family == Toolchain::ClangCL; }
         [[nodiscard]] bool isClangCL() const { return family == Toolchain::ClangCL; }
     };
@@ -1702,6 +1706,7 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-fcoverage-mapping"));
         }
         const bool supportsSanitizers =
+            resolvedProject.adapter.family != Toolchain::FilC and
             not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
                 resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
         if ((resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers)
@@ -1712,6 +1717,12 @@ struct SC::Build::NativeBuild
             resolvedProject.targetContext.hostMachine.platform != Platform::Linux)
         {
             SC_TRY(commandLine.append("-fuse-ld=lld"));
+        }
+        if (resolvedProject.adapter.family == Toolchain::FilC and
+            not resolvedProject.adapter.linkerToolDirectory.isEmpty())
+        {
+            SC_TRY(commandLine.append("-B"));
+            SC_TRY(commandLine.append(resolvedProject.adapter.linkerToolDirectory.view()));
         }
         if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike() and
             targetPlatform(resolvedProject.targetContext) != Platform::Linux)
@@ -1899,6 +1910,7 @@ struct SC::Build::NativeBuild
         }
 
         const bool supportsSanitizers =
+            resolvedProject.adapter.family != Toolchain::FilC and
             not(isLinuxTarget(resolvedProject.targetContext) and resolvedProject.adapter.family == Toolchain::Clang and
                 resolvedProject.targetContext.hostMachine.platform != Platform::Linux);
         if (flags.enableASAN and supportsSanitizers)
@@ -2466,6 +2478,74 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static Result resolvePackagedFilCToolchain(const Parameters& parameters, CompilerAdapter& adapter)
+    {
+        Tools::Package filCPackage;
+        SC_TRY(Tools::installFilCToolchain(parameters.directories.packagesCacheDirectory.view(),
+                                           parameters.directories.packagesInstallDirectory.view(), filCPackage));
+
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+
+        String defaultCompilerC   = StringEncoding::Utf8;
+        String defaultCompilerCpp = StringEncoding::Utf8;
+        String wrappedCompilerC   = StringEncoding::Utf8;
+        String wrappedCompilerCpp = StringEncoding::Utf8;
+        SC_TRY(Path::join(wrappedCompilerC, {filCPackage.installDirectoryLink.view(), "sc-filc", "bin", "clang"}));
+        SC_TRY(Path::join(wrappedCompilerCpp, {filCPackage.installDirectoryLink.view(), "sc-filc", "bin", "clang++"}));
+        if (fs.existsAndIsFile(wrappedCompilerC.view()) and fs.existsAndIsFile(wrappedCompilerCpp.view()))
+        {
+            SC_TRY(defaultCompilerC.assign(wrappedCompilerC.view()));
+            SC_TRY(defaultCompilerCpp.assign(wrappedCompilerCpp.view()));
+        }
+        else
+        {
+            SC_TRY(Path::join(defaultCompilerC, {filCPackage.installDirectoryLink.view(), "build", "bin", "clang"}));
+            SC_TRY(
+                Path::join(defaultCompilerCpp, {filCPackage.installDirectoryLink.view(), "build", "bin", "clang++"}));
+        }
+
+        SC_TRY(resolveExecutable(parameters.toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
+        SC_TRY(resolveExecutable(parameters.toolchain.compilerCpp.view(), defaultCompilerCpp.view(),
+                                 adapter.executableCpp));
+        SC_TRY(resolveExecutable(parameters.toolchain.linker.view(), adapter.executableCpp.view(),
+                                 adapter.executableLink));
+        SC_TRY(resolveExecutable(parameters.toolchain.archiver.view(), "ar", adapter.executableArchive));
+
+        if (parameters.hostMachine.platform == Platform::Linux and
+            parameters.hostMachine.architecture == Architecture::Arm64)
+        {
+            String linkerProvider = StringEncoding::Utf8;
+            if (not resolveRunnableHostCommand("ld.lld", linkerProvider))
+            {
+                Tools::Package llvmPackage;
+                SC_TRY(Tools::installLLVMToolchain(parameters.directories.packagesCacheDirectory.view(),
+                                                   parameters.directories.packagesInstallDirectory.view(),
+                                                   llvmPackage));
+                SC_TRY(Path::join(linkerProvider, {llvmPackage.installDirectoryLink.view(), "bin", "ld.lld"}));
+            }
+
+            FileSystem wrapperFs;
+            SC_TRY(wrapperFs.init("."));
+
+            String wrapperRoot = StringEncoding::Utf8;
+            String wrapperPath = StringEncoding::Utf8;
+            SC_TRY(Path::join(wrapperRoot, {parameters.directories.buildCacheDirectory.view(), "filc-linker"}));
+            SC_TRY(Path::join(wrapperPath, {wrapperRoot.view(), "ld"}));
+            SC_TRY(wrapperFs.makeDirectoryRecursive(wrapperRoot.view()));
+
+            String script  = StringEncoding::Utf8;
+            auto   builder = StringBuilder::create(script);
+            SC_TRY(builder.append("#!/bin/sh\n"));
+            SC_TRY(builder.append("exec \"{}\" \"$@\"\n", linkerProvider.view()));
+            builder.finalize();
+            SC_TRY(wrapperFs.writeString(wrapperPath.view(), script.view()));
+            SC_TRY(wrapperFs.chmod(wrapperPath.view(), 0755));
+            SC_TRY(adapter.linkerToolDirectory.assign(wrapperRoot.view()));
+        }
+        return Result(true);
+    }
+
     static Result resolvePackagedLinuxSysroot(const Parameters& parameters, const ResolvedTargetContext& context,
                                               String& sysroot)
     {
@@ -2587,6 +2667,14 @@ struct SC::Build::NativeBuild
     {
         return targetPlatform(context) == context.hostMachine.platform and
                targetArchitecture(context) == context.hostMachine.architecture and
+               context.targetMachine.environment == TargetEnvironment::Native;
+    }
+
+    static constexpr bool canRunThroughHostTranslation(const Parameters&            parameters,
+                                                       const ResolvedTargetContext& context)
+    {
+        return parameters.toolchain.family == Toolchain::FilC and targetPlatform(context) == Platform::Linux and
+               context.hostMachine.platform == Platform::Linux and
                context.targetMachine.environment == TargetEnvironment::Native;
     }
 
@@ -2870,11 +2958,12 @@ struct SC::Build::NativeBuild
         switch (runnerSpec.type)
         {
         case RunnerSpec::None:
-            SC_TRY_MSG(canRunDirectly(targetContext), "Runner is disabled for foreign targets");
+            SC_TRY_MSG(canRunDirectly(targetContext) or canRunThroughHostTranslation(parameters, targetContext),
+                       "Runner is disabled for foreign targets");
             runner.mode = ResolvedRunner::Direct;
             return Result(true);
         case RunnerSpec::Auto:
-            if (canRunDirectly(targetContext))
+            if (canRunDirectly(targetContext) or canRunThroughHostTranslation(parameters, targetContext))
             {
                 runner.mode = ResolvedRunner::Direct;
                 return Result(true);
@@ -3588,6 +3677,16 @@ struct SC::Build::NativeBuild
                 SC_TRY(resolveExecutable(toolchain.archiver.view(), "ar", adapter.executableArchive));
             }
             SC_TRY(adapter.displayName.assign("clang"));
+            break;
+        case Toolchain::FilC:
+            SC_TRY_MSG(targetContext.hostMachine.platform == Platform::Linux, "Fil-C is only supported on Linux hosts");
+            SC_TRY_MSG(targetPlatform(targetContext) == Platform::Linux and
+                           targetContext.targetMachine.environment == TargetEnvironment::Native,
+                       "Fil-C currently only supports native Linux targets");
+            SC_TRY_MSG(targetArchitecture(targetContext) == Architecture::Intel64,
+                       "Fil-C currently only supports x86_64 Linux output");
+            SC_TRY(resolvePackagedFilCToolchain(parameters, adapter));
+            SC_TRY(adapter.displayName.assign("filc"));
             break;
         case Toolchain::GCC:
             SC_TRY(resolveExecutable(toolchain.compilerC.view(), "gcc", adapter.executableC));

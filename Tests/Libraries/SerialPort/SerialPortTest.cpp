@@ -25,6 +25,7 @@ struct SerialPortTest;
 
 namespace
 {
+#if SC_PLATFORM_WINDOWS || !SC_COMPILER_FILC
 static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<char> destination)
 {
     size_t totalRead = 0;
@@ -37,6 +38,7 @@ static SC::Result readExactDescriptor(SC::FileDescriptor& descriptor, SC::Span<c
     }
     return SC::Result(true);
 }
+#endif
 
 #if SC_PLATFORM_WINDOWS
 struct WindowsCom0ComPorts
@@ -291,6 +293,13 @@ void SC::SerialPortTest::nonSerialHandleContract()
 #if !SC_PLATFORM_WINDOWS
 void SC::SerialPortTest::posixPTYOpenConfigureReadback()
 {
+#if SC_COMPILER_FILC
+    if (not report.quietMode)
+    {
+        report.console.printLine(
+            "SerialPortTest - Skipping POSIX PTY loopback under Fil-C: PTY name resolution is not yet supported");
+    }
+#else
     PosixPTYPair pair;
     SC_TEST_EXPECT(pair.create());
 
@@ -333,6 +342,7 @@ void SC::SerialPortTest::posixPTYOpenConfigureReadback()
     char receivedByPeer[4] = {0};
     SC_TEST_EXPECT(readExactDescriptor(pair.master, {receivedByPeer, sizeof(receivedByPeer)}));
     SC_TEST_EXPECT(::memcmp(receivedByPeer, fromSerial, sizeof(fromSerial)) == 0);
+#endif
 }
 #else
 void SC::SerialPortTest::windowsCom0ComOpenConfigureReadback()

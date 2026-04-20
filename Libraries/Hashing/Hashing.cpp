@@ -165,7 +165,26 @@ bool SC::Hashing::getHash(Result& res)
 }
 
 #elif SC_PLATFORM_LINUX
+#if defined(__has_include)
+#if __has_include(<linux/if_alg.h>)
 #include <linux/if_alg.h>
+#else
+#include <stdint.h>
+#ifndef AF_ALG
+#define AF_ALG 38
+#endif
+struct sockaddr_alg
+{
+    uint16_t salg_family;
+    char     salg_type[14];
+    uint32_t salg_feat;
+    uint32_t salg_mask;
+    char     salg_name[64];
+};
+#endif
+#else
+#include <linux/if_alg.h>
+#endif
 #include <sys/socket.h>
 #include <unistd.h>
 

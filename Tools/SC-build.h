@@ -53,6 +53,7 @@ struct BuildCLIParseContext
 {
     StringSpan target           = {};
     StringSpan targetProfile    = {};
+    StringSpan toolchain        = {};
     StringSpan configuration    = {};
     StringSpan generator        = {};
     StringSpan architecture     = {};
@@ -180,6 +181,15 @@ struct BuildCLIParseContext
                                  "  - windows-msvc-arm64: Windows MSVC arm64 target through portable MSVC + Wine\n"
                                  "  - windows-gnu-arm64: Windows GNU arm64 target through llvm-mingw\n"),
                    "Failed writing SC-build help");
+        SC_TRY_MSG(output.append("\nToolchain values:\n"
+                                 "  - default / host-default: host-default compiler family\n"
+                                 "  - clang: explicit clang-family driver\n"
+                                 "  - gcc: explicit GCC-family driver\n"
+                                 "  - msvc: explicit MSVC toolchain family\n"
+                                 "  - clang-cl: explicit clang-cl toolchain family\n"
+                                 "  - llvm-mingw: packaged Windows GNU cross-toolchain\n"
+                                 "  - filc: experimental Linux-only Fil-C compiler track\n"),
+                   "Failed writing SC-build help");
         SC_TRY_MSG(
             output.append(
                 "\nCurrent tested cross-target support:\n"
@@ -187,6 +197,7 @@ struct BuildCLIParseContext
                 "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
                 "  - macOS hosts can compile linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, and "
                 "linux-musl-arm64 through packaged LLVM + packaged sysroots\n"
+                "  - Linux hosts can also experiment with Fil-C through --toolchain filc for native Linux builds\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
                 "  - build run can also wrap foreign Linux targets through qemu-user when a suitable qemu "
                 "executable and sysroot are available\n"
@@ -698,6 +709,59 @@ template <size_t N>
     return Result(true);
 }
 
+[[nodiscard]] inline Result applyToolchainValue(Build::Action& action, StringView toolchainValue, Console& console)
+{
+    if (toolchainValue.isEmpty())
+    {
+        return Result(true);
+    }
+    static constexpr StringView toolchainNames[] = {"default", "host-default", "clang",    "filc",
+                                                    "gcc",     "msvc",         "clang-cl", "llvm-mingw"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--toolchain", toolchainValue, toolchainNames, resolved, console));
+    action.parameters.toolchain.platform     = Build::Platform::Unknown;
+    action.parameters.toolchain.architecture = Build::Architecture::Any;
+    if (equalsAsciiIgnoreCase(resolved, "clang"))
+    {
+        action.parameters.toolchain.family = Build::Toolchain::Clang;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "filc"))
+    {
+        action.parameters.toolchain.family       = Build::Toolchain::FilC;
+        action.parameters.toolchain.platform     = Build::Platform::Linux;
+        action.parameters.toolchain.architecture = Build::Architecture::Intel64;
+        if (action.parameters.architecture == Build::Architecture::Any)
+        {
+            action.parameters.architecture = Build::Architecture::Intel64;
+        }
+        if (action.parameters.targetMachine.architecture == Build::Architecture::Any)
+        {
+            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+        }
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "gcc"))
+    {
+        action.parameters.toolchain.family = Build::Toolchain::GCC;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "msvc"))
+    {
+        action.parameters.toolchain.family = Build::Toolchain::MSVC;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "clang-cl"))
+    {
+        action.parameters.toolchain.family = Build::Toolchain::ClangCL;
+    }
+    else if (equalsAsciiIgnoreCase(resolved, "llvm-mingw"))
+    {
+        action.parameters.toolchain.family = Build::Toolchain::LLVMMingw;
+    }
+    else
+    {
+        action.parameters.toolchain.family = Build::Toolchain::HostDefault;
+    }
+    return Result(true);
+}
+
 [[nodiscard]] inline Result resolveOutputModeValue(StringView value, Build::OutputMode::Type& outputMode,
                                                    Console& console)
 {
@@ -966,6 +1030,41 @@ template <size_t N>
             }
         }
     }
+    if (action.parameters.toolchain.family == Build::Toolchain::FilC)
+    {
+        if (action.parameters.hostMachine.platform != Build::Platform::Linux)
+        {
+            return printBuildActionCombinationError(console, "Fil-C is only supported on Linux hosts");
+        }
+        if (not context.generator.isEmpty())
+        {
+            StringView resolvedGenerator;
+            SC_TRY(resolveBuildGeneratorKeyword(context.generator, resolvedGenerator, console));
+            if (not(equalsAsciiIgnoreCase(resolvedGenerator, "default") or
+                    equalsAsciiIgnoreCase(resolvedGenerator, "native")))
+            {
+                return printBuildActionCombinationError(console, "Fil-C requires --generator native (or default)");
+            }
+        }
+        if (action.parameters.targetMachine.platform != Build::Platform::Linux or
+            action.parameters.targetMachine.environment != Build::TargetEnvironment::Native)
+        {
+            return printBuildActionCombinationError(console, "Fil-C currently only supports native Linux targets");
+        }
+        if (action.parameters.targetMachine.architecture != Build::Architecture::Intel64)
+        {
+            return printBuildActionCombinationError(
+                console, "Fil-C currently only supports x86_64 Linux output in the packaged pizfix distribution");
+        }
+        if (not context.targetTriple.isEmpty())
+        {
+            return printBuildActionCombinationError(console, "Fil-C does not accept --triple overrides yet");
+        }
+        if (not context.sysroot.isEmpty())
+        {
+            return printBuildActionCombinationError(console, "Fil-C does not accept --sysroot overrides yet");
+        }
+    }
 
     if (actionType != Build::Action::Run)
     {
@@ -1127,7 +1226,7 @@ template <size_t N>
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[12];
+    CommandLineOption     options[13];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -1146,6 +1245,12 @@ template <size_t N>
         "windows-msvc-arm64, linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, linux-musl-arm64)";
     options[numOptions].valueName = "PROFILE";
     options[numOptions].value     = CommandLineValue::stringSpan(context.targetProfile);
+    numOptions++;
+
+    options[numOptions].longName = "toolchain";
+    options[numOptions].help = "Compiler family (default, host-default, clang, filc, gcc, msvc, clang-cl, llvm-mingw)";
+    options[numOptions].valueName = "NAME";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.toolchain);
     numOptions++;
 
     options[numOptions].longName  = "generator";
@@ -1297,6 +1402,10 @@ template <size_t N>
     if (not context.targetProfile.isEmpty())
     {
         SC_TRY(applyTargetProfileValue(action, context.targetProfile, arguments.console));
+    }
+    if (not context.toolchain.isEmpty())
+    {
+        SC_TRY(applyToolchainValue(action, context.toolchain, arguments.console));
     }
     if (not context.targetTriple.isEmpty())
     {

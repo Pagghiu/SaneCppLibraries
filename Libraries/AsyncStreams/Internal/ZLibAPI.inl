@@ -74,6 +74,10 @@ struct SC::ZLibAPI::Internal
 
 SC::Result SC::ZLibAPI::load(const char* libPath)
 {
+#if SC_COMPILER_FILC
+    (void)libPath;
+    return Result::Error("ZLib unavailable under Fil-C: host zlib ABI integration is not implemented");
+#else
     if (library != nullptr)
     {
         refCount++;
@@ -117,6 +121,7 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
     SC_TRY(Internal::loadSymbol(*this, pInflateInit2, "inflateInit2_"));
     refCount = 1;
     return Result(true);
+#endif
 }
 
 void SC::ZLibAPI::unload()

@@ -141,6 +141,7 @@ Named options are:
 - `-g`, `--generator <NAME>`
 - `-a`, `--arch <NAME>`
 - `--target <PROFILE>` (`compile` / `run`)
+- `--toolchain <NAME>`
 - `--triple <VALUE>`
 - `--sysroot <PATH>`
 - `--runner <MODE>` (`run`)
@@ -153,6 +154,9 @@ Named options are:
 Target profiles currently exposed by the CLI are `host`, `native`, `linux-glibc-x86_64`, `linux-glibc-arm64`,
 `linux-musl-x86_64`, `linux-musl-arm64`, `windows-gnu-x86_64`, `windows-msvc-x86_64`, `windows-msvc-arm64`, and
 `windows-gnu-arm64`.
+
+Toolchain keywords currently exposed by the CLI are `default`, `host-default`, `clang`, `filc`, `gcc`, `msvc`,
+`clang-cl`, and `llvm-mingw`.
 
 Runner keywords currently exposed by the CLI are `auto`, `none`, `wine`, `qemu`, and `custom`.
 
@@ -173,6 +177,7 @@ Current defaults:
 - macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
   `linux-musl-x86_64`, and `linux-musl-arm64`
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
+- Linux native builds can now also experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is compiler-first Linux support for native `x86_64` output only and is not yet a public target-profile row
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
 - Linux arm64 hosts can now validate the portable MSVC path end-to-end for `windows-msvc-x86_64` and
@@ -248,6 +253,12 @@ Build through the native backend
 Prepare the packaged host LLVM toolchain for Linux targets
 ```
 ./SC.sh package install llvm
+```
+
+Register an imported Fil-C installation and compile a native Linux target through the experimental compiler-first path
+```
+./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
+./SC.sh build compile SaneHttpGet --generator native --toolchain filc --output quiet
 ```
 
 Cross-compile a Linux glibc executable through the native backend with the packaged macOS sysroot path
@@ -358,6 +369,8 @@ These are the packages that are currently downloaded and extracted / symlinked b
 - `LLVM 20.1.8`: Downloads `clang-format` from the official LLVM github repository using SHA256 pinned archives
 - `LLVM toolchain 20.1.8`: Downloads the full host LLVM toolchain (`clang`, `clang++`, `llvm-ar`, `lld`) for
   Linux-target native-backend flows on supported hosts
+- `Fil-C 0.678` (experimental): Linux-only compiler package with a pinned upstream `pizfix` download path plus
+  `--import-directory <path>` registration for compiler-first native-backend work through `--toolchain filc`
 - `doxygen`: Doxygen documentation generator
 - `doxygen-awesome-css`: Doxygen awesome css (Doxygen theme)
 

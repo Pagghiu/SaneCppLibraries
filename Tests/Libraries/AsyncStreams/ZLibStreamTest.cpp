@@ -33,6 +33,13 @@ struct SC::ZLibStreamTest : public SC::TestCase
 {
     ZLibStreamTest(SC::TestReport& report) : TestCase(report, "ZLibStreamTest")
     {
+#if SC_COMPILER_FILC
+        if (not report.quietMode)
+        {
+            report.console.printLine(
+                "ZLibStreamTest - Skipping under Fil-C: compression paths depend on host zlib ABI loading");
+        }
+#else
         // Avoid "expression is constant" warning
         auto host           = HostPlatform;
         auto instructionSet = HostInstructionSet;
@@ -67,6 +74,7 @@ struct SC::ZLibStreamTest : public SC::TestCase
             syncDecompression(ZLibStream::DecompressZLib, "test"_a8, testCompressedZLIB);
             syncCompression(ZLibStream::CompressZLib, "test"_a8, testCompressedZLIB);
         }
+#endif
     }
 
     void syncCompression(ZLibStream::Algorithm compressionAlgorithm, const StringView inputString,

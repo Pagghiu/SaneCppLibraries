@@ -16,6 +16,7 @@
 
 - The native backend now models build machine, host machine, target machine, and runner explicitly instead of treating every build as host-native.
 - Prefer friendly `build --target` profiles before raw overrides. Current public profiles include `linux-glibc-x86_64`, `linux-glibc-arm64`, `linux-musl-x86_64`, `linux-musl-arm64`, `windows-gnu-x86_64`, `windows-gnu-arm64`, `windows-msvc-x86_64`, and `windows-msvc-arm64`.
+- `build --toolchain` is now public too. Current values include `default`, `host-default`, `clang`, `filc`, `gcc`, `msvc`, `clang-cl`, and `llvm-mingw`.
 - Use raw `--triple` and `--sysroot` only as escape hatches; they intentionally override friendly profile defaults.
 - Use `build run --runner <mode>` when the target is foreign. Current runner keywords are `auto`, `none`, `wine`, `qemu`, and `custom`.
 - Foreign Linux targets can now run through `qemu-user` via `--runner qemu` or `--runner auto`; when that path is used the backend passes `-L <sysroot>` so dynamic Linux binaries resolve against the selected sysroot.
@@ -24,6 +25,7 @@
 - For Linux-target profiles on macOS and Windows, the native backend now auto-selects a packaged LLVM toolchain when explicit compiler paths are not provided. On macOS, the packaged Linux glibc and musl sysroots are now first-class too, so `linux-glibc-*` and `linux-musl-*` can compile without an explicit `--sysroot`.
 - `SC-package install msvc` is the entry point for portable MSVC + Windows SDK acquisition. It now accepts `--import-directory <path>` and `--wine <path>` for imported layouts and custom runner wrappers.
 - `SC-package install llvm` is now the packaged host-toolchain prerequisite for Linux-target native-backend work on non-Linux hosts.
+- `SC-package install filc` is the new experimental compiler-first entry point for Linux Fil-C work. Use it together with `build ... --toolchain filc`; do not describe it as a public `linux-filc-*` target profile yet.
 - `SCBuildTest` fixture runs now keep per-run projects, outputs, intermediates, and build cache isolated under `_Build/_Tests/...`, but reuse the repository `_Build/_PackagesCache` and `_Build/_Packages` roots so large packaged toolchains and runners are not re-downloaded for every fixture run.
 - Once portable MSVC is installed, later native `windows-msvc-*` builds can reuse the wrapper path recorded in `sc-msvc-package.json` instead of requiring `SC_MSVC_WINE` again.
 - Existing portable MSVC layouts can now repair missing metadata and wrapper scripts in place, and SDK version detection falls back from `Windows Kits/10/bin` to `Include` or `Lib` when the SDK tools directory is absent.
@@ -44,6 +46,7 @@
 - Do not treat `SC::Build` as a mandatory replacement for the user’s build system.
 - Do not forget that the native backend is only available on macOS and Linux.
 - Do not describe cross-target support as "run anything anywhere". Build support and run support still differ by host, target family, architecture, and available runner assets.
+- Do not present Fil-C as a public support-matrix row yet; it is still an experimental Linux compiler track with compiler-first validation work in progress.
 - Keep export-symbol decisions on the host executable, not on the plugin target.
 
 ## References

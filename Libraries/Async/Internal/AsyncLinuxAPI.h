@@ -5,6 +5,8 @@
 #include <sys/uio.h> // for iovec
 #include <unistd.h>
 
+#include "AsyncLinuxUAPI.h"
+
 struct AsyncLinuxAPI
 {
     void* liburingHandle = nullptr;
@@ -165,9 +167,6 @@ struct AsyncLinuxLibURingLoader : public AsyncLinuxAPI
 // minimal amount of headers/struct for the functions used by the SC::Async library :-(
 //
 // TODO: Use the liburing-ffi supplied functions if they're available on the system
-
-#include <linux/io_uring.h>   // io_uring
-#include <linux/time_types.h> // __kernel_timespec
 
 struct io_uring_sq
 {

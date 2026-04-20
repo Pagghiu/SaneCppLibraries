@@ -83,6 +83,24 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Arm64);
             SC_TEST_EXPECT(action.parameters.execution.outputMode == Build::OutputMode::Quiet);
         }
+        if (test_section("build cli parses filc toolchain selection"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--toolchain";
+            args[2]             = "filc";
+            arguments.arguments = {args, 3};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::FilC);
+            SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
+            SC_TEST_EXPECT(action.parameters.toolchain.architecture == Build::Architecture::Intel64);
+        }
         if (test_section("build cli parses Windows GNU target profiles"))
         {
             arguments.tool      = "build";
@@ -683,6 +701,25 @@ struct SupportToolsTest : public TestCase
             args[0]             = "clang";
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("install filc rejects missing import-directory value"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "filc";
+            args[1]             = "--import-directory";
+            arguments.arguments = {args, 2};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("install filc rejects unknown option"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "filc";
+            args[1]             = "--unknown";
+            args[2]             = "value";
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
         }
         if (test_section("install msvc rejects missing wine option value"))
         {

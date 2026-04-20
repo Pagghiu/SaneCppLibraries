@@ -56,6 +56,13 @@ struct SC::PluginTest : public SC::TestCase
         }
         if (test_section("PluginScanner/PluginCompiler/PluginRegistry"))
         {
+#if SC_COMPILER_FILC
+            if (not report.quietMode)
+            {
+                report.console.printLine("PluginTest - Skipping plugin compile/load under Fil-C: plugin "
+                                         "toolchain/runtime ABI integration is not implemented");
+            }
+#else
             StringPath sourcePluginsPath;
             SC_TEST_EXPECT(Path::join(sourcePluginsPath, {report.libraryRootDirectory.view(), "Tests", "Libraries",
                                                           "Plugin", "PluginTestDirectory"}));
@@ -172,6 +179,7 @@ struct SC::PluginTest : public SC::TestCase
             // Cleanup
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierChild));
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
+#endif
         }
     }
 };

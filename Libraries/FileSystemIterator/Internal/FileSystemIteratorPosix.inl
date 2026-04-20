@@ -9,10 +9,16 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#if SC_PLATFORM_LINUX
+#if defined(__has_include)
+#if __has_include(<linux/limits.h>)
 #include <linux/limits.h> // For PATH_MAX on Linux
+#elif __has_include(<limits.h>)
+#include <limits.h> // For PATH_MAX when Linux UAPI headers are unavailable
 #else
 #include <sys/syslimits.h> // For PATH_MAX on Apple and other POSIX systems
+#endif
+#else
+#include <limits.h>
 #endif
 
 struct SC::FileSystemIterator::Internal

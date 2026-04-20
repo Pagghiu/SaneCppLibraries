@@ -42,7 +42,10 @@ static Result extractTarArchiveFlatteningRoot(StringView sourceFile, StringView 
     SC_TRY_MSG(extractProcess.getExitStatus() == 0, "tar extraction failed");
     SC_TRY_MSG(fs.existsAndIsDirectory(extractedRoot.view()), "tar extraction root directory missing");
 
-    SC_TRY(fs.removeDirectoryRecursive(destinationDirectory));
+    if (fs.existsAndIsDirectory(destinationDirectory))
+    {
+        SC_TRY(fs.removeDirectoryRecursive(destinationDirectory));
+    }
     SC_TRY(fs.rename(extractedRoot.view(), destinationDirectory));
     SC_TRY(fs.removeDirectoryRecursive(tempDirectory.view()));
     return Result(true);
@@ -821,6 +824,43 @@ struct MSVCPackageInstallOptions
     StringView wineExecutable;
 };
 
+struct FilCPackageInstallOptions
+{
+    StringView importDirectory;
+};
+
+static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, FilCPackageInstallOptions& options)
+{
+    options = {};
+    if (arguments.sizeInElements() <= 1)
+    {
+        return Result(true);
+    }
+
+    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments[idx];
+        if (argument == "--import-directory")
+        {
+            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            options.importDirectory = arguments[++idx];
+        }
+        else if (argument.startsWith("--"))
+        {
+            return Result::Error("Unknown option for SC-package install filc");
+        }
+        else if (options.importDirectory.isEmpty())
+        {
+            options.importDirectory = argument;
+        }
+        else
+        {
+            return Result::Error("Unexpected extra argument for SC-package install filc");
+        }
+    }
+    return Result(true);
+}
+
 static Result parseMSVCPackageInstallOptions(Span<const StringView> arguments, MSVCPackageInstallOptions& options)
 {
     options = {};
@@ -951,20 +991,25 @@ static Result writeMSVCWrapperScripts(StringView packageRoot)
     return Result(true);
 }
 
-static Result finalizeInstalledPackage(Package& package)
+static Result finalizeInstalledPackageFromRoot(StringView packageRoot, Package& package)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
     SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
-    if (not createLink(package.packageLocalDirectory.view(), package.installDirectoryLink.view()))
+    if (not createLink(packageRoot, package.installDirectoryLink.view()))
     {
         if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
         {
             SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
         }
-        SC_TRY(fs.copyDirectory(package.packageLocalDirectory.view(), package.installDirectoryLink.view()));
+        SC_TRY(fs.copyDirectory(packageRoot, package.installDirectoryLink.view()));
     }
     return Result(true);
+}
+
+static Result finalizeInstalledPackage(Package& package)
+{
+    return finalizeInstalledPackageFromRoot(package.packageLocalDirectory.view(), package);
 }
 
 static Result testMSVCToolchain(const Package& package)
@@ -1472,6 +1517,359 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
 }
+
+#if SC_PLATFORM_LINUX
+static Result resolveFilCRawCompilerPath(StringView packageRoot, StringView executableName, String& output)
+{
+    SC_TRY(Path::join(output, {packageRoot, "build", "bin", executableName}));
+    return Result(true);
+}
+
+static Result resolveFilCCompilerPath(StringView packageRoot, StringView executableName, String& output)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String wrapperPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(wrapperPath, {packageRoot, "sc-filc", "bin", executableName}));
+    if (fs.existsAndIsFile(wrapperPath.view()))
+    {
+        SC_TRY(output.assign(wrapperPath.view()));
+        return Result(true);
+    }
+
+    return resolveFilCRawCompilerPath(packageRoot, executableName, output);
+}
+
+static Result probeFilCCompiler(StringView compilerPath, String& versionOutput)
+{
+    String compilerDirectory = StringEncoding::Utf8;
+    SC_TRY(compilerDirectory.assign(Path::dirname(compilerPath, Path::AsNative)));
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(compilerDirectory.view()));
+    SC_TRY(process.exec({compilerPath, "--version"}, versionOutput));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C compiler returned error");
+    SC_TRY_MSG(StringView(versionOutput.view()).containsString("Fil-C"), "Fil-C compiler marker missing");
+    SC_TRY_MSG(StringView(versionOutput.view()).containsString("Target:"), "Fil-C target triple missing");
+    return Result(true);
+}
+
+static Result extractVersionLineSuffix(StringView versionOutput, StringView prefix, String& value)
+{
+    StringViewTokenizer lines(versionOutput);
+    while (lines.tokenizeNextLine())
+    {
+        StringView line = lines.component.trimWhiteSpaces();
+        if (line.startsWith(prefix))
+        {
+            SC_TRY(value.assign(line.sliceStart(prefix.sizeInBytes()).trimWhiteSpaces()));
+            return Result(true);
+        }
+    }
+    return Result::Error("Missing Fil-C metadata line");
+}
+
+static Result writeFilCPackageMetadata(StringView packageRoot, StringView version, StringView flavor,
+                                       StringView compilerC, StringView compilerCpp, StringView linker,
+                                       StringView archiver, StringView targetTriple)
+{
+    String metadataPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(metadataPath, {packageRoot, "sc-filc-package.json"}));
+
+    String metadata = StringEncoding::Utf8;
+    auto   builder  = StringBuilder::create(metadata);
+    SC_TRY(builder.append("{\n"));
+    SC_TRY(builder.append("  \"version\": \"{}\",\n", version));
+    SC_TRY(builder.append("  \"flavor\": \"{}\",\n", flavor));
+    SC_TRY(builder.append("  \"compilerC\": \"{}\",\n", compilerC));
+    SC_TRY(builder.append("  \"compilerCpp\": \"{}\",\n", compilerCpp));
+    SC_TRY(builder.append("  \"linker\": \"{}\",\n", linker));
+    SC_TRY(builder.append("  \"archiver\": \"{}\",\n", archiver));
+    SC_TRY(builder.append("  \"targetTriple\": \"{}\"\n", targetTriple));
+    SC_TRY(builder.append("}\n"));
+    builder.finalize();
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.writeString(metadataPath.view(), metadata.view()));
+    return Result(true);
+}
+
+static Result writeFilCCompilerWrapperScript(FileSystem& fs, StringView scriptPath, StringView launcherPath,
+                                             StringView compilerPath)
+{
+    String script  = StringEncoding::Utf8;
+    auto   builder = StringBuilder::create(script);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("COMPILER_PATH=\"{}\"\n", compilerPath));
+    SC_TRY(builder.append("COMPILER_DIR=$(dirname \"$COMPILER_PATH\")\n"));
+    SC_TRY(builder.append("cd \"$COMPILER_DIR\" || exit 1\n"));
+    SC_TRY(builder.append("exec \"{}\" \"$COMPILER_PATH\" \"$@\"\n", launcherPath));
+    builder.finalize();
+    SC_TRY(fs.writeString(scriptPath, script.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755));
+    return Result(true);
+}
+
+static Result prepareFilCCompilerLaunchers(StringView packageRoot)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    if (HostPlatform != Platform::Linux or HostInstructionSet != InstructionSet::ARM64)
+    {
+        return Result(true);
+    }
+
+    static constexpr StringView rosettaPath = "/media/psf/RosettaLinux/rosetta";
+    if (not fs.existsAndIsFile(rosettaPath))
+    {
+        return Result(true);
+    }
+
+    String rawCompilerC   = StringEncoding::Utf8;
+    String rawCompilerCpp = StringEncoding::Utf8;
+    String wrapperRoot    = StringEncoding::Utf8;
+    String wrapperC       = StringEncoding::Utf8;
+    String wrapperCpp     = StringEncoding::Utf8;
+    SC_TRY(resolveFilCRawCompilerPath(packageRoot, "clang", rawCompilerC));
+    SC_TRY(resolveFilCRawCompilerPath(packageRoot, "clang++", rawCompilerCpp));
+    SC_TRY(Path::join(wrapperRoot, {packageRoot, "sc-filc", "bin"}));
+    SC_TRY(Path::join(wrapperC, {wrapperRoot.view(), "clang"}));
+    SC_TRY(Path::join(wrapperCpp, {wrapperRoot.view(), "clang++"}));
+    SC_TRY(fs.makeDirectoryRecursive(wrapperRoot.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperC.view(), rosettaPath, rawCompilerC.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperCpp.view(), rosettaPath, rawCompilerCpp.view()));
+    return Result(true);
+}
+
+static Result ensureFilCPackagePrepared(StringView packageRoot)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String compilerCpp = StringEncoding::Utf8;
+    SC_TRY(resolveFilCRawCompilerPath(packageRoot, "clang++", compilerCpp));
+    if (fs.existsAndIsFile(compilerCpp.view()))
+    {
+        return Result(true);
+    }
+
+    String setupPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(setupPath, {packageRoot, "setup.sh"}));
+    SC_TRY_MSG(fs.existsAndIsFile(setupPath.view()), "Fil-C package is missing setup.sh");
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(packageRoot));
+    SC_TRY(process.exec({"sh", "./setup.sh"}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C setup.sh failed");
+    SC_TRY_MSG(fs.existsAndIsFile(compilerCpp.view()), "Fil-C setup did not produce build/bin/clang++");
+    return Result(true);
+}
+
+static Result testFilCToolchain(const Package& package, String* detectedVersion = nullptr,
+                                String* detectedTarget = nullptr)
+{
+    String compilerC    = StringEncoding::Utf8;
+    String compilerCpp  = StringEncoding::Utf8;
+    String versionOut   = StringEncoding::Utf8;
+    String version      = StringEncoding::Utf8;
+    String targetTriple = StringEncoding::Utf8;
+    SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang", compilerC));
+    SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang++", compilerCpp));
+    SC_TRY(probeFilCCompiler(compilerCpp.view(), versionOut));
+    SC_TRY(extractVersionLineSuffix(versionOut.view(), "Fil-C "_a8, version));
+    SC_TRY(extractVersionLineSuffix(versionOut.view(), "Target:"_a8, targetTriple));
+    SC_TRY_MSG(targetTriple == "x86_64-unknown-linux-gnu",
+               "Fil-C package target triple doesn't match the supported x86_64 Linux slice");
+
+    Process process;
+    String  cVersionOut = StringEncoding::Utf8;
+    SC_TRY(process.exec({compilerC.view(), "--version"}, cVersionOut));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C C compiler returned error");
+
+    if (detectedVersion)
+    {
+        SC_TRY(detectedVersion->assign(version.view()));
+    }
+    if (detectedTarget)
+    {
+        SC_TRY(detectedTarget->assign(targetTriple.view()));
+    }
+    return Result(true);
+}
+
+Result installFilCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                            StringView importDirectory)
+{
+
+    static constexpr StringView packageVersion = "0.678";
+    static constexpr StringView packageFlavor  = "pizfix";
+    static constexpr StringView packageURL =
+        "https://github.com/pizlonator/fil-c/releases/download/v0.678/filc-0.678-linux-x86_64.tar.xz";
+    static constexpr StringView packageHash = "8c515f704b3ba524566847d78a8c324708a64d0eefadabb40094bc5130aa8995";
+
+    package.packageFullName       = "filc-0.678-linux-x86_64-pizfix";
+    package.packageBaseName       = "filc-0.678-linux-x86_64.tar.xz";
+    package.packageLocalFile      = format("{}/filc/{}", packagesCacheDirectory, package.packageBaseName.view());
+    package.packageLocalDirectory = format("{}/filc/pizfix-{}-linux-x86_64", packagesCacheDirectory, packageVersion);
+    package.packageLocalTxt      = format("{}/filc/pizfix-{}-linux-x86_64.txt", packagesCacheDirectory, packageVersion);
+    package.installDirectoryLink = format("{}/filc_linux_x86_64", packagesInstallDirectory);
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalFile.view(), Path::AsNative)));
+
+    String resolvedImportDirectory = StringEncoding::Utf8;
+    if (not importDirectory.isEmpty())
+    {
+        SC_TRY(resolvedImportDirectory.assign(importDirectory));
+    }
+    else if (fs.existsAndIsFile(package.packageLocalTxt.view()))
+    {
+        String metadata = StringEncoding::Utf8;
+        SC_TRY(fs.read(package.packageLocalTxt.view(), metadata));
+
+        StringView          urlValue;
+        StringViewTokenizer lines(metadata.view());
+        while (lines.tokenizeNextLine())
+        {
+            StringView line = lines.component.trimWhiteSpaces();
+            if (line.startsWith("SC_PACKAGE_URL=import:"))
+            {
+                SC_TRY(line.splitAfter("SC_PACKAGE_URL=import:", urlValue));
+                SC_TRY(resolvedImportDirectory.assign(urlValue));
+                break;
+            }
+            if (line.startsWith("SC_PACKAGE_URL=/"))
+            {
+                SC_TRY(line.splitAfter("SC_PACKAGE_URL=", urlValue));
+                SC_TRY(resolvedImportDirectory.assign(urlValue));
+                break;
+            }
+        }
+    }
+
+    const bool importing        = not resolvedImportDirectory.isEmpty();
+    String     sourceIdentifier = StringEncoding::Utf8;
+    if (importing)
+    {
+        SC_TRY(StringBuilder::format(sourceIdentifier, "import:{}", resolvedImportDirectory.view()));
+    }
+    else
+    {
+        SC_TRY(sourceIdentifier.assign(packageURL));
+    }
+
+    String activePackageRoot = StringEncoding::Utf8;
+    SC_TRY(activePackageRoot.assign(importing ? resolvedImportDirectory.view() : package.packageLocalDirectory.view()));
+
+    auto metadataMatches = [&](bool& matches) -> Result
+    {
+        matches = false;
+        if (not fs.existsAndIsFile(package.packageLocalTxt.view()))
+        {
+            return Result(true);
+        }
+
+        String metadata = StringEncoding::Utf8;
+        SC_TRY(fs.read(package.packageLocalTxt.view(), metadata));
+
+        StringView          urlValue;
+        StringView          flavorValue;
+        StringViewTokenizer lines(metadata.view());
+        while (lines.tokenizeNextLine())
+        {
+            StringView line = lines.component.trimWhiteSpaces();
+            if (line.startsWith("SC_PACKAGE_URL="))
+            {
+                SC_TRY(line.splitAfter("SC_PACKAGE_URL=", urlValue));
+            }
+            else if (line.startsWith("SC_PACKAGE_FLAVOR="))
+            {
+                SC_TRY(line.splitAfter("SC_PACKAGE_FLAVOR=", flavorValue));
+            }
+        }
+        matches = flavorValue == packageFlavor and
+                  (urlValue == sourceIdentifier.view() or (importing and urlValue == resolvedImportDirectory.view()));
+        return Result(true);
+    };
+
+    bool needsInstall = true;
+    if (fs.existsAndIsDirectory(activePackageRoot.view()))
+    {
+        SC_TRY(prepareFilCCompilerLaunchers(activePackageRoot.view()));
+        SC_TRY(finalizeInstalledPackageFromRoot(activePackageRoot.view(), package));
+        bool matches = false;
+        SC_TRY(metadataMatches(matches));
+        if (matches and testFilCToolchain(package))
+        {
+            needsInstall = false;
+        }
+    }
+
+    if (needsInstall)
+    {
+        if (not importing and fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+        }
+
+        if (importing)
+        {
+            SC_TRY_MSG(fs.existsAndIsDirectory(resolvedImportDirectory.view()),
+                       "Imported Fil-C toolchain directory does not exist");
+        }
+        else
+        {
+            SC_TRY(downloadFileHash(packageURL, package.packageLocalFile.view(), Hashing::TypeSHA256, packageHash));
+            SC_TRY(
+                extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), package.packageLocalDirectory.view()));
+        }
+
+        SC_TRY(ensureFilCPackagePrepared(activePackageRoot.view()));
+        SC_TRY(prepareFilCCompilerLaunchers(activePackageRoot.view()));
+        SC_TRY(finalizeInstalledPackageFromRoot(activePackageRoot.view(), package));
+
+        String compilerC       = StringEncoding::Utf8;
+        String compilerCpp     = StringEncoding::Utf8;
+        String archiver        = StringEncoding::Utf8;
+        String detectedVersion = StringEncoding::Utf8;
+        String detectedTarget  = StringEncoding::Utf8;
+        SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang", compilerC));
+        SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang++", compilerCpp));
+        SC_TRY(resolveHostCommandPath("ar", archiver));
+        SC_TRY(testFilCToolchain(package, &detectedVersion, &detectedTarget));
+        SC_TRY(writeFilCPackageMetadata(activePackageRoot.view(), detectedVersion.view(), packageFlavor,
+                                        compilerC.view(), compilerCpp.view(), compilerCpp.view(), archiver.view(),
+                                        detectedTarget.view()));
+
+        String metadata = StringEncoding::Utf8;
+        auto   builder  = StringBuilder::create(metadata);
+        SC_TRY(builder.append("SC_PACKAGE_URL={}\n", sourceIdentifier.view()));
+        if (not importing)
+        {
+            SC_TRY(builder.append("SC_PACKAGE_HASH=sha256:{}\n", packageHash));
+        }
+        SC_TRY(builder.append("SC_PACKAGE_FLAVOR={}\n", packageFlavor));
+        SC_TRY(builder.append("SC_PACKAGE_VERSION={}\n", detectedVersion.view()));
+        SC_TRY(builder.append("SC_PACKAGE_TARGET={}\n", detectedTarget.view()));
+        builder.finalize();
+        SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalTxt.view(), Path::AsNative)));
+        SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
+    }
+
+    return Result(true);
+}
+#else
+Result installFilCToolchain(StringView, StringView, Package&, StringView)
+{
+    return Result::Error("Fil-C package install is only supported on Linux hosts");
+}
+#endif
 
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package)
@@ -2413,6 +2811,13 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(
                 Tools::installLLVMToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else if (packageName == "filc")
+        {
+            FilCPackageInstallOptions options;
+            SC_TRY(parseFilCPackageInstallOptions(arguments.arguments, options));
+            SC_TRY(Tools::installFilCToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                                               options.importDirectory));
         }
         else if (packageName == "llvm-mingw")
         {

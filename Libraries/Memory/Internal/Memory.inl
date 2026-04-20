@@ -29,7 +29,11 @@ void* SC::FixedAllocator::allocateImpl(const void* owner, size_t numBytes, size_
             uintptr_t addr = (uintptr_t)ptr;
             // Round up to the next multiple of alignment
             uintptr_t aligned_addr = (addr + alignment - 1) & ~(alignment - 1);
+#if SC_COMPILER_FILC
+            return zmkptr(ptr, static_cast<unsigned long>(aligned_addr));
+#else
             return (void*)aligned_addr;
+#endif
         };
         char* nextAllocation = static_cast<char*>(memory) + position;
         lastAllocation       = alignPointer(nextAllocation, alignment);

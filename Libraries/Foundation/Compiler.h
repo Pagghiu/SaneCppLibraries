@@ -36,6 +36,12 @@
 #define SC_COMPILER_CLANG_CL 0 ///< Flag indicating non-Clang-CL (MSVC) compiler.
 #endif
 
+#if defined(__FILC__)
+#define SC_COMPILER_FILC 1
+#else
+#define SC_COMPILER_FILC 0
+#endif
+
 #if SC_COMPILER_MSVC
 
 #define SC_COMPILER_FORCE_INLINE __forceinline  ///< Macro for forcing inline functions.

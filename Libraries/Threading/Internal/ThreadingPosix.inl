@@ -4,6 +4,7 @@
 
 #include <errno.h> // errno
 #include <pthread.h>
+#include <string.h> // memcpy
 #include <unistd.h> // usleep
 SC::Mutex::Mutex() { pthread_mutex_init(&mutex.reinterpret_as<pthread_mutex_t>(), 0); }
 SC::Mutex::~Mutex() { pthread_mutex_destroy(&mutex.reinterpret_as<pthread_mutex_t>()); }
@@ -72,6 +73,16 @@ struct SC::Thread::Internal
     }
 };
 
+#if !SC_PLATFORM_APPLE && !SC_PLATFORM_EMSCRIPTEN
+static SC::uint64_t scThreadIDValueFromNative(pthread_t thread)
+{
+    SC::uint64_t value = 0;
+    static_assert(sizeof(pthread_t) <= sizeof(value), "pthread_t does not fit in uint64_t");
+    memcpy(&value, &thread, sizeof(thread));
+    return value;
+}
+#endif
+
 void SC::Thread::Sleep(uint32_t milliseconds)
 {
     int rc;
@@ -90,7 +101,7 @@ SC::uint64_t SC::Thread::CurrentThreadID()
     pthread_threadid_np(NULL, &tid);
     return tid;
 #else
-    return pthread_self();
+    return scThreadIDValueFromNative(pthread_self());
 #endif
 }
 
@@ -107,7 +118,7 @@ SC::uint64_t SC::Thread::threadID()
         pthread_threadid_np(threadNative->reinterpret_as<pthread_t>(), &tid);
         return tid;
 #else
-        return threadNative->reinterpret_as<pthread_t>();
+        return scThreadIDValueFromNative(threadNative->reinterpret_as<pthread_t>());
 #endif
     }
     return 0;

@@ -1369,6 +1369,11 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     // On epoll AsyncProcessExit uses a per-request pidfd watcher.
     Result setupAsync(AsyncEventLoop& eventLoop, AsyncProcessExit& async)
     {
+#if SC_COMPILER_FILC
+        (void)eventLoop;
+        (void)async;
+        return Result::Error("AsyncProcessExit unsupported under Fil-C on Linux: pidfd_open is unavailable");
+#else
         const int pidFd = ::syscall(SYS_pidfd_open, async.handle, SOCK_NONBLOCK); // == PIDFD_NONBLOCK
         if (pidFd < 0)
         {
@@ -1376,6 +1381,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         }
         SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         return setEventWatcher(eventLoop, async, pidFd, INPUT_EVENTS_MASK);
+#endif
     }
 
     static Result teardownAsync(AsyncProcessExit*, AsyncTeardown& teardown)

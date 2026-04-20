@@ -8,6 +8,9 @@
 #define SC_MEMORY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_MEMORY)
 
 #include "../Foundation/PrimitiveTypes.h"
+#if SC_COMPILER_FILC
+#include <stdfil.h>
+#endif
 namespace SC
 {
 struct SC_MEMORY_EXPORT Memory;
@@ -53,12 +56,22 @@ struct SC::MemoryAllocator
     template <typename T, typename... U>
     T* create(U&&... u)
     {
-        T* t = reinterpret_cast<T*>(allocate(nullptr, sizeof(T), alignof(T)));
-        if (t)
+        void* rawMemory = allocate(nullptr, sizeof(T), alignof(T));
+        if (rawMemory)
         {
+#if SC_COMPILER_FILC
+            const size_t pointerAlignment = sizeof(void*);
+            const size_t address          = reinterpret_cast<size_t>(rawMemory);
+            if ((address & (pointerAlignment - 1)) == 0 and (sizeof(T) & (pointerAlignment - 1)) == 0)
+            {
+                zsetcap(rawMemory, rawMemory, sizeof(T));
+            }
+#endif
+            T* t = reinterpret_cast<T*>(rawMemory);
             placementNew(*t, forward<U>(u)...);
+            return t;
         }
-        return t;
+        return nullptr;
     }
 
     /// @brief Allocates numBytes bytes of memory

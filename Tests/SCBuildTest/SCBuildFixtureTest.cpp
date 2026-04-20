@@ -88,6 +88,7 @@ static Result detectCompilerName(const Build::Toolchain& toolchain, StringView& 
     switch (toolchain.family)
     {
     case Build::Toolchain::Clang: compilerName = "clang"; return Result(true);
+    case Build::Toolchain::FilC: compilerName = "filc"; return Result(true);
     case Build::Toolchain::GCC: compilerName = "gcc"; return Result(true);
     case Build::Toolchain::LLVMMingw: compilerName = "llvm-mingw"; return Result(true);
     case Build::Toolchain::MSVC: compilerName = "msvc"; return Result(true);
@@ -630,6 +631,55 @@ static Result createPortableMSVCImportFixture(FileSystem& fs, StringView rootDir
             SC_TRY(fs.writeString(toolPath.view(), ""));
         }
     }
+    return Result(true);
+}
+#endif
+
+#if SC_PLATFORM_LINUX
+static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                               StringView toolPath, StringView installedDir)
+{
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
+    SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'Fil-C 0.678 clang version 20.1.8'\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'Target: x86_64-unknown-linux-gnu'\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'Thread model: posix'\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'InstalledDir: {}'\n", installedDir));
+    SC_TRY(builder.append("  printf '%s\\n' 'Build config: +assertions'\n"));
+    SC_TRY(builder.append("  exit 0\n"));
+    SC_TRY(builder.append("fi\n"));
+    SC_TRY(builder.append("exec \"{}\" \"$@\"\n", toolPath));
+    builder.finalize();
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
+static Result createFakeFilCImportFixture(FileSystem& fs, StringView rootDirectory, StringView compilerCLogPath,
+                                          StringView compilerCppLogPath)
+{
+    String binDirectory = StringEncoding::Utf8;
+    String clangPath    = StringEncoding::Utf8;
+    String clangCppPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {rootDirectory, "build", "bin"}));
+    SC_TRY(Path::join(clangPath, {binDirectory.view(), "clang"}));
+    SC_TRY(Path::join(clangCppPath, {binDirectory.view(), "clang++"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+
+    String hostClang    = StringEncoding::Utf8;
+    String hostClangCpp = StringEncoding::Utf8;
+    SC_TRY(resolveHostToolPath("clang", hostClang));
+    SC_TRY(resolveHostToolPath("clang++", hostClangCpp));
+
+    SC_TRY(fs.writeString(compilerCLogPath, ""));
+    SC_TRY(fs.writeString(compilerCppLogPath, ""));
+    SC_TRY(writeFilCForwardingWrapperScript(fs, clangPath.view(), compilerCLogPath, hostClang.view(),
+                                            binDirectory.view()));
+    SC_TRY(writeFilCForwardingWrapperScript(fs, clangCppPath.view(), compilerCppLogPath, hostClangCpp.view(),
+                                            binDirectory.view()));
     return Result(true);
 }
 #endif
@@ -1899,6 +1949,169 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\x64\\cl.exe"));
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Hostx64\\arm64\\cl.exe"));
         }
+
+#if SC_PLATFORM_LINUX
+        if (test_section("package tool installs filc import from explicit arguments"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot     = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String compilerCLog   = StringEncoding::Utf8;
+            String compilerCppLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "FilCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerCLog, {toolRoot.view(), "filc-clang.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCppLog, {toolRoot.view(), "filc-clangxx.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(
+                createFakeFilCImportFixture(fs, importRoot.view(), compilerCLog.view(), compilerCppLog.view()));
+
+            StringPath toolDestination;
+            SC_TRUST_RESULT(toolDestination.assign(buildRoot.view()));
+
+            Tools::Tool::Arguments toolArguments{*globalConsole,
+                                                 report.libraryRootDirectory,
+                                                 report.libraryRootDirectory,
+                                                 toolDestination,
+                                                 "package",
+                                                 "install",
+                                                 {}};
+
+            StringView packageArgumentsStorage[] = {"filc", "--import-directory", importRoot.view()};
+            toolArguments.arguments              = {packageArgumentsStorage, 3};
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::runPackageTool(toolArguments, &package));
+
+            String metadataPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(metadataPath, {package.installDirectoryLink.view(), "sc-filc-package.json"}));
+            SC_TEST_EXPECT(fs.existsAndIsFile(metadataPath.view()));
+
+            String metadata = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(metadataPath.view(), metadata));
+            SC_TEST_EXPECT(StringView(metadata.view()).containsString("\"flavor\": \"pizfix\""));
+            SC_TEST_EXPECT(
+                StringView(metadata.view()).containsString("\"targetTriple\": \"x86_64-unknown-linux-gnu\""));
+
+            String compilerCInvocation   = StringEncoding::Utf8;
+            String compilerCppInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerCLog.view(), compilerCInvocation));
+            SC_TRUST_RESULT(fs.read(compilerCppLog.view(), compilerCppInvocation));
+            SC_TEST_EXPECT(StringView(compilerCInvocation.view()).containsString("--version"));
+            SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("--version"));
+        }
+
+        if (test_section("package install reuses imported filc metadata without explicit import arguments"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot     = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String compilerCLog   = StringEncoding::Utf8;
+            String compilerCppLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "FilCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerCLog, {toolRoot.view(), "filc-reuse-clang.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCppLog, {toolRoot.view(), "filc-reuse-clangxx.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(
+                createFakeFilCImportFixture(fs, importRoot.view(), compilerCLog.view(), compilerCppLog.view()));
+
+            Tools::Package firstPackage;
+            SC_TEST_EXPECT(Tools::installFilCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), firstPackage,
+                                                       importRoot.view()));
+            SC_TRUST_RESULT(fs.writeString(compilerCLog.view(), ""));
+            SC_TRUST_RESULT(fs.writeString(compilerCppLog.view(), ""));
+
+            Tools::Package reusedPackage;
+            SC_TEST_EXPECT(Tools::installFilCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), reusedPackage));
+            SC_TEST_EXPECT(firstPackage.packageLocalDirectory.view() == reusedPackage.packageLocalDirectory.view());
+
+            String compilerCInvocation   = StringEncoding::Utf8;
+            String compilerCppInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerCLog.view(), compilerCInvocation));
+            SC_TRUST_RESULT(fs.read(compilerCppLog.view(), compilerCppInvocation));
+            SC_TEST_EXPECT(StringView(compilerCInvocation.view()).containsString("--version"));
+            SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("--version"));
+        }
+
+        if (test_section("native backend routes packaged filc toolchains without PATH overrides"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot     = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String compilerCLog   = StringEncoding::Utf8;
+            String compilerCppLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "FilCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerCLog, {toolRoot.view(), "filc-build-clang.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCppLog, {toolRoot.view(), "filc-build-clangxx.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(
+                createFakeFilCImportFixture(fs, importRoot.view(), compilerCLog.view(), compilerCppLog.view()));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(Tools::installFilCToolchain(directories.packagesCacheDirectory.view(),
+                                                       directories.packagesInstallDirectory.view(), package,
+                                                       importRoot.view()));
+
+            Build::Action action                         = makeNativeCompileAction(directories, FixtureProjectName);
+            action.parameters.platform                   = Build::Platform::Linux;
+            action.parameters.architecture               = Build::Architecture::Intel64;
+            action.parameters.toolchain.family           = Build::Toolchain::FilC;
+            action.parameters.toolchain.architecture     = Build::Architecture::Intel64;
+            action.parameters.targetMachine.platform     = Build::Platform::Linux;
+            action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
+            action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+
+            String expectedOutput = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read("Tests/SCBuildTest/Fixture/TinyConsoleProgram/stdout.txt", expectedOutput));
+            SC_TRUST_RESULT(normalizeConsoleOutput(expectedOutput));
+            SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
+
+            String compilerCppInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(compilerCppLog.view(), compilerCppInvocation));
+            SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("main.cpp"));
+            SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("--version"));
+        }
+#endif
 
         if (test_section("package install repairs legacy portable MSVC layout without SDK bin metadata"))
         {

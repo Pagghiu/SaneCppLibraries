@@ -1399,7 +1399,6 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <sys/clonefile.h>
 #elif SC_PLATFORM_LINUX
 #include <sys/sendfile.h>
-#include <sys/syscall.h> // SYS_getcwd
 #endif
 struct SC::FileSystem::Operations::Internal
 {
@@ -1417,7 +1416,7 @@ struct SC::FileSystem::Operations::Internal
 
 static SC::TimeMs posixTimespecToTimeMs(const struct timespec& ts)
 {
-    return SC::TimeMs{static_cast<int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
+    return SC::TimeMs{static_cast<SC::int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
 }
 
 static SC::FileSystemEntryType posixEntryTypeFromMode(mode_t mode)
@@ -2044,11 +2043,9 @@ SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executa
 
 SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
 {
-    const int pathLength =
-        syscall(SYS_getcwd, currentWorkingDirectory.view().bytesIncludingTerminator(), StringPath::MaxPath);
-    if (pathLength > 0)
+    if (::getcwd(currentWorkingDirectory.writableSpan().data(), StringPath::MaxPath) != nullptr)
     {
-        (void)currentWorkingDirectory.resize(static_cast<size_t>(pathLength));
+        (void)currentWorkingDirectory.resize(::strlen(currentWorkingDirectory.view().bytesIncludingTerminator()));
         return currentWorkingDirectory.view();
     }
     return {};
