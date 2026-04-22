@@ -24,9 +24,9 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm-mingw
-        key: sc-packages-posix-llvm-mingw-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-posix-llvm-mingw-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: install
       run:  |
         sudo apt-get update

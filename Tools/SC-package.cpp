@@ -1878,6 +1878,7 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     static constexpr StringView llvmVersion    = "22.1.2";
 
     CustomFunctions functions;
+    functions.keepDownloadedArchive = false;
 
     Download download;
     download.packagesCacheDirectory   = packagesCacheDirectory;
