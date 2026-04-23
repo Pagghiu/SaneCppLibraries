@@ -1534,118 +1534,6 @@ static constexpr StringView packagedLinuxSysrootCacheDirectoryName(Build::Target
     return {};
 }
 
-static Result seedInstalledWindowsLLVMToolchain(FileSystem& fs, const Build::Directories& directories)
-{
-    String llvmRoot  = StringEncoding::Utf8;
-    String llvmBin   = StringEncoding::Utf8;
-    String clangPath = StringEncoding::Utf8;
-    String sourceBin = StringEncoding::Utf8;
-    SC_TRY(Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
-    SC_TRY(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
-    SC_TRY(fs.makeDirectoryRecursive(llvmRoot.view()));
-    SC_TRY(resolveVisualStudioLLVMToolPath("clang.exe", clangPath));
-    SC_TRY(sourceBin.assign(Path::dirname(clangPath.view(), Path::AsNative)));
-    SC_TRY(fs.copyDirectory(sourceBin.view(), llvmBin.view(), FileSystem::CopyFlags().setOverwrite(true)));
-    return Result(true);
-}
-
-static Result seedPackagedLinuxSysrootCache(FileSystem& fs, const Build::Directories& directories,
-                                            Build::TargetEnvironment::Type environment,
-                                            Build::Architecture::Type      architecture)
-{
-    const StringView cacheLeaf = packagedLinuxSysrootCacheDirectoryName(environment, architecture);
-    SC_TRY_MSG(not cacheLeaf.isEmpty(), "Unsupported packaged Linux sysroot test target");
-
-    String sysrootRoot = StringEncoding::Utf8;
-    SC_TRY(Path::join(sysrootRoot, {directories.packagesCacheDirectory.view(), "linux-sysroot", cacheLeaf}));
-    SC_TRY(fs.makeDirectoryRecursive(sysrootRoot.view()));
-
-    auto makeSysrootPath = [&](StringView pattern, String& path) -> Result
-    { return Result(StringBuilder::format(path, pattern, sysrootRoot.view())); };
-    auto makeSysrootDirectory = [&](StringView pattern) -> Result
-    {
-        String path = StringEncoding::Utf8;
-        SC_TRY(makeSysrootPath(pattern, path));
-        return fs.makeDirectoryRecursive(path.view());
-    };
-    auto writeSysrootFile = [&](StringView pattern) -> Result
-    {
-        String path = StringEncoding::Utf8;
-        SC_TRY(makeSysrootPath(pattern, path));
-        return fs.writeString(path.view(), "");
-    };
-
-    if (environment == Build::TargetEnvironment::LinuxGlibc)
-    {
-        if (architecture == Build::Architecture::Intel64)
-        {
-            SC_TRY(makeSysrootDirectory("{}/usr/include"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib/x86_64-linux-gnu"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-linux-gnu/11"));
-            SC_TRY(makeSysrootDirectory("{}/lib/x86_64-linux-gnu"));
-            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/x86_64-linux-gnu/Scrt1.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-linux-gnu/11/libgcc.a"));
-            SC_TRY(writeSysrootFile("{}/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"));
-        }
-        else if (architecture == Build::Architecture::Arm64)
-        {
-            SC_TRY(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/include"));
-            SC_TRY(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
-            SC_TRY(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
-            SC_TRY(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a"));
-        }
-        else
-        {
-            return Result::Error("Unsupported packaged Linux glibc sysroot test target");
-        }
-    }
-    else if (environment == Build::TargetEnvironment::LinuxMusl)
-    {
-        if (architecture == Build::Architecture::Intel64)
-        {
-            SC_TRY(makeSysrootDirectory("{}/lib"));
-            SC_TRY(makeSysrootDirectory("{}/usr/include"));
-            SC_TRY(makeSysrootDirectory("{}/usr/include/linux"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0"));
-            SC_TRY(writeSysrootFile("{}/lib/ld-musl-x86_64.so.1"));
-            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
-            SC_TRY(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/crt1.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtbeginS.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/libgcc.a"));
-        }
-        else if (architecture == Build::Architecture::Arm64)
-        {
-            SC_TRY(makeSysrootDirectory("{}/lib"));
-            SC_TRY(makeSysrootDirectory("{}/usr/include"));
-            SC_TRY(makeSysrootDirectory("{}/usr/include/linux"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib"));
-            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0"));
-            SC_TRY(writeSysrootFile("{}/lib/ld-musl-aarch64.so.1"));
-            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
-            SC_TRY(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/crt1.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/crtbeginS.o"));
-            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/libgcc.a"));
-        }
-        else
-        {
-            return Result::Error("Unsupported packaged Linux musl sysroot test target");
-        }
-    }
-    else
-    {
-        return Result::Error("Unsupported packaged Linux sysroot environment");
-    }
-
-    return Result(true);
-}
 #endif
 #endif
 
@@ -3683,8 +3571,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(
-                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -3693,10 +3580,6 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "WindowsLinuxGlibcStaticLibraryFixture"}));
             SC_TRUST_RESULT(writeStaticLibraryFixture(fs, sourceRoot.view()));
             SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
-
-            SC_TRUST_RESULT(seedInstalledWindowsLLVMToolchain(fs, directories));
-            SC_TRUST_RESULT(seedPackagedLinuxSysrootCache(fs, directories, Build::TargetEnvironment::LinuxGlibc,
-                                                          Build::Architecture::Arm64));
 
             Build::Action action = makeNativeCompileAction(directories, StaticLibraryProjectName);
             SC_TRUST_RESULT(
@@ -3717,8 +3600,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
-            SC_TRUST_RESULT(
-                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
 
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -3727,10 +3609,6 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "WindowsLinuxMuslStaticLibraryFixture"}));
             SC_TRUST_RESULT(writeStaticLibraryFixture(fs, sourceRoot.view()));
             SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
-
-            SC_TRUST_RESULT(seedInstalledWindowsLLVMToolchain(fs, directories));
-            SC_TRUST_RESULT(seedPackagedLinuxSysrootCache(fs, directories, Build::TargetEnvironment::LinuxMusl,
-                                                          Build::Architecture::Intel64));
 
             Build::Action action = makeNativeCompileAction(directories, StaticLibraryProjectName);
             SC_TRUST_RESULT(

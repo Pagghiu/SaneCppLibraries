@@ -5,7 +5,53 @@ on:
   pull_request:
 
 jobs:
+  package-warmup:
+    strategy:
+      matrix:
+        params: [ { os: windows-2022, generator: vs2022 },
+                  { os: windows-2025, generator: vs2022 } ]
+    runs-on: ${{ matrix.params.os }}
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore LLVM package cache
+      id: llvm-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/llvm
+        key: sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux sysroot cache
+      id: linux-sysroot-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/linux-sysroot
+        key: sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Warm packaged Linux cross toolchains
+      shell: cmd
+      run: |
+        SC.bat package install llvm
+        SC.bat package install linux-sysroot-glibc-arm64
+        SC.bat package install linux-sysroot-musl-x86_64
+    - name: Save LLVM package cache
+      if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/llvm
+        key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
+    - name: Save Linux sysroot cache
+      if: always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/linux-sysroot/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/linux-sysroot
+        key: ${{ steps.linux-sysroot-cache.outputs.cache-primary-key }}
+
   build:
+    needs: package-warmup
     strategy:
       matrix:
         config: [ Debug, Release ]
@@ -16,14 +62,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Restore package cache
-      id: packages-cache
+    - name: Restore LLVM package cache
+      id: llvm-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache
-        key: sc-packages-windows-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        path: _Build/_PackagesCache/llvm
+        key: sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-windows-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux sysroot cache
+      id: linux-sysroot-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/linux-sysroot
+        key: sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
@@ -55,9 +109,3 @@ jobs:
     - name: test InteropSTL
       shell: cmd
       run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
-    - name: Save package cache
-      if: always() && steps.packages-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/**') != ''
-      uses: actions/cache/save@v4
-      with:
-        path: _Build/_PackagesCache
-        key: ${{ steps.packages-cache.outputs.cache-primary-key }}
