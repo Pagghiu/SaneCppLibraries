@@ -1449,7 +1449,12 @@ struct SC::Build::NativeBuild
             {
                 SC_TRY(StringBuilder::createForAppendingTo(contents).append("\n"));
             }
-            SC_TRY(appendQuoted(contents, commandLine.arguments[idx].view()));
+            bool forceQuotes = false;
+#if SC_PLATFORM_WINDOWS
+            forceQuotes =
+                not adapter.isMSVCStyle() and StringView(commandLine.arguments[idx].view()).containsCodePoint('\\');
+#endif
+            SC_TRY(appendQuoted(contents, commandLine.arguments[idx].view(), forceQuotes));
         }
         SC_TRY(makeParentDirectory(fs, responsePath));
         SC_TRY(fs.writeString(responsePath, contents.view()));
@@ -2430,7 +2435,7 @@ struct SC::Build::NativeBuild
 
     static constexpr bool shouldUsePackagedLinuxSysroot(const ResolvedTargetContext& context)
     {
-        return isLinuxTarget(context) and context.hostMachine.platform == Platform::Apple;
+        return isLinuxTarget(context) and context.hostMachine.platform != Platform::Linux;
     }
 
     static constexpr StringView hostLLVMExecutableName(StringView baseName)
@@ -2728,9 +2733,21 @@ struct SC::Build::NativeBuild
 
         Process process;
         String  commandPath = StringEncoding::Utf8;
-        SC_TRY(process.exec({"which", executable}, commandPath));
+        switch (HostPlatform)
+        {
+        case SC::Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
+        case SC::Platform::Apple:
+        case SC::Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
+        case SC::Platform::Emscripten: return Result::Error("Cannot resolve host command path");
+        }
         SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
-        SC_TRY(output.assign(StringView(commandPath.view()).trimWhiteSpaces()));
+        StringView resolvedCommand = StringView(commandPath.view()).trimWhiteSpaces();
+#if SC_PLATFORM_WINDOWS
+        StringViewTokenizer tokenizer(resolvedCommand);
+        SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "Cannot resolve host command path");
+        resolvedCommand = tokenizer.component.trimWhiteSpaces();
+#endif
+        SC_TRY(output.assign(resolvedCommand));
         return Result(true);
     }
 
@@ -3974,10 +3991,10 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result appendQuoted(String& output, StringView value)
+    static Result appendQuoted(String& output, StringView value, bool forceQuotes = false)
     {
-        const bool needsQuotes =
-            value.containsCodePoint(' ') or value.containsCodePoint('\t') or value.containsCodePoint('"');
+        const bool needsQuotes = forceQuotes or value.containsCodePoint(' ') or value.containsCodePoint('\t') or
+                                 value.containsCodePoint('"');
         if (not needsQuotes)
         {
             SC_TRY(StringBuilder::createForAppendingTo(output).append(value));

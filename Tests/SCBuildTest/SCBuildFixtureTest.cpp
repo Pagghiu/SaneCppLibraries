@@ -919,7 +919,16 @@ static Result computeBuildDirectoryName(const Build::Action& action, String& bui
     switch (action.parameters.platform)
     {
     case Build::Platform::Apple: targetOS = "macOS"; break;
-    case Build::Platform::Linux: targetOS = "linux"; break;
+    case Build::Platform::Linux:
+        switch (action.parameters.targetMachine.environment)
+        {
+        case Build::TargetEnvironment::LinuxGlibc: targetOS = "linux-glibc"; break;
+        case Build::TargetEnvironment::LinuxMusl: targetOS = "linux-musl"; break;
+        case Build::TargetEnvironment::Native:
+        case Build::TargetEnvironment::WindowsGNU:
+        case Build::TargetEnvironment::WindowsMSVC: targetOS = "linux"; break;
+        }
+        break;
     case Build::Platform::Windows: targetOS = "windows"; break;
     case Build::Platform::Wasm: targetOS = "wasm"; break;
     case Build::Platform::Unknown: return Result::Error("Unknown platform");
@@ -1400,7 +1409,9 @@ static Result configureWindowsMSVCAction(Build::Action& action, Build::Architect
     SC_TRY(action.parameters.toolchain.targetTriple.assign({}));
     return Result(true);
 }
+#endif
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX or SC_PLATFORM_WINDOWS
 static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnvironment::Type environment,
                                          Build::Architecture::Type architecture, StringView sysroot = {})
 {
@@ -1494,6 +1505,151 @@ static constexpr StringView packagedLinuxSysrootInstallDirectoryName(Build::Targ
     return {};
 }
 
+#if SC_PLATFORM_WINDOWS
+static constexpr StringView packagedLinuxSysrootCacheDirectoryName(Build::TargetEnvironment::Type environment,
+                                                                   Build::Architecture::Type      architecture)
+{
+    if (environment == Build::TargetEnvironment::LinuxGlibc)
+    {
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64: return "glibc-x86_64";
+        case Build::Architecture::Arm64: return "glibc-arm64";
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return {};
+        }
+    }
+    if (environment == Build::TargetEnvironment::LinuxMusl)
+    {
+        switch (architecture)
+        {
+        case Build::Architecture::Intel64: return "musl-x86_64";
+        case Build::Architecture::Arm64: return "musl-arm64";
+        case Build::Architecture::Intel32:
+        case Build::Architecture::Wasm:
+        case Build::Architecture::Any: return {};
+        }
+    }
+    return {};
+}
+
+static Result seedInstalledWindowsLLVMToolchain(FileSystem& fs, const Build::Directories& directories)
+{
+    String llvmRoot  = StringEncoding::Utf8;
+    String llvmBin   = StringEncoding::Utf8;
+    String clangPath = StringEncoding::Utf8;
+    String sourceBin = StringEncoding::Utf8;
+    SC_TRY(Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
+    SC_TRY(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
+    SC_TRY(fs.makeDirectoryRecursive(llvmRoot.view()));
+    SC_TRY(resolveVisualStudioLLVMToolPath("clang.exe", clangPath));
+    SC_TRY(sourceBin.assign(Path::dirname(clangPath.view(), Path::AsNative)));
+    SC_TRY(fs.copyDirectory(sourceBin.view(), llvmBin.view(), FileSystem::CopyFlags().setOverwrite(true)));
+    return Result(true);
+}
+
+static Result seedPackagedLinuxSysrootCache(FileSystem& fs, const Build::Directories& directories,
+                                            Build::TargetEnvironment::Type environment,
+                                            Build::Architecture::Type      architecture)
+{
+    const StringView cacheLeaf = packagedLinuxSysrootCacheDirectoryName(environment, architecture);
+    SC_TRY_MSG(not cacheLeaf.isEmpty(), "Unsupported packaged Linux sysroot test target");
+
+    String sysrootRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(sysrootRoot, {directories.packagesCacheDirectory.view(), "linux-sysroot", cacheLeaf}));
+    SC_TRY(fs.makeDirectoryRecursive(sysrootRoot.view()));
+
+    auto makeSysrootPath = [&](StringView pattern, String& path) -> Result
+    { return Result(StringBuilder::format(path, pattern, sysrootRoot.view())); };
+    auto makeSysrootDirectory = [&](StringView pattern) -> Result
+    {
+        String path = StringEncoding::Utf8;
+        SC_TRY(makeSysrootPath(pattern, path));
+        return fs.makeDirectoryRecursive(path.view());
+    };
+    auto writeSysrootFile = [&](StringView pattern) -> Result
+    {
+        String path = StringEncoding::Utf8;
+        SC_TRY(makeSysrootPath(pattern, path));
+        return fs.writeString(path.view(), "");
+    };
+
+    if (environment == Build::TargetEnvironment::LinuxGlibc)
+    {
+        if (architecture == Build::Architecture::Intel64)
+        {
+            SC_TRY(makeSysrootDirectory("{}/usr/include"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib/x86_64-linux-gnu"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-linux-gnu/11"));
+            SC_TRY(makeSysrootDirectory("{}/lib/x86_64-linux-gnu"));
+            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/x86_64-linux-gnu/Scrt1.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-linux-gnu/11/crtbeginS.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-linux-gnu/11/libgcc.a"));
+            SC_TRY(writeSysrootFile("{}/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2"));
+        }
+        else if (architecture == Build::Architecture::Arm64)
+        {
+            SC_TRY(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/include"));
+            SC_TRY(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
+            SC_TRY(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
+            SC_TRY(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a"));
+        }
+        else
+        {
+            return Result::Error("Unsupported packaged Linux glibc sysroot test target");
+        }
+    }
+    else if (environment == Build::TargetEnvironment::LinuxMusl)
+    {
+        if (architecture == Build::Architecture::Intel64)
+        {
+            SC_TRY(makeSysrootDirectory("{}/lib"));
+            SC_TRY(makeSysrootDirectory("{}/usr/include"));
+            SC_TRY(makeSysrootDirectory("{}/usr/include/linux"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0"));
+            SC_TRY(writeSysrootFile("{}/lib/ld-musl-x86_64.so.1"));
+            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
+            SC_TRY(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/crt1.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/crtbeginS.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/x86_64-alpine-linux-musl/15.2.0/libgcc.a"));
+        }
+        else if (architecture == Build::Architecture::Arm64)
+        {
+            SC_TRY(makeSysrootDirectory("{}/lib"));
+            SC_TRY(makeSysrootDirectory("{}/usr/include"));
+            SC_TRY(makeSysrootDirectory("{}/usr/include/linux"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib"));
+            SC_TRY(makeSysrootDirectory("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0"));
+            SC_TRY(writeSysrootFile("{}/lib/ld-musl-aarch64.so.1"));
+            SC_TRY(writeSysrootFile("{}/usr/include/stdio.h"));
+            SC_TRY(writeSysrootFile("{}/usr/include/linux/io_uring.h"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/crt1.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/crtbeginS.o"));
+            SC_TRY(writeSysrootFile("{}/usr/lib/gcc/aarch64-alpine-linux-musl/15.2.0/libgcc.a"));
+        }
+        else
+        {
+            return Result::Error("Unsupported packaged Linux musl sysroot test target");
+        }
+    }
+    else
+    {
+        return Result::Error("Unsupported packaged Linux sysroot environment");
+    }
+
+    return Result(true);
+}
+#endif
+#endif
+
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static Build::Action makeGeneratedCompileAction(const Build::Directories& directories, StringView projectName,
                                                 StringView configurationName = "Debug")
 {
@@ -3517,6 +3673,77 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString("--sysroot"));
             SC_TEST_EXPECT(StringView(linkerLog.view()).containsString(sysroot.view()));
         }
+#endif
+
+#if SC_PLATFORM_WINDOWS
+        if (test_section("native backend auto-selects packaged LLVM toolchain and glibc sysroot for Linux target "
+                         "profiles on Windows"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "WindowsLinuxGlibcStaticLibraryFixture"}));
+            SC_TRUST_RESULT(writeStaticLibraryFixture(fs, sourceRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            SC_TRUST_RESULT(seedInstalledWindowsLLVMToolchain(fs, directories));
+            SC_TRUST_RESULT(seedPackagedLinuxSysrootCache(fs, directories, Build::TargetEnvironment::LinuxGlibc,
+                                                          Build::Architecture::Arm64));
+
+            Build::Action action = makeNativeCompileAction(directories, StaticLibraryProjectName);
+            SC_TRUST_RESULT(
+                configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc, Build::Architecture::Arm64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram, FixtureWorkspaceName));
+
+            String libraryPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                computeArtifactPath(action, StaticLibraryProjectName, Build::TargetType::StaticLibrary, libraryPath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(libraryPath.view()));
+        }
+
+        if (test_section("native backend auto-selects packaged LLVM toolchain and musl sysroot for Linux target "
+                         "profiles on Windows"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String sourceRoot = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(sourceRoot, {buildRoot.view(), "WindowsLinuxMuslStaticLibraryFixture"}));
+            SC_TRUST_RESULT(writeStaticLibraryFixture(fs, sourceRoot.view()));
+            SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
+
+            SC_TRUST_RESULT(seedInstalledWindowsLLVMToolchain(fs, directories));
+            SC_TRUST_RESULT(seedPackagedLinuxSysrootCache(fs, directories, Build::TargetEnvironment::LinuxMusl,
+                                                          Build::Architecture::Intel64));
+
+            Build::Action action = makeNativeCompileAction(directories, StaticLibraryProjectName);
+            SC_TRUST_RESULT(
+                configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl, Build::Architecture::Intel64));
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram, FixtureWorkspaceName));
+
+            String libraryPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                computeArtifactPath(action, StaticLibraryProjectName, Build::TargetType::StaticLibrary, libraryPath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(libraryPath.view()));
+        }
+#endif
 
 #if SC_PLATFORM_APPLE
         if (test_section("native backend auto-selects packaged LLVM toolchain and glibc sysroot for Linux target "
@@ -3763,7 +3990,6 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString("TinyConsoleProgram"));
             SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString("--fixture runner"));
         }
-#endif
 #endif
     }
 };

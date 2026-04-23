@@ -137,9 +137,21 @@ static Result resolveHostCommandPath(StringView executable, String& output)
 
     Process process;
     String  commandPath = StringEncoding::Utf8;
-    SC_TRY(process.exec({"which", executable}, commandPath));
+    switch (HostPlatform)
+    {
+    case Platform::Windows: SC_TRY(process.exec({"where", executable}, commandPath)); break;
+    case Platform::Apple:
+    case Platform::Linux: SC_TRY(process.exec({"which", executable}, commandPath)); break;
+    case Platform::Emscripten: return Result::Error("Cannot resolve host command path");
+    }
     SC_TRY_MSG(process.getExitStatus() == 0, "Cannot resolve host command path");
-    SC_TRY(output.assign(StringView(commandPath.view()).trimWhiteSpaces()));
+    StringView resolvedCommand = StringView(commandPath.view()).trimWhiteSpaces();
+#if SC_PLATFORM_WINDOWS
+    StringViewTokenizer tokenizer(resolvedCommand);
+    SC_TRY_MSG(tokenizer.tokenizeNext({'\n'}), "Cannot resolve host command path");
+    resolvedCommand = tokenizer.component.trimWhiteSpaces();
+#endif
+    SC_TRY(output.assign(resolvedCommand));
     return Result(true);
 }
 
@@ -162,7 +174,7 @@ static bool resolveRunnableHostCommand(StringView executable, String& output)
 static bool isArm64HostInstructionSet() { return HostInstructionSet == InstructionSet::ARM64; }
 static bool supportsAutomaticLinuxSysrootInstall()
 {
-    return HostPlatform == Platform::Apple or HostPlatform == Platform::Linux;
+    return HostPlatform == Platform::Apple or HostPlatform == Platform::Linux or HostPlatform == Platform::Windows;
 }
 
 static Result writeLinuxWineWrapper(StringView packagesCacheDirectory, StringView wrapperName, StringView firstStage,
