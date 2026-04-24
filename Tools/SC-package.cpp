@@ -1496,8 +1496,9 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     CustomFunctions functions;
-    Download        download;
-    StringView      archiveRoot = {};
+    functions.keepDownloadedArchive = false;
+    Download   download;
+    StringView archiveRoot = {};
     SC_TRY(resolveHostLLVMArchive("llvm"_a8, packagesCacheDirectory, packagesInstallDirectory, download, package,
                                   archiveRoot));
 

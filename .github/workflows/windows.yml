@@ -16,9 +16,9 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux sysroot cache
       id: linux-sysroot-cache
       uses: actions/cache/restore@v4
@@ -64,9 +64,9 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
-          sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux sysroot cache
       id: linux-sysroot-cache
       if: matrix.config == 'Release'
