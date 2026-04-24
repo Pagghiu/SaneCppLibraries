@@ -13,7 +13,6 @@ jobs:
     - uses: actions/checkout@v4
     - name: Restore LLVM package cache
       id: llvm-cache
-      if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
@@ -22,7 +21,6 @@ jobs:
           sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux sysroot cache
       id: linux-sysroot-cache
-      if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/linux-sysroot
@@ -62,6 +60,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Restore LLVM package cache
       id: llvm-cache
+      if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
@@ -70,6 +69,7 @@ jobs:
           sc-packages-windows-llvm-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux sysroot cache
       id: linux-sysroot-cache
+      if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/linux-sysroot
