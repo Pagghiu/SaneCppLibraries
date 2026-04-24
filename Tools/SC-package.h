@@ -483,6 +483,8 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package);
+Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                         StringView importDirectory = {});
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installFilCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                             StringView importDirectory = {});
@@ -492,6 +494,7 @@ Result installLinuxSysroot(StringView packagesCacheDirectory, StringView package
                            const LinuxSysrootSpec& spec, Package& package);
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                             StringView importDirectory = {}, StringView wineExecutableOverride = {});
+Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet architecture, String& output);
 Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
 
 } // namespace Tools

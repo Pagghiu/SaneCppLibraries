@@ -2875,13 +2875,38 @@ struct SC::Build::NativeBuild
         return Result::Error("Cannot find runner executable");
     }
 
-    static Result resolveLinuxQEMUExecutable(StringView configured, const ResolvedTargetContext& targetContext,
-                                             String& output)
+    static constexpr InstructionSet qemuRunnerInstructionSet(Architecture::Type architecture)
+    {
+        switch (architecture)
+        {
+        case Architecture::Intel64: return InstructionSet::Intel64;
+        case Architecture::Arm64: return InstructionSet::ARM64;
+        case Architecture::Intel32:
+        case Architecture::Any:
+        case Architecture::Wasm: return InstructionSet::Intel32;
+        }
+        Assert::unreachable();
+    }
+
+    static Result resolveLinuxQEMUExecutable(const Parameters& parameters, StringView configured,
+                                             const ResolvedTargetContext& targetContext, String& output)
     {
         if (not configured.isEmpty())
         {
             SC_TRY(resolveHostCommandPath(configured, output));
             return Result(true);
+        }
+
+        Tools::Package packagedQEMU;
+        if (Tools::installQEMURunner(parameters.directories.packagesCacheDirectory.view(),
+                                     parameters.directories.packagesInstallDirectory.view(), packagedQEMU))
+        {
+            const InstructionSet instructionSet = qemuRunnerInstructionSet(targetArchitecture(targetContext));
+            if (instructionSet != InstructionSet::Intel32 and
+                Tools::resolveQEMURunnerExecutable(packagedQEMU.installDirectoryLink.view(), instructionSet, output))
+            {
+                return Result(true);
+            }
         }
 
         static constexpr StringView x86_64Candidates[] = {"qemu-x86_64", "qemu-x86_64-static"};
@@ -2899,7 +2924,8 @@ struct SC::Build::NativeBuild
                 return Result(true);
             }
         }
-        return Result::Error("Cannot find runner executable");
+        return Result::Error("Cannot find a usable QEMU runner. Install qemu on PATH or register one with "
+                             "SC-package install qemu [--import-directory <path>].");
     }
 
     static Result resolveLinuxRunnerSysroot(const Parameters& parameters, const ResolvedTargetContext& targetContext,
@@ -3007,7 +3033,8 @@ struct SC::Build::NativeBuild
             {
                 String sysroot = StringEncoding::Utf8;
                 runner.mode    = ResolvedRunner::Wrapped;
-                SC_TRY(resolveLinuxQEMUExecutable(runnerSpec.executable.view(), targetContext, runner.executable));
+                SC_TRY(
+                    resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext, runner.executable));
                 SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
                 SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
                 SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));
@@ -3041,7 +3068,8 @@ struct SC::Build::NativeBuild
 
             String sysroot = StringEncoding::Utf8;
             runner.mode    = ResolvedRunner::Wrapped;
-            SC_TRY(resolveLinuxQEMUExecutable(runnerSpec.executable.view(), targetContext, runner.executable));
+            SC_TRY(resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext,
+                                              runner.executable));
             SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
             SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
             SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));

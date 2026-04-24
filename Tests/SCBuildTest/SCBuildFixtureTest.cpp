@@ -349,6 +349,39 @@ static Result writeVersionedLoggingOnlyWrapperScript(FileSystem& fs, StringView 
     SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
+
+static Result writeFakeQEMUWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
+                                         StringView versionText)
+{
+    String scriptContents = StringEncoding::Utf8;
+    auto   builder        = StringBuilder::create(scriptContents);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
+    SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
+    SC_TRY(builder.append("  printf '%s\\n' '{}'\n", versionText));
+    SC_TRY(builder.append("  exit 0\n"));
+    SC_TRY(builder.append("fi\n"));
+    SC_TRY(builder.append("exit 0\n"));
+    builder.finalize();
+    SC_TRY(fs.writeString(scriptPath, scriptContents.view()));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
+    return Result(true);
+}
+
+static Result createFakeImportedQEMURunner(FileSystem& fs, StringView runnerRoot, StringView qemuX86Log,
+                                           StringView qemuArm64Log)
+{
+    String binDirectory = StringEncoding::Utf8;
+    String qemuX86Path  = StringEncoding::Utf8;
+    String qemuArmPath  = StringEncoding::Utf8;
+    SC_TRY(Path::join(binDirectory, {runnerRoot, "bin"}));
+    SC_TRY(Path::join(qemuX86Path, {binDirectory.view(), "qemu-x86_64"}));
+    SC_TRY(Path::join(qemuArmPath, {binDirectory.view(), "qemu-aarch64"}));
+    SC_TRY(fs.makeDirectoryRecursive(binDirectory.view()));
+    SC_TRY(writeFakeQEMUWrapperScript(fs, qemuX86Path.view(), qemuX86Log, "qemu-x86_64 version 10.0.0"));
+    SC_TRY(writeFakeQEMUWrapperScript(fs, qemuArmPath.view(), qemuArm64Log, "qemu-aarch64 version 10.0.0"));
+    return Result(true);
+}
 #endif
 
 #if SC_PLATFORM_LINUX
@@ -2350,6 +2383,66 @@ struct SCBuildFixtureTest : public SC::TestCase
             }
         }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
+        if (test_section("package install imports qemu runner from PATH"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String runnerRoot      = StringEncoding::Utf8;
+            String hostToolsRoot   = StringEncoding::Utf8;
+            String importedBin     = StringEncoding::Utf8;
+            String qemuX86Log      = StringEncoding::Utf8;
+            String qemuArm64Log    = StringEncoding::Utf8;
+            String installedQEMU   = StringEncoding::Utf8;
+            String packageMetadata = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(runnerRoot, {buildRoot.view(), "ImportedQEMU"}));
+            SC_TRUST_RESULT(Path::join(hostToolsRoot, {buildRoot.view(), "HostTools"}));
+            SC_TRUST_RESULT(Path::join(importedBin, {runnerRoot.view(), "bin"}));
+            SC_TRUST_RESULT(Path::join(qemuX86Log, {hostToolsRoot.view(), "qemu-x86_64.log"}));
+            SC_TRUST_RESULT(Path::join(qemuArm64Log, {hostToolsRoot.view(), "qemu-aarch64.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(hostToolsRoot.view()));
+            SC_TRUST_RESULT(createFakeImportedQEMURunner(fs, runnerRoot.view(), qemuX86Log.view(), qemuArm64Log.view()));
+
+            String newPath = StringEncoding::Utf8;
+            if (const char* existingPath = ::getenv("PATH"))
+            {
+                SC_TRUST_RESULT(StringBuilder::format(newPath, "{}:{}", importedBin.view(),
+                                                      StringView::fromNullTerminated(existingPath,
+                                                                                     StringEncoding::Native)));
+            }
+            else
+            {
+                SC_TRUST_RESULT(newPath.assign(importedBin.view()));
+            }
+            ScopedEnvironmentVariable scopedPath;
+            SC_TRUST_RESULT(setScopedEnvironmentVariable("PATH", newPath.view(), scopedPath));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(
+                Tools::installQEMURunner(directories.packagesCacheDirectory.view(),
+                                         directories.packagesInstallDirectory.view(), package));
+            SC_TEST_EXPECT(fs.existsAndIsDirectory(package.installDirectoryLink.view()));
+            SC_TRUST_RESULT(Tools::resolveQEMURunnerExecutable(package.installDirectoryLink.view(),
+                                                               InstructionSet::ARM64, installedQEMU));
+
+            Process process;
+            String  version = StringEncoding::Utf8;
+            SC_TRUST_RESULT(process.exec({installedQEMU.view(), "--version"}, version));
+            SC_TEST_EXPECT(process.getExitStatus() == 0);
+            SC_TEST_EXPECT(StringView(version.view()).containsString("qemu-aarch64"));
+
+            SC_TRUST_RESULT(fs.read(package.packageLocalTxt.view(), packageMetadata));
+            SC_TEST_EXPECT(StringView(packageMetadata.view()).containsString("SC_PACKAGE_URL=import:"));
+            SC_TEST_EXPECT(StringView(packageMetadata.view()).containsString("SC_PACKAGE_TARGETS=x86_64,arm64"));
+        }
+#endif
+
 #if SC_PLATFORM_LINUX
         if (test_section("native backend auto-resolves box64 Wine wrappers on Linux arm64"))
         {
@@ -3767,6 +3860,94 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
             SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-target x86_64-unknown-linux-musl"));
             SC_TEST_EXPECT(StringView(clangLog.view()).containsString("-fuse-ld=lld"));
+        }
+
+        if (test_section("native backend auto-routes Linux arm64 runs through packaged qemu on macOS"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String llvmRoot    = StringEncoding::Utf8;
+            String llvmBin     = StringEncoding::Utf8;
+            String clangLogPath = StringEncoding::Utf8;
+            String clangPath    = StringEncoding::Utf8;
+            String clangCppPath = StringEncoding::Utf8;
+            String llvmArPath   = StringEncoding::Utf8;
+            String sysrootRoot  = StringEncoding::Utf8;
+            String qemuRoot     = StringEncoding::Utf8;
+            String qemuX86Log   = StringEncoding::Utf8;
+            String qemuArmLog   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(
+                Path::join(llvmRoot, {directories.packagesInstallDirectory.view(), hostLLVMInstallDirectoryName()}));
+            SC_TRUST_RESULT(Path::join(llvmBin, {llvmRoot.view(), "bin"}));
+            SC_TRUST_RESULT(Path::join(clangLogPath, {llvmRoot.view(), "clang.log"}));
+            SC_TRUST_RESULT(Path::join(clangPath, {llvmBin.view(), "clang"}));
+            SC_TRUST_RESULT(Path::join(clangCppPath, {llvmBin.view(), "clang++"}));
+            SC_TRUST_RESULT(Path::join(llvmArPath, {llvmBin.view(), "llvm-ar"}));
+            SC_TRUST_RESULT(
+                Path::join(sysrootRoot, {directories.packagesInstallDirectory.view(),
+                                         packagedLinuxSysrootInstallDirectoryName(Build::TargetEnvironment::LinuxGlibc,
+                                                                                  Build::Architecture::Arm64)}));
+            SC_TRUST_RESULT(Path::join(qemuRoot, {buildRoot.view(), "ImportedQEMU"}));
+            SC_TRUST_RESULT(Path::join(qemuX86Log, {buildRoot.view(), "qemu-x86_64.log"}));
+            SC_TRUST_RESULT(Path::join(qemuArmLog, {buildRoot.view(), "qemu-aarch64.log"}));
+            auto makeSysrootPath = [&](StringView pattern, String& path) -> Result
+            { return Result(StringBuilder::format(path, pattern, sysrootRoot.view())); };
+            auto makeSysrootDirectory = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.makeDirectoryRecursive(path.view());
+            };
+            auto writeSysrootFile = [&](StringView pattern) -> Result
+            {
+                String path = StringEncoding::Utf8;
+                SC_TRY(makeSysrootPath(pattern, path));
+                return fs.writeString(path.view(), "");
+            };
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(llvmBin.view()));
+            SC_TRUST_RESULT(createFakeImportedQEMURunner(fs, qemuRoot.view(), qemuX86Log.view(), qemuArmLog.view()));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/include"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/aarch64-linux-gnu/lib"));
+            SC_TRUST_RESULT(makeSysrootDirectory("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11"));
+            SC_TRUST_RESULT(fs.writeString(clangLogPath.view(), ""));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, clangCppPath.view(), clangLogPath.view(),
+                                                                       "clang version 20.1.8"));
+            SC_TRUST_RESULT(writeVersionedOutputProducingWrapperScript(fs, llvmArPath.view(), clangLogPath.view(),
+                                                                       "LLVM archive tool"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/include/stdio.h"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/aarch64-linux-gnu/lib/ld-linux-aarch64.so.1"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/crtbeginS.o"));
+            SC_TRUST_RESULT(writeSysrootFile("{}/usr/lib/gcc-cross/aarch64-linux-gnu/11/libgcc.a"));
+
+            Tools::Package qemuPackage;
+            SC_TEST_EXPECT(Tools::installQEMURunner(directories.packagesCacheDirectory.view(),
+                                                    directories.packagesInstallDirectory.view(), qemuPackage,
+                                                    qemuRoot.view()));
+
+            Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
+            action.action        = Build::Action::Run;
+            SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
+                                                       Build::Architecture::Arm64, sysrootRoot.view()));
+            StringView forwardedArguments[] = {"--fixture", "runner"};
+            action.additionalArguments      = {forwardedArguments,
+                                               sizeof(forwardedArguments) / sizeof(forwardedArguments[0])};
+
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+
+            String qemuInvocation = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(qemuArmLog.view(), qemuInvocation));
+            SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString("-L"));
+            SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString(sysrootRoot.view()));
+            SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString("TinyConsoleProgram"));
+            SC_TEST_EXPECT(StringView(qemuInvocation.view()).containsString("--fixture runner"));
         }
 
         if (test_section("native backend auto-routes Linux arm64 runs through qemu on macOS"))

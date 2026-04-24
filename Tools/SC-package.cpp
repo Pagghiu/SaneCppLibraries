@@ -830,6 +830,245 @@ static Result resolveMSVCWineExecutable(StringView packagesCacheDirectory, Strin
     Assert::unreachable();
 }
 
+static constexpr StringView qemuRunnerCacheLeafName()
+{
+    switch (HostPlatform)
+    {
+    case Platform::Apple:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "macos-arm64";
+        case InstructionSet::Intel64: return "macos-intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Linux:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "linux-arm64";
+        case InstructionSet::Intel64: return "linux-intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Windows:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "windows-arm64";
+        case InstructionSet::Intel64: return "windows-intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Emscripten: return {};
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView qemuRunnerInstallLeafName()
+{
+    switch (HostPlatform)
+    {
+    case Platform::Apple:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "macos_arm64";
+        case InstructionSet::Intel64: return "macos_intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Linux:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "linux_arm64";
+        case InstructionSet::Intel64: return "linux_intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Windows:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: return "windows_arm64";
+        case InstructionSet::Intel64: return "windows_intel64";
+        case InstructionSet::Intel32: return {};
+        }
+        break;
+    case Platform::Emscripten: return {};
+    }
+    Assert::unreachable();
+}
+
+static Result resolveImportedQEMURootFromMetadata(StringView metadataPath, String& root, bool& found)
+{
+    found = false;
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsFile(metadataPath))
+    {
+        return Result(true);
+    }
+
+    String metadata = StringEncoding::Utf8;
+    SC_TRY(fs.read(metadataPath, metadata));
+
+    StringView sourcePath;
+    StringViewTokenizer lines(metadata.view());
+    while (lines.tokenizeNextLine())
+    {
+        StringView line = lines.component.trimWhiteSpaces();
+        if (line.startsWith("SC_PACKAGE_URL=import:"))
+        {
+            SC_TRY(line.splitAfter("SC_PACKAGE_URL=import:", sourcePath));
+            break;
+        }
+        if (line.startsWith("SC_PACKAGE_URL=/"))
+        {
+            SC_TRY(line.splitAfter("SC_PACKAGE_URL=", sourcePath));
+            break;
+        }
+#if SC_PLATFORM_WINDOWS
+        if (line.startsWith("SC_PACKAGE_URL=") and line.containsString(":\\"_a8))
+        {
+            SC_TRY(line.splitAfter("SC_PACKAGE_URL=", sourcePath));
+            break;
+        }
+#endif
+    }
+
+    if (sourcePath.isEmpty())
+    {
+        return Result(true);
+    }
+
+    SC_TRY(root.assign(sourcePath));
+    found = true;
+    return Result(true);
+}
+
+static Result resolveImportedQEMURootFromPATH(String& root)
+{
+    static constexpr StringView candidates[] = {"qemu-x86_64", "qemu-x86_64-static", "qemu-aarch64",
+                                                "qemu-aarch64-static"};
+    for (const StringView candidate : candidates)
+    {
+        String executablePath = StringEncoding::Utf8;
+        if (resolveRunnableHostCommand(candidate, executablePath))
+        {
+            SC_TRY(root.assign(Path::dirname(executablePath.view(), Path::AsNative)));
+            return Result(true);
+        }
+    }
+    return Result::Error("Cannot find QEMU runner executable");
+}
+
+static Result qemuRunnerExecutableCandidates(InstructionSet architecture, Span<const StringView>& candidates)
+{
+#if SC_PLATFORM_WINDOWS
+    static constexpr StringView x86_64Candidates[] = {"qemu-x86_64.exe", "qemu-x86_64-static.exe"};
+    static constexpr StringView arm64Candidates[]  = {"qemu-aarch64.exe", "qemu-aarch64-static.exe"};
+#else
+    static constexpr StringView x86_64Candidates[] = {"qemu-x86_64", "qemu-x86_64-static"};
+    static constexpr StringView arm64Candidates[]  = {"qemu-aarch64", "qemu-aarch64-static"};
+#endif
+    switch (architecture)
+    {
+    case InstructionSet::Intel64:
+        candidates = {x86_64Candidates, sizeof(x86_64Candidates) / sizeof(x86_64Candidates[0])};
+        return Result(true);
+    case InstructionSet::ARM64:
+        candidates = {arm64Candidates, sizeof(arm64Candidates) / sizeof(arm64Candidates[0])};
+        return Result(true);
+    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    }
+    Assert::unreachable();
+}
+
+Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet architecture, String& output)
+{
+    Span<const StringView> candidates;
+    SC_TRY(qemuRunnerExecutableCandidates(architecture, candidates));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    for (const StringView candidate : candidates)
+    {
+        String executable = StringEncoding::Utf8;
+        SC_TRY(Path::join(executable, {packageRoot, "bin", candidate}));
+        if (fs.existsAndIsFile(executable.view()))
+        {
+            SC_TRY(output.assign(executable.view()));
+            return Result(true);
+        }
+
+        SC_TRY(executable.assign({}));
+        SC_TRY(Path::join(executable, {packageRoot, candidate}));
+        if (fs.existsAndIsFile(executable.view()))
+        {
+            SC_TRY(output.assign(executable.view()));
+            return Result(true);
+        }
+    }
+
+    return Result::Error("QEMU package is missing the requested runner executable");
+}
+
+static Result testQEMURunnerExecutable(StringView executable, String* versionLine = nullptr)
+{
+    Process process;
+    String  output = StringEncoding::Utf8;
+    SC_TRY(process.exec({executable, "--version"}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "QEMU runner returned error");
+
+    StringView firstLine = StringView(output.view()).trimWhiteSpaces();
+    StringViewTokenizer tokenizer(firstLine);
+    if (tokenizer.tokenizeNextLine())
+    {
+        firstLine = tokenizer.component.trimWhiteSpaces();
+    }
+
+    SC_TRY_MSG(firstLine.containsString("qemu") or firstLine.containsString("QEMU"),
+               "QEMU runner version output is missing the qemu banner");
+    if (versionLine != nullptr)
+    {
+        SC_TRY(versionLine->assign(firstLine));
+    }
+    return Result(true);
+}
+
+static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTargets = nullptr)
+{
+    bool   foundAny = false;
+    String targets  = StringEncoding::Utf8;
+    for (const InstructionSet architecture : {InstructionSet::Intel64, InstructionSet::ARM64})
+    {
+        String executable = StringEncoding::Utf8;
+        if (resolveQEMURunnerExecutable(packageRoot, architecture, executable))
+        {
+            SC_TRY(testQEMURunnerExecutable(executable.view()));
+            foundAny = true;
+            if (detectedTargets != nullptr and not targets.isEmpty())
+            {
+                SC_TRY(StringBuilder::createForAppendingTo(targets).append(","));
+            }
+            SC_TRY(StringBuilder::createForAppendingTo(targets).append(architecture == InstructionSet::Intel64
+                                                                           ? "x86_64"_a8
+                                                                           : "arm64"_a8));
+        }
+    }
+
+    SC_TRY_MSG(foundAny, "QEMU package must provide qemu-x86_64 or qemu-aarch64");
+    if (detectedTargets != nullptr)
+    {
+        SC_TRY(detectedTargets->assign(targets.view()));
+    }
+    return Result(true);
+}
+
+struct QEMUPackageInstallOptions
+{
+    StringView importDirectory;
+};
+
 struct MSVCPackageInstallOptions
 {
     StringView importDirectory;
@@ -840,6 +1079,38 @@ struct FilCPackageInstallOptions
 {
     StringView importDirectory;
 };
+
+static Result parseQEMUPackageInstallOptions(Span<const StringView> arguments, QEMUPackageInstallOptions& options)
+{
+    options = {};
+    if (arguments.sizeInElements() <= 1)
+    {
+        return Result(true);
+    }
+
+    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments[idx];
+        if (argument == "--import-directory")
+        {
+            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            options.importDirectory = arguments[++idx];
+        }
+        else if (argument.startsWith("--"))
+        {
+            return Result::Error("Unknown option for SC-package install qemu");
+        }
+        else if (options.importDirectory.isEmpty())
+        {
+            options.importDirectory = argument;
+        }
+        else
+        {
+            return Result::Error("Unexpected extra argument for SC-package install qemu");
+        }
+    }
+    return Result(true);
+}
 
 static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, FilCPackageInstallOptions& options)
 {
@@ -1022,6 +1293,70 @@ static Result finalizeInstalledPackageFromRoot(StringView packageRoot, Package& 
 static Result finalizeInstalledPackage(Package& package)
 {
     return finalizeInstalledPackageFromRoot(package.packageLocalDirectory.view(), package);
+}
+
+Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                         StringView importDirectory)
+{
+    const StringView cacheLeaf   = qemuRunnerCacheLeafName();
+    const StringView installLeaf = qemuRunnerInstallLeafName();
+    SC_TRY_MSG(not cacheLeaf.isEmpty() and not installLeaf.isEmpty(),
+               "QEMU package install is not supported on this host");
+
+    package.packageFullName       = format("qemu-{}", cacheLeaf);
+    package.packageLocalDirectory = format("{}/qemu/{}", packagesCacheDirectory, cacheLeaf);
+    package.packageLocalTxt       = format("{}/qemu/{}.txt", packagesCacheDirectory, cacheLeaf);
+    package.installDirectoryLink  = format("{}/qemu_{}", packagesInstallDirectory, installLeaf);
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalTxt.view(), Path::AsNative)));
+
+    if (fs.existsAndIsDirectory(package.installDirectoryLink.view()) and
+        testQEMUPackageRoot(package.installDirectoryLink.view()))
+    {
+        if (importDirectory.isEmpty())
+        {
+            return Result(true);
+        }
+    }
+
+    String sourceRoot     = StringEncoding::Utf8;
+    bool   hasSourceRoot  = false;
+    bool   explicitImport = not importDirectory.isEmpty();
+    if (explicitImport)
+    {
+        SC_TRY(sourceRoot.assign(importDirectory));
+        hasSourceRoot = true;
+    }
+    else
+    {
+        SC_TRY(resolveImportedQEMURootFromMetadata(package.packageLocalTxt.view(), sourceRoot, hasSourceRoot));
+        if (not hasSourceRoot and resolveImportedQEMURootFromPATH(sourceRoot))
+        {
+            hasSourceRoot = true;
+        }
+    }
+
+    SC_TRY_MSG(hasSourceRoot,
+               "Cannot find a reusable QEMU runner. Install qemu on PATH or run SC-package install qemu "
+               "--import-directory <path>.");
+    SC_TRY_MSG(fs.existsAndIsDirectory(sourceRoot.view()), "Imported QEMU runner directory does not exist");
+
+    SC_TRY(finalizeInstalledPackageFromRoot(sourceRoot.view(), package));
+
+    String detectedTargets = StringEncoding::Utf8;
+    SC_TRY(testQEMUPackageRoot(package.installDirectoryLink.view(), &detectedTargets));
+
+    String metadata = StringEncoding::Utf8;
+    auto   builder  = StringBuilder::create(metadata);
+    SC_TRY(builder.append("SC_PACKAGE_URL=import:{}\n", sourceRoot.view()));
+    SC_TRY(builder.append("SC_PACKAGE_TARGETS={}\n", detectedTargets.view()));
+    builder.finalize();
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
+    return Result(true);
 }
 
 static Result testMSVCToolchain(const Package& package)
@@ -2825,6 +3160,14 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             SC_TRY(
                 Tools::installLLVMToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+        }
+        else if (packageName == "qemu")
+        {
+            QEMUPackageInstallOptions options;
+            SC_TRY(parseQEMUPackageInstallOptions(arguments.arguments, options));
+            SC_TRY(
+                Tools::installQEMURunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                                         options.importDirectory));
         }
         else if (packageName == "filc")
         {

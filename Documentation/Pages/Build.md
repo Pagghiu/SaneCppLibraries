@@ -178,9 +178,9 @@ Current cross-compilation scope:
   for them when the caller has not provided explicit compiler paths
 - macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
   `linux-musl-x86_64`, and `linux-musl-arm64`
-- `build run` can now wrap foreign Linux targets through `qemu-user`; on macOS this can auto-resolve host `qemu-*`
-  executables from `PATH`, and the runner passes `-L <sysroot>` so dynamically linked Linux targets can find their
-  loader and libraries
+- `build run` can now wrap foreign Linux targets through `qemu-user`; the native runner can reuse a managed
+  `SC-package install qemu` registration or fall back to host `qemu-*` executables from `PATH`, and it passes
+  `-L <sysroot>` so dynamically linked Linux targets can find their loader and libraries
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
 - Linux arm64 hosts can now validate the same portable MSVC path end-to-end for `windows-msvc-x86_64` and
   `windows-msvc-arm64`; the package tool auto-prefers a generated `box64 + wine64` wrapper when those host tools are
@@ -225,6 +225,7 @@ Typical native commands:
 ./SC.sh build compile SCBuildTest --config Debug --generator native
 ./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
 ./SC.sh package install llvm
+./SC.sh package install qemu --import-directory /opt/qemu-user
 ./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
 ./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
@@ -244,8 +245,8 @@ SC.bat build compile SCTest Debug native
 Important current limits:
 
 - macOS is the only non-Linux host with a validated packaged Linux sysroot path today
-- The QEMU runner path is implemented, but real repository-side QEMU execution is not yet validated in CI against a
-  host-installed `qemu-user` package
+- The QEMU runner path can now reuse a managed imported `qemu-user` layout, but real repository-side QEMU execution is
+  not yet validated in CI against a real host QEMU install
 - Windows-host Linux-target packaging and validation are still pending
 - Fil-C is still an experimental compiler-first Linux track: no public `linux-filc-*` target profile exists yet, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
 - Windows native sysroot selection is not implemented yet

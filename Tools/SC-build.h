@@ -199,8 +199,8 @@ struct BuildCLIParseContext
                 "linux-musl-arm64 through packaged LLVM + packaged sysroots\n"
                 "  - Linux hosts can also experiment with Fil-C through --toolchain filc for native Linux builds\n"
                 "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
-                "  - build run can also wrap foreign Linux targets through qemu-user when a suitable qemu "
-                "executable and sysroot are available\n"
+                "  - build run can also wrap foreign Linux targets through qemu-user when a suitable packaged or "
+                "host qemu executable and sysroot are available\n"
                 "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
                 "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
                 "macOS runner does not yet\n"),
