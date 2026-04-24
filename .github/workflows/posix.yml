@@ -21,6 +21,7 @@ jobs:
     - uses: actions/checkout@v4
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
+      if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm-mingw
@@ -63,7 +64,7 @@ jobs:
       run: ./SC.sh build run SCTest ${{ matrix.config }} xcode -- --all-tests
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Save llvm-mingw cache
-      if: always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
+      if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
       uses: actions/cache/save@v4
       with:
         path: _Build/_PackagesCache/llvm-mingw
