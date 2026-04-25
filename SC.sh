@@ -24,4 +24,4 @@ if [ ! -f "$BOOTSTRAP_EXE" ] || [ "${SCRIPT_DIR}/Tools/ToolsBootstrap.c" -nt "$B
 fi
 
 # Execute ToolsBootstrap with original args
-"$BOOTSTRAP_EXE" "$SCRIPT_DIR" "$SCRIPT_DIR/Tools" "$SCRIPT_DIR/_Build" "$@"
+"$BOOTSTRAP_EXE" "$SCRIPT_DIR" "$SCRIPT_DIR/Tools" "$SCRIPT_DIR/_Build" "$SCRIPT_DIR" "$@"

@@ -910,7 +910,7 @@ static Result resolveImportedQEMURootFromMetadata(StringView metadataPath, Strin
     String metadata = StringEncoding::Utf8;
     SC_TRY(fs.read(metadataPath, metadata));
 
-    StringView sourcePath;
+    StringView          sourcePath;
     StringViewTokenizer lines(metadata.view());
     while (lines.tokenizeNextLine())
     {
@@ -1019,7 +1019,7 @@ static Result testQEMURunnerExecutable(StringView executable, String* versionLin
     SC_TRY(process.exec({executable, "--version"}, output));
     SC_TRY_MSG(process.getExitStatus() == 0, "QEMU runner returned error");
 
-    StringView firstLine = StringView(output.view()).trimWhiteSpaces();
+    StringView          firstLine = StringView(output.view()).trimWhiteSpaces();
     StringViewTokenizer tokenizer(firstLine);
     if (tokenizer.tokenizeNextLine())
     {
@@ -1050,9 +1050,8 @@ static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTarget
             {
                 SC_TRY(StringBuilder::createForAppendingTo(targets).append(","));
             }
-            SC_TRY(StringBuilder::createForAppendingTo(targets).append(architecture == InstructionSet::Intel64
-                                                                           ? "x86_64"_a8
-                                                                           : "arm64"_a8));
+            SC_TRY(StringBuilder::createForAppendingTo(targets).append(
+                architecture == InstructionSet::Intel64 ? "x86_64"_a8 : "arm64"_a8));
         }
     }
 
@@ -1340,9 +1339,8 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
         }
     }
 
-    SC_TRY_MSG(hasSourceRoot,
-               "Cannot find a reusable QEMU runner. Install qemu on PATH or run SC-package install qemu "
-               "--import-directory <path>.");
+    SC_TRY_MSG(hasSourceRoot, "Cannot find a reusable QEMU runner. Install qemu on PATH or run SC-package install qemu "
+                              "--import-directory <path>.");
     SC_TRY_MSG(fs.existsAndIsDirectory(sourceRoot.view()), "Imported QEMU runner directory does not exist");
 
     SC_TRY(finalizeInstalledPackageFromRoot(sourceRoot.view(), package));
@@ -3165,9 +3163,8 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
         {
             QEMUPackageInstallOptions options;
             SC_TRY(parseQEMUPackageInstallOptions(arguments.arguments, options));
-            SC_TRY(
-                Tools::installQEMURunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                                         options.importDirectory));
+            SC_TRY(Tools::installQEMURunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                                            options.importDirectory));
         }
         else if (packageName == "filc")
         {

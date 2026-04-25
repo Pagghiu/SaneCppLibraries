@@ -627,6 +627,7 @@ struct Directories
     String packagesCacheDirectory;
     String packagesInstallDirectory;
     String libraryDirectory;
+    String projectDirectory;
 };
 
 /// @brief Describes a specific set of platforms, architectures and build generators to generate projects for
@@ -704,7 +705,7 @@ struct Action
     struct Internal;
 };
 
-// Defined inside SC-Build.cpp
+// Defined by the SC-build implementation
 Result executeAction(const Action& action);
 struct NativeBuild;
 } // namespace Build

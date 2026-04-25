@@ -28,6 +28,7 @@ struct Tool
         StringPath libraryDirectory;
         StringPath toolSource;
         StringPath toolDestination;
+        StringPath projectDirectory;
         StringView tool   = StringView();
         StringView action = StringView();
 

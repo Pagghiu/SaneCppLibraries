@@ -78,6 +78,7 @@ typedef struct {
     char* libraryDir;
     char* toolSourceDir;
     char* buildDir;
+    char* projectDir;
     char* toolName;
     char** remainingArgs;
 } BootloaderArgs;
@@ -131,6 +132,11 @@ void StringVector_destroy(StringVector* sv);
 void StringVector_add(StringVector* sv, const char* str);
 char* StringVector_join(const StringVector* sv, const char* sep);
 char* StringBuilder_join(const StringBuilder* sb, const char* sep);
+
+char* String_duplicate(const char* str);
+int String_containsPathSeparator(const char* str);
+const char* Path_fileName(const char* path);
+char* deriveToolIdentity(const char* toolPath);
 
 // Implementation
 PathContext Path_init(void) {
@@ -253,6 +259,51 @@ char* StringBuilder_join(const StringBuilder* sb, const char* sep) {
     if (result) {
         memcpy(result, sb->buffer, sb->length + 1);
     }
+    return result;
+}
+
+char* String_duplicate(const char* str) {
+    if (!str) return NULL;
+    char* result = (char*)malloc(strlen(str) + 1);
+    if (result) strcpy(result, str);
+    return result;
+}
+
+int String_containsPathSeparator(const char* str) {
+    if (!str) return 0;
+    while (*str) {
+        if (*str == '/' || *str == '\\') return 1;
+        str++;
+    }
+    return 0;
+}
+
+const char* Path_fileName(const char* path) {
+    const char* lastSlash = strrchr(path, '/');
+    const char* lastBackslash = strrchr(path, '\\');
+    if (!lastSlash) return lastBackslash ? lastBackslash + 1 : path;
+    if (!lastBackslash) return lastSlash + 1;
+    return (lastSlash > lastBackslash ? lastSlash : lastBackslash) + 1;
+}
+
+char* deriveToolIdentity(const char* toolPath) {
+    const char* fileName = Path_fileName(toolPath);
+    size_t len = strlen(fileName);
+    if (len >= 4 && strcmp(fileName + len - 4, ".cpp") == 0) {
+        len -= 4;
+    }
+    size_t start = 0;
+    if (len >= 3 && fileName[0] == 'S' && fileName[1] == 'C' && fileName[2] == '-') {
+        start = 3;
+        len -= 3;
+    }
+    if (len == 0) {
+        return String_duplicate("tool");
+    }
+    char* result = (char*)malloc(len + 1);
+    if (!result) return NULL;
+    memcpy(result, fileName + start, len);
+    result[len] = 0;
     return result;
 }
 
@@ -449,6 +500,7 @@ void BootloaderArgs_init(BootloaderArgs* args) {
     args->libraryDir = NULL;
     args->toolSourceDir = NULL;
     args->buildDir = NULL;
+    args->projectDir = NULL;
     args->toolName = NULL;
     args->remainingArgs = NULL;
 }
@@ -457,6 +509,7 @@ void BootloaderArgs_destroy(BootloaderArgs* args) {
     if (args->libraryDir) free(args->libraryDir);
     if (args->toolSourceDir) free(args->toolSourceDir);
     if (args->buildDir) free(args->buildDir);
+    if (args->projectDir) free(args->projectDir);
     if (args->toolName) free(args->toolName);
     if (args->remainingArgs) {
         for (int i = 0; i < args->numRemainingArgs; ++i) {
@@ -542,29 +595,24 @@ void freeArgs(int argc, char** args) {
 BootloaderArgs parseArgs(const char** string_argv, int argc) {
     BootloaderArgs args;
     BootloaderArgs_init(&args);
-    // Assume the first 4 are from SC.sh/bat, then tool name, then args
-    if (argc >= 4) {
-        args.libraryDir = (char*)malloc(strlen(string_argv[1]) + 1);
-        if (args.libraryDir) strcpy(args.libraryDir, string_argv[1]);
-        args.toolSourceDir = (char*)malloc(strlen(string_argv[2]) + 1);
-        if (args.toolSourceDir) strcpy(args.toolSourceDir, string_argv[2]);
-        args.buildDir = (char*)malloc(strlen(string_argv[3]) + 1);
-        if (args.buildDir) strcpy(args.buildDir, string_argv[3]);
-        args.toolName = (argc >= 5) ? (char*)malloc(strlen(string_argv[4]) + 1) : (char*)malloc(strlen("build") + 1);
-        if (args.toolName) strcpy(args.toolName, (argc >= 5) ? string_argv[4] : "build");
-        args.numRemainingArgs = (argc > 5) ? (argc - 5) : 0;
+    // Assume the first 5 are from SC.sh/bat, then tool name, then args
+    if (argc >= 5) {
+        args.libraryDir = String_duplicate(string_argv[1]);
+        args.toolSourceDir = String_duplicate(string_argv[2]);
+        args.buildDir = String_duplicate(string_argv[3]);
+        args.projectDir = String_duplicate(string_argv[4]);
+        args.toolName = (argc >= 6) ? String_duplicate(string_argv[5]) : String_duplicate("build");
+        args.numRemainingArgs = (argc > 6) ? (argc - 6) : 0;
         if (args.numRemainingArgs > 0) {
             args.remainingArgs = (char**)malloc(args.numRemainingArgs * sizeof(char*));
             if (args.remainingArgs) {
                 for (int i = 0; i < args.numRemainingArgs; ++i) {
-                    args.remainingArgs[i] = (char*)malloc(strlen(string_argv[5 + i]) + 1);
-                    if (args.remainingArgs[i]) strcpy(args.remainingArgs[i], string_argv[5 + i]);
+                    args.remainingArgs[i] = String_duplicate(string_argv[6 + i]);
                 }
             }
         }
     } else {
-        args.toolName = (char*)malloc(strlen("build") + 1);
-        if (args.toolName) strcpy(args.toolName, "build");
+        args.toolName = String_duplicate("build");
     }
     return args;
 }
@@ -594,6 +642,7 @@ void setupCompilation(CompilationInfo* ci) {
 #endif
 
     // Set paths like original
+    int builtInTool = 1;
     char* toolCpp = Path_join(args->toolSourceDir, "SC-");
     toolCpp = (char*)realloc(toolCpp, strlen(toolCpp) + strlen(args->toolName) + strlen(".cpp") + 1);
     if (toolCpp) {
@@ -603,11 +652,19 @@ void setupCompilation(CompilationInfo* ci) {
 
     if (!FileSystem_exists(toolCpp)) {
         // Try if toolName is path to cpp file
-        char* potentialCpp = (char*)malloc(strlen(args->toolName) + 1);
-        if (potentialCpp) strcpy(potentialCpp, args->toolName);
+        char* potentialCpp = String_duplicate(args->toolName);
         if (FileSystem_exists(potentialCpp)) {
             free(toolCpp);
             toolCpp = potentialCpp;
+            builtInTool = 0;
+            char* toolIdentity = deriveToolIdentity(toolCpp);
+            if (!toolIdentity) {
+                fprintf(stderr, "Error: Failed deriving tool name from \"%s\"\n", toolCpp);
+                free(toolCpp);
+                exit(1);
+            }
+            free(args->toolName);
+            args->toolName = toolIdentity;
         } else {
             free(potentialCpp);
             fprintf(stderr, "Error: Tool \"%s\" doesn't exist\n", args->toolName);
@@ -645,7 +702,7 @@ void setupCompilation(CompilationInfo* ci) {
     }
 
     // toolH
-    if (strstr(toolCpp, "ToolsBootstrap.") != toolCpp) { // Not this file
+    if (builtInTool && strstr(toolCpp, "ToolsBootstrap.") != toolCpp) { // Not this file
         ci->toolH = Path_join(args->toolSourceDir, "SC-");
         ci->toolH = (char*)realloc(ci->toolH, strlen(ci->toolH) + strlen(args->toolName) + strlen(".h") + 1);
         if (ci->toolH) {
@@ -1090,9 +1147,11 @@ int needsRebuildExe(CompilationInfo* ci) {
 }
 
 // Helper functions for building compile commands
-void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char* output, const char* input, int useClang) {
+void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char* includeDir, const char* output,
+                              const char* input, int useClang) {
     CommandLine_init(cmd, compiler);
-    CommandLine_arg(cmd, "-I../../..");
+    CommandLine_arg(cmd, "-I");
+    CommandLine_argQuoted(cmd, includeDir);
     CommandLine_arg(cmd, "-std=c++14");
     CommandLine_arg(cmd, "-pthread");
     CommandLine_arg(cmd, "-MMD");
@@ -1118,10 +1177,12 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     CommandLine_argQuoted(cmd, input);
 }
 
-void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, const char* output, const char* input, const char* jsonFile, const char* pdbName) {
+void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, const char* includeDir,
+                                const char* output, const char* input, const char* jsonFile, const char* pdbName) {
     CommandLine_init(cmd, "cl.exe");
     CommandLine_arg(cmd, "/nologo");
-    CommandLine_arg(cmd, "/I.");
+    CommandLine_arg(cmd, "/I");
+    CommandLine_argQuoted(cmd, includeDir);
     CommandLine_arg(cmd, "/std:c++14");
     CommandLine_arg(cmd, "/D_DEBUG");
     CommandLine_arg(cmd, "/Zi");
@@ -1177,7 +1238,7 @@ int compilePOSIX(CompilationInfo* ci) {
             // Compile Tools.cpp
             char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, toolsObj, ci->toolsCpp, useClang);
+            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
             free(toolsObj);
@@ -1190,7 +1251,7 @@ int compilePOSIX(CompilationInfo* ci) {
             toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
             sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, toolObj, ci->toolCpp, useClang);
+            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
             free(toolObj);
@@ -1205,7 +1266,7 @@ int compilePOSIX(CompilationInfo* ci) {
     } else if (needTools) {
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, toolsObj, ci->toolsCpp, useClang);
+        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang);
         printf("Tools.cpp\n");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
@@ -1216,7 +1277,7 @@ int compilePOSIX(CompilationInfo* ci) {
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
         sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, toolObj, ci->toolCpp, useClang);
+        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang);
         printf("SC-%s.cpp\n", ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
@@ -1228,6 +1289,9 @@ int compilePOSIX(CompilationInfo* ci) {
     }
 
     if (needsRebuildExe(ci)) {
+        char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
+        FileSystem_createDirectoryRecursive(exeDir);
+        free(exeDir);
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
         char* toolObj = Path_join(ci->intermediateDir, "SC-");
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
@@ -1309,6 +1373,7 @@ int executeTool(BootloaderArgs* args, CompilationInfo* ci) {
     CommandLine_argQuoted(&cmd, args->libraryDir);
     CommandLine_argQuoted(&cmd, args->toolSourceDir);
     CommandLine_argQuoted(&cmd, args->buildDir);
+    CommandLine_argQuoted(&cmd, args->projectDir ? args->projectDir : args->libraryDir);
     CommandLine_argQuoted(&cmd, args->toolName);
     for (int i = 0; i < args->numRemainingArgs; ++i) {
         CommandLine_argQuoted(&cmd, args->remainingArgs[i]);
@@ -1417,7 +1482,8 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
             char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
             CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, toolsObj, ci->toolsCpp, toolsJson, "Tools");
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp,
+                                       toolsJson, "Tools");
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
             STARTUPINFOW si = {sizeof(si)};
@@ -1453,7 +1519,8 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
             sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
             CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, toolObj, ci->toolCpp, toolJson, ci->args->toolName);
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp,
+                                       toolJson, ci->args->toolName);
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
             STARTUPINFOW si = {sizeof(si)};
@@ -1502,7 +1569,8 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
         char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
         CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, toolsObj, ci->toolsCpp, toolsJson, "Tools");
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp, toolsJson,
+                                   "Tools");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
@@ -1517,7 +1585,8 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
         sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
         CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, toolObj, ci->toolCpp, toolJson, ci->args->toolName);
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp, toolJson,
+                                   ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);

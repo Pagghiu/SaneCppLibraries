@@ -63,6 +63,6 @@ if !build_bootstrap! equ 1 (
 )
 
 @REM Execute ToolsBootstrap with original args
-"%BOOTSTRAP_EXE%" "%SCRIPT_DIR%" "%SCRIPT_DIR%\Tools" "%SCRIPT_DIR%\_Build" %*
+"%BOOTSTRAP_EXE%" "%SCRIPT_DIR%" "%SCRIPT_DIR%\Tools" "%SCRIPT_DIR%\_Build" "%SCRIPT_DIR%" %*
 
 endlocal

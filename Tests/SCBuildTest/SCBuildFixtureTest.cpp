@@ -38,6 +38,7 @@ static constexpr StringView WorkspaceLibraryProjectName    = "WorkspaceStaticLib
 static constexpr StringView WorkspaceExecutableProjectName = "WorkspaceExecutable";
 static constexpr StringView IndependentProgramOneName      = "IndependentProgramOne";
 static constexpr StringView IndependentProgramTwoName      = "IndependentProgramTwo";
+static constexpr StringView ExternalFixtureProjectName     = "ExternalFixtureProgram";
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static constexpr StringView CustomDriverSourceRootName = "CustomDriverFixture";
 #endif
@@ -169,6 +170,7 @@ static Result createFixtureDirectories(TestReport& report, String& buildRoot, Bu
         SC_TRY(Path::join(directories.packagesInstallDirectory, {buildRoot.view(), "_Packages"}));
     }
     directories.libraryDirectory = report.libraryRootDirectory.view();
+    directories.projectDirectory = report.libraryRootDirectory.view();
     return Result(true);
 }
 
@@ -747,7 +749,7 @@ static Result configureTinyConsoleProgram(Build::Definition& definition, const B
     Build::Workspace workspace = {FixtureWorkspaceName};
     Build::Project   project   = {Build::TargetType::ConsoleExecutable, FixtureProjectName};
 
-    SC_TRY(project.setRootDirectory(parameters.directories.libraryDirectory.view()));
+    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(project.addFiles("Tests/SCBuildTest/Fixture/TinyConsoleProgram", "main.cpp"));
@@ -762,7 +764,7 @@ static Result configureSmallSCProgram(Build::Definition& definition, const Build
     Build::Workspace workspace = {FixtureWorkspaceName};
     Build::Project   project   = {Build::TargetType::ConsoleExecutable, SmallFixtureProjectName};
 
-    SC_TRY(project.setRootDirectory(parameters.directories.libraryDirectory.view()));
+    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(project.addIncludePaths({"."}));
@@ -1203,6 +1205,43 @@ static Result captureRepositoryBuildCommand(TestReport& report, Span<const Strin
 }
 #endif
 
+static Result captureExternalBuildCommand(TestReport& report, StringView workingDirectory,
+                                          Span<const StringSpan> arguments, CapturedProcessOutput& capturedOutput)
+{
+    String scriptPath = StringEncoding::Utf8;
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.ps1"}));
+
+    StringSpan processArguments[48];
+    size_t     numArguments          = 0;
+    processArguments[numArguments++] = "powershell";
+    processArguments[numArguments++] = "-NoProfile";
+    processArguments[numArguments++] = "-ExecutionPolicy";
+    processArguments[numArguments++] = "Bypass";
+    processArguments[numArguments++] = "-File";
+    processArguments[numArguments++] = scriptPath.view();
+#else
+    SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.sh"}));
+
+    StringSpan processArguments[48];
+    size_t     numArguments          = 0;
+    processArguments[numArguments++] = scriptPath.view();
+#endif
+    for (const StringSpan argument : arguments)
+    {
+        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many process arguments");
+        processArguments[numArguments++] = argument;
+    }
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(workingDirectory));
+    SC_TRY(process.exec({processArguments, numArguments}, capturedOutput.stdOut, {}, capturedOutput.stdErr));
+    capturedOutput.exitStatus = process.getExitStatus();
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdOut));
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdErr));
+    return Result(true);
+}
+
 #if SC_PLATFORM_WINDOWS
 static Result computeWindowsImportLibraryPath(const Build::Action& action, StringView projectName, String& libraryPath)
 {
@@ -1261,6 +1300,55 @@ static Result writeSourceFixture(FileSystem& fs, StringView sourceRoot, StringVi
 
     String sourcePath = StringEncoding::Utf8;
     SC_TRY(Path::join(sourcePath, {sourceRoot, "main.cpp"}));
+    SC_TRY(fs.writeString(sourcePath.view(), sourceContents));
+    return Result(true);
+}
+
+static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot)
+{
+    SC_TRY(fs.makeDirectoryRecursive(projectRoot));
+
+    String sourceRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(sourceRoot, {projectRoot, "Source"}));
+    SC_TRY(fs.makeDirectoryRecursive(sourceRoot.view()));
+
+    String buildDefinitionPath = StringEncoding::Utf8;
+    String sourcePath          = StringEncoding::Utf8;
+    SC_TRY(Path::join(buildDefinitionPath, {projectRoot, "SC-build.cpp"}));
+    SC_TRY(Path::join(sourcePath, {sourceRoot.view(), "main.cpp"}));
+
+    static constexpr StringView buildDefinitionContents =
+        "#include \"Tools/SC-build.h\"\n"
+        "\n"
+        "namespace SC\n"
+        "{\n"
+        "namespace Build\n"
+        "{\n"
+        "Result configure(Definition& definition, const Parameters& parameters)\n"
+        "{\n"
+        "    Workspace workspace = {\"SCWorkspace\"};\n"
+        "    Project   project   = {TargetType::ConsoleExecutable, \"ExternalFixtureProgram\"};\n"
+        "\n"
+        "    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));\n"
+        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));\n"
+        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));\n"
+        "    SC_TRY(project.addFiles(\"Source\", \"main.cpp\"));\n"
+        "\n"
+        "    SC_TRY(workspace.projects.push_back(move(project)));\n"
+        "    SC_TRY(definition.workspaces.push_back(move(workspace)));\n"
+        "    return Result(true);\n"
+        "}\n"
+        "} // namespace Build\n"
+        "} // namespace SC\n";
+    static constexpr StringView sourceContents = "#include <stdio.h>\n"
+                                                 "\n"
+                                                 "int main()\n"
+                                                 "{\n"
+                                                 "    puts(\"external-build-fixture\");\n"
+                                                 "    return 0;\n"
+                                                 "}\n";
+
+    SC_TRY(fs.writeString(buildDefinitionPath.view(), buildDefinitionContents));
     SC_TRY(fs.writeString(sourcePath.view(), sourceContents));
     return Result(true);
 }
@@ -1712,6 +1800,62 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
 
+        if (test_section("SC-build launcher builds external project from nested working directory"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String projectRoot = StringEncoding::Utf8;
+            String nestedRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), "ExternalBuildFixture"}));
+            SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
+            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
+
+            StringSpan commandArguments[] = {
+                "--libraries-root", report.libraryRootDirectory.view(),
+                "compile",          ExternalFixtureProjectName,
+                "--config",         "Debug",
+                "--generator",      "native",
+            };
+
+            CapturedProcessOutput capturedOutput;
+            SC_TRUST_RESULT(captureExternalBuildCommand(report, nestedRoot.view(), commandArguments, capturedOutput));
+            SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+
+            Build::Directories externalDirectories;
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.projectsDirectory, {projectRoot.view(), "_Build", "_Projects"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.outputsDirectory, {projectRoot.view(), "_Build", "_Outputs"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.intermediatesDirectory,
+                                       {projectRoot.view(), "_Build", "_Intermediates"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.buildCacheDirectory, {projectRoot.view(), "_Build", "_BuildCache"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.packagesCacheDirectory,
+                                       {projectRoot.view(), "_Build", "_PackagesCache"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.packagesInstallDirectory, {projectRoot.view(), "_Build", "_Packages"}));
+            externalDirectories.libraryDirectory = report.libraryRootDirectory.view();
+            externalDirectories.projectDirectory = projectRoot.view();
+
+            Build::Action action = makeNativeCompileAction(externalDirectories, ExternalFixtureProjectName);
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, ExternalFixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "external-build-fixture\n"_a8);
+        }
+
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
         if (test_section("native backend cross compiles Windows x86_64 fixture with llvm-mingw"))
         {
@@ -2002,6 +2146,7 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                  report.libraryRootDirectory,
                                                  report.libraryRootDirectory,
                                                  toolDestination,
+                                                 report.libraryRootDirectory,
                                                  "package",
                                                  "install",
                                                  {}};
@@ -2059,6 +2204,7 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                  report.libraryRootDirectory,
                                                  report.libraryRootDirectory,
                                                  toolDestination,
+                                                 report.libraryRootDirectory,
                                                  "package",
                                                  "install",
                                                  {}};
@@ -2288,6 +2434,7 @@ struct SCBuildFixtureTest : public SC::TestCase
                                                  report.libraryRootDirectory,
                                                  report.libraryRootDirectory,
                                                  toolDestination,
+                                                 report.libraryRootDirectory,
                                                  "package",
                                                  "install",
                                                  {}};
@@ -2407,14 +2554,15 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Path::join(qemuX86Log, {hostToolsRoot.view(), "qemu-x86_64.log"}));
             SC_TRUST_RESULT(Path::join(qemuArm64Log, {hostToolsRoot.view(), "qemu-aarch64.log"}));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(hostToolsRoot.view()));
-            SC_TRUST_RESULT(createFakeImportedQEMURunner(fs, runnerRoot.view(), qemuX86Log.view(), qemuArm64Log.view()));
+            SC_TRUST_RESULT(
+                createFakeImportedQEMURunner(fs, runnerRoot.view(), qemuX86Log.view(), qemuArm64Log.view()));
 
             String newPath = StringEncoding::Utf8;
             if (const char* existingPath = ::getenv("PATH"))
             {
-                SC_TRUST_RESULT(StringBuilder::format(newPath, "{}:{}", importedBin.view(),
-                                                      StringView::fromNullTerminated(existingPath,
-                                                                                     StringEncoding::Native)));
+                SC_TRUST_RESULT(
+                    StringBuilder::format(newPath, "{}:{}", importedBin.view(),
+                                          StringView::fromNullTerminated(existingPath, StringEncoding::Native)));
             }
             else
             {
@@ -2424,9 +2572,8 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(setScopedEnvironmentVariable("PATH", newPath.view(), scopedPath));
 
             Tools::Package package;
-            SC_TEST_EXPECT(
-                Tools::installQEMURunner(directories.packagesCacheDirectory.view(),
-                                         directories.packagesInstallDirectory.view(), package));
+            SC_TEST_EXPECT(Tools::installQEMURunner(directories.packagesCacheDirectory.view(),
+                                                    directories.packagesInstallDirectory.view(), package));
             SC_TEST_EXPECT(fs.existsAndIsDirectory(package.installDirectoryLink.view()));
             SC_TRUST_RESULT(Tools::resolveQEMURunnerExecutable(package.installDirectoryLink.view(),
                                                                InstructionSet::ARM64, installedQEMU));
@@ -3872,8 +4019,8 @@ struct SCBuildFixtureTest : public SC::TestCase
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
 
-            String llvmRoot    = StringEncoding::Utf8;
-            String llvmBin     = StringEncoding::Utf8;
+            String llvmRoot     = StringEncoding::Utf8;
+            String llvmBin      = StringEncoding::Utf8;
             String clangLogPath = StringEncoding::Utf8;
             String clangPath    = StringEncoding::Utf8;
             String clangCppPath = StringEncoding::Utf8;

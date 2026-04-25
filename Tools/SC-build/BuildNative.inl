@@ -1558,8 +1558,32 @@ struct SC::Build::NativeBuild
 
             SC_TRY(Path::join(source.sourcePath, {project.rootDirectory.view(), renderItem.referencePath.view()}));
 
-            String objectRelative = StringEncoding::Utf8;
-            SC_TRY(objectRelative.assign(renderItem.referencePath.view()));
+            String     objectRelative  = StringEncoding::Utf8;
+            StringView objectReference = renderItem.referencePath.view();
+            bool       isExternalFile  = false;
+            while (objectReference.startsWith("../"_a8))
+            {
+                objectReference = objectReference.sliceStart(sizeof("../") - 1);
+                isExternalFile  = true;
+            }
+            while (objectReference.startsWith("./"_a8))
+            {
+                objectReference = objectReference.sliceStart(sizeof("./") - 1);
+            }
+            if (isExternalFile)
+            {
+                SC_TRY(objectRelative.assign("_External"_a8));
+                if (not objectReference.isEmpty())
+                {
+                    SC_TRY(StringBuilder::createForAppendingTo(objectRelative).append("/"_a8));
+                    SC_TRY(StringBuilder::createForAppendingTo(objectRelative)
+                               .appendReplaceAll(objectReference, ":", "_"));
+                }
+            }
+            else
+            {
+                SC_TRY(objectRelative.assign(objectReference));
+            }
             SC_TRY(
                 StringBuilder::createForAppendingTo(objectRelative)
                     .append(targetPlatform(resolvedProject.targetContext) == Platform::Windows ? ".obj"_a8 : ".o"_a8));
@@ -3033,8 +3057,8 @@ struct SC::Build::NativeBuild
             {
                 String sysroot = StringEncoding::Utf8;
                 runner.mode    = ResolvedRunner::Wrapped;
-                SC_TRY(
-                    resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext, runner.executable));
+                SC_TRY(resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext,
+                                                  runner.executable));
                 SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
                 SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
                 SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));
@@ -3068,8 +3092,8 @@ struct SC::Build::NativeBuild
 
             String sysroot = StringEncoding::Utf8;
             runner.mode    = ResolvedRunner::Wrapped;
-            SC_TRY(resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext,
-                                              runner.executable));
+            SC_TRY(
+                resolveLinuxQEMUExecutable(parameters, runnerSpec.executable.view(), targetContext, runner.executable));
             SC_TRY(resolveLinuxRunnerSysroot(parameters, targetContext, sysroot));
             SC_TRY(appendRunnerArgument(runner.arguments, "-L"));
             SC_TRY(appendRunnerArgument(runner.arguments, sysroot.view()));

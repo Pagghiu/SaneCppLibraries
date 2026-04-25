@@ -1,8 +1,19 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#define SC_BUILD_SOURCE 1
 #include "SC-build.h"
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
+#include "../Libraries/Process/Process.h"
 #include "SC-build/Build.inl"
+#include "SC-build/BuildCLI.h"
+
+#if !defined(SC_TOOLS_COMPILED_SEPARATELY)
+#define SC_TOOLS_IMPORT
+#include "SC-package.cpp"
+#undef SC_TOOLS_IMPORT
+#endif
+
+#include "SC-build/BuildCLI.inl"
 
 namespace SC
 {
@@ -49,7 +60,6 @@ Result installDearImGui(const Build::Directories& directories, Package& package)
     SC_TRY(packageInstall(download, package, functions));
     return Result(true);
 }
-
 } // namespace Tools
 namespace Build
 {
@@ -57,12 +67,14 @@ SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ig
 
 void addSaneCppLibraries(Project& project, const Parameters& parameters)
 {
-    // Files
-    project.addFiles("Libraries", "**.cpp"); // recursively add all cpp files
-    project.addFiles("Libraries", "**.h");   // recursively add all header files
-    project.addFiles("Libraries", "**.inl"); // recursively add all inline files
+    String librariesRoot = StringEncoding::Utf8;
+    (void)Path::join(librariesRoot, {parameters.directories.libraryDirectory.view(), "Libraries"});
+    (void)project.addIncludePaths({parameters.directories.libraryDirectory.view()});
 
-    // Libraries to link
+    project.addFiles(librariesRoot.view(), "**.cpp");
+    project.addFiles(librariesRoot.view(), "**.h");
+    project.addFiles(librariesRoot.view(), "**.inl");
+
     if (parameters.platform == Platform::Apple)
     {
         project.addLinkFrameworks({"CoreFoundation", "CoreServices", "CFNetwork", "Foundation"});
@@ -77,14 +89,19 @@ void addSaneCppLibraries(Project& project, const Parameters& parameters)
         project.addLinkLibraries({"dl", "pthread"});
     }
 
-    // Debug visualization helpers
     if (parameters.generator == Generator::VisualStudio2022)
     {
-        project.addFiles("Support/DebugVisualizers/MSVC", "*.natvis");
+        String debugVisualizersRoot = StringEncoding::Utf8;
+        (void)Path::join(debugVisualizersRoot,
+                         {parameters.directories.libraryDirectory.view(), "Support/DebugVisualizers/MSVC"});
+        project.addFiles(debugVisualizersRoot.view(), "*.natvis");
     }
     else
     {
-        project.addFiles("Support/DebugVisualizers/LLDB", "*");
+        String debugVisualizersRoot = StringEncoding::Utf8;
+        (void)Path::join(debugVisualizersRoot,
+                         {parameters.directories.libraryDirectory.view(), "Support/DebugVisualizers/LLDB"});
+        project.addFiles(debugVisualizersRoot.view(), "*");
     }
 }
 
@@ -328,57 +345,49 @@ static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
 Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {TargetType::ConsoleExecutable, TEST_PROJECT_NAME};
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
 
-    // All relative paths are evaluated from this project root directory.
-    project.setRootDirectory(parameters.directories.libraryDirectory.view());
-
-    // Project Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
-    project.configurations.back().coverage.excludeRegex =
-        ".*\\/Tools.*|"
-        ".*\\Test.(cpp|h|c)|"
-        ".*\\test.(c|h)|"
-        ".*\\/Tests/.*\\.*|"
-        ".*\\/LibC\\+\\+.inl|"              // new / delete overloads
-        ".*\\/Assert.h|"                    // Can't test Assert::unreachable
-        ".*\\/PluginMacros.h|"              // macros for client plugins
-        ".*\\/ProcessPosixFork.inl|"        // Can't compute coverage for fork
-        ".*\\/EnvironmentTable.h|"          // Can't compute coverage for fork
-        ".*\\/InitializerList.h|"           // C++ Language Support
-        ".*\\/Reflection/.*\\.*|"           // constexpr and templates
-        ".*\\/ContainersReflection/.*\\.*|" // constexpr and templates
-        ".*\\/SerializationBinary/.*\\.*|"  // constexpr and templates
-        ".*\\/Extra/Deprecated/.*\\.*";
+    project.configurations.back().coverage.excludeRegex = ".*\\/Tools.*|"
+                                                          ".*\\Test.(cpp|h|c)|"
+                                                          ".*\\test.(c|h)|"
+                                                          ".*\\/Tests/.*\\.*|"
+                                                          ".*\\/LibC\\+\\+.inl|"
+                                                          ".*\\/Assert.h|"
+                                                          ".*\\/PluginMacros.h|"
+                                                          ".*\\/ProcessPosixFork.inl|"
+                                                          ".*\\/EnvironmentTable.h|"
+                                                          ".*\\/InitializerList.h|"
+                                                          ".*\\/Reflection/.*\\.*|"
+                                                          ".*\\/ContainersReflection/.*\\.*|"
+                                                          ".*\\/SerializationBinary/.*\\.*|"
+                                                          ".*\\/Extra/Deprecated/.*\\.*";
     if (parameters.platform == Platform::Linux)
     {
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters, "DebugValgrind");
-        project.configurations.back().compile.enableASAN = false; // ASAN and Valgrind don't mix
-        project.configurations.back().link.enableASAN    = false; // ASAN and Valgrind don't mix
+        project.configurations.back().compile.enableASAN = false;
+        project.configurations.back().link.enableASAN    = false;
     }
 
-    // Defines
-    // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
     project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
-
-    // Includes
     project.addIncludePaths({
-        ".",            // Libraries path (for PluginTest)
-        "Tests/SCTest", // SCConfig.h path (enabled by SC_COMPILER_ENABLE_CONFIG == 1)
+        ".",
+        "Tests/SCTest",
     });
 
     addSaneCppLibraries(project, parameters);
-    project.addFiles("Tests/SCTest", "*.cpp");     // add all .cpp from SCTest directory
-    project.addFiles("Tests/SCTest", "*.h");       // add all .h from SCTest directory
-    project.addFiles("Tests/Libraries", "**.c*");  // add all tests from Libraries directory
-    project.addFiles("Tests/Libraries", "**.inl"); // add all tests from Libraries directory
+    project.addFiles("Tests/SCTest", "*.cpp");
+    project.addFiles("Tests/SCTest", "*.h");
+    project.addFiles("Tests/Libraries", "**.c*");
+    project.addFiles("Tests/Libraries", "**.inl");
     project.removeFiles("Tests/Libraries/Build", "BuildTest.cpp");
-    project.addFiles("Tests/Support", "**.cpp"); // add all tests from Support directory
-    project.addFiles("Tests/Tools", "**.cpp");   // add all tests from Tools directory
-    project.addFiles("Tools", "SC-*.cpp");       // add all tools
-    project.addFiles("Tools", "*.h");            // add tools headers
+    project.addFiles("Tests/Support", "**.cpp");
+    project.addFiles("Tests/Tools", "**.cpp");
+    project.addFiles("Tools", "SC-*.cpp");
+    project.addFiles("Tools", "*.h");
 
     if (not project.addExportLibraries({"Foundation", "Memory", "Strings", "Containers"}))
     {
@@ -386,25 +395,18 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     }
     project.link.preserveExportedSymbols = true;
 
-    // Deprecated code tests and libraries (to be removed when deprecated code will be removed)
-    project.addFiles("Extra/Deprecated/Tests", "**.cpp");     // add all deprecated tests
-    project.addFiles("Extra/Deprecated/Libraries", "**.h");   // add all deprecated libraries header files
-    project.addFiles("Extra/Deprecated/Libraries", "**.cpp"); // add all deprecated libraries cpp files
+    project.addFiles("Extra/Deprecated/Tests", "**.cpp");
+    project.addFiles("Extra/Deprecated/Libraries", "**.h");
+    project.addFiles("Extra/Deprecated/Libraries", "**.cpp");
 
-    // This is a totally useless per-file define to test "per-file" flags SC::Build feature.
     SourceFiles specificFiles;
-    // For testing purposes let's create a needlessly complex selection filter for "SC Spaces.cpp"
     specificFiles.addSelection("Tests/SCTest", "*.cpp");
     specificFiles.removeSelection("Tests/SCTest", "SCTest.cpp");
-
-    // Add an useless define to be checked inside "SC Spaces.cpp" and "SCTest.cpp"
     specificFiles.compile.addDefines({"SC_SPACES_SPECIFIC_DEFINE=1"});
     specificFiles.compile.addIncludePaths({"../Directory With Spaces"});
-
-    // For testing purposes disable some warnings caused in "SC Spaces.cpp"
-    specificFiles.compile.disableWarnings({4100});                                 // MSVC only
-    specificFiles.compile.disableWarnings({"unused-parameter"});                   // GCC and Clang
-    specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"}); // Clang Only
+    specificFiles.compile.disableWarnings({4100});
+    specificFiles.compile.disableWarnings({"unused-parameter"});
+    specificFiles.compile.disableClangWarnings({"reserved-user-defined-literal"});
     project.addSpecificFileFlags(specificFiles);
 
     SC_TRY(workspace.projects.push_back(move(project)));
@@ -414,8 +416,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
 Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {TargetType::ConsoleExecutable, BUILD_TEST_PROJECT_NAME};
-
-    project.setRootDirectory(parameters.directories.libraryDirectory.view());
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
 
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
@@ -442,8 +443,7 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
 {
     Project project = {TargetType::SharedLibrary, "SC"};
 
-    project.setRootDirectory(parameters.directories.libraryDirectory.view());
-
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
@@ -459,23 +459,18 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
 {
     Project project = {TargetType::ConsoleExecutable, "InteropSTL"};
 
-    // All relative paths are evaluated from this project root directory.
-    project.setRootDirectory(parameters.directories.libraryDirectory.view());
-
-    // Project Configurations
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-    // Enable C++ STL, exceptions and RTTI
     project.files.compile.enableStdCpp     = true;
     project.files.compile.enableExceptions = true;
     project.files.compile.enableRTTI       = true;
-    project.files.compile.cppStandard      = CppStandard::CPP17; // string_view requires C++17
+    project.files.compile.cppStandard      = CppStandard::CPP17;
 
-    // $(PROJECT_ROOT) expands to Project::setRootDirectory expressed relative to $(PROJECT_DIR)
     project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
-    project.addIncludePaths({"."}); // Libraries path
+    project.addIncludePaths({"."});
     addSaneCppLibraries(project, parameters);
     project.addFiles("Tests/InteropSTL", "*.cpp");
     project.addFiles("Tests/InteropSTL", "*.h");
@@ -493,45 +488,38 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
                                     (parameters.targetMachine.environment == TargetEnvironment::WindowsGNU or
                                      parameters.toolchain.family == Toolchain::LLVMMingw);
 
-    // All relative paths are evaluated from this project root directory.
-    project.setRootDirectory(parameters.directories.libraryDirectory.view());
-
-    // Project icon (currently used only by Xcode backend)
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.iconPath = "Documentation/Doxygen/SC.svg";
 
-    // Install dependencies
     Tools::Package sokol;
     SC_TRY(Tools::installSokol(parameters.directories, sokol));
     Tools::Package imgui;
     SC_TRY(Tools::installDearImGui(parameters.directories, imgui));
 
-    // Add includes
     project.addIncludePaths({".", sokol.packageLocalDirectory.view(), imgui.packageLocalDirectory.view()});
-
-    // Project Configurations
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
 
-    addSaneCppLibraries(project, parameters); // add all SC Libraries
+    addSaneCppLibraries(project, parameters);
 
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addFiles(sokol.packageLocalDirectory.view(), "*.h");
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     SC_TRY(addHotReloadIncludePathsDefine(project, parameters, imgui.packageLocalDirectory.view()));
-    project.addExportAllLibraries(); // Export all SC libraries for plugins
+    project.addExportAllLibraries();
     SC_TRY(project.addExportDirectories({imgui.packageLocalDirectory.view()}));
     project.link.preserveExportedSymbols = true;
     if (parameters.platform == Platform::Apple)
     {
-        project.addFiles("Examples/SCExample", "*.m"); // add all .m from SCExample directory
+        project.addFiles("Examples/SCExample", "*.m");
         project.addLinkFrameworks({"Metal", "MetalKit", "QuartzCore"});
         project.addLinkFrameworksMacOS({"Cocoa"});
         project.addLinkFrameworksIOS({"UIKit", "Foundation"});
     }
     else
     {
-        project.addFiles("Examples/SCExample", "*.c"); // add all .c from SCExample directory
+        project.addFiles("Examples/SCExample", "*.c");
         if (parameters.platform == Platform::Linux)
         {
             project.addLinkLibraries({"GL", "EGL", "X11", "Xi", "Xcursor"});
@@ -546,8 +534,8 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     {
         project.addDefines({"IMGUI_API=__attribute__((visibility(\"default\")))"});
     }
-    project.addFiles("Examples/SCExample", "**.h");   // add all .h from SCExample directory recursively
-    project.addFiles("Examples/SCExample", "**.cpp"); // add all .cpp from SCExample directory recursively
+    project.addFiles("Examples/SCExample", "**.h");
+    project.addFiles("Examples/SCExample", "**.cpp");
 
     if (not project.addExportLibraries({"Async", "Containers", "ContainersReflection", "File", "FileSystem",
                                         "Foundation", "Http", "Memory", "Plugin", "Process", "Reflection",
@@ -575,17 +563,14 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 
 Result configureExamplesConsole(const Parameters& parameters, Workspace& workspace)
 {
-    // Read all projects from Examples directory
     FileSystemIterator::FolderState entries[2];
-
-    FileSystemIterator fsi;
+    FileSystemIterator              fsi;
 
     String path;
-    SC_TRY(Path::join(path, {parameters.directories.libraryDirectory.view(), "Examples"}));
+    SC_TRY(Path::join(path, {parameters.directories.projectDirectory.view(), "Examples"}));
 
     fsi.init(path.view(), entries);
 
-    // Create a project for folder containing a .cpp file
     while (fsi.enumerateNext())
     {
         FileSystemIterator::Entry entry = fsi.get();
@@ -599,15 +584,14 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.targetType = TargetType::ConsoleExecutable;
         project.name       = name;
         project.targetName = name;
-        // All relative paths are evaluated from this project root directory.
-        project.setRootDirectory(parameters.directories.libraryDirectory.view());
+        project.setRootDirectory(parameters.directories.projectDirectory.view());
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-#if 0 // Flip this ifdef to add all Sane C++ Libraries instead of using the SC.cpp unity build
+#if 0
         addSaneCppLibraries(project, parameters);
 #else
-        project.addFile("SC.cpp"); // Unity build file including all Sane C++ Libraries
+        project.addFile("SC.cpp");
         if (parameters.platform == Platform::Apple)
         {
             project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
@@ -628,43 +612,36 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
 {
     Workspace workspace = {"SCSingleFileLibs"};
 
-    // Read all single file libraries from the _Build/_SingleFileLibrariesTest directory
     FileSystemIterator::FolderState entries[1];
-
-    FileSystemIterator fsi;
+    FileSystemIterator              fsi;
 
     String path;
-    SC_TRY(Path::join(path, {parameters.directories.libraryDirectory.view(), "_Build", "_SingleFileLibrariesTest"}));
+    SC_TRY(Path::join(path, {parameters.directories.projectDirectory.view(), "_Build", "_SingleFileLibrariesTest"}));
 
     SC_TRY_MSG(fsi.init(path.view(), entries), "Cannot access _Build/_SingleFileLibrariesTest");
 
-    // Create a project for each single file library
     while (fsi.enumerateNext())
     {
         StringView name, extension;
         SC_TRY(Path::parseNameExtension(fsi.get().name, name, extension));
         if (extension != "cpp" or not name.startsWith("Test_"))
-            continue; // Only process .cpp files
+            continue;
 
         Project project;
         project.targetType = TargetType::ConsoleExecutable;
         project.name       = name;
         project.targetName = project.name;
-        // All relative paths are evaluated from this project root directory.
-        project.setRootDirectory(parameters.directories.libraryDirectory.view());
+        project.setRootDirectory(parameters.directories.projectDirectory.view());
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        // Link C++ stdlib to avoid needing to link Memory library to define __cxa_guard_acquire etc.
         project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
         project.configurations[0].compile.enableStdCpp = true;
         project.configurations[1].compile.enableStdCpp = true;
 
         project.addIncludePaths({"_Build/_SingleFileLibraries"});
-
         project.addFile(fsi.get().path);
 
-        // Libraries to link
         if (parameters.platform == Platform::Apple)
         {
             project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
@@ -680,7 +657,6 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
     definition.workspaces.push_back(move(workspace));
     return Result(true);
 }
-static constexpr StringView DEFAULT_WORKSPACE = "SCWorkspace";
 
 Result configure(Definition& definition, const Parameters& parameters)
 {
@@ -693,18 +669,9 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));
     definition.workspaces.push_back(move(defaultWorkspace));
 
-    // Ignore errors from configuring single file libraries
     (void)configureSingleFileLibs(definition, parameters);
     return Result(true);
 }
 SC_COMPILER_WARNING_POP;
-
-Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE); }
 } // namespace Build
-
-#if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)
-StringView Tools::Tool::getToolName() { return "SC-build"; }
-StringView Tools::Tool::getDefaultAction() { return "configure"; }
-Result     Tools::Tool::runTool(Tools::Tool::Arguments& arguments) { return Tools::runBuildTool(arguments); }
-#endif
 } // namespace SC

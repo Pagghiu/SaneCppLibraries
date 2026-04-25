@@ -6,6 +6,7 @@
 #include "Libraries/Strings/StringFormat.h"
 #include "Libraries/Testing/Testing.h"
 #include "Tools/SC-build.h"
+#include "Tools/SC-build/BuildCLI.h"
 
 extern SC::Console* globalConsole;
 namespace SC
@@ -14,7 +15,7 @@ static bool writeBuildHelpAddendumToString(Build::Action::Type actionType, Strin
 {
     GrowableBuffer<String> growable(text);
     StringFormatOutput     output(StringEncoding::Utf8, growable);
-    const bool             result = Tools::appendBuildActionHelpAddendum(output, actionType);
+    const bool             result = Tools::detail::appendBuildActionHelpAddendum(output, actionType);
     growable.finalize();
     return result;
 }
@@ -24,12 +25,14 @@ struct SupportToolsTest : public TestCase
     SupportToolsTest(SC::TestReport& report) : TestCase(report, "SupportToolsTest")
     {
         using namespace SC::Tools;
+        using namespace SC::Tools::detail;
         StringPath outputDirectory;
         (void)StringBuilder::format(outputDirectory, "{0}/_Build", report.libraryRootDirectory);
         Tool::Arguments arguments{*globalConsole,
                                   report.libraryRootDirectory,
                                   report.libraryRootDirectory,
                                   outputDirectory,
+                                  report.libraryRootDirectory,
                                   StringView(),
                                   StringView(),
                                   {}};

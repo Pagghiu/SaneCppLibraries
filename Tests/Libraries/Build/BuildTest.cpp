@@ -21,7 +21,7 @@ static Result configureMakefileStaticLibrary(Build::Definition& definition, cons
     Build::Workspace workspace = {MakefileStaticLibraryWorkspaceName};
     Build::Project   project   = {Build::TargetType::StaticLibrary, MakefileStaticLibraryProjectName};
 
-    SC_TRY(project.setRootDirectory(parameters.directories.libraryDirectory.view()));
+    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(project.addFiles("Tests/SCBuildTest/Fixture/TinyConsoleProgram", "main.cpp"));
@@ -76,6 +76,7 @@ struct SC::BuildTest : public SC::TestCase
         SC_TRUST_RESULT(Path::join(directories.packagesInstallDirectory, {buildDir.view(), "_Packages"}));
 
         directories.libraryDirectory = report.libraryRootDirectory.view();
+        directories.projectDirectory = report.libraryRootDirectory.view();
 
         if (test_section("Visual Studio 2022"))
         {

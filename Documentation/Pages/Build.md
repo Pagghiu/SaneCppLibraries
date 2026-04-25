@@ -28,7 +28,11 @@ supports direct host builds on macOS, Linux, and Windows.
 # Description
 
 Build descriptions are regular C++ files, conventionally named `SC-build.cpp`, that are compiled on the fly through the
-bootstrap scripts `SC.sh` and `SC.bat`.
+repository bootstraps `SC.sh` / `SC.bat` or the external-project launchers `SC-build.sh` / `SC-build.bat` /
+`SC-build.ps1`.
+
+For the external bootstrap workflow, including vendored, shared-checkout, and standalone-cache usage, see
+[External SC::Build Bootstrap](@ref page_build_external).
 
 The same public API serves two workflows:
 
@@ -140,6 +144,7 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `RunnerSpec::{Auto, None, Wine, QEMU, Custom}`
 - `ExecutionOptions` for native-backend parallelism / verbosity knobs
 - `OutputMode::{Quiet, Normal, Verbose}` and `ExecutionOptions::outputMode` for native-backend presentation control
+- `Directories::projectDirectory` for the root of the project being configured, distinct from the SaneCppLibraries checkout
 - `Project::addSpecificFileFlags` for per-file flag groups
 - `Project::addExportLibraries`, `addExportAllLibraries`, and `addExportDirectories` for plugin host exports
 

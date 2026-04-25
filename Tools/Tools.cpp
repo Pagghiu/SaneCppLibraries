@@ -32,9 +32,10 @@ int main(int argc, const char* argv[])
 
     globalConsole = &console;
 
-    if (argc < 4)
+    if (argc < 5)
     {
-        console.printLine("Usage: ${TOOL} libraryDirectory toolSource toolDestination [tool] [action]");
+        console.printLine(
+            "Usage: ${TOOL} libraryDirectory toolSource toolDestination projectDirectory [tool] [action]");
         return -1;
     }
     int numArguments = 0;
@@ -60,18 +61,20 @@ int main(int argc, const char* argv[])
     const StringView libraryDirectory = StringView::fromNullTerminated(nativeArgs[1], StringEncoding::Native);
     const StringView toolSource       = StringView::fromNullTerminated(nativeArgs[2], StringEncoding::Native);
     const StringView toolDestination  = StringView::fromNullTerminated(nativeArgs[3], StringEncoding::Native);
+    const StringView projectDirectory = StringView::fromNullTerminated(nativeArgs[4], StringEncoding::Native);
 
     {
         (void)Path::normalize(arguments.libraryDirectory, libraryDirectory, Path::Type::AsNative);
         (void)Path::normalize(arguments.toolSource, toolSource, Path::Type::AsNative);
         (void)Path::normalize(arguments.toolDestination, toolDestination, Path::Type::AsNative);
+        (void)Path::normalize(arguments.projectDirectory, projectDirectory, Path::Type::AsNative);
     }
 
     arguments.tool = Tool::getToolName();
 
-    if (numArguments > 5)
+    if (numArguments > 6)
     {
-        arguments.action = StringView::fromNullTerminated(argv[5], StringEncoding::Ascii);
+        arguments.action = StringView::fromNullTerminated(argv[6], StringEncoding::Ascii);
     }
     else
     {
@@ -79,20 +82,20 @@ int main(int argc, const char* argv[])
     }
     constexpr int maxAdditionalArguments = 16;
     StringView    additionalArguments[maxAdditionalArguments];
-    if (numArguments - 4 > maxAdditionalArguments)
+    if (numArguments - 5 > maxAdditionalArguments)
     {
-        console.printLine("Error: Exceeded maximum number of additional arguments (20)");
+        console.printLine("Error: Exceeded maximum number of additional arguments (21)");
         return -1;
     }
 
-    for (int idx = 6; idx < numArguments; ++idx)
+    for (int idx = 7; idx < numArguments; ++idx)
     {
-        additionalArguments[idx - 6] = StringView::fromNullTerminated(nativeArgs[idx], StringEncoding::Native);
+        additionalArguments[idx - 7] = StringView::fromNullTerminated(nativeArgs[idx], StringEncoding::Native);
     }
 
-    if (numArguments >= 6)
+    if (numArguments >= 7)
     {
-        arguments.arguments = {additionalArguments, static_cast<size_t>(numArguments - 6)};
+        arguments.arguments = {additionalArguments, static_cast<size_t>(numArguments - 7)};
     }
 
     SC::Time::Realtime started = SC::Time::Realtime::now();
@@ -102,6 +105,7 @@ int main(int argc, const char* argv[])
     SC_TRY(builder.append("librarySource    = \"{}\"\n", arguments.libraryDirectory));
     SC_TRY(builder.append("toolSource       = \"{}\"\n", arguments.toolSource));
     SC_TRY(builder.append("toolDestination  = \"{}\"\n", arguments.toolDestination));
+    SC_TRY(builder.append("projectDirectory = \"{}\"\n", arguments.projectDirectory));
     builder.finalize();
     console.print(gFormatString.view());
 

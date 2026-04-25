@@ -55,6 +55,19 @@ SC.bat build compile
 
 @note `SC::Tools` are just regular programs being compiled on the fly when needed, so they require a working host compiler to be available in system path. This limitation could be removed if needed, as described in the Roadmap section.  
 
+# External SC::Build launcher
+
+External projects should use `SC-build.sh`, `SC-build.bat`, or `SC-build.ps1` instead of the repository-only
+`SC.sh build ...` entrypoint.
+
+Those launchers:
+
+- Search upward for a project-local `SC-build.cpp`
+- Accept `--project-dir <path>` and `--libraries-root <path>` overrides
+- Can use a vendored checkout, an explicit shared checkout, or a shared cached clone plus versioned worktrees
+
+See [External SC::Build Bootstrap](@ref page_build_external) for the full workflow and examples.
+
 # Invoking custom tools
 
 Tools can be automatically compiled and run by just passing its full path to the `SC` bootstrap.
