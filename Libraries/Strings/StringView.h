@@ -162,6 +162,10 @@ struct SC::StringView : public StringSpan
     /// @endcode
     [[nodiscard]] bool startsWith(const StringView str) const;
 
+    /// @brief Check if StringView starts with another StringView using ASCII-only case-insensitive comparison.
+    ///        Non-ASCII code points are compared without case folding.
+    [[nodiscard]] bool startsWithIgnoreCaseASCII(const StringView str) const;
+
     /// @brief Check if StringView ends with another StringView
     /// @param str The other StringView to check with current
     /// @return  Returns `true` if this StringView ends with str
@@ -185,6 +189,14 @@ struct SC::StringView : public StringSpan
     /// SC_TRY(not asd.containsString("4567"));
     /// @endcode
     [[nodiscard]] bool containsString(const StringView str) const;
+
+    /// @brief Check if StringView contains another StringView using ASCII-only case-insensitive comparison.
+    ///        Non-ASCII code points are compared without case folding.
+    [[nodiscard]] bool containsStringIgnoreCaseASCII(const StringView str) const;
+
+    /// @brief Check if StringView is equal to another StringView using ASCII-only case-insensitive comparison.
+    ///        Non-ASCII code points are compared without case folding.
+    [[nodiscard]] bool equalsIgnoreCaseASCII(const StringView str) const;
 
     /// @brief Returns the remaining part of the string after matching stringToMatch
     /// @param stringToMatch String to match inside the source string

@@ -31,6 +31,20 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(StringView() == "");
         }
 
+        if (test_section("comparison ignore case ASCII"))
+        {
+            SC_TEST_EXPECT("Alpha"_a8.equalsIgnoreCaseASCII("alpha"_a8));
+            SC_TEST_EXPECT("alpha"_a8.equalsIgnoreCaseASCII("ALPHA"_a8));
+            SC_TEST_EXPECT(not "alpha"_a8.equalsIgnoreCaseASCII("alph"_a8));
+            SC_TEST_EXPECT(not "alpha"_a8.equalsIgnoreCaseASCII("alpzA"_a8));
+            SC_TEST_EXPECT("Stra\xc3\x9f"
+                           "e"_u8.equalsIgnoreCaseASCII("stra\xc3\x9f"
+                                                        "e"_u8));
+            SC_TEST_EXPECT(not "Stra\xc3\x9f"
+                               "e"_u8.equalsIgnoreCaseASCII("STRASSE"_a8));
+            SC_TEST_EXPECT(StringView().equalsIgnoreCaseASCII(""_a8));
+        }
+
         if (test_section("parseInt32"))
         {
             StringView other;
@@ -140,6 +154,16 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not test2.startsWith("A"));
             SC_TEST_EXPECT(test2.endsWith(""));
             SC_TEST_EXPECT(not test2.endsWith("A"));
+        }
+
+        if (test_section("startsWith ignore case ASCII"))
+        {
+            SC_TEST_EXPECT("windows-gnu-x86_64"_a8.startsWithIgnoreCaseASCII("WINDOWS"_a8));
+            SC_TEST_EXPECT("windows-gnu-x86_64"_a8.startsWithIgnoreCaseASCII("win"_a8));
+            SC_TEST_EXPECT(not "windows-gnu-x86_64"_a8.startsWithIgnoreCaseASCII("gnu"_a8));
+            SC_TEST_EXPECT(not ""_a8.startsWithIgnoreCaseASCII("A"_a8));
+            SC_TEST_EXPECT("caf\xc3\xa9-runner"_u8.startsWithIgnoreCaseASCII("CAF\xc3\xa9"_u8));
+            SC_TEST_EXPECT(not "caf\xc3\xa9-runner"_u8.startsWithIgnoreCaseASCII("CAF\xc3\x89"_u8));
         }
 
         if (test_section("view"))
@@ -257,6 +281,15 @@ struct SC::StringViewTest : public SC::TestCase
             SC_TEST_EXPECT(not asd.containsString("4567"));
             size_t overlapPoints = 0;
             SC_TEST_EXPECT(not asd.fullyOverlaps("123___", overlapPoints) and overlapPoints == 3);
+        }
+        if (test_section("contains ignore case ASCII"))
+        {
+            SC_TEST_EXPECT("x86_64-w64-windows-gnu"_a8.containsStringIgnoreCaseASCII("WINDOWS"_a8));
+            SC_TEST_EXPECT("x86_64-w64-windows-gnu"_a8.containsStringIgnoreCaseASCII("gnu"_a8));
+            SC_TEST_EXPECT("x86_64-w64-windows-gnu"_a8.containsStringIgnoreCaseASCII(""_a8));
+            SC_TEST_EXPECT(not "x86_64-w64-windows-gnu"_a8.containsStringIgnoreCaseASCII("musl"_a8));
+            SC_TEST_EXPECT("caf\xc3\xa9-runner"_u8.containsStringIgnoreCaseASCII("CAF\xc3\xa9"_u8));
+            SC_TEST_EXPECT(not "caf\xc3\xa9-runner"_u8.containsStringIgnoreCaseASCII("CAF\xc3\x89"_u8));
         }
         if (test_section("compare"))
         {

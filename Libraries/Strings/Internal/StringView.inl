@@ -118,6 +118,38 @@ bool SC::StringView::parseDouble(double& value) const
     return true;
 }
 
+static constexpr uint32_t stringViewLowercaseASCII(uint32_t codePoint)
+{
+    return (codePoint >= 'A' and codePoint <= 'Z') ? static_cast<uint32_t>(codePoint - 'A' + 'a') : codePoint;
+}
+
+bool SC::StringView::equalsIgnoreCaseASCII(const StringView str) const
+{
+    return withIterators(*this, str,
+                         [](auto it1, auto it2)
+                         {
+                             uint32_t codePoint1 = 0;
+                             uint32_t codePoint2 = 0;
+                             while (true)
+                             {
+                                 const bool has1 = it1.advanceRead(codePoint1);
+                                 const bool has2 = it2.advanceRead(codePoint2);
+                                 if (has1 != has2)
+                                 {
+                                     return false;
+                                 }
+                                 if (not has1)
+                                 {
+                                     return true;
+                                 }
+                                 if (stringViewLowercaseASCII(codePoint1) != stringViewLowercaseASCII(codePoint2))
+                                 {
+                                     return false;
+                                 }
+                             }
+                         });
+}
+
 bool SC::StringView::startsWith(const StringView str) const
 {
     if (hasCompatibleEncoding(str))
@@ -130,6 +162,28 @@ bool SC::StringView::startsWith(const StringView str) const
         return false;
     }
     return withIterator([str](auto it1) { return str.withIterator([it1](auto it2) { return it1.startsWith(it2); }); });
+}
+
+bool SC::StringView::startsWithIgnoreCaseASCII(const StringView str) const
+{
+    return withIterators(*this, str,
+                         [](auto it1, auto it2)
+                         {
+                             uint32_t codePoint1 = 0;
+                             uint32_t codePoint2 = 0;
+                             while (it2.advanceRead(codePoint2))
+                             {
+                                 if (not it1.advanceRead(codePoint1))
+                                 {
+                                     return false;
+                                 }
+                                 if (stringViewLowercaseASCII(codePoint1) != stringViewLowercaseASCII(codePoint2))
+                                 {
+                                     return false;
+                                 }
+                             }
+                             return true;
+                         });
 }
 
 bool SC::StringView::endsWith(const StringView str) const
@@ -150,6 +204,46 @@ bool SC::StringView::endsWith(const StringView str) const
 bool SC::StringView::containsString(const StringView str) const
 {
     return withIterators(*this, str, [](auto it1, auto it2) { return it1.advanceAfterFinding(it2); });
+}
+
+bool SC::StringView::containsStringIgnoreCaseASCII(const StringView str) const
+{
+    if (str.isEmpty())
+    {
+        return true;
+    }
+    return withIterators(*this, str,
+                         [](auto haystackStart, auto needleStart)
+                         {
+                             uint32_t ignoredCodePoint = 0;
+                             while (true)
+                             {
+                                 auto haystack = haystackStart;
+                                 auto needle   = needleStart;
+
+                                 uint32_t haystackCodePoint = 0;
+                                 uint32_t needleCodePoint   = 0;
+                                 bool     matches           = true;
+                                 while (needle.advanceRead(needleCodePoint))
+                                 {
+                                     if (not haystack.advanceRead(haystackCodePoint) or
+                                         stringViewLowercaseASCII(haystackCodePoint) !=
+                                             stringViewLowercaseASCII(needleCodePoint))
+                                     {
+                                         matches = false;
+                                         break;
+                                     }
+                                 }
+                                 if (matches)
+                                 {
+                                     return true;
+                                 }
+                                 if (not haystackStart.advanceRead(ignoredCodePoint))
+                                 {
+                                     return false;
+                                 }
+                             }
+                         });
 }
 
 bool SC::StringView::splitAfter(const StringView stringToMatch, StringView& remainingAfterSplit) const
