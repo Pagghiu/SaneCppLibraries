@@ -489,18 +489,69 @@ SC::Result SC::Build::Definition::configure(StringView workspaceName, const Buil
     return Result(writer.write(workspaceName));
 }
 
+SC::Result SC::Build::Definition::addProject(Project&& project)
+{
+    if (workspaces.isEmpty())
+    {
+        SC_TRY(workspaces.push_back({"Workspace"}));
+    }
+    return Result(workspaces[0].projects.push_back(move(project)));
+}
+
+SC::Result SC::Build::Definition::enforceDefaults(const Parameters& parameters)
+{
+    for (Workspace& workspace : workspaces)
+    {
+        for (Project& project : workspace.projects)
+        {
+            if (project.targetName.isEmpty())
+            {
+                SC_TRY(project.targetName.assign(project.name.view()));
+            }
+
+            if (project.rootDirectory.isEmpty())
+            {
+                SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
+            }
+            if (project.configurations.isEmpty())
+            {
+                SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));
+                SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));
+            }
+        }
+    }
+    return Result(true);
+}
+
 bool SC::Build::Definition::findConfiguration(StringView workspaceName, StringView projectName,
                                               StringView configurationName, Workspace*& workspace, Project*& project,
                                               Configuration*& configuration)
 {
-    size_t workspaceIdx = 0;
-    SC_TRY(workspaces.find([&](auto& it) { return it.name == workspaceName; }, &workspaceIdx));
-    workspace         = &workspaces[workspaceIdx];
-    size_t projectIdx = 0;
-    SC_TRY(workspace->projects.find([&](auto& it) { return it.name == projectName; }, &projectIdx));
-    project                 = &workspace->projects[projectIdx];
+    size_t workspaceIdx     = 0;
+    size_t projectIdx       = 0;
     size_t configurationIdx = 0;
+    SC_TRY(workspaces.find([&](auto& it) { return it.name == workspaceName; }, &workspaceIdx));
+    workspace = &workspaces[workspaceIdx];
+    SC_TRY(workspace->projects.find([&](auto& it) { return it.name == projectName; }, &projectIdx));
+    project = &workspace->projects[projectIdx];
     SC_TRY(project->configurations.find([&](auto& it) { return it.name == configurationName; }, &configurationIdx));
+    configuration = &project->configurations[configurationIdx];
+    return true;
+}
+
+bool SC::Build::Definition::findConfiguration(StringView workspaceName, StringView projectName,
+                                              StringView configurationName, const Workspace*& workspace,
+                                              const Project*& project, const Configuration*& configuration) const
+{
+    size_t workspaceIdx     = 0;
+    size_t projectIdx       = 0;
+    size_t configurationIdx = 0;
+    SC_TRY(workspaces.find([&](const Workspace& it) { return it.name == workspaceName; }, &workspaceIdx));
+    workspace = &workspaces[workspaceIdx];
+    SC_TRY(workspace->projects.find([&](const Project& it) { return it.name == projectName; }, &projectIdx));
+    project = &workspace->projects[projectIdx];
+    SC_TRY(project->configurations.find([&](const Configuration& it) { return it.name == configurationName; },
+                                        &configurationIdx));
     configuration = &project->configurations[configurationIdx];
     return true;
 }
@@ -848,9 +899,9 @@ static SC::Result writeGeneratedFileIfChanged(SC::FileSystem& fs, SC::StringView
 
 struct SC::Build::Action::Internal
 {
-    static Result configure(ConfigureFunction configure, const Action& action);
-    static Result coverage(ConfigureFunction configure, const Action& action);
-    static Result compileRunPrint(ConfigureFunction configure, const Action& action, Span<StringView> environment = {},
+    static Result configure(const Definition& definition, const Action& action);
+    static Result coverage(const Definition& definition, const Action& action);
+    static Result compileRunPrint(const Definition& definition, const Action& action, Span<StringView> environment = {},
                                   String* outputExecutable = nullptr);
     static Result runExecutable(StringView executablePath, Span<StringView> arguments, const Action& action);
 
@@ -898,14 +949,18 @@ struct SC::Build::Action::Internal
     }
 };
 
-SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure,
-                                      StringView defaultWorkspaceName)
+SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction configure)
 {
+    Build::Definition definition;
+    SC_TRY(configure(definition, action.parameters));
+    SC_TRY(definition.enforceDefaults(action.parameters));
+
     Action newAction = action;
 
     if (newAction.workspaceName.isEmpty())
     {
-        newAction.workspaceName = defaultWorkspaceName;
+        SC_TRY_MSG(not definition.workspaces.isEmpty(), "No workspaces defined");
+        newAction.workspaceName = definition.workspaces[0].name.view();
     }
     if (newAction.projectName.isEmpty())
     {
@@ -924,21 +979,19 @@ SC::Result SC::Build::Action::execute(const Action& action, ConfigureFunction co
     {
     case Print:
     case Run:
-    case Compile: return Internal::compileRunPrint(configure, newAction);
-    case Coverage: return Internal::coverage(configure, newAction);
-    case Configure: return Internal::configure(configure, newAction);
+    case Compile: return Internal::compileRunPrint(definition, newAction);
+    case Coverage: return Internal::coverage(definition, newAction);
+    case Configure: return Internal::configure(definition, newAction);
     }
     return Result::Error("Action::execute - unsupported action");
 }
 
-SC::Result SC::Build::Action::Internal::configure(ConfigureFunction configure, const Action& action)
+SC::Result SC::Build::Action::Internal::configure(const Definition& definition, const Action& action)
 {
-    Build::Definition definition;
-    SC_TRY(configure(definition, action.parameters));
     SC_TRY(definition.configure(action.workspaceName, action.parameters));
     return Result(true);
 }
-SC::Result SC::Build::Action::Internal::coverage(ConfigureFunction configure, const Action& action)
+SC::Result SC::Build::Action::Internal::coverage(const Definition& definition, const Action& action)
 {
     Action newAction = action;
     String executablePath;
@@ -946,17 +999,15 @@ SC::Result SC::Build::Action::Internal::coverage(ConfigureFunction configure, co
     // Build the configuration with coverage information
     newAction.action         = Action::Compile;
     StringView environment[] = {"CC", "clang", "CXX", "clang++"};
-    SC_TRY(compileRunPrint(configure, newAction, environment));
+    SC_TRY(compileRunPrint(definition, newAction, environment));
 
     // Get coverage configuration executable path
     newAction.action = Action::Print;
-    SC_TRY(compileRunPrint(configure, newAction, environment, &executablePath));
+    SC_TRY(compileRunPrint(definition, newAction, environment, &executablePath));
 
-    Build::Definition definition;
-    SC_TRY(configure(definition, action.parameters));
-    Workspace*     workspace     = nullptr;
-    Project*       project       = nullptr;
-    Configuration* configuration = nullptr;
+    const Workspace*     workspace     = nullptr;
+    const Project*       project       = nullptr;
+    const Configuration* configuration = nullptr;
     SC_TRY(definition.findConfiguration(action.workspaceName, action.projectName, action.configurationName, workspace,
                                         project, configuration));
     String coverageExcludeRegex;
@@ -1192,17 +1243,15 @@ static SC::Result extractLastNonEmptyOutputLine(SC::StringView output, SC::Strin
     return SC::Result(true);
 }
 
-SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction configure, const Action& action,
+SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& definition, const Action& action,
                                                         Span<StringView> environment, String* outputExecutable)
 {
     if (action.parameters.generator == Generator::Native)
     {
         SC_COMPILER_UNUSED(environment);
-        return NativeBuild::execute(configure, action, outputExecutable);
+        return NativeBuild::execute(definition, action, outputExecutable);
     }
 
-    Definition definition;
-    SC_TRY(configure(definition, action.parameters));
     SC_TRY(definition.configure(action.workspaceName, action.parameters));
 
     SmallString<256>       solutionLocation;
@@ -1406,9 +1455,9 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(ConfigureFunction config
     case Generator::Make: {
         if (action.action == Action::Run and not action.allTargets)
         {
-            Workspace*     workspace     = nullptr;
-            Project*       project       = nullptr;
-            Configuration* configuration = nullptr;
+            const Workspace*     workspace     = nullptr;
+            const Project*       project       = nullptr;
+            const Configuration* configuration = nullptr;
             if (definition.findConfiguration(action.workspaceName, action.projectName, action.configurationName,
                                              workspace, project, configuration))
             {

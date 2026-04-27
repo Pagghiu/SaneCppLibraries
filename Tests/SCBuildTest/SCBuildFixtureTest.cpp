@@ -747,7 +747,7 @@ static Result resolveVisualStudioLLVMToolPath(StringView executableName, String&
 static Result configureTinyConsoleProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
-    Build::Project   project   = {Build::TargetType::ConsoleExecutable, FixtureProjectName};
+    Build::Project   project   = {FixtureProjectName, Build::TargetType::ConsoleExecutable};
 
     SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
@@ -762,7 +762,7 @@ static Result configureTinyConsoleProgram(Build::Definition& definition, const B
 static Result configureSmallSCProgram(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {FixtureWorkspaceName};
-    Build::Project   project   = {Build::TargetType::ConsoleExecutable, SmallFixtureProjectName};
+    Build::Project   project   = {SmallFixtureProjectName, Build::TargetType::ConsoleExecutable};
 
     SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
@@ -821,7 +821,7 @@ static Result configureStaticLibraryConsumerProgram(Build::Definition& definitio
     SC_TRY_MSG(not DynamicLinkedLibraryPath.isEmpty(), "Static library path is not initialized");
 
     Build::Workspace workspace = {FixtureWorkspaceName};
-    Build::Project   project   = {Build::TargetType::ConsoleExecutable, StaticLibraryConsumerName};
+    Build::Project   project   = {StaticLibraryConsumerName, Build::TargetType::ConsoleExecutable};
 
     SC_TRY(project.setRootDirectory(DynamicFixtureProjectRoot));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
@@ -845,13 +845,13 @@ static Result configureWorkspaceDependencyProgram(Build::Definition& definition,
     SC_TRY(Path::join(libraryRoot, {DynamicFixtureProjectRoot, "Library"}));
     SC_TRY(Path::join(executableRoot, {DynamicFixtureProjectRoot, "Executable"}));
 
-    Build::Project libraryProject = {Build::TargetType::StaticLibrary, WorkspaceLibraryProjectName};
+    Build::Project libraryProject = {WorkspaceLibraryProjectName, Build::TargetType::StaticLibrary};
     SC_TRY(libraryProject.setRootDirectory(libraryRoot.view()));
     SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(libraryProject.addFiles(".", "*.cpp"));
 
-    Build::Project executableProject = {Build::TargetType::ConsoleExecutable, WorkspaceExecutableProjectName};
+    Build::Project executableProject = {WorkspaceExecutableProjectName, Build::TargetType::ConsoleExecutable};
     SC_TRY(executableProject.setRootDirectory(executableRoot.view()));
     SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
@@ -875,13 +875,13 @@ static Result configureIndependentWorkspacePrograms(Build::Definition& definitio
     SC_TRY(Path::join(programOneRoot, {DynamicFixtureProjectRoot, "ProgramOne"}));
     SC_TRY(Path::join(programTwoRoot, {DynamicFixtureProjectRoot, "ProgramTwo"}));
 
-    Build::Project programOne = {Build::TargetType::ConsoleExecutable, IndependentProgramOneName};
+    Build::Project programOne = {IndependentProgramOneName, Build::TargetType::ConsoleExecutable};
     SC_TRY(programOne.setRootDirectory(programOneRoot.view()));
     SC_TRY(programOne.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(programOne.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(programOne.addFiles(".", "*.cpp"));
 
-    Build::Project programTwo = {Build::TargetType::ConsoleExecutable, IndependentProgramTwoName};
+    Build::Project programTwo = {IndependentProgramTwoName, Build::TargetType::ConsoleExecutable};
     SC_TRY(programTwo.setRootDirectory(programTwoRoot.view()));
     SC_TRY(programTwo.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(programTwo.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
@@ -905,14 +905,14 @@ static Result configureCustomDriverDependencyProgram(Build::Definition& definiti
     SC_TRY(Path::join(libraryRoot, {DynamicFixtureProjectRoot, "Library"}));
     SC_TRY(Path::join(executableRoot, {DynamicFixtureProjectRoot, "Executable"}));
 
-    Build::Project libraryProject = {Build::TargetType::StaticLibrary, WorkspaceLibraryProjectName};
+    Build::Project libraryProject = {WorkspaceLibraryProjectName, Build::TargetType::StaticLibrary};
     SC_TRY(libraryProject.setRootDirectory(libraryRoot.view()));
     SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(libraryProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
     SC_TRY(libraryProject.addFiles(".", "*.c"));
     SC_TRY(libraryProject.addFiles(".", "*.cpp"));
 
-    Build::Project executableProject = {Build::TargetType::ConsoleExecutable, WorkspaceExecutableProjectName};
+    Build::Project executableProject = {WorkspaceExecutableProjectName, Build::TargetType::ConsoleExecutable};
     SC_TRY(executableProject.setRootDirectory(executableRoot.view()));
     SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
     SC_TRY(executableProject.addPresetConfiguration(Build::Configuration::Preset::Release, parameters));
@@ -932,7 +932,7 @@ static Result configureDynamicFixtureProgram(Build::Definition& definition, cons
     SC_TRY_MSG(not DynamicFixtureProjectRoot.isEmpty(), "Dynamic fixture root is not initialized");
 
     Build::Workspace workspace = {FixtureWorkspaceName};
-    Build::Project   project   = {targetType, projectName};
+    Build::Project   project   = {projectName, targetType};
 
     SC_TRY(project.setRootDirectory(DynamicFixtureProjectRoot));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
@@ -1072,8 +1072,7 @@ static Result normalizeConsoleOutput(String& output)
 }
 
 static Result captureBuildActionOutput(const Build::Action& action, Build::Action::ConfigureFunction configure,
-                                       StringView defaultWorkspaceName, Result& buildResult,
-                                       CapturedBuildOutput& capturedOutput)
+                                       Result& buildResult, CapturedBuildOutput& capturedOutput)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
@@ -1110,7 +1109,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
 
     Console windowsRedirectedConsole;
     globalConsole = &windowsRedirectedConsole;
-    buildResult   = Build::Action::execute(action, configure, defaultWorkspaceName);
+    buildResult   = Build::Action::execute(action, configure);
     globalConsole->flush();
     globalConsole->flushStdErr();
 
@@ -1159,7 +1158,7 @@ static Result captureBuildActionOutput(const Build::Action& action, Build::Actio
     (void)::close(stdoutDescriptor);
     (void)::close(stderrDescriptor);
 
-    buildResult = Build::Action::execute(action, configure, defaultWorkspaceName);
+    buildResult = Build::Action::execute(action, configure);
     globalConsole->flush();
     globalConsole->flushStdErr();
 
@@ -1327,7 +1326,7 @@ static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot)
         "Result configure(Definition& definition, const Parameters& parameters)\n"
         "{\n"
         "    Workspace workspace = {\"SCWorkspace\"};\n"
-        "    Project   project   = {TargetType::ConsoleExecutable, \"ExternalFixtureProgram\"};\n"
+        "    Project   project   = {\"ExternalFixtureProgram\", TargetType::ConsoleExecutable};\n"
         "\n"
         "    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));\n"
         "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));\n"
@@ -1782,7 +1781,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -1868,7 +1867,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
             SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Intel64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -1889,7 +1888,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
             SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -1932,7 +1931,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
             SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Intel64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -1979,7 +1978,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
             SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Arm64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -2315,7 +2314,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             action.parameters.targetMachine.architecture = Build::Architecture::Intel64;
             action.parameters.targetMachine.environment  = Build::TargetEnvironment::Native;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -2457,7 +2456,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action = makeNativeCompileAction(directories, FixtureProjectName);
             SC_TRUST_RESULT(configureWindowsMSVCAction(action, Build::Architecture::Intel64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -2502,7 +2501,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             StringView forwardedArguments[] = {"--fixture", "runner"};
             action.additionalArguments      = forwardedArguments;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, FixtureProjectName, executablePath));
@@ -2650,7 +2649,7 @@ struct SCBuildFixtureTest : public SC::TestCase
                 StringView forwardedArguments[] = {"--fixture", "runner"};
                 action.additionalArguments      = forwardedArguments;
 
-                SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+                SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
                 String generatedWineWrapper = StringEncoding::Utf8;
                 String generatedConsole     = StringEncoding::Utf8;
@@ -2756,7 +2755,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(configureWindowsGNUAction(action, Build::Architecture::Arm64));
             SC_TRUST_RESULT(action.parameters.runner.executable.assign(runnerPath.view()));
 
-            Result runResult = Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName);
+            Result runResult = Build::Action::execute(action, configureTinyConsoleProgram);
             SC_TEST_EXPECT(not runResult);
 
             String executablePath = StringEncoding::Utf8;
@@ -2795,7 +2794,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             StringView forwardedArguments[] = {"--fixture", "runner"};
             action.additionalArguments      = forwardedArguments;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String runnerInvocation = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(runnerLog.view(), runnerInvocation));
@@ -2960,7 +2959,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action = makeNativeCompileAction(directories, SmallFixtureProjectName, "Release");
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureSmallSCProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureSmallSCProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(action, SmallFixtureProjectName, executablePath));
@@ -2999,7 +2998,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action                = makeNativeCompileAction(directories, FixtureProjectName);
             action.parameters.execution.verbose = true;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String executablePath = StringEncoding::Utf8;
             String objectPath     = StringEncoding::Utf8;
@@ -3016,7 +3015,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(fs.stat(executablePath.view(), initialExecutableStat));
 
             Thread::Sleep(20);
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             FileSystem::FileStat finalObjectStat;
             FileSystem::FileStat finalExecutableStat;
@@ -3046,7 +3045,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action = makeNativeCompileAction(directories, HeaderFixtureProjectName);
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
 
             String executablePath = StringEncoding::Utf8;
             String objectPath     = StringEncoding::Utf8;
@@ -3068,7 +3067,7 @@ struct SCBuildFixtureTest : public SC::TestCase
                     fs.setLastModifiedTime(headerPath.view(), TimeMs{Time::Realtime::now().milliseconds + 2000}));
             }
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
 
             SC_TEST_EXPECT(fs.existsAndIsFile(objectPath.view()));
             SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
@@ -3101,7 +3100,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action = makeNativeCompileAction(directories, CompileFailureProjectName);
 
-            Result compileResult = Build::Action::execute(action, configureCompileFailureProgram, FixtureWorkspaceName);
+            Result compileResult = Build::Action::execute(action, configureCompileFailureProgram);
             SC_TEST_EXPECT(not compileResult);
 
             String executablePath = StringEncoding::Utf8;
@@ -3135,8 +3134,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureCompileFailureProgram, FixtureWorkspaceName,
-                                                     buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureCompileFailureProgram, buildResult, capturedOutput));
             SC_TEST_EXPECT(not buildResult);
             const StringView quietStdOut = capturedOutput.stdOut.view();
             SC_TEST_EXPECT(quietStdOut.isEmpty() or quietStdOut.bytesWithoutTerminator()[0] != '[');
@@ -3169,7 +3168,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Build::Action action = makeNativeCompileAction(directories, LinkFailureProjectName);
 
-            Result compileResult = Build::Action::execute(action, configureLinkFailureProgram, FixtureWorkspaceName);
+            Result compileResult = Build::Action::execute(action, configureLinkFailureProgram);
             SC_TEST_EXPECT(not compileResult);
 
             String executablePath = StringEncoding::Utf8;
@@ -3197,7 +3196,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             SC_TRUST_RESULT(setDynamicFixtureProjectRoot(libraryRoot.view()));
             Build::Action libraryAction = makeNativeCompileAction(directories, StaticLibraryProjectName);
-            SC_TEST_EXPECT(Build::Action::execute(libraryAction, configureStaticLibraryProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(libraryAction, configureStaticLibraryProgram));
 
             String libraryPath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeArtifactPath(libraryAction, StaticLibraryProjectName,
@@ -3208,8 +3207,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(setDynamicFixtureProjectRoot(consumerRoot.view()));
 
             Build::Action consumerAction = makeNativeCompileAction(directories, StaticLibraryConsumerName);
-            SC_TEST_EXPECT(
-                Build::Action::execute(consumerAction, configureStaticLibraryConsumerProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(consumerAction, configureStaticLibraryConsumerProgram));
 
             String executablePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeExecutablePath(consumerAction, StaticLibraryConsumerName, executablePath));
@@ -3237,7 +3235,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(setDynamicFixtureProjectRoot(sourceRoot.view()));
 
             Build::Action action = makeNativeCompileAction(directories, WorkspaceExecutableProjectName);
-            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram));
 
             String executablePath = StringEncoding::Utf8;
             String libraryPath    = StringEncoding::Utf8;
@@ -3275,7 +3273,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action                        = makeNativeCompileAction(directories, {});
             action.parameters.execution.maxParallelJobs = 2;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureIndependentWorkspacePrograms, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureIndependentWorkspacePrograms));
 
             String programOneExecutable = StringEncoding::Utf8;
             String programTwoExecutable = StringEncoding::Utf8;
@@ -3314,8 +3312,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              normalBuildResult = Result(true);
             CapturedBuildOutput normalOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(normalAction, configureHeaderDependencyProgram,
-                                                     FixtureWorkspaceName, normalBuildResult, normalOutput));
+            SC_TRUST_RESULT(captureBuildActionOutput(normalAction, configureHeaderDependencyProgram, normalBuildResult,
+                                                     normalOutput));
             SC_TEST_EXPECT(normalBuildResult);
 
             String             quietBuildRoot = StringEncoding::Utf8;
@@ -3332,8 +3330,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              quietBuildResult = Result(true);
             CapturedBuildOutput quietOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(quietAction, configureHeaderDependencyProgram,
-                                                     FixtureWorkspaceName, quietBuildResult, quietOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(quietAction, configureHeaderDependencyProgram, quietBuildResult, quietOutput));
             SC_TEST_EXPECT(quietBuildResult);
             SC_TEST_EXPECT(quietOutput.stdOut.view().sizeInBytes() < normalOutput.stdOut.view().sizeInBytes());
         }
@@ -3358,8 +3356,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
-                                                     buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureHeaderDependencyProgram, buildResult, capturedOutput));
             SC_TEST_EXPECT(buildResult);
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("quiet-run\n"));
         }
@@ -3381,12 +3379,12 @@ struct SCBuildFixtureTest : public SC::TestCase
             Build::Action action                   = makeGeneratedCompileAction(directories, HeaderFixtureProjectName);
             action.parameters.execution.outputMode = Build::OutputMode::Normal;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureHeaderDependencyProgram));
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
-                                                     buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureHeaderDependencyProgram, buildResult, capturedOutput));
             SC_TEST_EXPECT(buildResult);
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("Nothing to be done"));
             SC_TEST_EXPECT(not StringView(capturedOutput.stdOut.view()).containsString("Compiling "));
@@ -3442,8 +3440,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
-                                                     buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureHeaderDependencyProgram, buildResult, capturedOutput));
             SC_TEST_EXPECT(buildResult);
             SC_TEST_EXPECT(not StringView(capturedOutput.stdOut.view()).containsString("noisy compiler stdout"));
             SC_TEST_EXPECT(not StringView(capturedOutput.stdErr.view()).containsString("noisy compiler stderr"));
@@ -3499,8 +3497,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureHeaderDependencyProgram, FixtureWorkspaceName,
-                                                     buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureHeaderDependencyProgram, buildResult, capturedOutput));
             SC_TEST_EXPECT(buildResult);
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("OUTPUT:"));
             SC_TEST_EXPECT(StringView(capturedOutput.stdOut.view()).containsString("noisy compiler stdout"));
@@ -3558,8 +3556,8 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             Result              buildResult = Result(true);
             CapturedBuildOutput capturedOutput;
-            SC_TRUST_RESULT(captureBuildActionOutput(action, configureIndependentWorkspacePrograms,
-                                                     FixtureWorkspaceName, buildResult, capturedOutput));
+            SC_TRUST_RESULT(
+                captureBuildActionOutput(action, configureIndependentWorkspacePrograms, buildResult, capturedOutput));
             SC_TEST_EXPECT(not buildResult);
             const StringView quietStdOut = capturedOutput.stdOut.view();
             SC_TEST_EXPECT(quietStdOut.isEmpty() or quietStdOut.bytesWithoutTerminator()[0] != '[');
@@ -3602,7 +3600,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(llvmLibPath.view()));
             action.parameters.execution.maxParallelJobs = 2;
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureWorkspaceDependencyProgram));
 
             String executablePath = StringEncoding::Utf8;
             String libraryPath    = StringEncoding::Utf8;
@@ -3674,8 +3672,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(action.parameters.toolchain.linker.assign(compilerCppWrapper.view()));
             SC_TRUST_RESULT(action.parameters.toolchain.archiver.assign(archiverWrapper.view()));
 
-            SC_TEST_EXPECT(
-                Build::Action::execute(action, configureCustomDriverDependencyProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureCustomDriverDependencyProgram));
 
             String executablePath = StringEncoding::Utf8;
             String libraryPath    = StringEncoding::Utf8;
@@ -3738,7 +3735,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl,
                                                        Build::Architecture::Arm64, sysroot.view()));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String compilerLog = StringEncoding::Utf8;
             String linkerLog   = StringEncoding::Utf8;
@@ -3788,7 +3785,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc,
                                                        Build::Architecture::Intel64, sysroot.view()));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String compilerLog = StringEncoding::Utf8;
             String linkerLog   = StringEncoding::Utf8;
@@ -3825,7 +3822,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(
                 configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc, Build::Architecture::Arm64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram));
 
             String libraryPath = StringEncoding::Utf8;
             SC_TRUST_RESULT(
@@ -3854,7 +3851,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(
                 configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl, Build::Architecture::Intel64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureStaticLibraryProgram));
 
             String libraryPath = StringEncoding::Utf8;
             SC_TRUST_RESULT(
@@ -3927,7 +3924,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(
                 configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxGlibc, Build::Architecture::Arm64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String clangLog = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
@@ -4001,7 +3998,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(
                 configureLinuxTargetAction(action, Build::TargetEnvironment::LinuxMusl, Build::Architecture::Intel64));
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String clangLog = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(clangLogPath.view(), clangLog));
@@ -4087,7 +4084,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             action.additionalArguments      = {forwardedArguments,
                                                sizeof(forwardedArguments) / sizeof(forwardedArguments[0])};
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String qemuInvocation = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(qemuArmLog.view(), qemuInvocation));
@@ -4187,7 +4184,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             action.additionalArguments      = {forwardedArguments,
                                                sizeof(forwardedArguments) / sizeof(forwardedArguments[0])};
 
-            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram, FixtureWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
 
             String qemuInvocation = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(qemuLogPath.view(), qemuInvocation));

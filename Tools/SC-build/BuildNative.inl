@@ -1092,11 +1092,8 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result execute(Action::ConfigureFunction configure, const Action& action, String* outputExecutable)
+    static Result execute(const Definition& definition, const Action& action, String* outputExecutable)
     {
-        Definition definition;
-        SC_TRY(configure(definition, action.parameters));
-
         FilePathsResolver filePathsResolver;
         SC_TRY(filePathsResolver.resolve(definition));
 

@@ -19,7 +19,7 @@ static constexpr StringView MakefileStaticLibraryProjectName   = "WriterStaticLi
 static Result configureMakefileStaticLibrary(Build::Definition& definition, const Build::Parameters& parameters)
 {
     Build::Workspace workspace = {MakefileStaticLibraryWorkspaceName};
-    Build::Project   project   = {Build::TargetType::StaticLibrary, MakefileStaticLibraryProjectName};
+    Build::Project   project   = {MakefileStaticLibraryProjectName, Build::TargetType::StaticLibrary};
 
     SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
     SC_TRY(project.addPresetConfiguration(Build::Configuration::Preset::Debug, parameters));
@@ -129,8 +129,7 @@ struct SC::BuildTest : public SC::TestCase
                 staticLibraryAction.parameters.platform = Build::Platform::Apple;
             }
 
-            SC_TEST_EXPECT(Build::Action::execute(staticLibraryAction, configureMakefileStaticLibrary,
-                                                  MakefileStaticLibraryWorkspaceName));
+            SC_TEST_EXPECT(Build::Action::execute(staticLibraryAction, configureMakefileStaticLibrary));
 
             String makefilePath = StringEncoding::Utf8;
             SC_TRUST_RESULT(computeGeneratedMakefilePath(staticLibraryAction.parameters.directories,
@@ -154,8 +153,7 @@ struct SC::BuildTest : public SC::TestCase
 
             staticLibraryAction.action      = Build::Action::Run;
             staticLibraryAction.projectName = MakefileStaticLibraryProjectName;
-            Result runResult = Build::Action::execute(staticLibraryAction, configureMakefileStaticLibrary,
-                                                      MakefileStaticLibraryWorkspaceName);
+            Result runResult = Build::Action::execute(staticLibraryAction, configureMakefileStaticLibrary);
             SC_TEST_EXPECT(not runResult);
         }
     }

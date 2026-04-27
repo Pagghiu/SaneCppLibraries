@@ -1410,9 +1410,7 @@ Result runBuildTool(Tool::Arguments& arguments)
 } // namespace Tools
 namespace Build
 {
-static constexpr StringView DEFAULT_WORKSPACE = "SCWorkspace";
-
-Result executeAction(const Action& action) { return Build::Action::execute(action, configure, DEFAULT_WORKSPACE); }
+Result executeAction(const Action& action) { return Build::Action::execute(action, configure); }
 } // namespace Build
 
 #if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)

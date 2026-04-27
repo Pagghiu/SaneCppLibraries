@@ -517,14 +517,15 @@ struct TargetType
 /// @brief Groups multiple Configuration and source files with their compile and link flags
 struct Project
 {
-    Project() = default;
-    Project(TargetType::Type targetType, StringView name) : targetType(targetType), name(name), targetName(name) {}
+    Project(StringView name = {}, TargetType::Type targetType = TargetType::ConsoleExecutable)
+        : name(name), targetType(targetType)
+    {}
 
+    String           name;                                       ///< Project name
     TargetType::Type targetType = TargetType::ConsoleExecutable; ///< Type of build artifact
 
-    String name;          ///< Project name
-    String rootDirectory; ///< Project root directory
-    String targetName;    ///< Project target name
+    String rootDirectory; ///< Project root directory (== Parameters::projectDirectory if empty)
+    String targetName;    ///< Project target name (== Project::name if empty)
     String iconPath;      ///< Icon location
 
     SourceFiles files; ///< Project source files with their associated compile flags
@@ -658,6 +659,9 @@ struct Definition
 {
     Vector<Workspace> workspaces; ///< Workspaces to be generated
 
+    /// @brief Adds a project to the default workspace
+    Result addProject(Project&& project);
+
     /// @brief Generates projects for all workspaces, with specified parameters at given root path.
     /// @param workspaceName Name of the workspace to generate
     /// @param parameters Set of parameters with the wanted platforms, architectures and generators to generate
@@ -665,9 +669,17 @@ struct Definition
     /// builds are driven through `Action::Compile`, `Action::Run`, and `Action::Coverage`.
     Result configure(StringView workspaceName, const Parameters& parameters) const;
 
+    /// @brief Fills relevant defaults for parameters that are not specified
+    Result enforceDefaults(const Parameters& parameters);
+
     /// @brief Finds the configuration with given name in given workspace and project
     [[nodiscard]] bool findConfiguration(StringView workspaceName, StringView projectName, StringView configurationName,
                                          Workspace*& workspace, Project*& project, Configuration*& configuration);
+
+    /// @brief Const overload of findConfiguration
+    [[nodiscard]] bool findConfiguration(StringView workspaceName, StringView projectName, StringView configurationName,
+                                         const Workspace*& workspace, const Project*& project,
+                                         const Configuration*& configuration) const;
 };
 
 //! @}
@@ -688,7 +700,7 @@ struct Action
     };
     using ConfigureFunction = Result (*)(Build::Definition& definition, const Build::Parameters& parameters);
 
-    static Result execute(const Action& action, ConfigureFunction configure, StringView defaultWorkspaceName);
+    static Result execute(const Action& action, ConfigureFunction configure);
 
     Type action = Configure;
 

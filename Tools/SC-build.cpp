@@ -344,7 +344,7 @@ static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
 
 Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
-    Project project = {TargetType::ConsoleExecutable, TEST_PROJECT_NAME};
+    Project project = {TEST_PROJECT_NAME};
     project.setRootDirectory(parameters.directories.projectDirectory.view());
 
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -415,7 +415,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
 
 Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
 {
-    Project project = {TargetType::ConsoleExecutable, BUILD_TEST_PROJECT_NAME};
+    Project project = {BUILD_TEST_PROJECT_NAME};
     project.setRootDirectory(parameters.directories.projectDirectory.view());
 
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -441,7 +441,7 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
 
 Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspace)
 {
-    Project project = {TargetType::SharedLibrary, "SC"};
+    Project project = {"SC", TargetType::SharedLibrary};
 
     project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -457,7 +457,7 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
 
 Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspace)
 {
-    Project project = {TargetType::ConsoleExecutable, "InteropSTL"};
+    Project project = {"InteropSTL"};
 
     project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
@@ -483,7 +483,7 @@ static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
 Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 {
-    Project    project            = {TargetType::GUIApplication, EXAMPLE_PROJECT_NAME};
+    Project    project            = {EXAMPLE_PROJECT_NAME, TargetType::GUIApplication};
     const bool isWindowsGNUTarget = parameters.platform == Platform::Windows and
                                     (parameters.targetMachine.environment == TargetEnvironment::WindowsGNU or
                                      parameters.toolchain.family == Toolchain::LLVMMingw);
@@ -660,7 +660,7 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
 
 Result configure(Definition& definition, const Parameters& parameters)
 {
-    Workspace defaultWorkspace = {DEFAULT_WORKSPACE};
+    Workspace defaultWorkspace = {"SCWorkspace"};
     SC_TRY(configureTests(parameters, defaultWorkspace));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));

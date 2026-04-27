@@ -34,26 +34,13 @@ Example `SC-build.cpp`:
 ```cpp
 #include "Tools/SC-build.h"
 
-namespace SC
+SC::Result SC::Build::configure(Definition &definition, const Parameters &parameters)
 {
-namespace Build
-{
-Result configure(Definition& definition, const Parameters& parameters)
-{
-    Workspace workspace = {"SCWorkspace"};
-    Project   project   = {TargetType::ConsoleExecutable, "MyProject"};
-
-    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
-    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));
-    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));
+    Project project = {"MyProject"};
     SC_TRY(project.addFiles("Source", "main.cpp"));
-
-    SC_TRY(workspace.projects.push_back(move(project)));
-    SC_TRY(definition.workspaces.push_back(move(workspace)));
-    return Result(true);
+    return definition.addProject(move(project)); // Added to implicitly created Workspace
 }
-} // namespace Build
-} // namespace SC
+
 ```
 
 `parameters.directories.projectDirectory` is the project root discovered by the launcher.  
