@@ -65,30 +65,8 @@ namespace Build
 {
 SC_COMPILER_WARNING_PUSH_UNUSED_RESULT; // Doing some optimistic coding here, ignoring all failures
 
-void addSaneCppLibraries(Project& project, const Parameters& parameters)
+void addSaneCppDebugVisualizers(Project& project, const Parameters& parameters)
 {
-    String librariesRoot = StringEncoding::Utf8;
-    (void)Path::join(librariesRoot, {parameters.directories.libraryDirectory.view(), "Libraries"});
-    (void)project.addIncludePaths({parameters.directories.libraryDirectory.view()});
-
-    project.addFiles(librariesRoot.view(), "**.cpp");
-    project.addFiles(librariesRoot.view(), "**.h");
-    project.addFiles(librariesRoot.view(), "**.inl");
-
-    if (parameters.platform == Platform::Apple)
-    {
-        project.addLinkFrameworks({"CoreFoundation", "CoreServices", "CFNetwork", "Foundation"});
-    }
-
-    if (parameters.platform == Platform::Windows)
-    {
-        project.addLinkLibraries({"Advapi32", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"});
-    }
-    else
-    {
-        project.addLinkLibraries({"dl", "pthread"});
-    }
-
     if (parameters.generator == Generator::VisualStudio2022)
     {
         String debugVisualizersRoot = StringEncoding::Utf8;
@@ -378,7 +356,8 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
         "Tests/SCTest",
     });
 
-    addSaneCppLibraries(project, parameters);
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/SCTest", "*.cpp");
     project.addFiles("Tests/SCTest", "*.h");
     project.addFiles("Tests/Libraries", "**.c*");
@@ -428,7 +407,8 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
         "Tests/SCBuildTest",
     });
 
-    addSaneCppLibraries(project, parameters);
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/SCBuildTest", "*.cpp");
     project.addFiles("Tests/SCBuildTest", "*.h");
     project.addFiles("Tests/Libraries/Build", "BuildTest.cpp");
@@ -448,7 +428,8 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
     project.addIncludePaths({"."});
-    addSaneCppLibraries(project, parameters);
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    addSaneCppDebugVisualizers(project, parameters);
     SC_TRY_MSG(project.addExportAllLibraries(), "Failed to configure exported Sane C++ libraries");
 
     SC_TRY(workspace.projects.push_back(move(project)));
@@ -471,7 +452,8 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
     project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({"."});
-    addSaneCppLibraries(project, parameters);
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/InteropSTL", "*.cpp");
     project.addFiles("Tests/InteropSTL", "*.h");
 
@@ -501,7 +483,8 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
 
-    addSaneCppLibraries(project, parameters);
+    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    addSaneCppDebugVisualizers(project, parameters);
 
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
     project.addFiles(sokol.packageLocalDirectory.view(), "*.h");
@@ -588,20 +571,7 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-#if 0
-        addSaneCppLibraries(project, parameters);
-#else
-        project.addFile("SC.cpp");
-        if (parameters.platform == Platform::Apple)
-        {
-            project.addLinkFrameworks({"CoreFoundation", "CoreServices"});
-        }
-
-        if (parameters.platform != Platform::Windows)
-        {
-            project.addLinkLibraries({"dl", "pthread"});
-        }
-#endif
+        SC_TRY(addSaneCppLibraries(project, parameters));
         project.addFiles(entry.path, "**.cpp");
         workspace.projects.push_back(move(project));
     }

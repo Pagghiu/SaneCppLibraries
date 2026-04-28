@@ -37,15 +37,49 @@ Example `SC-build.cpp`:
 SC::Result SC::Build::configure(Definition &definition, const Parameters &parameters)
 {
     Project project = {"MyProject"};
+    SC_TRY(addSaneCppLibraries(project, parameters));
     SC_TRY(project.addFiles("Source", "main.cpp"));
     return definition.addProject(move(project)); // Added to implicitly created Workspace
 }
 
 ```
 
+Example `Source/main.cpp` using Sane C++ Libraries:
+
+```cpp
+#include "Libraries/Strings/Console.h"
+
+int main()
+{
+    using namespace SC;
+    Console console;
+    console.print("{1} {0}\n", "a tutti", "Salve");
+    return 0;
+}
+```
+
 `parameters.directories.projectDirectory` is the project root discovered by the launcher.  
 `parameters.directories.libraryDirectory` is the SaneCppLibraries checkout that provides the generic build driver and
 the public headers.
+
+# Using Sane C++ Libraries
+
+For casual external projects, `SC::Build` can wire Sane C++ Libraries into a target with one line:
+
+```cpp
+SC_TRY(addSaneCppLibraries(project, parameters));
+```
+
+This default uses `SC.cpp`.
+
+If you prefer non-unity compilation under `SC::Build`, use:
+
+```cpp
+SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+```
+
+`Libraries::SingleFile` is the default and is recommended for the simplest onboarding.  
+`Libraries::Multiple` adds the individual files under `Libraries/`.
 
 # Launchers
 

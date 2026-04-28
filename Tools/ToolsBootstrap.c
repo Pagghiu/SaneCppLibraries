@@ -125,12 +125,15 @@ TimePoint FileSystem_getModificationTime(const char* path);
 int FileSystem_exists(const char* path);
 int FileSystem_isDirectory(const char* path);
 FILE* FileSystem_open(const char* path, const char* mode);
+char* FileSystem_canonicalizePath(const char* path);
 
 // String/vector utilities
 void StringVector_init(StringVector* sv, size_t initial_capacity);
 void StringVector_destroy(StringVector* sv);
 void StringVector_add(StringVector* sv, const char* str);
 char* StringVector_join(const StringVector* sv, const char* sep);
+int StringVector_contains(const StringVector* sv, const char* str);
+int StringVector_containsPath(const StringVector* sv, const char* str);
 char* StringBuilder_join(const StringBuilder* sb, const char* sep);
 
 char* String_duplicate(const char* str);
@@ -250,6 +253,52 @@ char* StringVector_join(const StringVector* sv, const char* sep) {
         strcat(result, sv->data[i]);
     }
     return result;
+}
+
+int StringVector_contains(const StringVector* sv, const char* str) {
+    for (size_t i = 0; i < sv->count; ++i) {
+        if (strcmp(sv->data[i], str) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+char* FileSystem_canonicalizePath(const char* path) {
+    if (!path) return NULL;
+#ifdef _WIN32
+    DWORD required = GetFullPathNameA(path, 0, NULL, NULL);
+    if (required == 0) return String_duplicate(path);
+    char* buffer = (char*)malloc(required);
+    if (!buffer) return NULL;
+    DWORD written = GetFullPathNameA(path, required, buffer, NULL);
+    if (written == 0 || written >= required) {
+        free(buffer);
+        return String_duplicate(path);
+    }
+    return buffer;
+#else
+    char* resolved = realpath(path, NULL);
+    if (resolved) return resolved;
+    return String_duplicate(path);
+#endif
+}
+
+int StringVector_containsPath(const StringVector* sv, const char* str) {
+    char* canonicalTarget = FileSystem_canonicalizePath(str);
+    if (!canonicalTarget) return 0;
+    for (size_t i = 0; i < sv->count; ++i) {
+        char* canonicalDep = FileSystem_canonicalizePath(sv->data[i]);
+        if (!canonicalDep) continue;
+        const int matches = strcmp(canonicalDep, canonicalTarget) == 0;
+        free(canonicalDep);
+        if (matches) {
+            free(canonicalTarget);
+            return 1;
+        }
+    }
+    free(canonicalTarget);
+    return 0;
 }
 
 char* StringBuilder_join(const StringBuilder* sb, const char* sep) {
@@ -1018,7 +1067,10 @@ int checkNeedsRebuild(TimePoint objTime, StringVector* sources, StringVector* de
     }
     for (size_t i = 0; i < dependencies->count; ++i) {
         if (!FileSystem_exists(dependencies->data[i])) {
-            fprintf(stderr, "Error: Dependency file %s does not exist\n", dependencies->data[i]);
+            if (printMessages) {
+                printf("  Dependency %s is missing, needs rebuild\n", dependencies->data[i]);
+            }
+            return 1;
         } else {
             TimePoint depTime = FileSystem_getModificationTime(dependencies->data[i]);
             if (printMessages) {
@@ -1056,6 +1108,17 @@ int needsRebuildTools(CompilationInfo* ci) {
     StringVector_add(&sources, ci->toolsCpp);
 
     StringVector deps = parseDependencies(ci->toolsDepFile, ci->intermediateDir);
+
+    if (deps.count == 0 || !StringVector_containsPath(&deps, ci->toolsCpp) ||
+        !StringVector_containsPath(&deps, ci->scCpp)) {
+        if (printMessages) {
+            printf("  Tools obj dependencies are stale, needs rebuild\n");
+        }
+        StringVector_destroy(&sources);
+        StringVector_destroy(&deps);
+        free(toolsObj);
+        return 1;
+    }
 
     int ret = checkNeedsRebuild(objTime, &sources, &deps);
 
@@ -1100,6 +1163,16 @@ int needsRebuildToolObj(CompilationInfo* ci) {
     if (ci->toolH) StringVector_add(&sources, ci->toolH);
 
     StringVector deps = parseDependencies(ci->toolDepFile, ci->intermediateDir);
+
+    if (deps.count == 0 || !StringVector_containsPath(&deps, ci->toolCpp)) {
+        if (printMessages) {
+            printf("  Tool obj dependencies are stale, needs rebuild\n");
+        }
+        StringVector_destroy(&sources);
+        StringVector_destroy(&deps);
+        free(toolObj);
+        return 1;
+    }
 
     int ret = checkNeedsRebuild(objTime, &sources, &deps);
 

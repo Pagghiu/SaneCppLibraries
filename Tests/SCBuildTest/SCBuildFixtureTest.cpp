@@ -1303,7 +1303,7 @@ static Result writeSourceFixture(FileSystem& fs, StringView sourceRoot, StringVi
     return Result(true);
 }
 
-static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot)
+static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot, Build::Libraries librariesMode)
 {
     SC_TRY(fs.makeDirectoryRecursive(projectRoot));
 
@@ -1316,39 +1316,63 @@ static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot)
     SC_TRY(Path::join(buildDefinitionPath, {projectRoot, "SC-build.cpp"}));
     SC_TRY(Path::join(sourcePath, {sourceRoot.view(), "main.cpp"}));
 
-    static constexpr StringView buildDefinitionContents =
-        "#include \"Tools/SC-build.h\"\n"
-        "\n"
-        "namespace SC\n"
-        "{\n"
-        "namespace Build\n"
-        "{\n"
-        "Result configure(Definition& definition, const Parameters& parameters)\n"
-        "{\n"
-        "    Workspace workspace = {\"SCWorkspace\"};\n"
-        "    Project   project   = {\"ExternalFixtureProgram\", TargetType::ConsoleExecutable};\n"
-        "\n"
-        "    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));\n"
-        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));\n"
-        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));\n"
-        "    SC_TRY(project.addFiles(\"Source\", \"main.cpp\"));\n"
-        "\n"
-        "    SC_TRY(workspace.projects.push_back(move(project)));\n"
-        "    SC_TRY(definition.workspaces.push_back(move(workspace)));\n"
-        "    return Result(true);\n"
-        "}\n"
-        "} // namespace Build\n"
-        "} // namespace SC\n";
-    static constexpr StringView sourceContents = "#include <stdio.h>\n"
-                                                 "\n"
-                                                 "int main()\n"
-                                                 "{\n"
-                                                 "    puts(\"external-build-fixture\");\n"
-                                                 "    return 0;\n"
-                                                 "}\n";
+    const StringView librariesArgument =
+        librariesMode == Build::Libraries::Multiple ? ", Libraries::Multiple"_a8 : StringView();
+    const StringView fixtureMessage =
+        librariesMode == Build::Libraries::Multiple ? "external-build-multiple"_a8 : "external-build-single-file"_a8;
 
-    SC_TRY(fs.writeString(buildDefinitionPath.view(), buildDefinitionContents));
-    SC_TRY(fs.writeString(sourcePath.view(), sourceContents));
+    String buildDefinitionContents = StringEncoding::Utf8;
+    {
+        auto builder = StringBuilder::create(buildDefinitionContents);
+        SC_TRY(builder.append("#include \"Tools/SC-build.h\"\n"
+                              "\n"
+                              "namespace SC\n"
+                              "{\n"
+                              "namespace Build\n"
+                              "{\n"
+                              "Result configure(Definition& definition, const Parameters& parameters)\n"
+                              "{\n"
+                              "    Project project = {\"ExternalFixtureProgram\", TargetType::ConsoleExecutable};\n"
+                              "\n"
+                              "    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));\n"
+                              "    SC_TRY(addSaneCppLibraries(project, parameters"));
+        SC_TRY(builder.append(librariesArgument));
+        SC_TRY(
+            builder.append("));\n"
+                           "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));\n"
+                           "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));\n"
+                           "    SC_TRY(project.addFiles(\"Source\", \"main.cpp\"));\n"
+                           "    return definition.addProject(move(project));\n"
+                           "}\n"
+                           "} // namespace Build\n"
+                           "} // namespace SC\n"));
+        builder.finalize();
+    }
+
+    String sourceContents = StringEncoding::Utf8;
+    {
+        auto builder = StringBuilder::create(sourceContents);
+        SC_TRY(builder.append("#include \"Libraries/Memory/String.h\"\n"
+                              "#include \"Libraries/Strings/StringBuilder.h\"\n"
+                              "#include <stdio.h>\n"
+                              "\n"
+                              "int main()\n"
+                              "{\n"
+                              "    SC::SmallString<64> output(SC::StringEncoding::Ascii);\n"
+                              "    if (not SC::StringBuilder::format(output, \"{}\", \""));
+        SC_TRY(builder.append(fixtureMessage));
+        SC_TRY(builder.append("\"))\n"
+                              "    {\n"
+                              "        return 1;\n"
+                              "    }\n"
+                              "    puts(output.view().bytesIncludingTerminator());\n"
+                              "    return 0;\n"
+                              "}\n"));
+        builder.finalize();
+    }
+
+    SC_TRY(fs.writeString(buildDefinitionPath.view(), buildDefinitionContents.view()));
+    SC_TRY(fs.writeString(sourcePath.view(), sourceContents.view()));
     return Result(true);
 }
 
@@ -1799,9 +1823,19 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
 
-        if (test_section("SC-build launcher builds external project from nested working directory"))
+        const bool externalSingleFile = test_section(
+            "SC-build launcher builds external project with single-file libraries from nested working directory");
+        const bool externalMultipleFiles = test_section(
+            "SC-build launcher builds external project with multiple library sources from nested working directory");
+        if (externalSingleFile or externalMultipleFiles)
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            const bool       useMultipleLibraries = externalMultipleFiles;
+            const StringView expectedOutput =
+                useMultipleLibraries ? "external-build-multiple\n"_a8 : "external-build-single-file\n"_a8;
+            const StringView fixtureDirectoryName =
+                useMultipleLibraries ? "ExternalBuildFixtureMultiple"_a8 : "ExternalBuildFixtureSingleFile"_a8;
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -1812,9 +1846,11 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String projectRoot = StringEncoding::Utf8;
             String nestedRoot  = StringEncoding::Utf8;
-            SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), "ExternalBuildFixture"}));
+            SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), fixtureDirectoryName}));
             SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
-            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view()));
+            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view(),
+                                                      useMultipleLibraries ? Build::Libraries::Multiple
+                                                                           : Build::Libraries::SingleFile));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
 
             StringSpan commandArguments[] = {
@@ -1852,7 +1888,7 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String stdoutOutput = StringEncoding::Utf8;
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
-            SC_TEST_EXPECT(stdoutOutput == "external-build-fixture\n"_a8);
+            SC_TEST_EXPECT(stdoutOutput == expectedOutput);
         }
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX

@@ -514,6 +514,13 @@ struct TargetType
     };
 };
 
+/// @brief How a project consumes Sane C++ Libraries
+enum class Libraries
+{
+    SingleFile, ///< Add the repository root `SC.cpp` unity build file
+    Multiple,   ///< Add all files under `Libraries/`
+};
+
 /// @brief Groups multiple Configuration and source files with their compile and link flags
 struct Project
 {
@@ -653,6 +660,10 @@ struct Parameters
 
     ExecutionOptions execution;
 };
+
+/// @brief Add Sane C++ Libraries to a project using either `SC.cpp` or the individual library sources
+[[nodiscard]] Result addSaneCppLibraries(Project& project, const Parameters& parameters,
+                                         Libraries mode = Libraries::SingleFile);
 
 /// @brief Top level build description holding all Workspace objects
 struct Definition

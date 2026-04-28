@@ -137,6 +137,7 @@ This is the repository `Tools/SC-build.cpp` file used to configure the default w
 The public API in `Tools/SC-build/Build.h` currently exposes:
 
 - `Definition`, `Workspace`, `Project`, and `Configuration` for the build graph
+- `Libraries::{SingleFile, Multiple}` plus `addSaneCppLibraries(...)` for adding Sane C++ Libraries to a target
 - `Machine` and `TargetEnvironment` for explicit host / target modeling
 - `TargetType::{ConsoleExecutable, GUIApplication, SharedLibrary, StaticLibrary}`
 - `Generator::{Native, XCode, VisualStudio2022, VisualStudio2019, Make}`
@@ -147,6 +148,25 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `Directories::projectDirectory` for the root of the project being configured, distinct from the SaneCppLibraries checkout
 - `Project::addSpecificFileFlags` for per-file flag groups
 - `Project::addExportLibraries`, `addExportAllLibraries`, and `addExportDirectories` for plugin host exports
+
+# Consuming Sane C++ Libraries
+
+External `SC-build.cpp` files can add Sane C++ Libraries to a project with:
+
+```cpp
+SC_TRY(addSaneCppLibraries(project, parameters));
+```
+
+This defaults to `Libraries::SingleFile`, which adds `SC.cpp`.
+
+To compile the individual library sources instead, use:
+
+```cpp
+SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+```
+
+Call the helper after setting the project root directory, typically with
+`project.setRootDirectory(parameters.directories.projectDirectory.view())`.
 
 # Backend Matrix
 

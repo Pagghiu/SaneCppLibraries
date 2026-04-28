@@ -269,6 +269,54 @@ bool SC::Build::Project::addLinkFrameworksIOS(Span<const StringView> frameworks)
 
 bool SC::Build::Project::addDefines(Span<const StringView> defines) { return files.compile.defines.append(defines); }
 
+SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& parameters, Libraries mode)
+{
+    StringView projectRoot =
+        project.rootDirectory.isEmpty() ? parameters.directories.projectDirectory.view() : project.rootDirectory.view();
+    SC_TRY_MSG(not projectRoot.isEmpty(), "Project root directory must be set before adding Sane C++ Libraries");
+    SC_TRY_MSG(not parameters.directories.libraryDirectory.isEmpty(), "Sane C++ library directory is not configured");
+
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
+
+    switch (mode)
+    {
+    case Libraries::SingleFile: {
+        String scCppPath = StringEncoding::Utf8;
+        String relative  = StringEncoding::Utf8;
+        SC_TRY(Path::join(scCppPath, {parameters.directories.libraryDirectory.view(), "SC.cpp"}));
+        SC_TRY(Path::relativeFromTo(relative, projectRoot, scCppPath.view(), Path::AsNative, Path::AsPosix));
+        SC_TRY(project.addFile(relative.view()));
+        break;
+    }
+    case Libraries::Multiple: {
+        String librariesRoot = StringEncoding::Utf8;
+        String relative      = StringEncoding::Utf8;
+        SC_TRY(Path::join(librariesRoot, {parameters.directories.libraryDirectory.view(), "Libraries"}));
+        SC_TRY(Path::relativeFromTo(relative, projectRoot, librariesRoot.view(), Path::AsNative, Path::AsPosix));
+        SC_TRY(project.addFiles(relative.view(), "**.cpp"));
+        SC_TRY(project.addFiles(relative.view(), "**.h"));
+        SC_TRY(project.addFiles(relative.view(), "**.inl"));
+        break;
+    }
+    }
+
+    if (parameters.platform == Platform::Apple)
+    {
+        SC_TRY(project.addLinkFrameworks({"CoreFoundation", "CoreServices", "CFNetwork", "Foundation"}));
+    }
+
+    if (parameters.platform == Platform::Windows)
+    {
+        SC_TRY(project.addLinkLibraries({"Advapi32", "Dbghelp", "Mswsock", "ntdll", "Rstrtmgr", "Winhttp", "Ws2_32"}));
+    }
+    else
+    {
+        SC_TRY(project.addLinkLibraries({"dl", "pthread"}));
+    }
+
+    return Result(true);
+}
+
 namespace
 {
 static bool buildAppendUpperSnakeCase(SC::StringView input, SC::String& output)
