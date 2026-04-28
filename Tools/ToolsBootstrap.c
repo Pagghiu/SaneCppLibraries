@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 #if defined(__linux__)
+#define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 #endif
 
@@ -140,6 +141,7 @@ char* String_duplicate(const char* str);
 int String_containsPathSeparator(const char* str);
 const char* Path_fileName(const char* path);
 char* deriveToolIdentity(const char* toolPath);
+int isSCBuildDefinitionSource(const char* toolPath);
 
 // Implementation
 PathContext Path_init(void) {
@@ -354,6 +356,11 @@ char* deriveToolIdentity(const char* toolPath) {
     memcpy(result, fileName + start, len);
     result[len] = 0;
     return result;
+}
+
+int isSCBuildDefinitionSource(const char* toolPath) {
+    const char* fileName = Path_fileName(toolPath);
+    return strcmp(fileName, "SC-build.cpp") == 0;
 }
 
 // Path functions
@@ -1221,7 +1228,7 @@ int needsRebuildExe(CompilationInfo* ci) {
 
 // Helper functions for building compile commands
 void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char* includeDir, const char* output,
-                              const char* input, int useClang) {
+                              const char* input, int useClang, int defineSCBuild) {
     CommandLine_init(cmd, compiler);
     CommandLine_arg(cmd, "-I");
     CommandLine_argQuoted(cmd, includeDir);
@@ -1243,6 +1250,9 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     else {
         CommandLine_arg(cmd, "-DSC_COMPILER_ENABLE_STD_CPP=1"); // Only GCC 13+ supports nostdinc++
     }
+    if (defineSCBuild) {
+        CommandLine_arg(cmd, "-DSC_BUILD=1");
+    }
 
     CommandLine_arg(cmd, "-o");
     CommandLine_argQuoted(cmd, output);
@@ -1251,13 +1261,17 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
 }
 
 void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, const char* includeDir,
-                                const char* output, const char* input, const char* jsonFile, const char* pdbName) {
+                                const char* output, const char* input, const char* jsonFile, const char* pdbName,
+                                int defineSCBuild) {
     CommandLine_init(cmd, "cl.exe");
     CommandLine_arg(cmd, "/nologo");
     CommandLine_arg(cmd, "/I");
     CommandLine_argQuoted(cmd, includeDir);
     CommandLine_arg(cmd, "/std:c++17");
     CommandLine_arg(cmd, "/D_DEBUG");
+    if (defineSCBuild) {
+        CommandLine_arg(cmd, "/DSC_BUILD=1");
+    }
     CommandLine_arg(cmd, "/Zi");
     CommandLine_arg(cmd, "/MTd");
     CommandLine_arg(cmd, "/GS");
@@ -1292,6 +1306,7 @@ int compilePOSIX(CompilationInfo* ci) {
 
     char* compiler = "";
     int useClang = 0;
+    int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
     if (runCommand("clang++ --version > /dev/null 2>&1") == 0) {
         compiler = "clang++";
         useClang = 1;
@@ -1311,7 +1326,7 @@ int compilePOSIX(CompilationInfo* ci) {
             // Compile Tools.cpp
             char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang);
+            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang, 0);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
             free(toolsObj);
@@ -1324,7 +1339,8 @@ int compilePOSIX(CompilationInfo* ci) {
             toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
             sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang);
+            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang,
+                                     defineSCBuild);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
             free(toolObj);
@@ -1339,7 +1355,7 @@ int compilePOSIX(CompilationInfo* ci) {
     } else if (needTools) {
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang);
+        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang, 0);
         printf("Tools.cpp\n");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
@@ -1350,7 +1366,8 @@ int compilePOSIX(CompilationInfo* ci) {
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
         sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang);
+        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang,
+                                 defineSCBuild);
         printf("SC-%s.cpp\n", ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
@@ -1539,6 +1556,7 @@ int compileWindows(CompilationInfo* ci, int* objsCompiled) {
     // Simplified Windows compilation
 FileSystem_createDirectoryRecursive(ci->intermediateDir);
     FileSystem_createDirectoryRecursive(ci->toolOutputDir);
+    int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
 
     int needTools = needsRebuildTools(ci);
     int needTool = needsRebuildToolObj(ci);
@@ -1556,7 +1574,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
             CommandLine cmd;
             buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp,
-                                       toolsJson, "Tools");
+                                       toolsJson, "Tools", 0);
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
             STARTUPINFOW si = {sizeof(si)};
@@ -1593,7 +1611,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
             CommandLine cmd;
             buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp,
-                                       toolJson, ci->args->toolName);
+                                       toolJson, ci->args->toolName, defineSCBuild);
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
             STARTUPINFOW si = {sizeof(si)};
@@ -1643,7 +1661,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
         CommandLine cmd;
         buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp, toolsJson,
-                                   "Tools");
+                                   "Tools", 0);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
@@ -1659,7 +1677,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
         CommandLine cmd;
         buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp, toolJson,
-                                   ci->args->toolName);
+                                   ci->args->toolName, defineSCBuild);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);

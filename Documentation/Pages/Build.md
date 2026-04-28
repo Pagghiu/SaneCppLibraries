@@ -295,6 +295,13 @@ The current backend behavior is:
 The repository example lives in `Tools/SC-build.cpp`, where the `SCTest` target applies a dedicated define, include path,
 and warning disables to a selected subset of files.
 
+# `SC_BUILD` Define
+
+When `SC-build.cpp` is compiled as the build-definition tool, `SC::Build` defines `SC_BUILD=1` for that compilation.
+
+This allows one `SC-build.cpp` file to provide `SC::Build::configure(...)` in the `SC_BUILD` branch and a normal
+`main()` in the `#else` branch if the same file is also added to the built target.
+
 # Plugin Host Exports
 
 For host executables using the [Plugin](@ref library_plugin) library:

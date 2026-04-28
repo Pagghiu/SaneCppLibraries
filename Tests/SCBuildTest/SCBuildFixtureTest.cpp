@@ -39,6 +39,7 @@ static constexpr StringView WorkspaceExecutableProjectName = "WorkspaceExecutabl
 static constexpr StringView IndependentProgramOneName      = "IndependentProgramOne";
 static constexpr StringView IndependentProgramTwoName      = "IndependentProgramTwo";
 static constexpr StringView ExternalFixtureProjectName     = "ExternalFixtureProgram";
+static constexpr StringView SelfHostingFixtureProjectName  = "SelfHostingFixtureProgram";
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
 static constexpr StringView CustomDriverSourceRootName = "CustomDriverFixture";
 #endif
@@ -147,9 +148,10 @@ static Result createFixtureDirectories(TestReport& report, String& buildRoot, Bu
     String targetDirectory = report.applicationRootDirectory.view();
     SC_TRY(Path::append(targetDirectory, {"../..", "_Tests"}, Path::AsNative));
 
+    static size_t    fixtureRunCounter = 0;
     SmallString<128> runDirectory;
-    SC_TRY(StringBuilder::format(runDirectory, "scbuild-{}-{}", Time::Realtime::now().milliseconds,
-                                 reinterpret_cast<size_t>(&report)));
+    fixtureRunCounter += 1;
+    SC_TRY(StringBuilder::format(runDirectory, "sb-{}-{}", Time::Realtime::now().milliseconds, fixtureRunCounter));
     SC_TRY(Path::append(targetDirectory, {runDirectory.view()}, Path::AsNative));
     SC_TRY(Path::normalize(buildRoot, targetDirectory.view(), Path::AsNative));
 
@@ -1376,6 +1378,46 @@ static Result writeExternalBuildFixture(FileSystem& fs, StringView projectRoot, 
     return Result(true);
 }
 
+static Result writeSelfHostingBuildFixture(FileSystem& fs, StringView projectRoot)
+{
+    SC_TRY(fs.makeDirectoryRecursive(projectRoot));
+
+    String buildDefinitionPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(buildDefinitionPath, {projectRoot, "SC-build.cpp"}));
+
+    static constexpr StringView buildDefinitionContents =
+        "#if defined(SC_BUILD)\n"
+        "#include \"Tools/SC-build.h\"\n"
+        "\n"
+        "namespace SC\n"
+        "{\n"
+        "namespace Build\n"
+        "{\n"
+        "Result configure(Definition& definition, const Parameters& parameters)\n"
+        "{\n"
+        "    Project project = {\"SelfHostingFixtureProgram\", TargetType::ConsoleExecutable};\n"
+        "    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));\n"
+        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));\n"
+        "    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));\n"
+        "    SC_TRY(project.addFile(\"SC-build.cpp\"));\n"
+        "    return definition.addProject(move(project));\n"
+        "}\n"
+        "} // namespace Build\n"
+        "} // namespace SC\n"
+        "#else\n"
+        "#include <stdio.h>\n"
+        "\n"
+        "int main()\n"
+        "{\n"
+        "    puts(\"self-hosting-build-file\");\n"
+        "    return 0;\n"
+        "}\n"
+        "#endif\n";
+
+    SC_TRY(fs.writeString(buildDefinitionPath.view(), buildDefinitionContents));
+    return Result(true);
+}
+
 static Result writeStaticLibraryFixture(FileSystem& fs, StringView sourceRoot)
 {
     SC_TRY(fs.makeDirectoryRecursive(sourceRoot));
@@ -1823,19 +1865,10 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == expectedOutput.view());
         }
 
-        const bool externalSingleFile = test_section(
-            "SC-build launcher builds external project with single-file libraries from nested working directory");
-        const bool externalMultipleFiles = test_section(
-            "SC-build launcher builds external project with multiple library sources from nested working directory");
-        if (externalSingleFile or externalMultipleFiles)
+        const auto runExternalBuildFixture =
+            [&](Build::Libraries librariesMode, StringView fixtureDirectoryName, StringView expectedOutput)
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
-
-            const bool       useMultipleLibraries = externalMultipleFiles;
-            const StringView expectedOutput =
-                useMultipleLibraries ? "external-build-multiple\n"_a8 : "external-build-single-file\n"_a8;
-            const StringView fixtureDirectoryName =
-                useMultipleLibraries ? "ExternalBuildFixtureMultiple"_a8 : "ExternalBuildFixtureSingleFile"_a8;
 
             String             buildRoot = StringEncoding::Utf8;
             Build::Directories directories;
@@ -1848,9 +1881,7 @@ struct SCBuildFixtureTest : public SC::TestCase
             String nestedRoot  = StringEncoding::Utf8;
             SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), fixtureDirectoryName}));
             SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
-            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view(),
-                                                      useMultipleLibraries ? Build::Libraries::Multiple
-                                                                           : Build::Libraries::SingleFile));
+            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view(), librariesMode));
             SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
 
             StringSpan commandArguments[] = {
@@ -1862,7 +1893,17 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             CapturedProcessOutput capturedOutput;
             SC_TRUST_RESULT(captureExternalBuildCommand(report, nestedRoot.view(), commandArguments, capturedOutput));
-            SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+            if (not recordExpectation("capturedOutput.exitStatus == 0", capturedOutput.exitStatus == 0))
+            {
+                if (not capturedOutput.stdOut.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdOut", false, capturedOutput.stdOut.view());
+                }
+                if (not capturedOutput.stdErr.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdErr", false, capturedOutput.stdErr.view());
+                }
+            }
 
             Build::Directories externalDirectories;
             SC_TRUST_RESULT(
@@ -1889,6 +1930,76 @@ struct SCBuildFixtureTest : public SC::TestCase
             String stdoutOutput = StringEncoding::Utf8;
             SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
             SC_TEST_EXPECT(stdoutOutput == expectedOutput);
+        };
+
+        if (test_section("SC-build launcher builds external project with single-file libraries from nested working "
+                         "directory"))
+        {
+            runExternalBuildFixture(Build::Libraries::SingleFile, "ExternalBuildFixtureSingleFile"_a8,
+                                    "external-build-single-file\n"_a8);
+        }
+
+        if (test_section("SC-build launcher builds external project with multiple library sources from nested working "
+                         "directory"))
+        {
+            runExternalBuildFixture(Build::Libraries::Multiple, "ExternalBuildFixtureMultiple"_a8,
+                                    "external-build-multiple\n"_a8);
+        }
+
+        if (test_section("SC-build launcher defines SC_BUILD for self-hosting SC-build.cpp"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String projectRoot = StringEncoding::Utf8;
+            String nestedRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), "SelfHostingBuildFixture"}));
+            SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
+            SC_TRUST_RESULT(writeSelfHostingBuildFixture(fs, projectRoot.view()));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
+
+            StringSpan commandArguments[] = {
+                "--libraries-root", report.libraryRootDirectory.view(),
+                "compile",          SelfHostingFixtureProjectName,
+                "--config",         "Debug",
+                "--generator",      "native",
+            };
+
+            CapturedProcessOutput capturedOutput;
+            SC_TRUST_RESULT(captureExternalBuildCommand(report, nestedRoot.view(), commandArguments, capturedOutput));
+            SC_TEST_EXPECT(capturedOutput.exitStatus == 0);
+
+            Build::Directories externalDirectories;
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.projectsDirectory, {projectRoot.view(), "_Build", "_Projects"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.outputsDirectory, {projectRoot.view(), "_Build", "_Outputs"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.intermediatesDirectory,
+                                       {projectRoot.view(), "_Build", "_Intermediates"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.buildCacheDirectory, {projectRoot.view(), "_Build", "_BuildCache"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.packagesCacheDirectory,
+                                       {projectRoot.view(), "_Build", "_PackagesCache"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.packagesInstallDirectory, {projectRoot.view(), "_Build", "_Packages"}));
+            externalDirectories.libraryDirectory = report.libraryRootDirectory.view();
+            externalDirectories.projectDirectory = projectRoot.view();
+
+            Build::Action action = makeNativeCompileAction(externalDirectories, SelfHostingFixtureProjectName);
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, SelfHostingFixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "self-hosting-build-file\n"_a8);
         }
 
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX

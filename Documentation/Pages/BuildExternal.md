@@ -81,6 +81,36 @@ SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
 `Libraries::SingleFile` is the default and is recommended for the simplest onboarding.  
 `Libraries::Multiple` adds the individual files under `Libraries/`.
 
+# `SC_BUILD` Define
+
+When `SC-build.cpp` itself is compiled as the build-definition tool, `SC::Build` defines `SC_BUILD=1`.
+
+This lets one file act as both the build definition and the target source:
+
+```cpp
+#if defined(SC_BUILD)
+#include "Tools/SC-build.h"
+
+SC::Result SC::Build::configure(Definition &definition, const Parameters &parameters)
+{
+    Project project = {"MyProject"};
+    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
+    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));
+    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));
+    SC_TRY(project.addFile("SC-build.cpp"));
+    return definition.addProject(move(project));
+}
+#else
+#include <stdio.h>
+
+int main()
+{
+    puts("hello from the built program");
+    return 0;
+}
+#endif
+```
+
 # Launchers
 
 Vendored checkout:
