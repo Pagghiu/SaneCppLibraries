@@ -19,6 +19,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: LibC Compatibility Check
+      run: ./Support/Scripts/CheckLibC.sh
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
       if: matrix.config == 'Release'

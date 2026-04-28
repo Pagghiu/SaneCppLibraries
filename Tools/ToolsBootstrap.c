@@ -1152,7 +1152,7 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     CommandLine_init(cmd, compiler);
     CommandLine_arg(cmd, "-I");
     CommandLine_argQuoted(cmd, includeDir);
-    CommandLine_arg(cmd, "-std=c++14");
+    CommandLine_arg(cmd, "-std=c++17");
     CommandLine_arg(cmd, "-pthread");
     CommandLine_arg(cmd, "-MMD");
     CommandLine_arg(cmd, "-fstrict-aliasing");
@@ -1183,7 +1183,7 @@ void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, c
     CommandLine_arg(cmd, "/nologo");
     CommandLine_arg(cmd, "/I");
     CommandLine_argQuoted(cmd, includeDir);
-    CommandLine_arg(cmd, "/std:c++14");
+    CommandLine_arg(cmd, "/std:c++17");
     CommandLine_arg(cmd, "/D_DEBUG");
     CommandLine_arg(cmd, "/Zi");
     CommandLine_arg(cmd, "/MTd");
