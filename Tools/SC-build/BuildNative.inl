@@ -756,6 +756,8 @@ struct SC::Build::NativeBuild
                                      const ResolvedSource& source, StringView commandString, bool& anyObjectBuilt,
                                      NativeJobRecord& job, NativeBuildReporter& reporter)
     {
+        job.status = job.exitStatus == 0 ? NativeJobStatus::Succeeded : NativeJobStatus::Failed;
+
         if (resolvedProject.parameters->execution.useCompilerDependencies and resolvedProject.adapter.isMSVCStyle())
         {
             SC_TRY(writeWindowsDependencyFile(fs, resolvedProject, source, job.stdOut, job.stdErr));

@@ -1503,6 +1503,19 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
     }
     break;
     case Generator::Make: {
+        StringView makeTargetProjectName = action.projectName;
+        if ((action.action == Action::Run or action.action == Action::Print) and action.allTargets)
+        {
+            const Workspace* workspace      = nullptr;
+            size_t           workspaceIndex = 0;
+            SC_TRY_MSG(definition.workspaces.find([&](const Workspace& item)
+                                                  { return item.name == action.workspaceName; }, &workspaceIndex),
+                       "Cannot find requested workspace");
+            workspace = &definition.workspaces[workspaceIndex];
+            SC_TRY_MSG(workspace->projects.size() == 1, "Run requires selecting a single project");
+            makeTargetProjectName = workspace->projects[0].name.view();
+        }
+
         if (action.action == Action::Run and not action.allTargets)
         {
             const Workspace*     workspace     = nullptr;
@@ -1556,12 +1569,12 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
         }
         break;
         case Action::Run: {
-            SC_TRY(StringBuilder::format(compileTargetName, "{}_COMPILE_COMMANDS", action.projectName));
-            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", action.projectName));
+            SC_TRY(StringBuilder::format(compileTargetName, "{}_COMPILE_COMMANDS", makeTargetProjectName));
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", makeTargetProjectName));
         }
         break;
         case Action::Print: {
-            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", action.projectName));
+            SC_TRY(StringBuilder::format(targetName, "{}_PRINT_EXECUTABLE_PATH", makeTargetProjectName));
         }
         break;
         default: return Result::Error("Unexpected Build::Action (supported \"compile\", \"run\")");
