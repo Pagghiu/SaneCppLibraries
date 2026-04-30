@@ -278,7 +278,7 @@ SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& pa
 
     String publicIncludes = StringEncoding::Utf8;
     SC_TRY(Path::join(publicIncludes, {parameters.directories.libraryDirectory.view(), "Includes"}));
-    SC_TRY(project.addIncludePaths({publicIncludes.view(), parameters.directories.libraryDirectory.view()}));
+    SC_TRY(project.addIncludePaths({publicIncludes.view()}));
 
     switch (mode)
     {

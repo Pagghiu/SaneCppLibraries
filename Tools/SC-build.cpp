@@ -357,6 +357,7 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
     });
 
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/SCTest", "*.cpp");
     project.addFiles("Tests/SCTest", "*.h");
@@ -408,6 +409,7 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
     });
 
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/SCBuildTest", "*.cpp");
     project.addFiles("Tests/SCBuildTest", "*.h");
@@ -429,6 +431,7 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
 
     project.addIncludePaths({"."});
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
     SC_TRY_MSG(project.addExportAllLibraries(), "Failed to configure exported Sane C++ libraries");
 
@@ -453,6 +456,7 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({"."});
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
     project.addFiles("Tests/InteropSTL", "*.cpp");
     project.addFiles("Tests/InteropSTL", "*.h");
@@ -484,6 +488,7 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
 
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
+    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
     addSaneCppDebugVisualizers(project, parameters);
 
     project.addFiles(imgui.packageLocalDirectory.view(), "*.cpp");
@@ -572,6 +577,7 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
         SC_TRY(addSaneCppLibraries(project, parameters));
+        SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
         project.addFiles(entry.path, "**.cpp");
         workspace.projects.push_back(move(project));
     }

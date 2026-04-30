@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Tools/SC-build.h"
+#include "SaneCppBuild.h"
 
 namespace
 {
