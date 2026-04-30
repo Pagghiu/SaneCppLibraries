@@ -22,8 +22,8 @@
 🟨 MVP
 
 `SC::Build` is used by this repository to generate projects and/or build the test suites, tools, examples, and the `SC`
-shared library. The generated-project backends remain part of the daily workflow, while the standalone native backend now
-supports direct host builds on macOS, Linux, and Windows.
+shared library. The standalone native backend is now the default day-to-day workflow on macOS, Linux, and Windows,
+while the generated-project backends remain available for IDE and project-file flows.
 
 # Description
 
@@ -39,13 +39,19 @@ The same public API serves two workflows:
 - Generated backends: emit XCode, Visual Studio, or Make projects into `_Build/_Projects`
 - Native backend: invoke compiler, linker, and archiver child processes directly without generating project files first
 
-The repository tool surface is the `SC-build` tool described in [Tools](@ref page_tools). Its command-line shape is:
+The repository tool surface is the `SC-build` tool described in [Tools](@ref page_tools). Its normal command-line shape
+is:
 
 ```text
-./SC.sh build configure [workspace:project | project]
 ./SC.sh build compile [workspace:project | project] [options]
 ./SC.sh build run [workspace:project | project] [options] [-- extra args...]
 ./SC.sh build coverage [workspace:project | project] [options]
+```
+
+Generated-project workflows also use:
+
+```text
+./SC.sh build configure [workspace:project | project]
 ```
 
 Named options accepted by `compile`, `run`, and `coverage` are:
@@ -118,8 +124,8 @@ Current CLI behavior:
 - If no project is specified, `compile` builds the whole default workspace
 - `run` requires a single executable target and forwards arguments placed after `--`
 - If no configuration is specified, `Debug` is used
-- Host-default generator selection is `vs2022` on Windows and `make` on macOS / Linux
-- `configure` is primarily for generated backends; the native backend builds directly into `_Build/_Outputs` and `_Build/_Intermediates`
+- Host-default generator selection is `native` on Windows, macOS, and Linux
+- `configure` is primarily for generated backends; normal native `compile` / `run` flows build directly into `_Build/_Outputs` and `_Build/_Intermediates`
 - `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
 - `--target` selects a friendly host or cross target profile without requiring the caller to spell the toolchain triple manually
 - `--toolchain` selects the compiler family orthogonally to `--target`
@@ -174,8 +180,8 @@ Call the helper after setting the project root directory, typically with
 |:--|:--|:--|:--|:--|
 | `Native` | macOS, Linux, Windows hosts | Console executable, GUI application, shared library, static library | Yes | Direct compile / run / coverage flow; no project files are generated |
 | `XCode` | Apple | Console executable, GUI application, shared library, static library | Yes | GUI apps also emit storyboard / assets; `Intel32` and `Wasm` architectures are unsupported |
-| `VisualStudio2022` / `VisualStudio2019` | Windows | Console executable, GUI application, shared library, static library | No | The repository defaults to VS2022, but VS2019 generation is still available |
-| `Make` | Apple, Linux | Console executable, GUI application, shared library, static library | Yes on clang-style flows | GCC builds still compile, but Makefile-side compile database generation is unavailable there |
+| `VisualStudio2022` / `VisualStudio2019` | Windows | Console executable, GUI application, shared library, static library | No | Explicit generated-project workflow for Visual Studio |
+| `Make` | Apple, Linux | Console executable, GUI application, shared library, static library | Yes on clang-style flows | Explicit generated-project workflow for Make; GCC builds still compile, but Makefile-side compile database generation is unavailable there |
 
 # Native Backend
 
@@ -247,8 +253,8 @@ Current cross-compilation scope:
 Typical native commands:
 
 ```bash
-./SC.sh build compile SCBuildTest --config Debug --generator native
-./SC.sh build compile SCBuildTest -c d -g native -a arm64 --verbose
+./SC.sh build compile SCBuildTest --config Debug
+./SC.sh build compile SCBuildTest -c d -a arm64 --verbose
 ./SC.sh package install llvm
 ./SC.sh package install qemu --import-directory /opt/qemu-user
 ./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
@@ -256,15 +262,15 @@ Typical native commands:
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
 ./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
-./SC.sh build compile SaneHttpGet --generator native --toolchain filc --output quiet
+./SC.sh build compile SaneHttpGet --toolchain filc --output quiet
 ./SC.sh package install msvc
 ./SC.sh package install msvc --import-directory /opt/msvc-portable --wine /opt/bin/wine-wrapper
 ./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-msvc-arm64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --triple x86_64-custom-windows-gnu --sysroot /opt/sysroots/windows
 ./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test BaseTest --test-section new/delete
-./SC.sh build run SCBuildTest --config Debug --generator native -- --test "BuildTest"
-SC.bat build compile SCTest Debug native
+./SC.sh build run SCBuildTest --config Debug -- --test "BuildTest"
+SC.bat build compile SCTest --config Debug
 ```
 
 Important current limits:
@@ -276,8 +282,8 @@ Important current limits:
 - Fil-C is still an experimental compiler-first Linux track: no public `linux-filc-*` target profile exists yet, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
-- The repository `build configure` command does not rely on a Windows-native generation pass because native builds do
-  not need generated project files
+- The repository `build configure` command remains available for generated-project workflows; native builds do not need
+  generated project files first
 
 # Per-file Flags
 
@@ -332,6 +338,21 @@ Repository-generated paths are currently:
 
 1. Build `SC-build` itself through one of the repository build tasks or through `build compile`
 2. Launch the generated `SC-build` executable under your debugger with the same arguments passed by the bootstrap
+
+# Generated Project Workflows
+
+Use `build configure` when you explicitly want generated projects for IDEs or Make:
+
+```bash
+./SC.sh build configure
+SC.bat build configure
+```
+
+Typical examples:
+
+- XCode: open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace`
+- Visual Studio: open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
+- Make: use `_Build/_Projects/Make/SCWorkspace/apple` or `_Build/_Projects/Make/SCWorkspace/linux`
 
 With any debugger or IDE other than VSCode, debug `_Build/_Tools/<Platform>/SC-build` (or
 `_Build/_Tools/Windows/SC-build.exe`) and pass arguments similar to:

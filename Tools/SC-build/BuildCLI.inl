@@ -179,15 +179,15 @@ static void applyHostDefaultBuildParameters(Build::Action& action)
     switch (HostPlatform)
     {
     case Platform::Windows:
-        action.parameters.generator = Build::Generator::VisualStudio2022;
+        action.parameters.generator = Build::Generator::Native;
         action.parameters.platform  = Build::Platform::Windows;
         break;
     case Platform::Apple:
-        action.parameters.generator = Build::Generator::Make;
+        action.parameters.generator = Build::Generator::Native;
         action.parameters.platform  = Build::Platform::Apple;
         break;
     case Platform::Linux:
-        action.parameters.generator = Build::Generator::Make;
+        action.parameters.generator = Build::Generator::Native;
         action.parameters.platform  = Build::Platform::Linux;
         break;
     default: break;
@@ -1037,7 +1037,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
 
     options[numOptions].longName  = "generator";
     options[numOptions].shortName = 'g';
-    options[numOptions].help      = "Build generator (default, native, make, xcode, vs2022, vs2019)";
+    options[numOptions].help      = "Build generator (default/native, make, xcode, vs2022, vs2019)";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.generator);
     numOptions++;
@@ -1293,6 +1293,10 @@ static Result runBuildConfigure(Tool::Arguments& arguments)
     action.parameters.generator = Build::Generator::Make;
     action.parameters.platform  = Build::Platform::Apple;
     arguments.console.print("Executing \"{}\" for Make on Apple platform\n", arguments.action);
+    SC_TRY(Build::executeAction(action));
+    action.parameters.generator = Build::Generator::Native;
+    action.parameters.platform  = Build::Platform::Windows;
+    arguments.console.print("Executing \"{}\" for Native on Windows platform\n", arguments.action);
     SC_TRY(Build::executeAction(action));
     action.parameters.generator = Build::Generator::Native;
     action.parameters.platform  = Build::Platform::Linux;

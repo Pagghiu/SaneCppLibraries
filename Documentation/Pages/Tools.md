@@ -41,16 +41,16 @@ All built-in tools are invoked with the `SC.sh` or `SC.bat` bootstrap script tha
 
 Such script must be called with the name of the tool and some parameters.  
 
-For Example, invoking the `Tools\SC-build.cpp` tool with `configure` action: 
+For example, invoking the `Tools\SC-build.cpp` tool to build a target directly:
 
 ```
-./SC.sh build configure
+./SC.sh build compile SCTest
 ```
 
 or (on Windows)
 
 ```
-SC.bat build compile
+SC.bat build compile SCTest
 ```
 
 @note `SC::Tools` are just regular programs being compiled on the fly when needed, so they require a working host compiler to be available in system path. This limitation could be removed if needed, as described in the Roadmap section.  
@@ -127,7 +127,8 @@ This is the list of tools that currently exist in the Sane C++ repository.
 
 # SC-build.cpp
 
-`SC-build` configures generated projects and can also build Sane C++ repository targets directly through the standalone native backend in [SC::Build](@ref page_build).
+`SC-build` builds Sane C++ repository targets directly through the standalone native backend by default, and can also
+configure generated projects through [SC::Build](@ref page_build).
 
 ## Actions
 
@@ -140,10 +141,10 @@ This is the list of tools that currently exist in the Sane C++ repository.
 `SC-build` command shape:
 
 ```text
-./SC.sh build configure [workspace:project | project]
 ./SC.sh build compile [workspace:project | project] [options]
 ./SC.sh build run [workspace:project | project] [options] [-- extra args...]
 ./SC.sh build coverage [workspace:project | project] [options]
+./SC.sh build configure [workspace:project | project]
 ```
 
 Generator keywords are `default`, `native`, `make`, `xcode`, `vs2022`, and `vs2019`.
@@ -181,9 +182,9 @@ fail early with concrete CLI errors instead of drifting into backend-time failur
 
 Current defaults:
 
-- Windows: `default` resolves to `vs2022`
-- macOS / Linux: `default` resolves to `make`
-- Native builds do not require a prior `configure` step
+- Windows / macOS / Linux: `default` resolves to `native`
+- Native `compile` / `run` are the standard workflows and do not require a prior `configure` step
+- `configure` is for generated-project and IDE workflows
 - Linux `glibc` and `musl` target profiles now shape canonical target triples and sysroot flags; macOS and Windows
   hosts auto-select a packaged LLVM toolchain for those profiles when the caller does not provide explicit compiler
   paths, and macOS now also auto-selects packaged Linux glibc/musl sysroots for them
@@ -231,7 +232,7 @@ Current defaults:
 - Legacy positional compatibility is still accepted after `target` as `[config] [generator] [arch] [output]`
 
 ## Examples
-Configure project, generating them:
+Generate explicit project files:
 ```
 ./SC.sh build configure
 ```
@@ -258,9 +259,9 @@ Build all projects
 ./SC.sh build compile
 ```
 
-Build through the native backend
+Build through the default native backend
 ```
-./SC.sh build compile SCTest --config Debug --generator native
+./SC.sh build compile SCTest --config Debug
 ```
 
 Prepare the packaged host LLVM toolchain for Linux targets
@@ -276,7 +277,7 @@ Register an imported QEMU user-runner layout for foreign Linux `build run`
 Register an imported Fil-C installation and compile a native Linux target through the experimental compiler-first path
 ```
 ./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
-./SC.sh build compile SaneHttpGet --generator native --toolchain filc --output quiet
+./SC.sh build compile SaneHttpGet --toolchain filc --output quiet
 ```
 
 Cross-compile a Linux glibc executable through the native backend with the packaged macOS sysroot path

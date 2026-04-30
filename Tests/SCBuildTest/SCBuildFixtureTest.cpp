@@ -1655,18 +1655,8 @@ static Result configureLinuxTargetAction(Build::Action& action, Build::TargetEnv
     return Result(true);
 }
 
-static constexpr StringView hostLLVMInstallDirectoryName()
-{
 #if SC_PLATFORM_APPLE
-    return "llvm_macos_arm64";
-#elif SC_PLATFORM_LINUX
-    return HostInstructionSet == InstructionSet::ARM64 ? "llvm_linux_arm64"_a8 : "llvm_linux_intel64"_a8;
-#elif SC_PLATFORM_WINDOWS
-    return HostInstructionSet == InstructionSet::ARM64 ? "llvm_windows_arm64"_a8 : "llvm_windows_intel64"_a8;
-#else
-    return {};
-#endif
-}
+static constexpr StringView hostLLVMInstallDirectoryName() { return "llvm_macos_arm64"; }
 
 static constexpr StringView packagedLinuxSysrootInstallDirectoryName(Build::TargetEnvironment::Type environment,
                                                                      Build::Architecture::Type      architecture)
@@ -1695,6 +1685,7 @@ static constexpr StringView packagedLinuxSysrootInstallDirectoryName(Build::Targ
     }
     return {};
 }
+#endif
 
 #if SC_PLATFORM_WINDOWS
 static constexpr StringView packagedLinuxSysrootCacheDirectoryName(Build::TargetEnvironment::Type environment,

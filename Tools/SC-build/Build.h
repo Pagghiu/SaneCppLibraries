@@ -649,7 +649,7 @@ struct Parameters
     {
         platform     = Platform::Linux;
         architecture = Architecture::Any;
-        generator    = Generator::Make;
+        generator    = Generator::Native;
     }
     Directories directories;
     Toolchain   toolchain;

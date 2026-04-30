@@ -86,6 +86,36 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Arm64);
             SC_TEST_EXPECT(action.parameters.execution.outputMode == Build::OutputMode::Quiet);
         }
+        if (test_section("build cli defaults omitted generator to native"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            arguments.arguments = {args, 1};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+        }
+        if (test_section("build cli maps generator default to native"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--generator";
+            args[2]             = "default";
+            arguments.arguments = {args, 3};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Error;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.generator == Build::Generator::Native);
+        }
         if (test_section("build cli parses filc toolchain selection"))
         {
             arguments.tool      = "build";

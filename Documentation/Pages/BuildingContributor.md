@@ -4,42 +4,48 @@ Follow this guide if you're interested in building the library to contribute (ch
 
 [TOC]
 
-# Generate projects
+# Build and run directly
 
-The test suite and example projects uses the handmade / self-hosted [SC::Build](@ref page_build) system, that describes builds in C++
+The test suite and example projects use the handmade / self-hosted [SC::Build](@ref page_build) system, and the
+default workflow now builds them directly through the native backend.
 
 ## Command-line
-- Generate projects
-    - **Windows**: `SC.bat build configure`
-    - **Posix**: `SC.sh build configure`
-- Open generated projects (in `_Build/_Projects`). 
+- Build the test suite
+    - **Windows**: `SC.bat build compile SCTest --config Debug`
+    - **Posix**: `SC.sh build compile SCTest --config Debug`
+- Run focused build-system coverage
+    - **Windows**: `SC.bat build run SCBuildTest --config Debug`
+    - **Posix**: `SC.sh build run SCBuildTest --config Debug`
 
 @note Check the [Tools](@ref page_tools) page for more details on invoking `SC.sh build`.
 
-## VSCode
+## VSCode / IDE project generation
 
 Under VSCode select `Tasks: Run Task` and choose:
 - `Generate Projects`
+
+Generated projects are still useful for Visual Studio, XCode, and Make workflows, but they are no longer required
+before normal `build compile` / `build run` usage.
 
 # Build the test suite
 
 ## Command-line
 
 Intel Machines
-- **Windows**: `SC.bat build compile SCTest --config Debug --generator default --arch intel64`
-- **Posix**: `SC.sh build compile SCTest --config Debug --generator default --arch intel64`
+- **Windows**: `SC.bat build compile SCTest --config Debug --arch intel64`
+- **Posix**: `SC.sh build compile SCTest --config Debug --arch intel64`
 
 Arm Machines
-- **Windows**: `SC.bat build compile SCTest --config Debug --generator default --arch arm64`
-- **Posix**: `SC.sh build compile SCTest --config Debug --generator default --arch arm64`
+- **Windows**: `SC.bat build compile SCTest --config Debug --arch arm64`
+- **Posix**: `SC.sh build compile SCTest --config Debug --arch arm64`
 
 ## Command-line Native Backend
 
-- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --generator native`
-- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --generator native --arch arm64 --verbose`
-- **macOS / Linux**: `./SC.sh build run SCBuildTest --config Debug --generator native`
-- **Windows**: `SC.bat build compile SCTest --config Debug --generator native`
-- **Windows**: `SC.bat build run SCBuildTest --config Debug --generator native`
+- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug`
+- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --arch arm64 --verbose`
+- **macOS / Linux**: `./SC.sh build run SCBuildTest --config Debug`
+- **Windows**: `SC.bat build compile SCTest --config Debug`
+- **Windows**: `SC.bat build run SCBuildTest --config Debug`
 
 @note The native backend currently supports direct host builds on macOS, Linux, and Windows. Windows sysroot selection is
 not implemented yet, and the exact toolchain combinations available still depend on the installed host tools.
@@ -47,14 +53,17 @@ not implemented yet, and the exact toolchain combinations available still depend
 and `--verbose` shortcuts. Legacy positional syntax is still accepted for compatibility.
 
 ## Visual Studio 2022
+- Generate projects first: `SC.bat build configure`
 - Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
 - Build the default configuration target (or another one you prefer)
 
 ## XCode
+- Generate projects first: `./SC.sh build configure`
 - Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace`
 - Build the default configuration target (or another one you prefer)
 
 ## Makefile
+- Generate projects first: `./SC.sh build configure`
 - Linux: `cd _Build/_Projects/Make/SCWorkspace/linux`
 - macOS: `cd _Build/_Projects/Make/SCWorkspace/apple`
 - Build Debug: `make -j SCTest`

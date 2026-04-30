@@ -3,12 +3,8 @@
 
 ## Building
 
-@note Generated-backend workflows assume `build configure` has already run, as described in
-[Building Contributor](@ref page_building_contributor):
-- Posix: `./SC.sh build configure`
-- Windows: `SC.bat build configure`
-
-Native `build compile` / `build run` can build examples directly without a prior `configure`.
+@note Examples now build directly through native `build compile` / `build run` without a prior `configure`.
+Use `build configure` only when you explicitly want generated Visual Studio, XCode, or Make projects.
 
 @note Projects will be generated in `_Build/_Projects`.  
 After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.
@@ -25,13 +21,13 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 |               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
 |               | Windows: None                                                                                                                     |
 |               | macOS: None                                                                                                                       |
-| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during `./SC.sh build configure`, `SC.bat build configure`, or the first native `build compile` / `build run` |
+| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during the first `build compile` / `build run`, or during `build configure` if you are generating projects explicitly |
 | Run (Posix)   | `./SC.sh build run SCExample` (will also compile before running)                                                                  |
 | Run (Windows) | `SC.bat build run SCExample`  (will also compile before running)                                                                  |
-| Run (Native)  | `./SC.sh build run SCExample Debug native` or `SC.bat build run SCExample Debug native`                                           |
+| Run (Native)  | `./SC.sh build run SCExample --config Debug` or `SC.bat build run SCExample --config Debug`                                       |
 | Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
-| Debug (XCode) | Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `SCExample` scheme                               |
-| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5)                                     |
+| Debug (XCode) | Run `./SC.sh build configure`, then open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `SCExample` scheme |
+| Debug (VS2022)| Run `SC.bat build configure`, then open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5) |
 
 ## AsyncWebServerExample
 
@@ -48,8 +44,8 @@ After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${p
 | Run (Windows) | `Examples/AsyncWebServer/BuildAndRun.bat` (will also compile before running)                                                      |
 | Parameters    | All parameters can be added after `BuildAndRun` for example `BuildAndRun.sh --directory /somedir`:                                |
 |               | `--directory /path/to/dir`: Serves the given folder                                                                               |
-| Debug (XCode) | Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `AsyncWebServer` scheme                          |
-| Debug (VS2022)| Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5)                                     |
+| Debug (XCode) | Run `./SC.sh build configure`, then open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `AsyncWebServer` scheme |
+| Debug (VS2022)| Run `SC.bat build configure`, then open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5) |
 
 # Blog
 

@@ -57,7 +57,7 @@ int main()
 }
 ```
 
-__Note__: the public `Include` folder has been added by `Build::addSaneCppLibraries` so that `main.cpp` can `#include "SaneCppStrings.h"`.
+__Note__: the public `Includes` folder is added by `Build::addSaneCppLibraries` so that `main.cpp` can `#include "SaneCppStrings.h"`.
 
 
 # Using Sane C++ Libraries
@@ -79,7 +79,7 @@ SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
 `Libraries::SingleFile` is the default and is recommended for the simplest onboarding.  
 `Libraries::Multiple` adds the individual files under `Libraries/`.
 
-This function adds the public `Include` folder to include paths, to allow `#include "SaneCpp$LIBRARY$.h"`.
+This function adds the public `Includes` folder to include paths, to allow `#include "SaneCpp$LIBRARY$.h"`.
 
 # `SC_BUILD` Define
 
@@ -124,13 +124,13 @@ MyProject/
 Invoke from the project root or any nested subdirectory:
 
 ```bash
-ThirdParty/SaneCppLibraries/SC-build.sh compile MyProject --config Release --generator native
+ThirdParty/SaneCppLibraries/SC-build.sh compile MyProject --config Release
 ```
 
 Explicit shared checkout:
 
 ```bash
-/path/to/SaneCppLibraries/SC-build.sh --libraries-root /path/to/SaneCppLibraries compile MyProject --config Release --generator native
+/path/to/SaneCppLibraries/SC-build.sh --libraries-root /path/to/SaneCppLibraries compile MyProject --config Release
 ```
 
 Standalone downloaded launcher:
@@ -138,14 +138,14 @@ Standalone downloaded launcher:
 ```bash
 curl -L -o SC-build.sh https://raw.githubusercontent.com/Pagghiu/SaneCppLibraries/<branch-or-tag>/SC-build.sh
 chmod +x SC-build.sh
-./SC-build.sh compile MyProject --config Release --generator native
+./SC-build.sh compile MyProject --config Release
 ```
 
 Windows PowerShell:
 
 ```powershell
 Invoke-WebRequest https://raw.githubusercontent.com/Pagghiu/SaneCppLibraries/<branch-or-tag>/SC-build.ps1 -OutFile SC-build.ps1
-./SC-build.ps1 compile MyProject --config Release --generator native
+./SC-build.ps1 compile MyProject --config Release
 ```
 
 When testing a non-`main` branch, download the launcher from that branch and pin the same branch in `SC-build.cpp`:
