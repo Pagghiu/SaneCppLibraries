@@ -1,0 +1,5 @@
+#include "../Libraries/Strings/Console.h"
+#include "../Libraries/Strings/StringBuilder.h"
+#include "../Libraries/Strings/StringConverter.h"
+#include "../Libraries/Strings/StringFormat.h"
+#include "../Libraries/Strings/StringIterator.h"

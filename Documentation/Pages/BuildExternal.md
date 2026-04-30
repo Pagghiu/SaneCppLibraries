@@ -32,35 +32,33 @@ MyProject/
 Example `SC-build.cpp`:
 
 ```cpp
-#include "Tools/SC-build.h"
+#include "SaneCppBuild.h"
 
 SC::Result SC::Build::configure(Definition &definition, const Parameters &parameters)
 {
     Project project = {"MyProject"};
-    SC_TRY(addSaneCppLibraries(project, parameters));
-    SC_TRY(project.addFiles("Source", "main.cpp"));
-    return definition.addProject(move(project)); // Added to implicitly created Workspace
+    SC_TRY(Build::addSaneCppLibraries(project, parameters)); // Link Sane C++ libraries single file
+    SC_TRY(project.addFiles("Source", "*.cpp"));             // Add all cpp files from Source folder
+    return definition.addProject(move(project));             // Added to implicitly created workspace
 }
-
 ```
 
 Example `Source/main.cpp` using Sane C++ Libraries:
 
 ```cpp
-#include "Libraries/Strings/Console.h"
+#include "SaneCppStrings.h"
 
 int main()
 {
     using namespace SC;
     Console console;
-    console.print("{1} {0}\n", "a tutti", "Salve");
+    console.print("{1} {0}!\n", "world", "Hello");
     return 0;
 }
 ```
 
-`parameters.directories.projectDirectory` is the project root discovered by the launcher.  
-`parameters.directories.libraryDirectory` is the SaneCppLibraries checkout that provides the generic build driver and
-the public headers.
+__Note__: the public `Include` folder has been added by `Build::addSaneCppLibraries` so that `main.cpp` can `#include "SaneCppStrings.h"`.
+
 
 # Using Sane C++ Libraries
 
@@ -81,6 +79,8 @@ SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
 `Libraries::SingleFile` is the default and is recommended for the simplest onboarding.  
 `Libraries::Multiple` adds the individual files under `Libraries/`.
 
+This function adds the public `Include` folder to include paths, to allow `#include "SaneCpp$LIBRARY$.h"`.
+
 # `SC_BUILD` Define
 
 When `SC-build.cpp` itself is compiled as the build-definition tool, `SC::Build` defines `SC_BUILD=1`.
@@ -89,16 +89,14 @@ This lets one file act as both the build definition and the target source:
 
 ```cpp
 #if defined(SC_BUILD)
-#include "Tools/SC-build.h"
+#include "SaneCppBuild.h"
 
 SC::Result SC::Build::configure(Definition &definition, const Parameters &parameters)
 {
     Project project = {"MyProject"};
-    SC_TRY(project.setRootDirectory(parameters.directories.projectDirectory.view()));
-    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));
-    SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));
-    SC_TRY(project.addFile("SC-build.cpp"));
-    return definition.addProject(move(project));
+    SC_TRY(Build::addSaneCppLibraries(project, parameters)); // Link Sane C++ libraries
+    SC_TRY(project.addFile("SC-build.cpp"));                 // Flag this file to build
+    return definition.addProject(move(project));             // Add to default workspace
 }
 #else
 #include <stdio.h>

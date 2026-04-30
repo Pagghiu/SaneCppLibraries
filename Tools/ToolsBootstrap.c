@@ -1305,6 +1305,7 @@ int compilePOSIX(CompilationInfo* ci) {
     FileSystem_createDirectoryRecursive(ci->toolOutputDir); // Wait, already there
 
     char* compiler = "";
+    char* includeDir = Path_join(ci->args->libraryDir, "Includes");
     int useClang = 0;
     int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
     if (runCommand("clang++ --version > /dev/null 2>&1") == 0) {
@@ -1313,6 +1314,7 @@ int compilePOSIX(CompilationInfo* ci) {
     } else if (runCommand("g++ --version > /dev/null 2>&1") == 0) {
         compiler = "g++";
     } else {
+        free(includeDir);
         return 1;
     }
 
@@ -1326,7 +1328,7 @@ int compilePOSIX(CompilationInfo* ci) {
             // Compile Tools.cpp
             char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang, 0);
+            buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolsObj, ci->toolsCpp, useClang, 0);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
             free(toolsObj);
@@ -1339,7 +1341,7 @@ int compilePOSIX(CompilationInfo* ci) {
             toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
             sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
             CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang,
+            buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolObj, ci->toolCpp, useClang,
                                      defineSCBuild);
             int ret = CommandLine_run(&cmd);
             CommandLine_destroy(&cmd);
@@ -1349,34 +1351,44 @@ int compilePOSIX(CompilationInfo* ci) {
         int status1, status2;
         waitpid(pid1, &status1, 0);
         waitpid(pid2, &status2, 0);
-        if (WEXITSTATUS(status1) != 0 || WEXITSTATUS(status2) != 0) return 1;
+        if (WEXITSTATUS(status1) != 0 || WEXITSTATUS(status2) != 0) {
+            free(includeDir);
+            return 1;
+        }
         printf("Tools.cpp\n");
         printf("SC-%s.cpp\n", ci->args->toolName);
     } else if (needTools) {
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolsObj, ci->toolsCpp, useClang, 0);
+        buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolsObj, ci->toolsCpp, useClang, 0);
         printf("Tools.cpp\n");
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
-        if (ret != 0) return 1;
+        if (ret != 0) {
+            free(includeDir);
+            return 1;
+        }
     } else if (needTool) {
         char* toolObj = Path_join(ci->intermediateDir, "SC-");
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
         sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
         CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, ci->args->libraryDir, toolObj, ci->toolCpp, useClang,
+        buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolObj, ci->toolCpp, useClang,
                                  defineSCBuild);
         printf("SC-%s.cpp\n", ci->args->toolName);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);
-        if (ret != 0) return 1;
+        if (ret != 0) {
+            free(includeDir);
+            return 1;
+        }
     } else {
         printf("\"%s\" is up to date\n", ci->toolsCpp);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
+    free(includeDir);
 
     if (needsRebuildExe(ci)) {
         char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
@@ -1556,6 +1568,7 @@ int compileWindows(CompilationInfo* ci, int* objsCompiled) {
     // Simplified Windows compilation
 FileSystem_createDirectoryRecursive(ci->intermediateDir);
     FileSystem_createDirectoryRecursive(ci->toolOutputDir);
+    char* includeDir = Path_join(ci->args->libraryDir, "Includes");
     int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
 
     int needTools = needsRebuildTools(ci);
@@ -1573,7 +1586,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
             char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
             CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp,
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp,
                                        toolsJson, "Tools", 0);
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
@@ -1610,7 +1623,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
             sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
             CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp,
+            buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolObj, ci->toolCpp,
                                        toolJson, ci->args->toolName, defineSCBuild);
 #ifdef _WIN32
             char* command = StringVector_join(&cmd.args, " ");
@@ -1647,8 +1660,12 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             GetExitCodeProcess(processes[1], &exit2);
             CloseHandle(processes[0]);
             CloseHandle(processes[1]);
-            if (exit1 != 0 || exit2 != 0) return 0;
+            if (exit1 != 0 || exit2 != 0) {
+                free(includeDir);
+                return 0;
+            }
         } else {
+            free(includeDir);
             return 0;
         }
 #else
@@ -1660,13 +1677,16 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
         char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
         CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolsObj, ci->toolsCpp, toolsJson,
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp, toolsJson,
                                    "Tools", 0);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolsObj);
         free(toolsJson);
-        if (ret != 0) return 0;
+        if (ret != 0) {
+            free(includeDir);
+            return 0;
+        }
     } else if (needTool) {
         *objsCompiled = 1;
         char* toolObj = Path_join(ci->intermediateDir, "SC-");
@@ -1676,16 +1696,20 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
         sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
         CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, ci->args->libraryDir, toolObj, ci->toolCpp, toolJson,
+        buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolObj, ci->toolCpp, toolJson,
                                    ci->args->toolName, defineSCBuild);
         int ret = CommandLine_run(&cmd);
         CommandLine_destroy(&cmd);
         free(toolObj);
         free(toolJson);
-        if (ret != 0) return 0;
+        if (ret != 0) {
+            free(includeDir);
+            return 0;
+        }
     } else {
         printf("\"%s\" is up to date\n", ci->toolsCpp);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
+    free(includeDir);
     return 1;
 }
