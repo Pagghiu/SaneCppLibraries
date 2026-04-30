@@ -1940,6 +1940,66 @@ struct SCBuildFixtureTest : public SC::TestCase
             runExternalBuildFixture(Build::Libraries::Multiple, "ebm"_a8, "external-build-multiple\n"_a8);
         }
 
+        if (test_section("SC-build launcher defaults to compile for external projects"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String projectRoot = StringEncoding::Utf8;
+            String nestedRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(projectRoot, {buildRoot.view(), "ebd"}));
+            SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
+            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view(), Build::Libraries::SingleFile));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
+
+            StringSpan commandArguments[] = {
+                "--libraries-root",
+                report.libraryRootDirectory.view(),
+            };
+
+            CapturedProcessOutput capturedOutput;
+            SC_TRUST_RESULT(captureExternalBuildCommand(report, nestedRoot.view(), commandArguments, capturedOutput));
+            if (not recordExpectation("capturedOutput.exitStatus == 0", capturedOutput.exitStatus == 0))
+            {
+                if (not capturedOutput.stdOut.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdOut", false, capturedOutput.stdOut.view());
+                }
+                if (not capturedOutput.stdErr.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdErr", false, capturedOutput.stdErr.view());
+                }
+            }
+
+            Build::Directories externalDirectories;
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.projectsDirectory, {projectRoot.view(), "_Build", "_Projects"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.outputsDirectory, {projectRoot.view(), "_Build", "_Outputs"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.intermediatesDirectory,
+                                       {projectRoot.view(), "_Build", "_Intermediates"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.buildCacheDirectory, {projectRoot.view(), "_Build", "_BuildCache"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.packagesCacheDirectory,
+                                       {projectRoot.view(), "_Build", "_PackagesCache"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.packagesInstallDirectory, {projectRoot.view(), "_Build", "_Packages"}));
+            externalDirectories.libraryDirectory = report.libraryRootDirectory.view();
+            externalDirectories.projectDirectory = projectRoot.view();
+
+            Build::Action action = makeNativeCompileAction(externalDirectories, ExternalFixtureProjectName);
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, ExternalFixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+        }
+
         if (test_section("SC-build launcher defines SC_BUILD for self-hosting SC-build.cpp"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());

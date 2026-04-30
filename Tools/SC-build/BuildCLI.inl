@@ -1419,7 +1419,7 @@ Result executeAction(const Action& action) { return Build::Action::execute(actio
 
 #if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)
 StringView Tools::Tool::getToolName() { return "SC-build"; }
-StringView Tools::Tool::getDefaultAction() { return "configure"; }
+StringView Tools::Tool::getDefaultAction() { return "compile"; }
 Result     Tools::Tool::runTool(Tools::Tool::Arguments& arguments) { return Tools::runBuildTool(arguments); }
 #endif
 } // namespace SC

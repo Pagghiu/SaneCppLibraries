@@ -219,10 +219,15 @@ bootstrap_exe=$(ensure_bootstrap_executable "$libraries_root")
 build_root=$project_root/_Build
 mkdir -p "$build_root"
 
-"$bootstrap_exe" \
-    "$libraries_root" \
-    "$libraries_root/Tools" \
-    "$build_root" \
-    "$project_root" \
-    "$project_file" \
-    "${forwarded_args[@]}"
+bootstrap_args=(
+    "$libraries_root"
+    "$libraries_root/Tools"
+    "$build_root"
+    "$project_root"
+    "$project_file"
+)
+if ((${#forwarded_args[@]} > 0)); then
+    bootstrap_args+=("${forwarded_args[@]}")
+fi
+
+"$bootstrap_exe" "${bootstrap_args[@]}"
