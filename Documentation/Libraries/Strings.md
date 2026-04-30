@@ -170,6 +170,6 @@ we will investigate if there OS functions allowing to achieve that functionality
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 1019			| 1075		| 2094	|
-| Sources   | 3041			| 396		| 3437	|
-| Sum       | 4060			| 1471		| 5531	|
+| Headers   | 1012			| 1081		| 2093	|
+| Sources   | 3114			| 398		| 3512	|
+| Sum       | 4126			| 1479		| 5605	|

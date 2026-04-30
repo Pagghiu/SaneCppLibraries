@@ -46,5 +46,5 @@ Some relevant blog posts are:
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 82			| 73		| 155	|
-| Sources   | 352			| 68		| 420	|
-| Sum       | 434			| 141		| 575	|
+| Sources   | 358			| 68		| 426	|
+| Sum       | 440			| 141		| 581	|

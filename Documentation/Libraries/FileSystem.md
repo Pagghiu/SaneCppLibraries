@@ -161,5 +161,5 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 177			| 289		| 466	|
-| Sources   | 1802			| 276		| 2078	|
-| Sum       | 1979			| 565		| 2544	|
+| Sources   | 1800			| 276		| 2076	|
+| Sum       | 1977			| 565		| 2542	|

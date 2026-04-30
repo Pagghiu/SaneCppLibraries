@@ -111,5 +111,5 @@ Some relevant blog posts are:
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 664			| 229		| 893	|
-| Sources   | 2090			| 335		| 2425	|
-| Sum       | 2754			| 564		| 3318	|
+| Sources   | 2092			| 335		| 2427	|
+| Sum       | 2756			| 564		| 3320	|

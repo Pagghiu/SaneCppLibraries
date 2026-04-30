@@ -144,5 +144,5 @@ any system or compiler header.
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 368			| 231		| 599	|
-| Sources   | 1477			| 259		| 1736	|
-| Sum       | 1845			| 490		| 2335	|
+| Sources   | 1516			| 269		| 1785	|
+| Sum       | 1884			| 500		| 2384	|

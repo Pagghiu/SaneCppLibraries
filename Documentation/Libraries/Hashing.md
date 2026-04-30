@@ -40,5 +40,5 @@ The library is very simple it it has what is needed so far (mainly by [Build](@r
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 90			| 97		| 187	|
-| Sources   | 267			| 51		| 318	|
-| Sum       | 357			| 148		| 505	|
+| Sources   | 286			| 51		| 337	|
+| Sum       | 376			| 148		| 524	|
