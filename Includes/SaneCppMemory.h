@@ -1,3 +1,6 @@
+#include "../Libraries/Memory/Buffer.h"
 #include "../Libraries/Memory/Globals.h"
+#include "../Libraries/Memory/Memory.h"
+#include "../Libraries/Memory/Segment.h"
 #include "../Libraries/Memory/String.h"
 #include "../Libraries/Memory/VirtualMemory.h"

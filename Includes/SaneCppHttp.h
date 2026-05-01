@@ -1,6 +1,8 @@
 #include "../Libraries/Http/HttpAsyncClient.h"
 #include "../Libraries/Http/HttpAsyncFileServer.h"
 #include "../Libraries/Http/HttpAsyncServer.h"
+#include "../Libraries/Http/HttpConnection.h"
+#include "../Libraries/Http/HttpExport.h"
 #include "../Libraries/Http/HttpMultipartParser.h"
 #include "../Libraries/Http/HttpParser.h"
 #include "../Libraries/Http/HttpURLParser.h"
