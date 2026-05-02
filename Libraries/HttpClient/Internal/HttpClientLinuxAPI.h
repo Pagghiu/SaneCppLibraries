@@ -44,13 +44,20 @@ typedef int CURLoption;
 #define CURLOPT_HEADERDATA       (CURLOPTTYPE_OBJECTPOINT + 29)
 #define CURLOPT_TIMEOUT_MS       (CURLOPTTYPE_LONG + 155)
 #define CURLOPT_FOLLOWLOCATION   (CURLOPTTYPE_LONG + 52)
+#define CURLOPT_MAXREDIRS        (CURLOPTTYPE_LONG + 68)
+#define CURLOPT_SSL_VERIFYPEER   (CURLOPTTYPE_LONG + 64)
+#define CURLOPT_CAINFO           (CURLOPTTYPE_OBJECTPOINT + 65)
+#define CURLOPT_SSL_VERIFYHOST   (CURLOPTTYPE_LONG + 81)
 #define CURLOPT_NOPROGRESS       (CURLOPTTYPE_LONG + 43)
 #define CURLOPT_XFERINFOFUNCTION (CURLOPTTYPE_FUNCTIONPOINT + 219)
 #define CURLOPT_XFERINFODATA     (CURLOPTTYPE_OBJECTPOINT + 57)
 
 typedef int CURLINFO;
+#define CURLINFO_STRING          0x100000
 #define CURLINFO_LONG            0x200000
+#define CURLINFO_EFFECTIVE_URL   (CURLINFO_STRING + 1)
 #define CURLINFO_RESPONSE_CODE   (CURLINFO_LONG + 2)
+#define CURLINFO_REDIRECT_COUNT  (CURLINFO_LONG + 20)
 
 #define CURL_READFUNC_ABORT 0x10000000
 
@@ -76,6 +83,7 @@ struct HttpClientLinuxLibCurlLoader
     int (*curl_easy_setopt_long)(CURL*, int, long)                           = nullptr;
     int (*curl_easy_setopt_ptr)(CURL*, int, const void*)                     = nullptr;
     int (*curl_easy_getinfo_long)(CURL*, int, long*)                         = nullptr;
+    int (*curl_easy_getinfo_ptr)(CURL*, int, void*)                          = nullptr;
     struct curl_slist* (*curl_slist_append)(struct curl_slist*, const char*) = nullptr;
     void (*curl_slist_free_all)(struct curl_slist*)                          = nullptr;
 
@@ -109,6 +117,7 @@ struct HttpClientLinuxLibCurlLoader
 
         auto getinfo           = reinterpret_cast<void*>(::dlsym(libcurlHandle, "curl_easy_getinfo"));
         curl_easy_getinfo_long = reinterpret_cast<decltype(curl_easy_getinfo_long)>(getinfo);
+        curl_easy_getinfo_ptr  = reinterpret_cast<decltype(curl_easy_getinfo_ptr)>(getinfo);
 
         // Verify essential symbols
         if (curl_easy_init == nullptr or curl_easy_cleanup == nullptr or curl_easy_perform == nullptr)

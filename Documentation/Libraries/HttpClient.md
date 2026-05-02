@@ -25,14 +25,18 @@
 The API is stabilizing and the streaming core is in place, but consider everything HIGHLY experimental.
 
 # Description
-HttpClient is designed to stay allocation-free by relying on caller-provided buffers and queues. The core library is poll-driven and independent from `Async`, `AsyncStreams`, `Threading`, and `Time`. Response headers are written into a user-provided buffer, while response body chunks are delivered during `poll()` through a small listener interface.
+HttpClient is designed to stay allocation-free by relying on caller-provided buffers and queues. The core library is poll-driven and independent from `Async`, `AsyncStreams`, `Threading`, and `Time`. Response headers and transport metadata are written into user-provided buffers, while response body chunks are delivered during `poll()` through a small listener interface.
 
-Request bodies can be passed as a fixed span or streamed by implementing a pull-based provider with an explicit `Content-Length`. For stream-first integration there is a separate `SC::HttpClientAsyncT<T_AsyncEventLoop, T_AsyncStreams>` adapter that translates the same core operation into `AsyncReadableStream` and `AsyncWritableStream`.
+`HttpClientRequest` groups caller-owned headers, body, and transport options into one request object. Request bodies can be passed as a fixed span or streamed by providing a pull-based `HttpClientRequestBodyProvider` with an explicit size. Redirect, timeout, TLS, and protocol concerns are grouped under `HttpClientRequestOptions`.
+
+For stream-first integration there is a separate `SC::HttpClientAsyncT<T_AsyncEventLoop, T_AsyncStreams>` adapter that translates the same core operation into `AsyncReadableStream` and `AsyncWritableStream`.
 
 Current limitations:
-- One in-flight request per `SC::HttpClient`
+- One in-flight request per `SC::HttpClientOperation`
+- Multiple `HttpClientOperation` instances can share one `SC::HttpClient`
 - Chunked request bodies are not fully supported on all backends
-- Redirects disabled by default
+- Non-default protocol preference is not fully implemented yet
+- Some TLS customizations fail fast on backends that do not support them yet
 - HTTP/2 only when provided by the OS backend
 
 # Details
@@ -95,11 +99,10 @@ Some relevant blog posts are:
 
 🟨 MVP
 - Chunked transfer encoding for request bodies
-- Multi-inflight support (one client managing multiple concurrent requests)
 
 🟩 Usable Features:
-- Expanded redirect policy controls
-- Optional TLS configuration hooks
+- Expanded protocol controls
+- Broader TLS customization parity
 
 🟦 Complete Features:
 - Pluggable backend selection

@@ -18,6 +18,84 @@ namespace SC
 //! @addtogroup group_http_client
 //! @{
 
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestBodyProvider;
+
+/// @brief One outgoing request header
+struct SC_HTTP_CLIENT_EXPORT HttpClientHeader
+{
+    StringSpan name;
+    StringSpan value;
+};
+
+/// @brief Outgoing request body description
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestBody
+{
+    Span<const char>               bytes;
+    HttpClientRequestBodyProvider* provider = nullptr;
+
+    uint64_t sizeInBytes = 0; ///< Required for streamed bodies
+    bool     canReplay   = false;
+
+    [[nodiscard]] bool isStreamed() const
+    {
+        return provider != nullptr or (bytes.sizeInBytes() == 0 and sizeInBytes > 0);
+    }
+    [[nodiscard]] uint64_t getDeclaredSizeInBytes() const
+    {
+        return isStreamed() ? sizeInBytes : static_cast<uint64_t>(bytes.sizeInBytes());
+    }
+};
+
+/// @brief Redirect handling policy for one request
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestRedirectOptions
+{
+    enum Mode : uint8_t
+    {
+        NoRedirects,
+        FollowGetHead,
+        FollowAll,
+    };
+
+    Mode    mode         = NoRedirects;
+    uint8_t maxRedirects = 10;
+};
+
+/// @brief Timeout policy for one request
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestTimeoutOptions
+{
+    uint32_t requestTimeoutMs = 30000; ///< Request timeout in milliseconds (0 = no timeout)
+};
+
+/// @brief TLS policy for one request
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestTlsOptions
+{
+    bool       verifyPeer = true;
+    StringSpan caCertificatesPath;
+};
+
+/// @brief HTTP protocol preference for one request
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestProtocolOptions
+{
+    enum Preference : uint8_t
+    {
+        Default,
+        Http11Only,
+        Http2Preferred,
+        Http2Required,
+    };
+
+    Preference preference = Default;
+};
+
+/// @brief Extended request options grouped by transport concern
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestOptions
+{
+    HttpClientRequestRedirectOptions redirect;
+    HttpClientRequestTimeoutOptions  timeouts;
+    HttpClientRequestTlsOptions      tls;
+    HttpClientRequestProtocolOptions protocol;
+};
+
 /// @brief Configuration for an outgoing HTTP request
 struct SC_HTTP_CLIENT_EXPORT HttpClientRequest
 {
@@ -36,15 +114,9 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientRequest
 
     StringSpan url; ///< Full URL including scheme (e.g. "https://example.com/path")
 
-    Span<const StringSpan> headerNames;
-    Span<const StringSpan> headerValues;
-
-    Span<const char> body; ///< Fixed request body
-
-    uint64_t streamedBodySize = 0; ///< If > 0, caller must provide a HttpClientRequestBodyProvider
-
-    uint32_t timeoutMs      = 30000; ///< Request timeout in milliseconds (0 = no timeout)
-    bool     allowRedirects = false;
+    Span<const HttpClientHeader> headers;
+    HttpClientRequestBody        body;
+    HttpClientRequestOptions     options;
 };
 
 /// @brief Parsed response metadata filled when headers arrive
@@ -61,8 +133,10 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientResponse
 
     Span<const char> headers;
 
-    size_t   headersLength      = 0;
-    Protocol negotiatedProtocol = Protocol::Unknown;
+    size_t     headersLength      = 0;
+    Protocol   negotiatedProtocol = Protocol::Unknown;
+    StringSpan effectiveUrl;
+    uint32_t   redirectCount = 0;
 
     [[nodiscard]] bool getHeader(StringSpan name, StringSpan& value) const;
 };
@@ -148,6 +222,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperationMemory
 
     Span<char> responseBufferMemory; ///< Optional; split equally into responseBuffers if non-empty
     Span<char> responseHeaders;
+    Span<char> responseMetadata;
     Span<char> backendScratch;
 };
 
@@ -223,11 +298,9 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
     /// @param request Request metadata
     /// @param response Parsed response metadata storage updated as the request progresses
     /// @param listener Optional poll-driven response listener
-    /// @param bodyProvider Optional request body provider for streamed uploads
     /// @return `Result(true)` on success, otherwise the start error
     [[nodiscard]] Result start(const HttpClientRequest& request, HttpClientResponse& response,
-                               HttpClientOperationListener*   listener     = nullptr,
-                               HttpClientRequestBodyProvider* bodyProvider = nullptr);
+                               HttpClientOperationListener* listener = nullptr);
 
     /// @brief Processes queued backend events and optionally waits for more work
     /// @param timeoutMilliseconds Maximum time to wait for new events, `0` for non-blocking polling
@@ -266,24 +339,27 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperation
     void enqueueResponseComplete();
     void enqueueError(Result error);
 
-    void resetResponseState(HttpClientResponse& response);
-    void resetRequestBodyState();
+    void   resetResponseState(HttpClientResponse& response);
+    void   resetRequestBodyState();
+    bool   isAutomaticRedirectEnabled() const;
+    bool   canAutomaticRedirectRequestReplay() const;
+    Result copyResponseEffectiveUrl(StringSpan url);
 
     size_t readRequestBodyChunk(Span<char> dest, Result& outError, bool& outEnd);
     bool   hasPendingEvents() const;
     Result processPendingEvents();
 
-    HttpClient*                    client              = nullptr;
-    HttpClientResponse*            currentResponse     = nullptr;
-    HttpClientOperationListener*   currentListener     = nullptr;
-    HttpClientRequestBodyProvider* currentBodyProvider = nullptr;
-    HttpClientOperationNotifier*   notifier            = nullptr;
-    HttpClientRequest              currentRequest;
+    HttpClient*                  client          = nullptr;
+    HttpClientResponse*          currentResponse = nullptr;
+    HttpClientOperationListener* currentListener = nullptr;
+    HttpClientOperationNotifier* notifier        = nullptr;
+    HttpClientRequest            currentRequest;
 
     Span<HttpClientResponseBuffer> responseBuffers;
     Span<HttpClientOperationEvent> eventQueue;
 
     Span<char> responseHeaders;
+    Span<char> responseMetadata;
     Span<char> backendScratch;
 
     mutable HttpClientLocalMutex     eventMutex;

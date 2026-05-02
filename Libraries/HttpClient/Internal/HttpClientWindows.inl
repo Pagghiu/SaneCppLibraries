@@ -240,24 +240,41 @@ SC::Result SC::HttpClientOperation::platformStart()
                 return 0;
             }
 
-            if (operation->currentRequest.timeoutMs > 0)
+            if (operation->currentRequest.options.timeouts.requestTimeoutMs > 0)
             {
-                const int timeoutMs = static_cast<int>(operation->currentRequest.timeoutMs);
+                const int timeoutMs = static_cast<int>(operation->currentRequest.options.timeouts.requestTimeoutMs);
                 WinHttpSetTimeouts(internalRef.hRequest, timeoutMs, timeoutMs, timeoutMs, timeoutMs);
             }
 
-            DWORD redirectPolicy = operation->currentRequest.allowRedirects ? WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS
-                                                                            : WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
+            DWORD redirectPolicy = operation->isAutomaticRedirectEnabled() ? WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS
+                                                                           : WINHTTP_OPTION_REDIRECT_POLICY_NEVER;
             (void)WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_REDIRECT_POLICY, &redirectPolicy,
                                    sizeof(redirectPolicy));
+            DWORD maxRedirects = operation->currentRequest.options.redirect.maxRedirects;
+            (void)WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_MAX_HTTP_AUTOMATIC_REDIRECTS, &maxRedirects,
+                                   sizeof(maxRedirects));
+
+            if (operation->currentRequest.options.tls.caCertificatesPath.sizeInBytes() > 0)
+            {
+                operation->enqueueError(Result::Error("HttpClient: WinHTTP custom CA path not supported"));
+                internalRef.workerRunning = false;
+                return 0;
+            }
+            if (not operation->currentRequest.options.tls.verifyPeer)
+            {
+                DWORD securityFlags = SECURITY_FLAG_IGNORE_UNKNOWN_CA | SECURITY_FLAG_IGNORE_CERT_DATE_INVALID |
+                                      SECURITY_FLAG_IGNORE_CERT_CN_INVALID | SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE;
+                (void)WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_SECURITY_FLAGS, &securityFlags,
+                                       sizeof(securityFlags));
+            }
 
             wchar_t*     headerLine = wideScratch;
             const size_t headerCap  = wideCap;
-            for (size_t idx = 0; idx < operation->currentRequest.headerNames.sizeInElements(); ++idx)
+            for (size_t idx = 0; idx < operation->currentRequest.headers.sizeInElements(); ++idx)
             {
                 const int nameLen =
-                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headerNames[idx].toCharSpan().data(),
-                                        static_cast<int>(operation->currentRequest.headerNames[idx].sizeInBytes()),
+                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headers[idx].name.toCharSpan().data(),
+                                        static_cast<int>(operation->currentRequest.headers[idx].name.sizeInBytes()),
                                         headerLine, static_cast<int>(headerCap));
                 if (nameLen <= 0 or static_cast<size_t>(nameLen + 3) >= headerCap)
                 {
@@ -266,8 +283,8 @@ SC::Result SC::HttpClientOperation::platformStart()
                 headerLine[nameLen]     = L':';
                 headerLine[nameLen + 1] = L' ';
                 const int valueLen =
-                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headerValues[idx].toCharSpan().data(),
-                                        static_cast<int>(operation->currentRequest.headerValues[idx].sizeInBytes()),
+                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headers[idx].value.toCharSpan().data(),
+                                        static_cast<int>(operation->currentRequest.headers[idx].value.sizeInBytes()),
                                         headerLine + nameLen + 2, static_cast<int>(headerCap - nameLen - 2));
                 if (valueLen <= 0)
                 {
@@ -278,23 +295,23 @@ SC::Result SC::HttpClientOperation::platformStart()
                                                WINHTTP_ADDREQ_FLAG_ADD);
             }
 
-            DWORD requestBodyLength = static_cast<DWORD>(operation->currentRequest.body.sizeInBytes());
-            if (operation->currentRequest.streamedBodySize > 0)
+            DWORD requestBodyLength = static_cast<DWORD>(operation->currentRequest.body.bytes.sizeInBytes());
+            if (operation->currentRequest.body.isStreamed())
             {
-                if (operation->currentRequest.streamedBodySize > 0xFFFFFFFFu)
+                if (operation->currentRequest.body.sizeInBytes > 0xFFFFFFFFu)
                 {
                     operation->enqueueError(Result::Error("HttpClient: streamed body too large for WinHTTP"));
                     internalRef.workerRunning = false;
                     return 0;
                 }
-                requestBodyLength = static_cast<DWORD>(operation->currentRequest.streamedBodySize);
+                requestBodyLength = static_cast<DWORD>(operation->currentRequest.body.sizeInBytes);
             }
 
             const BOOL sent = WinHttpSendRequest(internalRef.hRequest, WINHTTP_NO_ADDITIONAL_HEADERS, 0,
-                                                 operation->currentRequest.body.sizeInBytes() > 0
-                                                     ? const_cast<char*>(operation->currentRequest.body.data())
+                                                 operation->currentRequest.body.bytes.sizeInBytes() > 0
+                                                     ? const_cast<char*>(operation->currentRequest.body.bytes.data())
                                                      : WINHTTP_NO_REQUEST_DATA,
-                                                 operation->currentRequest.streamedBodySize > 0 ? 0 : requestBodyLength,
+                                                 operation->currentRequest.body.isStreamed() ? 0 : requestBodyLength,
                                                  requestBodyLength, 0);
             if (not sent)
             {
@@ -303,7 +320,7 @@ SC::Result SC::HttpClientOperation::platformStart()
                 return 0;
             }
 
-            if (operation->currentRequest.streamedBodySize > 0)
+            if (operation->currentRequest.body.isStreamed())
             {
                 char*  chunkData = reinterpret_cast<char*>(operation->backendScratch.data());
                 size_t chunkSize = operation->backendScratch.sizeInBytes();
@@ -355,6 +372,7 @@ SC::Result SC::HttpClientOperation::platformStart()
                                       WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
             operation->currentResponse->statusCode         = static_cast<int>(statusCode);
             operation->currentResponse->negotiatedProtocol = HttpClientResponse::Protocol::Http11;
+            operation->currentResponse->redirectCount      = 0;
 
             DWORD rawHeaderBytes = 0;
             (void)WinHttpQueryHeaders(internalRef.hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF,
@@ -372,6 +390,23 @@ SC::Result SC::HttpClientOperation::platformStart()
                         static_cast<int>(operation->currentResponse->headers.sizeInBytes()), NULL, NULL);
                     operation->currentResponse->headersLength = static_cast<size_t>(utf8Len > 0 ? utf8Len : 0);
                 }
+            }
+
+            wchar_t* effectiveUrl = nullptr;
+            DWORD    effectiveLen = sizeof(effectiveUrl);
+            if (WinHttpQueryOption(internalRef.hRequest, WINHTTP_OPTION_URL, &effectiveUrl, &effectiveLen) and
+                effectiveUrl != nullptr)
+            {
+                const int utf8Len = WideCharToMultiByte(CP_UTF8, 0, effectiveUrl, -1, NULL, 0, NULL, NULL);
+                if (utf8Len > 1 and static_cast<size_t>(utf8Len - 1) <= operation->responseMetadata.sizeInBytes())
+                {
+                    (void)WideCharToMultiByte(CP_UTF8, 0, effectiveUrl, -1, operation->responseMetadata.data(),
+                                              static_cast<int>(operation->responseMetadata.sizeInBytes()), NULL, NULL);
+                    (void)operation->copyResponseEffectiveUrl(
+                        StringSpan({operation->responseMetadata.data(), static_cast<size_t>(utf8Len - 1)}, false,
+                                   operation->currentRequest.url.getEncoding()));
+                }
+                GlobalFree(effectiveUrl);
             }
 
             operation->enqueueResponseHead();

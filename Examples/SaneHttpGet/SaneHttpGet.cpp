@@ -35,8 +35,9 @@ Result saneMain(Span<StringSpan> args)
     console.print("GET {}\n", urlArg);
 
     HttpClientRequest request;
-    request.url       = urlArg;
-    request.timeoutMs = 30000;
+    request.url = urlArg;
+
+    request.options.timeouts.requestTimeoutMs = 30000;
 
     HttpClientResponse       response;
     HttpClientResponseBuffer responseBuffers[16];
@@ -47,6 +48,7 @@ Result saneMain(Span<StringSpan> args)
     char bodyBuf[256 * 1024]; // 256 KB max response body
     char responseMemory[64 * 1024];
     char headerBuf[8 * 1024];
+    char metadataBuf[4 * 1024];
     char backendScratch[16 * 1024];
 
     HttpClientOperationMemory operationMemory;
@@ -54,6 +56,7 @@ Result saneMain(Span<StringSpan> args)
     operationMemory.responseBufferMemory = {responseMemory, sizeof(responseMemory)};
     operationMemory.eventQueue           = {eventQueue, 32};
     operationMemory.responseHeaders      = {headerBuf, sizeof(headerBuf)};
+    operationMemory.responseMetadata     = {metadataBuf, sizeof(metadataBuf)};
     operationMemory.backendScratch       = {backendScratch, sizeof(backendScratch)};
 
     Result res =
@@ -66,6 +69,7 @@ Result saneMain(Span<StringSpan> args)
     }
 
     console.print("Status: {}\n", response.statusCode);
+    console.print("Effective URL: {}\n", StringView(response.effectiveUrl));
     console.print("Headers ({} bytes):\n", response.headersLength);
 
     StringView headers({headerBuf, response.headersLength}, false, StringEncoding::Ascii);

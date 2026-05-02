@@ -285,10 +285,35 @@ SC::Result SC::HttpClientOperation::platformStart()
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CUSTOMREQUEST, getCustomMethod(currentRequest.method));
     }
 
-    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_FOLLOWLOCATION, currentRequest.allowRedirects ? 1L : 0L);
-    if (currentRequest.timeoutMs > 0)
+    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_FOLLOWLOCATION, isAutomaticRedirectEnabled() ? 1L : 0L);
+    session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_MAXREDIRS, currentRequest.options.redirect.maxRedirects);
+    if (currentRequest.options.timeouts.requestTimeoutMs > 0)
     {
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_TIMEOUT_MS, static_cast<long>(currentRequest.timeoutMs));
+        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_TIMEOUT_MS,
+                                           static_cast<long>(currentRequest.options.timeouts.requestTimeoutMs));
+    }
+
+    if (not currentRequest.options.tls.verifyPeer)
+    {
+        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
+        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
+    if (currentRequest.options.tls.caCertificatesPath.sizeInBytes() > 0)
+    {
+        if (currentRequest.options.tls.caCertificatesPath.isNullTerminated())
+        {
+            session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CAINFO,
+                                              currentRequest.options.tls.caCertificatesPath.bytesIncludingTerminator());
+        }
+        else
+        {
+            const Span<const char> caInfo = currentRequest.options.tls.caCertificatesPath.toCharSpan();
+            SC_TRY_MSG(backendScratch.sizeInBytes() > caInfo.sizeInBytes(),
+                       "HttpClient: backend scratch too small for CA path");
+            memcpy(backendScratch.data(), caInfo.data(), caInfo.sizeInBytes());
+            backendScratch[caInfo.sizeInBytes()] = '\0';
+            session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_CAINFO, backendScratch.data());
+        }
     }
 
     session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_NOPROGRESS, 0L);
@@ -309,16 +334,16 @@ SC::Result SC::HttpClientOperation::platformStart()
         session.curl.curl_slist_free_all(internal.requestHeaders);
         internal.requestHeaders = nullptr;
     }
-    for (size_t idx = 0; idx < currentRequest.headerNames.sizeInElements(); ++idx)
+    for (size_t idx = 0; idx < currentRequest.headers.sizeInElements(); ++idx)
     {
-        const size_t nameLen = currentRequest.headerNames[idx].sizeInBytes();
-        const size_t valLen  = currentRequest.headerValues[idx].sizeInBytes();
+        const size_t nameLen = currentRequest.headers[idx].name.sizeInBytes();
+        const size_t valLen  = currentRequest.headers[idx].value.sizeInBytes();
         SC_TRY_MSG(nameLen + valLen + 3 < backendScratch.sizeInBytes(),
                    "HttpClient: backend scratch too small for headers");
-        memcpy(backendScratch.data(), currentRequest.headerNames[idx].toCharSpan().data(), nameLen);
+        memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
         backendScratch[nameLen]     = ':';
         backendScratch[nameLen + 1] = ' ';
-        memcpy(backendScratch.data() + nameLen + 2, currentRequest.headerValues[idx].toCharSpan().data(), valLen);
+        memcpy(backendScratch.data() + nameLen + 2, currentRequest.headers[idx].value.toCharSpan().data(), valLen);
         backendScratch[nameLen + 2 + valLen] = '\0';
         internal.requestHeaders = session.curl.curl_slist_append(internal.requestHeaders, backendScratch.data());
     }
@@ -327,12 +352,12 @@ SC::Result SC::HttpClientOperation::platformStart()
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_HTTPHEADER, internal.requestHeaders);
     }
 
-    if (currentRequest.streamedBodySize > 0)
+    if (currentRequest.body.isStreamed())
     {
-        SC_TRY_MSG(currentRequest.streamedBodySize <= static_cast<uint64_t>(LONG_MAX),
+        SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
                    "HttpClient: streamed body too large for libcurl");
         session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
-                                           static_cast<long>(currentRequest.streamedBodySize));
+                                           static_cast<long>(currentRequest.body.sizeInBytes));
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READFUNCTION,
                                           reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlReadCallback));
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READDATA, this);
@@ -341,11 +366,11 @@ SC::Result SC::HttpClientOperation::platformStart()
             session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
         }
     }
-    else if (currentRequest.body.sizeInBytes() > 0)
+    else if (currentRequest.body.bytes.sizeInBytes() > 0)
     {
-        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_POSTFIELDS, currentRequest.body.data());
+        session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_POSTFIELDS, currentRequest.body.bytes.data());
         session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
-                                           static_cast<long>(currentRequest.body.sizeInBytes()));
+                                           static_cast<long>(currentRequest.body.bytes.sizeInBytes()));
         if (currentRequest.method == HttpClientRequest::HttpPOST)
         {
             session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
@@ -370,6 +395,19 @@ SC::Result SC::HttpClientOperation::platformStart()
                 sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
                 operation->currentResponse->statusCode         = static_cast<int>(httpCode);
                 operation->currentResponse->negotiatedProtocol = HttpClientResponse::Protocol::Http11;
+                long redirectCount                             = 0;
+                (void)sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_REDIRECT_COUNT,
+                                                             &redirectCount);
+                operation->currentResponse->redirectCount =
+                    static_cast<uint32_t>(redirectCount < 0 ? 0 : redirectCount);
+                char* effectiveUrl = nullptr;
+                if (sessionRef.curl.curl_easy_getinfo_ptr(internalRef.curlHandle, CURLINFO_EFFECTIVE_URL,
+                                                          &effectiveUrl) == CURLE_OK and
+                    effectiveUrl != nullptr)
+                {
+                    (void)operation->copyResponseEffectiveUrl(
+                        StringSpan::fromNullTerminated(effectiveUrl, operation->currentRequest.url.getEncoding()));
+                }
                 operation->enqueueResponseHead();
             }
 

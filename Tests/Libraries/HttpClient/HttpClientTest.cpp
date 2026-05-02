@@ -58,6 +58,22 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             blockingTimeout();
         }
+        if (test_section("redirect policy"))
+        {
+            redirectPolicy();
+        }
+        if (test_section("cancel"))
+        {
+            cancelRequest();
+        }
+        if (test_section("method coverage"))
+        {
+            methodCoverage();
+        }
+        if (test_section("streamed body size validation"))
+        {
+            streamedBodySizeValidation();
+        }
         if (test_section("poll GET local"))
         {
             pollGet();
@@ -125,6 +141,7 @@ struct SC::HttpClientTest : public SC::TestCase
 
         char responseMemory[ResponseBytes];
         char responseHeaders[HeaderBytes];
+        char responseMetadata[4096];
         char backendScratch[ScratchBytes];
 
         CoreOperationMemory()
@@ -133,6 +150,7 @@ struct SC::HttpClientTest : public SC::TestCase
             memory.responseBufferMemory = {responseMemory, sizeof(responseMemory)};
             memory.eventQueue           = {eventQueue, EventQueueSize};
             memory.responseHeaders      = {responseHeaders, sizeof(responseHeaders)};
+            memory.responseMetadata     = {responseMetadata, sizeof(responseMetadata)};
             memory.backendScratch       = {backendScratch, sizeof(backendScratch)};
         }
     };
@@ -152,6 +170,7 @@ struct SC::HttpClientTest : public SC::TestCase
 
         char responseMemory[ResponseBytes];
         char responseHeaders[HeaderBytes];
+        char responseMetadata[4096];
         char backendScratch[ScratchBytes];
 
         AsyncOperationMemory()
@@ -160,6 +179,7 @@ struct SC::HttpClientTest : public SC::TestCase
             coreMemory.responseBufferMemory = {responseMemory, sizeof(responseMemory)};
             coreMemory.eventQueue           = {eventQueue, EventQueueSize};
             coreMemory.responseHeaders      = {responseHeaders, sizeof(responseHeaders)};
+            coreMemory.responseMetadata     = {responseMetadata, sizeof(responseMetadata)};
             coreMemory.backendScratch       = {backendScratch, sizeof(backendScratch)};
 
             asyncMemory.responseBuffers      = {asyncResponseBuffers, NumResponseBuffers};
@@ -301,7 +321,6 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
             SC_TEST_EXPECT(client.response.end());
         };
-
         Thread clientThread;
         SC_TEST_EXPECT(clientThread.start(
             [&](Thread&)
@@ -363,9 +382,9 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[1024] = {};
                 size_t             bodyLength = 0;
 
-                request.url    = server.endpoint.view();
-                request.method = HttpClientRequest::HttpPOST;
-                request.body   = {"HelloBody", 9};
+                request.url        = server.endpoint.view();
+                request.method     = HttpClientRequest::HttpPOST;
+                request.body.bytes = {"HelloBody", 9};
 
                 SC_TEST_EXPECT(
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
@@ -409,12 +428,10 @@ struct SC::HttpClientTest : public SC::TestCase
 
                 CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
 
-                StringSpan        headerName  = "X-Test"_a8;
-                StringSpan        headerValue = "HeaderValue"_a8;
+                HttpClientHeader  header = {"X-Test"_a8, "HeaderValue"_a8};
                 HttpClientRequest request;
-                request.url          = server.endpoint.view();
-                request.headerNames  = {&headerName, 1};
-                request.headerValues = {&headerValue, 1};
+                request.url     = server.endpoint.view();
+                request.headers = {&header, 1};
 
                 HttpClientResponse response;
                 char               body[64]   = {};
@@ -460,12 +477,256 @@ struct SC::HttpClientTest : public SC::TestCase
                 char               body[64]   = {};
                 size_t             bodyLength = 0;
 
-                request.url       = server.endpoint.view();
-                request.timeoutMs = 100;
+                request.url                               = server.endpoint.view();
+                request.options.timeouts.requestTimeoutMs = 100;
 
                 SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
                                                                memory.memory));
                 SC_TEST_EXPECT(client.close());
+            }));
+
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void redirectPolicy()
+    {
+        struct DummyBodyProvider final : public HttpClientRequestBodyProvider
+        {
+            Result pullRequestBody(Span<char>, size_t& bytesWritten, bool& endReached) override
+            {
+                bytesWritten = 0;
+                endReached   = true;
+                return Result(true);
+            }
+        };
+        DummyBodyProvider dummyBodyProvider;
+
+        HttpClient client;
+        SC_TEST_EXPECT(client.init());
+
+        CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+        HttpClientOperation                                    operation;
+        SC_TEST_EXPECT(operation.init(client, memory.memory));
+
+        {
+            HttpClientRequest request;
+            request.url                   = "http://127.0.0.1:1/redirect"_a8;
+            request.method                = HttpClientRequest::HttpPOST;
+            request.options.redirect.mode = HttpClientRequestRedirectOptions::FollowGetHead;
+
+            HttpClientResponse response;
+            SC_TEST_EXPECT(not operation.start(request, response));
+        }
+
+        {
+            HttpClientRequest request;
+            request.url                   = "http://127.0.0.1:1/redirect"_a8;
+            request.method                = HttpClientRequest::HttpPOST;
+            request.options.redirect.mode = HttpClientRequestRedirectOptions::FollowAll;
+            request.body.provider         = &dummyBodyProvider;
+            request.body.sizeInBytes      = 4;
+            request.body.canReplay        = false;
+
+            HttpClientResponse response;
+            SC_TEST_EXPECT(not operation.start(request, response));
+        }
+
+        SC_TEST_EXPECT(operation.close());
+        SC_TEST_EXPECT(client.close());
+    }
+
+    void cancelRequest()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+
+        TestServer server(loop);
+        SC_TEST_EXPECT(server.start(report));
+        server.server.onRequest = [](HttpConnection&) {};
+
+        Thread clientThread;
+        SC_TEST_EXPECT(clientThread.start(
+            [&](Thread&)
+            {
+                HttpClient client;
+                SC_TEST_EXPECT(client.init());
+
+                CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+                HttpClientOperation                                    operation;
+                SC_TEST_EXPECT(operation.init(client, memory.memory));
+
+                HttpClientRequest  request;
+                HttpClientResponse response;
+                char               body[64] = {};
+
+                PollResponseCollector collector;
+                collector.bodyBuffer = {body, sizeof(body)};
+
+                request.url = server.endpoint.view();
+                SC_TEST_EXPECT(operation.start(request, response, &collector));
+                SC_TEST_EXPECT(operation.cancel());
+                while (not collector.completed)
+                {
+                    SC_TEST_EXPECT(operation.poll(50));
+                }
+
+                SC_TEST_EXPECT(not collector.finalRes);
+                SC_TEST_EXPECT(operation.close());
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(server.scheduleStop());
+            }));
+
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void methodCoverage()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+
+        TestServer server(loop);
+        SC_TEST_EXPECT(server.start(report));
+        server.server.onRequest = [this](HttpConnection& client)
+        {
+            const HttpParser::Method method = client.request.getParser().method;
+            SC_TEST_EXPECT(method == HttpParser::Method::HttpPUT);
+            const StringSpan responseBody = "PUT"_a8;
+
+            char      contentLength[16] = {};
+            const int written = snprintf(contentLength, sizeof(contentLength), "%zu", responseBody.sizeInBytes());
+            SC_TEST_EXPECT(written > 0);
+            SC_TEST_EXPECT(client.response.startResponse(200));
+            SC_TEST_EXPECT(
+                client.response.addHeader("Content-Length"_a8, StringSpan({contentLength, static_cast<size_t>(written)},
+                                                                          false, StringEncoding::Ascii)));
+            SC_TEST_EXPECT(client.response.sendHeaders());
+            if (responseBody.sizeInBytes() > 0)
+            {
+                SC_TEST_EXPECT(client.response.getWritableStream().write(responseBody.toCharSpan()));
+            }
+            SC_TEST_EXPECT(client.response.end());
+        };
+
+        Thread clientThread;
+        SC_TEST_EXPECT(clientThread.start(
+            [&](Thread&)
+            {
+                HttpClient client;
+                SC_TEST_EXPECT(client.init());
+
+                CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+                HttpClientRequest  request;
+                HttpClientResponse response;
+                char               body[64]   = {};
+                size_t             bodyLength = 0;
+
+                request.url    = server.endpoint.view();
+                request.method = HttpClientRequest::HttpPUT;
+
+                SC_TEST_EXPECT(
+                    HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
+                SC_TEST_EXPECT(response.statusCode == 200);
+                SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "PUT");
+
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(server.scheduleStop());
+            }));
+
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void streamedBodySizeValidation()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+
+        TestServer server(loop);
+        SC_TEST_EXPECT(server.start(report));
+        server.server.onRequest = [](HttpConnection&) {};
+
+        struct FixedBodyProvider final : public HttpClientRequestBodyProvider
+        {
+            Span<const char> payload;
+
+            bool sent = false;
+
+            Result pullRequestBody(Span<char> dest, size_t& bytesWritten, bool& endReached) override
+            {
+                bytesWritten = 0;
+                endReached   = false;
+                if (sent)
+                {
+                    endReached = true;
+                    return Result(true);
+                }
+
+                const size_t toCopy =
+                    payload.sizeInBytes() < dest.sizeInBytes() ? payload.sizeInBytes() : dest.sizeInBytes();
+                memcpy(dest.data(), payload.data(), toCopy);
+                bytesWritten = toCopy;
+                sent         = true;
+                endReached   = true;
+                return Result(true);
+            }
+        };
+
+        Thread clientThread;
+        SC_TEST_EXPECT(clientThread.start(
+            [&](Thread&)
+            {
+                HttpClient client;
+                SC_TEST_EXPECT(client.init());
+
+                CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+                {
+                    FixedBodyProvider provider;
+                    provider.payload = {"abc", 3};
+
+                    HttpClientRequest  request;
+                    HttpClientResponse response;
+                    char               body[64]   = {};
+                    size_t             bodyLength = 0;
+
+                    request.url              = server.endpoint.view();
+                    request.method           = HttpClientRequest::HttpPOST;
+                    request.body.provider    = &provider;
+                    request.body.sizeInBytes = 5;
+
+                    SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
+                                                                   memory.memory));
+                }
+
+                {
+                    FixedBodyProvider provider;
+                    provider.payload = {"abcdef", 6};
+
+                    HttpClientRequest  request;
+                    HttpClientResponse response;
+                    char               body[64]   = {};
+                    size_t             bodyLength = 0;
+
+                    request.url              = server.endpoint.view();
+                    request.method           = HttpClientRequest::HttpPOST;
+                    request.body.provider    = &provider;
+                    request.body.sizeInBytes = 3;
+
+                    SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
+                                                                   memory.memory));
+                }
+
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(server.scheduleStop());
             }));
 
         SC_TEST_EXPECT(loop.run());
@@ -1033,7 +1294,8 @@ struct SC::HttpClientTest : public SC::TestCase
         HttpClientRequest request;
         request.url              = server.endpoint.view();
         request.method           = HttpClientRequest::HttpPOST;
-        request.streamedBodySize = UploadSize;
+        request.body.sizeInBytes = UploadSize;
+        request.body.canReplay   = true;
 
         HttpClientResponse response;
 

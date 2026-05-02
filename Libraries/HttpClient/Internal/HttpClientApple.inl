@@ -50,9 +50,9 @@ static bool httpClientAppleAsciiEqualsIgnoreCase(SC::StringSpan a, SC::StringSpa
 
 static bool httpClientAppleHasHeader(const SC::HttpClientRequest& request, SC::StringSpan name)
 {
-    for (size_t idx = 0; idx < request.headerNames.sizeInElements(); ++idx)
+    for (size_t idx = 0; idx < request.headers.sizeInElements(); ++idx)
     {
-        if (httpClientAppleAsciiEqualsIgnoreCase(request.headerNames[idx], name))
+        if (httpClientAppleAsciiEqualsIgnoreCase(request.headers[idx].name, name))
         {
             return true;
         }
@@ -92,8 +92,9 @@ struct SC::HttpClientOperation::Internal
     id delegate = nullptr;
     id task     = nullptr;
 
-    id   bodyStream      = nullptr;
-    bool cancelRequested = false;
+    id       bodyStream      = nullptr;
+    bool     cancelRequested = false;
+    uint32_t redirectCount   = 0;
 };
 
 struct SC::HttpClientAppleCallbacks
@@ -280,6 +281,19 @@ struct SC::HttpClientAppleCallbacks
         SC::HttpClientResponse& response = *operation->currentResponse;
         response.statusCode         = static_cast<int>(sc_objc_msgSend<long>(urlResponse, sel_getUid("statusCode")));
         response.negotiatedProtocol = SC::HttpClientResponse::Protocol::Http11;
+        response.redirectCount =
+            reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage)->redirectCount;
+
+        id          url            = sc_objc_msgSend<id>(urlResponse, sel_getUid("URL"));
+        id          absoluteString = sc_objc_msgSend<id>(url, sel_getUid("absoluteString"));
+        const char* urlCStr        = absoluteString != nullptr
+                                         ? sc_objc_msgSend<const char*>(absoluteString, sel_getUid("UTF8String"))
+                                         : nullptr;
+        if (urlCStr != nullptr)
+        {
+            (void)operation->copyResponseEffectiveUrl(
+                SC::StringSpan::fromNullTerminated(urlCStr, operation->currentRequest.url.getEncoding()));
+        }
 
         id            headers = sc_objc_msgSend<id>(urlResponse, sel_getUid("allHeaderFields"));
         id            allKeys = sc_objc_msgSend<id>(headers, sel_getUid("allKeys"));
@@ -369,9 +383,18 @@ struct SC::HttpClientAppleCallbacks
             void (*invoke)(void*, id);
         };
         auto block = reinterpret_cast<BlockLiteral*>(completionHandler);
-        if (operation != nullptr and operation->currentRequest.allowRedirects)
+        if (operation != nullptr and operation->isAutomaticRedirectEnabled())
         {
-            block->invoke(block, newRequest);
+            auto& internal = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
+            if (internal.redirectCount >= operation->currentRequest.options.redirect.maxRedirects)
+            {
+                block->invoke(block, nullptr);
+            }
+            else
+            {
+                internal.redirectCount += 1;
+                block->invoke(block, newRequest);
+            }
         }
         else
         {
@@ -508,6 +531,11 @@ SC::Result SC::HttpClientOperation::platformStart()
 {
     auto& internal           = *reinterpret_cast<Internal*>(storage);
     internal.cancelRequested = false;
+    internal.redirectCount   = 0;
+
+    SC_TRY_MSG(currentRequest.options.tls.verifyPeer, "HttpClient: Apple custom TLS settings not supported");
+    SC_TRY_MSG(currentRequest.options.tls.caCertificatesPath.sizeInBytes() == 0,
+               "HttpClient: Apple custom TLS settings not supported");
 
     id configurationClass = reinterpret_cast<id>(objc_getClass("NSURLSessionConfiguration"));
     id configuration      = sc_objc_msgSend<id>(configurationClass, sel_getUid("ephemeralSessionConfiguration"));
@@ -569,27 +597,27 @@ SC::Result SC::HttpClientOperation::platformStart()
     }
     sc_objc_msgSend<void>(requestObj, sel_getUid("setHTTPMethod:"), methodString);
 
-    if (currentRequest.timeoutMs > 0)
+    if (currentRequest.options.timeouts.requestTimeoutMs > 0)
     {
         sc_objc_msgSend<void>(requestObj, sel_getUid("setTimeoutInterval:"),
-                              static_cast<double>(currentRequest.timeoutMs) / 1000.0);
+                              static_cast<double>(currentRequest.options.timeouts.requestTimeoutMs) / 1000.0);
     }
 
-    for (size_t idx = 0; idx < currentRequest.headerNames.sizeInElements(); ++idx)
+    for (size_t idx = 0; idx < currentRequest.headers.sizeInElements(); ++idx)
     {
         id headerName  = sc_objc_msgSend<id>(reinterpret_cast<id>(objc_getClass("NSString")),
                                              sel_getUid("stringWithBytes:length:encoding:"),
-                                             currentRequest.headerNames[idx].toCharSpan().data(),
-                                             currentRequest.headerNames[idx].sizeInBytes(), NSUTF8StringEncoding);
+                                             currentRequest.headers[idx].name.toCharSpan().data(),
+                                             currentRequest.headers[idx].name.sizeInBytes(), NSUTF8StringEncoding);
         id headerValue = sc_objc_msgSend<id>(reinterpret_cast<id>(objc_getClass("NSString")),
                                              sel_getUid("stringWithBytes:length:encoding:"),
-                                             currentRequest.headerValues[idx].toCharSpan().data(),
-                                             currentRequest.headerValues[idx].sizeInBytes(), NSUTF8StringEncoding);
+                                             currentRequest.headers[idx].value.toCharSpan().data(),
+                                             currentRequest.headers[idx].value.sizeInBytes(), NSUTF8StringEncoding);
         sc_objc_msgSend<void>(requestObj, sel_getUid("setValue:forHTTPHeaderField:"), headerValue, headerName);
     }
 
     const uint64_t declaredBodySize =
-        currentRequest.streamedBodySize > 0 ? currentRequest.streamedBodySize : currentRequest.body.sizeInBytes();
+        currentRequest.body.isStreamed() ? currentRequest.body.sizeInBytes : currentRequest.body.bytes.sizeInBytes();
     if (declaredBodySize > 0 and not httpClientAppleHasHeader(currentRequest, SC::StringSpan("Content-Length")))
     {
         const size_t encodedLength = httpClientAppleWriteUnsigned(declaredBodySize, backendScratch);
@@ -601,7 +629,7 @@ SC::Result SC::HttpClientOperation::platformStart()
                                              encodedLength, NSUTF8StringEncoding);
         sc_objc_msgSend<void>(requestObj, sel_getUid("setValue:forHTTPHeaderField:"), headerValue, headerName);
     }
-    if (currentRequest.streamedBodySize > 0 and not httpClientAppleHasHeader(currentRequest, SC::StringSpan("Expect")))
+    if (currentRequest.body.isStreamed() and not httpClientAppleHasHeader(currentRequest, SC::StringSpan("Expect")))
     {
         id headerName  = sc_objc_msgSend<id>(reinterpret_cast<id>(objc_getClass("NSString")),
                                              sel_getUid("stringWithUTF8String:"), "Expect");
@@ -610,14 +638,14 @@ SC::Result SC::HttpClientOperation::platformStart()
         sc_objc_msgSend<void>(requestObj, sel_getUid("setValue:forHTTPHeaderField:"), headerValue, headerName);
     }
 
-    if (currentRequest.body.sizeInBytes() > 0)
+    if (currentRequest.body.bytes.sizeInBytes() > 0)
     {
         id dataClass = reinterpret_cast<id>(objc_getClass("NSData"));
-        id bodyData  = sc_objc_msgSend<id>(dataClass, sel_getUid("dataWithBytes:length:"), currentRequest.body.data(),
-                                           currentRequest.body.sizeInBytes());
+        id bodyData  = sc_objc_msgSend<id>(dataClass, sel_getUid("dataWithBytes:length:"),
+                                           currentRequest.body.bytes.data(), currentRequest.body.bytes.sizeInBytes());
         sc_objc_msgSend<void>(requestObj, sel_getUid("setHTTPBody:"), bodyData);
     }
-    else if (currentRequest.streamedBodySize > 0)
+    else if (currentRequest.body.isStreamed())
     {
         internal.bodyStream = HttpClientAppleCallbacks::createBodyStream(*this);
         SC_TRY_MSG(internal.bodyStream != nullptr, "HttpClient: failed creating request body stream");

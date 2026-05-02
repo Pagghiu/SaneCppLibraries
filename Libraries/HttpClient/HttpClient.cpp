@@ -316,12 +316,14 @@ SC::Result SC::HttpClientOperation::init(HttpClient& clientValue, const HttpClie
     SC_TRY_MSG(memory.responseBuffers.sizeInElements() > 0, "HttpClientOperation: response buffers missing");
     SC_TRY_MSG(memory.eventQueue.sizeInElements() > 0, "HttpClientOperation: event queue missing");
     SC_TRY_MSG(memory.responseHeaders.sizeInBytes() > 0, "HttpClientOperation: response headers buffer missing");
+    SC_TRY_MSG(memory.responseMetadata.sizeInBytes() > 0, "HttpClientOperation: response metadata buffer missing");
 
-    client          = &clientValue;
-    responseBuffers = memory.responseBuffers;
-    eventQueue      = memory.eventQueue;
-    responseHeaders = memory.responseHeaders;
-    backendScratch  = memory.backendScratch;
+    client           = &clientValue;
+    responseBuffers  = memory.responseBuffers;
+    eventQueue       = memory.eventQueue;
+    responseHeaders  = memory.responseHeaders;
+    responseMetadata = memory.responseMetadata;
+    backendScratch   = memory.backendScratch;
 
     if (memory.responseBufferMemory.sizeInBytes() > 0)
     {
@@ -362,12 +364,11 @@ SC::Result SC::HttpClientOperation::close()
 
     SC_TRY(platformClose());
 
-    client              = nullptr;
-    currentResponse     = nullptr;
-    currentListener     = nullptr;
-    currentBodyProvider = nullptr;
-    currentRequest      = {};
-    notifier            = nullptr;
+    client          = nullptr;
+    currentResponse = nullptr;
+    currentListener = nullptr;
+    currentRequest  = {};
+    notifier        = nullptr;
 
     eventMutex.lock();
     eventHead  = 0;
@@ -398,30 +399,44 @@ SC::Result SC::HttpClientOperation::cancel()
 }
 
 SC::Result SC::HttpClientOperation::start(const HttpClientRequest& request, HttpClientResponse& response,
-                                          HttpClientOperationListener*   listener,
-                                          HttpClientRequestBodyProvider* bodyProvider)
+                                          HttpClientOperationListener* listener)
 {
     SC_TRY_MSG(initialized, "HttpClientOperation: not initialized");
     SC_TRY_MSG(not requestInFlight, "HttpClientOperation: request already in flight");
     SC_TRY_MSG(request.url.sizeInBytes() > 0, "HttpClientOperation: URL is empty");
-    SC_TRY_MSG(not(request.streamedBodySize > 0 and request.body.sizeInBytes() > 0),
-               "HttpClientOperation: body and streamedBodySize both set");
-    SC_TRY_MSG(request.headerNames.sizeInElements() == request.headerValues.sizeInElements(),
-               "HttpClientOperation: mismatched request headers");
-
-    if (request.streamedBodySize > 0)
+    SC_TRY_MSG(not(request.body.isStreamed() and request.body.bytes.sizeInBytes() > 0),
+               "HttpClientOperation: inline and streamed request body both set");
+    if (not request.body.isStreamed())
     {
-        SC_TRY_MSG(bodyProvider != nullptr, "HttpClientOperation: streamed request body requires body provider");
+        SC_TRY_MSG(request.body.sizeInBytes == 0 or request.body.sizeInBytes == request.body.bytes.sizeInBytes(),
+                   "HttpClientOperation: inline request body size mismatch");
     }
+    else
+    {
+        SC_TRY_MSG(request.body.provider != nullptr, "HttpClientOperation: streamed request body requires provider");
+    }
+
+    if (request.options.redirect.mode == HttpClientRequestRedirectOptions::FollowGetHead)
+    {
+        SC_TRY_MSG(request.method == HttpClientRequest::HttpGET or request.method == HttpClientRequest::HttpHEAD,
+                   "HttpClientOperation: FollowGetHead requires GET or HEAD");
+    }
+    if (request.options.redirect.mode != HttpClientRequestRedirectOptions::NoRedirects)
+    {
+        SC_TRY_MSG((not request.body.isStreamed()) or request.body.canReplay,
+                   "HttpClientOperation: automatic redirects require a replayable request body");
+    }
+    SC_TRY_MSG(request.options.protocol.preference == HttpClientRequestProtocolOptions::Default,
+               "HttpClientOperation: protocol preference not yet supported");
 
     resetResponseState(response);
     resetRequestBodyState();
 
-    currentRequest      = request;
-    currentResponse     = &response;
-    currentListener     = listener;
-    currentBodyProvider = bodyProvider;
-    requestInFlight     = true;
+    currentRequest  = request;
+    currentResponse = &response;
+    currentListener = listener;
+    requestInFlight = true;
+    SC_TRY(copyResponseEffectiveUrl(currentRequest.url));
 
     return platformStart();
 }
@@ -654,6 +669,8 @@ void SC::HttpClientOperation::resetResponseState(HttpClientResponse& response)
     response.headers            = responseHeaders;
     response.headersLength      = 0;
     response.negotiatedProtocol = HttpClientResponse::Protocol::Unknown;
+    response.effectiveUrl       = {};
+    response.redirectCount      = 0;
 }
 
 void SC::HttpClientOperation::resetRequestBodyState()
@@ -663,12 +680,39 @@ void SC::HttpClientOperation::resetRequestBodyState()
     requestBodyBytesRead = 0;
 }
 
+bool SC::HttpClientOperation::isAutomaticRedirectEnabled() const
+{
+    return currentRequest.options.redirect.mode != HttpClientRequestRedirectOptions::NoRedirects;
+}
+
+bool SC::HttpClientOperation::canAutomaticRedirectRequestReplay() const
+{
+    if (currentRequest.body.isStreamed())
+    {
+        return currentRequest.body.canReplay;
+    }
+    return true;
+}
+
+SC::Result SC::HttpClientOperation::copyResponseEffectiveUrl(StringSpan url)
+{
+    SC_TRY_MSG(currentResponse != nullptr, "HttpClientOperation: missing response");
+    SC_TRY_MSG(responseMetadata.sizeInBytes() >= url.sizeInBytes(), "HttpClient: response metadata buffer too small");
+
+    if (url.sizeInBytes() > 0)
+    {
+        memcpy(responseMetadata.data(), url.toCharSpan().data(), url.sizeInBytes());
+    }
+    currentResponse->effectiveUrl = StringSpan({responseMetadata.data(), url.sizeInBytes()}, false, url.getEncoding());
+    return Result(true);
+}
+
 size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& outError, bool& outEnd)
 {
     outError = Result(true);
     outEnd   = false;
 
-    if (currentRequest.streamedBodySize == 0)
+    if (not currentRequest.body.isStreamed())
     {
         outEnd = true;
         return 0;
@@ -680,7 +724,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
         return 0;
     }
 
-    if (currentBodyProvider == nullptr)
+    if (currentRequest.body.provider == nullptr)
     {
         outError = Result::Error("HttpClientOperation: missing request body provider");
         return 0;
@@ -691,7 +735,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
 
     SC_TRY_MSG(dest.sizeInBytes() > 0, "HttpClientOperation: request body destination is empty");
 
-    outError = currentBodyProvider->pullRequestBody(dest, bytesWritten, endReached);
+    outError = currentRequest.body.provider->pullRequestBody(dest, bytesWritten, endReached);
     if (not outError)
     {
         return 0;
@@ -710,7 +754,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
     }
 
     requestBodyBytesRead += bytesWritten;
-    if (requestBodyBytesRead > currentRequest.streamedBodySize)
+    if (requestBodyBytesRead > currentRequest.body.sizeInBytes)
     {
         outError = Result::Error("HttpClientOperation: streamed body exceeded declared size");
         return 0;
@@ -719,7 +763,7 @@ size_t SC::HttpClientOperation::readRequestBodyChunk(Span<char> dest, Result& ou
     if (endReached)
     {
         requestBodyFinished = true;
-        if (requestBodyBytesRead != currentRequest.streamedBodySize)
+        if (requestBodyBytesRead != currentRequest.body.sizeInBytes)
         {
             outError = Result::Error("HttpClientOperation: streamed body ended before expected size");
             return 0;

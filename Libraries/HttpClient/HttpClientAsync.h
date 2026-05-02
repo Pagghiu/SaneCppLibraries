@@ -158,7 +158,7 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
                  T_AsyncBuffersPool* requestBodyPool = nullptr)
     {
         SC_TRY_MSG(initialized, "HttpClientAsyncT: not initialized");
-        if (request.streamedBodySize > 0)
+        if (request.body.isStreamed())
         {
             SC_TRY_MSG(requestBodyPool != nullptr, "HttpClientAsyncT: streamed request body requires buffers pool");
         }
@@ -170,7 +170,7 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
         SC_TRY(responseBodyStream.init(responseBuffersPool));
         SC_TRY(responseBodyStream.start());
 
-        if (request.streamedBodySize > 0)
+        if (request.body.isStreamed())
         {
             SC_TRY(requestBodySink.init(*requestBodyBuffersPool, requestWriteQueue, *this));
         }
@@ -181,10 +181,16 @@ struct HttpClientAsyncT final : private HttpClientOperationListener,
             wakeUpStarted = true;
         }
 
-        const Result res = operation.start(request, response, this, request.streamedBodySize > 0 ? this : nullptr);
+        HttpClientRequest asyncRequest = request;
+        if (asyncRequest.body.isStreamed())
+        {
+            asyncRequest.body.provider = this;
+        }
+
+        const Result res = operation.start(asyncRequest, response, this);
         if (not res)
         {
-            if (request.streamedBodySize > 0)
+            if (request.body.isStreamed())
             {
                 requestBodySink.destroy();
             }
