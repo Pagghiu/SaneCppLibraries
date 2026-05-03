@@ -3,6 +3,7 @@
 #pragma once
 
 #include <coroutine>
+#include <new>
 
 namespace SC
 {
