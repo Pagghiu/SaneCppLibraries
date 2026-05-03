@@ -356,6 +356,7 @@ static bool buildAppendUpperSnakeCase(SC::StringView input, SC::String& output)
 }
 
 static constexpr SC::StringView ALL_SC_EXPORT_LIBRARIES[] = {
+    "Await",
     "Async",
     "AsyncStreams",
     "Containers",
