@@ -130,7 +130,7 @@ resolve_shared_libraries_root() {
     requested_ref=$(read_requested_git_ref "$project_file" || true)
     if [[ -z "$requested_ref" ]]; then
         requested_ref=$(git -C "$repository_root" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || printf '%s\n' origin/main)
-        warn "Missing \"// sc-build-version: <git-ref>\" in $project_file, using $requested_ref"
+        warn "Missing \"// sc-build-version: <git-ref>\" in $project_file, using $requested_ref. Add the pragma near the top of SC-build.cpp for reproducible shared-cache builds, or pass --libraries-root <path> while developing locally."
     fi
 
     local commit

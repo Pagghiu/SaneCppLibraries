@@ -1211,15 +1211,13 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
 {
     String scriptPath = StringEncoding::Utf8;
 #if SC_PLATFORM_WINDOWS
-    SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.ps1"}));
+    SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.bat"}));
 
     StringSpan processArguments[48];
     size_t     numArguments          = 0;
-    processArguments[numArguments++] = "powershell";
-    processArguments[numArguments++] = "-NoProfile";
-    processArguments[numArguments++] = "-ExecutionPolicy";
-    processArguments[numArguments++] = "Bypass";
-    processArguments[numArguments++] = "-File";
+    processArguments[numArguments++] = "cmd";
+    processArguments[numArguments++] = "/d";
+    processArguments[numArguments++] = "/c";
     processArguments[numArguments++] = scriptPath.view();
 #else
     SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.sh"}));

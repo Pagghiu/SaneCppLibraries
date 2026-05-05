@@ -141,7 +141,7 @@ function Resolve-SharedLibrariesRoot([string]$ProjectRoot) {
         if ([string]::IsNullOrWhiteSpace($RequestedRef)) {
             $RequestedRef = "origin/main"
         }
-        Write-Warning "Missing `"// sc-build-version: <git-ref>`" in $ProjectFile, using $RequestedRef"
+        Write-Warning "Missing `"// sc-build-version: <git-ref>`" in $ProjectFile, using $RequestedRef. Add the pragma near the top of SC-build.cpp for reproducible shared-cache builds, or pass --libraries-root <path> while developing locally."
     }
 
     $Commit = Resolve-RequestedCommit $RepositoryRoot $RequestedRef

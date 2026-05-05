@@ -183,6 +183,7 @@ fail early with concrete CLI errors instead of drifting into backend-time failur
 Current defaults:
 
 - Windows / macOS / Linux: `default` resolves to `native`
+- `SC-build` defaults to the `compile` action when no action is passed
 - Native `compile` / `run` are the standard workflows and do not require a prior `configure` step
 - `configure` is for generated-project and IDE workflows
 - Linux `glibc` and `musl` target profiles now shape canonical target triples and sysroot flags; macOS and Windows

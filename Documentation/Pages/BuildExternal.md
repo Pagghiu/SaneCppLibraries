@@ -124,12 +124,16 @@ MyProject/
 Invoke from the project root or any nested subdirectory:
 
 ```bash
+ThirdParty/SaneCppLibraries/SC-build.sh
 ThirdParty/SaneCppLibraries/SC-build.sh compile MyProject --config Release
 ```
+
+With no action, the launcher defaults to `compile` and uses the native generator.
 
 Explicit shared checkout:
 
 ```bash
+/path/to/SaneCppLibraries/SC-build.sh --libraries-root /path/to/SaneCppLibraries
 /path/to/SaneCppLibraries/SC-build.sh --libraries-root /path/to/SaneCppLibraries compile MyProject --config Release
 ```
 
@@ -138,15 +142,19 @@ Standalone downloaded launcher:
 ```bash
 curl -L -o SC-build.sh https://raw.githubusercontent.com/Pagghiu/SaneCppLibraries/<branch-or-tag>/SC-build.sh
 chmod +x SC-build.sh
+./SC-build.sh
 ./SC-build.sh compile MyProject --config Release
 ```
 
-Windows PowerShell:
+Windows:
 
 ```powershell
 Invoke-WebRequest https://raw.githubusercontent.com/Pagghiu/SaneCppLibraries/<branch-or-tag>/SC-build.ps1 -OutFile SC-build.ps1
+./SC-build.ps1
 ./SC-build.ps1 compile MyProject --config Release
 ```
+
+The `SC-build.bat` wrapper forwards to `SC-build.ps1`, so either launcher can be used from `cmd.exe` or PowerShell.
 
 When testing a non-`main` branch, download the launcher from that branch and pin the same branch in `SC-build.cpp`:
 
@@ -166,7 +174,16 @@ When the launcher uses the shared cache flow, it reads the requested SaneCppLibr
 The value can be a tag, branch, or commit SHA.
 
 If the pragma is missing, the launcher resolves the latest default-branch revision and prints a warning because that
-mode is less reproducible.
+mode is less reproducible. Add the pragma near the top of `SC-build.cpp` once you know which SaneCppLibraries revision
+the external project should follow:
+
+```cpp
+// sc-build-version: 5ab42c5abfea35e9c148e18ff244563b593979a2
+#include "SaneCppBuild.h"
+```
+
+Branch pins are convenient while developing against an active branch. Tags or commit SHAs are better for projects that
+need repeatable builds.
 
 # Shared Cache
 
