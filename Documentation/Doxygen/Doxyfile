@@ -18,6 +18,7 @@ INPUT                  = ../../_Build/_Dependencies/Dependencies.md \
                          ../../Documentation/Libraries \
                          ../../Libraries/Async \
                          ../../Libraries/AsyncStreams \
+                         ../../Libraries/Await \
                          ../../Libraries/Containers \
                          ../../Libraries/File \
                          ../../Libraries/FileSystem \

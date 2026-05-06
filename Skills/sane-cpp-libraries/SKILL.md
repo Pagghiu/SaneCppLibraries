@@ -1,6 +1,6 @@
 ---
 name: sane-cpp-libraries
-description: Unified guidance for Sane C++ Libraries. Use when the user is adopting Sane C++ Libraries, choosing the right Sane library, looking for examples or tests, or working with Foundation, Memory, Strings, Containers, Async, Socket, Http, File, FileSystem, Process, Time, Threading, Reflection, Serialization, Plugin, Build, Tools, or Testing.
+description: Unified guidance for Sane C++ Libraries. Use when the user is adopting Sane C++ Libraries, choosing the right Sane library, looking for examples or tests, or working with Foundation, Memory, Strings, Containers, Async, Await, Socket, Http, File, FileSystem, Process, Time, Threading, Reflection, Serialization, Plugin, Build, Tools, or Testing.
 ---
 
 # Sane C++ Libraries
@@ -43,6 +43,7 @@ Use this as the single installed skill for every Sane C++ Libraries request.
 ### I/O, Async, And Platforms
 
 - Event loop, requests, and wake-up integration: [references/async/guide.md](references/async/guide.md)
+- Draft coroutine wrapper over Async: [references/await/guide.md](references/await/guide.md)
 - Backpressure-aware stream pipelines: [references/async-streams/guide.md](references/async-streams/guide.md)
 - Cross-library async composition recipes: [references/async-networking/guide.md](references/async-networking/guide.md)
 - Raw synchronous sockets and DNS: [references/socket/guide.md](references/socket/guide.md)

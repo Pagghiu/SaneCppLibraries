@@ -12,7 +12,14 @@
 #include "../Foundation/Result.h"
 #include "Internal/AwaitCoroutine.h"
 
-//! @addtogroup group_await Await
+//! @defgroup group_await Await
+//! @copybrief library_await (see @ref library_await for more details)
+//! Draft C++20 coroutine layer over SC::AsyncEventLoop.
+//!
+//! Await is an experimental wrapper that lets coroutine bodies express asynchronous operations with `co_await` while
+//! still returning plain SC::Result values and using caller-provided output objects.
+
+//! @addtogroup group_await
 //! @{
 namespace SC
 {
@@ -41,12 +48,14 @@ struct AwaitSocketSendResult
     size_t numBytes = 0;
 };
 
+/// @brief Result object populated by AwaitEventLoop::receive.
 struct AwaitSocketReceiveResult
 {
     Span<char> data;
     bool       disconnected = false;
 };
 
+/// @brief Cancellation hook installed by the awaiter currently suspending an AwaitTask.
 struct AwaitCancellationHandler
 {
     void* object = nullptr;
@@ -54,6 +63,7 @@ struct AwaitCancellationHandler
     Result (*cancel)(void* object, AwaitEventLoop& eventLoop) = nullptr;
 };
 
+/// @brief Caller-owned monotonic arena for coroutine frame allocation.
 struct SC_AWAIT_EXPORT AwaitArena
 {
     explicit AwaitArena(Span<char> memory);
@@ -69,6 +79,7 @@ struct SC_AWAIT_EXPORT AwaitArena
     size_t     offset = 0;
 };
 
+/// @brief Caller-owned coroutine task returning a plain SC::Result.
 struct SC_AWAIT_EXPORT AwaitTask
 {
     struct Promise;
@@ -109,6 +120,7 @@ struct SC_AWAIT_EXPORT AwaitTask
     Handle handle = {};
 };
 
+/// @brief Coroutine promise implementation used by AwaitTask.
 struct SC_AWAIT_EXPORT AwaitTask::Promise
 {
     Promise();
@@ -164,6 +176,7 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
     bool cancellationRequested;
 };
 
+/// @brief Coroutine-friendly wrapper around an existing AsyncEventLoop.
 struct SC_AWAIT_EXPORT AwaitEventLoop
 {
     explicit AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitArena* arena = nullptr);
@@ -192,6 +205,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitArena*     frameArena;
 };
 
+/// @brief Awaiter for a single AsyncLoopTimeout operation.
 struct SC_AWAIT_EXPORT AwaitSleepAwaiter
 {
     AwaitSleepAwaiter(AwaitEventLoop& await, TimeMs duration);
@@ -215,6 +229,7 @@ struct SC_AWAIT_EXPORT AwaitSleepAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter for a single AsyncSocketAccept operation.
 struct SC_AWAIT_EXPORT AwaitSocketAcceptAwaiter
 {
     AwaitSocketAcceptAwaiter(AwaitEventLoop& await, const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
@@ -239,6 +254,7 @@ struct SC_AWAIT_EXPORT AwaitSocketAcceptAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter for a single AsyncSocketSend operation.
 struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
 {
     AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<const char> data,
@@ -265,6 +281,7 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter that reactivates AsyncSocketSend until the whole buffer is sent.
 struct SC_AWAIT_EXPORT AwaitSocketSendAllAwaiter
 {
     AwaitSocketSendAllAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<const char> data,
@@ -292,6 +309,7 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAllAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter for a single AsyncSocketReceive operation.
 struct SC_AWAIT_EXPORT AwaitSocketReceiveAwaiter
 {
     AwaitSocketReceiveAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<char> buffer,

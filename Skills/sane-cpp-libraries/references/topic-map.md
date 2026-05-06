@@ -14,6 +14,7 @@ Use this page when the request is broad or you need to pick the first guide quic
 | Time sources, durations, parsing, scheduling basics | [time/guide.md](time/guide.md) | `async` |
 | Threads, locks, semaphores, barriers, thread pool | [threading/guide.md](threading/guide.md) | `async` for I/O-driven coordination |
 | Event loops, async requests, wake-up integration | [async/guide.md](async/guide.md) | `file`, `process`, `socket`, `async-streams` |
+| C++20 coroutine syntax over Async | [await/guide.md](await/guide.md) | `async`, `socket`, `testing` |
 | Async stream pipelines and backpressure | [async-streams/guide.md](async-streams/guide.md) | `async`, `http`, `http-client` |
 | Pick the right async networking stack | [async-networking/guide.md](async-networking/guide.md) | `async`, `socket`, `http`, `http-client` |
 | Blocking sockets or DNS lookup | [socket/guide.md](socket/guide.md) | `async` if the task should stop blocking |

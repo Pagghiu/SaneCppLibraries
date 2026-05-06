@@ -32,6 +32,23 @@
             "Foundation"
         ]
     },
+    "Await": {
+        "direct_dependencies": [
+            "Async",
+            "Foundation"
+        ],
+        "minimal_dependencies": [
+            "Async"
+        ],
+        "all_dependencies": [
+            "Async",
+            "File",
+            "FileSystem",
+            "Foundation",
+            "Socket",
+            "Threading"
+        ]
+    },
     "Containers": {
         "direct_dependencies": [
             "Foundation",
