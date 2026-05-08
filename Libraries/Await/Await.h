@@ -125,6 +125,12 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
 {
     Promise();
 
+    template <typename First, typename... Rest>
+    Promise(First& first, Rest&... rest) : Promise()
+    {
+        eventLoop = findEventLoop(first, rest...);
+    }
+
     static AwaitEventLoop* findEventLoop();
     static AwaitEventLoop* findEventLoop(AwaitEventLoop& await);
 
@@ -170,6 +176,7 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
 
     AwaitTask::Handle        continuation;
     AwaitCancellationHandler cancellation;
+    AwaitEventLoop*          eventLoop;
 
     bool started;
     bool completed;

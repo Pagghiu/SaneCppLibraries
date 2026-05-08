@@ -32,9 +32,17 @@ struct SC::AwaitTest : public SC::TestCase
         {
             cancelSleep();
         }
+        if (test_section("cancel edge cases"))
+        {
+            cancelEdgeCases();
+        }
         if (test_section("callback and coroutine coexist"))
         {
             callbackAndCoroutineCoexist();
+        }
+        if (test_section("spawn wrong event loop"))
+        {
+            spawnWrongEventLoop();
         }
         if (test_section("socket accept"))
         {
@@ -59,6 +67,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("arena"))
         {
             arena();
+        }
+        if (test_section("arena exhaustion"))
+        {
+            arenaExhaustion();
         }
     }
 
@@ -253,6 +265,32 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
+    void cancelEdgeCases()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        AwaitTask notStarted = waitTwice(await);
+        SC_TEST_EXPECT(not notStarted.cancel(await));
+        SC_TEST_EXPECT(not notStarted.isCancellationRequested());
+
+        AwaitTask completed = immediate(await);
+        SC_TEST_EXPECT(await.spawn(completed));
+        SC_TEST_EXPECT(completed.isCompleted());
+        SC_TEST_EXPECT(completed.cancel(await));
+
+        AwaitTask active = waitLong(await);
+        SC_TEST_EXPECT(await.spawn(active));
+        SC_TEST_EXPECT(active.cancel(await));
+        SC_TEST_EXPECT(active.cancel(await));
+        SC_TEST_EXPECT(active.isCancellationRequested());
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(not active.result());
+        SC_TEST_EXPECT(async.close());
+    }
+
     void callbackAndCoroutineCoexist()
     {
         AsyncEventLoop async;
@@ -275,6 +313,24 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(callbackCount == 1);
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void spawnWrongEventLoop()
+    {
+        AsyncEventLoop asyncA;
+        AsyncEventLoop asyncB;
+        SC_TEST_EXPECT(asyncA.create());
+        SC_TEST_EXPECT(asyncB.create());
+
+        AwaitEventLoop awaitA(asyncA);
+        AwaitEventLoop awaitB(asyncB);
+
+        AwaitTask task = waitTwice(awaitA);
+        SC_TEST_EXPECT(not awaitB.spawn(task));
+        SC_TEST_EXPECT(not task.isStarted());
+
+        SC_TEST_EXPECT(asyncA.close());
+        SC_TEST_EXPECT(asyncB.close());
     }
 
     void socketAccept()
@@ -400,6 +456,22 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(await.spawn(task));
         SC_TEST_EXPECT(await.run());
         SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void arenaExhaustion()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+
+        char           arenaMemory[1] = {0};
+        AwaitArena     arenaStorage({arenaMemory, sizeof(arenaMemory)});
+        AwaitEventLoop await(async, &arenaStorage);
+
+        AwaitTask task = arenaWait(await);
+        SC_TEST_EXPECT(not task.isValid());
+        SC_TEST_EXPECT(not await.spawn(task));
+        SC_TEST_EXPECT(arenaStorage.used() == 0);
         SC_TEST_EXPECT(async.close());
     }
 };

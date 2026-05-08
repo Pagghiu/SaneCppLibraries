@@ -122,11 +122,15 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
     {
         return Result::Error("AwaitTask is not started");
     }
-    promise.cancellationRequested = true;
+    if (promise.cancellationRequested)
+    {
+        return Result(true);
+    }
     if (promise.cancellation.cancel == nullptr)
     {
         return Result::Error("AwaitTask cannot be cancelled right now");
     }
+    promise.cancellationRequested = true;
     return promise.cancellation.cancel(promise.cancellation.object, await);
 }
 
@@ -179,7 +183,8 @@ void AwaitTask::destroy()
     }
 }
 
-AwaitTask::Promise::Promise() : taskResult(Result::Error("AwaitTask not completed")), started(false), completed(false)
+AwaitTask::Promise::Promise()
+    : taskResult(Result::Error("AwaitTask not completed")), eventLoop(nullptr), started(false), completed(false)
 {
     cancellationRequested = false;
 }
@@ -277,6 +282,16 @@ AwaitArena* AwaitEventLoop::arena() { return frameArena; }
 
 Result AwaitEventLoop::spawn(AwaitTask& task)
 {
+    if (not task.isValid())
+    {
+        return Result::Error("AwaitTask is invalid");
+    }
+    AwaitEventLoop* taskEventLoop = task.handle.promise().eventLoop;
+    if (taskEventLoop != nullptr and taskEventLoop != this)
+    {
+        return Result::Error("AwaitTask belongs to another AwaitEventLoop");
+    }
+
     SC_TRY(task.start());
     task.resume();
     return Result(true);
