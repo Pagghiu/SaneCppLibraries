@@ -48,9 +48,17 @@ struct SC::AwaitTest : public SC::TestCase
         {
             socketAccept();
         }
+        if (test_section("socket connect"))
+        {
+            socketConnect();
+        }
         if (test_section("socket send receive"))
         {
             socketSendReceive();
+        }
+        if (test_section("socket send to receive from"))
+        {
+            socketSendToReceiveFrom();
         }
         if (test_section("socket send all"))
         {
@@ -95,6 +103,12 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask connectOne(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address)
+    {
+        SC_CO_TRY(co_await await.connect(socket, address));
+        co_return Result(true);
+    }
+
     AwaitTask sendReceiveOnce(AwaitEventLoop& await, const SocketDescriptor& sender, const SocketDescriptor& receiver)
     {
         const char sendBuffer[]      = {1, 2, 3};
@@ -127,6 +141,29 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
         SC_TEST_EXPECT(not receiveResult.disconnected);
+        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(sendBuffer));
+        for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
+        {
+            SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
+        }
+
+        co_return Result(true);
+    }
+
+    AwaitTask sendToReceiveFromOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                    const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
+    {
+        const char sendBuffer[]      = {'P', 'I', 'N', 'G'};
+        char       receiveBuffer[16] = {0};
+
+        AwaitSocketSendResult sendResult;
+        SC_CO_TRY(co_await await.sendTo(sender, receiverAddress, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
+        SC_TEST_EXPECT(sendResult.numBytes == sizeof(sendBuffer));
+
+        AwaitSocketReceiveFromResult receiveResult;
+        SC_CO_TRY(co_await await.receiveFrom(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        SC_TEST_EXPECT(not receiveResult.disconnected);
+        SC_TEST_EXPECT(receiveResult.sourceAddress.isValid());
         SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(sendBuffer));
         for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
         {
@@ -361,6 +398,37 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
+    void socketConnect()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        SocketDescriptor serverSocket;
+        SocketIPAddress  nativeAddress;
+        createTCPServer(async, serverSocket, nativeAddress);
+
+        SocketDescriptor acceptedClient;
+        AwaitTask        acceptTask = acceptOne(await, serverSocket, acceptedClient);
+        SC_TEST_EXPECT(await.spawn(acceptTask));
+
+        SocketDescriptor client;
+        SC_TEST_EXPECT(async.createAsyncTCPSocket(nativeAddress.getAddressFamily(), client));
+
+        AwaitTask connectTask = connectOne(await, client, nativeAddress);
+        SC_TEST_EXPECT(await.spawn(connectTask));
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(acceptTask.result());
+        SC_TEST_EXPECT(connectTask.result());
+        SC_TEST_EXPECT(acceptedClient.isValid());
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(acceptedClient.close());
+        SC_TEST_EXPECT(serverSocket.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
     void socketSendReceive()
     {
         AsyncEventLoop async;
@@ -378,6 +446,36 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(client.close());
         SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void socketSendToReceiveFrom()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        const uint16_t port = report.mapPort(5052);
+
+        SocketIPAddress bindAddress;
+        SC_TEST_EXPECT(bindAddress.fromAddressPort("0.0.0.0", port));
+
+        SocketIPAddress receiverAddress;
+        SC_TEST_EXPECT(receiverAddress.fromAddressPort("127.0.0.1", port));
+
+        SocketDescriptor receiver;
+        SocketDescriptor sender;
+        SC_TEST_EXPECT(async.createAsyncUDPSocket(bindAddress.getAddressFamily(), receiver));
+        SC_TEST_EXPECT(async.createAsyncUDPSocket(receiverAddress.getAddressFamily(), sender));
+        SC_TEST_EXPECT(SocketServer(receiver).bind(bindAddress));
+
+        AwaitTask task = sendToReceiveFromOnce(await, sender, receiver, receiverAddress);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+
+        SC_TEST_EXPECT(receiver.close());
+        SC_TEST_EXPECT(sender.close());
         SC_TEST_EXPECT(async.close());
     }
 

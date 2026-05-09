@@ -310,10 +310,21 @@ AwaitSocketAcceptAwaiter AwaitEventLoop::accept(const SocketDescriptor& serverSo
     return AwaitSocketAcceptAwaiter(*this, serverSocket, outClient);
 }
 
+AwaitSocketConnectAwaiter AwaitEventLoop::connect(const SocketDescriptor& socket, SocketIPAddress address)
+{
+    return AwaitSocketConnectAwaiter(*this, socket, address);
+}
+
 AwaitSocketSendAwaiter AwaitEventLoop::send(const SocketDescriptor& socket, Span<const char> data,
                                             AwaitSocketSendResult* outResult)
 {
     return AwaitSocketSendAwaiter(*this, socket, data, outResult);
+}
+
+AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketIPAddress address,
+                                                Span<const char> data, AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
 }
 
 AwaitSocketSendAllAwaiter AwaitEventLoop::sendAll(const SocketDescriptor& socket, Span<const char> data,
@@ -326,6 +337,12 @@ AwaitSocketReceiveAwaiter AwaitEventLoop::receive(const SocketDescriptor& socket
                                                   AwaitSocketReceiveResult& outResult)
 {
     return AwaitSocketReceiveAwaiter(*this, socket, buffer, outResult);
+}
+
+AwaitSocketReceiveFromAwaiter AwaitEventLoop::receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
+                                                          AwaitSocketReceiveFromResult& outResult)
+{
+    return AwaitSocketReceiveFromAwaiter(*this, socket, buffer, outResult);
 }
 
 AwaitSleepAwaiter::AwaitSleepAwaiter(AwaitEventLoop& await, TimeMs duration) : await(await), duration(duration) {}
@@ -433,6 +450,60 @@ void AwaitSocketAcceptAwaiter::clearCancellation()
     }
 }
 
+AwaitSocketConnectAwaiter::AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                     SocketIPAddress address)
+    : await(await), socket(socket), address(address)
+{}
+
+bool AwaitSocketConnectAwaiter::await_ready() const { return false; }
+
+bool AwaitSocketConnectAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitSocketConnectAwaiter::cancel};
+
+    request.callback = [this](AsyncSocketConnect::Result& result)
+    {
+        operationResult = result.isValid();
+        continuation.resume();
+    };
+
+    operationResult = request.start(await.asyncEventLoop(), socket, address);
+    return operationResult;
+}
+
+Result AwaitSocketConnectAwaiter::await_resume()
+{
+    clearCancellation();
+    return operationResult;
+}
+
+Result AwaitSocketConnectAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketConnectAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketConnectAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+void AwaitSocketConnectAwaiter::clearCancellation()
+{
+    if (continuation == nullptr)
+    {
+        return;
+    }
+    AwaitTask::Promise& promise = continuation.promise();
+    if (promise.cancellation.object == this)
+    {
+        promise.cancellation = {};
+    }
+}
+
 AwaitSocketSendAwaiter::AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
                                                Span<const char> data, AwaitSocketSendResult* outResult)
     : await(await), socket(socket), data(data), outResult(outResult)
@@ -479,6 +550,65 @@ Result AwaitSocketSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 }
 
 void AwaitSocketSendAwaiter::clearCancellation()
+{
+    if (continuation == nullptr)
+    {
+        return;
+    }
+    AwaitTask::Promise& promise = continuation.promise();
+    if (promise.cancellation.object == this)
+    {
+        promise.cancellation = {};
+    }
+}
+
+AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                   SocketIPAddress address, Span<const char> data,
+                                                   AwaitSocketSendResult* outResult)
+    : await(await), socket(socket), address(address), data(data), outResult(outResult)
+{}
+
+bool AwaitSocketSendToAwaiter::await_ready() const { return false; }
+
+bool AwaitSocketSendToAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitSocketSendToAwaiter::cancel};
+
+    request.callback = [this](AsyncSocketSendTo::Result& result)
+    {
+        operationResult = result.isValid();
+        if (outResult != nullptr)
+        {
+            outResult->numBytes = result.completionData.numBytes;
+        }
+        continuation.resume();
+    };
+
+    operationResult = request.start(await.asyncEventLoop(), socket, address, data);
+    return operationResult;
+}
+
+Result AwaitSocketSendToAwaiter::await_resume()
+{
+    clearCancellation();
+    return operationResult;
+}
+
+Result AwaitSocketSendToAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketSendToAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketSendToAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+void AwaitSocketSendToAwaiter::clearCancellation()
 {
     if (continuation == nullptr)
     {
@@ -621,6 +751,63 @@ Result AwaitSocketReceiveAwaiter::cancel(AwaitEventLoop& eventLoop)
 }
 
 void AwaitSocketReceiveAwaiter::clearCancellation()
+{
+    if (continuation == nullptr)
+    {
+        return;
+    }
+    AwaitTask::Promise& promise = continuation.promise();
+    if (promise.cancellation.object == this)
+    {
+        promise.cancellation = {};
+    }
+}
+
+AwaitSocketReceiveFromAwaiter::AwaitSocketReceiveFromAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                             Span<char> buffer, AwaitSocketReceiveFromResult& outResult)
+    : await(await), socket(socket), buffer(buffer), outResult(outResult)
+{}
+
+bool AwaitSocketReceiveFromAwaiter::await_ready() const { return false; }
+
+bool AwaitSocketReceiveFromAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitSocketReceiveFromAwaiter::cancel};
+
+    outResult        = {};
+    request.callback = [this](AsyncSocketReceiveFrom::Result& result)
+    {
+        operationResult         = result.get(outResult.data);
+        outResult.sourceAddress = result.getSourceAddress();
+        outResult.disconnected  = result.completionData.disconnected;
+        continuation.resume();
+    };
+
+    operationResult = request.start(await.asyncEventLoop(), socket, buffer);
+    return operationResult;
+}
+
+Result AwaitSocketReceiveFromAwaiter::await_resume()
+{
+    clearCancellation();
+    return operationResult;
+}
+
+Result AwaitSocketReceiveFromAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketReceiveFromAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketReceiveFromAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+void AwaitSocketReceiveFromAwaiter::clearCancellation()
 {
     if (continuation == nullptr)
     {

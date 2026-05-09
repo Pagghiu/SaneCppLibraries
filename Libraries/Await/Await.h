@@ -28,9 +28,12 @@ struct AwaitArena;
 struct AwaitCancellationHandler;
 struct AwaitSleepAwaiter;
 struct AwaitSocketAcceptAwaiter;
+struct AwaitSocketConnectAwaiter;
 struct AwaitSocketSendAwaiter;
+struct AwaitSocketSendToAwaiter;
 struct AwaitSocketSendAllAwaiter;
 struct AwaitSocketReceiveAwaiter;
+struct AwaitSocketReceiveFromAwaiter;
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
 #define SC_CO_TRY(expression)                                                                                          \
@@ -53,6 +56,14 @@ struct AwaitSocketReceiveResult
 {
     Span<char> data;
     bool       disconnected = false;
+};
+
+/// @brief Result object populated by AwaitEventLoop::receiveFrom.
+struct AwaitSocketReceiveFromResult
+{
+    Span<char>      data;
+    SocketIPAddress sourceAddress;
+    bool            disconnected = false;
 };
 
 /// @brief Cancellation hook installed by the awaiter currently suspending an AwaitTask.
@@ -198,14 +209,19 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     Result runOnce();
     Result runNoWait();
 
-    AwaitSleepAwaiter         sleep(TimeMs duration);
-    AwaitSocketAcceptAwaiter  accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
-    AwaitSocketSendAwaiter    send(const SocketDescriptor& socket, Span<const char> data,
-                                   AwaitSocketSendResult* outResult = nullptr);
-    AwaitSocketSendAllAwaiter sendAll(const SocketDescriptor& socket, Span<const char> data,
-                                      AwaitSocketSendResult* outResult = nullptr);
-    AwaitSocketReceiveAwaiter receive(const SocketDescriptor& socket, Span<char> buffer,
-                                      AwaitSocketReceiveResult& outResult);
+    AwaitSleepAwaiter             sleep(TimeMs duration);
+    AwaitSocketAcceptAwaiter      accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
+    AwaitSocketConnectAwaiter     connect(const SocketDescriptor& socket, SocketIPAddress address);
+    AwaitSocketSendAwaiter        send(const SocketDescriptor& socket, Span<const char> data,
+                                       AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendToAwaiter      sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
+                                         AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendAllAwaiter     sendAll(const SocketDescriptor& socket, Span<const char> data,
+                                          AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketReceiveAwaiter     receive(const SocketDescriptor& socket, Span<char> buffer,
+                                          AwaitSocketReceiveResult& outResult);
+    AwaitSocketReceiveFromAwaiter receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
+                                              AwaitSocketReceiveFromResult& outResult);
 
   private:
     AsyncEventLoop& eventLoop;
@@ -261,6 +277,31 @@ struct SC_AWAIT_EXPORT AwaitSocketAcceptAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter for a single AsyncSocketConnect operation.
+struct SC_AWAIT_EXPORT AwaitSocketConnectAwaiter
+{
+    AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address);
+
+    AwaitEventLoop&         await;
+    const SocketDescriptor& socket;
+    SocketIPAddress         address;
+    AsyncSocketConnect      request;
+    Result                  operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   clearCancellation();
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
 /// @brief Awaiter for a single AsyncSocketSend operation.
 struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
 {
@@ -272,6 +313,34 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
     Span<const char>        data;
     AwaitSocketSendResult*  outResult = nullptr;
     AsyncSocketSend         request;
+    Result                  operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   clearCancellation();
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single AsyncSocketSendTo operation.
+struct SC_AWAIT_EXPORT AwaitSocketSendToAwaiter
+{
+    AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address,
+                             Span<const char> data, AwaitSocketSendResult* outResult);
+
+    AwaitEventLoop&         await;
+    const SocketDescriptor& socket;
+    SocketIPAddress         address;
+    Span<const char>        data;
+    AwaitSocketSendResult*  outResult = nullptr;
+    AsyncSocketSendTo       request;
     Result                  operationResult = Result(true);
 
     bool   await_ready() const;
@@ -328,6 +397,33 @@ struct SC_AWAIT_EXPORT AwaitSocketReceiveAwaiter
     AwaitSocketReceiveResult& outResult;
     AsyncSocketReceive        request;
     Result                    operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   clearCancellation();
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single AsyncSocketReceiveFrom operation.
+struct SC_AWAIT_EXPORT AwaitSocketReceiveFromAwaiter
+{
+    AwaitSocketReceiveFromAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<char> buffer,
+                                  AwaitSocketReceiveFromResult& outResult);
+
+    AwaitEventLoop&               await;
+    const SocketDescriptor&       socket;
+    Span<char>                    buffer;
+    AwaitSocketReceiveFromResult& outResult;
+    AsyncSocketReceiveFrom        request;
+    Result                        operationResult = Result(true);
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);
