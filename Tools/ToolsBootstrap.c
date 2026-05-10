@@ -292,7 +292,11 @@ int StringVector_containsPath(const StringVector* sv, const char* str) {
     for (size_t i = 0; i < sv->count; ++i) {
         char* canonicalDep = FileSystem_canonicalizePath(sv->data[i]);
         if (!canonicalDep) continue;
+#ifdef _WIN32
+        const int matches = _stricmp(canonicalDep, canonicalTarget) == 0;
+#else
         const int matches = strcmp(canonicalDep, canonicalTarget) == 0;
+#endif
         free(canonicalDep);
         if (matches) {
             free(canonicalTarget);
@@ -889,6 +893,15 @@ StringVector parseJsonDependencies(FILE* file) {
     int inArray = 0;
     while (fgets(line, sizeof(line), file)) {
         char* str = line;
+        if (strstr(str, "\"Source\"")) {
+            char* colon = strstr(str, ":");
+            char* start = colon ? strstr(colon, "\"") : NULL;
+            char* end = start ? strstr(start + 1, "\"") : NULL;
+            if (start && end) {
+                *end = 0;
+                StringVector_add(&deps, start + 1);
+            }
+        }
         if (strstr(str, "\"Includes\"")) {
             inIncludes = 1;
         }
