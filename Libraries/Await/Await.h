@@ -36,6 +36,7 @@ struct AwaitSocketReceiveAwaiter;
 struct AwaitSocketReceiveFromAwaiter;
 struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
+struct AwaitLoopWorkAwaiter;
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
 #define SC_CO_TRY(expression)                                                                                          \
@@ -239,6 +240,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitFileReadAwaiter  fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
     AwaitFileWriteAwaiter fileWrite(const FileDescriptor& file, Span<const char> data,
                                     AwaitFileWriteResult* outResult = nullptr);
+    AwaitLoopWorkAwaiter  loopWork(ThreadPool& threadPool, Function<Result()> work);
 
   private:
     AsyncEventLoop& eventLoop;
@@ -495,6 +497,31 @@ struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
     AwaitFileWriteResult* outResult = nullptr;
     AsyncFileWrite        request;
     Result                operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   clearCancellation();
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single AsyncLoopWork operation.
+struct SC_AWAIT_EXPORT AwaitLoopWorkAwaiter
+{
+    AwaitLoopWorkAwaiter(AwaitEventLoop& await, ThreadPool& threadPool, Function<Result()> work);
+
+    AwaitEventLoop&    await;
+    ThreadPool&        threadPool;
+    Function<Result()> work;
+    AsyncLoopWork      request;
+    Result             operationResult = Result(true);
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);

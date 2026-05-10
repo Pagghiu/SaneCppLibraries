@@ -71,6 +71,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             fileReadWrite();
         }
+        if (test_section("loop work"))
+        {
+            loopWork();
+        }
         if (test_section("child task"))
         {
             childTask();
@@ -193,6 +197,17 @@ struct SC::AwaitTest : public SC::TestCase
                            AwaitFileReadResult& readResult)
     {
         SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult));
+        co_return Result(true);
+    }
+
+    AwaitTask loopWorkOnce(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
+    {
+        Function<Result()> work = [&workCount]
+        {
+            workCount.fetch_add(1);
+            return Result(true);
+        };
+        SC_CO_TRY(co_await await.loopWork(threadPool, work));
         co_return Result(true);
     }
 
@@ -574,6 +589,26 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
         SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
         SC_TEST_EXPECT(async.close());
+    }
+
+    void loopWork()
+    {
+        ThreadPool threadPool;
+        SC_TEST_EXPECT(threadPool.create(2));
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        Atomic<int> workCount = 0;
+        AwaitTask   task      = loopWorkOnce(await, threadPool, workCount);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(workCount.load() == 1);
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(threadPool.destroy());
     }
 
     void childTask()
