@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: MIT
 
 #include "Libraries/Await/Await.h"
+#include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
@@ -63,6 +66,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("socket send all"))
         {
             socketSendAll();
+        }
+        if (test_section("file read write"))
+        {
+            fileReadWrite();
         }
         if (test_section("child task"))
         {
@@ -170,6 +177,22 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
         }
 
+        co_return Result(true);
+    }
+
+    AwaitTask writeFileOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    {
+        const char           writeBuffer[] = {'t', 'e', 's', 't'};
+        AwaitFileWriteResult writeResult;
+        SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult));
+        SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        co_return Result(true);
+    }
+
+    AwaitTask readFileOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
+                           AwaitFileReadResult& readResult)
+    {
+        SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult));
         co_return Result(true);
     }
 
@@ -496,6 +519,60 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(client.close());
         SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void fileReadWrite()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        SmallStringNative<255> filePath = StringEncoding::Native;
+        SmallStringNative<255> dirPath  = StringEncoding::Native;
+        const StringView       name     = "AwaitTest";
+        const StringView       fileName = "file-read-write.txt";
+        SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
+        SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
+
+        FileDescriptor file;
+        FileOpen       writeOpen(FileOpen::Write);
+        writeOpen.blocking = false;
+        SC_TEST_EXPECT(file.open(filePath.view(), writeOpen));
+        SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+        AwaitTask writeTask = writeFileOnce(await, file);
+        SC_TEST_EXPECT(await.spawn(writeTask));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(writeTask.result());
+        SC_TEST_EXPECT(file.close());
+
+        FileOpen readOpen(FileOpen::Read);
+        readOpen.blocking = false;
+        SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
+        SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+        char                readBuffer[16] = {0};
+        AwaitFileReadResult readResult;
+        AwaitTask           readTask = readFileOnce(await, file, {readBuffer, sizeof(readBuffer)}, readResult);
+        SC_TEST_EXPECT(await.spawn(readTask));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(readTask.result());
+        SC_TEST_EXPECT(readResult.data.sizeInBytes() == 4);
+        SC_TEST_EXPECT(readResult.data.data()[0] == 't');
+        SC_TEST_EXPECT(readResult.data.data()[1] == 'e');
+        SC_TEST_EXPECT(readResult.data.data()[2] == 's');
+        SC_TEST_EXPECT(readResult.data.data()[3] == 't');
+        SC_TEST_EXPECT(file.close());
+
+        SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+        SC_TEST_EXPECT(fs.removeFile(fileName));
+        SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
         SC_TEST_EXPECT(async.close());
     }
 
