@@ -357,6 +357,12 @@ AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span
     return AwaitFileWriteAwaiter(*this, file, data, outResult);
 }
 
+AwaitFileSendAwaiter AwaitEventLoop::fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
+                                              AwaitFileSendResult& outResult, AwaitFileSendOptions options)
+{
+    return AwaitFileSendAwaiter(*this, file, socket, outResult, options);
+}
+
 AwaitLoopWorkAwaiter AwaitEventLoop::loopWork(ThreadPool& threadPool, Function<Result()> work)
 {
     return AwaitLoopWorkAwaiter(*this, threadPool, move(work));
@@ -939,6 +945,75 @@ Result AwaitFileWriteAwaiter::cancel(AwaitEventLoop& eventLoop)
 }
 
 void AwaitFileWriteAwaiter::clearCancellation()
+{
+    if (continuation == nullptr)
+    {
+        return;
+    }
+    AwaitTask::Promise& promise = continuation.promise();
+    if (promise.cancellation.object == this)
+    {
+        promise.cancellation = {};
+    }
+}
+
+AwaitFileSendAwaiter::AwaitFileSendAwaiter(AwaitEventLoop& await, const FileDescriptor& file,
+                                           const SocketDescriptor& socket, AwaitFileSendResult& outResult,
+                                           AwaitFileSendOptions options)
+    : await(await), file(file), socket(socket), outResult(outResult), options(options)
+{}
+
+bool AwaitFileSendAwaiter::await_ready() const { return false; }
+
+bool AwaitFileSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitFileSendAwaiter::cancel};
+
+    outResult        = {};
+    request.callback = [this](AsyncFileSend::Result& result)
+    {
+        operationResult            = result.isValid();
+        outResult.bytesTransferred = result.getBytesTransferred();
+        outResult.usedZeroCopy     = result.usedZeroCopy();
+        outResult.complete         = result.isComplete();
+        continuation.resume();
+    };
+
+    if (options.threadPool != nullptr)
+    {
+        operationResult = request.executeOn(taskSequence, *options.threadPool);
+        if (not operationResult)
+        {
+            return false;
+        }
+    }
+
+    operationResult =
+        request.start(await.asyncEventLoop(), file, socket, options.offset, options.length, options.pipeSize);
+    return operationResult;
+}
+
+Result AwaitFileSendAwaiter::await_resume()
+{
+    clearCancellation();
+    return operationResult;
+}
+
+Result AwaitFileSendAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitFileSendAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitFileSendAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+void AwaitFileSendAwaiter::clearCancellation()
 {
     if (continuation == nullptr)
     {

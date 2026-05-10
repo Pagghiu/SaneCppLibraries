@@ -71,6 +71,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             fileReadWrite();
         }
+        if (test_section("file send"))
+        {
+            fileSend();
+        }
         if (test_section("loop work"))
         {
             loopWork();
@@ -197,6 +201,32 @@ struct SC::AwaitTest : public SC::TestCase
                            AwaitFileReadResult& readResult)
     {
         SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult));
+        co_return Result(true);
+    }
+
+    AwaitTask fileSendOnce(AwaitEventLoop& await, const FileDescriptor& file, const SocketDescriptor& sender,
+                           const SocketDescriptor& receiver, ThreadPool& threadPool, Span<const char> expected)
+    {
+        char receiveBuffer[256] = {0};
+
+        AwaitFileSendOptions sendOptions;
+        sendOptions.length     = expected.sizeInBytes();
+        sendOptions.threadPool = &threadPool;
+
+        AwaitFileSendResult sendResult;
+        SC_CO_TRY(co_await await.fileSend(file, sender, sendResult, sendOptions));
+        SC_TEST_EXPECT(sendResult.bytesTransferred == expected.sizeInBytes());
+        SC_TEST_EXPECT(sendResult.complete);
+
+        AwaitSocketReceiveResult receiveResult;
+        SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        SC_TEST_EXPECT(not receiveResult.disconnected);
+        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == expected.sizeInBytes());
+        for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
+        {
+            SC_TEST_EXPECT(receiveResult.data.data()[idx] == expected.data()[idx]);
+        }
+
         co_return Result(true);
     }
 
@@ -589,6 +619,56 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
         SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
         SC_TEST_EXPECT(async.close());
+    }
+
+    void fileSend()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        ThreadPool threadPool;
+        SC_TEST_EXPECT(threadPool.create(2));
+
+        SmallStringNative<255> filePath = StringEncoding::Native;
+        SmallStringNative<255> dirPath  = StringEncoding::Native;
+        const StringView       name     = "AwaitTest";
+        const StringView       fileName = "file-send.txt";
+        SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), name}));
+        SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(name));
+        SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));
+
+        const char fileContent[] = "Await file send";
+        SC_TEST_EXPECT(fs.write(fileName, {fileContent, sizeof(fileContent) - 1}));
+
+        SocketDescriptor receiver;
+        SocketDescriptor sender;
+        createTCPSocketPair(async, receiver, sender);
+
+        FileDescriptor file;
+        FileOpen       readOpen(FileOpen::Read);
+        readOpen.blocking = true;
+        SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
+
+        AwaitTask task =
+            fileSendOnce(await, file, sender, receiver, threadPool, {fileContent, sizeof(fileContent) - 1});
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(file.close());
+        SC_TEST_EXPECT(receiver.close());
+        SC_TEST_EXPECT(sender.close());
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(threadPool.destroy());
+
+        SC_TEST_EXPECT(fs.removeFile(fileName));
+        SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
     }
 
     void loopWork()

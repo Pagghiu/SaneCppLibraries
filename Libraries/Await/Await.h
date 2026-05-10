@@ -36,6 +36,7 @@ struct AwaitSocketReceiveAwaiter;
 struct AwaitSocketReceiveFromAwaiter;
 struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
+struct AwaitFileSendAwaiter;
 struct AwaitLoopWorkAwaiter;
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
@@ -79,6 +80,21 @@ struct AwaitFileReadResult
 struct AwaitFileWriteResult
 {
     size_t numBytes = 0;
+};
+
+struct AwaitFileSendOptions
+{
+    int64_t     offset     = 0;
+    size_t      length     = 0;
+    size_t      pipeSize   = 0;
+    ThreadPool* threadPool = nullptr;
+};
+
+struct AwaitFileSendResult
+{
+    size_t bytesTransferred = 0;
+    bool   usedZeroCopy     = false;
+    bool   complete         = false;
 };
 
 /// @brief Cancellation hook installed by the awaiter currently suspending an AwaitTask.
@@ -240,6 +256,8 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitFileReadAwaiter  fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
     AwaitFileWriteAwaiter fileWrite(const FileDescriptor& file, Span<const char> data,
                                     AwaitFileWriteResult* outResult = nullptr);
+    AwaitFileSendAwaiter  fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
+                                   AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
     AwaitLoopWorkAwaiter  loopWork(ThreadPool& threadPool, Function<Result()> work);
 
   private:
@@ -497,6 +515,35 @@ struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
     AwaitFileWriteResult* outResult = nullptr;
     AsyncFileWrite        request;
     Result                operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   clearCancellation();
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single AsyncFileSend operation.
+struct SC_AWAIT_EXPORT AwaitFileSendAwaiter
+{
+    AwaitFileSendAwaiter(AwaitEventLoop& await, const FileDescriptor& file, const SocketDescriptor& socket,
+                         AwaitFileSendResult& outResult, AwaitFileSendOptions options);
+
+    AwaitEventLoop&         await;
+    const FileDescriptor&   file;
+    const SocketDescriptor& socket;
+    AwaitFileSendResult&    outResult;
+    AwaitFileSendOptions    options;
+    AsyncFileSend           request;
+    AsyncTaskSequence       taskSequence;
+    Result                  operationResult = Result(true);
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);
