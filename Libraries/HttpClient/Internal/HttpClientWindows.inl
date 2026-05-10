@@ -18,8 +18,8 @@ struct SC::HttpClientOperation::Internal
 {
     HANDLE workerThread = NULL;
 
-    bool workerRunning   = false;
-    bool cancelRequested = false;
+    bool          workerRunning   = false;
+    volatile LONG cancelRequested = 0;
 
     HINTERNET hConnect = NULL;
     HINTERNET hRequest = NULL;
@@ -42,6 +42,16 @@ static const wchar_t* getVerb(SC::HttpClientRequest::Method method)
     case SC::HttpClientRequest::HttpOPTIONS: return L"OPTIONS";
     }
     return L"GET";
+}
+
+static void setCancelRequested(SC::HttpClientOperation::Internal& internal, bool requested)
+{
+    (void)InterlockedExchange(&internal.cancelRequested, requested ? 1 : 0);
+}
+
+static bool isCancelRequested(const SC::HttpClientOperation::Internal& internal)
+{
+    return InterlockedCompareExchange(const_cast<volatile LONG*>(&internal.cancelRequested), 0, 0) != 0;
 }
 } // namespace
 
@@ -101,8 +111,8 @@ SC::Result SC::HttpClientOperation::platformInit() { return Result(true); }
 
 SC::Result SC::HttpClientOperation::platformClose()
 {
-    auto& internal           = *reinterpret_cast<Internal*>(storage);
-    internal.cancelRequested = true;
+    auto& internal = *reinterpret_cast<Internal*>(storage);
+    setCancelRequested(internal, true);
 
     internal.handlesMutex.lock();
     if (internal.hRequest != NULL)
@@ -124,19 +134,28 @@ SC::Result SC::HttpClientOperation::platformClose()
         internal.workerThread  = NULL;
         internal.workerRunning = false;
     }
-    internal.cancelRequested = false;
+    setCancelRequested(internal, false);
     return Result(true);
 }
 
 SC::Result SC::HttpClientOperation::platformCancel()
 {
-    auto& internal           = *reinterpret_cast<Internal*>(storage);
-    internal.cancelRequested = true;
+    auto& internal = *reinterpret_cast<Internal*>(storage);
+    setCancelRequested(internal, true);
+    if (internal.workerThread != NULL)
+    {
+        (void)CancelSynchronousIo(internal.workerThread);
+    }
     internal.handlesMutex.lock();
     if (internal.hRequest != NULL)
     {
         WinHttpCloseHandle(internal.hRequest);
         internal.hRequest = NULL;
+    }
+    if (internal.hConnect != NULL)
+    {
+        WinHttpCloseHandle(internal.hConnect);
+        internal.hConnect = NULL;
     }
     internal.handlesMutex.unlock();
     return Result(true);
@@ -151,8 +170,8 @@ SC::Result SC::HttpClientOperation::platformStart()
     SC_TRY_MSG(sessionHandle != NULL, "HttpClient: missing WinHTTP session");
     SC_TRY_MSG(not internal.workerRunning, "HttpClient: request already in flight");
 
-    internal.cancelRequested = false;
-    internal.workerRunning   = true;
+    setCancelRequested(internal, false);
+    internal.workerRunning = true;
 
     internal.workerThread = CreateThread(
         NULL, 0,
@@ -164,6 +183,34 @@ SC::Result SC::HttpClientOperation::platformStart()
             auto& session     = *reinterpret_cast<HttpClient::Internal*>(operation->client->storage);
 
             HINTERNET sessionHandle = session.hSession;
+
+            auto closeHandles = [&internalRef]()
+            {
+                internalRef.handlesMutex.lock();
+                if (internalRef.hRequest != NULL)
+                {
+                    WinHttpCloseHandle(internalRef.hRequest);
+                    internalRef.hRequest = NULL;
+                }
+                if (internalRef.hConnect != NULL)
+                {
+                    WinHttpCloseHandle(internalRef.hConnect);
+                    internalRef.hConnect = NULL;
+                }
+                internalRef.handlesMutex.unlock();
+            };
+
+            auto finishIfCancelled = [&]() -> bool
+            {
+                if (not isCancelRequested(internalRef))
+                {
+                    return false;
+                }
+                closeHandles();
+                operation->enqueueError(Result::Error("HttpClient: request cancelled"));
+                internalRef.workerRunning = false;
+                return true;
+            };
 
             URL_COMPONENTS urlComp   = {};
             urlComp.dwStructSize     = sizeof(urlComp);
@@ -198,6 +245,11 @@ SC::Result SC::HttpClientOperation::platformStart()
                 return 0;
             }
 
+            if (finishIfCancelled())
+            {
+                return 0;
+            }
+
             const wchar_t savedHost                        = urlComp.lpszHostName[urlComp.dwHostNameLength];
             urlComp.lpszHostName[urlComp.dwHostNameLength] = L'\0';
 
@@ -210,6 +262,11 @@ SC::Result SC::HttpClientOperation::platformStart()
             {
                 operation->enqueueError(Result::Error("HttpClient: WinHttpConnect failed"));
                 internalRef.workerRunning = false;
+                return 0;
+            }
+
+            if (finishIfCancelled())
+            {
                 return 0;
             }
 
@@ -237,6 +294,11 @@ SC::Result SC::HttpClientOperation::platformStart()
                 internalRef.hConnect = NULL;
                 internalRef.handlesMutex.unlock();
                 internalRef.workerRunning = false;
+                return 0;
+            }
+
+            if (finishIfCancelled())
+            {
                 return 0;
             }
 
@@ -293,6 +355,11 @@ SC::Result SC::HttpClientOperation::platformStart()
                 headerLine[nameLen + 2 + valueLen] = L'\0';
                 (void)WinHttpAddRequestHeaders(internalRef.hRequest, headerLine, static_cast<DWORD>(-1L),
                                                WINHTTP_ADDREQ_FLAG_ADD);
+            }
+
+            if (finishIfCancelled())
+            {
+                return 0;
             }
 
             DWORD requestBodyLength = static_cast<DWORD>(operation->currentRequest.body.bytes.sizeInBytes());
@@ -359,7 +426,7 @@ SC::Result SC::HttpClientOperation::platformStart()
 
             if (not WinHttpReceiveResponse(internalRef.hRequest, NULL))
             {
-                operation->enqueueError(internalRef.cancelRequested
+                operation->enqueueError(isCancelRequested(internalRef)
                                             ? Result::Error("HttpClient: request cancelled")
                                             : Result::Error("HttpClient: WinHttpReceiveResponse failed"));
                 internalRef.workerRunning = false;

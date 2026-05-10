@@ -566,11 +566,14 @@ struct SC::HttpClientTest : public SC::TestCase
                 collector.bodyBuffer = {body, sizeof(body)};
 
                 request.url = server.endpoint.view();
+                // Keep cancellation bounded on backends where tearing down a blocked receive is not instantaneous,
+                // while still preferring the explicit cancel path over a long fallback wait.
+                request.options.timeouts.requestTimeoutMs = 100;
                 SC_TEST_EXPECT(operation.start(request, response, &collector));
                 SC_TEST_EXPECT(operation.cancel());
                 while (not collector.completed)
                 {
-                    SC_TEST_EXPECT(operation.poll(50));
+                    SC_TEST_EXPECT(operation.poll(5));
                 }
 
                 SC_TEST_EXPECT(not collector.finalRes);
