@@ -8,12 +8,15 @@ Choose `async` when the task needs the Sane event loop, request-driven completio
 - Use `AsyncEventLoopMonitor` when another loop or thread must wake the async loop.
 - Keep every `AsyncRequest`-derived object in stable memory until the callback finishes.
 - Use `AsyncSequence` when request ordering matters.
+- Use `await` as the companion guide when discussing the Draft C++20 coroutine wrapper over `AsyncEventLoop`.
 
 ## What To Watch
 
 - Pair `async` with `socket` for socket I/O.
 - Pair it with `file` and `process` for file and process events.
 - Pair it with `async-streams` when request data should flow through stream pipelines.
+- `AwaitEventLoop` wraps an existing `AsyncEventLoop&`; it should not be described as a replacement for callback-style
+  `Async`, because both styles can coexist on the same loop.
 
 ## References
 

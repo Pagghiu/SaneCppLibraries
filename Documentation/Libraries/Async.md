@@ -9,6 +9,10 @@
 @note
 Check @ref library_async_streams for an higher level construct when streaming data
 
+@note
+Check @ref library_await for the Draft C++20 coroutine layer that wraps `AsyncEventLoop` with `co_await` syntax while
+preserving the same request lifetime expectations.
+
 # Dependencies
 - Dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
 - All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)

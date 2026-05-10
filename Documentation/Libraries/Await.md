@@ -41,9 +41,16 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitArena](@ref SC::AwaitArena)              | @copybrief SC::AwaitArena                      |
 | [AwaitSleepAwaiter](@ref SC::AwaitSleepAwaiter)| @copybrief SC::AwaitSleepAwaiter               |
 | [AwaitSocketAcceptAwaiter](@ref SC::AwaitSocketAcceptAwaiter) | @copybrief SC::AwaitSocketAcceptAwaiter |
+| [AwaitSocketConnectAwaiter](@ref SC::AwaitSocketConnectAwaiter) | @copybrief SC::AwaitSocketConnectAwaiter |
 | [AwaitSocketSendAwaiter](@ref SC::AwaitSocketSendAwaiter) | @copybrief SC::AwaitSocketSendAwaiter     |
+| [AwaitSocketSendToAwaiter](@ref SC::AwaitSocketSendToAwaiter) | @copybrief SC::AwaitSocketSendToAwaiter |
 | [AwaitSocketSendAllAwaiter](@ref SC::AwaitSocketSendAllAwaiter) | @copybrief SC::AwaitSocketSendAllAwaiter |
 | [AwaitSocketReceiveAwaiter](@ref SC::AwaitSocketReceiveAwaiter) | @copybrief SC::AwaitSocketReceiveAwaiter |
+| [AwaitSocketReceiveFromAwaiter](@ref SC::AwaitSocketReceiveFromAwaiter) | @copybrief SC::AwaitSocketReceiveFromAwaiter |
+| [AwaitFileReadAwaiter](@ref SC::AwaitFileReadAwaiter) | @copybrief SC::AwaitFileReadAwaiter       |
+| [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
+| [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
+| [AwaitLoopWorkAwaiter](@ref SC::AwaitLoopWorkAwaiter) | @copybrief SC::AwaitLoopWorkAwaiter       |
 
 # Example
 
@@ -70,9 +77,11 @@ AwaitTask sendAndReceive(AwaitEventLoop& await, const SocketDescriptor& sender, 
 The current proof of concept supports:
 
 - `sleep()`;
-- socket `accept()`;
-- socket `send()` and `sendAll()`;
-- socket `receive()`;
+- socket `accept()` and `connect()`;
+- socket `send()`, `sendAll()`, and `receive()`;
+- datagram socket `sendTo()` and `receiveFrom()`;
+- file `fileRead()`, `fileWrite()`, and `fileSend()`;
+- background `loopWork()`;
 - task cancellation for currently suspended operations;
 - awaiting explicitly spawned child tasks;
 - optional arena-backed coroutine frame allocation.
@@ -108,8 +117,8 @@ destroyed.
 
 🟪 Draft Features:
 
-- Expand cancellation semantics and edge-case coverage.
-- Add `connect()` and file awaitables.
+- Add the remaining `Async` operations that map cleanly to one-shot awaiters.
+- Expand cancellation semantics and edge-case coverage for every awaiter.
 - Decide if arena allocation should become mandatory for production use.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
