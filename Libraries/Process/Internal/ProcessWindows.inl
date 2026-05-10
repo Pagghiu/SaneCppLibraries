@@ -28,10 +28,19 @@ bool SC::Process::isWindowsEmulatedProcess()
     ::IsWow64Process2(GetCurrentProcess(), &processMachine, &nativeMachine);
     if (processMachine == IMAGE_FILE_MACHINE_UNKNOWN)
     {
-        // Older Wine ARM64 builds still stub GetProcessInformation(ProcessMachineTypeInfo).
-        // Falling back to the native machine keeps emulation detection conservative and avoids
-        // aborting process teardown when the API exists only as an unimplemented stub.
-        processMachine = nativeMachine;
+        PROCESS_MACHINE_INFORMATION processMachineInfo;
+        if (::GetProcessInformation(::GetCurrentProcess(), ProcessMachineTypeInfo, &processMachineInfo,
+                                    sizeof(PROCESS_MACHINE_INFORMATION)))
+        {
+            processMachine = processMachineInfo.ProcessMachine;
+        }
+        else
+        {
+            // Older Wine ARM64 builds still stub GetProcessInformation(ProcessMachineTypeInfo).
+            // Falling back to the native machine keeps emulation detection conservative and avoids
+            // aborting process teardown when the API exists only as an unimplemented stub.
+            processMachine = nativeMachine;
+        }
     }
     return processMachine != nativeMachine;
 #endif
@@ -427,9 +436,19 @@ SC::Result SC::ProcessFork::fork(State state)
     if (status == RTL_CLONE_CHILD)
     {
         side = ForkChild;
-        // Enables using the Console
-        ::FreeConsole();
-        ::AttachConsole(ATTACH_PARENT_PROCESS);
+        SC_TRY(parentToFork.writePipe.close());
+        SC_TRY(forkToParent.readPipe.close());
+
+        // When stdout/stderr are redirected (for example under SSH), the cloned child can
+        // already write through the inherited handles and forcing a console reattach is
+        // unnecessary. In those environments AttachConsole can also be unreliable, so only
+        // opt into the console handoff when stdout is actually a console device.
+        HANDLE stdOut = ::GetStdHandle(STD_OUTPUT_HANDLE);
+        if (stdOut != NULL and stdOut != INVALID_HANDLE_VALUE and ::GetFileType(stdOut) == FILE_TYPE_CHAR)
+        {
+            ::FreeConsole();
+            (void)::AttachConsole(ATTACH_PARENT_PROCESS);
+        }
 
         switch (state)
         {
@@ -464,8 +483,9 @@ SC::Result SC::ProcessFork::fork(State state)
             ::CloseHandle(hThread);
             ::CloseHandle(hProcess);
         }
-
         side = ForkParent;
+        SC_TRY(parentToFork.readPipe.close());
+        SC_TRY(forkToParent.writePipe.close());
     }
     return Result(true);
 }
