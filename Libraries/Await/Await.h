@@ -38,6 +38,7 @@ struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
 struct AwaitFileSystemOperationAwaiter;
+struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
@@ -96,6 +97,11 @@ struct AwaitFileSendResult
     size_t bytesTransferred = 0;
     bool   usedZeroCopy     = false;
     bool   complete         = false;
+};
+
+struct AwaitTimeoutResult
+{
+    bool timedOut = false;
 };
 
 enum class AwaitFileSystemOperationType : uint8_t
@@ -163,6 +169,7 @@ struct SC_AWAIT_EXPORT AwaitTask
 
   private:
     friend struct AwaitEventLoop;
+    friend struct AwaitTaskTimeoutAwaiter;
 
     Result start();
     void   resume();
@@ -228,6 +235,8 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
     AwaitTask::Handle        continuation;
     AwaitCancellationHandler cancellation;
     AwaitEventLoop*          eventLoop;
+    void*                    completionObject;
+    void (*completionCallback)(void* object);
 
     bool started;
     bool completed;
@@ -273,6 +282,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                                FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
     AwaitFileSystemOperationAwaiter fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath);
     AwaitFileSystemOperationAwaiter fsRemoveFile(ThreadPool& threadPool, StringSpan path);
+    AwaitTaskTimeoutAwaiter         waitFor(AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult = nullptr);
     AwaitLoopWorkAwaiter            loopWork(ThreadPool& threadPool, Function<Result()> work);
 
   private:
@@ -589,6 +599,34 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
 
   private:
     AwaitTask::Handle continuation;
+};
+
+/// @brief Awaiter that waits for a child task, cancelling it if a timeout expires first.
+struct SC_AWAIT_EXPORT AwaitTaskTimeoutAwaiter
+{
+    AwaitTaskTimeoutAwaiter(AwaitEventLoop& await, AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult);
+
+    AwaitEventLoop&     await;
+    AwaitTask&          task;
+    TimeMs              timeout;
+    AwaitTimeoutResult* outResult = nullptr;
+    AsyncLoopTimeout    timeoutRequest;
+    Result              operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static void onTaskCompleted(void* object);
+
+    void onTaskCompleted();
+    void finish(Result result);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+    bool                         timeoutFired = false;
+    bool                         finished     = false;
 };
 
 /// @brief Awaiter for a single AsyncLoopWork operation.

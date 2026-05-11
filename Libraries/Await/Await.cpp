@@ -199,6 +199,8 @@ void AwaitTask::destroy()
 AwaitTask::Promise::Promise()
     : taskResult(Result::Error("AwaitTask not completed")), eventLoop(nullptr), started(false), completed(false)
 {
+    completionObject      = nullptr;
+    completionCallback    = nullptr;
     cancellationRequested = false;
 }
 
@@ -266,6 +268,15 @@ void AwaitTask::Promise::FinalSuspend::await_suspend(AwaitTask::Handle handle) n
     AwaitTask::Promise& promise = handle.promise();
     promise.completed           = true;
     promise.cancellation        = {};
+    if (promise.completionCallback != nullptr)
+    {
+        void (*callback)(void*)    = promise.completionCallback;
+        void* callbackObject       = promise.completionObject;
+        promise.completionObject   = nullptr;
+        promise.completionCallback = nullptr;
+        callback(callbackObject);
+        return;
+    }
     if (promise.continuation != nullptr)
     {
         AwaitTask::Handle parentContinuation      = promise.continuation;
@@ -398,6 +409,11 @@ AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRename(ThreadPool& threadPool,
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRemoveFile(ThreadPool& threadPool, StringSpan path)
 {
     return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::RemoveFile, path);
+}
+
+AwaitTaskTimeoutAwaiter AwaitEventLoop::waitFor(AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult)
+{
+    return AwaitTaskTimeoutAwaiter(*this, task, timeout, outResult);
 }
 
 AwaitLoopWorkAwaiter AwaitEventLoop::loopWork(ThreadPool& threadPool, Function<Result()> work)
@@ -980,6 +996,120 @@ Result AwaitFileSystemOperationAwaiter::await_resume()
 {
     clearCancellation(continuation, this);
     return operationResult;
+}
+
+AwaitTaskTimeoutAwaiter::AwaitTaskTimeoutAwaiter(AwaitEventLoop& await, AwaitTask& task, TimeMs timeout,
+                                                 AwaitTimeoutResult* outResult)
+    : await(await), task(task), timeout(timeout), outResult(outResult)
+{}
+
+bool AwaitTaskTimeoutAwaiter::await_ready() const { return not task.isActive(); }
+
+bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    if (outResult != nullptr)
+    {
+        outResult->timedOut = false;
+    }
+
+    if (not task.isActive())
+    {
+        operationResult = task.result();
+        return false;
+    }
+
+    AwaitTask::Promise& promise = task.handle.promise();
+    if (promise.completionCallback != nullptr or promise.continuation != nullptr)
+    {
+        operationResult = Result::Error("AwaitTask is already being awaited");
+        return false;
+    }
+
+    promise.completionObject   = this;
+    promise.completionCallback = AwaitTaskTimeoutAwaiter::onTaskCompleted;
+
+    timeoutRequest.callback = [this](AsyncLoopTimeout::Result& result)
+    {
+        operationResult = result.isValid();
+        if (not operationResult)
+        {
+            finish(operationResult);
+            return;
+        }
+
+        timeoutFired = true;
+        if (outResult != nullptr)
+        {
+            outResult->timedOut = true;
+        }
+        operationResult     = Result::Error("AwaitTask timed out");
+        Result cancelResult = task.cancel(await);
+        if (not cancelResult)
+        {
+            finish(cancelResult);
+        }
+    };
+
+    operationResult = timeoutRequest.start(await.asyncEventLoop(), timeout);
+    if (not operationResult)
+    {
+        promise.completionObject   = nullptr;
+        promise.completionCallback = nullptr;
+    }
+    return operationResult;
+}
+
+Result AwaitTaskTimeoutAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+void AwaitTaskTimeoutAwaiter::onTaskCompleted(void* object)
+{
+    static_cast<AwaitTaskTimeoutAwaiter*>(object)->onTaskCompleted();
+}
+
+void AwaitTaskTimeoutAwaiter::onTaskCompleted()
+{
+    if (finished)
+    {
+        return;
+    }
+
+    if (timeoutFired)
+    {
+        finish(operationResult);
+        return;
+    }
+
+    operationResult   = task.result();
+    stopCallback      = [this](AsyncResult&) { finish(operationResult); };
+    Result stopResult = timeoutRequest.stop(await.asyncEventLoop(), &stopCallback);
+    if (not stopResult)
+    {
+        finish(stopResult);
+    }
+}
+
+void AwaitTaskTimeoutAwaiter::finish(Result result)
+{
+    if (finished)
+    {
+        return;
+    }
+    finished        = true;
+    operationResult = result;
+
+    AwaitTask::Promise& promise = task.handle.promise();
+    if (promise.completionObject == this)
+    {
+        promise.completionObject   = nullptr;
+        promise.completionCallback = nullptr;
+    }
+
+    continuation.resume();
 }
 
 AwaitLoopWorkAwaiter::AwaitLoopWorkAwaiter(AwaitEventLoop& await, ThreadPool& threadPool, Function<Result()> work)
