@@ -283,7 +283,6 @@ struct SC_AWAIT_EXPORT AwaitSleepAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -308,7 +307,6 @@ struct SC_AWAIT_EXPORT AwaitSocketAcceptAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -333,7 +331,6 @@ struct SC_AWAIT_EXPORT AwaitSocketConnectAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -360,7 +357,6 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -388,7 +384,6 @@ struct SC_AWAIT_EXPORT AwaitSocketSendToAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -416,7 +411,6 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAllAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -443,7 +437,6 @@ struct SC_AWAIT_EXPORT AwaitSocketReceiveAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -470,7 +463,6 @@ struct SC_AWAIT_EXPORT AwaitSocketReceiveFromAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -497,7 +489,6 @@ struct SC_AWAIT_EXPORT AwaitFileReadAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -524,7 +515,6 @@ struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -553,7 +543,6 @@ struct SC_AWAIT_EXPORT AwaitFileSendAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -578,7 +567,6 @@ struct SC_AWAIT_EXPORT AwaitLoopWorkAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
-    void   clearCancellation();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;

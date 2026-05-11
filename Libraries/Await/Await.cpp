@@ -37,6 +37,19 @@ static AwaitAllocationHeader& allocationHeaderFromFrame(void* frame)
 {
     return *(reinterpret_cast<AwaitAllocationHeader*>(frame) - 1);
 }
+
+static void clearCancellation(AwaitTask::Handle continuation, void* object)
+{
+    if (continuation == nullptr)
+    {
+        return;
+    }
+    AwaitTask::Promise& promise = continuation.promise();
+    if (promise.cancellation.object == object)
+    {
+        promise.cancellation = {};
+    }
+}
 } // namespace
 
 AwaitArena::AwaitArena(Span<char> memory) : storage(memory) {}
@@ -391,7 +404,7 @@ bool AwaitSleepAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSleepAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -404,19 +417,6 @@ Result AwaitSleepAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSleepAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketAcceptAwaiter::AwaitSocketAcceptAwaiter(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
@@ -445,7 +445,7 @@ bool AwaitSocketAcceptAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketAcceptAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -458,19 +458,6 @@ Result AwaitSocketAcceptAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketAcceptAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketConnectAwaiter::AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -499,7 +486,7 @@ bool AwaitSocketConnectAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketConnectAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -512,19 +499,6 @@ Result AwaitSocketConnectAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketConnectAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketSendAwaiter::AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -557,7 +531,7 @@ bool AwaitSocketSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketSendAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -570,19 +544,6 @@ Result AwaitSocketSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketSendAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -616,7 +577,7 @@ bool AwaitSocketSendToAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketSendToAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -629,19 +590,6 @@ Result AwaitSocketSendToAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketSendToAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketSendAllAwaiter::AwaitSocketSendAllAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -698,7 +646,7 @@ bool AwaitSocketSendAllAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketSendAllAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     if (outResult != nullptr and operationResult)
     {
         outResult->numBytes = numBytesSent;
@@ -715,19 +663,6 @@ Result AwaitSocketSendAllAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketSendAllAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketReceiveAwaiter::AwaitSocketReceiveAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -758,7 +693,7 @@ bool AwaitSocketReceiveAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitSocketReceiveAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -771,19 +706,6 @@ Result AwaitSocketReceiveAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketReceiveAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitSocketReceiveFromAwaiter::AwaitSocketReceiveFromAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -815,7 +737,7 @@ bool AwaitSocketReceiveFromAwaiter::await_suspend(AwaitTask::Handle newContinuat
 
 Result AwaitSocketReceiveFromAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -828,19 +750,6 @@ Result AwaitSocketReceiveFromAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitSocketReceiveFromAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitFileReadAwaiter::AwaitFileReadAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<char> buffer,
@@ -871,7 +780,7 @@ bool AwaitFileReadAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitFileReadAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -884,19 +793,6 @@ Result AwaitFileReadAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitFileReadAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,
@@ -929,7 +825,7 @@ bool AwaitFileWriteAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitFileWriteAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -942,19 +838,6 @@ Result AwaitFileWriteAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitFileWriteAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitFileSendAwaiter::AwaitFileSendAwaiter(AwaitEventLoop& await, const FileDescriptor& file,
@@ -998,7 +881,7 @@ bool AwaitFileSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitFileSendAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -1011,19 +894,6 @@ Result AwaitFileSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
-}
-
-void AwaitFileSendAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
 }
 
 AwaitLoopWorkAwaiter::AwaitLoopWorkAwaiter(AwaitEventLoop& await, ThreadPool& threadPool, Function<Result()> work)
@@ -1063,7 +933,7 @@ bool AwaitLoopWorkAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 
 Result AwaitLoopWorkAwaiter::await_resume()
 {
-    clearCancellation();
+    clearCancellation(continuation, this);
     return operationResult;
 }
 
@@ -1078,17 +948,5 @@ Result AwaitLoopWorkAwaiter::cancel(AwaitEventLoop& eventLoop)
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
 }
 
-void AwaitLoopWorkAwaiter::clearCancellation()
-{
-    if (continuation == nullptr)
-    {
-        return;
-    }
-    AwaitTask::Promise& promise = continuation.promise();
-    if (promise.cancellation.object == this)
-    {
-        promise.cancellation = {};
-    }
-}
 } // namespace SC
 #endif
