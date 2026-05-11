@@ -376,6 +376,30 @@ AwaitFileSendAwaiter AwaitEventLoop::fileSend(const FileDescriptor& file, const 
     return AwaitFileSendAwaiter(*this, file, socket, outResult, options);
 }
 
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
+                                                       FileDescriptor& outFile)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Open, path, StringSpan(),
+                                           mode, &outFile);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsCopyFile(ThreadPool& threadPool, StringSpan path,
+                                                           StringSpan destinationPath, FileSystemCopyFlags copyFlags)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::CopyFile, path,
+                                           destinationPath, FileOpen(), nullptr, copyFlags);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Rename, path, newPath);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRemoveFile(ThreadPool& threadPool, StringSpan path)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::RemoveFile, path);
+}
+
 AwaitLoopWorkAwaiter AwaitEventLoop::loopWork(ThreadPool& threadPool, Function<Result()> work)
 {
     return AwaitLoopWorkAwaiter(*this, threadPool, move(work));
@@ -894,6 +918,68 @@ Result AwaitFileSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                                                 AwaitFileSystemOperationType operation,
+                                                                 StringSpan path, StringSpan otherPath, FileOpen mode,
+                                                                 FileDescriptor* outFile, FileSystemCopyFlags copyFlags)
+    : await(await), threadPool(threadPool), operation(operation), path(path), otherPath(otherPath), mode(mode),
+      outFile(outFile), copyFlags(copyFlags)
+{}
+
+bool AwaitFileSystemOperationAwaiter::await_ready() const { return false; }
+
+bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+
+    request.callback = [this](AsyncFileSystemOperation::Result& result)
+    {
+        operationResult = result.isValid();
+        if (operationResult and operation == AwaitFileSystemOperationType::Open)
+        {
+            FileDescriptor openedFile(result.completionData.handle);
+            operationResult = outFile->assign(move(openedFile));
+        }
+        continuation.resume();
+    };
+
+    operationResult = request.setThreadPool(threadPool);
+    if (not operationResult)
+    {
+        return false;
+    }
+
+    switch (operation)
+    {
+    case AwaitFileSystemOperationType::Open:
+        if (outFile == nullptr)
+        {
+            operationResult = Result::Error("Await fsOpen missing output file");
+            return false;
+        }
+        operationResult = request.open(await.asyncEventLoop(), path, mode);
+        return operationResult;
+    case AwaitFileSystemOperationType::CopyFile:
+        operationResult = request.copyFile(await.asyncEventLoop(), path, otherPath, copyFlags);
+        return operationResult;
+    case AwaitFileSystemOperationType::Rename:
+        operationResult = request.rename(await.asyncEventLoop(), path, otherPath);
+        return operationResult;
+    case AwaitFileSystemOperationType::RemoveFile:
+        operationResult = request.removeFile(await.asyncEventLoop(), path);
+        return operationResult;
+    }
+
+    operationResult = Result::Error("Await file system operation is invalid");
+    return false;
+}
+
+Result AwaitFileSystemOperationAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
 }
 
 AwaitLoopWorkAwaiter::AwaitLoopWorkAwaiter(AwaitEventLoop& await, ThreadPool& threadPool, Function<Result()> work)

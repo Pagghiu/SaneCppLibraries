@@ -37,6 +37,7 @@ struct AwaitSocketReceiveFromAwaiter;
 struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
+struct AwaitFileSystemOperationAwaiter;
 struct AwaitLoopWorkAwaiter;
 
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
@@ -95,6 +96,14 @@ struct AwaitFileSendResult
     size_t bytesTransferred = 0;
     bool   usedZeroCopy     = false;
     bool   complete         = false;
+};
+
+enum class AwaitFileSystemOperationType : uint8_t
+{
+    Open,
+    CopyFile,
+    Rename,
+    RemoveFile,
 };
 
 /// @brief Cancellation hook installed by the awaiter currently suspending an AwaitTask.
@@ -258,7 +267,13 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                     AwaitFileWriteResult* outResult = nullptr);
     AwaitFileSendAwaiter  fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
                                    AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
-    AwaitLoopWorkAwaiter  loopWork(ThreadPool& threadPool, Function<Result()> work);
+    AwaitFileSystemOperationAwaiter fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
+                                           FileDescriptor& outFile);
+    AwaitFileSystemOperationAwaiter fsCopyFile(ThreadPool& threadPool, StringSpan path, StringSpan destinationPath,
+                                               FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+    AwaitFileSystemOperationAwaiter fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath);
+    AwaitFileSystemOperationAwaiter fsRemoveFile(ThreadPool& threadPool, StringSpan path);
+    AwaitLoopWorkAwaiter            loopWork(ThreadPool& threadPool, Function<Result()> work);
 
   private:
     AsyncEventLoop& eventLoop;
@@ -546,6 +561,34 @@ struct SC_AWAIT_EXPORT AwaitFileSendAwaiter
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for selected AsyncFileSystemOperation path operations.
+struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
+{
+    AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                    AwaitFileSystemOperationType operation, StringSpan path,
+                                    StringSpan otherPath = StringSpan(), FileOpen mode = FileOpen(),
+                                    FileDescriptor*     outFile   = nullptr,
+                                    FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+
+    AwaitEventLoop&              await;
+    ThreadPool&                  threadPool;
+    AwaitFileSystemOperationType operation;
+    StringSpan                   path;
+    StringSpan                   otherPath;
+    FileOpen                     mode;
+    FileDescriptor*              outFile = nullptr;
+    FileSystemCopyFlags          copyFlags;
+    AsyncFileSystemOperation     request;
+    Result                       operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    AwaitTask::Handle continuation;
 };
 
 /// @brief Awaiter for a single AsyncLoopWork operation.
