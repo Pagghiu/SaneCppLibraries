@@ -673,7 +673,9 @@ SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDes
     {
         FileDescriptor fd(readData.handle);
         Span<char>     actuallyRead;
-        SC_TRY(fd.read(readData.buffer, actuallyRead, readData.offset));
+        SC::Result     readResult = fd.read(readData.buffer, actuallyRead, readData.offset);
+        fd.detach();
+        SC_TRY(readResult);
         completionData.numBytes = actuallyRead.sizeInBytes();
         return SC::Result(true);
     };
@@ -695,7 +697,9 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
     loopWork.work = [&]()
     {
         FileDescriptor fd(writeData.handle);
-        SC_TRY(fd.write(writeData.buffer, writeData.offset));
+        SC::Result     writeResult = fd.write(writeData.buffer, writeData.offset);
+        fd.detach();
+        SC_TRY(writeResult);
         completionData.numBytes = writeData.buffer.sizeInBytes();
         return SC::Result(true);
     };

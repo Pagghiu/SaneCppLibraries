@@ -181,7 +181,8 @@ void SC::AsyncTest::fileSystemOperationRead()
     StringView readContent({buffer, 23}, true, StringEncoding::Ascii);
     SC_TEST_EXPECT(readContent == StringView("FileSystemOperationRead"));
 
-    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(fd.assign(handle));
+    SC_TEST_EXPECT(fd.close());
 
     // Remove test files
     SC_TEST_EXPECT(fs.removeFile("FileSystemOperationRead.txt"));
@@ -222,6 +223,8 @@ void SC::AsyncTest::fileSystemOperationWrite()
     const char* writeData = "FileSystemOperationWrite";
     SC_TEST_EXPECT(asyncFileSystemOperation.write(eventLoop, handle, Span<const char>(writeData, 24), 0));
     SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(fd.assign(handle));
+    SC_TEST_EXPECT(fd.close());
 
     // Verify the content was written correctly
     FileDescriptor verifyFd;
