@@ -11,7 +11,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Use `SC_CO_TRY(co_await ...)` inside coroutine bodies instead of `SC_TRY`.
 - Keep callback-style `Async` compatibility: `Await` operations share the same underlying event loop.
 - Current awaiter coverage includes sleep, socket accept/connect/send/sendAll/receive, datagram sendTo/receiveFrom,
-  fileRead/fileWrite/fileSend, loopWork, child tasks, and cancellation of the currently suspended operation.
+  fileRead/fileWrite/fileSend, fsOpen/fsCopyFile/fsRename/fsRemoveFile, loopWork, child tasks, child task timeouts
+  with `waitFor()`, and cancellation of the currently suspended operation.
 - Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage, but call out that the library is still experimental.
 
 ## What To Watch
@@ -20,6 +21,7 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
 - Child tasks currently need explicit `spawn()` before `co_await child`.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
+- `waitFor()` cancels the child task when the timeout expires and reports timeout state through `AwaitTimeoutResult`.
 - Operation results follow Sane conventions: awaiters return plain `Result`, and extra data is written into explicit
   caller-provided result objects such as `AwaitSocketReceiveResult` or `AwaitFileReadResult`.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.

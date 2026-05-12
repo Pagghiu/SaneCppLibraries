@@ -1,6 +1,6 @@
 @page library_await Await
 
-@brief 🟪 Draft C++20 coroutine layer over Async
+@brief 🟥 C++20 coroutine layer over Async
 
 [TOC]
 
@@ -50,6 +50,8 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFileReadAwaiter](@ref SC::AwaitFileReadAwaiter) | @copybrief SC::AwaitFileReadAwaiter       |
 | [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
 | [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
+| [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
+| [AwaitTaskTimeoutAwaiter](@ref SC::AwaitTaskTimeoutAwaiter) | @copybrief SC::AwaitTaskTimeoutAwaiter |
 | [AwaitLoopWorkAwaiter](@ref SC::AwaitLoopWorkAwaiter) | @copybrief SC::AwaitLoopWorkAwaiter       |
 
 # Example
@@ -72,7 +74,7 @@ AwaitTask sendAndReceive(AwaitEventLoop& await, const SocketDescriptor& sender, 
 
 # Status
 
-🟪 Draft
+🟥 Draft
 
 The current proof of concept supports:
 
@@ -81,9 +83,11 @@ The current proof of concept supports:
 - socket `send()`, `sendAll()`, and `receive()`;
 - datagram socket `sendTo()` and `receiveFrom()`;
 - file `fileRead()`, `fileWrite()`, and `fileSend()`;
+- selected path-level filesystem operations: `fsOpen()`, `fsCopyFile()`, `fsRename()`, and `fsRemoveFile()`;
 - background `loopWork()`;
 - task cancellation for currently suspended operations;
 - awaiting explicitly spawned child tasks;
+- child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
 The draft is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
@@ -115,19 +119,18 @@ destroyed.
 
 # Roadmap
 
-🟪 Draft Features:
+🟥 Draft Features:
 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
-- Expand cancellation semantics and edge-case coverage for every awaiter.
+- Expand cancellation semantics and edge-case coverage for every awaiter, including parent cancellation while waiting on `waitFor()`.
 - Decide if arena allocation should become mandatory for production use.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
 - Explore structured child tasks / task groups.
 
 # Statistics
-
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 249			| 106		| 355	|
-| Sources   | 502			| 119		| 621	|
-| Sum       | 751			| 225		| 976	|
+| Headers   | 489			| 185		| 674	|
+| Sources   | 946			| 223		| 1169	|
+| Sum       | 1435			| 408		| 1843	|

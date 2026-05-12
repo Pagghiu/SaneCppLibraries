@@ -14,7 +14,7 @@
 
 //! @defgroup group_await Await
 //! @copybrief library_await (see @ref library_await for more details)
-//! Draft C++20 coroutine layer over SC::AsyncEventLoop.
+//! C++20 coroutine layer over SC::AsyncEventLoop.
 //!
 //! Await is an experimental wrapper that lets coroutine bodies express asynchronous operations with `co_await` while
 //! still returning plain SC::Result values and using caller-provided output objects.
