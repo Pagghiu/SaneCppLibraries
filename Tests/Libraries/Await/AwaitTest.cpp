@@ -99,6 +99,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             waitForTimeout();
         }
+        if (test_section("cancel wait for"))
+        {
+            cancelWaitFor();
+        }
         if (test_section("arena"))
         {
             arena();
@@ -337,6 +341,18 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(not child.result());
 
         co_return Result(true);
+    }
+
+    AwaitTask waitForCancellableChild(AwaitEventLoop& await, AwaitTask& child, AwaitTimeoutResult& timeoutResult)
+    {
+        child = waitLong(await);
+        SC_CO_TRY(await.spawn(child));
+
+        Result waitResult = co_await await.waitFor(child, 10000_ms, &timeoutResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(not timeoutResult.timedOut);
+
+        co_return waitResult;
     }
 
     static AwaitTask arenaWait(AwaitEventLoop& await)
@@ -885,6 +901,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(parent.isActive());
         SC_TEST_EXPECT(child.isActive());
         SC_TEST_EXPECT(parent.cancel(await));
+        SC_TEST_EXPECT(child.isCancellationRequested());
 
         SC_TEST_EXPECT(await.run());
 
@@ -919,6 +936,30 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(task.result());
             SC_TEST_EXPECT(async.close());
         }
+    }
+
+    void cancelWaitFor()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        AwaitTask          child;
+        AwaitTimeoutResult timeoutResult;
+        AwaitTask          parent = waitForCancellableChild(await, child, timeoutResult);
+        SC_TEST_EXPECT(await.spawn(parent));
+        SC_TEST_EXPECT(parent.isActive());
+        SC_TEST_EXPECT(child.isActive());
+        SC_TEST_EXPECT(parent.cancel(await));
+
+        SC_TEST_EXPECT(await.run());
+
+        SC_TEST_EXPECT(child.isCompleted());
+        SC_TEST_EXPECT(parent.isCompleted());
+        SC_TEST_EXPECT(not child.result());
+        SC_TEST_EXPECT(not parent.result());
+        SC_TEST_EXPECT(not timeoutResult.timedOut);
+        SC_TEST_EXPECT(async.close());
     }
 
     void arena()

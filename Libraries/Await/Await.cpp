@@ -1057,6 +1057,10 @@ bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         promise.completionObject   = nullptr;
         promise.completionCallback = nullptr;
     }
+    else
+    {
+        continuation.promise().cancellation = {this, AwaitTaskTimeoutAwaiter::cancel};
+    }
     return operationResult;
 }
 
@@ -1071,6 +1075,42 @@ void AwaitTaskTimeoutAwaiter::onTaskCompleted(void* object)
     static_cast<AwaitTaskTimeoutAwaiter*>(object)->onTaskCompleted();
 }
 
+Result AwaitTaskTimeoutAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitTaskTimeoutAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitTaskTimeoutAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    cancelling      = true;
+    if (outResult != nullptr)
+    {
+        outResult->timedOut = false;
+    }
+
+    Result cancelResult = task.cancel(eventLoop);
+    if (not cancelResult)
+    {
+        return cancelResult;
+    }
+
+    if (timeoutFired)
+    {
+        return Result(true);
+    }
+
+    stopCallback = [this](AsyncResult&)
+    {
+        timeoutStopped = true;
+        if (childCompleted)
+        {
+            finish(operationResult);
+        }
+    };
+    return timeoutRequest.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
 void AwaitTaskTimeoutAwaiter::onTaskCompleted()
 {
     if (finished)
@@ -1078,14 +1118,27 @@ void AwaitTaskTimeoutAwaiter::onTaskCompleted()
         return;
     }
 
+    childCompleted = true;
     if (timeoutFired)
     {
         finish(operationResult);
         return;
     }
+    if (cancelling)
+    {
+        if (timeoutStopped)
+        {
+            finish(operationResult);
+        }
+        return;
+    }
 
-    operationResult   = task.result();
-    stopCallback      = [this](AsyncResult&) { finish(operationResult); };
+    operationResult = task.result();
+    stopCallback    = [this](AsyncResult&)
+    {
+        timeoutStopped = true;
+        finish(operationResult);
+    };
     Result stopResult = timeoutRequest.stop(await.asyncEventLoop(), &stopCallback);
     if (not stopResult)
     {

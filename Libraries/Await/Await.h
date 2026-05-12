@@ -618,15 +618,20 @@ struct SC_AWAIT_EXPORT AwaitTaskTimeoutAwaiter
     Result await_resume();
 
   private:
-    static void onTaskCompleted(void* object);
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+    static void   onTaskCompleted(void* object);
 
-    void onTaskCompleted();
-    void finish(Result result);
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   onTaskCompleted();
+    void   finish(Result result);
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
-    bool                         timeoutFired = false;
-    bool                         finished     = false;
+    bool                         cancelling     = false;
+    bool                         childCompleted = false;
+    bool                         timeoutStopped = false;
+    bool                         timeoutFired   = false;
+    bool                         finished       = false;
 };
 
 /// @brief Awaiter for a single AsyncLoopWork operation.
