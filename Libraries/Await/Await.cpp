@@ -394,6 +394,11 @@ AwaitFileSystemOperationAwaiter AwaitEventLoop::fsOpen(ThreadPool& threadPool, S
                                            mode, &outFile);
 }
 
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsClose(ThreadPool& threadPool, FileDescriptor& file)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Close, file);
+}
+
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsCopyFile(ThreadPool& threadPool, StringSpan path,
                                                            StringSpan destinationPath, FileSystemCopyFlags copyFlags)
 {
@@ -401,9 +406,22 @@ AwaitFileSystemOperationAwaiter AwaitEventLoop::fsCopyFile(ThreadPool& threadPoo
                                            destinationPath, FileOpen(), nullptr, copyFlags);
 }
 
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsCopyDirectory(ThreadPool& threadPool, StringSpan path,
+                                                                StringSpan          destinationPath,
+                                                                FileSystemCopyFlags copyFlags)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::CopyDirectory, path,
+                                           destinationPath, FileOpen(), nullptr, copyFlags);
+}
+
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath)
 {
     return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Rename, path, newPath);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRemoveEmptyDirectory(ThreadPool& threadPool, StringSpan path)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::RemoveEmptyDirectory, path);
 }
 
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRemoveFile(ThreadPool& threadPool, StringSpan path)
@@ -944,6 +962,12 @@ AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop&
       outFile(outFile), copyFlags(copyFlags)
 {}
 
+AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                                                 AwaitFileSystemOperationType operation,
+                                                                 FileDescriptor&              file)
+    : await(await), threadPool(threadPool), operation(operation), fileToClose(&file)
+{}
+
 bool AwaitFileSystemOperationAwaiter::await_ready() const { return false; }
 
 bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinuation)
@@ -977,11 +1001,36 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         operationResult = request.open(await.asyncEventLoop(), path, mode);
         return operationResult;
+    case AwaitFileSystemOperationType::Close: {
+        if (fileToClose == nullptr)
+        {
+            operationResult = Result::Error("Await fsClose missing file");
+            return false;
+        }
+        FileDescriptor::Handle handle = FileDescriptor::Invalid;
+        operationResult               = fileToClose->get(handle, Result::Error("Await fsClose invalid file"));
+        if (not operationResult)
+        {
+            return false;
+        }
+        operationResult = request.close(await.asyncEventLoop(), handle);
+        if (operationResult)
+        {
+            fileToClose->detach();
+        }
+        return operationResult;
+    }
     case AwaitFileSystemOperationType::CopyFile:
         operationResult = request.copyFile(await.asyncEventLoop(), path, otherPath, copyFlags);
         return operationResult;
+    case AwaitFileSystemOperationType::CopyDirectory:
+        operationResult = request.copyDirectory(await.asyncEventLoop(), path, otherPath, copyFlags);
+        return operationResult;
     case AwaitFileSystemOperationType::Rename:
         operationResult = request.rename(await.asyncEventLoop(), path, otherPath);
+        return operationResult;
+    case AwaitFileSystemOperationType::RemoveEmptyDirectory:
+        operationResult = request.removeEmptyDirectory(await.asyncEventLoop(), path);
         return operationResult;
     case AwaitFileSystemOperationType::RemoveFile:
         operationResult = request.removeFile(await.asyncEventLoop(), path);

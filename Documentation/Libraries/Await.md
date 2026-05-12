@@ -83,7 +83,8 @@ The current proof of concept supports:
 - socket `send()`, `sendAll()`, and `receive()`;
 - datagram socket `sendTo()` and `receiveFrom()`;
 - file `fileRead()`, `fileWrite()`, and `fileSend()`;
-- selected path-level filesystem operations: `fsOpen()`, `fsCopyFile()`, `fsRename()`, and `fsRemoveFile()`;
+- selected filesystem operations: `fsOpen()`, `fsClose()`, `fsCopyFile()`, `fsCopyDirectory()`, `fsRename()`,
+  `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
 - task cancellation for currently suspended operations;
 - awaiting explicitly spawned child tasks;
@@ -123,6 +124,7 @@ destroyed.
 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
 - Expand cancellation semantics and edge-case coverage for every awaiter, including parent cancellation while waiting on `waitFor()`.
+- Clarify `AsyncFileSystemOperation::read()` and `write()` handle ownership before adding Await wrappers for them.
 - Decide if arena allocation should become mandatory for production use.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
@@ -131,6 +133,6 @@ destroyed.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 489			| 185		| 674	|
-| Sources   | 946			| 223		| 1169	|
-| Sum       | 1435			| 408		| 1843	|
+| Headers   | 504			| 185		| 689	|
+| Sources   | 1039			| 232		| 1271	|
+| Sum       | 1543			| 417		| 1960	|

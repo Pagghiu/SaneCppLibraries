@@ -107,8 +107,11 @@ struct AwaitTimeoutResult
 enum class AwaitFileSystemOperationType : uint8_t
 {
     Open,
+    Close,
     CopyFile,
+    CopyDirectory,
     Rename,
+    RemoveEmptyDirectory,
     RemoveFile,
 };
 
@@ -278,9 +281,13 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                    AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
     AwaitFileSystemOperationAwaiter fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                            FileDescriptor& outFile);
+    AwaitFileSystemOperationAwaiter fsClose(ThreadPool& threadPool, FileDescriptor& file);
     AwaitFileSystemOperationAwaiter fsCopyFile(ThreadPool& threadPool, StringSpan path, StringSpan destinationPath,
                                                FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+    AwaitFileSystemOperationAwaiter fsCopyDirectory(ThreadPool& threadPool, StringSpan path, StringSpan destinationPath,
+                                                    FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
     AwaitFileSystemOperationAwaiter fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath);
+    AwaitFileSystemOperationAwaiter fsRemoveEmptyDirectory(ThreadPool& threadPool, StringSpan path);
     AwaitFileSystemOperationAwaiter fsRemoveFile(ThreadPool& threadPool, StringSpan path);
     AwaitTaskTimeoutAwaiter         waitFor(AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult = nullptr);
     AwaitLoopWorkAwaiter            loopWork(ThreadPool& threadPool, Function<Result()> work);
@@ -581,6 +588,8 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
                                     StringSpan otherPath = StringSpan(), FileOpen mode = FileOpen(),
                                     FileDescriptor*     outFile   = nullptr,
                                     FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
+    AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                    AwaitFileSystemOperationType operation, FileDescriptor& file);
 
     AwaitEventLoop&              await;
     ThreadPool&                  threadPool;
@@ -588,7 +597,8 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
     StringSpan                   path;
     StringSpan                   otherPath;
     FileOpen                     mode;
-    FileDescriptor*              outFile = nullptr;
+    FileDescriptor*              outFile     = nullptr;
+    FileDescriptor*              fileToClose = nullptr;
     FileSystemCopyFlags          copyFlags;
     AsyncFileSystemOperation     request;
     Result                       operationResult = Result(true);

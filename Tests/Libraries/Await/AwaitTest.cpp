@@ -247,7 +247,9 @@ struct SC::AwaitTest : public SC::TestCase
     }
 
     AwaitTask fileSystemOperationsOnce(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan sourcePath,
-                                       StringSpan copyPath, StringSpan renamePath)
+                                       StringSpan copyPath, StringSpan renamePath, StringSpan directoryPath,
+                                       StringSpan directoryCopyPath, StringSpan directoryFilePath,
+                                       StringSpan directoryCopyFilePath)
     {
         FileDescriptor openedFile;
         SC_CO_TRY(co_await await.fsOpen(threadPool, sourcePath, FileOpen::Read, openedFile));
@@ -255,12 +257,18 @@ struct SC::AwaitTest : public SC::TestCase
         String text;
         SC_CO_TRY(openedFile.readUntilEOF(text));
         SC_TEST_EXPECT(text.view() == "AwaitFileSystemOperations");
-        SC_CO_TRY(openedFile.close());
+        SC_CO_TRY(co_await await.fsClose(threadPool, openedFile));
+        SC_TEST_EXPECT(not openedFile.isValid());
 
         SC_CO_TRY(co_await await.fsCopyFile(threadPool, sourcePath, copyPath));
         SC_CO_TRY(co_await await.fsRename(threadPool, copyPath, renamePath));
+        SC_CO_TRY(co_await await.fsCopyDirectory(threadPool, directoryPath, directoryCopyPath));
         SC_CO_TRY(co_await await.fsRemoveFile(threadPool, sourcePath));
         SC_CO_TRY(co_await await.fsRemoveFile(threadPool, renamePath));
+        SC_CO_TRY(co_await await.fsRemoveFile(threadPool, directoryFilePath));
+        SC_CO_TRY(co_await await.fsRemoveFile(threadPool, directoryCopyFilePath));
+        SC_CO_TRY(co_await await.fsRemoveEmptyDirectory(threadPool, directoryPath));
+        SC_CO_TRY(co_await await.fsRemoveEmptyDirectory(threadPool, directoryCopyPath));
 
         co_return Result(true);
     }
@@ -787,23 +795,38 @@ struct SC::AwaitTest : public SC::TestCase
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(1));
 
-        SmallStringNative<255> sourcePath = StringEncoding::Native;
-        SmallStringNative<255> copyPath   = StringEncoding::Native;
-        SmallStringNative<255> renamePath = StringEncoding::Native;
-        const StringView       sourceName = "await-fs-source.txt";
-        const StringView       copyName   = "await-fs-copy.txt";
-        const StringView       renameName = "await-fs-renamed.txt";
+        SmallStringNative<255> sourcePath      = StringEncoding::Native;
+        SmallStringNative<255> copyPath        = StringEncoding::Native;
+        SmallStringNative<255> renamePath      = StringEncoding::Native;
+        SmallStringNative<255> dirPath         = StringEncoding::Native;
+        SmallStringNative<255> dirCopyPath     = StringEncoding::Native;
+        SmallStringNative<255> dirFilePath     = StringEncoding::Native;
+        SmallStringNative<255> dirCopyFilePath = StringEncoding::Native;
+        const StringView       sourceName      = "await-fs-source.txt";
+        const StringView       copyName        = "await-fs-copy.txt";
+        const StringView       renameName      = "await-fs-renamed.txt";
+        const StringView       dirName         = "await-fs-dir";
+        const StringView       dirCopyName     = "await-fs-dir-copy";
+        const StringView       dirFileName     = "await-fs-dir/file.txt";
+        const StringView       dirCopyFileName = "await-fs-dir-copy/file.txt";
 
         SC_TEST_EXPECT(Path::join(sourcePath, {report.applicationRootDirectory.view(), sourceName}));
         SC_TEST_EXPECT(Path::join(copyPath, {report.applicationRootDirectory.view(), copyName}));
         SC_TEST_EXPECT(Path::join(renamePath, {report.applicationRootDirectory.view(), renameName}));
+        SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), dirName}));
+        SC_TEST_EXPECT(Path::join(dirCopyPath, {report.applicationRootDirectory.view(), dirCopyName}));
+        SC_TEST_EXPECT(Path::join(dirFilePath, {report.applicationRootDirectory.view(), dirFileName}));
+        SC_TEST_EXPECT(Path::join(dirCopyFilePath, {report.applicationRootDirectory.view(), dirCopyFileName}));
 
         FileSystem fs;
         SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
         SC_TEST_EXPECT(fs.writeString(sourceName, "AwaitFileSystemOperations"));
+        SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(dirName));
+        SC_TEST_EXPECT(fs.writeString(dirFileName, "AwaitDirectoryFile"));
 
         AwaitTask task =
-            fileSystemOperationsOnce(await, threadPool, sourcePath.view(), copyPath.view(), renamePath.view());
+            fileSystemOperationsOnce(await, threadPool, sourcePath.view(), copyPath.view(), renamePath.view(),
+                                     dirPath.view(), dirCopyPath.view(), dirFilePath.view(), dirCopyFilePath.view());
         SC_TEST_EXPECT(await.spawn(task));
         SC_TEST_EXPECT(await.run());
 
@@ -811,6 +834,8 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(not fs.existsAndIsFile(sourceName));
         SC_TEST_EXPECT(not fs.existsAndIsFile(copyName));
         SC_TEST_EXPECT(not fs.existsAndIsFile(renameName));
+        SC_TEST_EXPECT(not fs.existsAndIsDirectory(dirName));
+        SC_TEST_EXPECT(not fs.existsAndIsDirectory(dirCopyName));
         SC_TEST_EXPECT(async.close());
         SC_TEST_EXPECT(threadPool.destroy());
     }
