@@ -6,7 +6,7 @@ Library                                     | Description                       
 :-------------------------------------------|:----------------------------------------------|---------------
 @subpage library_async                      | @copybrief library_async                      |   7062
 @subpage library_async_streams              | @copybrief library_async_streams              |   2627
-@subpage library_await                      | @copybrief library_await                      |   2036
+@subpage library_await                      | @copybrief library_await                      |   2373
 @subpage library_containers                 | @copybrief library_containers                 |   959
 @subpage library_containers_reflection      | @copybrief library_containers_reflection      |   217
 @subpage library_file                       | @copybrief library_file                       |   1485
@@ -32,10 +32,10 @@ Library                                     | Description                       
 
 LOC               | Count
 :-----------------|:-----------------
-Header            | 11485
-Implementation    | 31578
-Comments          | 13440
-*Total*           | 56503
+Header            | 11573
+Implementation    | 31827
+Comments          | 13508
+*Total*           | 56908
 
 ![Dependency Graph](https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg)
 

@@ -65,9 +65,17 @@ struct SC::AwaitTest : public SC::TestCase
         {
             cancelEdgeCases();
         }
+        if (test_section("cancel suspended awaiters"))
+        {
+            cancelSuspendedAwaiters();
+        }
         if (test_section("callback and coroutine coexist"))
         {
             callbackAndCoroutineCoexist();
+        }
+        if (test_section("loop wake up"))
+        {
+            loopWakeUp();
         }
         if (test_section("spawn wrong event loop"))
         {
@@ -92,6 +100,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("socket send all"))
         {
             socketSendAll();
+        }
+        if (test_section("tiny echo conversation"))
+        {
+            tinyEchoConversation();
         }
         if (test_section("file read write"))
         {
@@ -149,6 +161,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             taskGroup();
         }
+        if (test_section("task group wait any"))
+        {
+            taskGroupWaitAny();
+        }
         if (test_section("cancel child task"))
         {
             cancelChildTask();
@@ -183,6 +199,13 @@ struct SC::AwaitTest : public SC::TestCase
     AwaitTask waitLong(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1000_ms));
+        co_return Result(true);
+    }
+
+    AwaitTask wakeUpOnce(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& result)
+    {
+        SC_CO_TRY(co_await await.wakeUp(wakeUp, result));
+        SC_TEST_EXPECT(result.deliveryCount >= 1);
         co_return Result(true);
     }
 
@@ -235,6 +258,55 @@ struct SC::AwaitTest : public SC::TestCase
         {
             SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
         }
+
+        co_return Result(true);
+    }
+
+    AwaitTask receiveForever(AwaitEventLoop& await, const SocketDescriptor& receiver)
+    {
+        char                     receiveBuffer[16] = {};
+        AwaitSocketReceiveResult receiveResult;
+        SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        co_return Result(true);
+    }
+
+    AwaitTask tinyEchoServer(AwaitEventLoop& await, const SocketDescriptor& serverSocket, SocketDescriptor& accepted)
+    {
+        char                     receiveBuffer[64] = {};
+        AwaitSocketReceiveResult receiveResult;
+
+        SC_CO_TRY(co_await await.accept(serverSocket, accepted));
+        SC_CO_TRY(co_await await.receive(accepted, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        SC_CO_TRY(co_await await.sendAll(accepted, receiveResult.data));
+
+        co_return Result(true);
+    }
+
+    AwaitTask tinyEchoClient(AwaitEventLoop& await, const SocketDescriptor& client, SocketIPAddress address,
+                             Span<char> receiveBuffer, AwaitSocketReceiveResult& reply)
+    {
+        const char message[] = "niche readable await";
+
+        SC_CO_TRY(co_await await.connect(client, address));
+        SC_CO_TRY(co_await await.sendAll(client, {message, sizeof(message) - 1}));
+        SC_CO_TRY(co_await await.receive(client, receiveBuffer, reply));
+
+        co_return Result(true);
+    }
+
+    AwaitTask tinyEchoConversationOnce(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                                       const SocketDescriptor& client, SocketIPAddress address,
+                                       SocketDescriptor& accepted, Span<char> replyBuffer,
+                                       AwaitSocketReceiveResult& reply)
+    {
+        AwaitTask server     = tinyEchoServer(await, serverSocket, accepted);
+        AwaitTask clientTask = tinyEchoClient(await, client, address, replyBuffer, reply);
+
+        AwaitTask*     storage[2] = {};
+        AwaitTaskGroup group(await, storage);
+        SC_CO_TRY(group.spawn(server));
+        SC_CO_TRY(group.spawn(clientTask));
+        SC_CO_TRY(co_await group.waitAll());
 
         co_return Result(true);
     }
@@ -471,6 +543,41 @@ struct SC::AwaitTest : public SC::TestCase
         co_return groupResult;
     }
 
+    AwaitTask waitAnyTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    {
+        AwaitTask fastChild = waitTwice(await);
+        slowChild           = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(fastChild));
+        SC_CO_TRY(group.spawn(slowChild));
+
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        SC_CO_TRY(co_await group.waitAny(waitAnyResult));
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == &fastChild);
+        SC_TEST_EXPECT(fastChild.result());
+        SC_TEST_EXPECT(slowChild.isCompleted());
+        SC_TEST_EXPECT(not slowChild.result());
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAllLeaveChildrenRunning(AwaitEventLoop& await, AwaitTask& child)
+    {
+        child = waitLong(await);
+
+        AwaitTask*     groupStorage[1] = {};
+        AwaitTaskGroup group(await, groupStorage, AwaitTaskGroupCancelPolicy::LeaveChildrenRunning);
+        SC_CO_TRY(group.spawn(child));
+
+        Result groupResult = co_await group.waitAll();
+        SC_TEST_EXPECT(not groupResult);
+
+        co_return groupResult;
+    }
+
     AwaitTask waitForCompletedChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitTwice(await);
@@ -660,6 +767,87 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
+    void cancelSuspendedAwaiters()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitLoopWakeUp       wakeUp;
+            AwaitLoopWakeUpResult result;
+            AwaitTask             task = wakeUpOnce(await, wakeUp, result);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            PipeDescriptor pipe;
+            PipeOptions    pipeOptions;
+            pipeOptions.blocking = false;
+            SC_TEST_EXPECT(pipe.createPipe(pipeOptions));
+            SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(pipe.readPipe));
+
+            AwaitTask task = filePollOnce(await, pipe.readPipe);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(pipe.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor client;
+            SocketDescriptor serverSideClient;
+            createTCPSocketPair(async, client, serverSideClient);
+
+            AwaitTask task = receiveForever(await, serverSideClient);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSideClient.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor serverSocket;
+            SocketIPAddress  nativeAddress;
+            createTCPServer(async, serverSocket, nativeAddress);
+
+            SocketDescriptor acceptedClient;
+            AwaitTask        task = acceptOne(await, serverSocket, acceptedClient);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(serverSocket.close());
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
     void callbackAndCoroutineCoexist()
     {
         AsyncEventLoop async;
@@ -681,6 +869,40 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(callbackCount == 1);
         SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void loopWakeUp()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        AwaitLoopWakeUp       wakeUp;
+        AwaitLoopWakeUpResult result;
+        AwaitTask             task = wakeUpOnce(await, wakeUp, result);
+        SC_TEST_EXPECT(await.spawn(task));
+
+        Thread senderThread;
+        struct ThreadContext
+        {
+            AwaitEventLoop*  await;
+            AwaitLoopWakeUp* wakeUp;
+            Result           wakeUpResult = Result(false);
+        } threadContext = {&await, &wakeUp};
+
+        auto sender = [&threadContext](Thread& thread)
+        {
+            thread.setThreadName(SC_NATIVE_STR("await-wakeup"));
+            threadContext.wakeUpResult = threadContext.wakeUp->wakeUp(*threadContext.await);
+        };
+
+        SC_TEST_EXPECT(senderThread.start(sender));
+        SC_TEST_EXPECT(senderThread.join());
+        SC_TEST_EXPECT(threadContext.wakeUpResult);
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(result.deliveryCount == 1);
         SC_TEST_EXPECT(async.close());
     }
 
@@ -828,6 +1050,39 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(client.close());
         SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void tinyEchoConversation()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        SocketDescriptor serverSocket;
+        SocketIPAddress  nativeAddress;
+        createTCPServer(async, serverSocket, nativeAddress);
+
+        SocketDescriptor client;
+        SC_TEST_EXPECT(async.createAsyncTCPSocket(nativeAddress.getAddressFamily(), client));
+
+        SocketDescriptor         acceptedClient;
+        char                     replyBuffer[64] = {};
+        AwaitSocketReceiveResult reply;
+        AwaitTask                task =
+            tinyEchoConversationOnce(await, serverSocket, client, nativeAddress, acceptedClient, replyBuffer, reply);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+
+        SC_TEST_EXPECT(task.result());
+        const StringView expected = "niche readable await";
+        SC_TEST_EXPECT(reply.data.sizeInBytes() == expected.sizeInBytes());
+        SC_TEST_EXPECT(StringView({reply.data.data(), reply.data.sizeInBytes()}, false, StringEncoding::Ascii) ==
+                       expected);
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(acceptedClient.close());
+        SC_TEST_EXPECT(serverSocket.close());
         SC_TEST_EXPECT(async.close());
     }
 
@@ -1298,6 +1553,45 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(not childA.result());
             SC_TEST_EXPECT(not childB.result());
             SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
+    void taskGroupWaitAny()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask slowChild;
+            AwaitTask task = waitAnyTaskGroup(await, slowChild);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(slowChild.isCompleted());
+            SC_TEST_EXPECT(not slowChild.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask child;
+            AwaitTask parent = waitAllLeaveChildrenRunning(await, child);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(parent.isActive());
+            SC_TEST_EXPECT(child.isActive());
+            SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(child.isActive());
+
+            SC_TEST_EXPECT(child.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(child.isCompleted());
+            SC_TEST_EXPECT(not child.result());
             SC_TEST_EXPECT(async.close());
         }
     }

@@ -410,6 +410,12 @@ AwaitFileSendAwaiter AwaitEventLoop::fileSend(const FileDescriptor& file, const 
 
 AwaitFilePollAwaiter AwaitEventLoop::filePoll(const FileDescriptor& file) { return AwaitFilePollAwaiter(*this, file); }
 
+AwaitLoopWakeUpAwaiter AwaitEventLoop::wakeUp(AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& outResult,
+                                              AsyncLoopWakeUpOptions options)
+{
+    return AwaitLoopWakeUpAwaiter(*this, wakeUp, outResult, options);
+}
+
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                                        FileDescriptor& outFile)
 {
@@ -489,6 +495,12 @@ AwaitLoopWorkAwaiter AwaitEventLoop::loopWork(ThreadPool& threadPool, Function<R
     return AwaitLoopWorkAwaiter(*this, threadPool, move(work));
 }
 
+Result AwaitLoopWakeUp::wakeUp(AwaitEventLoop& await) { return wakeUp(await.asyncEventLoop()); }
+
+Result AwaitLoopWakeUp::wakeUp(AsyncEventLoop& eventLoop) { return request.wakeUp(eventLoop); }
+
+bool AwaitLoopWakeUp::isActive() const { return request.isActive(); }
+
 AwaitSleepAwaiter::AwaitSleepAwaiter(AwaitEventLoop& await, TimeMs duration) : await(await), duration(duration) {}
 
 bool AwaitSleepAwaiter::await_ready() const { return false; }
@@ -521,6 +533,45 @@ Result AwaitSleepAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 Result AwaitSleepAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+AwaitLoopWakeUpAwaiter::AwaitLoopWakeUpAwaiter(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp,
+                                               AwaitLoopWakeUpResult& outResult, AsyncLoopWakeUpOptions options)
+    : await(await), wakeUp(wakeUp), outResult(outResult), options(options)
+{}
+
+bool AwaitLoopWakeUpAwaiter::await_ready() const { return false; }
+
+bool AwaitLoopWakeUpAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitLoopWakeUpAwaiter::cancel);
+
+    outResult               = {};
+    wakeUp.request.callback = [this](AsyncLoopWakeUp::Result& result)
+    {
+        operationResult         = result.isValid();
+        outResult.deliveryCount = result.completionData.deliveryCount;
+        continuation.resume();
+    };
+
+    operationResult = wakeUp.request.start(await.asyncEventLoop(), options);
+    return operationResult;
+}
+
+Result AwaitLoopWakeUpAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitLoopWakeUpAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitLoopWakeUpAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitLoopWakeUpAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(wakeUp.request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketAcceptAwaiter::AwaitSocketAcceptAwaiter(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
@@ -1035,7 +1086,7 @@ bool AwaitFileSystemOperationAwaiter::await_ready() const { return false; }
 
 bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFileSystemOperationAwaiter::cancel);
 
     request.callback = [this](AsyncFileSystemOperation::Result& result)
     {
@@ -1155,7 +1206,19 @@ Result AwaitFileSystemOperationAwaiter::await_resume()
     return operationResult;
 }
 
-AwaitTaskGroup::AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage) : await(await), tasks(taskStorage)
+Result AwaitFileSystemOperationAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitFileSystemOperationAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitFileSystemOperationAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+AwaitTaskGroup::AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage,
+                               AwaitTaskGroupCancelPolicy cancelPolicy)
+    : await(await), tasks(taskStorage), cancelPolicy(cancelPolicy)
 {}
 
 Result AwaitTaskGroup::spawn(AwaitTask& task)
@@ -1171,6 +1234,12 @@ Result AwaitTaskGroup::spawn(AwaitTask& task)
 }
 
 AwaitTaskGroupWaitAllAwaiter AwaitTaskGroup::waitAll() { return AwaitTaskGroupWaitAllAwaiter(*this); }
+
+AwaitTaskGroupWaitAnyAwaiter AwaitTaskGroup::waitAny(AwaitTaskGroupWaitAnyResult& outResult,
+                                                     AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy)
+{
+    return AwaitTaskGroupWaitAnyAwaiter(*this, outResult, waitAnyPolicy);
+}
 
 size_t AwaitTaskGroup::size() const { return numTasks; }
 
@@ -1241,6 +1310,12 @@ Result AwaitTaskGroupWaitAllAwaiter::cancel(void* object, AwaitEventLoop& eventL
 Result AwaitTaskGroupWaitAllAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     operationResult = AwaitTaskCancelled();
+    if (group.cancelPolicy == AwaitTaskGroupCancelPolicy::LeaveChildrenRunning)
+    {
+        finish(operationResult);
+        return Result(true);
+    }
+
     Result cancelResult(true);
     for (size_t idx = 0; idx < group.numTasks; ++idx)
     {
@@ -1318,6 +1393,223 @@ Result AwaitTaskGroupWaitAllAwaiter::collectResult() const
         SC_TRY(task->result());
     }
     return Result(true);
+}
+
+AwaitTaskGroupWaitAnyAwaiter::AwaitTaskGroupWaitAnyAwaiter(AwaitTaskGroup&              group,
+                                                           AwaitTaskGroupWaitAnyResult& outResult,
+                                                           AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy)
+    : group(group), outResult(outResult), waitAnyPolicy(waitAnyPolicy)
+{}
+
+bool AwaitTaskGroupWaitAnyAwaiter::await_ready() const { return false; }
+
+bool AwaitTaskGroupWaitAnyAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    outResult    = {};
+
+    if (group.numTasks == 0)
+    {
+        operationResult = Result::Error("AwaitTaskGroup is empty");
+        return false;
+    }
+
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task == nullptr or not task->isValid())
+        {
+            operationResult = Result::Error("AwaitTaskGroup contains invalid task");
+            clearChildCallbacks();
+            return false;
+        }
+        if (task->isCompleted())
+        {
+            completedTasks++;
+            if (winnerIndex == size_t(-1))
+            {
+                operationResult = setWinner(idx);
+            }
+            continue;
+        }
+        if (not task->isActive())
+        {
+            operationResult = Result::Error("AwaitTaskGroup contains inactive task");
+            clearChildCallbacks();
+            return false;
+        }
+
+        AwaitTask::Promise& promise = task->handle.promise();
+        if (promise.completionCallback != nullptr or promise.continuation != nullptr)
+        {
+            operationResult = Result::Error("AwaitTask is already being awaited");
+            clearChildCallbacks();
+            return false;
+        }
+
+        promise.completionObject   = this;
+        promise.completionCallback = AwaitTaskGroupWaitAnyAwaiter::onTaskCompleted;
+    }
+
+    if (winnerIndex == size_t(-1) and not operationResult)
+    {
+        clearChildCallbacks();
+        return false;
+    }
+
+    continuation.promise().cancellation = {this, AwaitTaskGroupWaitAnyAwaiter::cancel};
+
+    if (winnerIndex != size_t(-1))
+    {
+        if (waitAnyPolicy == AwaitTaskGroupWaitAnyPolicy::LeaveRemainingRunning or completedTasks == group.numTasks)
+        {
+            clearChildCallbacks();
+            return false;
+        }
+
+        Result cancelResult = cancelRemaining(group.await);
+        if (not cancelResult)
+        {
+            operationResult = cancelResult;
+            clearChildCallbacks();
+            return false;
+        }
+        return completedTasks != group.numTasks;
+    }
+
+    return true;
+}
+
+Result AwaitTaskGroupWaitAnyAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitTaskGroupWaitAnyAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitTaskGroupWaitAnyAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitTaskGroupWaitAnyAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    if (group.cancelPolicy == AwaitTaskGroupCancelPolicy::LeaveChildrenRunning)
+    {
+        finish(operationResult);
+        return Result(true);
+    }
+
+    cancelling = true;
+    return cancelRemaining(eventLoop);
+}
+
+void AwaitTaskGroupWaitAnyAwaiter::onTaskCompleted(void* object)
+{
+    static_cast<AwaitTaskGroupWaitAnyAwaiter*>(object)->onTaskCompleted();
+}
+
+void AwaitTaskGroupWaitAnyAwaiter::onTaskCompleted()
+{
+    if (finished)
+    {
+        return;
+    }
+
+    completedTasks++;
+    if (winnerIndex == size_t(-1))
+    {
+        for (size_t idx = 0; idx < group.numTasks; ++idx)
+        {
+            AwaitTask* task = group.tasks[idx];
+            if (task != nullptr and task->isCompleted())
+            {
+                operationResult = setWinner(idx);
+                break;
+            }
+        }
+
+        if (waitAnyPolicy == AwaitTaskGroupWaitAnyPolicy::LeaveRemainingRunning)
+        {
+            finish(operationResult);
+            return;
+        }
+
+        Result cancelResult = cancelRemaining(group.await);
+        if (not cancelResult)
+        {
+            finish(cancelResult);
+            return;
+        }
+    }
+
+    if ((cancelling or waitAnyPolicy == AwaitTaskGroupWaitAnyPolicy::CancelRemaining) and
+        completedTasks == group.numTasks)
+    {
+        finish(operationResult);
+    }
+}
+
+void AwaitTaskGroupWaitAnyAwaiter::finish(Result result)
+{
+    if (finished)
+    {
+        return;
+    }
+    finished        = true;
+    operationResult = result;
+    clearChildCallbacks();
+    continuation.resume();
+}
+
+void AwaitTaskGroupWaitAnyAwaiter::clearChildCallbacks()
+{
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task == nullptr or not task->isValid())
+        {
+            continue;
+        }
+        AwaitTask::Promise& promise = task->handle.promise();
+        if (promise.completionObject == this)
+        {
+            promise.completionObject   = nullptr;
+            promise.completionCallback = nullptr;
+        }
+    }
+}
+
+Result AwaitTaskGroupWaitAnyAwaiter::setWinner(size_t index)
+{
+    AwaitTask* task = group.tasks[index];
+    if (task == nullptr)
+    {
+        return Result::Error("AwaitTaskGroup contains invalid task");
+    }
+
+    winnerIndex     = index;
+    outResult.index = index;
+    outResult.task  = task;
+    return task->result();
+}
+
+Result AwaitTaskGroupWaitAnyAwaiter::cancelRemaining(AwaitEventLoop& eventLoop)
+{
+    Result cancelResult(true);
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task != nullptr and idx != winnerIndex and task->isActive())
+        {
+            Result taskCancelResult = task->cancel(eventLoop);
+            if (cancelResult and not taskCancelResult)
+            {
+                cancelResult = taskCancelResult;
+            }
+        }
+    }
+    return cancelResult;
 }
 
 AwaitProcessExitAwaiter::AwaitProcessExitAwaiter(AwaitEventLoop& await, FileDescriptor::Handle process,

@@ -47,6 +47,8 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitSocketSendAllAwaiter](@ref SC::AwaitSocketSendAllAwaiter) | @copybrief SC::AwaitSocketSendAllAwaiter |
 | [AwaitSocketReceiveAwaiter](@ref SC::AwaitSocketReceiveAwaiter) | @copybrief SC::AwaitSocketReceiveAwaiter |
 | [AwaitSocketReceiveFromAwaiter](@ref SC::AwaitSocketReceiveFromAwaiter) | @copybrief SC::AwaitSocketReceiveFromAwaiter |
+| [AwaitLoopWakeUp](@ref SC::AwaitLoopWakeUp) | @copybrief SC::AwaitLoopWakeUp           |
+| [AwaitLoopWakeUpAwaiter](@ref SC::AwaitLoopWakeUpAwaiter) | @copybrief SC::AwaitLoopWakeUpAwaiter |
 | [AwaitFileReadAwaiter](@ref SC::AwaitFileReadAwaiter) | @copybrief SC::AwaitFileReadAwaiter       |
 | [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
 | [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
@@ -54,6 +56,7 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
 | [AwaitTaskGroup](@ref SC::AwaitTaskGroup)       | @copybrief SC::AwaitTaskGroup                  |
 | [AwaitTaskGroupWaitAllAwaiter](@ref SC::AwaitTaskGroupWaitAllAwaiter) | @copybrief SC::AwaitTaskGroupWaitAllAwaiter |
+| [AwaitTaskGroupWaitAnyAwaiter](@ref SC::AwaitTaskGroupWaitAnyAwaiter) | @copybrief SC::AwaitTaskGroupWaitAnyAwaiter |
 | [AwaitProcessExitAwaiter](@ref SC::AwaitProcessExitAwaiter) | @copybrief SC::AwaitProcessExitAwaiter |
 | [AwaitSignalAwaiter](@ref SC::AwaitSignalAwaiter) | @copybrief SC::AwaitSignalAwaiter         |
 | [AwaitTaskSpawnAwaiter](@ref SC::AwaitTaskSpawnAwaiter) | @copybrief SC::AwaitTaskSpawnAwaiter     |
@@ -63,20 +66,50 @@ The goal is to let the compiler generate the callback state machine while preser
 # Example
 
 ```cpp
-AwaitTask sendAndReceive(AwaitEventLoop& await, const SocketDescriptor& sender, const SocketDescriptor& receiver)
+AwaitTask echoServer(AwaitEventLoop& await, const SocketDescriptor& serverSocket, SocketDescriptor& accepted)
 {
-    const char sendBuffer[]      = {1, 2, 3};
-    char       receiveBuffer[16] = {};
+    char                     receiveBuffer[64] = {};
+    AwaitSocketReceiveResult received;
 
-    AwaitSocketSendResult sendResult;
-    SC_CO_TRY(co_await await.sendAll(sender, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
+    SC_CO_TRY(co_await await.accept(serverSocket, accepted));
+    SC_CO_TRY(co_await await.receive(accepted, {receiveBuffer, sizeof(receiveBuffer)}, received));
+    SC_CO_TRY(co_await await.sendAll(accepted, received.data));
 
-    AwaitSocketReceiveResult receiveResult;
-    SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+    co_return Result(true);
+}
+
+AwaitTask echoClient(AwaitEventLoop& await, const SocketDescriptor& client, SocketIPAddress address,
+                     Span<char> replyBuffer, AwaitSocketReceiveResult& reply)
+{
+    const char message[] = "niche readable await";
+
+    SC_CO_TRY(co_await await.connect(client, address));
+    SC_CO_TRY(co_await await.sendAll(client, {message, sizeof(message) - 1}));
+    SC_CO_TRY(co_await await.receive(client, replyBuffer, reply));
+
+    co_return Result(true);
+}
+
+AwaitTask echoConversation(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                           const SocketDescriptor& client, SocketIPAddress address,
+                           SocketDescriptor& accepted, Span<char> replyBuffer,
+                           AwaitSocketReceiveResult& reply)
+{
+    AwaitTask server = echoServer(await, serverSocket, accepted);
+    AwaitTask clientTask = echoClient(await, client, address, replyBuffer, reply);
+
+    AwaitTask*     storage[2] = {};
+    AwaitTaskGroup group(await, storage);
+    SC_CO_TRY(group.spawn(server));
+    SC_CO_TRY(group.spawn(clientTask));
+    SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);
 }
 ```
+
+The reply buffer is supplied by the caller because `Await` keeps the same stable object and buffer lifetime expectations
+as `Async`.
 
 # Status
 
@@ -88,15 +121,17 @@ The current proof of concept supports:
 - socket `accept()` and `connect()`;
 - socket `send()`, `sendAll()`, and `receive()`;
 - datagram socket `sendTo()` and `receiveFrom()`;
+- loop wake-up waiting with `AwaitLoopWakeUp`;
 - file `fileRead()`, `fileWrite()`, `fileSend()`, and `filePoll()`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
 - process exit waiting with `processExit()`;
 - one-shot signal waiting with `signal()`;
-- task cancellation for currently suspended operations;
+- task cancellation for currently suspended operations, including several socket, file polling, wake-up, and task-group
+  waits covered by tests;
 - awaiting explicitly spawned child tasks, or starting and awaiting one with `spawnAndWait()`;
-- structured `AwaitTaskGroup` waiting with caller-provided task pointer storage;
+- structured `AwaitTaskGroup` waiting with caller-provided task pointer storage, `waitAll()`, and `waitAny()`;
 - child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
@@ -119,6 +154,17 @@ coroutine header.
 
 @copydoc SC::AwaitArena
 
+# Task groups
+
+`AwaitTaskGroup` stores caller-owned task pointers in caller-provided storage. Its default cancellation policy is
+structured: cancelling the parent task while it is suspended in `waitAll()` or `waitAny()` cancels active children before
+the parent completes. `AwaitTaskGroupCancelPolicy::LeaveChildrenRunning` exists for advanced cases where child tasks
+outlive the waiting parent.
+
+`waitAny()` defaults to `AwaitTaskGroupWaitAnyPolicy::CancelRemaining`, so stack-owned child tasks are not left active
+after the first child completes. Use `LeaveRemainingRunning` only when pending children have an explicitly managed
+lifetime.
+
 # Memory allocation
 
 `AwaitArena` can hold coroutine frames in caller-provided storage. The current draft intentionally supports two
@@ -138,16 +184,15 @@ direction is to keep the arena-backed path first-class and later decide whether 
 🟥 Draft Features:
 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
-- Expand cancellation semantics and edge-case coverage for every awaiter.
-- Expand task group helpers with `waitAny()`, scoped cancellation policies, and result aggregation helpers.
+- Expand cancellation semantics and edge-case coverage for filesystem and thread-pool-backed awaiters.
+- Expand task group helpers with result aggregation helpers and more policy tests.
 - Decide if arena allocation should become mandatory for production builds.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
-- Explore structured child tasks / task groups.
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 642			| 228		| 870	|
-| Sources   | 1394			| 290		| 1684	|
-| Sum       | 2036			| 518		| 2554	|
+| Headers   | 730			| 253		| 983	|
+| Sources   | 1643			| 333		| 1976	|
+| Sum       | 2373			| 586		| 2959	|

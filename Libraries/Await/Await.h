@@ -25,6 +25,7 @@ namespace SC
 {
 struct AwaitEventLoop;
 struct AwaitArena;
+struct AwaitTask;
 struct AwaitCancellationHandler;
 struct AwaitSleepAwaiter;
 struct AwaitSocketAcceptAwaiter;
@@ -34,6 +35,8 @@ struct AwaitSocketSendToAwaiter;
 struct AwaitSocketSendAllAwaiter;
 struct AwaitSocketReceiveAwaiter;
 struct AwaitSocketReceiveFromAwaiter;
+struct AwaitLoopWakeUp;
+struct AwaitLoopWakeUpAwaiter;
 struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
@@ -43,6 +46,7 @@ struct AwaitProcessExitAwaiter;
 struct AwaitSignalAwaiter;
 struct AwaitTaskGroup;
 struct AwaitTaskGroupWaitAllAwaiter;
+struct AwaitTaskGroupWaitAnyAwaiter;
 struct AwaitTaskSpawnAwaiter;
 struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
@@ -121,6 +125,29 @@ struct AwaitSignalResult
     uint32_t deliveryCount = 0;
 };
 
+struct AwaitLoopWakeUpResult
+{
+    uint32_t deliveryCount = 0;
+};
+
+struct AwaitTaskGroupWaitAnyResult
+{
+    size_t     index = size_t(-1);
+    AwaitTask* task  = nullptr;
+};
+
+enum class AwaitTaskGroupCancelPolicy : uint8_t
+{
+    CancelChildren,
+    LeaveChildrenRunning,
+};
+
+enum class AwaitTaskGroupWaitAnyPolicy : uint8_t
+{
+    CancelRemaining,
+    LeaveRemainingRunning,
+};
+
 enum class AwaitFileSystemOperationType : uint8_t
 {
     Open,
@@ -193,6 +220,7 @@ struct SC_AWAIT_EXPORT AwaitTask
     friend struct AwaitEventLoop;
     friend struct AwaitTaskGroup;
     friend struct AwaitTaskGroupWaitAllAwaiter;
+    friend struct AwaitTaskGroupWaitAnyAwaiter;
     friend struct AwaitTaskSpawnAwaiter;
     friend struct AwaitTaskTimeoutAwaiter;
 
@@ -297,12 +325,14 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                           AwaitSocketReceiveResult& outResult);
     AwaitSocketReceiveFromAwaiter receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
                                               AwaitSocketReceiveFromResult& outResult);
-    AwaitFileReadAwaiter  fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
-    AwaitFileWriteAwaiter fileWrite(const FileDescriptor& file, Span<const char> data,
-                                    AwaitFileWriteResult* outResult = nullptr);
-    AwaitFileSendAwaiter  fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
-                                   AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
-    AwaitFilePollAwaiter  filePoll(const FileDescriptor& file);
+    AwaitFileReadAwaiter   fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
+    AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<const char> data,
+                                     AwaitFileWriteResult* outResult = nullptr);
+    AwaitFileSendAwaiter   fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
+                                    AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
+    AwaitFilePollAwaiter   filePoll(const FileDescriptor& file);
+    AwaitLoopWakeUpAwaiter wakeUp(AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& outResult,
+                                  AsyncLoopWakeUpOptions options = {});
     AwaitFileSystemOperationAwaiter fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                            FileDescriptor& outFile);
     AwaitFileSystemOperationAwaiter fsClose(ThreadPool& threadPool, FileDescriptor& file);
@@ -328,6 +358,20 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitArena*     frameArena;
 };
 
+/// @brief Stable wake-up object that can resume an AwaitLoopWakeUpAwaiter from another thread.
+struct SC_AWAIT_EXPORT AwaitLoopWakeUp
+{
+    Result wakeUp(AwaitEventLoop& await);
+    Result wakeUp(AsyncEventLoop& eventLoop);
+
+    [[nodiscard]] bool isActive() const;
+
+  private:
+    friend struct AwaitLoopWakeUpAwaiter;
+
+    AsyncLoopWakeUp request;
+};
+
 /// @brief Awaiter for a single AsyncLoopTimeout operation.
 struct SC_AWAIT_EXPORT AwaitSleepAwaiter
 {
@@ -337,6 +381,31 @@ struct SC_AWAIT_EXPORT AwaitSleepAwaiter
     TimeMs           duration;
     AsyncLoopTimeout request;
     Result           operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single AsyncLoopWakeUp delivery.
+struct SC_AWAIT_EXPORT AwaitLoopWakeUpAwaiter
+{
+    AwaitLoopWakeUpAwaiter(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& outResult,
+                           AsyncLoopWakeUpOptions options);
+
+    AwaitEventLoop&        await;
+    AwaitLoopWakeUp&       wakeUp;
+    AwaitLoopWakeUpResult& outResult;
+    AsyncLoopWakeUpOptions options;
+    Result                 operationResult = Result(true);
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);
@@ -674,26 +743,37 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
     Result await_resume();
 
   private:
-    AwaitTask::Handle continuation;
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
 };
 
 /// @brief Caller-storage structured group of child tasks owned by the current scope.
 struct SC_AWAIT_EXPORT AwaitTaskGroup
 {
-    AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage);
+    AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage,
+                   AwaitTaskGroupCancelPolicy cancelPolicy = AwaitTaskGroupCancelPolicy::CancelChildren);
 
     Result                       spawn(AwaitTask& task);
     AwaitTaskGroupWaitAllAwaiter waitAll();
+    AwaitTaskGroupWaitAnyAwaiter waitAny(
+        AwaitTaskGroupWaitAnyResult& outResult,
+        AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy = AwaitTaskGroupWaitAnyPolicy::CancelRemaining);
 
     [[nodiscard]] size_t size() const;
     [[nodiscard]] size_t capacity() const;
 
   private:
     friend struct AwaitTaskGroupWaitAllAwaiter;
+    friend struct AwaitTaskGroupWaitAnyAwaiter;
 
-    AwaitEventLoop&  await;
-    Span<AwaitTask*> tasks;
-    size_t           numTasks = 0;
+    AwaitEventLoop&            await;
+    Span<AwaitTask*>           tasks;
+    AwaitTaskGroupCancelPolicy cancelPolicy;
+    size_t                     numTasks = 0;
 };
 
 /// @brief Awaiter that waits for every active task in an AwaitTaskGroup.
@@ -720,6 +800,39 @@ struct SC_AWAIT_EXPORT AwaitTaskGroupWaitAllAwaiter
 
     AwaitTask::Handle continuation;
     size_t            completedTasks = 0;
+    bool              finished       = false;
+};
+
+/// @brief Awaiter that waits for the first active task in an AwaitTaskGroup to complete.
+struct SC_AWAIT_EXPORT AwaitTaskGroupWaitAnyAwaiter
+{
+    AwaitTaskGroupWaitAnyAwaiter(AwaitTaskGroup& group, AwaitTaskGroupWaitAnyResult& outResult,
+                                 AwaitTaskGroupWaitAnyPolicy waitAnyPolicy);
+
+    AwaitTaskGroup&              group;
+    AwaitTaskGroupWaitAnyResult& outResult;
+    AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy;
+    Result                       operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+    static void   onTaskCompleted(void* object);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   onTaskCompleted();
+    void   finish(Result result);
+    void   clearChildCallbacks();
+    Result setWinner(size_t index);
+    Result cancelRemaining(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle continuation;
+    size_t            completedTasks = 0;
+    size_t            winnerIndex    = size_t(-1);
+    bool              cancelling     = false;
     bool              finished       = false;
 };
 
