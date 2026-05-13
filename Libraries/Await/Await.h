@@ -33,6 +33,7 @@ struct AwaitSocketConnectAwaiter;
 struct AwaitSocketSendAwaiter;
 struct AwaitSocketSendToAwaiter;
 struct AwaitSocketSendAllAwaiter;
+struct AwaitSocketSendAllBuffersAwaiter;
 struct AwaitSocketReceiveAwaiter;
 struct AwaitSocketReceiveFromAwaiter;
 struct AwaitLoopWakeUp;
@@ -312,21 +313,29 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     Result runOnce();
     Result runNoWait();
 
-    AwaitSleepAwaiter             sleep(TimeMs duration);
-    AwaitSocketAcceptAwaiter      accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
-    AwaitSocketConnectAwaiter     connect(const SocketDescriptor& socket, SocketIPAddress address);
-    AwaitSocketSendAwaiter        send(const SocketDescriptor& socket, Span<const char> data,
-                                       AwaitSocketSendResult* outResult = nullptr);
-    AwaitSocketSendToAwaiter      sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
-                                         AwaitSocketSendResult* outResult = nullptr);
-    AwaitSocketSendAllAwaiter     sendAll(const SocketDescriptor& socket, Span<const char> data,
-                                          AwaitSocketSendResult* outResult = nullptr);
-    AwaitSocketReceiveAwaiter     receive(const SocketDescriptor& socket, Span<char> buffer,
-                                          AwaitSocketReceiveResult& outResult);
-    AwaitSocketReceiveFromAwaiter receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
-                                              AwaitSocketReceiveFromResult& outResult);
+    AwaitSleepAwaiter         sleep(TimeMs duration);
+    AwaitSocketAcceptAwaiter  accept(const SocketDescriptor& serverSocket, SocketDescriptor& outClient);
+    AwaitSocketConnectAwaiter connect(const SocketDescriptor& socket, SocketIPAddress address);
+    AwaitSocketSendAwaiter    send(const SocketDescriptor& socket, Span<const char> data,
+                                   AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendAwaiter    send(const SocketDescriptor& socket, Span<Span<const char>> data,
+                                   AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendToAwaiter  sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
+                                     AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendToAwaiter  sendTo(const SocketDescriptor& socket, SocketIPAddress address,
+                                     Span<Span<const char>> data, AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendAllAwaiter sendAll(const SocketDescriptor& socket, Span<const char> data,
+                                      AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketSendAllBuffersAwaiter sendAll(const SocketDescriptor& socket, Span<Span<const char>> data,
+                                             AwaitSocketSendResult* outResult = nullptr);
+    AwaitSocketReceiveAwaiter        receive(const SocketDescriptor& socket, Span<char> buffer,
+                                             AwaitSocketReceiveResult& outResult);
+    AwaitSocketReceiveFromAwaiter    receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
+                                                 AwaitSocketReceiveFromResult& outResult);
     AwaitFileReadAwaiter   fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
     AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<const char> data,
+                                     AwaitFileWriteResult* outResult = nullptr);
+    AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
                                      AwaitFileWriteResult* outResult = nullptr);
     AwaitFileSendAwaiter   fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
                                     AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
@@ -473,13 +482,17 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAwaiter
 {
     AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<const char> data,
                            AwaitSocketSendResult* outResult);
+    AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<Span<const char>> data,
+                           AwaitSocketSendResult* outResult);
 
     AwaitEventLoop&         await;
     const SocketDescriptor& socket;
     Span<const char>        data;
+    Span<Span<const char>>  buffers;
     AwaitSocketSendResult*  outResult = nullptr;
     AsyncSocketSend         request;
     Result                  operationResult = Result(true);
+    bool                    singleBuffer    = true;
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);
@@ -499,14 +512,18 @@ struct SC_AWAIT_EXPORT AwaitSocketSendToAwaiter
 {
     AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address,
                              Span<const char> data, AwaitSocketSendResult* outResult);
+    AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address,
+                             Span<Span<const char>> data, AwaitSocketSendResult* outResult);
 
     AwaitEventLoop&         await;
     const SocketDescriptor& socket;
     SocketIPAddress         address;
     Span<const char>        data;
+    Span<Span<const char>>  buffers;
     AwaitSocketSendResult*  outResult = nullptr;
     AsyncSocketSendTo       request;
     Result                  operationResult = Result(true);
+    bool                    singleBuffer    = true;
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);
@@ -543,6 +560,39 @@ struct SC_AWAIT_EXPORT AwaitSocketSendAllAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter that sends every buffer in a scatter/gather list.
+struct SC_AWAIT_EXPORT AwaitSocketSendAllBuffersAwaiter
+{
+    AwaitSocketSendAllBuffersAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<Span<const char>> data,
+                                     AwaitSocketSendResult* outResult);
+
+    AwaitEventLoop&         await;
+    const SocketDescriptor& socket;
+    Span<Span<const char>>  data;
+    AwaitSocketSendResult*  outResult = nullptr;
+    AsyncSocketSend         request;
+    AsyncLoopTimeout        deferredStart;
+    Result                  operationResult = Result(true);
+    size_t                  numBytesSent    = 0;
+    size_t                  bufferIndex     = 0;
+    size_t                  bufferOffset    = 0;
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    bool   findNextBuffer();
+    Result startCurrentBuffer();
+    Result updateRequestBuffer();
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;
@@ -631,13 +681,17 @@ struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
 {
     AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,
                           AwaitFileWriteResult* outResult);
+    AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<Span<const char>> data,
+                          AwaitFileWriteResult* outResult);
 
-    AwaitEventLoop&       await;
-    const FileDescriptor& file;
-    Span<const char>      data;
-    AwaitFileWriteResult* outResult = nullptr;
-    AsyncFileWrite        request;
-    Result                operationResult = Result(true);
+    AwaitEventLoop&        await;
+    const FileDescriptor&  file;
+    Span<const char>       data;
+    Span<Span<const char>> buffers;
+    AwaitFileWriteResult*  outResult = nullptr;
+    AsyncFileWrite         request;
+    Result                 operationResult = Result(true);
+    bool                   singleBuffer    = true;
 
     bool   await_ready() const;
     bool   await_suspend(AwaitTask::Handle continuation);

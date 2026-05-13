@@ -366,8 +366,20 @@ AwaitSocketSendAwaiter AwaitEventLoop::send(const SocketDescriptor& socket, Span
     return AwaitSocketSendAwaiter(*this, socket, data, outResult);
 }
 
+AwaitSocketSendAwaiter AwaitEventLoop::send(const SocketDescriptor& socket, Span<Span<const char>> data,
+                                            AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendAwaiter(*this, socket, data, outResult);
+}
+
 AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketIPAddress address,
                                                 Span<const char> data, AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
+}
+
+AwaitSocketSendToAwaiter AwaitEventLoop::sendTo(const SocketDescriptor& socket, SocketIPAddress address,
+                                                Span<Span<const char>> data, AwaitSocketSendResult* outResult)
 {
     return AwaitSocketSendToAwaiter(*this, socket, address, data, outResult);
 }
@@ -376,6 +388,12 @@ AwaitSocketSendAllAwaiter AwaitEventLoop::sendAll(const SocketDescriptor& socket
                                                   AwaitSocketSendResult* outResult)
 {
     return AwaitSocketSendAllAwaiter(*this, socket, data, outResult);
+}
+
+AwaitSocketSendAllBuffersAwaiter AwaitEventLoop::sendAll(const SocketDescriptor& socket, Span<Span<const char>> data,
+                                                         AwaitSocketSendResult* outResult)
+{
+    return AwaitSocketSendAllBuffersAwaiter(*this, socket, data, outResult);
 }
 
 AwaitSocketReceiveAwaiter AwaitEventLoop::receive(const SocketDescriptor& socket, Span<char> buffer,
@@ -397,6 +415,12 @@ AwaitFileReadAwaiter AwaitEventLoop::fileRead(const FileDescriptor& file, Span<c
 }
 
 AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span<const char> data,
+                                                AwaitFileWriteResult* outResult)
+{
+    return AwaitFileWriteAwaiter(*this, file, data, outResult);
+}
+
+AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
                                                 AwaitFileWriteResult* outResult)
 {
     return AwaitFileWriteAwaiter(*this, file, data, outResult);
@@ -653,6 +677,11 @@ AwaitSocketSendAwaiter::AwaitSocketSendAwaiter(AwaitEventLoop& await, const Sock
     : await(await), socket(socket), data(data), outResult(outResult)
 {}
 
+AwaitSocketSendAwaiter::AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                               Span<Span<const char>> data, AwaitSocketSendResult* outResult)
+    : await(await), socket(socket), buffers(data), outResult(outResult), singleBuffer(false)
+{}
+
 bool AwaitSocketSendAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
@@ -669,7 +698,14 @@ bool AwaitSocketSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         continuation.resume();
     };
 
-    operationResult = request.start(await.asyncEventLoop(), socket, data);
+    if (singleBuffer)
+    {
+        operationResult = request.start(await.asyncEventLoop(), socket, data);
+    }
+    else
+    {
+        operationResult = request.start(await.asyncEventLoop(), socket, buffers);
+    }
     return operationResult;
 }
 
@@ -695,6 +731,12 @@ AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const 
     : await(await), socket(socket), address(address), data(data), outResult(outResult)
 {}
 
+AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                   SocketIPAddress address, Span<Span<const char>> data,
+                                                   AwaitSocketSendResult* outResult)
+    : await(await), socket(socket), address(address), buffers(data), outResult(outResult), singleBuffer(false)
+{}
+
 bool AwaitSocketSendToAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketSendToAwaiter::await_suspend(AwaitTask::Handle newContinuation)
@@ -711,7 +753,14 @@ bool AwaitSocketSendToAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         continuation.resume();
     };
 
-    operationResult = request.start(await.asyncEventLoop(), socket, address, data);
+    if (singleBuffer)
+    {
+        operationResult = request.start(await.asyncEventLoop(), socket, address, data);
+    }
+    else
+    {
+        operationResult = request.start(await.asyncEventLoop(), socket, address, buffers);
+    }
     return operationResult;
 }
 
@@ -798,6 +847,139 @@ Result AwaitSocketSendAllAwaiter::cancel(void* object, AwaitEventLoop& eventLoop
 Result AwaitSocketSendAllAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+AwaitSocketSendAllBuffersAwaiter::AwaitSocketSendAllBuffersAwaiter(AwaitEventLoop&         await,
+                                                                   const SocketDescriptor& socket,
+                                                                   Span<Span<const char>>  data,
+                                                                   AwaitSocketSendResult*  outResult)
+    : await(await), socket(socket), data(data), outResult(outResult)
+{}
+
+bool AwaitSocketSendAllBuffersAwaiter::await_ready() const
+{
+    for (size_t idx = 0; idx < data.sizeInElements(); ++idx)
+    {
+        if (not data[idx].empty())
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool AwaitSocketSendAllBuffersAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketSendAllBuffersAwaiter::cancel);
+
+    deferredStart.callback = [this](AsyncLoopTimeout::Result& result)
+    {
+        operationResult = result.isValid();
+        if (operationResult)
+        {
+            operationResult = startCurrentBuffer();
+        }
+        if (not operationResult)
+        {
+            continuation.resume();
+        }
+    };
+
+    request.callback = [this](AsyncSocketSend::Result& result)
+    {
+        operationResult = result.isValid();
+        if (operationResult)
+        {
+            const size_t bytesSent = result.completionData.numBytes;
+            if (bytesSent == 0)
+            {
+                operationResult = Result::Error("AwaitSocketSendAllBuffers made no progress");
+                continuation.resume();
+                return;
+            }
+
+            numBytesSent += bytesSent;
+            bufferOffset += bytesSent;
+            if (outResult != nullptr)
+            {
+                outResult->numBytes = numBytesSent;
+            }
+
+            if (findNextBuffer())
+            {
+                operationResult = deferredStart.start(await.asyncEventLoop(), TimeMs{0});
+                if (not operationResult)
+                {
+                    continuation.resume();
+                }
+                return;
+            }
+        }
+        continuation.resume();
+    };
+
+    if (not findNextBuffer())
+    {
+        return false;
+    }
+    operationResult = startCurrentBuffer();
+    return operationResult;
+}
+
+Result AwaitSocketSendAllBuffersAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    if (outResult != nullptr and operationResult)
+    {
+        outResult->numBytes = numBytesSent;
+    }
+    return operationResult;
+}
+
+Result AwaitSocketSendAllBuffersAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketSendAllBuffersAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketSendAllBuffersAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    if (not request.isFree())
+    {
+        return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+    }
+    if (not deferredStart.isFree())
+    {
+        return cancelCancellableAwait(deferredStart, operationResult, eventLoop, stopCallback);
+    }
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+bool AwaitSocketSendAllBuffersAwaiter::findNextBuffer()
+{
+    while (bufferIndex < data.sizeInElements())
+    {
+        if (bufferOffset < data[bufferIndex].sizeInBytes())
+        {
+            return true;
+        }
+        bufferIndex++;
+        bufferOffset = 0;
+    }
+    return false;
+}
+
+Result AwaitSocketSendAllBuffersAwaiter::startCurrentBuffer()
+{
+    SC_TRY(updateRequestBuffer());
+    return request.start(await.asyncEventLoop(), socket, request.buffer);
+}
+
+Result AwaitSocketSendAllBuffersAwaiter::updateRequestBuffer()
+{
+    Span<const char> remaining;
+    SC_TRY(data[bufferIndex].sliceStart(bufferOffset, remaining));
+    request.buffer = remaining;
+    return Result(true);
 }
 
 AwaitSocketReceiveAwaiter::AwaitSocketReceiveAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -923,6 +1105,11 @@ AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDe
     : await(await), file(file), data(data), outResult(outResult)
 {}
 
+AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file,
+                                             Span<Span<const char>> data, AwaitFileWriteResult* outResult)
+    : await(await), file(file), buffers(data), outResult(outResult), singleBuffer(false)
+{}
+
 bool AwaitFileWriteAwaiter::await_ready() const { return false; }
 
 bool AwaitFileWriteAwaiter::await_suspend(AwaitTask::Handle newContinuation)
@@ -939,7 +1126,14 @@ bool AwaitFileWriteAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         continuation.resume();
     };
 
-    operationResult = request.start(await.asyncEventLoop(), file, data);
+    if (singleBuffer)
+    {
+        operationResult = request.start(await.asyncEventLoop(), file, data);
+    }
+    else
+    {
+        operationResult = request.start(await.asyncEventLoop(), file, buffers);
+    }
     return operationResult;
 }
 
@@ -1517,7 +1711,7 @@ void AwaitTaskGroupWaitAnyAwaiter::onTaskCompleted()
     }
 
     completedTasks++;
-    if (winnerIndex == size_t(-1))
+    if (winnerIndex == size_t(-1) and not cancelling)
     {
         for (size_t idx = 0; idx < group.numTasks; ++idx)
         {

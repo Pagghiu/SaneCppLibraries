@@ -111,6 +111,8 @@ AwaitTask echoConversation(AwaitEventLoop& await, const SocketDescriptor& server
 The reply buffer is supplied by the caller because `Await` keeps the same stable object and buffer lifetime expectations
 as `Async`.
 
+A complete console version of this flow lives in `Examples/AwaitEcho`.
+
 # Status
 
 🟥 Draft
@@ -119,10 +121,10 @@ The current proof of concept supports:
 
 - `sleep()`;
 - socket `accept()` and `connect()`;
-- socket `send()`, `sendAll()`, and `receive()`;
-- datagram socket `sendTo()` and `receiveFrom()`;
+- socket `send()`, scatter/gather `send()`, `sendAll()`, and `receive()`;
+- datagram socket `sendTo()`, scatter/gather `sendTo()`, and `receiveFrom()`;
 - loop wake-up waiting with `AwaitLoopWakeUp`;
-- file `fileRead()`, `fileWrite()`, `fileSend()`, and `filePoll()`;
+- file `fileRead()`, `fileWrite()`, scatter/gather `fileWrite()`, `fileSend()`, and `filePoll()`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
@@ -154,6 +156,15 @@ coroutine header.
 
 @copydoc SC::AwaitArena
 
+# Lifetime rules
+
+Awaiters keep the same stable-object rules as `Async`: sockets, file descriptors, buffers, result objects, wake-up
+objects, and child tasks must stay alive while the operation is active.
+
+Result objects may contain spans into caller-provided buffers. For example, `AwaitSocketReceiveResult::data` and
+`AwaitFileReadResult::data` point into the receive/read buffer passed to the awaiter. Keep those buffers alive until
+after the result has been inspected or copied elsewhere.
+
 # Task groups
 
 `AwaitTaskGroup` stores caller-owned task pointers in caller-provided storage. Its default cancellation policy is
@@ -167,17 +178,20 @@ lifetime.
 
 # Memory allocation
 
-`AwaitArena` can hold coroutine frames in caller-provided storage. The current draft intentionally supports two
-allocation modes:
+`AwaitArena` can hold coroutine frames in caller-provided storage. The draft currently supports two allocation modes:
 
 - Passing an arena to `AwaitEventLoop` gives no-allocation coroutine frame storage for production-style Sane C++ usage.
-- Omitting the arena keeps the proof of concept ergonomic and falls back to standard nothrow coroutine allocation.
+- Omitting the arena keeps experiments ergonomic and falls back to standard nothrow coroutine allocation.
 
 Arena-backed frames are not individually freed. The caller must only reset the arena after all tasks using it have been
 destroyed.
 
 `AwaitEventLoop::hasArena()` can be used by tests and examples to make the selected mode explicit. The intended
-direction is to keep the arena-backed path first-class and later decide whether production builds should require it.
+direction is:
+
+- examples and production-style code should pass an arena;
+- tests may cover both arena and no-arena modes;
+- a future production gate may require an arena without removing the no-arena draft path immediately.
 
 # Roadmap
 
@@ -186,7 +200,7 @@ direction is to keep the arena-backed path first-class and later decide whether 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
 - Expand cancellation semantics and edge-case coverage for filesystem and thread-pool-backed awaiters.
 - Expand task group helpers with result aggregation helpers and more policy tests.
-- Decide if arena allocation should become mandatory for production builds.
+- Decide how to enforce arena-backed allocation in production builds.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
 

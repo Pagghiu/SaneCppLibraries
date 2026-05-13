@@ -775,7 +775,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
             msgs.msg_namelen = addressLen;
             msgs.msg_iov     = vec;
             msgs.msg_iovlen  = remainingVectors;
-            return ::sendmsg(fd, &msgs, 1);
+            return ::sendmsg(fd, &msgs, 0);
         }
     };
 

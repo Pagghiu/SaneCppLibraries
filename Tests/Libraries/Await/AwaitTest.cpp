@@ -101,6 +101,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             socketSendAll();
         }
+        if (test_section("scatter gather operations"))
+        {
+            scatterGatherOperations();
+        }
         if (test_section("tiny echo conversation"))
         {
             tinyEchoConversation();
@@ -202,6 +206,12 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask failSoon(AwaitEventLoop& await)
+    {
+        SC_CO_TRY(co_await await.sleep(1_ms));
+        co_return Result::Error("AwaitTest failSoon");
+    }
+
     AwaitTask wakeUpOnce(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& result)
     {
         SC_CO_TRY(co_await await.wakeUp(wakeUp, result));
@@ -258,6 +268,68 @@ struct SC::AwaitTest : public SC::TestCase
         {
             SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
         }
+
+        co_return Result(true);
+    }
+
+    AwaitTask scatterGatherSocketOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                      const SocketDescriptor& receiver)
+    {
+        const char       first[]   = {'A', 'w', 'a', 'i', 't'};
+        const char       second[]  = {' ', 'S', 'G'};
+        Span<const char> buffers[] = {{first, sizeof(first)}, {second, sizeof(second)}};
+
+        AwaitSocketSendResult sendResult;
+        Result                sendOperationResult = co_await await.sendAll(sender, buffers, &sendResult);
+        if (not sendOperationResult)
+        {
+            co_return Result::Error("TCP scatter/gather sendAll failed");
+        }
+        SC_TEST_EXPECT(sendResult.numBytes == sizeof(first) + sizeof(second));
+
+        char   receiveBuffer[16] = {};
+        size_t receivedBytes     = 0;
+        while (receivedBytes < sizeof(first) + sizeof(second))
+        {
+            Span<char> receiveStorage = {receiveBuffer, sizeof(receiveBuffer)};
+            Span<char> remaining;
+            SC_TEST_EXPECT(receiveStorage.sliceStart(receivedBytes, remaining));
+
+            AwaitSocketReceiveResult receiveResult;
+            SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
+            if (receiveResult.disconnected or receiveResult.data.empty())
+            {
+                co_return Result::Error("TCP scatter/gather receive failed");
+            }
+            receivedBytes += receiveResult.data.sizeInBytes();
+        }
+        SC_TEST_EXPECT(receivedBytes == sizeof(first) + sizeof(second));
+        SC_TEST_EXPECT(StringView({receiveBuffer, receivedBytes}, false, StringEncoding::Ascii) == "Await SG");
+
+        co_return Result(true);
+    }
+
+    AwaitTask scatterGatherDatagramOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                        const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
+    {
+        const char       first[]   = {'U', 'D', 'P'};
+        const char       second[]  = {' ', 'S', 'G'};
+        Span<const char> buffers[] = {{first, sizeof(first)}, {second, sizeof(second)}};
+
+        AwaitSocketSendResult sendResult;
+        Result sendOperationResult = co_await await.sendTo(sender, receiverAddress, buffers, &sendResult);
+        if (not sendOperationResult)
+        {
+            co_return Result::Error("UDP scatter/gather sendTo failed");
+        }
+        SC_TEST_EXPECT(sendResult.numBytes == sizeof(first) + sizeof(second));
+
+        char                         receiveBuffer[16] = {};
+        AwaitSocketReceiveFromResult receiveResult;
+        SC_CO_TRY(co_await await.receiveFrom(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(first) + sizeof(second));
+        SC_TEST_EXPECT(StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false,
+                                  StringEncoding::Ascii) == "UDP SG");
 
         co_return Result(true);
     }
@@ -340,6 +412,22 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitFileWriteResult writeResult;
         SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult));
         SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        co_return Result(true);
+    }
+
+    AwaitTask writeFileScatterGatherOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    {
+        const char       first[]   = {'f', 'i', 'l', 'e'};
+        const char       second[]  = {'-', 's', 'g'};
+        Span<const char> buffers[] = {{first, sizeof(first)}, {second, sizeof(second)}};
+
+        AwaitFileWriteResult writeResult;
+        Result               writeOperationResult = co_await await.fileWrite(file, buffers, &writeResult);
+        if (not writeOperationResult)
+        {
+            co_return Result::Error("file scatter/gather write failed");
+        }
+        SC_TEST_EXPECT(writeResult.numBytes == sizeof(first) + sizeof(second));
         co_return Result(true);
     }
 
@@ -562,6 +650,100 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(not slowChild.result());
 
         co_return Result(true);
+    }
+
+    AwaitTask waitAnyEmptyTaskGroup(AwaitEventLoop& await)
+    {
+        Span<AwaitTask*>            emptyStorage;
+        AwaitTaskGroup              group(await, emptyStorage);
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        Result                      waitResult = co_await group.waitAny(waitAnyResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyCompletedTaskGroup(AwaitEventLoop& await)
+    {
+        AwaitTask completed = immediate(await);
+        AwaitTask slow      = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(completed));
+        SC_CO_TRY(group.spawn(slow));
+
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        SC_CO_TRY(co_await group.waitAny(waitAnyResult));
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == &completed);
+        SC_TEST_EXPECT(completed.result());
+        SC_TEST_EXPECT(slow.isCompleted());
+        SC_TEST_EXPECT(not slow.result());
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyFailingWinnerTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    {
+        AwaitTask failing = failSoon(await);
+        slowChild         = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(failing));
+        SC_CO_TRY(group.spawn(slowChild));
+
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        Result                      waitResult = co_await group.waitAny(waitAnyResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == &failing);
+        SC_TEST_EXPECT(failing.isCompleted());
+        SC_TEST_EXPECT(not failing.result());
+        SC_TEST_EXPECT(slowChild.isCompleted());
+        SC_TEST_EXPECT(not slowChild.result());
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyLeaveRemainingRunningTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    {
+        AwaitTask fastChild = waitTwice(await);
+        slowChild           = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(fastChild));
+        SC_CO_TRY(group.spawn(slowChild));
+
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        SC_CO_TRY(co_await group.waitAny(waitAnyResult, AwaitTaskGroupWaitAnyPolicy::LeaveRemainingRunning));
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == &fastChild);
+        SC_TEST_EXPECT(fastChild.result());
+        SC_TEST_EXPECT(slowChild.isActive());
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
+    {
+        childA = waitLong(await);
+        childB = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(childA));
+        SC_CO_TRY(group.spawn(childB));
+
+        AwaitTaskGroupWaitAnyResult waitAnyResult;
+        Result                      waitResult = co_await group.waitAny(waitAnyResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+
+        co_return waitResult;
     }
 
     AwaitTask waitAllLeaveChildrenRunning(AwaitEventLoop& await, AwaitTask& child)
@@ -1051,6 +1233,85 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(client.close());
         SC_TEST_EXPECT(serverSideClient.close());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void scatterGatherOperations()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor client;
+            SocketDescriptor serverSideClient;
+            createTCPSocketPair(async, client, serverSideClient);
+
+            AwaitTask task = scatterGatherSocketOnce(await, client, serverSideClient);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSideClient.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            const uint16_t port = report.mapPort(5053);
+
+            SocketIPAddress bindAddress;
+            SC_TEST_EXPECT(bindAddress.fromAddressPort("0.0.0.0", port));
+
+            SocketIPAddress receiverAddress;
+            SC_TEST_EXPECT(receiverAddress.fromAddressPort("127.0.0.1", port));
+
+            SocketDescriptor receiver;
+            SocketDescriptor sender;
+            SC_TEST_EXPECT(async.createAsyncUDPSocket(bindAddress.getAddressFamily(), receiver));
+            SC_TEST_EXPECT(async.createAsyncUDPSocket(receiverAddress.getAddressFamily(), sender));
+            SC_TEST_EXPECT(SocketServer(receiver).bind(bindAddress));
+
+            AwaitTask task = scatterGatherDatagramOnce(await, sender, receiver, receiverAddress);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+
+            SC_TEST_EXPECT(receiver.close());
+            SC_TEST_EXPECT(sender.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SmallStringNative<255> filePath = StringEncoding::Native;
+            const StringView       fileName = "await-file-sg.txt";
+            SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), fileName}));
+
+            FileDescriptor file;
+            FileOpen       writeOpen(FileOpen::Write);
+            writeOpen.blocking = false;
+            SC_TEST_EXPECT(file.open(filePath.view(), writeOpen));
+            SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+            AwaitTask task = writeFileScatterGatherOnce(await, file);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(file.close());
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+            String text;
+            SC_TEST_EXPECT(fs.read(fileName, text));
+            SC_TEST_EXPECT(text.view() == "file-sg");
+            SC_TEST_EXPECT(fs.removeFile(fileName));
+            SC_TEST_EXPECT(async.close());
+        }
     }
 
     void tinyEchoConversation()
@@ -1564,6 +1825,27 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(async.create());
             AwaitEventLoop await(async);
 
+            AwaitTask task = waitAnyEmptyTaskGroup(await);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask task = waitAnyCompletedTaskGroup(await);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
             AwaitTask slowChild;
             AwaitTask task = waitAnyTaskGroup(await, slowChild);
             SC_TEST_EXPECT(await.spawn(task));
@@ -1571,6 +1853,61 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(task.result());
             SC_TEST_EXPECT(slowChild.isCompleted());
             SC_TEST_EXPECT(not slowChild.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask slowChild;
+            AwaitTask task = waitAnyFailingWinnerTaskGroup(await, slowChild);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(slowChild.isCompleted());
+            SC_TEST_EXPECT(not slowChild.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask slowChild;
+            AwaitTask task = waitAnyLeaveRemainingRunningTaskGroup(await, slowChild);
+            SC_TEST_EXPECT(await.spawn(task));
+            while (task.isActive())
+            {
+                SC_TEST_EXPECT(await.runOnce());
+            }
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(slowChild.isActive());
+            SC_TEST_EXPECT(slowChild.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(not slowChild.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask childA;
+            AwaitTask childB;
+            AwaitTask parent = waitAnyCancellableTaskGroup(await, childA, childB);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(parent.isActive());
+            SC_TEST_EXPECT(childA.isActive());
+            SC_TEST_EXPECT(childB.isActive());
+            SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(childA.isCompleted());
+            SC_TEST_EXPECT(childB.isCompleted());
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(not childA.result());
+            SC_TEST_EXPECT(not childB.result());
+            SC_TEST_EXPECT(not parent.result());
             SC_TEST_EXPECT(async.close());
         }
         {

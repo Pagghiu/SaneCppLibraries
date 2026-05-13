@@ -608,7 +608,19 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        SC_TRY(addSaneCppLibraries(project, parameters));
+        if (name == "AwaitEcho")
+        {
+            project.files.compile.enableStdCpp = true;
+            project.files.compile.cppStandard  = CppStandard::CPP20;
+            project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
+            SC_TRY(addSaneCppLibraries(project, parameters));
+            project.addFiles("Libraries/Await", "**.cpp");
+            project.addFiles("Libraries/Await", "**.h");
+        }
+        else
+        {
+            SC_TRY(addSaneCppLibraries(project, parameters));
+        }
         SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
         project.addFiles(entry.path, "**.cpp");
         workspace.projects.push_back(move(project));
