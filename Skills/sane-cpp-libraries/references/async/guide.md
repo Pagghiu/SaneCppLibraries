@@ -15,6 +15,8 @@ Choose `async` when the task needs the Sane event loop, request-driven completio
 - Pair `async` with `socket` for socket I/O.
 - Pair it with `file` and `process` for file and process events.
 - Pair it with `async-streams` when request data should flow through stream pipelines.
+- `AsyncFileSystemOperation::read()` and `write()` borrow raw file handles and preserve caller ownership; only
+  `close()` consumes the handle.
 - `AwaitEventLoop` wraps an existing `AsyncEventLoop&`; it should not be described as a replacement for callback-style
   `Async`, because both styles can coexist on the same loop.
 

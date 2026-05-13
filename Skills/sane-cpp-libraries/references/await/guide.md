@@ -12,18 +12,20 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Keep callback-style `Async` compatibility: `Await` operations share the same underlying event loop.
 - Current awaiter coverage includes sleep, socket accept/connect/send/sendAll/receive, datagram sendTo/receiveFrom,
   fileRead/fileWrite/fileSend, fsOpen/fsClose/fsCopyFile/fsCopyDirectory/fsRename/fsRemoveEmptyDirectory/fsRemoveFile,
-  loopWork, child tasks, child task timeouts with `waitFor()`, and cancellation of the currently suspended operation.
+  processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`, child task timeouts with `waitFor()`, and
+  cancellation of the currently suspended operation.
 - Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage, but call out that the library is still experimental.
 
 ## What To Watch
 
 - `SCAwaitTest` is C++20 and standard-library enabled; it is intentionally separate from `SCTest`.
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
-- Child tasks currently need explicit `spawn()` before `co_await child`.
+- Child tasks can still be explicitly `spawn()`-ed before `co_await child`; use `spawnAndWait()` when a parent should
+  start and await a child in one expression.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
 - `waitFor()` cancels the child task when the timeout expires and reports timeout state through `AwaitTimeoutResult`.
-- Await wraps selected `AsyncFileSystemOperation` operations, but intentionally does not wrap its read/write methods yet
-  because handle ownership needs a clearer API decision.
+- Await wraps selected `AsyncFileSystemOperation` operations, but does not wrap its read/write methods yet.
+  `AsyncFileSystemOperation::read()` and `write()` borrow handles and preserve caller ownership.
 - Operation results follow Sane conventions: awaiters return plain `Result`, and extra data is written into explicit
   caller-provided result objects such as `AwaitSocketReceiveResult` or `AwaitFileReadResult`.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.

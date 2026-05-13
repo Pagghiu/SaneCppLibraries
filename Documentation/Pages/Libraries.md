@@ -4,9 +4,9 @@ This is the list of all libraries, whose internal dependencies are documented at
 
 Library                                     | Description                                   | LOC
 :-------------------------------------------|:----------------------------------------------|---------------
-@subpage library_async                      | @copybrief library_async                      |   7058
+@subpage library_async                      | @copybrief library_async                      |   7062
 @subpage library_async_streams              | @copybrief library_async_streams              |   2627
-@subpage library_await                      | @copybrief library_await                      |   1543
+@subpage library_await                      | @copybrief library_await                      |   1738
 @subpage library_containers                 | @copybrief library_containers                 |   959
 @subpage library_containers_reflection      | @copybrief library_containers_reflection      |   217
 @subpage library_file                       | @copybrief library_file                       |   1485
@@ -32,10 +32,10 @@ Library                                     | Description                       
 
 LOC               | Count
 :-----------------|:-----------------
-Header            | 11347
-Implementation    | 31219
-Comments          | 13339
-*Total*           | 55905
+Header            | 11411
+Implementation    | 31354
+Comments          | 13395
+*Total*           | 56160
 
 ![Dependency Graph](https://pagghiu.github.io/images/dependencies/SaneCppLibrariesDependencies.svg)
 

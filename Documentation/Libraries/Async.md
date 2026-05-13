@@ -12,7 +12,7 @@ Check @ref library_async_streams for an higher level construct when streaming da
 @note
 Check @ref library_await for the C++20 coroutine layer that wraps `AsyncEventLoop` with `co_await` syntax while
 preserving the same request lifetime expectations. It currently covers a small but useful subset of timers, sockets,
-files, selected filesystem operations, background work, child tasks, cancellation, and timeouts.
+files, selected filesystem operations, process exit, signals, background work, child tasks, cancellation, and timeouts.
 
 # Dependencies
 - Dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
@@ -210,5 +210,5 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 884			| 828		| 1712	|
-| Sources   | 6174			| 1445		| 7619	|
-| Sum       | 7058			| 2273		| 9331	|
+| Sources   | 6178			| 1445		| 7623	|
+| Sum       | 7062			| 2273		| 9335	|

@@ -51,6 +51,9 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
 | [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
 | [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
+| [AwaitProcessExitAwaiter](@ref SC::AwaitProcessExitAwaiter) | @copybrief SC::AwaitProcessExitAwaiter |
+| [AwaitSignalAwaiter](@ref SC::AwaitSignalAwaiter) | @copybrief SC::AwaitSignalAwaiter         |
+| [AwaitTaskSpawnAwaiter](@ref SC::AwaitTaskSpawnAwaiter) | @copybrief SC::AwaitTaskSpawnAwaiter     |
 | [AwaitTaskTimeoutAwaiter](@ref SC::AwaitTaskTimeoutAwaiter) | @copybrief SC::AwaitTaskTimeoutAwaiter |
 | [AwaitLoopWorkAwaiter](@ref SC::AwaitLoopWorkAwaiter) | @copybrief SC::AwaitLoopWorkAwaiter       |
 
@@ -86,8 +89,10 @@ The current proof of concept supports:
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsCopyFile()`, `fsCopyDirectory()`, `fsRename()`,
   `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
+- process exit waiting with `processExit()`;
+- one-shot signal waiting with `signal()`;
 - task cancellation for currently suspended operations;
-- awaiting explicitly spawned child tasks;
+- awaiting explicitly spawned child tasks, or starting and awaiting one with `spawnAndWait()`;
 - child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
@@ -124,7 +129,8 @@ destroyed.
 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
 - Expand cancellation semantics and edge-case coverage for every awaiter, including parent cancellation while waiting on `waitFor()`.
-- Clarify `AsyncFileSystemOperation::read()` and `write()` handle ownership before adding Await wrappers for them.
+- Add Await wrappers for `AsyncFileSystemOperation::read()` and `write()` now that the Async layer preserves caller
+  ownership of borrowed file handles.
 - Decide if arena allocation should become mandatory for production use.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
@@ -133,6 +139,6 @@ destroyed.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 504			| 185		| 689	|
-| Sources   | 1039			| 232		| 1271	|
-| Sum       | 1543			| 417		| 1960	|
+| Headers   | 568			| 208		| 776	|
+| Sources   | 1170			| 265		| 1435	|
+| Sum       | 1738			| 473		| 2211	|

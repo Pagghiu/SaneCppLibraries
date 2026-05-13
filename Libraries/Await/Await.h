@@ -38,6 +38,9 @@ struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
 struct AwaitFileSystemOperationAwaiter;
+struct AwaitProcessExitAwaiter;
+struct AwaitSignalAwaiter;
+struct AwaitTaskSpawnAwaiter;
 struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
 
@@ -102,6 +105,17 @@ struct AwaitFileSendResult
 struct AwaitTimeoutResult
 {
     bool timedOut = false;
+};
+
+struct AwaitProcessExitResult
+{
+    int exitStatus = -1;
+};
+
+struct AwaitSignalResult
+{
+    int      signalNumber  = 0;
+    uint32_t deliveryCount = 0;
 };
 
 enum class AwaitFileSystemOperationType : uint8_t
@@ -172,6 +186,7 @@ struct SC_AWAIT_EXPORT AwaitTask
 
   private:
     friend struct AwaitEventLoop;
+    friend struct AwaitTaskSpawnAwaiter;
     friend struct AwaitTaskTimeoutAwaiter;
 
     Result start();
@@ -289,6 +304,9 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitFileSystemOperationAwaiter fsRename(ThreadPool& threadPool, StringSpan path, StringSpan newPath);
     AwaitFileSystemOperationAwaiter fsRemoveEmptyDirectory(ThreadPool& threadPool, StringSpan path);
     AwaitFileSystemOperationAwaiter fsRemoveFile(ThreadPool& threadPool, StringSpan path);
+    AwaitProcessExitAwaiter         processExit(FileDescriptor::Handle process, AwaitProcessExitResult& outResult);
+    AwaitSignalAwaiter              signal(int signalNumber, AwaitSignalResult& outResult);
+    AwaitTaskSpawnAwaiter           spawnAndWait(AwaitTask& task);
     AwaitTaskTimeoutAwaiter         waitFor(AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult = nullptr);
     AwaitLoopWorkAwaiter            loopWork(ThreadPool& threadPool, Function<Result()> work);
 
@@ -608,6 +626,75 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
     Result await_resume();
 
   private:
+    AwaitTask::Handle continuation;
+};
+
+/// @brief Awaiter for a single AsyncProcessExit operation.
+struct SC_AWAIT_EXPORT AwaitProcessExitAwaiter
+{
+    AwaitProcessExitAwaiter(AwaitEventLoop& await, FileDescriptor::Handle process, AwaitProcessExitResult& outResult);
+
+    AwaitEventLoop&         await;
+    FileDescriptor::Handle  process = FileDescriptor::Invalid;
+    AwaitProcessExitResult& outResult;
+    AsyncProcessExit        request;
+    Result                  operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter for a single one-shot AsyncSignal operation.
+struct SC_AWAIT_EXPORT AwaitSignalAwaiter
+{
+    AwaitSignalAwaiter(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& outResult);
+
+    AwaitEventLoop&    await;
+    int                signalNumber = 0;
+    AwaitSignalResult& outResult;
+    AsyncSignal        request;
+    Result             operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter that starts a child task if needed, then waits for it to complete.
+struct SC_AWAIT_EXPORT AwaitTaskSpawnAwaiter
+{
+    AwaitTaskSpawnAwaiter(AwaitEventLoop& await, AwaitTask& task);
+
+    AwaitEventLoop& await;
+    AwaitTask&      task;
+    Result          operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
     AwaitTask::Handle continuation;
 };
 

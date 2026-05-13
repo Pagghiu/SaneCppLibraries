@@ -429,6 +429,18 @@ AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRemoveFile(ThreadPool& threadP
     return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::RemoveFile, path);
 }
 
+AwaitProcessExitAwaiter AwaitEventLoop::processExit(FileDescriptor::Handle process, AwaitProcessExitResult& outResult)
+{
+    return AwaitProcessExitAwaiter(*this, process, outResult);
+}
+
+AwaitSignalAwaiter AwaitEventLoop::signal(int signalNumber, AwaitSignalResult& outResult)
+{
+    return AwaitSignalAwaiter(*this, signalNumber, outResult);
+}
+
+AwaitTaskSpawnAwaiter AwaitEventLoop::spawnAndWait(AwaitTask& task) { return AwaitTaskSpawnAwaiter(*this, task); }
+
 AwaitTaskTimeoutAwaiter AwaitEventLoop::waitFor(AwaitTask& task, TimeMs timeout, AwaitTimeoutResult* outResult)
 {
     return AwaitTaskTimeoutAwaiter(*this, task, timeout, outResult);
@@ -1045,6 +1057,158 @@ Result AwaitFileSystemOperationAwaiter::await_resume()
 {
     clearCancellation(continuation, this);
     return operationResult;
+}
+
+AwaitProcessExitAwaiter::AwaitProcessExitAwaiter(AwaitEventLoop& await, FileDescriptor::Handle process,
+                                                 AwaitProcessExitResult& outResult)
+    : await(await), process(process), outResult(outResult)
+{}
+
+bool AwaitProcessExitAwaiter::await_ready() const { return false; }
+
+bool AwaitProcessExitAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitProcessExitAwaiter::cancel};
+
+    outResult        = {};
+    request.callback = [this](AsyncProcessExit::Result& result)
+    {
+        operationResult = result.get(outResult.exitStatus);
+        continuation.resume();
+    };
+
+    operationResult = request.start(await.asyncEventLoop(), process);
+    return operationResult;
+}
+
+Result AwaitProcessExitAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitProcessExitAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitProcessExitAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitProcessExitAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+AwaitSignalAwaiter::AwaitSignalAwaiter(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& outResult)
+    : await(await), signalNumber(signalNumber), outResult(outResult)
+{}
+
+bool AwaitSignalAwaiter::await_ready() const { return false; }
+
+bool AwaitSignalAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+    stopCallback = [this](AsyncResult&) { continuation.resume(); };
+
+    continuation.promise().cancellation = {this, AwaitSignalAwaiter::cancel};
+
+    outResult        = {};
+    request.callback = [this](AsyncSignal::Result& result)
+    {
+        operationResult         = result.isValid();
+        outResult.signalNumber  = result.completionData.signalNumber;
+        outResult.deliveryCount = result.completionData.deliveryCount;
+        continuation.resume();
+    };
+
+    AsyncSignalOptions options;
+    options.mode    = AsyncSignalOptions::Mode::OneShot;
+    operationResult = request.start(await.asyncEventLoop(), signalNumber, options);
+    return operationResult;
+}
+
+Result AwaitSignalAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitSignalAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSignalAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSignalAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
+
+AwaitTaskSpawnAwaiter::AwaitTaskSpawnAwaiter(AwaitEventLoop& await, AwaitTask& task) : await(await), task(task) {}
+
+bool AwaitTaskSpawnAwaiter::await_ready() const { return false; }
+
+bool AwaitTaskSpawnAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+
+    if (not task.isValid())
+    {
+        operationResult = Result::Error("AwaitTask is invalid");
+        return false;
+    }
+
+    AwaitEventLoop* taskEventLoop = task.handle.promise().eventLoop;
+    if (taskEventLoop != nullptr and taskEventLoop != &await)
+    {
+        operationResult = Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        return false;
+    }
+
+    if (not task.isStarted())
+    {
+        operationResult = await.spawn(task);
+        if (not operationResult)
+        {
+            return false;
+        }
+    }
+
+    if (not task.isActive())
+    {
+        operationResult = task.result();
+        return false;
+    }
+
+    AwaitTask::Promise& child = task.handle.promise();
+    if (child.completionCallback != nullptr or child.continuation != nullptr)
+    {
+        operationResult = Result::Error("AwaitTask is already being awaited");
+        return false;
+    }
+
+    child.continuation                  = continuation;
+    continuation.promise().cancellation = {this, AwaitTaskSpawnAwaiter::cancel};
+    return true;
+}
+
+Result AwaitTaskSpawnAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitTaskSpawnAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitTaskSpawnAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitTaskSpawnAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    return task.cancel(eventLoop);
 }
 
 AwaitTaskTimeoutAwaiter::AwaitTaskTimeoutAwaiter(AwaitEventLoop& await, AwaitTask& task, TimeMs timeout,

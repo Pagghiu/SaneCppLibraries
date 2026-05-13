@@ -4,11 +4,37 @@
 #include "Libraries/Await/Await.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Process/Process.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
+
+#include <signal.h>
+#if SC_PLATFORM_APPLE
+#include <sys/sysctl.h>
+#endif
+#if not SC_PLATFORM_WINDOWS
+#include <unistd.h>
+#endif
+
+namespace
+{
+#if SC_PLATFORM_APPLE
+static bool isDebuggerAttached()
+{
+    int               mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, static_cast<int>(::getpid())};
+    struct kinfo_proc info   = {};
+    size_t            size   = sizeof(info);
+    if (::sysctl(mib, 4, &info, &size, nullptr, 0) != 0)
+    {
+        return false;
+    }
+    return (info.kp_proc.p_flag & P_TRACED) != 0;
+}
+#endif
+} // namespace
 
 namespace SC
 {
@@ -87,9 +113,29 @@ struct SC::AwaitTest : public SC::TestCase
         {
             loopWork();
         }
+        if (test_section("process exit"))
+        {
+            processExit();
+        }
+        if (test_section("cancel process exit"))
+        {
+            cancelProcessExit();
+        }
+        if (test_section("signal"))
+        {
+            signal();
+        }
+        if (test_section("cancel signal"))
+        {
+            cancelSignal();
+        }
         if (test_section("child task"))
         {
             childTask();
+        }
+        if (test_section("spawn and wait child task"))
+        {
+            spawnAndWaitChildTask();
         }
         if (test_section("cancel child task"))
         {
@@ -316,10 +362,37 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask processExitOnce(AwaitEventLoop& await, Process& process, AwaitProcessExitResult& result)
+    {
+        SC_CO_TRY(co_await await.processExit(process.handle, result));
+        co_return Result(true);
+    }
+
+    AwaitTask signalOnce(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& result)
+    {
+        SC_CO_TRY(co_await await.signal(signalNumber, result));
+        co_return Result(true);
+    }
+
     AwaitTask awaitChild(AwaitEventLoop& await, AwaitTask& child)
     {
         SC_CO_TRY(await.spawn(child));
         SC_CO_TRY(co_await child);
+        co_return Result(true);
+    }
+
+    AwaitTask spawnAndWaitChild(AwaitEventLoop& await)
+    {
+        AwaitTask child = waitTwice(await);
+        SC_CO_TRY(co_await await.spawnAndWait(child));
+        SC_TEST_EXPECT(child.result());
+        co_return Result(true);
+    }
+
+    AwaitTask spawnAndWaitLongChild(AwaitEventLoop& await, AwaitTask& child)
+    {
+        child = waitLong(await);
+        SC_CO_TRY(co_await await.spawnAndWait(child));
         co_return Result(true);
     }
 
@@ -896,6 +969,120 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(threadPool.destroy());
     }
 
+    void processExit()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        Process processSuccess;
+        Process processFailure;
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(processSuccess.launch({"where", "where.exe"}));
+        SC_TEST_EXPECT(processFailure.launch({"cmd", "/C", "dir /DOCTORS"}));
+#else
+        SC_TEST_EXPECT(processSuccess.launch({"sleep", "0.2"}));
+        SC_TEST_EXPECT(processFailure.launch({"ls", "/~"}));
+#endif
+
+        AwaitProcessExitResult successResult;
+        AwaitProcessExitResult failureResult;
+        AwaitTask              successTask = processExitOnce(await, processSuccess, successResult);
+        AwaitTask              failureTask = processExitOnce(await, processFailure, failureResult);
+        SC_TEST_EXPECT(await.spawn(successTask));
+        SC_TEST_EXPECT(await.spawn(failureTask));
+        SC_TEST_EXPECT(await.run());
+
+        SC_TEST_EXPECT(successTask.result());
+        SC_TEST_EXPECT(successResult.exitStatus == 0);
+        SC_TEST_EXPECT(failureTask.result());
+        SC_TEST_EXPECT(failureResult.exitStatus != 0);
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void cancelProcessExit()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+#if SC_PLATFORM_WINDOWS
+        SC_TEST_EXPECT(async.close());
+#else
+        Process process;
+        SC_TEST_EXPECT(process.launch({"sleep", "0.3"}));
+
+        AwaitProcessExitResult result;
+        AwaitTask              task = processExitOnce(await, process, result);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(task.isActive());
+        SC_TEST_EXPECT(task.cancel(await));
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(not task.result());
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(process.waitForExitSync());
+        SC_TEST_EXPECT(process.getExitStatus() == 0);
+#endif
+    }
+
+    void signal()
+    {
+#if SC_PLATFORM_APPLE
+        if (isDebuggerAttached())
+        {
+            report.console.printLine("AwaitTest - Skipping signal section while debugger is attached");
+            return;
+        }
+#endif
+
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+#if SC_PLATFORM_WINDOWS
+        AwaitSignalResult result;
+        AwaitTask         task = signalOnce(await, 2, result);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(task.cancel(await));
+        SC_TEST_EXPECT(await.runNoWait());
+        SC_TEST_EXPECT(async.close());
+#else
+        AwaitSignalResult result;
+        AwaitTask         task = signalOnce(await, SIGINT, result);
+        SC_TEST_EXPECT(await.spawn(task));
+
+        AsyncLoopTimeout sendSignal;
+        sendSignal.callback = [this](AsyncLoopTimeout::Result&) { SC_TEST_EXPECT(::kill(::getpid(), SIGINT) == 0); };
+        SC_TEST_EXPECT(sendSignal.start(async, 10_ms));
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(result.signalNumber == SIGINT);
+        SC_TEST_EXPECT(result.deliveryCount >= 1);
+        SC_TEST_EXPECT(async.close());
+#endif
+    }
+
+    void cancelSignal()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        AwaitSignalResult result;
+        AwaitTask         task = signalOnce(await, SIGINT, result);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(task.isActive());
+        SC_TEST_EXPECT(task.cancel(await));
+
+        SC_TEST_EXPECT(await.runNoWait());
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(not task.result());
+        SC_TEST_EXPECT(async.close());
+    }
+
     void childTask()
     {
         AsyncEventLoop async;
@@ -911,6 +1098,40 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(child.result());
         SC_TEST_EXPECT(parent.result());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void spawnAndWaitChildTask()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask parent = spawnAndWaitChild(await);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(parent.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask child;
+            AwaitTask parent = spawnAndWaitLongChild(await, child);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(parent.isActive());
+            SC_TEST_EXPECT(child.isActive());
+            SC_TEST_EXPECT(parent.cancel(await));
+
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(child.isCompleted());
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(not child.result());
+            SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(async.close());
+        }
     }
 
     void cancelChildTask()
