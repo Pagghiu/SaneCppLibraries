@@ -11,10 +11,12 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Use `SC_CO_TRY(co_await ...)` inside coroutine bodies instead of `SC_TRY`.
 - Keep callback-style `Async` compatibility: `Await` operations share the same underlying event loop.
 - Current awaiter coverage includes sleep, socket accept/connect/send/sendAll/receive, datagram sendTo/receiveFrom,
-  fileRead/fileWrite/fileSend, fsOpen/fsClose/fsCopyFile/fsCopyDirectory/fsRename/fsRemoveEmptyDirectory/fsRemoveFile,
-  processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`, child task timeouts with `waitFor()`, and
-  cancellation of the currently suspended operation.
-- Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage, but call out that the library is still experimental.
+  fileRead/fileWrite/fileSend/filePoll, fsOpen/fsClose/fsRead/fsWrite/fsCopyFile/fsCopyDirectory/fsRename/
+  fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`,
+  `AwaitTaskGroup::waitAll()`, child task timeouts with `waitFor()`, and cancellation of the currently suspended
+  operation.
+- Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The draft still allows no-arena
+  standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
 
 ## What To Watch
 
@@ -22,10 +24,12 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
 - Child tasks can still be explicitly `spawn()`-ed before `co_await child`; use `spawnAndWait()` when a parent should
   start and await a child in one expression.
+- Use `AwaitTaskGroup` with caller-provided `Span<AwaitTask*>` storage when a parent needs to own several children and
+  cancel/wait them as a group.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
 - `waitFor()` cancels the child task when the timeout expires and reports timeout state through `AwaitTimeoutResult`.
-- Await wraps selected `AsyncFileSystemOperation` operations, but does not wrap its read/write methods yet.
-  `AsyncFileSystemOperation::read()` and `write()` borrow handles and preserve caller ownership.
+- `fsRead()` and `fsWrite()` wrap `AsyncFileSystemOperation::read()` and `write()`; those operations borrow file handles
+  and preserve caller ownership.
 - Operation results follow Sane conventions: awaiters return plain `Result`, and extra data is written into explicit
   caller-provided result objects such as `AwaitSocketReceiveResult` or `AwaitFileReadResult`.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.

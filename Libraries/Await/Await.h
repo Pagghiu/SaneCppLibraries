@@ -37,9 +37,12 @@ struct AwaitSocketReceiveFromAwaiter;
 struct AwaitFileReadAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
+struct AwaitFilePollAwaiter;
 struct AwaitFileSystemOperationAwaiter;
 struct AwaitProcessExitAwaiter;
 struct AwaitSignalAwaiter;
+struct AwaitTaskGroup;
+struct AwaitTaskGroupWaitAllAwaiter;
 struct AwaitTaskSpawnAwaiter;
 struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
@@ -122,6 +125,8 @@ enum class AwaitFileSystemOperationType : uint8_t
 {
     Open,
     Close,
+    Read,
+    Write,
     CopyFile,
     CopyDirectory,
     Rename,
@@ -186,6 +191,8 @@ struct SC_AWAIT_EXPORT AwaitTask
 
   private:
     friend struct AwaitEventLoop;
+    friend struct AwaitTaskGroup;
+    friend struct AwaitTaskGroupWaitAllAwaiter;
     friend struct AwaitTaskSpawnAwaiter;
     friend struct AwaitTaskTimeoutAwaiter;
 
@@ -269,6 +276,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     [[nodiscard]] AsyncEventLoop&       asyncEventLoop();
     [[nodiscard]] const AsyncEventLoop& asyncEventLoop() const;
     [[nodiscard]] AwaitArena*           arena();
+    [[nodiscard]] bool                  hasArena() const;
 
     Result spawn(AwaitTask& task);
 
@@ -294,9 +302,14 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                     AwaitFileWriteResult* outResult = nullptr);
     AwaitFileSendAwaiter  fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
                                    AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
+    AwaitFilePollAwaiter  filePoll(const FileDescriptor& file);
     AwaitFileSystemOperationAwaiter fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                            FileDescriptor& outFile);
     AwaitFileSystemOperationAwaiter fsClose(ThreadPool& threadPool, FileDescriptor& file);
+    AwaitFileSystemOperationAwaiter fsRead(ThreadPool& threadPool, FileDescriptor& file, Span<char> buffer,
+                                           AwaitFileReadResult& outResult, uint64_t offset = 0);
+    AwaitFileSystemOperationAwaiter fsWrite(ThreadPool& threadPool, FileDescriptor& file, Span<const char> data,
+                                            AwaitFileWriteResult* outResult = nullptr, uint64_t offset = 0);
     AwaitFileSystemOperationAwaiter fsCopyFile(ThreadPool& threadPool, StringSpan path, StringSpan destinationPath,
                                                FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
     AwaitFileSystemOperationAwaiter fsCopyDirectory(ThreadPool& threadPool, StringSpan path, StringSpan destinationPath,
@@ -598,6 +611,29 @@ struct SC_AWAIT_EXPORT AwaitFileSendAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter for a single AsyncFilePoll operation.
+struct SC_AWAIT_EXPORT AwaitFilePollAwaiter
+{
+    AwaitFilePollAwaiter(AwaitEventLoop& await, const FileDescriptor& file);
+
+    AwaitEventLoop&       await;
+    const FileDescriptor& file;
+    AsyncFilePoll         request;
+    Result                operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
 /// @brief Awaiter for selected AsyncFileSystemOperation path operations.
 struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
 {
@@ -608,6 +644,12 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
                                     FileSystemCopyFlags copyFlags = FileSystemCopyFlags());
     AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
                                     AwaitFileSystemOperationType operation, FileDescriptor& file);
+    AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                    AwaitFileSystemOperationType operation, FileDescriptor& file, Span<char> buffer,
+                                    AwaitFileReadResult& outResult, uint64_t offset);
+    AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                    AwaitFileSystemOperationType operation, FileDescriptor& file, Span<const char> data,
+                                    AwaitFileWriteResult* outResult, uint64_t offset);
 
     AwaitEventLoop&              await;
     ThreadPool&                  threadPool;
@@ -617,6 +659,12 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
     FileOpen                     mode;
     FileDescriptor*              outFile     = nullptr;
     FileDescriptor*              fileToClose = nullptr;
+    FileDescriptor*              fileToUse   = nullptr;
+    Span<char>                   readBuffer;
+    Span<const char>             writeBuffer;
+    AwaitFileReadResult*         outReadResult  = nullptr;
+    AwaitFileWriteResult*        outWriteResult = nullptr;
+    uint64_t                     offset         = 0;
     FileSystemCopyFlags          copyFlags;
     AsyncFileSystemOperation     request;
     Result                       operationResult = Result(true);
@@ -627,6 +675,52 @@ struct SC_AWAIT_EXPORT AwaitFileSystemOperationAwaiter
 
   private:
     AwaitTask::Handle continuation;
+};
+
+/// @brief Caller-storage structured group of child tasks owned by the current scope.
+struct SC_AWAIT_EXPORT AwaitTaskGroup
+{
+    AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage);
+
+    Result                       spawn(AwaitTask& task);
+    AwaitTaskGroupWaitAllAwaiter waitAll();
+
+    [[nodiscard]] size_t size() const;
+    [[nodiscard]] size_t capacity() const;
+
+  private:
+    friend struct AwaitTaskGroupWaitAllAwaiter;
+
+    AwaitEventLoop&  await;
+    Span<AwaitTask*> tasks;
+    size_t           numTasks = 0;
+};
+
+/// @brief Awaiter that waits for every active task in an AwaitTaskGroup.
+struct SC_AWAIT_EXPORT AwaitTaskGroupWaitAllAwaiter
+{
+    explicit AwaitTaskGroupWaitAllAwaiter(AwaitTaskGroup& group);
+
+    AwaitTaskGroup& group;
+    Result          operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+    static void   onTaskCompleted(void* object);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   onTaskCompleted();
+    void   finish(Result result);
+    void   clearChildCallbacks();
+    Result collectResult() const;
+
+    AwaitTask::Handle continuation;
+    size_t            completedTasks = 0;
+    bool              finished       = false;
 };
 
 /// @brief Awaiter for a single AsyncProcessExit operation.

@@ -50,7 +50,10 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFileReadAwaiter](@ref SC::AwaitFileReadAwaiter) | @copybrief SC::AwaitFileReadAwaiter       |
 | [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
 | [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
+| [AwaitFilePollAwaiter](@ref SC::AwaitFilePollAwaiter) | @copybrief SC::AwaitFilePollAwaiter       |
 | [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
+| [AwaitTaskGroup](@ref SC::AwaitTaskGroup)       | @copybrief SC::AwaitTaskGroup                  |
+| [AwaitTaskGroupWaitAllAwaiter](@ref SC::AwaitTaskGroupWaitAllAwaiter) | @copybrief SC::AwaitTaskGroupWaitAllAwaiter |
 | [AwaitProcessExitAwaiter](@ref SC::AwaitProcessExitAwaiter) | @copybrief SC::AwaitProcessExitAwaiter |
 | [AwaitSignalAwaiter](@ref SC::AwaitSignalAwaiter) | @copybrief SC::AwaitSignalAwaiter         |
 | [AwaitTaskSpawnAwaiter](@ref SC::AwaitTaskSpawnAwaiter) | @copybrief SC::AwaitTaskSpawnAwaiter     |
@@ -85,14 +88,15 @@ The current proof of concept supports:
 - socket `accept()` and `connect()`;
 - socket `send()`, `sendAll()`, and `receive()`;
 - datagram socket `sendTo()` and `receiveFrom()`;
-- file `fileRead()`, `fileWrite()`, and `fileSend()`;
-- selected filesystem operations: `fsOpen()`, `fsClose()`, `fsCopyFile()`, `fsCopyDirectory()`, `fsRename()`,
-  `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
+- file `fileRead()`, `fileWrite()`, `fileSend()`, and `filePoll()`;
+- selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
+  `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
 - process exit waiting with `processExit()`;
 - one-shot signal waiting with `signal()`;
 - task cancellation for currently suspended operations;
 - awaiting explicitly spawned child tasks, or starting and awaiting one with `spawnAndWait()`;
+- structured `AwaitTaskGroup` waiting with caller-provided task pointer storage;
 - child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
@@ -117,21 +121,26 @@ coroutine header.
 
 # Memory allocation
 
-`AwaitArena` can hold coroutine frames in caller-provided storage. If an `AwaitEventLoop` is constructed without an
-arena, the draft falls back to standard nothrow coroutine allocation.
+`AwaitArena` can hold coroutine frames in caller-provided storage. The current draft intentionally supports two
+allocation modes:
+
+- Passing an arena to `AwaitEventLoop` gives no-allocation coroutine frame storage for production-style Sane C++ usage.
+- Omitting the arena keeps the proof of concept ergonomic and falls back to standard nothrow coroutine allocation.
 
 Arena-backed frames are not individually freed. The caller must only reset the arena after all tasks using it have been
 destroyed.
+
+`AwaitEventLoop::hasArena()` can be used by tests and examples to make the selected mode explicit. The intended
+direction is to keep the arena-backed path first-class and later decide whether production builds should require it.
 
 # Roadmap
 
 🟥 Draft Features:
 
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
-- Expand cancellation semantics and edge-case coverage for every awaiter, including parent cancellation while waiting on `waitFor()`.
-- Add Await wrappers for `AsyncFileSystemOperation::read()` and `write()` now that the Async layer preserves caller
-  ownership of borrowed file handles.
-- Decide if arena allocation should become mandatory for production use.
+- Expand cancellation semantics and edge-case coverage for every awaiter.
+- Expand task group helpers with `waitAny()`, scoped cancellation policies, and result aggregation helpers.
+- Decide if arena allocation should become mandatory for production builds.
 - Investigate no-stdlib coroutine support.
 - Validate exception-disabled compiler modes across platforms.
 - Explore structured child tasks / task groups.
@@ -139,6 +148,6 @@ destroyed.
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 568			| 208		| 776	|
-| Sources   | 1170			| 265		| 1435	|
-| Sum       | 1738			| 473		| 2211	|
+| Headers   | 642			| 228		| 870	|
+| Sources   | 1394			| 290		| 1684	|
+| Sum       | 2036			| 518		| 2554	|

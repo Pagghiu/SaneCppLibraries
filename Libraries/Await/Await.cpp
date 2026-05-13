@@ -50,6 +50,25 @@ static void clearCancellation(AwaitTask::Handle continuation, void* object)
         promise.cancellation = {};
     }
 }
+
+static void setupCancellableAwait(AwaitTask::Handle& continuation, Function<void(AsyncResult&)>& stopCallback,
+                                  AwaitTask::Handle newContinuation, void* object,
+                                  Result (*cancel)(void* object, AwaitEventLoop& eventLoop))
+{
+    continuation                       = newContinuation;
+    AwaitTask::Handle* continuationPtr = &continuation;
+    stopCallback                       = [continuationPtr](AsyncResult&) { continuationPtr->resume(); };
+
+    continuation.promise().cancellation = {object, cancel};
+}
+
+template <typename AsyncRequestType>
+static Result cancelCancellableAwait(AsyncRequestType& request, Result& operationResult, AwaitEventLoop& eventLoop,
+                                     Function<void(AsyncResult&)>& stopCallback)
+{
+    operationResult = AwaitTaskCancelled();
+    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+}
 } // namespace
 
 AwaitArena::AwaitArena(Span<char> memory) : storage(memory) {}
@@ -304,6 +323,8 @@ const AsyncEventLoop& AwaitEventLoop::asyncEventLoop() const { return eventLoop;
 
 AwaitArena* AwaitEventLoop::arena() { return frameArena; }
 
+bool AwaitEventLoop::hasArena() const { return frameArena != nullptr; }
+
 Result AwaitEventLoop::spawn(AwaitTask& task)
 {
     if (not task.isValid())
@@ -387,6 +408,8 @@ AwaitFileSendAwaiter AwaitEventLoop::fileSend(const FileDescriptor& file, const 
     return AwaitFileSendAwaiter(*this, file, socket, outResult, options);
 }
 
+AwaitFilePollAwaiter AwaitEventLoop::filePoll(const FileDescriptor& file) { return AwaitFilePollAwaiter(*this, file); }
+
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                                        FileDescriptor& outFile)
 {
@@ -397,6 +420,21 @@ AwaitFileSystemOperationAwaiter AwaitEventLoop::fsOpen(ThreadPool& threadPool, S
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsClose(ThreadPool& threadPool, FileDescriptor& file)
 {
     return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Close, file);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsRead(ThreadPool& threadPool, FileDescriptor& file, Span<char> buffer,
+                                                       AwaitFileReadResult& outResult, uint64_t offset)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Read, file, buffer,
+                                           outResult, offset);
+}
+
+AwaitFileSystemOperationAwaiter AwaitEventLoop::fsWrite(ThreadPool& threadPool, FileDescriptor& file,
+                                                        Span<const char> data, AwaitFileWriteResult* outResult,
+                                                        uint64_t offset)
+{
+    return AwaitFileSystemOperationAwaiter(*this, threadPool, AwaitFileSystemOperationType::Write, file, data,
+                                           outResult, offset);
 }
 
 AwaitFileSystemOperationAwaiter AwaitEventLoop::fsCopyFile(ThreadPool& threadPool, StringSpan path,
@@ -457,10 +495,7 @@ bool AwaitSleepAwaiter::await_ready() const { return false; }
 
 bool AwaitSleepAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSleepAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSleepAwaiter::cancel);
 
     request.callback = [this](AsyncLoopTimeout::Result& result)
     {
@@ -485,8 +520,7 @@ Result AwaitSleepAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitSleepAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketAcceptAwaiter::AwaitSocketAcceptAwaiter(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
@@ -498,10 +532,7 @@ bool AwaitSocketAcceptAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketAcceptAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketAcceptAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketAcceptAwaiter::cancel);
 
     request.callback = [this](AsyncSocketAccept::Result& result)
     {
@@ -526,8 +557,7 @@ Result AwaitSocketAcceptAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitSocketAcceptAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketConnectAwaiter::AwaitSocketConnectAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -539,10 +569,7 @@ bool AwaitSocketConnectAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketConnectAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketConnectAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketConnectAwaiter::cancel);
 
     request.callback = [this](AsyncSocketConnect::Result& result)
     {
@@ -567,8 +594,7 @@ Result AwaitSocketConnectAwaiter::cancel(void* object, AwaitEventLoop& eventLoop
 
 Result AwaitSocketConnectAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketSendAwaiter::AwaitSocketSendAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -580,10 +606,7 @@ bool AwaitSocketSendAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketSendAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketSendAwaiter::cancel);
 
     request.callback = [this](AsyncSocketSend::Result& result)
     {
@@ -612,8 +635,7 @@ Result AwaitSocketSendAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitSocketSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketSendToAwaiter::AwaitSocketSendToAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -626,10 +648,7 @@ bool AwaitSocketSendToAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketSendToAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketSendToAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketSendToAwaiter::cancel);
 
     request.callback = [this](AsyncSocketSendTo::Result& result)
     {
@@ -658,8 +677,7 @@ Result AwaitSocketSendToAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitSocketSendToAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketSendAllAwaiter::AwaitSocketSendAllAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -671,10 +689,7 @@ bool AwaitSocketSendAllAwaiter::await_ready() const { return data.empty(); }
 
 bool AwaitSocketSendAllAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketSendAllAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketSendAllAwaiter::cancel);
 
     request.callback = [this](AsyncSocketSend::Result& result)
     {
@@ -731,8 +746,7 @@ Result AwaitSocketSendAllAwaiter::cancel(void* object, AwaitEventLoop& eventLoop
 
 Result AwaitSocketSendAllAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketReceiveAwaiter::AwaitSocketReceiveAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -744,10 +758,7 @@ bool AwaitSocketReceiveAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketReceiveAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketReceiveAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketReceiveAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncSocketReceive::Result& result)
@@ -774,8 +785,7 @@ Result AwaitSocketReceiveAwaiter::cancel(void* object, AwaitEventLoop& eventLoop
 
 Result AwaitSocketReceiveAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSocketReceiveFromAwaiter::AwaitSocketReceiveFromAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
@@ -787,10 +797,7 @@ bool AwaitSocketReceiveFromAwaiter::await_ready() const { return false; }
 
 bool AwaitSocketReceiveFromAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSocketReceiveFromAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketReceiveFromAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncSocketReceiveFrom::Result& result)
@@ -818,8 +825,7 @@ Result AwaitSocketReceiveFromAwaiter::cancel(void* object, AwaitEventLoop& event
 
 Result AwaitSocketReceiveFromAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitFileReadAwaiter::AwaitFileReadAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<char> buffer,
@@ -831,10 +837,7 @@ bool AwaitFileReadAwaiter::await_ready() const { return false; }
 
 bool AwaitFileReadAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitFileReadAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFileReadAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncFileRead::Result& result)
@@ -861,8 +864,7 @@ Result AwaitFileReadAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitFileReadAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,
@@ -874,10 +876,7 @@ bool AwaitFileWriteAwaiter::await_ready() const { return false; }
 
 bool AwaitFileWriteAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitFileWriteAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFileWriteAwaiter::cancel);
 
     request.callback = [this](AsyncFileWrite::Result& result)
     {
@@ -906,8 +905,7 @@ Result AwaitFileWriteAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitFileWriteAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitFileSendAwaiter::AwaitFileSendAwaiter(AwaitEventLoop& await, const FileDescriptor& file,
@@ -920,10 +918,7 @@ bool AwaitFileSendAwaiter::await_ready() const { return false; }
 
 bool AwaitFileSendAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitFileSendAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFileSendAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncFileSend::Result& result)
@@ -962,8 +957,48 @@ Result AwaitFileSendAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitFileSendAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+AwaitFilePollAwaiter::AwaitFilePollAwaiter(AwaitEventLoop& await, const FileDescriptor& file) : await(await), file(file)
+{}
+
+bool AwaitFilePollAwaiter::await_ready() const { return false; }
+
+bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFilePollAwaiter::cancel);
+
+    request.callback = [this](AsyncFilePoll::Result& result)
+    {
+        operationResult = result.isValid();
+        continuation.resume();
+    };
+
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    operationResult               = file.get(handle, Result::Error("Await filePoll invalid file"));
+    if (not operationResult)
+    {
+        return false;
+    }
+    operationResult = request.start(await.asyncEventLoop(), handle);
+    return operationResult;
+}
+
+Result AwaitFilePollAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitFilePollAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitFilePollAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitFilePollAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
@@ -980,6 +1015,22 @@ AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop&
     : await(await), threadPool(threadPool), operation(operation), fileToClose(&file)
 {}
 
+AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                                                 AwaitFileSystemOperationType operation,
+                                                                 FileDescriptor& file, Span<char> buffer,
+                                                                 AwaitFileReadResult& outResult, uint64_t offset)
+    : await(await), threadPool(threadPool), operation(operation), fileToUse(&file), readBuffer(buffer),
+      outReadResult(&outResult), offset(offset)
+{}
+
+AwaitFileSystemOperationAwaiter::AwaitFileSystemOperationAwaiter(AwaitEventLoop& await, ThreadPool& threadPool,
+                                                                 AwaitFileSystemOperationType operation,
+                                                                 FileDescriptor& file, Span<const char> data,
+                                                                 AwaitFileWriteResult* outResult, uint64_t offset)
+    : await(await), threadPool(threadPool), operation(operation), fileToUse(&file), writeBuffer(data),
+      outWriteResult(outResult), offset(offset)
+{}
+
 bool AwaitFileSystemOperationAwaiter::await_ready() const { return false; }
 
 bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinuation)
@@ -993,6 +1044,16 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         {
             FileDescriptor openedFile(result.completionData.handle);
             operationResult = outFile->assign(move(openedFile));
+        }
+        else if (operationResult and operation == AwaitFileSystemOperationType::Read)
+        {
+            operationResult =
+                Result(readBuffer.sliceStartLength(0, result.completionData.numBytes, outReadResult->data));
+            outReadResult->endOfFile = result.completionData.numBytes == 0;
+        }
+        else if (operationResult and operation == AwaitFileSystemOperationType::Write and outWriteResult != nullptr)
+        {
+            outWriteResult->numBytes = result.completionData.numBytes;
         }
         continuation.resume();
     };
@@ -1032,6 +1093,41 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         }
         return operationResult;
     }
+    case AwaitFileSystemOperationType::Read: {
+        if (fileToUse == nullptr or outReadResult == nullptr)
+        {
+            operationResult = Result::Error("Await fsRead missing file or result");
+            return false;
+        }
+        FileDescriptor::Handle handle = FileDescriptor::Invalid;
+        operationResult               = fileToUse->get(handle, Result::Error("Await fsRead invalid file"));
+        if (not operationResult)
+        {
+            return false;
+        }
+        *outReadResult  = {};
+        operationResult = request.read(await.asyncEventLoop(), handle, readBuffer, offset);
+        return operationResult;
+    }
+    case AwaitFileSystemOperationType::Write: {
+        if (fileToUse == nullptr)
+        {
+            operationResult = Result::Error("Await fsWrite missing file");
+            return false;
+        }
+        FileDescriptor::Handle handle = FileDescriptor::Invalid;
+        operationResult               = fileToUse->get(handle, Result::Error("Await fsWrite invalid file"));
+        if (not operationResult)
+        {
+            return false;
+        }
+        if (outWriteResult != nullptr)
+        {
+            *outWriteResult = {};
+        }
+        operationResult = request.write(await.asyncEventLoop(), handle, writeBuffer, offset);
+        return operationResult;
+    }
     case AwaitFileSystemOperationType::CopyFile:
         operationResult = request.copyFile(await.asyncEventLoop(), path, otherPath, copyFlags);
         return operationResult;
@@ -1059,6 +1155,171 @@ Result AwaitFileSystemOperationAwaiter::await_resume()
     return operationResult;
 }
 
+AwaitTaskGroup::AwaitTaskGroup(AwaitEventLoop& await, Span<AwaitTask*> taskStorage) : await(await), tasks(taskStorage)
+{}
+
+Result AwaitTaskGroup::spawn(AwaitTask& task)
+{
+    if (numTasks >= tasks.sizeInElements())
+    {
+        return Result::Error("AwaitTaskGroup storage is full");
+    }
+    SC_TRY(await.spawn(task));
+    tasks[numTasks] = &task;
+    numTasks++;
+    return Result(true);
+}
+
+AwaitTaskGroupWaitAllAwaiter AwaitTaskGroup::waitAll() { return AwaitTaskGroupWaitAllAwaiter(*this); }
+
+size_t AwaitTaskGroup::size() const { return numTasks; }
+
+size_t AwaitTaskGroup::capacity() const { return tasks.sizeInElements(); }
+
+AwaitTaskGroupWaitAllAwaiter::AwaitTaskGroupWaitAllAwaiter(AwaitTaskGroup& group) : group(group) {}
+
+bool AwaitTaskGroupWaitAllAwaiter::await_ready() const { return group.numTasks == 0; }
+
+bool AwaitTaskGroupWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task == nullptr or not task->isValid())
+        {
+            operationResult = Result::Error("AwaitTaskGroup contains invalid task");
+            clearChildCallbacks();
+            return false;
+        }
+        if (task->isCompleted())
+        {
+            completedTasks++;
+            continue;
+        }
+        if (not task->isActive())
+        {
+            operationResult = Result::Error("AwaitTaskGroup contains inactive task");
+            clearChildCallbacks();
+            return false;
+        }
+
+        AwaitTask::Promise& promise = task->handle.promise();
+        if (promise.completionCallback != nullptr or promise.continuation != nullptr)
+        {
+            operationResult = Result::Error("AwaitTask is already being awaited");
+            clearChildCallbacks();
+            return false;
+        }
+
+        promise.completionObject   = this;
+        promise.completionCallback = AwaitTaskGroupWaitAllAwaiter::onTaskCompleted;
+    }
+
+    if (completedTasks == group.numTasks)
+    {
+        operationResult = collectResult();
+        return false;
+    }
+
+    continuation.promise().cancellation = {this, AwaitTaskGroupWaitAllAwaiter::cancel};
+    return true;
+}
+
+Result AwaitTaskGroupWaitAllAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitTaskGroupWaitAllAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitTaskGroupWaitAllAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitTaskGroupWaitAllAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    operationResult = AwaitTaskCancelled();
+    Result cancelResult(true);
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task != nullptr and task->isActive())
+        {
+            Result taskCancelResult = task->cancel(eventLoop);
+            if (cancelResult and not taskCancelResult)
+            {
+                cancelResult = taskCancelResult;
+            }
+        }
+    }
+    return cancelResult;
+}
+
+void AwaitTaskGroupWaitAllAwaiter::onTaskCompleted(void* object)
+{
+    static_cast<AwaitTaskGroupWaitAllAwaiter*>(object)->onTaskCompleted();
+}
+
+void AwaitTaskGroupWaitAllAwaiter::onTaskCompleted()
+{
+    if (finished)
+    {
+        return;
+    }
+
+    completedTasks++;
+    if (completedTasks == group.numTasks)
+    {
+        finish(operationResult ? collectResult() : operationResult);
+    }
+}
+
+void AwaitTaskGroupWaitAllAwaiter::finish(Result result)
+{
+    if (finished)
+    {
+        return;
+    }
+    finished        = true;
+    operationResult = result;
+    clearChildCallbacks();
+    continuation.resume();
+}
+
+void AwaitTaskGroupWaitAllAwaiter::clearChildCallbacks()
+{
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task == nullptr or not task->isValid())
+        {
+            continue;
+        }
+        AwaitTask::Promise& promise = task->handle.promise();
+        if (promise.completionObject == this)
+        {
+            promise.completionObject   = nullptr;
+            promise.completionCallback = nullptr;
+        }
+    }
+}
+
+Result AwaitTaskGroupWaitAllAwaiter::collectResult() const
+{
+    for (size_t idx = 0; idx < group.numTasks; ++idx)
+    {
+        AwaitTask* task = group.tasks[idx];
+        if (task == nullptr)
+        {
+            return Result::Error("AwaitTaskGroup contains invalid task");
+        }
+        SC_TRY(task->result());
+    }
+    return Result(true);
+}
+
 AwaitProcessExitAwaiter::AwaitProcessExitAwaiter(AwaitEventLoop& await, FileDescriptor::Handle process,
                                                  AwaitProcessExitResult& outResult)
     : await(await), process(process), outResult(outResult)
@@ -1068,10 +1329,7 @@ bool AwaitProcessExitAwaiter::await_ready() const { return false; }
 
 bool AwaitProcessExitAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitProcessExitAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitProcessExitAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncProcessExit::Result& result)
@@ -1097,8 +1355,7 @@ Result AwaitProcessExitAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitProcessExitAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitSignalAwaiter::AwaitSignalAwaiter(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& outResult)
@@ -1109,10 +1366,7 @@ bool AwaitSignalAwaiter::await_ready() const { return false; }
 
 bool AwaitSignalAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitSignalAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSignalAwaiter::cancel);
 
     outResult        = {};
     request.callback = [this](AsyncSignal::Result& result)
@@ -1142,8 +1396,7 @@ Result AwaitSignalAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitSignalAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 AwaitTaskSpawnAwaiter::AwaitTaskSpawnAwaiter(AwaitEventLoop& await, AwaitTask& task) : await(await), task(task) {}
@@ -1386,10 +1639,7 @@ bool AwaitLoopWorkAwaiter::await_ready() const { return false; }
 
 bool AwaitLoopWorkAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
-    continuation = newContinuation;
-    stopCallback = [this](AsyncResult&) { continuation.resume(); };
-
-    continuation.promise().cancellation = {this, AwaitLoopWorkAwaiter::cancel};
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitLoopWorkAwaiter::cancel);
 
     if (not work.isValid())
     {
@@ -1426,8 +1676,7 @@ Result AwaitLoopWorkAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitLoopWorkAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
-    return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
 } // namespace SC
