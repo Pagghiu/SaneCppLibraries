@@ -1828,6 +1828,55 @@ AwaitTaskGroupWaitAnyAwaiter AwaitTaskGroup::waitAny(AwaitTaskGroupWaitAnyResult
     return AwaitTaskGroupWaitAnyAwaiter(*this, outResult, waitAnyPolicy);
 }
 
+Result AwaitTaskGroup::collectResults(Span<Result> outResults, AwaitTaskGroupResultSummary* outSummary) const
+{
+    if (outResults.sizeInElements() < numTasks)
+    {
+        return Result::Error("AwaitTaskGroup result storage is too small");
+    }
+
+    AwaitTaskGroupResultSummary summary;
+    summary.numTasks = numTasks;
+
+    Result aggregate(true);
+    for (size_t idx = 0; idx < numTasks; ++idx)
+    {
+        AwaitTask* task = tasks[idx];
+        if (task == nullptr)
+        {
+            return Result::Error("AwaitTaskGroup contains invalid task");
+        }
+
+        Result taskResult = task->result();
+        outResults[idx]   = taskResult;
+        if (task->isCompleted())
+        {
+            summary.numCompleted++;
+        }
+        if (taskResult)
+        {
+            summary.numSucceeded++;
+        }
+        else
+        {
+            summary.numFailed++;
+            if (summary.firstFailureTask == nullptr)
+            {
+                summary.firstFailureIndex = idx;
+                summary.firstFailureTask  = task;
+                summary.firstFailure      = taskResult;
+                aggregate                 = taskResult;
+            }
+        }
+    }
+
+    if (outSummary != nullptr)
+    {
+        *outSummary = summary;
+    }
+    return aggregate;
+}
+
 size_t AwaitTaskGroup::size() const { return numTasks; }
 
 size_t AwaitTaskGroup::capacity() const { return tasks.sizeInElements(); }

@@ -170,6 +170,17 @@ struct AwaitTaskGroupWaitAnyResult
     AwaitTask* task  = nullptr;
 };
 
+struct AwaitTaskGroupResultSummary
+{
+    size_t     numTasks          = 0;
+    size_t     numCompleted      = 0;
+    size_t     numSucceeded      = 0;
+    size_t     numFailed         = 0;
+    size_t     firstFailureIndex = size_t(-1);
+    AwaitTask* firstFailureTask  = nullptr;
+    Result     firstFailure      = Result(true);
+};
+
 enum class AwaitTaskGroupCancelPolicy : uint8_t
 {
     CancelChildren,
@@ -958,6 +969,7 @@ struct SC_AWAIT_EXPORT AwaitTaskGroup
     AwaitTaskGroupWaitAnyAwaiter waitAny(
         AwaitTaskGroupWaitAnyResult& outResult,
         AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy = AwaitTaskGroupWaitAnyPolicy::CancelRemaining);
+    Result collectResults(Span<Result> outResults, AwaitTaskGroupResultSummary* outSummary = nullptr) const;
 
     [[nodiscard]] size_t size() const;
     [[nodiscard]] size_t capacity() const;

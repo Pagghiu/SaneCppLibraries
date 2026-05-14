@@ -58,6 +58,7 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFilePollAwaiter](@ref SC::AwaitFilePollAwaiter) | @copybrief SC::AwaitFilePollAwaiter       |
 | [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
 | [AwaitTaskGroup](@ref SC::AwaitTaskGroup)       | @copybrief SC::AwaitTaskGroup                  |
+| [AwaitTaskGroupResultSummary](@ref SC::AwaitTaskGroupResultSummary) | @copybrief SC::AwaitTaskGroupResultSummary |
 | [AwaitTaskGroupWaitAllAwaiter](@ref SC::AwaitTaskGroupWaitAllAwaiter) | @copybrief SC::AwaitTaskGroupWaitAllAwaiter |
 | [AwaitTaskGroupWaitAnyAwaiter](@ref SC::AwaitTaskGroupWaitAnyAwaiter) | @copybrief SC::AwaitTaskGroupWaitAnyAwaiter |
 | [AwaitProcessExitAwaiter](@ref SC::AwaitProcessExitAwaiter) | @copybrief SC::AwaitProcessExitAwaiter |
@@ -118,6 +119,8 @@ Complete console examples live in:
 
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
+- `Examples/AwaitTaskGroupFiles`, showing Python `asyncio.TaskGroup`-style fan-out over two file reads while keeping
+  task storage caller-owned.
 
 # Socket send helpers
 
@@ -250,9 +253,18 @@ structured: cancelling the parent task while it is suspended in `waitAll()` or `
 the parent completes. `AwaitTaskGroupCancelPolicy::LeaveChildrenRunning` exists for advanced cases where child tasks
 outlive the waiting parent.
 
+For request-backed children, keep the child `AwaitTask` objects in caller-owned storage that outlives the parent
+coroutine suspension. This mirrors `Async`'s stable request-object rule: the coroutine frame owns the active awaiter,
+so the task object should not be a short-lived temporary when the event loop may still be unwinding an async
+completion. `Examples/AwaitTaskGroupFiles` keeps each child task inside a caller-owned job object.
+
 `waitAny()` defaults to `AwaitTaskGroupWaitAnyPolicy::CancelRemaining`, so stack-owned child tasks are not left active
 after the first child completes. Use `LeaveRemainingRunning` only when pending children have an explicitly managed
 lifetime.
+
+After `waitAll()` returns, `collectResults()` can copy each child `Result` into caller-provided storage and optionally
+fill `AwaitTaskGroupResultSummary` with counts plus the first failed task. This keeps aggregation no-allocation and
+still follows Sane C++'s plain-`Result` style.
 
 # Memory allocation
 

@@ -826,6 +826,39 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask waitTaskGroupAndCollectResults(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
+    {
+        childA = waitTwice(await);
+        childB = failSoon(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(childA));
+        SC_CO_TRY(group.spawn(childB));
+
+        Result waitResult = co_await group.waitAll();
+        SC_TEST_EXPECT(not waitResult);
+
+        Result shortResults[1] = {Result(true)};
+        SC_TEST_EXPECT(not group.collectResults(shortResults));
+
+        Result                      results[2] = {Result(true), Result(true)};
+        AwaitTaskGroupResultSummary summary;
+        Result                      aggregate = group.collectResults(results, &summary);
+        SC_TEST_EXPECT(not aggregate);
+        SC_TEST_EXPECT(results[0]);
+        SC_TEST_EXPECT(not results[1]);
+        SC_TEST_EXPECT(summary.numTasks == 2);
+        SC_TEST_EXPECT(summary.numCompleted == 2);
+        SC_TEST_EXPECT(summary.numSucceeded == 1);
+        SC_TEST_EXPECT(summary.numFailed == 1);
+        SC_TEST_EXPECT(summary.firstFailureIndex == 1);
+        SC_TEST_EXPECT(summary.firstFailureTask == &childB);
+        SC_TEST_EXPECT(not summary.firstFailure);
+
+        co_return Result(true);
+    }
+
     AwaitTask waitCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
     {
         childA = waitLong(await);
@@ -2285,6 +2318,21 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(await.spawn(task));
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask childA;
+            AwaitTask childB;
+            AwaitTask task = waitTaskGroupAndCollectResults(await, childA, childB);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(childA.result());
+            SC_TEST_EXPECT(not childB.result());
             SC_TEST_EXPECT(async.close());
         }
         {
