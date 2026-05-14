@@ -971,6 +971,39 @@ struct SC::AwaitTest : public SC::TestCase
         co_return groupResult;
     }
 
+    AwaitTask waitNestedCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& leafA, AwaitTask& leafB)
+    {
+        leafA = waitLong(await);
+        leafB = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(leafA));
+        SC_CO_TRY(group.spawn(leafB));
+
+        Result groupResult = co_await group.waitAll();
+        SC_TEST_EXPECT(not groupResult);
+
+        co_return groupResult;
+    }
+
+    AwaitTask waitOuterCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& nested, AwaitTask& leafA,
+                                            AwaitTask& leafB, AwaitTask& sibling)
+    {
+        nested  = waitNestedCancellableTaskGroup(await, leafA, leafB);
+        sibling = waitLong(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(nested));
+        SC_CO_TRY(group.spawn(sibling));
+
+        Result groupResult = co_await group.waitAll();
+        SC_TEST_EXPECT(not groupResult);
+
+        co_return groupResult;
+    }
+
     AwaitTask waitForCompletedChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitTwice(await);
@@ -1130,7 +1163,9 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(await.run());
 
         SC_TEST_EXPECT(task.isCompleted());
-        SC_TEST_EXPECT(not task.result());
+        Result taskResult = task.result();
+        SC_TEST_EXPECT(not taskResult);
+        SC_TEST_EXPECT(AwaitIsCancelled(taskResult));
         SC_TEST_EXPECT(async.close());
     }
 
@@ -1156,7 +1191,9 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(active.isCancellationRequested());
 
         SC_TEST_EXPECT(await.run());
-        SC_TEST_EXPECT(not active.result());
+        Result activeResult = active.result();
+        SC_TEST_EXPECT(not activeResult);
+        SC_TEST_EXPECT(AwaitIsCancelled(activeResult));
         SC_TEST_EXPECT(async.close());
     }
 
@@ -2225,6 +2262,8 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(parent.isActive());
             SC_TEST_EXPECT(child.isActive());
             SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(child.cancel(await));
 
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(child.isCompleted());
@@ -2261,6 +2300,9 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(childA.isActive());
             SC_TEST_EXPECT(childB.isActive());
             SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(childA.cancel(await));
+            SC_TEST_EXPECT(childB.cancel(await));
 
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(childA.isCompleted());
@@ -2269,6 +2311,37 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(not childA.result());
             SC_TEST_EXPECT(not childB.result());
             SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask nested;
+            AwaitTask leafA;
+            AwaitTask leafB;
+            AwaitTask sibling;
+            AwaitTask parent = waitOuterCancellableTaskGroup(await, nested, leafA, leafB, sibling);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(parent.isActive());
+            SC_TEST_EXPECT(nested.isActive());
+            SC_TEST_EXPECT(leafA.isActive());
+            SC_TEST_EXPECT(leafB.isActive());
+            SC_TEST_EXPECT(sibling.isActive());
+            SC_TEST_EXPECT(parent.cancel(await));
+
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(nested.isCompleted());
+            SC_TEST_EXPECT(leafA.isCompleted());
+            SC_TEST_EXPECT(leafB.isCompleted());
+            SC_TEST_EXPECT(sibling.isCompleted());
+            SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(not nested.result());
+            SC_TEST_EXPECT(not leafA.result());
+            SC_TEST_EXPECT(not leafB.result());
+            SC_TEST_EXPECT(not sibling.result());
             SC_TEST_EXPECT(async.close());
         }
     }
@@ -2356,6 +2429,9 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(childA.isActive());
             SC_TEST_EXPECT(childB.isActive());
             SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(parent.cancel(await));
+            SC_TEST_EXPECT(childA.cancel(await));
+            SC_TEST_EXPECT(childB.cancel(await));
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(childA.isCompleted());
             SC_TEST_EXPECT(childB.isCompleted());
@@ -2401,6 +2477,8 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(parent.isActive());
         SC_TEST_EXPECT(child.isActive());
         SC_TEST_EXPECT(parent.cancel(await));
+        SC_TEST_EXPECT(parent.cancel(await));
+        SC_TEST_EXPECT(child.cancel(await));
         SC_TEST_EXPECT(child.isCancellationRequested());
 
         SC_TEST_EXPECT(await.run());
@@ -2451,6 +2529,8 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(parent.isActive());
         SC_TEST_EXPECT(child.isActive());
         SC_TEST_EXPECT(parent.cancel(await));
+        SC_TEST_EXPECT(parent.cancel(await));
+        SC_TEST_EXPECT(child.cancel(await));
 
         SC_TEST_EXPECT(await.run());
 

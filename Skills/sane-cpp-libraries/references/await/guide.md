@@ -38,6 +38,10 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   cancel/wait them as a group. `waitAny()` defaults to cancelling remaining children before returning so stack-owned
   child tasks are not left active.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
+- Use `AwaitIsCancelled(result)` to distinguish cooperative cancellation from ordinary failure without introducing
+  `Result<T>` or exception-style control flow.
+- Treat cancellation as best-effort and idempotent after request: active `AsyncRequest` gets stopped when possible,
+  already-completed tasks keep normal result.
 - `AwaitLoopWakeUp` is the stable object shared with another thread or callback; the coroutine waits with
   `co_await await.wakeUp(wakeUp, result)` and the producer calls `wakeUp.wakeUp(await)`.
 - Use `receive()` for one-shot "some bytes" socket reads and `receiveExact()` when the caller buffer must be filled or

@@ -223,6 +223,17 @@ operation and only add a small, no-allocation loop over caller-provided storage.
 If future helpers start carrying protocol state, buffering policy, parsing rules, or multiple stable objects, they should
 move into explicit `Await*` helper structs instead of making `AwaitEventLoop` a grab bag.
 
+# Cancellation
+
+Cancellation is cooperative and follows the active awaiter's `AsyncRequest::stop()` when one exists. Cancelled awaits
+return `AwaitCancelledResult()`, and callers can use `AwaitIsCancelled(result)` when cancellation needs to be
+distinguished from ordinary failure while still preserving the plain `Result` API.
+
+`AwaitTask::cancel()` is idempotent after cancellation has been requested. Cancellation is best-effort: if the suspended
+operation is still active, `Await` asks the underlying `AsyncRequest` to stop and resumes the coroutine with the
+cancellation result. If the operation has already completed, the normal completion result wins. Cancelling an already
+completed task succeeds and leaves its result unchanged.
+
 # Lifetime rules
 
 Awaiters keep the same stable-object rules as `Async`: sockets, file descriptors, buffers, result objects, wake-up

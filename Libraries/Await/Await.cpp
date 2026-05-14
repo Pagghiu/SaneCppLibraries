@@ -17,7 +17,7 @@ struct AwaitAllocationHeader
     void*       allocation = nullptr;
 };
 
-static constexpr Result AwaitTaskCancelled() { return Result::Error("AwaitTask cancelled"); }
+static const char AwaitCancellationMessageStorage[] = "AwaitTask cancelled";
 
 static constexpr size_t AwaitFrameAlignment =
 #if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
@@ -66,10 +66,16 @@ template <typename AsyncRequestType>
 static Result cancelCancellableAwait(AsyncRequestType& request, Result& operationResult, AwaitEventLoop& eventLoop,
                                      Function<void(AsyncResult&)>& stopCallback)
 {
-    operationResult = AwaitTaskCancelled();
+    operationResult = AwaitCancelledResult();
     return request.stop(eventLoop.asyncEventLoop(), &stopCallback);
 }
 } // namespace
+
+const char* AwaitCancellationMessage() { return AwaitCancellationMessageStorage; }
+
+Result AwaitCancelledResult() { return Result::FromStableCharPointer(AwaitCancellationMessageStorage); }
+
+bool AwaitIsCancelled(Result result) { return result.message == AwaitCancellationMessageStorage; }
 
 AwaitArena::AwaitArena(Span<char> memory) : storage(memory) {}
 
@@ -1890,7 +1896,7 @@ Result AwaitTaskGroupWaitAllAwaiter::cancel(void* object, AwaitEventLoop& eventL
 
 Result AwaitTaskGroupWaitAllAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
+    operationResult = AwaitCancelledResult();
     if (group.cancelPolicy == AwaitTaskGroupCancelPolicy::LeaveChildrenRunning)
     {
         finish(operationResult);
@@ -2074,7 +2080,7 @@ Result AwaitTaskGroupWaitAnyAwaiter::cancel(void* object, AwaitEventLoop& eventL
 
 Result AwaitTaskGroupWaitAnyAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
+    operationResult = AwaitCancelledResult();
     if (group.cancelPolicy == AwaitTaskGroupCancelPolicy::LeaveChildrenRunning)
     {
         finish(operationResult);
@@ -2333,7 +2339,7 @@ Result AwaitTaskSpawnAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitTaskSpawnAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
+    operationResult = AwaitCancelledResult();
     return task.cancel(eventLoop);
 }
 
@@ -2421,7 +2427,7 @@ Result AwaitTaskTimeoutAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 
 Result AwaitTaskTimeoutAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
-    operationResult = AwaitTaskCancelled();
+    operationResult = AwaitCancelledResult();
     cancelling      = true;
     if (outResult != nullptr)
     {
