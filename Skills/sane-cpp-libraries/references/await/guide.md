@@ -11,13 +11,16 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Use `SC_CO_TRY(co_await ...)` inside coroutine bodies instead of `SC_TRY`.
 - Keep callback-style `Async` compatibility: `Await` operations share the same underlying event loop.
 - Current awaiter coverage includes sleep, loop wake-up, socket accept/connect/send/scatter-gather send/sendAll/receive,
-  datagram sendTo/scatter-gather sendTo/receiveFrom, fileRead/fileWrite/scatter-gather fileWrite/fileSend/filePoll, fsOpen/fsClose/fsRead/fsWrite/fsCopyFile/
-  fsCopyDirectory/fsRename/fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks,
-  `spawnAndWait()`, `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`,
-  and cancellation of the currently suspended operation.
+  datagram sendTo/scatter-gather sendTo/receiveFrom, fileRead/offset fileRead/fileWrite/offset fileWrite/scatter-gather
+  fileWrite/fileSend/POSIX filePoll, fsOpen/fsClose/fsRead/fsWrite/fsCopyFile/fsCopyDirectory/fsRename/
+  fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`,
+  `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`, and cancellation of
+  the currently suspended operation.
 - Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The draft still allows no-arena
   standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
-- Use `Examples/AwaitEcho` as the readable showcase example for socket connect/accept/receive/sendAll/task groups.
+- Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
+  allocation fallback.
+- Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 
 ## What To Watch
 
@@ -39,6 +42,9 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Operation results follow Sane conventions: awaiters return plain `Result`, and extra data is written into explicit
   caller-provided result objects such as `AwaitSocketReceiveResult` or `AwaitFileReadResult`.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.
+- The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
+- `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
+  useful on the POSIX backends for normal file/pipe handles.
 
 ## References
 

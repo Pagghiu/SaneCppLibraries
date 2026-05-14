@@ -238,10 +238,17 @@ void* AwaitTask::Promise::allocateFrame(size_t size, AwaitEventLoop* eventLoop) 
     {
         raw = arena->allocate(totalSize, alignof(AwaitAllocationHeader));
     }
+#if SC_AWAIT_REQUIRE_ARENA
+    else
+    {
+        return nullptr;
+    }
+#else
     else
     {
         raw = ::operator new(totalSize, std::nothrow);
     }
+#endif
 
     if (raw == nullptr)
     {
@@ -409,21 +416,21 @@ AwaitSocketReceiveFromAwaiter AwaitEventLoop::receiveFrom(const SocketDescriptor
 }
 
 AwaitFileReadAwaiter AwaitEventLoop::fileRead(const FileDescriptor& file, Span<char> buffer,
-                                              AwaitFileReadResult& outResult)
+                                              AwaitFileReadResult& outResult, AwaitFileReadOptions options)
 {
-    return AwaitFileReadAwaiter(*this, file, buffer, outResult);
+    return AwaitFileReadAwaiter(*this, file, buffer, outResult, options);
 }
 
 AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span<const char> data,
-                                                AwaitFileWriteResult* outResult)
+                                                AwaitFileWriteResult* outResult, AwaitFileWriteOptions options)
 {
-    return AwaitFileWriteAwaiter(*this, file, data, outResult);
+    return AwaitFileWriteAwaiter(*this, file, data, outResult, options);
 }
 
 AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
-                                                AwaitFileWriteResult* outResult)
+                                                AwaitFileWriteResult* outResult, AwaitFileWriteOptions options)
 {
-    return AwaitFileWriteAwaiter(*this, file, data, outResult);
+    return AwaitFileWriteAwaiter(*this, file, data, outResult, options);
 }
 
 AwaitFileSendAwaiter AwaitEventLoop::fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
@@ -1062,8 +1069,8 @@ Result AwaitSocketReceiveFromAwaiter::cancel(AwaitEventLoop& eventLoop)
 }
 
 AwaitFileReadAwaiter::AwaitFileReadAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<char> buffer,
-                                           AwaitFileReadResult& outResult)
-    : await(await), file(file), buffer(buffer), outResult(outResult)
+                                           AwaitFileReadResult& outResult, AwaitFileReadOptions options)
+    : await(await), file(file), buffer(buffer), outResult(outResult), options(options)
 {}
 
 bool AwaitFileReadAwaiter::await_ready() const { return false; }
@@ -1080,6 +1087,19 @@ bool AwaitFileReadAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         continuation.resume();
     };
 
+    if (options.threadPool != nullptr)
+    {
+        operationResult = request.executeOn(taskSequence, *options.threadPool);
+        if (not operationResult)
+        {
+            return false;
+        }
+    }
+
+    if (options.useOffset)
+    {
+        request.setOffset(options.offset);
+    }
     operationResult = request.start(await.asyncEventLoop(), file, buffer);
     return operationResult;
 }
@@ -1101,13 +1121,14 @@ Result AwaitFileReadAwaiter::cancel(AwaitEventLoop& eventLoop)
 }
 
 AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,
-                                             AwaitFileWriteResult* outResult)
-    : await(await), file(file), data(data), outResult(outResult)
+                                             AwaitFileWriteResult* outResult, AwaitFileWriteOptions options)
+    : await(await), file(file), data(data), outResult(outResult), options(options)
 {}
 
 AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file,
-                                             Span<Span<const char>> data, AwaitFileWriteResult* outResult)
-    : await(await), file(file), buffers(data), outResult(outResult), singleBuffer(false)
+                                             Span<Span<const char>> data, AwaitFileWriteResult* outResult,
+                                             AwaitFileWriteOptions options)
+    : await(await), file(file), buffers(data), outResult(outResult), options(options), singleBuffer(false)
 {}
 
 bool AwaitFileWriteAwaiter::await_ready() const { return false; }
@@ -1125,6 +1146,20 @@ bool AwaitFileWriteAwaiter::await_suspend(AwaitTask::Handle newContinuation)
         }
         continuation.resume();
     };
+
+    if (options.threadPool != nullptr)
+    {
+        operationResult = request.executeOn(taskSequence, *options.threadPool);
+        if (not operationResult)
+        {
+            return false;
+        }
+    }
+
+    if (options.useOffset)
+    {
+        request.setOffset(options.offset);
+    }
 
     if (singleBuffer)
     {
@@ -1214,6 +1249,10 @@ bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
 {
     setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitFilePollAwaiter::cancel);
 
+#if SC_PLATFORM_WINDOWS
+    operationResult = Result::Error("Await filePoll is not supported on Windows");
+    return false;
+#else
     request.callback = [this](AsyncFilePoll::Result& result)
     {
         operationResult = result.isValid();
@@ -1228,6 +1267,7 @@ bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     }
     operationResult = request.start(await.asyncEventLoop(), handle);
     return operationResult;
+#endif
 }
 
 Result AwaitFilePollAwaiter::await_resume()

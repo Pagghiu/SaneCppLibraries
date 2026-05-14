@@ -309,6 +309,18 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask scatterGatherSocketSendOnly(AwaitEventLoop& await, const SocketDescriptor& sender)
+    {
+        const char       first[]   = {'c', 'a', 'n'};
+        const char       second[]  = {'c', 'e', 'l'};
+        Span<const char> buffers[] = {{first, sizeof(first)}, {second, sizeof(second)}};
+
+        AwaitSocketSendResult sendResult;
+        SC_CO_TRY(co_await await.sendAll(sender, buffers, &sendResult));
+
+        co_return Result(true);
+    }
+
     AwaitTask scatterGatherDatagramOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
                                         const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
     {
@@ -431,10 +443,43 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask writeFileScatterGatherCancellable(AwaitEventLoop& await, const FileDescriptor& file)
+    {
+        const char       first[]   = {'c', 'a', 'n'};
+        const char       second[]  = {'c', 'e', 'l'};
+        Span<const char> buffers[] = {{first, sizeof(first)}, {second, sizeof(second)}};
+
+        SC_CO_TRY(co_await await.fileWrite(file, buffers));
+
+        co_return Result(true);
+    }
+
     AwaitTask readFileOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
                            AwaitFileReadResult& readResult)
     {
         SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult));
+        co_return Result(true);
+    }
+
+    AwaitTask writeFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    {
+        const char            writeBuffer[] = {'O', 'K'};
+        AwaitFileWriteResult  writeResult;
+        AwaitFileWriteOptions options;
+        options.useOffset = true;
+        options.offset    = 2;
+        SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult, options));
+        SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        co_return Result(true);
+    }
+
+    AwaitTask readFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
+                                   AwaitFileReadResult& readResult)
+    {
+        AwaitFileReadOptions options;
+        options.useOffset = true;
+        options.offset    = 2;
+        SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult, options));
         co_return Result(true);
     }
 
@@ -515,6 +560,33 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask receiveExpectedOnce(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
+                                  Span<const char> expected)
+    {
+        size_t receivedBytes = 0;
+        while (receivedBytes < expected.sizeInBytes())
+        {
+            Span<char> remaining;
+            SC_TEST_EXPECT(receiveBuffer.sliceStart(receivedBytes, remaining));
+
+            AwaitSocketReceiveResult receiveResult;
+            SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
+            if (receiveResult.disconnected or receiveResult.data.empty())
+            {
+                co_return Result::Error("Await receiveExpectedOnce did not receive data");
+            }
+            receivedBytes += receiveResult.data.sizeInBytes();
+        }
+
+        SC_TEST_EXPECT(receivedBytes == expected.sizeInBytes());
+        for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
+        {
+            SC_TEST_EXPECT(receiveBuffer.data()[idx] == expected.data()[idx]);
+        }
+
+        co_return Result(true);
+    }
+
     AwaitTask openFileAndSendToSocket(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path,
                                       const SocketDescriptor& sender, const SocketDescriptor& receiver,
                                       Span<const char> expected)
@@ -526,6 +598,10 @@ struct SC::AwaitTest : public SC::TestCase
         sendOptions.length     = expected.sizeInBytes();
         sendOptions.threadPool = &threadPool;
 
+        char      receiveBuffer[256] = {};
+        AwaitTask receiveTask = receiveExpectedOnce(await, receiver, {receiveBuffer, sizeof(receiveBuffer)}, expected);
+        SC_CO_TRY(await.spawn(receiveTask));
+
         AwaitFileSendResult sendResult;
         Result              sendStatus  = co_await await.fileSend(file, sender, sendResult, sendOptions);
         Result              closeStatus = file.close();
@@ -533,16 +609,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(closeStatus);
         SC_TEST_EXPECT(sendResult.bytesTransferred == expected.sizeInBytes());
         SC_TEST_EXPECT(sendResult.complete);
-
-        char                     receiveBuffer[256] = {0};
-        AwaitSocketReceiveResult receiveResult;
-        SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == expected.sizeInBytes());
-        for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
-        {
-            SC_TEST_EXPECT(receiveResult.data.data()[idx] == expected.data()[idx]);
-        }
+        SC_CO_TRY(co_await receiveTask);
 
         co_return Result(true);
     }
@@ -560,7 +627,12 @@ struct SC::AwaitTest : public SC::TestCase
 
     AwaitTask filePollOnce(AwaitEventLoop& await, const FileDescriptor& file)
     {
+#if SC_PLATFORM_WINDOWS
+        Result pollResult = co_await await.filePoll(file);
+        SC_TEST_EXPECT(not pollResult);
+#else
         SC_CO_TRY(co_await await.filePoll(file));
+#endif
         co_return Result(true);
     }
 
@@ -980,11 +1052,16 @@ struct SC::AwaitTest : public SC::TestCase
 
             AwaitTask task = filePollOnce(await, pipe.readPipe);
             SC_TEST_EXPECT(await.spawn(task));
+#if SC_PLATFORM_WINDOWS
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(task.result());
+#else
             SC_TEST_EXPECT(task.isActive());
             SC_TEST_EXPECT(task.cancel(await));
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(task.isCompleted());
             SC_TEST_EXPECT(not task.result());
+#endif
             SC_TEST_EXPECT(pipe.close());
             SC_TEST_EXPECT(async.close());
         }
@@ -1017,6 +1094,29 @@ struct SC::AwaitTest : public SC::TestCase
             SocketIPAddress  nativeAddress;
             createTCPServer(async, serverSocket, nativeAddress);
 
+            SocketDescriptor client;
+            SC_TEST_EXPECT(async.createAsyncTCPSocket(nativeAddress.getAddressFamily(), client));
+
+            AwaitTask task = connectOne(await, client, nativeAddress);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSocket.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor serverSocket;
+            SocketIPAddress  nativeAddress;
+            createTCPServer(async, serverSocket, nativeAddress);
+
             SocketDescriptor acceptedClient;
             AwaitTask        task = acceptOne(await, serverSocket, acceptedClient);
             SC_TEST_EXPECT(await.spawn(task));
@@ -1026,6 +1126,54 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(task.isCompleted());
             SC_TEST_EXPECT(not task.result());
             SC_TEST_EXPECT(serverSocket.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor client;
+            SocketDescriptor serverSideClient;
+            createTCPSocketPair(async, client, serverSideClient);
+
+            AwaitTask task = scatterGatherSocketSendOnly(await, client);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSideClient.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SmallStringNative<255> filePath = StringEncoding::Native;
+            SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), "await-cancel-sg.txt"}));
+
+            FileDescriptor file;
+            FileOpen       writeOpen(FileOpen::Write);
+            writeOpen.blocking = false;
+            SC_TEST_EXPECT(file.open(filePath.view(), writeOpen));
+            SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+            AwaitTask task = writeFileScatterGatherCancellable(await, file);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(file.close());
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+            (void)fs.removeFile("await-cancel-sg.txt");
             SC_TEST_EXPECT(async.close());
         }
     }
@@ -1392,6 +1540,31 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(readResult.data.data()[1] == 'e');
         SC_TEST_EXPECT(readResult.data.data()[2] == 's');
         SC_TEST_EXPECT(readResult.data.data()[3] == 't');
+        SC_TEST_EXPECT(file.close());
+
+        FileOpen readWriteOpen(FileOpen::ReadWrite);
+        readWriteOpen.blocking = false;
+        SC_TEST_EXPECT(file.open(filePath.view(), readWriteOpen));
+        SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+        AwaitTask offsetWriteTask = writeFileAtOffsetOnce(await, file);
+        SC_TEST_EXPECT(await.spawn(offsetWriteTask));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(offsetWriteTask.result());
+        SC_TEST_EXPECT(file.close());
+
+        SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
+        SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+        char                offsetReadBuffer[4] = {};
+        AwaitFileReadResult offsetReadResult;
+        AwaitTask           offsetReadTask = readFileAtOffsetOnce(await, file, {offsetReadBuffer, 2}, offsetReadResult);
+        SC_TEST_EXPECT(await.spawn(offsetReadTask));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(offsetReadTask.result());
+        SC_TEST_EXPECT(offsetReadResult.data.sizeInBytes() == 2);
+        SC_TEST_EXPECT(offsetReadResult.data.data()[0] == 'O');
+        SC_TEST_EXPECT(offsetReadResult.data.data()[1] == 'K');
         SC_TEST_EXPECT(file.close());
 
         SC_TEST_EXPECT(fs.changeDirectory(dirPath.view()));

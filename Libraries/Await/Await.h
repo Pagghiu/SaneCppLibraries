@@ -8,6 +8,10 @@
 #endif
 #define SC_AWAIT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_AWAIT)
 
+#ifndef SC_AWAIT_REQUIRE_ARENA
+#define SC_AWAIT_REQUIRE_ARENA 0
+#endif
+
 #include "../Async/Async.h"
 #include "../Foundation/Result.h"
 #include "Internal/AwaitCoroutine.h"
@@ -93,6 +97,20 @@ struct AwaitFileReadResult
 struct AwaitFileWriteResult
 {
     size_t numBytes = 0;
+};
+
+struct AwaitFileReadOptions
+{
+    ThreadPool* threadPool = nullptr;
+    uint64_t    offset     = 0;
+    bool        useOffset  = false;
+};
+
+struct AwaitFileWriteOptions
+{
+    ThreadPool* threadPool = nullptr;
+    uint64_t    offset     = 0;
+    bool        useOffset  = false;
 };
 
 struct AwaitFileSendOptions
@@ -332,11 +350,12 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                              AwaitSocketReceiveResult& outResult);
     AwaitSocketReceiveFromAwaiter    receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
                                                  AwaitSocketReceiveFromResult& outResult);
-    AwaitFileReadAwaiter   fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult);
+    AwaitFileReadAwaiter   fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult,
+                                    AwaitFileReadOptions options = {});
     AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<const char> data,
-                                     AwaitFileWriteResult* outResult = nullptr);
+                                     AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
     AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
-                                     AwaitFileWriteResult* outResult = nullptr);
+                                     AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
     AwaitFileSendAwaiter   fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
                                     AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
     AwaitFilePollAwaiter   filePoll(const FileDescriptor& file);
@@ -654,13 +673,15 @@ struct SC_AWAIT_EXPORT AwaitSocketReceiveFromAwaiter
 struct SC_AWAIT_EXPORT AwaitFileReadAwaiter
 {
     AwaitFileReadAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<char> buffer,
-                         AwaitFileReadResult& outResult);
+                         AwaitFileReadResult& outResult, AwaitFileReadOptions options);
 
     AwaitEventLoop&       await;
     const FileDescriptor& file;
     Span<char>            buffer;
     AwaitFileReadResult&  outResult;
     AsyncFileRead         request;
+    AsyncTaskSequence     taskSequence;
+    AwaitFileReadOptions  options;
     Result                operationResult = Result(true);
 
     bool   await_ready() const;
@@ -680,9 +701,9 @@ struct SC_AWAIT_EXPORT AwaitFileReadAwaiter
 struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
 {
     AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,
-                          AwaitFileWriteResult* outResult);
+                          AwaitFileWriteResult* outResult, AwaitFileWriteOptions options);
     AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<Span<const char>> data,
-                          AwaitFileWriteResult* outResult);
+                          AwaitFileWriteResult* outResult, AwaitFileWriteOptions options);
 
     AwaitEventLoop&        await;
     const FileDescriptor&  file;
@@ -690,6 +711,8 @@ struct SC_AWAIT_EXPORT AwaitFileWriteAwaiter
     Span<Span<const char>> buffers;
     AwaitFileWriteResult*  outResult = nullptr;
     AsyncFileWrite         request;
+    AsyncTaskSequence      taskSequence;
+    AwaitFileWriteOptions  options;
     Result                 operationResult = Result(true);
     bool                   singleBuffer    = true;
 

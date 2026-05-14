@@ -111,7 +111,9 @@ AwaitTask echoConversation(AwaitEventLoop& await, const SocketDescriptor& server
 The reply buffer is supplied by the caller because `Await` keeps the same stable object and buffer lifetime expectations
 as `Async`.
 
-A complete console version of this flow lives in `Examples/AwaitEcho`.
+Complete console examples live in:
+
+- `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
 
 # Status
 
@@ -124,7 +126,8 @@ The current proof of concept supports:
 - socket `send()`, scatter/gather `send()`, `sendAll()`, and `receive()`;
 - datagram socket `sendTo()`, scatter/gather `sendTo()`, and `receiveFrom()`;
 - loop wake-up waiting with `AwaitLoopWakeUp`;
-- file `fileRead()`, `fileWrite()`, scatter/gather `fileWrite()`, `fileSend()`, and `filePoll()`;
+- file `fileRead()`, offset `fileRead()`, `fileWrite()`, offset `fileWrite()`, scatter/gather `fileWrite()`,
+  `fileSend()`, and POSIX `filePoll()`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
@@ -191,7 +194,15 @@ direction is:
 
 - examples and production-style code should pass an arena;
 - tests may cover both arena and no-arena modes;
-- a future production gate may require an arena without removing the no-arena draft path immediately.
+- production builds can define `SC_AWAIT_REQUIRE_ARENA=1` to make coroutine frame allocation fail instead of falling
+  back to standard allocation when no `AwaitArena` is discoverable from the coroutine parameters.
+
+# Exceptions
+
+`Await` does not use exceptions for control flow. The C++20 test and examples intentionally keep
+`CompileFlags::enableExceptions` disabled, so macOS, Linux, and Windows validation covers the exception-disabled path.
+`AwaitTask::Promise::unhandled_exception()` remains present because the C++ coroutine promise interface requires it when
+compiling against the standard coroutine header.
 
 # Roadmap
 
@@ -200,9 +211,8 @@ direction is:
 - Add the remaining `Async` operations that map cleanly to one-shot awaiters.
 - Expand cancellation semantics and edge-case coverage for filesystem and thread-pool-backed awaiters.
 - Expand task group helpers with result aggregation helpers and more policy tests.
-- Decide how to enforce arena-backed allocation in production builds.
+- Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for non-test builds.
 - Investigate no-stdlib coroutine support.
-- Validate exception-disabled compiler modes across platforms.
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
