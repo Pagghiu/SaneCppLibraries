@@ -655,6 +655,50 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask readFileWithThreadPoolCancellable(AwaitEventLoop& await, const FileDescriptor& file,
+                                                ThreadPool& threadPool, Span<char> readBuffer,
+                                                AwaitFileReadResult& readResult)
+    {
+        AwaitFileReadOptions options;
+        options.threadPool = &threadPool;
+        SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult, options));
+        co_return Result(true);
+    }
+
+    AwaitTask fsOpenCancellable(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path, FileDescriptor& file)
+    {
+        SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
+        co_return Result(true);
+    }
+
+    void startThreadPoolBlocker(ThreadPool& threadPool, ThreadPoolTask& blocker, Atomic<bool>& entered,
+                                Atomic<bool>& release)
+    {
+        blocker.function = [&entered, &release]
+        {
+            entered.store(true);
+            while (not release.load())
+            {
+                Thread::Sleep(1);
+            }
+        };
+        SC_TEST_EXPECT(threadPool.queueTask(blocker));
+        while (not entered.load())
+        {
+            Thread::Sleep(1);
+        }
+    }
+
+    void releaseThreadPoolBlockerSoon(Thread& thread, Atomic<bool>& release)
+    {
+        SC_TEST_EXPECT(thread.start(
+            [&release](Thread&)
+            {
+                Thread::Sleep(10);
+                release.store(true);
+            }));
+    }
+
     AwaitTask receiveExpectedOnce(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
                                   Span<const char> expected)
     {
@@ -1269,6 +1313,88 @@ struct SC::AwaitTest : public SC::TestCase
             FileSystem fs;
             SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
             (void)fs.removeFile("await-cancel-sg.txt");
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            ThreadPool threadPool;
+            SC_TEST_EXPECT(threadPool.create(1));
+
+            ThreadPoolTask blocker;
+            Atomic<bool>   blockerEntered = false;
+            Atomic<bool>   releaseBlocker = false;
+            startThreadPoolBlocker(threadPool, blocker, blockerEntered, releaseBlocker);
+
+            SmallStringNative<255> filePath = StringEncoding::Native;
+            SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), "await-cancel-tp-file.txt"}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.writeString("await-cancel-tp-file.txt", "cancel"));
+
+            FileDescriptor file;
+            FileOpen       readOpen(FileOpen::Read);
+            readOpen.blocking = true;
+            SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
+
+            char                readBuffer[16] = {};
+            AwaitFileReadResult readResult;
+            AwaitTask task = readFileWithThreadPoolCancellable(await, file, threadPool, readBuffer, readResult);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+
+            Thread releaser;
+            releaseThreadPoolBlockerSoon(releaser, releaseBlocker);
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(releaser.join());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+
+            SC_TEST_EXPECT(file.close());
+            SC_TEST_EXPECT(threadPool.destroy());
+            (void)fs.removeFile("await-cancel-tp-file.txt");
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            ThreadPool threadPool;
+            SC_TEST_EXPECT(threadPool.create(1));
+
+            ThreadPoolTask blocker;
+            Atomic<bool>   blockerEntered = false;
+            Atomic<bool>   releaseBlocker = false;
+            startThreadPoolBlocker(threadPool, blocker, blockerEntered, releaseBlocker);
+
+            SmallStringNative<255> filePath = StringEncoding::Native;
+            SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), "await-cancel-fs-open.txt"}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+            SC_TEST_EXPECT(fs.writeString("await-cancel-fs-open.txt", "cancel"));
+
+            FileDescriptor file;
+            AwaitTask      task = fsOpenCancellable(await, threadPool, filePath.view(), file);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+
+            Thread releaser;
+            releaseThreadPoolBlockerSoon(releaser, releaseBlocker);
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(releaser.join());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+            SC_TEST_EXPECT(not file.isValid());
+
+            SC_TEST_EXPECT(threadPool.destroy());
+            (void)fs.removeFile("await-cancel-fs-open.txt");
             SC_TEST_EXPECT(async.close());
         }
     }

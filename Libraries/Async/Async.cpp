@@ -616,6 +616,15 @@ SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool)
     return loopWork.setThreadPool(threadPool);
 }
 
+SC::Result SC::AsyncFileSystemOperation::stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped)
+{
+    if (not loopWork.isFree())
+    {
+        return loopWork.stop(eventLoop, afterStopped);
+    }
+    return AsyncRequest::stop(eventLoop, afterStopped);
+}
+
 SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringSpan path, FileOpen mode)
 {
     SC_TRY(checkState());

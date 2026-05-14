@@ -1222,6 +1222,9 @@ struct SC_ASYNC_EXPORT AsyncFileSystemOperation : public AsyncRequest
     /// @brief Sets the thread pool to use for the operation
     SC::Result setThreadPool(ThreadPool& threadPool);
 
+    /// @brief Stops the operation, including the internal thread-pool work item when used.
+    SC::Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
+
     Function<void(Result&)> callback; ///< Called after the operation is completed, on the event loop thread
 
     /// @brief Opens a file asynchronously and returns its corresponding file descriptor
