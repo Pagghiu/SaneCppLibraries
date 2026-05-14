@@ -88,17 +88,31 @@ void* AwaitArena::allocate(size_t size, size_t alignment)
     size_t requiredOffset = alignedOffset + size;
     if (requiredOffset > storage.sizeInBytes())
     {
+        lastFailedAllocationSize = size;
         return nullptr;
     }
     offset = requiredOffset;
+    if (offset > peakOffset)
+    {
+        peakOffset = offset;
+    }
     return aligned;
 }
 
-void AwaitArena::reset() { offset = 0; }
+void AwaitArena::reset()
+{
+    offset                   = 0;
+    peakOffset               = 0;
+    lastFailedAllocationSize = 0;
+}
 
 size_t AwaitArena::used() const { return offset; }
 
 size_t AwaitArena::capacity() const { return storage.sizeInBytes(); }
+
+size_t AwaitArena::peakUsed() const { return peakOffset; }
+
+size_t AwaitArena::failedAllocationSize() const { return lastFailedAllocationSize; }
 
 AwaitTask::AwaitTask(Handle newHandle) : handle(newHandle) {}
 

@@ -19,6 +19,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   the currently suspended operation.
 - Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The draft still allows no-arena
   standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
+- Use `AwaitArena::capacity()`, `used()`, `peakUsed()`, and `failedAllocationSize()` when sizing caller-provided
+  coroutine frame storage.
 - Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
@@ -29,11 +31,15 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 ## What To Watch
 
 - `SCAwaitTest` is C++20 and standard-library enabled; it is intentionally separate from `SCTest`.
+- `SCAwaitArenaTest` is the focused `SC_AWAIT_REQUIRE_ARENA=1` target; use it when changing coroutine frame allocation
+  or arena behavior.
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
 - Result spans such as `AwaitSocketReceiveResult::data` and `AwaitFileReadResult::data` point into caller-provided
   buffers; those buffers must outlive result inspection.
 - Child tasks can still be explicitly `spawn()`-ed before `co_await child`; use `spawnAndWait()` when a parent should
   start and await a child in one expression.
+- Keep `spawnAndWait()` for the one-child convenience case; use `AwaitTaskGroup` for multiple children, aggregation,
+  `waitAny()`, or custom child cancellation policy.
 - Use `AwaitTaskGroup` with caller-provided `Span<AwaitTask*>` storage when a parent needs to own several children and
   cancel/wait them as a group. `waitAny()` defaults to cancelling remaining children before returning so stack-owned
   child tasks are not left active.
@@ -61,6 +67,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
   useful on the POSIX backends for normal file/pipe handles.
+- For validation, run the smallest relevant `SCAwaitTest` section on macOS, then Linux, then Windows. Run
+  `SCAwaitArenaTest` when arena allocation behavior changes.
 
 ## References
 
@@ -68,3 +76,4 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Public header: `Libraries/Await/Await.h`
 - Tests: `Tests/Libraries/Await/AwaitTest.cpp`
 - Test target: `Tests/SCAwaitTest/SCAwaitTest.cpp`
+- Arena-required target: `Tests/SCAwaitArenaTest/SCAwaitArenaTest.cpp`

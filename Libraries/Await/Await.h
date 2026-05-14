@@ -224,10 +224,14 @@ struct SC_AWAIT_EXPORT AwaitArena
 
     [[nodiscard]] size_t used() const;
     [[nodiscard]] size_t capacity() const;
+    [[nodiscard]] size_t peakUsed() const;
+    [[nodiscard]] size_t failedAllocationSize() const;
 
   private:
     Span<char> storage;
-    size_t     offset = 0;
+    size_t     offset                   = 0;
+    size_t     peakOffset               = 0;
+    size_t     lastFailedAllocationSize = 0;
 };
 
 /// @brief Caller-owned coroutine task returning a plain SC::Result.

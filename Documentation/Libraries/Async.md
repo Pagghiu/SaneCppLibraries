@@ -15,6 +15,11 @@ preserving the same request lifetime expectations. It currently covers a small b
 loop wake-ups, files, file polling, selected filesystem operations, process exit, signals, background work, child tasks,
 task groups, cancellation, and timeouts.
 
+@note
+`Await` keeps the same platform caveats as `Async`: POSIX file polling is exposed directly, while Windows file polling
+for normal file or pipe handles currently fails fast at the Await layer instead of pretending to be portable. File and
+filesystem operations that need blocking work use caller-provided `ThreadPool` storage.
+
 # Dependencies
 - Dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
 - All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)

@@ -175,7 +175,8 @@ The current proof of concept supports:
 - optional arena-backed coroutine frame allocation.
 
 The draft is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
-coroutine header.
+coroutine header. `SCAwaitArenaTest` additionally compiles with `SC_AWAIT_REQUIRE_ARENA=1` to keep the production-style
+no-fallback allocation path covered.
 
 # Details
 
@@ -184,6 +185,10 @@ coroutine header.
 ## AwaitEventLoop
 
 @copydoc SC::AwaitEventLoop
+
+`AwaitEventLoop` wraps an existing caller-owned `AsyncEventLoop&`. It does not create, close, or otherwise own the
+underlying loop; callback-style `Async` requests and coroutine-style `Await` tasks can share the same loop as long as
+their stable objects remain alive while active.
 
 ## AwaitTask
 
@@ -225,6 +230,23 @@ operation and only add a small, no-allocation loop over caller-provided storage.
 
 If future helpers start carrying protocol state, buffering policy, parsing rules, or multiple stable objects, they should
 move into explicit `Await*` helper structs instead of making `AwaitEventLoop` a grab bag.
+
+`spawnAndWait()` intentionally remains a convenience awaiter for the common "start one child and wait for it" case.
+`AwaitTaskGroup` is the structured API for multiple children, result aggregation, `waitAny()`, or custom child
+cancellation policy.
+
+# Platform notes
+
+`Await` inherits the platform shape of `Async`. POSIX backends can use `filePoll()` for ordinary file or pipe handles;
+on Windows the awaiter fails fast instead of hanging because normal `AsyncFilePoll` support is not currently exposed for
+those handles.
+
+Thread-pool-backed file and filesystem awaiters use `AsyncFileRead`, `AsyncFileWrite`, `AsyncFileSend`, or
+`AsyncFileSystemOperation` with caller-provided `ThreadPool` storage. Cancellation is still cooperative: when the work is
+already running on a worker thread, completion may arrive before the stop request can take effect.
+
+Local validation for Await changes should run macOS first, then Linux, then Windows. For targeted changes, prefer the
+smallest relevant `SCAwaitTest` section plus `SCAwaitArenaTest` when arena allocation behavior changes.
 
 # Cancellation
 
@@ -273,6 +295,10 @@ still follows Sane C++'s plain-`Result` style.
 - Passing an arena to `AwaitEventLoop` gives no-allocation coroutine frame storage for production-style Sane C++ usage.
 - Omitting the arena keeps experiments ergonomic and falls back to standard nothrow coroutine allocation.
 
+The arena exposes lightweight diagnostics for tuning frame storage: `capacity()` reports caller-provided bytes,
+`used()` reports current bump-pointer usage, `peakUsed()` reports the high-water mark since the last `reset()`, and
+`failedAllocationSize()` reports the last frame allocation request that did not fit.
+
 Arena-backed frames are not individually freed. The caller must only reset the arena after all tasks using it have been
 destroyed.
 
@@ -283,6 +309,9 @@ direction is:
 - tests may cover both arena and no-arena modes;
 - production builds can define `SC_AWAIT_REQUIRE_ARENA=1` to make coroutine frame allocation fail instead of falling
   back to standard allocation when no `AwaitArena` is discoverable from the coroutine parameters.
+
+The `SCAwaitArenaTest` target is compiled with `SC_AWAIT_REQUIRE_ARENA=1` and verifies both sides of that contract:
+tasks fail cleanly without an arena and run normally when `AwaitEventLoop` receives caller-provided arena storage.
 
 # Exceptions
 

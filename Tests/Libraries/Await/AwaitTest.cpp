@@ -2602,11 +2602,34 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTask task = arenaWait(await);
         SC_TEST_EXPECT(arenaStorage.used() > 0);
+        SC_TEST_EXPECT(arenaStorage.peakUsed() >= arenaStorage.used());
+        SC_TEST_EXPECT(arenaStorage.failedAllocationSize() == 0);
 
         SC_TEST_EXPECT(await.spawn(task));
         SC_TEST_EXPECT(await.run());
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(async.close());
+
+        char       diagnosticsMemory[16] = {};
+        AwaitArena diagnostics({diagnosticsMemory, sizeof(diagnosticsMemory)});
+        SC_TEST_EXPECT(diagnostics.capacity() == sizeof(diagnosticsMemory));
+        SC_TEST_EXPECT(diagnostics.used() == 0);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
+        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 0);
+        SC_TEST_EXPECT(diagnostics.allocate(4, 1) != nullptr);
+        SC_TEST_EXPECT(diagnostics.used() == 4);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 4);
+        SC_TEST_EXPECT(diagnostics.allocate(8, 1) != nullptr);
+        SC_TEST_EXPECT(diagnostics.used() == 12);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 12);
+        SC_TEST_EXPECT(diagnostics.allocate(8, 1) == nullptr);
+        SC_TEST_EXPECT(diagnostics.used() == 12);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 12);
+        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 8);
+        diagnostics.reset();
+        SC_TEST_EXPECT(diagnostics.used() == 0);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
+        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 0);
     }
 
     void arenaExhaustion()
@@ -2623,6 +2646,8 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(not task.isValid());
         SC_TEST_EXPECT(not await.spawn(task));
         SC_TEST_EXPECT(arenaStorage.used() == 0);
+        SC_TEST_EXPECT(arenaStorage.peakUsed() == 0);
+        SC_TEST_EXPECT(arenaStorage.failedAllocationSize() > arenaStorage.capacity());
         SC_TEST_EXPECT(async.close());
     }
 };
