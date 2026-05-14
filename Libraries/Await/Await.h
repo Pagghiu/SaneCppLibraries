@@ -39,10 +39,13 @@ struct AwaitSocketSendToAwaiter;
 struct AwaitSocketSendAllAwaiter;
 struct AwaitSocketSendAllBuffersAwaiter;
 struct AwaitSocketReceiveAwaiter;
+struct AwaitSocketReceiveExactAwaiter;
+struct AwaitSocketReceiveLineAwaiter;
 struct AwaitSocketReceiveFromAwaiter;
 struct AwaitLoopWakeUp;
 struct AwaitLoopWakeUpAwaiter;
 struct AwaitFileReadAwaiter;
+struct AwaitFileReadUntilFullOrEOFAwaiter;
 struct AwaitFileWriteAwaiter;
 struct AwaitFileSendAwaiter;
 struct AwaitFilePollAwaiter;
@@ -77,6 +80,14 @@ struct AwaitSocketReceiveResult
 {
     Span<char> data;
     bool       disconnected = false;
+};
+
+/// @brief Result object populated by AwaitEventLoop::receiveLine.
+struct AwaitSocketReceiveLineResult
+{
+    Span<char> line;
+    bool       disconnected = false;
+    bool       lineComplete = false;
 };
 
 /// @brief Result object populated by AwaitEventLoop::receiveFrom.
@@ -348,19 +359,30 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
                                              AwaitSocketSendResult* outResult = nullptr);
     AwaitSocketReceiveAwaiter        receive(const SocketDescriptor& socket, Span<char> buffer,
                                              AwaitSocketReceiveResult& outResult);
+    AwaitSocketReceiveExactAwaiter   receiveExact(const SocketDescriptor& socket, Span<char> buffer,
+                                                  AwaitSocketReceiveResult* outResult = nullptr);
+    AwaitSocketReceiveLineAwaiter    receiveLine(const SocketDescriptor& socket, Span<char> buffer,
+                                                 AwaitSocketReceiveLineResult& outResult);
     AwaitSocketReceiveFromAwaiter    receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
                                                  AwaitSocketReceiveFromResult& outResult);
-    AwaitFileReadAwaiter   fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult,
-                                    AwaitFileReadOptions options = {});
-    AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<const char> data,
-                                     AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
-    AwaitFileWriteAwaiter  fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
-                                     AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
-    AwaitFileSendAwaiter   fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
-                                    AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
-    AwaitFilePollAwaiter   filePoll(const FileDescriptor& file);
+
+    AwaitFileReadAwaiter fileRead(const FileDescriptor& file, Span<char> buffer, AwaitFileReadResult& outResult,
+                                  AwaitFileReadOptions options = {});
+    AwaitFileReadUntilFullOrEOFAwaiter fileReadUntilFullOrEOF(const FileDescriptor& file, Span<char> buffer,
+                                                              AwaitFileReadResult& outResult,
+                                                              AwaitFileReadOptions options = {});
+
+    AwaitFileWriteAwaiter fileWrite(const FileDescriptor& file, Span<const char> data,
+                                    AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
+    AwaitFileWriteAwaiter fileWrite(const FileDescriptor& file, Span<Span<const char>> data,
+                                    AwaitFileWriteResult* outResult = nullptr, AwaitFileWriteOptions options = {});
+    AwaitFileSendAwaiter  fileSend(const FileDescriptor& file, const SocketDescriptor& socket,
+                                   AwaitFileSendResult& outResult, AwaitFileSendOptions options = {});
+    AwaitFilePollAwaiter  filePoll(const FileDescriptor& file);
+
     AwaitLoopWakeUpAwaiter wakeUp(AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& outResult,
                                   AsyncLoopWakeUpOptions options = {});
+
     AwaitFileSystemOperationAwaiter fsOpen(ThreadPool& threadPool, StringSpan path, FileOpen mode,
                                            FileDescriptor& outFile);
     AwaitFileSystemOperationAwaiter fsClose(ThreadPool& threadPool, FileDescriptor& file);
@@ -643,6 +665,67 @@ struct SC_AWAIT_EXPORT AwaitSocketReceiveAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
+/// @brief Awaiter that reactivates AsyncSocketReceive until the whole caller buffer is filled.
+struct SC_AWAIT_EXPORT AwaitSocketReceiveExactAwaiter
+{
+    AwaitSocketReceiveExactAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<char> buffer,
+                                   AwaitSocketReceiveResult* outResult);
+
+    AwaitEventLoop&           await;
+    const SocketDescriptor&   socket;
+    Span<char>                buffer;
+    AwaitSocketReceiveResult* outResult = nullptr;
+    AsyncSocketReceive        request;
+    Result                    operationResult  = Result(true);
+    size_t                    numBytesReceived = 0;
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    Result startRemainingReceive();
+    Result updateRequestBuffer();
+    Result updateOutResult(bool disconnected);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter that reads a '\n'-terminated line into caller-provided storage.
+struct SC_AWAIT_EXPORT AwaitSocketReceiveLineAwaiter
+{
+    AwaitSocketReceiveLineAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket, Span<char> buffer,
+                                  AwaitSocketReceiveLineResult& outResult);
+
+    AwaitEventLoop&               await;
+    const SocketDescriptor&       socket;
+    Span<char>                    buffer;
+    AwaitSocketReceiveLineResult& outResult;
+    AsyncSocketReceive            request;
+    Result                        operationResult  = Result(true);
+    size_t                        numBytesReceived = 0;
+    char                          currentByte      = 0;
+    bool                          lineComplete     = false;
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    Result startNextByte();
+    Result updateOutResult(bool disconnected);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
 /// @brief Awaiter for a single AsyncSocketReceiveFrom operation.
 struct SC_AWAIT_EXPORT AwaitSocketReceiveFromAwaiter
 {
@@ -692,6 +775,38 @@ struct SC_AWAIT_EXPORT AwaitFileReadAwaiter
     static Result cancel(void* object, AwaitEventLoop& eventLoop);
 
     Result cancel(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle            continuation;
+    Function<void(AsyncResult&)> stopCallback;
+};
+
+/// @brief Awaiter that reads until the caller buffer is full or EOF is reached.
+struct SC_AWAIT_EXPORT AwaitFileReadUntilFullOrEOFAwaiter
+{
+    AwaitFileReadUntilFullOrEOFAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<char> buffer,
+                                       AwaitFileReadResult& outResult, AwaitFileReadOptions options);
+
+    AwaitEventLoop&       await;
+    const FileDescriptor& file;
+    Span<char>            buffer;
+    AwaitFileReadResult&  outResult;
+    AsyncFileRead         request;
+    AsyncTaskSequence     taskSequence;
+    AwaitFileReadOptions  options;
+    Result                operationResult = Result(true);
+    size_t                numBytesRead    = 0;
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    Result startRemainingRead();
+    Result updateRequestBufferAndOffset();
+    Result updateOutResult(bool endOfFile);
 
     AwaitTask::Handle            continuation;
     Function<void(AsyncResult&)> stopCallback;

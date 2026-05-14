@@ -101,6 +101,14 @@ struct SC::AwaitTest : public SC::TestCase
         {
             socketSendAll();
         }
+        if (test_section("socket receive exact"))
+        {
+            socketReceiveExact();
+        }
+        if (test_section("socket receive line"))
+        {
+            socketReceiveLine();
+        }
         if (test_section("scatter gather operations"))
         {
             scatterGatherOperations();
@@ -268,6 +276,86 @@ struct SC::AwaitTest : public SC::TestCase
         {
             SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
         }
+
+        co_return Result(true);
+    }
+
+    AwaitTask sendSplitMessage(AwaitEventLoop& await, const SocketDescriptor& sender)
+    {
+        const char first[]  = {'h', 'e'};
+        const char second[] = {'l', 'l', 'o'};
+
+        SC_CO_TRY(co_await await.sendAll(sender, {first, sizeof(first)}));
+        SC_CO_TRY(co_await await.sleep(1_ms));
+        SC_CO_TRY(co_await await.sendAll(sender, {second, sizeof(second)}));
+
+        co_return Result(true);
+    }
+
+    AwaitTask receiveExactMessage(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
+                                  AwaitSocketReceiveResult& receiveResult)
+    {
+        SC_CO_TRY(co_await await.receiveExact(receiver, receiveBuffer, &receiveResult));
+        SC_TEST_EXPECT(not receiveResult.disconnected);
+        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == receiveBuffer.sizeInBytes());
+        SC_TEST_EXPECT(StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false,
+                                  StringEncoding::Ascii) == "hello");
+
+        co_return Result(true);
+    }
+
+    AwaitTask receiveExactConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                           const SocketDescriptor& receiver, Span<char> receiveBuffer,
+                                           AwaitSocketReceiveResult& receiveResult)
+    {
+        AwaitTask senderTask   = sendSplitMessage(await, sender);
+        AwaitTask receiverTask = receiveExactMessage(await, receiver, receiveBuffer, receiveResult);
+
+        AwaitTask*     storage[2] = {};
+        AwaitTaskGroup group(await, storage);
+        SC_CO_TRY(group.spawn(receiverTask));
+        SC_CO_TRY(group.spawn(senderTask));
+        SC_CO_TRY(co_await group.waitAll());
+
+        co_return Result(true);
+    }
+
+    AwaitTask sendSplitLine(AwaitEventLoop& await, const SocketDescriptor& sender)
+    {
+        const char first[]  = {'h', 'e', 'l'};
+        const char second[] = {'l', 'o', '\r', '\n'};
+
+        SC_CO_TRY(co_await await.sendAll(sender, {first, sizeof(first)}));
+        SC_CO_TRY(co_await await.sleep(1_ms));
+        SC_CO_TRY(co_await await.sendAll(sender, {second, sizeof(second)}));
+
+        co_return Result(true);
+    }
+
+    AwaitTask receiveLineMessage(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> lineBuffer,
+                                 AwaitSocketReceiveLineResult& lineResult)
+    {
+        SC_CO_TRY(co_await await.receiveLine(receiver, lineBuffer, lineResult));
+        SC_TEST_EXPECT(not lineResult.disconnected);
+        SC_TEST_EXPECT(lineResult.lineComplete);
+        SC_TEST_EXPECT(StringView({lineResult.line.data(), lineResult.line.sizeInBytes()}, false,
+                                  StringEncoding::Ascii) == "hello");
+
+        co_return Result(true);
+    }
+
+    AwaitTask receiveLineConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                          const SocketDescriptor& receiver, Span<char> lineBuffer,
+                                          AwaitSocketReceiveLineResult& lineResult)
+    {
+        AwaitTask senderTask   = sendSplitLine(await, sender);
+        AwaitTask receiverTask = receiveLineMessage(await, receiver, lineBuffer, lineResult);
+
+        AwaitTask*     storage[2] = {};
+        AwaitTaskGroup group(await, storage);
+        SC_CO_TRY(group.spawn(receiverTask));
+        SC_CO_TRY(group.spawn(senderTask));
+        SC_CO_TRY(co_await group.waitAll());
 
         co_return Result(true);
     }
@@ -480,6 +568,13 @@ struct SC::AwaitTest : public SC::TestCase
         options.useOffset = true;
         options.offset    = 2;
         SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult, options));
+        co_return Result(true);
+    }
+
+    AwaitTask readFileUntilFullOrEOFOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
+                                         AwaitFileReadResult& readResult)
+    {
+        SC_CO_TRY(co_await await.fileReadUntilFullOrEOF(file, readBuffer, readResult));
         co_return Result(true);
     }
 
@@ -1383,6 +1478,50 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
+    void socketReceiveExact()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        SocketDescriptor client;
+        SocketDescriptor serverSideClient;
+        createTCPSocketPair(async, client, serverSideClient);
+
+        char                     receiveBuffer[5] = {};
+        AwaitSocketReceiveResult receiveResult;
+        AwaitTask task = receiveExactConversationOnce(await, client, serverSideClient, receiveBuffer, receiveResult);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void socketReceiveLine()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        SocketDescriptor client;
+        SocketDescriptor serverSideClient;
+        createTCPSocketPair(async, client, serverSideClient);
+
+        char                         lineBuffer[8] = {};
+        AwaitSocketReceiveLineResult lineResult;
+        AwaitTask task = receiveLineConversationOnce(await, client, serverSideClient, lineBuffer, lineResult);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(task.result());
+
+        SC_TEST_EXPECT(client.close());
+        SC_TEST_EXPECT(serverSideClient.close());
+        SC_TEST_EXPECT(async.close());
+    }
+
     void scatterGatherOperations()
     {
         {
@@ -1540,6 +1679,23 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(readResult.data.data()[1] == 'e');
         SC_TEST_EXPECT(readResult.data.data()[2] == 's');
         SC_TEST_EXPECT(readResult.data.data()[3] == 't');
+        SC_TEST_EXPECT(file.close());
+
+        SC_TEST_EXPECT(file.open(filePath.view(), readOpen));
+        SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+        char                readUntilEOFBuffer[8] = {};
+        AwaitFileReadResult readUntilEOFResult;
+        AwaitTask readUntilEOFTask = readFileUntilFullOrEOFOnce(await, file, readUntilEOFBuffer, readUntilEOFResult);
+        SC_TEST_EXPECT(await.spawn(readUntilEOFTask));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(readUntilEOFTask.result());
+        SC_TEST_EXPECT(readUntilEOFResult.endOfFile);
+        SC_TEST_EXPECT(readUntilEOFResult.data.sizeInBytes() == 4);
+        SC_TEST_EXPECT(readUntilEOFResult.data.data()[0] == 't');
+        SC_TEST_EXPECT(readUntilEOFResult.data.data()[1] == 'e');
+        SC_TEST_EXPECT(readUntilEOFResult.data.data()[2] == 's');
+        SC_TEST_EXPECT(readUntilEOFResult.data.data()[3] == 't');
         SC_TEST_EXPECT(file.close());
 
         FileOpen readWriteOpen(FileOpen::ReadWrite);

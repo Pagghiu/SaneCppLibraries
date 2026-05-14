@@ -409,6 +409,18 @@ AwaitSocketReceiveAwaiter AwaitEventLoop::receive(const SocketDescriptor& socket
     return AwaitSocketReceiveAwaiter(*this, socket, buffer, outResult);
 }
 
+AwaitSocketReceiveExactAwaiter AwaitEventLoop::receiveExact(const SocketDescriptor& socket, Span<char> buffer,
+                                                            AwaitSocketReceiveResult* outResult)
+{
+    return AwaitSocketReceiveExactAwaiter(*this, socket, buffer, outResult);
+}
+
+AwaitSocketReceiveLineAwaiter AwaitEventLoop::receiveLine(const SocketDescriptor& socket, Span<char> buffer,
+                                                          AwaitSocketReceiveLineResult& outResult)
+{
+    return AwaitSocketReceiveLineAwaiter(*this, socket, buffer, outResult);
+}
+
 AwaitSocketReceiveFromAwaiter AwaitEventLoop::receiveFrom(const SocketDescriptor& socket, Span<char> buffer,
                                                           AwaitSocketReceiveFromResult& outResult)
 {
@@ -419,6 +431,13 @@ AwaitFileReadAwaiter AwaitEventLoop::fileRead(const FileDescriptor& file, Span<c
                                               AwaitFileReadResult& outResult, AwaitFileReadOptions options)
 {
     return AwaitFileReadAwaiter(*this, file, buffer, outResult, options);
+}
+
+AwaitFileReadUntilFullOrEOFAwaiter AwaitEventLoop::fileReadUntilFullOrEOF(const FileDescriptor& file, Span<char> buffer,
+                                                                          AwaitFileReadResult& outResult,
+                                                                          AwaitFileReadOptions options)
+{
+    return AwaitFileReadUntilFullOrEOFAwaiter(*this, file, buffer, outResult, options);
 }
 
 AwaitFileWriteAwaiter AwaitEventLoop::fileWrite(const FileDescriptor& file, Span<const char> data,
@@ -1028,6 +1047,219 @@ Result AwaitSocketReceiveAwaiter::cancel(AwaitEventLoop& eventLoop)
     return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
 }
 
+AwaitSocketReceiveExactAwaiter::AwaitSocketReceiveExactAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                               Span<char> buffer, AwaitSocketReceiveResult* outResult)
+    : await(await), socket(socket), buffer(buffer), outResult(outResult)
+{}
+
+bool AwaitSocketReceiveExactAwaiter::await_ready() const { return false; }
+
+bool AwaitSocketReceiveExactAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketReceiveExactAwaiter::cancel);
+
+    if (outResult != nullptr)
+    {
+        *outResult = {};
+    }
+    if (buffer.empty())
+    {
+        operationResult = updateOutResult(false);
+        return false;
+    }
+
+    request.callback = [this](AsyncSocketReceive::Result& result)
+    {
+        Span<char> received;
+        operationResult = result.get(received);
+        if (operationResult)
+        {
+            const size_t bytesReceived = received.sizeInBytes();
+            numBytesReceived += bytesReceived;
+            operationResult = updateOutResult(result.completionData.disconnected);
+            if (not operationResult)
+            {
+                continuation.resume();
+                return;
+            }
+
+            if (numBytesReceived < buffer.sizeInBytes())
+            {
+                if (result.completionData.disconnected)
+                {
+                    operationResult = Result::Error("AwaitSocketReceiveExact disconnected before buffer was full");
+                    continuation.resume();
+                    return;
+                }
+                if (bytesReceived == 0)
+                {
+                    operationResult = Result::Error("AwaitSocketReceiveExact made no progress");
+                    continuation.resume();
+                    return;
+                }
+
+                operationResult = updateRequestBuffer();
+                if (operationResult)
+                {
+                    result.reactivateRequest(true);
+                    return;
+                }
+            }
+        }
+        continuation.resume();
+    };
+
+    operationResult = startRemainingReceive();
+    return operationResult;
+}
+
+Result AwaitSocketReceiveExactAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitSocketReceiveExactAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketReceiveExactAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketReceiveExactAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+Result AwaitSocketReceiveExactAwaiter::startRemainingReceive()
+{
+    SC_TRY(updateRequestBuffer());
+    return request.start(await.asyncEventLoop(), socket, request.buffer);
+}
+
+Result AwaitSocketReceiveExactAwaiter::updateRequestBuffer()
+{
+    Span<char> remaining;
+    SC_TRY(buffer.sliceStart(numBytesReceived, remaining));
+    request.buffer = remaining;
+    return Result(true);
+}
+
+Result AwaitSocketReceiveExactAwaiter::updateOutResult(bool disconnected)
+{
+    if (outResult != nullptr)
+    {
+        SC_TRY(buffer.sliceStartLength(0, numBytesReceived, outResult->data));
+        outResult->disconnected = disconnected;
+    }
+    return Result(true);
+}
+
+AwaitSocketReceiveLineAwaiter::AwaitSocketReceiveLineAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
+                                                             Span<char> buffer, AwaitSocketReceiveLineResult& outResult)
+    : await(await), socket(socket), buffer(buffer), outResult(outResult)
+{}
+
+bool AwaitSocketReceiveLineAwaiter::await_ready() const { return false; }
+
+bool AwaitSocketReceiveLineAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this, AwaitSocketReceiveLineAwaiter::cancel);
+
+    outResult = {};
+    if (buffer.empty())
+    {
+        operationResult = Result::Error("AwaitSocketReceiveLine buffer is empty");
+        return false;
+    }
+
+    request.callback = [this](AsyncSocketReceive::Result& result)
+    {
+        Span<char> received;
+        operationResult = result.get(received);
+        if (operationResult)
+        {
+            if (result.completionData.disconnected)
+            {
+                operationResult = updateOutResult(true);
+                continuation.resume();
+                return;
+            }
+            if (received.empty())
+            {
+                operationResult = Result::Error("AwaitSocketReceiveLine made no progress");
+                continuation.resume();
+                return;
+            }
+
+            if (currentByte == '\n')
+            {
+                lineComplete    = true;
+                operationResult = updateOutResult(false);
+                continuation.resume();
+                return;
+            }
+            if (numBytesReceived >= buffer.sizeInBytes())
+            {
+                operationResult = Result::Error("AwaitSocketReceiveLine buffer exhausted before newline");
+                (void)updateOutResult(false);
+                continuation.resume();
+                return;
+            }
+
+            buffer[numBytesReceived++] = currentByte;
+            operationResult            = startNextByte();
+            if (operationResult)
+            {
+                result.reactivateRequest(true);
+                return;
+            }
+        }
+        continuation.resume();
+    };
+
+    operationResult = startNextByte();
+    if (not operationResult)
+    {
+        return false;
+    }
+    operationResult = request.start(await.asyncEventLoop(), socket, request.buffer);
+    return operationResult;
+}
+
+Result AwaitSocketReceiveLineAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitSocketReceiveLineAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitSocketReceiveLineAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitSocketReceiveLineAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+Result AwaitSocketReceiveLineAwaiter::startNextByte()
+{
+    request.buffer = {&currentByte, sizeof(currentByte)};
+    return Result(true);
+}
+
+Result AwaitSocketReceiveLineAwaiter::updateOutResult(bool disconnected)
+{
+    size_t lineSize = numBytesReceived;
+    if (lineComplete and lineSize > 0 and buffer[lineSize - 1] == '\r')
+    {
+        lineSize--;
+    }
+    SC_TRY(buffer.sliceStartLength(0, lineSize, outResult.line));
+    outResult.disconnected = disconnected;
+    outResult.lineComplete = lineComplete;
+    return Result(true);
+}
+
 AwaitSocketReceiveFromAwaiter::AwaitSocketReceiveFromAwaiter(AwaitEventLoop& await, const SocketDescriptor& socket,
                                                              Span<char> buffer, AwaitSocketReceiveFromResult& outResult)
     : await(await), socket(socket), buffer(buffer), outResult(outResult)
@@ -1118,6 +1350,121 @@ Result AwaitFileReadAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
 Result AwaitFileReadAwaiter::cancel(AwaitEventLoop& eventLoop)
 {
     return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+AwaitFileReadUntilFullOrEOFAwaiter::AwaitFileReadUntilFullOrEOFAwaiter(AwaitEventLoop&       await,
+                                                                       const FileDescriptor& file, Span<char> buffer,
+                                                                       AwaitFileReadResult& outResult,
+                                                                       AwaitFileReadOptions options)
+    : await(await), file(file), buffer(buffer), outResult(outResult), options(options)
+{}
+
+bool AwaitFileReadUntilFullOrEOFAwaiter::await_ready() const { return false; }
+
+bool AwaitFileReadUntilFullOrEOFAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    setupCancellableAwait(continuation, stopCallback, newContinuation, this,
+                          AwaitFileReadUntilFullOrEOFAwaiter::cancel);
+
+    outResult = {};
+    if (buffer.empty())
+    {
+        operationResult = updateOutResult(false);
+        return false;
+    }
+
+    request.callback = [this](AsyncFileRead::Result& result)
+    {
+        Span<char> readData;
+        operationResult = result.get(readData);
+        if (operationResult)
+        {
+            const size_t bytesRead = readData.sizeInBytes();
+            numBytesRead += bytesRead;
+            operationResult = updateOutResult(result.completionData.endOfFile);
+            if (not operationResult)
+            {
+                continuation.resume();
+                return;
+            }
+
+            if (numBytesRead < buffer.sizeInBytes())
+            {
+                if (result.completionData.endOfFile)
+                {
+                    continuation.resume();
+                    return;
+                }
+                if (bytesRead == 0)
+                {
+                    operationResult = Result::Error("AwaitFileReadUntilFullOrEOF made no progress");
+                    continuation.resume();
+                    return;
+                }
+
+                operationResult = updateRequestBufferAndOffset();
+                if (operationResult)
+                {
+                    result.reactivateRequest(true);
+                    return;
+                }
+            }
+        }
+        continuation.resume();
+    };
+
+    if (options.threadPool != nullptr)
+    {
+        operationResult = request.executeOn(taskSequence, *options.threadPool);
+        if (not operationResult)
+        {
+            return false;
+        }
+    }
+
+    operationResult = startRemainingRead();
+    return operationResult;
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitFileReadUntilFullOrEOFAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::cancel(AwaitEventLoop& eventLoop)
+{
+    return cancelCancellableAwait(request, operationResult, eventLoop, stopCallback);
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::startRemainingRead()
+{
+    SC_TRY(updateRequestBufferAndOffset());
+    return request.start(await.asyncEventLoop(), file, request.buffer);
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::updateRequestBufferAndOffset()
+{
+    Span<char> remaining;
+    SC_TRY(buffer.sliceStart(numBytesRead, remaining));
+    request.buffer = remaining;
+    if (options.useOffset)
+    {
+        request.setOffset(options.offset + numBytesRead);
+    }
+    return Result(true);
+}
+
+Result AwaitFileReadUntilFullOrEOFAwaiter::updateOutResult(bool endOfFile)
+{
+    SC_TRY(buffer.sliceStartLength(0, numBytesRead, outResult.data));
+    outResult.endOfFile = endOfFile;
+    return Result(true);
 }
 
 AwaitFileWriteAwaiter::AwaitFileWriteAwaiter(AwaitEventLoop& await, const FileDescriptor& file, Span<const char> data,

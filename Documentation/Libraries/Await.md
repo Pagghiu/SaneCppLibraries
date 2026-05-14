@@ -46,10 +46,13 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitSocketSendToAwaiter](@ref SC::AwaitSocketSendToAwaiter) | @copybrief SC::AwaitSocketSendToAwaiter |
 | [AwaitSocketSendAllAwaiter](@ref SC::AwaitSocketSendAllAwaiter) | @copybrief SC::AwaitSocketSendAllAwaiter |
 | [AwaitSocketReceiveAwaiter](@ref SC::AwaitSocketReceiveAwaiter) | @copybrief SC::AwaitSocketReceiveAwaiter |
+| [AwaitSocketReceiveExactAwaiter](@ref SC::AwaitSocketReceiveExactAwaiter) | @copybrief SC::AwaitSocketReceiveExactAwaiter |
+| [AwaitSocketReceiveLineAwaiter](@ref SC::AwaitSocketReceiveLineAwaiter) | @copybrief SC::AwaitSocketReceiveLineAwaiter |
 | [AwaitSocketReceiveFromAwaiter](@ref SC::AwaitSocketReceiveFromAwaiter) | @copybrief SC::AwaitSocketReceiveFromAwaiter |
 | [AwaitLoopWakeUp](@ref SC::AwaitLoopWakeUp) | @copybrief SC::AwaitLoopWakeUp           |
 | [AwaitLoopWakeUpAwaiter](@ref SC::AwaitLoopWakeUpAwaiter) | @copybrief SC::AwaitLoopWakeUpAwaiter |
 | [AwaitFileReadAwaiter](@ref SC::AwaitFileReadAwaiter) | @copybrief SC::AwaitFileReadAwaiter       |
+| [AwaitFileReadUntilFullOrEOFAwaiter](@ref SC::AwaitFileReadUntilFullOrEOFAwaiter) | @copybrief SC::AwaitFileReadUntilFullOrEOFAwaiter |
 | [AwaitFileWriteAwaiter](@ref SC::AwaitFileWriteAwaiter) | @copybrief SC::AwaitFileWriteAwaiter     |
 | [AwaitFileSendAwaiter](@ref SC::AwaitFileSendAwaiter) | @copybrief SC::AwaitFileSendAwaiter       |
 | [AwaitFilePollAwaiter](@ref SC::AwaitFilePollAwaiter) | @copybrief SC::AwaitFilePollAwaiter       |
@@ -116,6 +119,33 @@ Complete console examples live in:
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
 
+# Socket send helpers
+
+`send()` is the direct one-shot wrapper over `AsyncSocketSend`: it completes when the socket reports one send
+operation, which may be smaller than the caller-provided data.
+
+`sendAll()` is the higher-level stream helper: it reactivates the underlying send request until all caller-provided data
+has been sent. When an `AwaitSocketSendResult*` is provided, `numBytes` reports the cumulative byte count.
+
+Single-buffer data can be sent directly:
+
+```cpp
+const char message[] = "single buffer payload";
+AwaitSocketSendResult sent;
+
+SC_CO_TRY(co_await await.sendAll(socket, {message, sizeof(message) - 1}, &sent));
+```
+
+Scatter/gather data uses caller-owned span storage, preserving the same no-allocation shape as `Async`:
+
+```cpp
+const char       header[] = "body:";
+Span<const char> buffers[] = {{header, sizeof(header) - 1}, body};
+AwaitSocketSendResult sent;
+
+SC_CO_TRY(co_await await.sendAll(socket, buffers, &sent));
+```
+
 # Status
 
 🟥 Draft
@@ -124,11 +154,11 @@ The current proof of concept supports:
 
 - `sleep()`;
 - socket `accept()` and `connect()`;
-- socket `send()`, scatter/gather `send()`, `sendAll()`, and `receive()`;
+- socket `send()`, scatter/gather `send()`, `sendAll()`, `receive()`, `receiveExact()`, and `receiveLine()`;
 - datagram socket `sendTo()`, scatter/gather `sendTo()`, and `receiveFrom()`;
 - loop wake-up waiting with `AwaitLoopWakeUp`;
-- file `fileRead()`, offset `fileRead()`, `fileWrite()`, offset `fileWrite()`, scatter/gather `fileWrite()`,
-  `fileSend()`, and POSIX `filePoll()`;
+- file `fileRead()`, offset `fileRead()`, `fileReadUntilFullOrEOF()`, `fileWrite()`, offset `fileWrite()`,
+  scatter/gather `fileWrite()`, `fileSend()`, and POSIX `filePoll()`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
@@ -159,6 +189,39 @@ coroutine header.
 ## AwaitArena
 
 @copydoc SC::AwaitArena
+
+# Socket receive helpers
+
+`receive()` is the direct one-shot wrapper over `AsyncSocketReceive`: it completes when the socket reports some data,
+disconnect, or an error, and the returned `AwaitSocketReceiveResult::data` span may be smaller than the caller buffer.
+
+`receiveExact()` is the higher-level stream helper: it reactivates the underlying receive request until the caller buffer
+is full. If the peer disconnects before the buffer is full, it returns an error and, when an output result is provided,
+the result object describes the partial data received so far.
+
+`receiveLine()` is a no-allocation line helper for simple text protocols. It reads into caller-provided storage until
+`\n`, trims a preceding `\r` from the reported line span, and fails if the buffer fills before the newline arrives.
+
+# File helpers
+
+`fileRead()` is the direct one-shot wrapper over `AsyncFileRead`: it may return fewer bytes than the caller buffer
+holds.
+
+`fileReadUntilFullOrEOF()` mirrors `FileDescriptor::readUntilFullOrEOF()` for coroutine code. It reactivates the
+underlying read request until the caller buffer is full or EOF is reached, and reports the actually-read prefix through
+`AwaitFileReadResult::data`.
+
+`fileWrite()` does not need a separate `fileWriteAll()` helper today: `AsyncFileWrite` already keeps writing until the
+provided single buffer or scatter/gather buffers are fully written, or returns an error.
+
+# Helper placement
+
+Thin convenience helpers currently live on `AwaitEventLoop` when they preserve the shape of one underlying `Async`
+operation and only add a small, no-allocation loop over caller-provided storage. Examples are `sendAll()`,
+`receiveExact()`, `receiveLine()`, and `fileReadUntilFullOrEOF()`.
+
+If future helpers start carrying protocol state, buffering policy, parsing rules, or multiple stable objects, they should
+move into explicit `Await*` helper structs instead of making `AwaitEventLoop` a grab bag.
 
 # Lifetime rules
 
