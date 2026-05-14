@@ -21,6 +21,7 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
+- Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 
 ## What To Watch
 

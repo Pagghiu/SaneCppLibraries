@@ -608,7 +608,7 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        if (name == "AwaitEcho")
+        if (name.startsWith("Await"))
         {
             project.files.compile.enableStdCpp = true;
             project.files.compile.cppStandard  = CppStandard::CPP20;

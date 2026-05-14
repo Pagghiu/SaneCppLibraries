@@ -114,6 +114,7 @@ as `Async`.
 Complete console examples live in:
 
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
+- `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
 
 # Status
 
