@@ -59,6 +59,10 @@ Some relevant blog posts are:
 
 | Example       | Description                                                                                                                       |
 |:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
+| AwaitCallbackBridge | Shows callback-style `Async` and coroutine-style `Await` sharing one caller-owned event loop                                |
+| AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |
+| AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned coroutine arena                                        |
+| AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |
 | Serialization | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
 | WebServer     | Use [Http](@ref library_http) to statically host a website from a specified directory                                             |
 

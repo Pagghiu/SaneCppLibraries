@@ -121,6 +121,8 @@ Complete console examples live in:
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
 - `Examples/AwaitTaskGroupFiles`, showing Python `asyncio.TaskGroup`-style fan-out over two file reads while keeping
   task storage caller-owned.
+- `Examples/AwaitCallbackBridge`, showing callback-style `Async` and coroutine-style `Await` sharing one
+  caller-owned event loop during migration.
 
 # Socket send helpers
 
