@@ -53,6 +53,14 @@ struct SC::AwaitTest : public SC::TestCase
         {
             moveTask();
         }
+        if (test_section("task lifetime edge cases"))
+        {
+            taskLifetimeEdgeCases();
+        }
+        if (test_section("task cross loop guards"))
+        {
+            taskCrossLoopGuards();
+        }
         if (test_section("sleep twice"))
         {
             sleepTwice();
@@ -140,6 +148,10 @@ struct SC::AwaitTest : public SC::TestCase
         if (test_section("file poll"))
         {
             filePoll();
+        }
+        if (test_section("unsupported awaiters fail fast"))
+        {
+            unsupportedAwaitersFailFast();
         }
         if (test_section("loop work"))
         {
@@ -794,6 +806,18 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask awaitExistingChild(AwaitEventLoop&, AwaitTask& child)
+    {
+        SC_CO_TRY(co_await child);
+        co_return Result(true);
+    }
+
+    AwaitTask spawnAndWaitExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    {
+        SC_CO_TRY(co_await await.spawnAndWait(child));
+        co_return Result(true);
+    }
+
     AwaitTask spawnAndWaitChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitTwice(await);
@@ -806,6 +830,23 @@ struct SC::AwaitTest : public SC::TestCase
     {
         child = waitLong(await);
         SC_CO_TRY(co_await await.spawnAndWait(child));
+        co_return Result(true);
+    }
+
+    AwaitTask waitForExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    {
+        AwaitTimeoutResult timeoutResult;
+        SC_CO_TRY(co_await await.waitFor(child, 100_ms, &timeoutResult));
+        SC_TEST_EXPECT(not timeoutResult.timedOut);
+        co_return Result(true);
+    }
+
+    AwaitTask waitTaskGroupExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    {
+        AwaitTask*     groupStorage[1] = {};
+        AwaitTaskGroup group(await, groupStorage);
+        SC_CO_TRY(group.spawn(child));
+        SC_CO_TRY(co_await group.waitAll());
         co_return Result(true);
     }
 
@@ -1159,6 +1200,106 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(await.run());
         SC_TEST_EXPECT(moved.result());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void taskLifetimeEdgeCases()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        AwaitTask invalid;
+        SC_TEST_EXPECT(not invalid.isValid());
+        SC_TEST_EXPECT(not invalid.result());
+        SC_TEST_EXPECT(not invalid.cancel(await));
+        SC_TEST_EXPECT(not await.spawn(invalid));
+
+        AwaitTask task  = waitTwice(await);
+        AwaitTask moved = move(task);
+        SC_TEST_EXPECT(not task.isValid());
+        SC_TEST_EXPECT(not task.result());
+        SC_TEST_EXPECT(not task.cancel(await));
+        SC_TEST_EXPECT(not await.spawn(task));
+
+        AwaitTask invalidChildParent = awaitExistingChild(await, task);
+        SC_TEST_EXPECT(await.spawn(invalidChildParent));
+        SC_TEST_EXPECT(invalidChildParent.isCompleted());
+        SC_TEST_EXPECT(not invalidChildParent.result());
+
+        SC_TEST_EXPECT(await.spawn(moved));
+        AwaitTask activeMoved = move(moved);
+        SC_TEST_EXPECT(not moved.isValid());
+        SC_TEST_EXPECT(activeMoved.isActive());
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(activeMoved.result());
+
+        {
+            AwaitTask completed = immediate(await);
+            SC_TEST_EXPECT(await.spawn(completed));
+            SC_TEST_EXPECT(completed.result());
+        }
+
+        {
+            char           storage[1024] = {};
+            AwaitArena     arena({storage, sizeof(storage)});
+            AwaitEventLoop arenaAwait(async, &arena);
+
+            {
+                AwaitTask arenaTask = arenaWait(arenaAwait);
+                SC_TEST_EXPECT(arenaAwait.spawn(arenaTask));
+                SC_TEST_EXPECT(arenaAwait.run());
+                SC_TEST_EXPECT(arenaTask.result());
+                SC_TEST_EXPECT(arena.used() > 0);
+            }
+
+            SC_TEST_EXPECT(arena.used() > 0);
+            arena.reset();
+            SC_TEST_EXPECT(arena.used() == 0);
+            SC_TEST_EXPECT(arena.peakUsed() == 0);
+        }
+
+        SC_TEST_EXPECT(async.close());
+    }
+
+    void taskCrossLoopGuards()
+    {
+        AsyncEventLoop asyncA;
+        AsyncEventLoop asyncB;
+        SC_TEST_EXPECT(asyncA.create());
+        SC_TEST_EXPECT(asyncB.create());
+
+        AwaitEventLoop awaitA(asyncA);
+        AwaitEventLoop awaitB(asyncB);
+
+        AwaitTask task = waitTwice(awaitA);
+        SC_TEST_EXPECT(not awaitB.spawn(task));
+        SC_TEST_EXPECT(not task.isStarted());
+
+        AwaitTask active = waitTwice(awaitA);
+        SC_TEST_EXPECT(awaitA.spawn(active));
+        SC_TEST_EXPECT(active.isActive());
+
+        AwaitTask spawnAndWaitParent = spawnAndWaitExistingChild(awaitB, active);
+        SC_TEST_EXPECT(awaitB.spawn(spawnAndWaitParent));
+        SC_TEST_EXPECT(spawnAndWaitParent.isCompleted());
+        SC_TEST_EXPECT(not spawnAndWaitParent.result());
+
+        AwaitTask waitForParent = waitForExistingChild(awaitB, active);
+        SC_TEST_EXPECT(awaitB.spawn(waitForParent));
+        SC_TEST_EXPECT(waitForParent.isCompleted());
+        SC_TEST_EXPECT(not waitForParent.result());
+
+        AwaitTask groupParent = waitTaskGroupExistingChild(awaitB, active);
+        SC_TEST_EXPECT(awaitB.spawn(groupParent));
+        SC_TEST_EXPECT(groupParent.isCompleted());
+        SC_TEST_EXPECT(not groupParent.result());
+
+        SC_TEST_EXPECT(active.cancel(awaitA));
+        SC_TEST_EXPECT(awaitA.run());
+        SC_TEST_EXPECT(not active.result());
+
+        SC_TEST_EXPECT(asyncA.close());
+        SC_TEST_EXPECT(asyncB.close());
     }
 
     void sleepTwice()
@@ -2118,6 +2259,24 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(pipe.close());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void unsupportedAwaitersFailFast()
+    {
+#if SC_PLATFORM_WINDOWS
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        FileDescriptor invalidFile;
+        AwaitTask      task = filePollOnce(await, invalidFile);
+        SC_TEST_EXPECT(await.spawn(task));
+        SC_TEST_EXPECT(task.isCompleted());
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(async.close());
+#else
+        SC_TEST_EXPECT(true);
+#endif
     }
 
     void loopWork()

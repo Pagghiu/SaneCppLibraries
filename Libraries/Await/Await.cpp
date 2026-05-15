@@ -2428,6 +2428,11 @@ bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     }
 
     AwaitTask::Promise& promise = task.handle.promise();
+    if (promise.eventLoop != nullptr and promise.eventLoop != &await)
+    {
+        operationResult = Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        return false;
+    }
     if (promise.completionCallback != nullptr or promise.continuation != nullptr)
     {
         operationResult = Result::Error("AwaitTask is already being awaited");
