@@ -2,10 +2,10 @@
 
 ## Quick Use
 
-Choose `await` when the task is specifically about the draft C++20 coroutine layer over `AsyncEventLoop`.
+Choose `await` when the task is specifically about the experimental C++20 coroutine layer over `AsyncEventLoop`.
 
-- Treat `Await` as Draft: inspect `Documentation/Libraries/Await.md`, `Libraries/Await/Await.h`, and the tests before
-  making API claims.
+- Treat `Await` as MVP / Experimental: inspect `Documentation/Libraries/Await.md`, `Libraries/Await/Await.h`, and the
+  tests before making API claims.
 - Use `AwaitEventLoop` as a wrapper around an existing `AsyncEventLoop&`; it does not own or close the async loop.
 - Keep Sane style: coroutine functions return `AwaitTask`, completion returns plain `Result`, and extra outputs use caller-provided objects.
 - Use `SC_CO_TRY(co_await ...)` inside coroutine bodies instead of `SC_TRY`.
@@ -17,8 +17,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`,
   `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`, and cancellation of
   the currently suspended operation.
-- Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The draft still allows no-arena
-  standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
+- Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The experimental target still
+  allows no-arena standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
 - Use `AwaitArena::capacity()`, `used()`, `peakUsed()`, and `failedAllocationSize()` when sizing caller-provided
   coroutine frame storage.
 - Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
@@ -78,7 +78,7 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   registry with fixed task slots, explicit shutdown cancellation, and no hidden allocation.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
   would need coroutine traits/handles/suspend types plus compiler builtin mapping, and should require
-  `SC_AWAIT_REQUIRE_ARENA=1`. This is Stable-track work, not required before Draft can become Experimental.
+  `SC_AWAIT_REQUIRE_ARENA=1`. This is stable-track work, not required for MVP usage.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
   useful on the POSIX backends for normal file/pipe handles.

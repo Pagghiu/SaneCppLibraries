@@ -1,15 +1,15 @@
 @page library_await Await
 
-@brief 🟥 C++20 coroutine layer over Async
+@brief 🟨 C++20 coroutine layer over Async
 
 [TOC]
 
-[SaneCppAwait.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAwait.h) is a draft
-library exploring `co_await` syntax on top of [Async](@ref library_async).
+[SaneCppAwait.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAwait.h) is an
+experimental library providing `co_await` syntax on top of [Async](@ref library_async).
 
 @warning
-This library is currently **Draft**. The API is intentionally small and may change as the coroutine model is refined.
-Use it to experiment with the current direction, not as a stable public API yet.
+This library is currently **MVP / Experimental**. It covers useful `Async` workflows, but the API may still change as
+the coroutine model is refined. Use it for focused experiments and examples, not as a stable public API yet.
 
 # Dependencies
 - Dependencies: [Async](@ref library_async)
@@ -154,9 +154,9 @@ SC_CO_TRY(co_await await.sendAll(socket, buffers, &sent));
 
 # Status
 
-🟥 Draft
+🟨 MVP / Experimental
 
-The current proof of concept supports:
+Current support includes:
 
 - `sleep()`;
 - socket `accept()` and `connect()`;
@@ -181,7 +181,7 @@ The current proof of concept supports:
 - child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
-The draft is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
+`Await` is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
 coroutine header. `SCAwaitArenaTest` additionally compiles with `SC_AWAIT_REQUIRE_ARENA=1` to keep the production-style
 no-fallback allocation path covered.
 
@@ -279,17 +279,16 @@ underlying `AsyncEventLoop`.
 This keeps the surface area small and preserves the plain-`Result` rule: if a future dedicated serial helper is added, it
 should still return `Result` and write any extra output into an explicit caller-owned result object.
 
-# Draft Graduation Criteria
+# Stability Criteria
 
-Before `Await` should move from Draft to Experimental, the remaining design forks should be resolved:
+Before `Await` should move from MVP / Experimental to a stable status, the remaining design forks should be resolved:
 
 - lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction;
 - optional helper APIs: whether detached/background task registries or filesystem watcher stream adapters are useful
   enough to add as explicit caller-owned `Await*` objects.
 
-No-stdlib coroutine support is not required for the Draft-to-Experimental step. `Await` can remain isolated in
-`SCAwaitTest` while the API is still moving; a `<coroutine>` replacement and normal `SCTest` participation are Stable
-track work.
+No-stdlib coroutine support is not required for the current MVP status. `Await` can remain isolated in `SCAwaitTest`
+while the API is still moving; a `<coroutine>` replacement and normal `SCTest` participation are stable-track work.
 
 # Cancellation
 
@@ -349,7 +348,7 @@ normal storage policy, usually an `AwaitArena`.
 
 # Memory allocation
 
-`AwaitArena` can hold coroutine frames in caller-provided storage. The draft currently supports two allocation modes:
+`AwaitArena` can hold coroutine frames in caller-provided storage. `Await` currently supports two allocation modes:
 
 - Passing an arena to `AwaitEventLoop` gives no-allocation coroutine frame storage for production-style Sane C++ usage.
 - Omitting the arena keeps experiments ergonomic and falls back to standard nothrow coroutine allocation.
@@ -386,7 +385,7 @@ compiling against the standard coroutine header.
 
 # No-stdlib coroutine status
 
-The no-stdlib story is intentionally not part of the current Draft-to-Experimental bar. Today
+The no-stdlib story is intentionally not part of the current MVP bar. Today
 `Libraries/Await/Internal/AwaitCoroutine.h` includes `<coroutine>` for `std::coroutine_traits`,
 `std::coroutine_handle`, and `std::suspend_always`. It also includes `<new>` so no-arena experimental builds can use
 `std::nothrow` fallback allocation.
@@ -399,12 +398,13 @@ is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` / `SCAwai
 
 # Roadmap
 
-🟥 Draft Features:
+🟨 MVP Follow-ups:
 
-- Add the remaining `Async` operations that map cleanly to one-shot awaiters.
-- Expand cancellation semantics and edge-case coverage for filesystem and thread-pool-backed awaiters.
-- Expand task group helpers with result aggregation helpers and more policy tests.
-- Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for non-test builds.
+- Add only the next `Async` operations that have concrete examples or migration pressure.
+- Add ASan-focused teardown coverage for thread-pool-backed awaiters and child-task destruction.
+- Decide whether detached/background task registries deserve a caller-owned `Await*` helper.
+- Decide whether filesystem watcher integration should become an explicit stream/channel-style adapter.
+- Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for production-style builds.
 - Prototype and validate the no-stdlib coroutine shim behind an opt-in macro before moving `Await` into `SCTest`.
 
 # Statistics

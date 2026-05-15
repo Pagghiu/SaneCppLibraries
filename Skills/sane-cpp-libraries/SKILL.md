@@ -43,7 +43,7 @@ Use this as the single installed skill for every Sane C++ Libraries request.
 ### I/O, Async, And Platforms
 
 - Event loop, requests, and wake-up integration: [references/async/guide.md](references/async/guide.md)
-- Draft coroutine wrapper over Async: [references/await/guide.md](references/await/guide.md)
+- Experimental coroutine wrapper over Async: [references/await/guide.md](references/await/guide.md)
 - Backpressure-aware stream pipelines: [references/async-streams/guide.md](references/async-streams/guide.md)
 - Cross-library async composition recipes: [references/async-networking/guide.md](references/async-networking/guide.md)
 - Raw synchronous sockets and DNS: [references/socket/guide.md](references/socket/guide.md)
