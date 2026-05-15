@@ -221,6 +221,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             arenaExhaustion();
         }
+        if (test_section("child task teardown during callback"))
+        {
+            childTaskTeardownDuringCallback();
+        }
     }
 
     AwaitTask immediate(AwaitEventLoop&) { co_return Result(true); }
@@ -741,6 +745,23 @@ struct SC::AwaitTest : public SC::TestCase
     AwaitTask fsOpenCancellable(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path, FileDescriptor& file)
     {
         SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
+        co_return Result(true);
+    }
+
+    AwaitTask fsOpenCloseChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
+    {
+        FileDescriptor file;
+        SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
+        SC_CO_TRY(co_await await.fsClose(threadPool, file));
+        SC_TEST_EXPECT(not file.isValid());
+        co_return Result(true);
+    }
+
+    AwaitTask spawnAndWaitFsChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
+    {
+        AwaitTask child = fsOpenCloseChild(await, threadPool, path);
+        SC_CO_TRY(co_await await.spawnAndWait(child));
+        SC_CO_TRY(child.result());
         co_return Result(true);
     }
 
@@ -3057,6 +3078,33 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(arenaStorage.peakUsed() == 0);
         SC_TEST_EXPECT(arenaStorage.failedAllocationSize() > arenaStorage.capacity());
         SC_TEST_EXPECT(async.close());
+    }
+
+    void childTaskTeardownDuringCallback()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        ThreadPool threadPool;
+        SC_TEST_EXPECT(threadPool.create(1));
+
+        SmallStringNative<255> filePath = StringEncoding::Native;
+        const StringView       fileName = "await-child-callback-teardown.txt";
+        SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), fileName}));
+
+        FileSystem fs;
+        SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+        SC_TEST_EXPECT(fs.writeString(fileName, "callback teardown"));
+
+        AwaitTask parent = spawnAndWaitFsChild(await, threadPool, filePath.view());
+        SC_TEST_EXPECT(await.spawn(parent));
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(parent.result());
+
+        SC_TEST_EXPECT(threadPool.destroy());
+        SC_TEST_EXPECT(async.close());
+        SC_TEST_EXPECT(fs.removeFile(fileName));
     }
 };
 

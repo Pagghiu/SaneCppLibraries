@@ -335,6 +335,7 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
     Result taskResult;
 
     AwaitTask::Handle        continuation;
+    AwaitTask::Handle        deferredDestroyNext;
     AwaitCancellationHandler cancellation;
     AwaitEventLoop*          eventLoop;
     void*                    completionObject;
@@ -343,6 +344,8 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
     bool started;
     bool completed;
     bool cancellationRequested;
+    bool inCompletionCallback;
+    bool destroyDeferred;
 };
 
 /// @brief Coroutine-friendly wrapper around an existing AsyncEventLoop.
@@ -423,8 +426,14 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     AwaitLoopWorkAwaiter            loopWork(ThreadPool& threadPool, Function<Result()> work);
 
   private:
-    AsyncEventLoop& eventLoop;
-    AwaitArena*     frameArena;
+    friend struct AwaitTask;
+
+    void deferDestroy(AwaitTask::Handle handle);
+    void drainDeferredDestroys();
+
+    AsyncEventLoop&   eventLoop;
+    AwaitArena*       frameArena;
+    AwaitTask::Handle deferredDestroyList;
 };
 
 /// @brief Stable wake-up object that can resume an AwaitLoopWakeUpAwaiter from another thread.

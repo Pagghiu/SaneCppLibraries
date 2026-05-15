@@ -37,6 +37,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - `SCAwaitArenaTest` is the focused `SC_AWAIT_REQUIRE_ARENA=1` target; use it when changing coroutine frame allocation
   or arena behavior.
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
+- Completed child task frames can be destroyed while an `Async` callback is unwinding; `AwaitEventLoop` defers that
+  destruction until `run()`, `runOnce()`, or `runNoWait()` returns so embedded `AsyncRequest` storage stays alive.
 - Result spans such as `AwaitSocketReceiveResult::data` and `AwaitFileReadResult::data` point into caller-provided
   buffers; those buffers must outlive result inspection.
 - Child tasks can still be explicitly `spawn()`-ed before `co_await child`; use `spawnAndWait()` when a parent should

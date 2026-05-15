@@ -230,6 +230,13 @@ void AwaitTask::destroy()
 {
     if (handle)
     {
+        AwaitTask::Promise& promise = handle.promise();
+        if (promise.inCompletionCallback and promise.eventLoop != nullptr)
+        {
+            promise.eventLoop->deferDestroy(handle);
+            handle = {};
+            return;
+        }
         handle.destroy();
         handle = {};
     }
@@ -238,9 +245,12 @@ void AwaitTask::destroy()
 AwaitTask::Promise::Promise()
     : taskResult(Result::Error("AwaitTask not completed")), eventLoop(nullptr), started(false), completed(false)
 {
+    deferredDestroyNext   = {};
     completionObject      = nullptr;
     completionCallback    = nullptr;
     cancellationRequested = false;
+    inCompletionCallback  = false;
+    destroyDeferred       = false;
 }
 
 AwaitEventLoop* AwaitTask::Promise::findEventLoop() { return nullptr; }
@@ -311,9 +321,10 @@ bool AwaitTask::Promise::FinalSuspend::await_ready() noexcept { return false; }
 
 void AwaitTask::Promise::FinalSuspend::await_suspend(AwaitTask::Handle handle) noexcept
 {
-    AwaitTask::Promise& promise = handle.promise();
-    promise.completed           = true;
-    promise.cancellation        = {};
+    AwaitTask::Promise& promise  = handle.promise();
+    promise.completed            = true;
+    promise.cancellation         = {};
+    promise.inCompletionCallback = true;
     if (promise.completionCallback != nullptr)
     {
         void (*callback)(void*)    = promise.completionCallback;
@@ -321,6 +332,7 @@ void AwaitTask::Promise::FinalSuspend::await_suspend(AwaitTask::Handle handle) n
         promise.completionObject   = nullptr;
         promise.completionCallback = nullptr;
         callback(callbackObject);
+        promise.inCompletionCallback = false;
         return;
     }
     if (promise.continuation != nullptr)
@@ -330,6 +342,7 @@ void AwaitTask::Promise::FinalSuspend::await_suspend(AwaitTask::Handle handle) n
         parentContinuation.promise().cancellation = {};
         parentContinuation.resume();
     }
+    promise.inCompletionCallback = false;
 }
 
 void AwaitTask::Promise::FinalSuspend::await_resume() noexcept {}
@@ -341,7 +354,7 @@ void AwaitTask::Promise::return_value(Result newResult) noexcept { taskResult = 
 void AwaitTask::Promise::unhandled_exception() noexcept { taskResult = Result::Error("AwaitTask unhandled exception"); }
 
 AwaitEventLoop::AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitArena* arena)
-    : eventLoop(asyncEventLoop), frameArena(arena)
+    : eventLoop(asyncEventLoop), frameArena(arena), deferredDestroyList({})
 {}
 
 AsyncEventLoop& AwaitEventLoop::asyncEventLoop() { return eventLoop; }
@@ -363,17 +376,61 @@ Result AwaitEventLoop::spawn(AwaitTask& task)
     {
         return Result::Error("AwaitTask belongs to another AwaitEventLoop");
     }
+    if (taskEventLoop == nullptr)
+    {
+        task.handle.promise().eventLoop = this;
+    }
 
     SC_TRY(task.start());
     task.resume();
     return Result(true);
 }
 
-Result AwaitEventLoop::run() { return eventLoop.run(); }
+void AwaitEventLoop::deferDestroy(AwaitTask::Handle handle)
+{
+    AwaitTask::Promise& promise = handle.promise();
+    if (promise.destroyDeferred)
+    {
+        return;
+    }
+    promise.destroyDeferred     = true;
+    promise.deferredDestroyNext = deferredDestroyList;
+    deferredDestroyList         = handle;
+}
 
-Result AwaitEventLoop::runOnce() { return eventLoop.runOnce(); }
+void AwaitEventLoop::drainDeferredDestroys()
+{
+    while (deferredDestroyList != nullptr)
+    {
+        AwaitTask::Handle   handle  = deferredDestroyList;
+        AwaitTask::Promise& promise = handle.promise();
+        deferredDestroyList         = promise.deferredDestroyNext;
+        promise.deferredDestroyNext = {};
+        promise.destroyDeferred     = false;
+        handle.destroy();
+    }
+}
 
-Result AwaitEventLoop::runNoWait() { return eventLoop.runNoWait(); }
+Result AwaitEventLoop::run()
+{
+    Result result = eventLoop.run();
+    drainDeferredDestroys();
+    return result;
+}
+
+Result AwaitEventLoop::runOnce()
+{
+    Result result = eventLoop.runOnce();
+    drainDeferredDestroys();
+    return result;
+}
+
+Result AwaitEventLoop::runNoWait()
+{
+    Result result = eventLoop.runNoWait();
+    drainDeferredDestroys();
+    return result;
+}
 
 AwaitSleepAwaiter AwaitEventLoop::sleep(TimeMs duration) { return AwaitSleepAwaiter(*this, duration); }
 

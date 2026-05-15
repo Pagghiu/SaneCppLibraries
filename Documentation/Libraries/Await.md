@@ -309,6 +309,10 @@ behavior instead.
 Awaiters keep the same stable-object rules as `Async`: sockets, file descriptors, buffers, result objects, wake-up
 objects, and child tasks must stay alive while the operation is active.
 
+When a completed child task is destroyed while an `Async` callback is still unwinding, `AwaitEventLoop` defers the
+actual coroutine frame destruction until `run()`, `runOnce()`, or `runNoWait()` returns. This keeps any embedded
+`AsyncRequest` alive until the lower-level event loop has finished its teardown work, without adding dynamic allocation.
+
 Result objects may contain spans into caller-provided buffers. For example, `AwaitSocketReceiveResult::data` and
 `AwaitFileReadResult::data` point into the receive/read buffer passed to the awaiter. Keep those buffers alive until
 after the result has been inspected or copied elsewhere.
