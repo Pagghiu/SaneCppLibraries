@@ -25,6 +25,7 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
+- Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
   `Span<const char>` storage when header/body fragments should be sent as one logical stream message.
 - Use `fileRead()` / `fileWrite()` with `SerialDescriptor`; do not add dedicated serial awaiter names unless `Async`
@@ -60,6 +61,9 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   complete the provided single or scatter/gather buffer, or return an error.
 - Keep thin no-allocation convenience helpers on `AwaitEventLoop`; move protocol adapters or helpers with extra stable
   state into explicit `Await*` structs.
+- Do not add direct filesystem watcher awaiters on `AwaitEventLoop` yet. `FileSystemWatcher` is a long-lived callback
+  stream; use `FileSystemWatcherAsyncT<AsyncEventLoop>` on the same loop, or design a caller-owned `Await*` adapter when
+  a concrete stream/channel workflow is needed.
 - `waitFor()` cancels the child task when the timeout expires and reports timeout state through `AwaitTimeoutResult`.
 - `fsRead()` and `fsWrite()` wrap `AsyncFileSystemOperation::read()` and `write()`; those operations borrow file handles
   and preserve caller ownership.

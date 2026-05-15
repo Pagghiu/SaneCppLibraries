@@ -123,6 +123,7 @@ Complete console examples live in:
   task storage caller-owned.
 - `Examples/AwaitCallbackBridge`, showing callback-style `Async` and coroutine-style `Await` sharing one
   caller-owned event loop during migration.
+- `Examples/AwaitFileCourier`, showing a file copy followed by `fileSend()` over a socket.
 
 # Socket send helpers
 
@@ -168,6 +169,8 @@ The current proof of concept supports:
   models serial I/O with `AsyncFileRead` / `AsyncFileWrite`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
+- filesystem watching remains in [FileSystemWatcher](@ref library_file_system_watcher) rather than direct
+  `AwaitEventLoop` awaiters, because it is a long-lived callback stream instead of a one-shot operation;
 - background `loopWork()`;
 - process exit waiting with `processExit()`;
 - one-shot signal waiting with `signal()`;
@@ -226,6 +229,18 @@ underlying read request until the caller buffer is full or EOF is reached, and r
 `fileWrite()` does not need a separate `fileWriteAll()` helper today: `AsyncFileWrite` already keeps writing until the
 provided single buffer or scatter/gather buffers are fully written, or returns an error.
 
+# Filesystem watcher integration
+
+`Await` intentionally does not expose direct filesystem watcher awaiters yet. `FileSystemWatcher` already models this as
+a long-lived callback stream with stable `FileSystemWatcher::FolderWatcher` objects and an event-loop runner
+(`FileSystemWatcherAsyncT<AsyncEventLoop>`). That shape is closer to an async iterator or channel than to the one-shot
+`AsyncRequest` wrappers currently living on `AwaitEventLoop`.
+
+For now, coroutine examples should keep using callback-style `FileSystemWatcher` on the same underlying
+`AsyncEventLoop`, or introduce a small caller-owned adapter outside the core `AwaitEventLoop` surface when a concrete
+workflow needs it. If a future helper is added, it should be an explicit `Await*` object carrying the watcher state and
+caller-provided notification storage, not another thin method on `AwaitEventLoop`.
+
 # Helper placement
 
 Thin convenience helpers currently live on `AwaitEventLoop` when they preserve the shape of one underlying `Async`
@@ -271,6 +286,7 @@ Before `Await` should move from Draft to Experimental, the remaining design fork
 - coroutine frame allocation policy: whether arena-required mode becomes the default outside tests/examples;
 - scheduling policy: whether `spawn()` keeps immediate first resume or moves to an explicit ready queue;
 - detached/background tasks: whether a caller-provided task registry is worth adding without hidden allocation;
+- filesystem watcher adapters: whether a caller-owned stream/channel helper is useful enough to become part of Await;
 - no-stdlib story: whether a minimal coroutine ABI shim can replace `<coroutine>` for normal `SCTest` builds;
 - lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction.
 
