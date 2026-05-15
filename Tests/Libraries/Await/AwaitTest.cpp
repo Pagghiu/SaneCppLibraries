@@ -81,6 +81,14 @@ struct SC::AwaitTest : public SC::TestCase
         {
             cancelSuspendedAwaiters();
         }
+        if (test_section("cancel before loop dispatch"))
+        {
+            cancelBeforeLoopDispatch();
+        }
+        if (test_section("cancel after completion"))
+        {
+            cancelAfterCompletion();
+        }
         if (test_section("callback and coroutine coexist"))
         {
             callbackAndCoroutineCoexist();
@@ -347,6 +355,13 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask receiveExactCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
+                                      AwaitSocketReceiveResult& receiveResult)
+    {
+        SC_CO_TRY(co_await await.receiveExact(receiver, receiveBuffer, &receiveResult));
+        co_return Result(true);
+    }
+
     AwaitTask receiveExactConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
                                            const SocketDescriptor& receiver, Span<char> receiveBuffer,
                                            AwaitSocketReceiveResult& receiveResult)
@@ -384,6 +399,13 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(StringView({lineResult.line.data(), lineResult.line.sizeInBytes()}, false,
                                   StringEncoding::Ascii) == "hello");
 
+        co_return Result(true);
+    }
+
+    AwaitTask receiveLineCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> lineBuffer,
+                                     AwaitSocketReceiveLineResult& lineResult)
+    {
+        SC_CO_TRY(co_await await.receiveLine(receiver, lineBuffer, lineResult));
         co_return Result(true);
     }
 
@@ -482,6 +504,14 @@ struct SC::AwaitTest : public SC::TestCase
         char                     receiveBuffer[16] = {};
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
+        co_return Result(true);
+    }
+
+    AwaitTask receiveFromCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver)
+    {
+        char                         receiveBuffer[16] = {};
+        AwaitSocketReceiveFromResult receiveResult;
+        SC_CO_TRY(co_await await.receiveFrom(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
         co_return Result(true);
     }
 
@@ -797,6 +827,17 @@ struct SC::AwaitTest : public SC::TestCase
     }
 
     AwaitTask loopWorkOnce(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
+    {
+        Function<Result()> work = [&workCount]
+        {
+            workCount.fetch_add(1);
+            return Result(true);
+        };
+        SC_CO_TRY(co_await await.loopWork(threadPool, work));
+        co_return Result(true);
+    }
+
+    AwaitTask loopWorkCancellable(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
     {
         Function<Result()> work = [&workCount]
         {
@@ -1674,6 +1715,146 @@ struct SC::AwaitTest : public SC::TestCase
 
             SC_TEST_EXPECT(threadPool.destroy());
             (void)fs.removeFile("await-cancel-fs-open.txt");
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
+    void cancelBeforeLoopDispatch()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor client;
+            SocketDescriptor serverSideClient;
+            createTCPSocketPair(async, client, serverSideClient);
+
+            char                     receiveBuffer[5] = {};
+            AwaitSocketReceiveResult receiveResult;
+            AwaitTask task = receiveExactCancellable(await, serverSideClient, receiveBuffer, receiveResult);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSideClient.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            SocketDescriptor client;
+            SocketDescriptor serverSideClient;
+            createTCPSocketPair(async, client, serverSideClient);
+
+            char                         lineBuffer[8] = {};
+            AwaitSocketReceiveLineResult lineResult;
+            AwaitTask                    task = receiveLineCancellable(await, serverSideClient, lineBuffer, lineResult);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+            SC_TEST_EXPECT(client.close());
+            SC_TEST_EXPECT(serverSideClient.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            const uint16_t port = report.mapPort(5054);
+
+            SocketIPAddress bindAddress;
+            SC_TEST_EXPECT(bindAddress.fromAddressPort("0.0.0.0", port));
+
+            SocketDescriptor receiver;
+            SC_TEST_EXPECT(async.createAsyncUDPSocket(bindAddress.getAddressFamily(), receiver));
+            SC_TEST_EXPECT(SocketServer(receiver).bind(bindAddress));
+
+            AwaitTask task = receiveFromCancellable(await, receiver);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+            SC_TEST_EXPECT(receiver.close());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            ThreadPool threadPool;
+            SC_TEST_EXPECT(threadPool.create(1));
+
+            ThreadPoolTask blocker;
+            Atomic<bool>   blockerEntered = false;
+            Atomic<bool>   releaseBlocker = false;
+            startThreadPoolBlocker(threadPool, blocker, blockerEntered, releaseBlocker);
+
+            Atomic<int> workCount = 0;
+            AwaitTask   task      = loopWorkCancellable(await, threadPool, workCount);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+
+            Thread releaser;
+            releaseThreadPoolBlockerSoon(releaser, releaseBlocker);
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(releaser.join());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+            SC_TEST_EXPECT(threadPool.destroy());
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
+    void cancelAfterCompletion()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitLoopWakeUp       wakeUp;
+            AwaitLoopWakeUpResult wakeUpResult;
+            AwaitTask             task = wakeUpOnce(await, wakeUp, wakeUpResult);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(task.isActive());
+            SC_TEST_EXPECT(wakeUp.wakeUp(await));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(task.result());
+
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(not task.isCancellationRequested());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask task = waitTwice(await);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(task.result());
+
+            SC_TEST_EXPECT(task.cancel(await));
+            SC_TEST_EXPECT(not task.isCancellationRequested());
+            SC_TEST_EXPECT(task.result());
             SC_TEST_EXPECT(async.close());
         }
     }

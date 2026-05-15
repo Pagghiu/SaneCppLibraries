@@ -72,7 +72,11 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - New awaiters must keep returning plain `Result`; if more information is needed, add an explicit result object parameter.
 - Keep `spawn()` immediate for now. Revisit only if Await grows a ready queue or runnable tasks that are not backed by an
   active `AsyncRequest`.
-- The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.
+- Prefer structured children through `AwaitTaskGroup`. If detached/background tasks are needed, design a caller-owned
+  registry with fixed task slots, explicit shutdown cancellation, and no hidden allocation.
+- The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
+  would need coroutine traits/handles/suspend types plus compiler builtin mapping, and should require
+  `SC_AWAIT_REQUIRE_ARENA=1`. This is Stable-track work, not required before Draft can become Experimental.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
   useful on the POSIX backends for normal file/pipe handles.

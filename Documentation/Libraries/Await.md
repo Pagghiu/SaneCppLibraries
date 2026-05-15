@@ -283,12 +283,13 @@ should still return `Result` and write any extra output into an explicit caller-
 
 Before `Await` should move from Draft to Experimental, the remaining design forks should be resolved:
 
-- coroutine frame allocation policy: whether arena-required mode becomes the default outside tests/examples;
-- scheduling policy: whether `spawn()` keeps immediate first resume or moves to an explicit ready queue;
-- detached/background tasks: whether a caller-provided task registry is worth adding without hidden allocation;
-- filesystem watcher adapters: whether a caller-owned stream/channel helper is useful enough to become part of Await;
-- no-stdlib story: whether a minimal coroutine ABI shim can replace `<coroutine>` for normal `SCTest` builds;
-- lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction.
+- lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction;
+- optional helper APIs: whether detached/background task registries or filesystem watcher stream adapters are useful
+  enough to add as explicit caller-owned `Await*` objects.
+
+No-stdlib coroutine support is not required for the Draft-to-Experimental step. `Await` can remain isolated in
+`SCAwaitTest` while the API is still moving; a `<coroutine>` replacement and normal `SCTest` participation are Stable
+track work.
 
 # Cancellation
 
@@ -299,7 +300,9 @@ distinguished from ordinary failure while still preserving the plain `Result` AP
 `AwaitTask::cancel()` is idempotent after cancellation has been requested. Cancellation is best-effort: if the suspended
 operation is still active, `Await` asks the underlying `AsyncRequest` to stop and resumes the coroutine with the
 cancellation result. If the operation has already completed, the normal completion result wins. Cancelling an already
-completed task succeeds and leaves its result unchanged.
+completed task succeeds and leaves its result unchanged. Awaiter callbacks resume their continuation synchronously, so
+there is no public "completed but not yet observed" cancellation window; tests cover the observable completion-wins
+behavior instead.
 
 # Lifetime rules
 
@@ -330,6 +333,16 @@ After `waitAll()` returns, `collectResults()` can copy each child `Result` into 
 fill `AwaitTaskGroupResultSummary` with counts plus the first failed task. This keeps aggregation no-allocation and
 still follows Sane C++'s plain-`Result` style.
 
+# Detached tasks
+
+`Await` does not currently provide detached/background task ownership. The preferred model remains structured: keep
+child `AwaitTask` objects in caller-owned storage and wait through `AwaitTaskGroup` or `spawnAndWait()`.
+
+If detached tasks become necessary, the no-allocation shape should be a caller-owned registry, roughly: fixed task slots,
+explicit `spawn()` into a free slot, explicit `cancelAll()` during shutdown, and an optional `waitAll()`/`pollCompleted()`
+surface for cleanup. Such a registry should own only task bookkeeping; coroutine frames still come from each task's
+normal storage policy, usually an `AwaitArena`.
+
 # Memory allocation
 
 `AwaitArena` can hold coroutine frames in caller-provided storage. The draft currently supports two allocation modes:
@@ -355,12 +368,30 @@ direction is:
 The `SCAwaitArenaTest` target is compiled with `SC_AWAIT_REQUIRE_ARENA=1` and verifies both sides of that contract:
 tasks fail cleanly without an arena and run normally when `AwaitEventLoop` receives caller-provided arena storage.
 
+There is no separate explicit frame-storage API today. The current arena discovery through an `AwaitEventLoop&`
+parameter keeps coroutine signatures close to normal async code and avoids adding a second ownership concept. If this
+proves too compiler-dependent, the fallback should be an explicit task/factory type that binds a frame arena before
+creating the coroutine, not hidden allocation.
+
 # Exceptions
 
 `Await` does not use exceptions for control flow. The C++20 test and examples intentionally keep
 `CompileFlags::enableExceptions` disabled, so macOS, Linux, and Windows validation covers the exception-disabled path.
 `AwaitTask::Promise::unhandled_exception()` remains present because the C++ coroutine promise interface requires it when
 compiling against the standard coroutine header.
+
+# No-stdlib coroutine status
+
+The no-stdlib story is intentionally not part of the current Draft-to-Experimental bar. Today
+`Libraries/Await/Internal/AwaitCoroutine.h` includes `<coroutine>` for `std::coroutine_traits`,
+`std::coroutine_handle`, and `std::suspend_always`. It also includes `<new>` so no-arena experimental builds can use
+`std::nothrow` fallback allocation.
+
+A future `-nostdinc++` shim looks technically possible but should be treated as Stable-track work. It would need to
+provide the compiler-facing coroutine names expected by C++20, map handles to the compiler coroutine builtins on each
+supported compiler, and require `SC_AWAIT_REQUIRE_ARENA=1` so `<new>` and fallback allocation are not needed. Until that
+is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` / `SCAwaitArenaTest` instead of the normal
+`SCTest` path.
 
 # Roadmap
 
@@ -370,7 +401,7 @@ compiling against the standard coroutine header.
 - Expand cancellation semantics and edge-case coverage for filesystem and thread-pool-backed awaiters.
 - Expand task group helpers with result aggregation helpers and more policy tests.
 - Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for non-test builds.
-- Investigate no-stdlib coroutine support.
+- Prototype and validate the no-stdlib coroutine shim behind an opt-in macro before moving `Await` into `SCTest`.
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
