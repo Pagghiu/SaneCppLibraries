@@ -61,6 +61,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             taskCrossLoopGuards();
         }
+        if (test_section("move active task frames"))
+        {
+            moveActiveTaskFrames();
+        }
         if (test_section("sleep twice"))
         {
             sleepTwice();
@@ -212,6 +216,33 @@ struct SC::AwaitTest : public SC::TestCase
     }
 
     AwaitTask immediate(AwaitEventLoop&) { co_return Result(true); }
+
+    struct FrameAddressProbe
+    {
+        void* beforeSuspend = nullptr;
+        void* afterResume   = nullptr;
+    };
+
+    AwaitTask captureFrameAddress(AwaitEventLoop& await, FrameAddressProbe& probe)
+    {
+        int frameLocal      = 0;
+        probe.beforeSuspend = &frameLocal;
+        SC_CO_TRY(co_await await.sleep(1_ms));
+        probe.afterResume = &frameLocal;
+        co_return Result(true);
+    }
+
+    AwaitTask captureParentAndChildFrameAddress(AwaitEventLoop& await, AwaitTask& child, FrameAddressProbe& parentProbe,
+                                                FrameAddressProbe& childProbe)
+    {
+        int parentLocal           = 0;
+        parentProbe.beforeSuspend = &parentLocal;
+        child                     = captureFrameAddress(await, childProbe);
+        SC_CO_TRY(await.spawn(child));
+        SC_CO_TRY(co_await child);
+        parentProbe.afterResume = &parentLocal;
+        co_return Result(true);
+    }
 
     AwaitTask waitTwice(AwaitEventLoop& await)
     {
@@ -1300,6 +1331,43 @@ struct SC::AwaitTest : public SC::TestCase
 
         SC_TEST_EXPECT(asyncA.close());
         SC_TEST_EXPECT(asyncB.close());
+    }
+
+    void moveActiveTaskFrames()
+    {
+        AsyncEventLoop async;
+        SC_TEST_EXPECT(async.create());
+        AwaitEventLoop await(async);
+
+        FrameAddressProbe standaloneProbe;
+        AwaitTask         standalone = captureFrameAddress(await, standaloneProbe);
+        SC_TEST_EXPECT(await.spawn(standalone));
+        SC_TEST_EXPECT(standalone.isActive());
+
+        AwaitTask movedStandalone = move(standalone);
+        SC_TEST_EXPECT(not standalone.isValid());
+        SC_TEST_EXPECT(movedStandalone.isActive());
+
+        FrameAddressProbe parentProbe;
+        FrameAddressProbe childProbe;
+        AwaitTask         child;
+        AwaitTask         parent = captureParentAndChildFrameAddress(await, child, parentProbe, childProbe);
+        SC_TEST_EXPECT(await.spawn(parent));
+        SC_TEST_EXPECT(parent.isActive());
+        SC_TEST_EXPECT(child.isActive());
+
+        AwaitTask movedParent = move(parent);
+        SC_TEST_EXPECT(not parent.isValid());
+        SC_TEST_EXPECT(movedParent.isActive());
+
+        SC_TEST_EXPECT(await.run());
+        SC_TEST_EXPECT(movedStandalone.result());
+        SC_TEST_EXPECT(movedParent.result());
+        SC_TEST_EXPECT(child.result());
+        SC_TEST_EXPECT(standaloneProbe.beforeSuspend == standaloneProbe.afterResume);
+        SC_TEST_EXPECT(parentProbe.beforeSuspend == parentProbe.afterResume);
+        SC_TEST_EXPECT(childProbe.beforeSuspend == childProbe.afterResume);
+        SC_TEST_EXPECT(async.close());
     }
 
     void sleepTwice()

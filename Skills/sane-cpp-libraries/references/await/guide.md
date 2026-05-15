@@ -27,6 +27,8 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
   `Span<const char>` storage when header/body fragments should be sent as one logical stream message.
+- Use `fileRead()` / `fileWrite()` with `SerialDescriptor`; do not add dedicated serial awaiter names unless `Async`
+  grows serial-specific request types.
 
 ## What To Watch
 
@@ -63,6 +65,9 @@ Choose `await` when the task is specifically about the draft C++20 coroutine lay
   and preserve caller ownership.
 - Operation results follow Sane conventions: awaiters return plain `Result`, and extra data is written into explicit
   caller-provided result objects such as `AwaitSocketReceiveResult` or `AwaitFileReadResult`.
+- New awaiters must keep returning plain `Result`; if more information is needed, add an explicit result object parameter.
+- Keep `spawn()` immediate for now. Revisit only if Await grows a ready queue or runnable tasks that are not backed by an
+  active `AsyncRequest`.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only

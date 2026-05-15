@@ -164,6 +164,8 @@ The current proof of concept supports:
 - loop wake-up waiting with `AwaitLoopWakeUp`;
 - file `fileRead()`, offset `fileRead()`, `fileReadUntilFullOrEOF()`, `fileWrite()`, offset `fileWrite()`,
   scatter/gather `fileWrite()`, `fileSend()`, and POSIX `filePoll()`;
+- serial descriptors through the existing file awaiters, because `SerialDescriptor` is a `FileDescriptor` and `Async`
+  models serial I/O with `AsyncFileRead` / `AsyncFileWrite`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
   `fsCopyDirectory()`, `fsRename()`, `fsRemoveEmptyDirectory()`, and `fsRemoveFile()`;
 - background `loopWork()`;
@@ -248,7 +250,29 @@ Thread-pool-backed file and filesystem awaiters use `AsyncFileRead`, `AsyncFileW
 already running on a worker thread, completion may arrive before the stop request can take effect.
 
 Local validation for Await changes should run macOS first, then Linux, then Windows. For targeted changes, prefer the
-smallest relevant `SCAwaitTest` section plus `SCAwaitArenaTest` when arena allocation behavior changes.
+smallest relevant `SCAwaitTest` section plus `SCAwaitArenaTest` when arena allocation behavior changes. Windows changes
+should include focused `SCAwaitTest` Debug and Release runs before committing when the touched awaiter has
+platform-specific behavior.
+
+# Serial descriptors
+
+`Await` does not currently add separate serial-port awaiter names. `SerialDescriptor` inherits from `FileDescriptor`, and
+the lower-level `Async` tests exercise serial I/O through `AsyncFileRead` and `AsyncFileWrite`; the coroutine layer keeps
+that shape by using `fileRead()` / `fileWrite()` with a `SerialDescriptor` after it has been associated with the
+underlying `AsyncEventLoop`.
+
+This keeps the surface area small and preserves the plain-`Result` rule: if a future dedicated serial helper is added, it
+should still return `Result` and write any extra output into an explicit caller-owned result object.
+
+# Draft Graduation Criteria
+
+Before `Await` should move from Draft to Experimental, the remaining design forks should be resolved:
+
+- coroutine frame allocation policy: whether arena-required mode becomes the default outside tests/examples;
+- scheduling policy: whether `spawn()` keeps immediate first resume or moves to an explicit ready queue;
+- detached/background tasks: whether a caller-provided task registry is worth adding without hidden allocation;
+- no-stdlib story: whether a minimal coroutine ABI shim can replace `<coroutine>` for normal `SCTest` builds;
+- lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction.
 
 # Cancellation
 
