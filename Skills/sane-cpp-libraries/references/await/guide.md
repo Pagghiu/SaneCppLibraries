@@ -28,6 +28,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 - Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.
+- Use `Examples/AwaitProcessExitCodes` for child process exit waits with `processExit()`.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
   `Span<const char>` storage when header/body fragments should be sent as one logical stream message.
 - Use `fileRead()` / `fileWrite()` with `SerialDescriptor`; do not add dedicated serial awaiter names unless `Async`
