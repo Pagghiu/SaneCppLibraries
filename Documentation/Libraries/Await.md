@@ -127,6 +127,7 @@ Complete console examples live in:
 - `Examples/AwaitFileCourier`, showing a file copy followed by `fileSend()` over a socket.
 - `Examples/AwaitLineProtocol`, showing a tiny CRLF text protocol built with `receiveLine()` and `sendAll()`.
 - `Examples/AwaitProcessExitCodes`, showing concurrent child-process exit waits with fixed job storage.
+- `Examples/AwaitThreadWakeUp`, showing another thread waking an Await coroutine through `AwaitLoopWakeUp`.
 
 # Socket send helpers
 

@@ -67,6 +67,7 @@ Some relevant blog posts are:
 | AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned coroutine arena                       |
 | AwaitProcessExitCodes | Shows concurrent child-process exit waits with `processExit()` and fixed job storage                                  |
 | AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |
+| AwaitThreadWakeUp | Shows another thread waking an Await coroutine through `AwaitLoopWakeUp`                                                   |
 | Serialization | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
 | WebServer     | Use [Http](@ref library_http) to statically host a website from a specified directory                                             |
 
