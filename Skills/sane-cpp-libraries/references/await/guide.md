@@ -24,6 +24,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
+- Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 - Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.

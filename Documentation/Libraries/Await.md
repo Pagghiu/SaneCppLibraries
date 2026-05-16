@@ -117,6 +117,7 @@ as `Async`.
 
 Complete console examples live in:
 
+- `Examples/AwaitBackgroundDigest`, showing ThreadPool-backed CPU work with `loopWork()` and caller-owned job state.
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
 - `Examples/AwaitTaskGroupFiles`, showing Python `asyncio.TaskGroup`-style fan-out over two file reads while keeping

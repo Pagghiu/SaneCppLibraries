@@ -59,6 +59,7 @@ Some relevant blog posts are:
 
 | Example       | Description                                                                                                                       |
 |:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
+| AwaitBackgroundDigest | Shows ThreadPool-backed CPU work with `AwaitEventLoop::loopWork()` and caller-owned result jobs                            |
 | AwaitCallbackBridge | Shows callback-style `Async` and coroutine-style `Await` sharing one caller-owned event loop                                |
 | AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |
 | AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned coroutine arena                                        |
