@@ -124,6 +124,7 @@ Complete console examples live in:
 - `Examples/AwaitCallbackBridge`, showing callback-style `Async` and coroutine-style `Await` sharing one
   caller-owned event loop during migration.
 - `Examples/AwaitFileCourier`, showing a file copy followed by `fileSend()` over a socket.
+- `Examples/AwaitLineProtocol`, showing a tiny CRLF text protocol built with `receiveLine()` and `sendAll()`.
 
 # Socket send helpers
 
