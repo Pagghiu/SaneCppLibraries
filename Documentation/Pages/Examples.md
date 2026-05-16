@@ -62,6 +62,7 @@ Some relevant blog posts are:
 | AwaitBackgroundDigest | Shows ThreadPool-backed CPU work with `AwaitEventLoop::loopWork()` and caller-owned result jobs                            |
 | AwaitCallbackBridge | Shows callback-style `Async` and coroutine-style `Await` sharing one caller-owned event loop                                |
 | AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |
+| AwaitDeadline | Shows a child coroutine deadline with `waitFor()` and cooperative cancellation                                                  |
 | AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned coroutine arena                                        |
 | AwaitFileCourier | Shows file copy followed by `AwaitEventLoop::fileSend()` over a socket                                                     |
 | AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned coroutine arena                       |
