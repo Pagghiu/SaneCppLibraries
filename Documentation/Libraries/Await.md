@@ -126,6 +126,7 @@ Complete console examples live in:
 - `Examples/AwaitCallbackBridge`, showing callback-style `Async` and coroutine-style `Await` sharing one
   caller-owned event loop during migration.
 - `Examples/AwaitFileCourier`, showing a file copy followed by `fileSend()` over a socket.
+- `Examples/AwaitFilePatch`, showing offset `fileWrite()` followed by `fileRead()` with caller-owned buffers.
 - `Examples/AwaitLineProtocol`, showing a tiny CRLF text protocol built with `receiveLine()` and `sendAll()`.
 - `Examples/AwaitProcessExitCodes`, showing concurrent child-process exit waits with fixed job storage.
 - `Examples/AwaitThreadWakeUp`, showing another thread waking an Await coroutine through `AwaitLoopWakeUp`.
@@ -233,6 +234,9 @@ underlying read request until the caller buffer is full or EOF is reached, and r
 
 `fileWrite()` does not need a separate `fileWriteAll()` helper today: `AsyncFileWrite` already keeps writing until the
 provided single buffer or scatter/gather buffers are fully written, or returns an error.
+
+For offset writes, prefer a single contiguous buffer in portable examples. Combining scatter/gather file writes with an
+explicit offset should be treated as backend-sensitive until the underlying `AsyncFileWrite` semantics are tightened.
 
 # Filesystem watcher integration
 

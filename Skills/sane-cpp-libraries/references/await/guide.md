@@ -28,6 +28,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitDeadline` for child task deadlines through `waitFor()` and `AwaitTimeoutResult`.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 - Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
+- Use `Examples/AwaitFilePatch` for offset `fileWrite()` followed by `fileRead()` with caller-owned buffers.
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.
 - Use `Examples/AwaitProcessExitCodes` for child process exit waits with `processExit()`.
 - Use `Examples/AwaitThreadWakeUp` for external thread notifications through `AwaitLoopWakeUp`.
@@ -66,6 +67,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `fileReadUntilFullOrEOF()` when file-reading code should fill caller storage unless EOF arrives first.
 - Do not invent `fileWriteAll()` at the Await layer unless `AsyncFileWrite` semantics change; current file writes already
   complete the provided single or scatter/gather buffer, or return an error.
+- Prefer single-buffer `fileWrite()` when using explicit offsets in portable examples; treat scatter/gather file writes
+  with offsets as backend-sensitive until `AsyncFileWrite` documents stronger semantics.
 - Keep thin no-allocation convenience helpers on `AwaitEventLoop`; move protocol adapters or helpers with extra stable
   state into explicit `Await*` structs.
 - Do not add direct filesystem watcher awaiters on `AwaitEventLoop` yet. `FileSystemWatcher` is a long-lived callback

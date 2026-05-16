@@ -168,6 +168,10 @@ This is very useful to integrate the event loop into applications with other eve
 ## AsyncFileWrite
 @copydoc SC::AsyncFileWrite
 
+When using offsets, prefer a single contiguous buffer for portable examples and higher-level helpers. Combining
+scatter/gather buffers with an explicit offset needs backend-specific validation before being treated as a portable
+idiom.
+
 ## AsyncFilePoll
 @copydoc SC::AsyncFilePoll
 
