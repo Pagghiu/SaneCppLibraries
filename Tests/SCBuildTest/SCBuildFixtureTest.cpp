@@ -216,6 +216,18 @@ static bool tryResolveHostToolPath(StringView toolName, String& toolPath)
     }
     return toolPath.assign(StringView(output.view()).trimWhiteSpaces());
 }
+
+static bool tryResolveHostToolPath(Span<const StringView> toolNames, String& toolPath)
+{
+    for (const StringView toolName : toolNames)
+    {
+        if (tryResolveHostToolPath(toolName, toolPath))
+        {
+            return true;
+        }
+    }
+    return false;
+}
 #endif
 
 static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath, StringView toolPath)
@@ -2883,6 +2895,10 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(fs.existsAndIsDirectory(package.installDirectoryLink.view()));
             SC_TRUST_RESULT(Tools::resolveQEMURunnerExecutable(package.installDirectoryLink.view(),
                                                                InstructionSet::ARM64, installedQEMU));
+            String installedQEMUFromCapability = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Tools::resolvePackageCapabilityPath(package.installDirectoryLink.view(), "runner.qemu.arm64",
+                                                               installedQEMUFromCapability));
+            SC_TEST_EXPECT(installedQEMUFromCapability.view() == installedQEMU.view());
 
             Process process;
             String  version = StringEncoding::Utf8;
@@ -4198,10 +4214,14 @@ struct SCBuildFixtureTest : public SC::TestCase
 
 #if SC_PLATFORM_APPLE
         {
-            String     qemuX86_64      = StringEncoding::Utf8;
-            String     qemuArm64       = StringEncoding::Utf8;
-            const bool hasQEMUX86_64   = tryResolveHostToolPath("qemu-x86_64", qemuX86_64);
-            const bool hasQEMUArm64    = tryResolveHostToolPath("qemu-aarch64", qemuArm64);
+            static constexpr StringView qemuX86_64Names[] = {"qemu-x86_64", "qemu-x86_64-static"};
+            static constexpr StringView qemuArm64Names[]  = {"qemu-aarch64", "qemu-aarch64-static"};
+            String                      qemuX86_64        = StringEncoding::Utf8;
+            String                      qemuArm64         = StringEncoding::Utf8;
+            const bool                  hasQEMUX86_64     = tryResolveHostToolPath(
+                {qemuX86_64Names, sizeof(qemuX86_64Names) / sizeof(qemuX86_64Names[0])}, qemuX86_64);
+            const bool hasQEMUArm64 =
+                tryResolveHostToolPath({qemuArm64Names, sizeof(qemuArm64Names) / sizeof(qemuArm64Names[0])}, qemuArm64);
             const bool requireRealQEMU = isEnvironmentFlagEnabled("SC_BUILD_REQUIRE_REAL_QEMU");
             if (test_section("native backend smoke-runs Linux target profiles through real qemu on macOS"))
             {

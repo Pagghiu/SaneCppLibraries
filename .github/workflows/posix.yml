@@ -56,6 +56,16 @@ jobs:
     - name: Install QEMU user runners
       run: brew install qemu
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: Probe QEMU user runners
+      id: qemu-user-runners
+      shell: bash
+      run: |
+        if { command -v qemu-x86_64 || command -v qemu-x86_64-static; } >/dev/null 2>&1 && { command -v qemu-aarch64 || command -v qemu-aarch64-static; } >/dev/null 2>&1; then
+          echo "available=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "available=false" >> "$GITHUB_OUTPUT"
+        fi
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Warm macOS Linux cross packages
       run: |
         ./SC.sh package install llvm
@@ -90,7 +100,7 @@ jobs:
       run: ./SC.sh build run SCBuildTest ${{ matrix.config }} -- --test SCBuildTest --test-section "native backend smoke-runs Linux target profiles through real qemu on macOS"
       env:
         SC_BUILD_REQUIRE_REAL_QEMU: 1
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.qemu-user-runners.outputs.available == 'true'
     - name: test InteropSTL
       run: ./SC.sh build run InteropSTL ${{ matrix.config }}
     - name: compile SCTest xcode
@@ -112,7 +122,7 @@ jobs:
         path: _Build/_PackagesCache/llvm
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
     - name: Save Linux sysroot cache
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/linux-sysroot/**') != ''
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: _Build/_PackagesCache/linux-sysroot

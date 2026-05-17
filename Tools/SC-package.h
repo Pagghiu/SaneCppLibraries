@@ -62,6 +62,88 @@ struct Package
     SmallString<255> installDirectoryLink;
 };
 
+struct PackageReceiptExport
+{
+    StringView kind;
+    StringView name;
+    StringView relativePath;
+};
+
+struct PackageReceiptInfo
+{
+    StringView             packageName;
+    StringView             packageVersion;
+    StringView             recipeVersion;
+    StringView             hostPlatform;
+    StringView             packageVariant;
+    StringView             source;
+    StringView             sourceHash;
+    StringView             validation;
+    Span<const StringView> phases;
+};
+
+using PackageInstallHandler = Result (*)(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                         Package& package, Span<const StringView> packageArguments);
+
+struct PackageRegistryEntry
+{
+    StringView             name;
+    StringView             installedName;
+    StringView             kind;
+    StringView             description;
+    StringView             variants;
+    StringView             source;
+    bool                   supportsImport = false;
+    Span<const StringView> exports;
+    Span<const StringView> phases;
+    PackageInstallHandler  install = nullptr;
+};
+
+struct PackageRegistry
+{
+    Span<const PackageRegistryEntry> entries;
+
+    [[nodiscard]] const PackageRegistryEntry* find(StringView packageName) const
+    {
+        for (const PackageRegistryEntry& entry : entries)
+        {
+            if (entry.name == packageName)
+            {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
+};
+
+struct PackageRegistryBuilder
+{
+    Span<PackageRegistryEntry> entries;
+    size_t                     size = 0;
+
+    [[nodiscard]] PackageRegistry registry() const { return {{entries.data(), size}}; }
+
+    [[nodiscard]] Result add(const PackageRegistryEntry& entry)
+    {
+        SC_TRY_MSG(registry().find(entry.name) == nullptr, "Duplicate package registry entry");
+        SC_TRY_MSG(size < entries.sizeInElements(), "Package registry storage exhausted");
+        entries[size] = entry;
+        size += 1;
+        return Result(true);
+    }
+
+    [[nodiscard]] Result add(PackageRegistry registryToAppend)
+    {
+        for (const PackageRegistryEntry& entry : registryToAppend.entries)
+        {
+            SC_TRY(add(entry));
+        }
+        return Result(true);
+    }
+
+    [[nodiscard]] operator PackageRegistry() const { return registry(); }
+};
+
 struct CustomFunctions
 {
     Function<Result(const Download&, const Package&)> testFunction;
@@ -465,6 +547,7 @@ inline Result verifyGitCommitHashInstall(const Download& download, const Package
 
 constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
+constexpr StringView PackageReceiptFileName   = "sc-package-receipt.json";
 
 struct LinuxSysrootSpec
 {
@@ -495,7 +578,14 @@ Result installLinuxSysroot(StringView packagesCacheDirectory, StringView package
 Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                             StringView importDirectory = {}, StringView wineExecutableOverride = {});
 Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet architecture, String& output);
-Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
+Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
+                           Span<const PackageReceiptExport> exports = {});
+Result resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output);
+Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output);
+PackageRegistry builtinPackageRegistry();
+Result          addBuiltinPackages(PackageRegistryBuilder& registry);
+Result          runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tools::Package* package = nullptr);
+Result          runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
 
 } // namespace Tools
 } // namespace SC

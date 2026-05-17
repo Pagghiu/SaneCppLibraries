@@ -40,7 +40,7 @@ jobs:
         path: _Build/_PackagesCache/llvm
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
     - name: Save Linux sysroot cache
-      if: always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/linux-sysroot/**') != ''
+      if: always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
         path: _Build/_PackagesCache/linux-sysroot

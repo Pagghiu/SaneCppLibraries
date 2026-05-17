@@ -165,6 +165,15 @@ static Result printBuildActionValueError(Console& console, StringView optionName
     return Result::Error("Invalid SC-build option value");
 }
 
+static Result markBuildCLIValueError(Result result, BuildCLIStatus& status)
+{
+    if (not result)
+    {
+        status = BuildCLIStatus::Error;
+    }
+    return result;
+}
+
 static Result printBuildActionAmbiguity(Console& console, StringView optionName, StringView value,
                                         Span<const StringView> matches)
 {
@@ -536,6 +545,12 @@ static Result applyArchitectureValue(Build::Action& action, StringView architect
     else if (resolved.equalsIgnoreCaseASCII("any"))
     {
         action.parameters.architecture = Build::Architecture::Any;
+    }
+    if (action.parameters.targetMachine.platform == action.parameters.platform and
+        action.parameters.targetMachine.environment == Build::TargetEnvironment::Native and
+        action.parameters.targetMachine.architecture == Build::Architecture::Any)
+    {
+        action.parameters.targetMachine.architecture = action.parameters.architecture;
     }
     return Result(true);
 }
@@ -1211,43 +1226,48 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
 
     if (context.legacyValues.sizeInElements() >= 1)
     {
-        SC_TRY(applyConfigurationValue(action, context.legacyValues[0], resolvedStorage, arguments.console));
+        SC_TRY(markBuildCLIValueError(
+            applyConfigurationValue(action, context.legacyValues[0], resolvedStorage, arguments.console), status));
     }
     if (context.legacyValues.sizeInElements() >= 2)
     {
-        SC_TRY(applyGeneratorValue(action, context.legacyValues[1], arguments.console));
+        SC_TRY(markBuildCLIValueError(applyGeneratorValue(action, context.legacyValues[1], arguments.console), status));
     }
     if (context.legacyValues.sizeInElements() >= 3)
     {
-        SC_TRY(applyArchitectureValue(action, context.legacyValues[2], arguments.console));
+        SC_TRY(
+            markBuildCLIValueError(applyArchitectureValue(action, context.legacyValues[2], arguments.console), status));
     }
     if (context.legacyValues.sizeInElements() >= 4 and
         (actionType == Build::Action::Compile or actionType == Build::Action::Run))
     {
         Build::OutputMode::Type legacyOutputMode = Build::OutputMode::Normal;
-        SC_TRY(resolveOutputModeValue(context.legacyValues[3], legacyOutputMode, arguments.console));
+        SC_TRY(markBuildCLIValueError(
+            resolveOutputModeValue(context.legacyValues[3], legacyOutputMode, arguments.console), status));
         action.parameters.execution.outputMode = legacyOutputMode;
     }
 
     if (not context.configuration.isEmpty())
     {
-        SC_TRY(applyConfigurationValue(action, context.configuration, resolvedStorage, arguments.console));
+        SC_TRY(markBuildCLIValueError(
+            applyConfigurationValue(action, context.configuration, resolvedStorage, arguments.console), status));
     }
     if (not context.generator.isEmpty())
     {
-        SC_TRY(applyGeneratorValue(action, context.generator, arguments.console));
+        SC_TRY(markBuildCLIValueError(applyGeneratorValue(action, context.generator, arguments.console), status));
     }
     if (not context.architecture.isEmpty())
     {
-        SC_TRY(applyArchitectureValue(action, context.architecture, arguments.console));
+        SC_TRY(markBuildCLIValueError(applyArchitectureValue(action, context.architecture, arguments.console), status));
     }
     if (not context.targetProfile.isEmpty())
     {
-        SC_TRY(applyTargetProfileValue(action, context.targetProfile, arguments.console));
+        SC_TRY(
+            markBuildCLIValueError(applyTargetProfileValue(action, context.targetProfile, arguments.console), status));
     }
     if (not context.toolchain.isEmpty())
     {
-        SC_TRY(applyToolchainValue(action, context.toolchain, arguments.console));
+        SC_TRY(markBuildCLIValueError(applyToolchainValue(action, context.toolchain, arguments.console), status));
     }
     if (not context.targetTriple.isEmpty())
     {
@@ -1259,7 +1279,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     }
     if (not context.runner.isEmpty())
     {
-        SC_TRY(applyRunnerValue(action, context.runner, arguments.console));
+        SC_TRY(markBuildCLIValueError(applyRunnerValue(action, context.runner, arguments.console), status));
     }
     if (not context.runnerPath.isEmpty())
     {
@@ -1271,7 +1291,8 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     {
         Build::OutputMode::Type namedOutputMode = Build::OutputMode::Normal;
         bool                    namedOutputSet  = false;
-        SC_TRY(scanNamedOutputMode(preArguments, namedOutputMode, namedOutputSet, arguments.console));
+        SC_TRY(markBuildCLIValueError(
+            scanNamedOutputMode(preArguments, namedOutputMode, namedOutputSet, arguments.console), status));
         if (namedOutputSet)
         {
             action.parameters.execution.outputMode = namedOutputMode;

@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
+#include "../Libraries/ContainersReflection/ContainersSerialization.h"
+#include "../Libraries/ContainersReflection/MemorySerialization.h"
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "../Libraries/Memory/String.h"
+#include "../Libraries/SerializationText/SerializationJson.h"
 #include <stdlib.h>
 namespace SC
 {
@@ -1018,6 +1021,42 @@ Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet archit
     Assert::unreachable();
 }
 
+static Result resolveQEMURunnerExecutableExport(StringView packageRoot, InstructionSet architecture, String& output)
+{
+    Span<const StringView> candidates;
+    SC_TRY(qemuRunnerExecutableCandidates(architecture, candidates));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    for (const StringView candidate : candidates)
+    {
+        String executable = StringEncoding::Utf8;
+        SC_TRY(Path::join(executable, {packageRoot, "bin", candidate}));
+        if (fs.existsAndIsFile(executable.view()))
+        {
+            SC_TRY(StringBuilder::format(output, "bin/{}", candidate));
+            return Result(true);
+        }
+
+        SC_TRY(executable.assign({}));
+        SC_TRY(Path::join(executable, {packageRoot, candidate}));
+        if (fs.existsAndIsFile(executable.view()))
+        {
+            SC_TRY(output.assign(candidate));
+            return Result(true);
+        }
+    }
+
+    switch (architecture)
+    {
+    case InstructionSet::Intel64: return Result::Error("QEMU package is missing qemu-x86_64 runner executable");
+    case InstructionSet::ARM64: return Result::Error("QEMU package is missing qemu-aarch64 runner executable");
+    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    }
+    Assert::unreachable();
+}
+
 static Result testQEMURunnerExecutable(StringView executable, String* versionLine = nullptr)
 {
     Process process;
@@ -1395,6 +1434,11 @@ static Result removePackageInstallLink(FileSystem& fs, const Package& package)
     return Result(true);
 }
 
+static Result writeManualPackageReceipt(const Package& package, StringView name, StringView version, StringView variant,
+                                        StringView source, StringView sourceHash,
+                                        Span<const PackageReceiptExport> exports = {},
+                                        Span<const StringView>           phases  = {});
+
 Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                          StringView importDirectory)
 {
@@ -1419,6 +1463,23 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
     {
         if (importDirectory.isEmpty())
         {
+            String qemuX86_64Export = StringEncoding::Utf8;
+            String qemuArm64Export  = StringEncoding::Utf8;
+            SC_TRY(resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::Intel64,
+                                                     qemuX86_64Export));
+            SC_TRY(resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::ARM64,
+                                                     qemuArm64Export));
+            const PackageReceiptExport exports[] = {
+                {"runner", "qemu", "."},
+                {"capability", "runner.qemu.x86_64", qemuX86_64Export.view()},
+                {"capability", "runner.qemu.arm64", qemuArm64Export.view()},
+            };
+            static constexpr StringView phases[] = {
+                "resolveImportedQEMU",
+                "validateQEMUTargets",
+                "writeReceipt",
+            };
+            SC_TRY(writeManualPackageReceipt(package, "qemu", "imported", installLeaf, "cached", {}, exports, phases));
             return Result(true);
         }
     }
@@ -1460,6 +1521,23 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
     SC_TRY(builder.append("SC_PACKAGE_TARGETS={}\n", detectedTargets.view()));
     builder.finalize();
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
+    String qemuX86_64Export = StringEncoding::Utf8;
+    String qemuArm64Export  = StringEncoding::Utf8;
+    SC_TRY(resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::Intel64,
+                                             qemuX86_64Export));
+    SC_TRY(
+        resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::ARM64, qemuArm64Export));
+    const PackageReceiptExport exports[] = {
+        {"runner", "qemu", "."},
+        {"capability", "runner.qemu.x86_64", qemuX86_64Export.view()},
+        {"capability", "runner.qemu.arm64", qemuArm64Export.view()},
+    };
+    static constexpr StringView phases[] = {
+        "resolveImportedQEMU",
+        "validateQEMUTargets",
+        "writeReceipt",
+    };
+    SC_TRY(writeManualPackageReceipt(package, "qemu", "imported", installLeaf, sourceRoot.view(), {}, exports, phases));
     return Result(true);
 }
 
@@ -1586,6 +1664,367 @@ static Result prepareMSVCWinePrefixHeadless(StringView wineExecutable, StringVie
     return Result(true);
 }
 
+struct PackageReceiptExportJSON
+{
+    String kind = StringEncoding::Utf8;
+    String name = StringEncoding::Utf8;
+    String path = StringEncoding::Utf8;
+};
+
+struct PackageReceiptJSON
+{
+    int    schema        = 1;
+    String name          = StringEncoding::Utf8;
+    String version       = StringEncoding::Utf8;
+    String recipeVersion = StringEncoding::Utf8;
+    String hostPlatform  = StringEncoding::Utf8;
+    String variant       = StringEncoding::Utf8;
+    String source        = StringEncoding::Utf8;
+    String sourceHash    = StringEncoding::Utf8;
+    String installRoot   = StringEncoding::Utf8;
+    String validation    = StringEncoding::Utf8;
+
+    Vector<String>                   phases;
+    Vector<PackageReceiptExportJSON> exports;
+};
+
+struct PackageLockEntryJSON
+{
+    String name          = StringEncoding::Utf8;
+    String version       = StringEncoding::Utf8;
+    String recipeVersion = StringEncoding::Utf8;
+    String hostPlatform  = StringEncoding::Utf8;
+    String variant       = StringEncoding::Utf8;
+    String source        = StringEncoding::Utf8;
+    String sourceHash    = StringEncoding::Utf8;
+    String installRoot   = StringEncoding::Utf8;
+    String receipt       = StringEncoding::Utf8;
+
+    Vector<PackageReceiptExportJSON> exports;
+};
+
+struct PackageLockJSON
+{
+    int                          schema = 1;
+    Vector<PackageLockEntryJSON> packages;
+};
+
+} // namespace Tools
+} // namespace SC
+
+SC_REFLECT_STRUCT_VISIT(SC::Tools::PackageReceiptExportJSON)
+SC_REFLECT_STRUCT_FIELD(0, kind)
+SC_REFLECT_STRUCT_FIELD(1, name)
+SC_REFLECT_STRUCT_FIELD(2, path)
+SC_REFLECT_STRUCT_LEAVE()
+
+SC_REFLECT_STRUCT_VISIT(SC::Tools::PackageReceiptJSON)
+SC_REFLECT_STRUCT_FIELD(0, schema)
+SC_REFLECT_STRUCT_FIELD(1, name)
+SC_REFLECT_STRUCT_FIELD(2, version)
+SC_REFLECT_STRUCT_FIELD(3, recipeVersion)
+SC_REFLECT_STRUCT_FIELD(4, hostPlatform)
+SC_REFLECT_STRUCT_FIELD(5, variant)
+SC_REFLECT_STRUCT_FIELD(6, source)
+SC_REFLECT_STRUCT_FIELD(7, sourceHash)
+SC_REFLECT_STRUCT_FIELD(8, installRoot)
+SC_REFLECT_STRUCT_FIELD(9, validation)
+SC_REFLECT_STRUCT_FIELD(10, phases)
+SC_REFLECT_STRUCT_FIELD(11, exports)
+SC_REFLECT_STRUCT_LEAVE()
+
+SC_REFLECT_STRUCT_VISIT(SC::Tools::PackageLockEntryJSON)
+SC_REFLECT_STRUCT_FIELD(0, name)
+SC_REFLECT_STRUCT_FIELD(1, version)
+SC_REFLECT_STRUCT_FIELD(2, recipeVersion)
+SC_REFLECT_STRUCT_FIELD(3, hostPlatform)
+SC_REFLECT_STRUCT_FIELD(4, variant)
+SC_REFLECT_STRUCT_FIELD(5, source)
+SC_REFLECT_STRUCT_FIELD(6, sourceHash)
+SC_REFLECT_STRUCT_FIELD(7, installRoot)
+SC_REFLECT_STRUCT_FIELD(8, receipt)
+SC_REFLECT_STRUCT_FIELD(9, exports)
+SC_REFLECT_STRUCT_LEAVE()
+
+SC_REFLECT_STRUCT_VISIT(SC::Tools::PackageLockJSON)
+SC_REFLECT_STRUCT_FIELD(0, schema)
+SC_REFLECT_STRUCT_FIELD(1, packages)
+SC_REFLECT_STRUCT_LEAVE()
+
+namespace SC
+{
+namespace Tools
+{
+
+static Result assignJSONField(String& output, StringView value)
+{
+    SC_TRY(output.assign(value));
+    return Result(true);
+}
+
+static Result appendJSONString(Vector<String>& output, StringView value)
+{
+    String item = StringEncoding::Utf8;
+    SC_TRY(item.assign(value));
+    SC_TRY(output.push_back(move(item)));
+    return Result(true);
+}
+
+static Result appendJSONExport(Vector<PackageReceiptExportJSON>& output, StringView kind, StringView name,
+                               StringView path)
+{
+    PackageReceiptExportJSON item;
+    SC_TRY(assignJSONField(item.kind, kind));
+    SC_TRY(assignJSONField(item.name, name));
+    SC_TRY(assignJSONField(item.path, path));
+    SC_TRY(output.push_back(move(item)));
+    return Result(true);
+}
+
+static Result validatePackageReceiptExportPath(StringView path)
+{
+    SC_TRY_MSG(not path.isEmpty(), "Package receipt export is missing path");
+    if (path == "."_a8)
+    {
+        return Result(true);
+    }
+    SC_TRY_MSG(not Path::isAbsolute(path, Path::AsPosix) and not Path::isAbsolute(path, Path::AsWindows),
+               "Package receipt export path must be relative");
+
+    StringViewTokenizer tokenizer(path);
+    while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::SkipEmpty))
+    {
+        SC_TRY_MSG(tokenizer.component != ".."_a8, "Package receipt export path cannot escape package root");
+    }
+    return Result(true);
+}
+
+static Result resolvePackageReceiptExportNativePath(StringView packageRoot, StringView exportPath, String& output)
+{
+    if (exportPath == "."_a8)
+    {
+        SC_TRY(output.assign(packageRoot));
+        return Result(true);
+    }
+
+    StringView          components[64];
+    size_t              numComponents = 0;
+    StringViewTokenizer tokenizer(exportPath);
+    while (tokenizer.tokenizeNext({'/', '\\'}, StringViewTokenizer::SkipEmpty))
+    {
+        SC_TRY_MSG(numComponents < sizeof(components) / sizeof(components[0]),
+                   "Package receipt export path has too many components");
+        components[numComponents] = tokenizer.component;
+        numComponents += 1;
+    }
+
+    SC_TRY(output.assign(packageRoot));
+    SC_TRY_MSG(Path::append(output, {components, numComponents}, Path::AsNative),
+               "Failed resolving package receipt export path");
+    return Result(true);
+}
+
+static Result validatePackageReceiptSourceHash(StringView sourceHash)
+{
+    if (sourceHash.isEmpty())
+    {
+        return Result(true);
+    }
+    StringView algorithm;
+    StringView digest;
+    SC_TRY_MSG(sourceHash.splitBefore(":"_a8, algorithm) and sourceHash.splitAfter(":"_a8, digest),
+               "Package receipt source hash is missing algorithm");
+    SC_TRY_MSG(algorithm == "md5"_a8 or algorithm == "sha1"_a8 or algorithm == "sha256"_a8,
+               "Package receipt source hash has an unsupported algorithm");
+    SC_TRY_MSG(not digest.isEmpty(), "Package receipt source hash is missing digest");
+    return Result(true);
+}
+
+static constexpr StringView hostPackagePlatformName()
+{
+    switch (HostPlatform)
+    {
+    case Platform::Apple: return "macos"_a8;
+    case Platform::Linux: return "linux"_a8;
+    case Platform::Windows: return "windows"_a8;
+    case Platform::Emscripten: return "emscripten"_a8;
+    }
+    Assert::unreachable();
+}
+
+static Result packageReceiptPath(StringView packageRoot, String& output)
+{
+    SC_TRY(Path::join(output, {packageRoot, PackageReceiptFileName}));
+    return Result(true);
+}
+
+Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
+                           Span<const PackageReceiptExport> exports)
+{
+    SC_TRY_MSG(not package.installDirectoryLink.isEmpty(), "Cannot write package receipt without install root");
+
+    String receiptPath = StringEncoding::Utf8;
+    SC_TRY(packageReceiptPath(package.installDirectoryLink.view(), receiptPath));
+
+    String sourceHash = StringEncoding::Utf8;
+    if (not info.sourceHash.isEmpty())
+    {
+        SC_TRY(validatePackageReceiptSourceHash(info.sourceHash));
+        SC_TRY(sourceHash.assign(info.sourceHash));
+    }
+
+    PackageReceiptJSON receiptJSON;
+    SC_TRY(assignJSONField(receiptJSON.name, info.packageName));
+    SC_TRY(assignJSONField(receiptJSON.version, info.packageVersion));
+    SC_TRY(assignJSONField(receiptJSON.recipeVersion, info.recipeVersion.isEmpty() ? "1"_a8 : info.recipeVersion));
+    SC_TRY(assignJSONField(receiptJSON.hostPlatform,
+                           info.hostPlatform.isEmpty() ? hostPackagePlatformName() : info.hostPlatform));
+    SC_TRY(assignJSONField(receiptJSON.variant, info.packageVariant));
+    SC_TRY(assignJSONField(receiptJSON.source, info.source));
+    SC_TRY(assignJSONField(receiptJSON.sourceHash, sourceHash.view()));
+    SC_TRY(assignJSONField(receiptJSON.installRoot, package.installDirectoryLink.view()));
+    SC_TRY(assignJSONField(receiptJSON.validation, info.validation));
+    for (size_t idx = 0; idx < info.phases.sizeInElements(); ++idx)
+    {
+        SC_TRY(appendJSONString(receiptJSON.phases, info.phases[idx]));
+    }
+    for (size_t idx = 0; idx < exports.sizeInElements(); ++idx)
+    {
+        SC_TRY(appendJSONExport(receiptJSON.exports, exports[idx].kind, exports[idx].name, exports[idx].relativePath));
+    }
+
+    String receipt = StringEncoding::Utf8;
+    SC_TRY_MSG(SerializationJson::write(receiptJSON, receipt), "Failed writing package receipt JSON");
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    return fs.writeString(receiptPath.view(), receipt.view());
+}
+
+static Result downloadReceiptInfo(const Download& download, PackageReceiptInfo& info, String& sourceHash)
+{
+    SC_TRY(sourceHash.assign({}));
+    if (not download.expectedHash.isEmpty())
+    {
+        SC_TRY(StringBuilder::format(sourceHash, "{}:{}", packageHashName(download.hashType), download.expectedHash));
+    }
+    info.packageName    = download.packageName.view();
+    info.packageVersion = download.packageVersion.view();
+    info.recipeVersion  = "1";
+    info.hostPlatform   = hostPackagePlatformName();
+    info.packageVariant = download.packagePlatform.view();
+    info.source         = download.url.view();
+    info.sourceHash     = sourceHash.view();
+    info.validation     = "passed";
+    return Result(true);
+}
+
+static Result writeDownloadPackageReceipt(const Download& download, const Package& package,
+                                          Span<const PackageReceiptExport> exports = {},
+                                          Span<const StringView>           phases  = {})
+{
+    PackageReceiptInfo info;
+    String             sourceHash = StringEncoding::Utf8;
+    SC_TRY(downloadReceiptInfo(download, info, sourceHash));
+    info.phases = phases;
+    return writePackageReceipt(package, info, exports);
+}
+
+static Result writeManualPackageReceipt(const Package& package, StringView name, StringView version, StringView variant,
+                                        StringView source, StringView sourceHash,
+                                        Span<const PackageReceiptExport> exports, Span<const StringView> phases)
+{
+    PackageReceiptInfo info;
+    info.packageName    = name;
+    info.packageVersion = version;
+    info.recipeVersion  = "1";
+    info.hostPlatform   = hostPackagePlatformName();
+    info.packageVariant = variant;
+    info.source         = source;
+    info.sourceHash     = sourceHash;
+    info.validation     = "passed";
+    info.phases         = phases;
+    return writePackageReceipt(package, info, exports);
+}
+
+static Result readPackageReceiptJSON(StringView receipt, PackageReceiptJSON& output)
+{
+    SC_TRY_MSG(SerializationJson::loadVersioned(output, receipt), "Malformed package receipt JSON");
+    return Result(true);
+}
+
+static Result validatePackageReceiptHeader(const PackageReceiptJSON& receiptJSON)
+{
+    SC_TRY_MSG(receiptJSON.schema == 1, "Package receipt schema is unsupported");
+    SC_TRY_MSG(not receiptJSON.name.isEmpty(), "Package receipt is missing package name");
+    return Result(true);
+}
+
+template <typename Callback>
+static Result forEachReceiptExport(StringView receipt, Callback&& callback)
+{
+    PackageReceiptJSON receiptJSON;
+    SC_TRY(readPackageReceiptJSON(receipt, receiptJSON));
+    SC_TRY(validatePackageReceiptHeader(receiptJSON));
+    for (auto& exportView : receiptJSON.exports)
+    {
+        SC_TRY(callback(exportView));
+    }
+    return Result(true);
+}
+
+static Result resolvePackageReceiptExportPath(StringView packageRoot, StringView exportKind, StringView exportName,
+                                              String& output)
+{
+    String receiptPath = StringEncoding::Utf8;
+    SC_TRY(packageReceiptPath(packageRoot, receiptPath));
+
+    String receipt = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(receiptPath.view(), receipt));
+
+    bool found = false;
+    SC_TRY(forEachReceiptExport(
+        receipt.view(),
+        [&](const PackageReceiptExportJSON& exportView) -> Result
+        {
+            if ((exportKind.isEmpty() or exportView.kind.view() == exportKind) and exportView.name.view() == exportName)
+            {
+                SC_TRY_MSG(not found, "Package receipt export is duplicated");
+                SC_TRY(validatePackageReceiptExportPath(exportView.path.view()));
+                SC_TRY(resolvePackageReceiptExportNativePath(packageRoot, exportView.path.view(), output));
+                found = true;
+            }
+            return Result(true);
+        }));
+    return found ? Result(true) : Result::Error("Package export not found");
+}
+
+Result resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output)
+{
+    return resolvePackageReceiptExportPath(packageRoot, {}, exportName, output);
+}
+
+Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output)
+{
+    return resolvePackageReceiptExportPath(packageRoot, "capability"_a8, capabilityName, output);
+}
+
+struct PackageRecipe
+{
+    Download                         download;
+    Package                          package;
+    CustomFunctions                  functions;
+    Span<const PackageReceiptExport> exports;
+    Span<const StringView>           phases;
+};
+
+static Result installPackageRecipe(const PackageRecipe& recipe, Package& package)
+{
+    package = recipe.package;
+    SC_TRY(packageInstall(recipe.download, package, recipe.functions));
+    return writeDownloadPackageReceipt(recipe.download, package, recipe.exports, recipe.phases);
+}
+
 Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
     // https://github.com/doxygen/doxygen/releases/download/Release_1_12_0/Doxygen-1.12.0.dmg
@@ -1594,27 +2033,25 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
     static constexpr StringView testVersion        = "1.12.0 (c73f5d30f9e8b1df5ba15a1d064ff2067cbb8267";
     static constexpr StringView baseURL            = "https://github.com/doxygen/doxygen/releases/download";
 
-    Download download;
-    download.packagesCacheDirectory   = packagesCacheDirectory;
-    download.packagesInstallDirectory = packagesInstallDirectory;
+    PackageRecipe recipe;
+    recipe.download.packagesCacheDirectory   = packagesCacheDirectory;
+    recipe.download.packagesInstallDirectory = packagesInstallDirectory;
+    recipe.download.packageName              = "doxygen";
+    recipe.download.packageVersion           = packageVersion;
 
-    download.packageName    = "doxygen";
-    download.packageVersion = packageVersion;
+    SC_TRY(StringBuilder::format(recipe.download.url, "{0}/Release_{1}/", baseURL, packageVersionDash));
 
-    SC_TRY(StringBuilder::format(download.url, "{0}/Release_{1}/", baseURL, packageVersionDash));
-
-    CustomFunctions functions;
-    functions.keepDownloadedArchive = false;
+    recipe.functions.keepDownloadedArchive = false;
     switch (HostPlatform)
     {
     case Platform::Apple: {
-        auto sb = StringBuilder::createForAppendingTo(download.url);
-        SC_TRY(sb.append("Doxygen-{0}.dmg", download.packageVersion));
+        auto sb = StringBuilder::createForAppendingTo(recipe.download.url);
+        SC_TRY(sb.append("Doxygen-{0}.dmg", recipe.download.packageVersion));
         sb.finalize();
-        download.packagePlatform  = "macos";
-        download.expectedHash     = "354ee835cf03e8a0187460a1456eb108";
-        package.packageBaseName   = format("Doxygen-{0}.dmg", download.packageVersion);
-        functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+        recipe.download.packagePlatform  = "macos";
+        recipe.download.expectedHash     = "354ee835cf03e8a0187460a1456eb108";
+        recipe.package.packageBaseName   = format("Doxygen-{0}.dmg", recipe.download.packageVersion);
+        recipe.functions.extractFunction = [](StringView fileName, StringView directory) -> Result
         {
             String mountPoint = format("/Volumes/Doxygen-{0}", packageVersion);
             SC_TRY(Process().exec({"hdiutil", "attach", "-nobrowse", "-readonly", "-noverify", "-noautoopen",
@@ -1635,29 +2072,29 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
         case InstructionSet::ARM64: return Result::Error("Doxygen: Unsupported architecture ARM64");
         default: break;
         }
-        auto sb = StringBuilder::createForAppendingTo(download.url);
-        SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", download.packageVersion));
+        auto sb = StringBuilder::createForAppendingTo(recipe.download.url);
+        SC_TRY(sb.append("doxygen-{0}.linux.bin.tar.gz", recipe.download.packageVersion));
         sb.finalize();
-        download.packagePlatform  = "linux";
-        download.expectedHash     = "fd96a5defa535dfe2e987b46540844a4";
-        package.packageBaseName   = format("doxygen-{0}.linux.bin.tar.gz", download.packageVersion);
-        functions.extractFunction = [](StringView fileName, StringView directory) -> Result
+        recipe.download.packagePlatform  = "linux";
+        recipe.download.expectedHash     = "fd96a5defa535dfe2e987b46540844a4";
+        recipe.package.packageBaseName   = format("doxygen-{0}.linux.bin.tar.gz", recipe.download.packageVersion);
+        recipe.functions.extractFunction = [](StringView fileName, StringView directory) -> Result
         { return tarExpandSingleFileTo(fileName, directory, "doxygen-1.12.0/bin/doxygen", 2); };
     }
     break;
     case Platform::Windows: {
-        auto sb = StringBuilder::createForAppendingTo(download.url);
-        SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", download.packageVersion));
+        auto sb = StringBuilder::createForAppendingTo(recipe.download.url);
+        SC_TRY(sb.append("doxygen-{0}.windows.x64.bin.zip", recipe.download.packageVersion));
         sb.finalize();
-        download.packagePlatform = "windows";
-        download.expectedHash    = "d014a212331693ffcf72ad99b2087ea0";
-        package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", download.packageVersion);
+        recipe.download.packagePlatform = "windows";
+        recipe.download.expectedHash    = "d014a212331693ffcf72ad99b2087ea0";
+        recipe.package.packageBaseName  = format("doxygen-{0}.windows.x64.bin.zip", recipe.download.packageVersion);
     }
     break;
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
 
-    functions.testFunction = [](const Download& download, const Package& package)
+    recipe.functions.testFunction = [](const Download& download, const Package& package)
     {
         SC_COMPILER_UNUSED(download);
         String result;
@@ -1674,28 +2111,45 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
         SC_TRY_MSG(Process().exec({path.view(), "-v"}, result), "Cannot run doxygen executable");
         return Result(StringView(result.view()).startsWith(testVersion));
     };
-    SC_TRY(packageInstall(download, package, functions));
-    return Result(true);
+    const PackageReceiptExport exports[] = {
+        {"tool", "doxygen", HostPlatform == Platform::Windows ? "doxygen.exe"_a8 : "doxygen"_a8},
+    };
+    static constexpr StringView phases[] = {
+        "resolveDoxygenRelease",
+        "extractDoxygenExecutable",
+        "validateDoxygenVersion",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
 }
 
 Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                 Package& package)
 {
-    Download download;
-    download.packagesCacheDirectory   = packagesCacheDirectory;
-    download.packagesInstallDirectory = packagesInstallDirectory;
+    const PackageReceiptExport exports[] = {
+        {"asset", "doxygen-awesome-css", "."},
+    };
 
-    download.packageName    = "doxygen-awesome-css";
-    download.packageVersion = "568f56c"; // corresponds to "v2.3.4";
-    download.url            = "https://github.com/jothepro/doxygen-awesome-css.git";
-    download.isGitClone     = true;
-    download.shallowClone   = "568f56cde6ac78b6dfcc14acd380b2e745c301ea";
-    package.packageBaseName = format("doxygen-awesome-css-{0}", download.packagePlatform);
-
-    CustomFunctions functions;
-    functions.testFunction = &verifyGitCommitHashInstall;
-    SC_TRY(packageInstall(download, package, functions));
-    return Result(true);
+    PackageRecipe recipe;
+    recipe.download.packagesCacheDirectory   = packagesCacheDirectory;
+    recipe.download.packagesInstallDirectory = packagesInstallDirectory;
+    recipe.download.packageName              = "doxygen-awesome-css";
+    recipe.download.packageVersion           = "568f56c"; // corresponds to "v2.3.4";
+    recipe.download.url                      = "https://github.com/jothepro/doxygen-awesome-css.git";
+    recipe.download.isGitClone               = true;
+    recipe.download.shallowClone             = "568f56cde6ac78b6dfcc14acd380b2e745c301ea";
+    recipe.package.packageBaseName           = format("doxygen-awesome-css-{0}", recipe.download.packagePlatform);
+    recipe.functions.testFunction            = &verifyGitCommitHashInstall;
+    static constexpr StringView phases[]     = {
+        "fetchGitRevision",
+        "validateGitCommit",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
 }
 
 Result clangFormatMatchesVersion(StringView versionString, StringView wantedVersion)
@@ -1795,21 +2249,21 @@ static Result               resolveHostLLVMArchive(StringView packageName, Strin
 
 Result installClangBinaries(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
-    CustomFunctions functions;
-    functions.keepDownloadedArchive = false;
-    Download   download;
-    StringView archiveRoot = {};
-    SC_TRY(resolveHostLLVMArchive("clang-binaries"_a8, packagesCacheDirectory, packagesInstallDirectory, download,
-                                  package, archiveRoot));
+    PackageRecipe recipe;
+    recipe.functions.keepDownloadedArchive = false;
+    StringView archiveRoot                 = {};
+    SC_TRY(resolveHostLLVMArchive("clang-binaries"_a8, packagesCacheDirectory, packagesInstallDirectory,
+                                  recipe.download, recipe.package, archiveRoot));
 
     static constexpr StringView wantedVersion            = "20.1.8";
     String                      clangFormatPathInArchive = StringEncoding::Utf8;
     SC_TRY(Path::join(clangFormatPathInArchive, {archiveRoot, "bin", hostLLVMExecutableName("clang-format"_a8)}));
 
-    functions.extractFunction = [&clangFormatPathInArchive](StringView sourceFile, StringView destinationDirectory)
+    recipe.functions.extractFunction =
+        [&clangFormatPathInArchive](StringView sourceFile, StringView destinationDirectory)
     { return tarExpandSingleFileTo(sourceFile, destinationDirectory, clangFormatPathInArchive.view(), 1); };
 
-    functions.testFunction = [](const Download&, const Package& package)
+    recipe.functions.testFunction = [](const Download&, const Package& package)
     {
         String  result;
         String  formatExecutable;
@@ -1820,8 +2274,20 @@ Result installClangBinaries(StringView packagesCacheDirectory, StringView packag
         SC_TRY_MSG(process.getExitStatus() == 0, "clang-format returned error");
         return clangFormatMatchesVersion(result.view(), wantedVersion);
     };
-    SC_TRY(packageInstall(download, package, functions));
-    return Result(true);
+    String clangFormat = StringEncoding::Utf8;
+    SC_TRY(Path::join(clangFormat, {"bin", hostLLVMExecutableName("clang-format"_a8)}));
+    const PackageReceiptExport exports[] = {
+        {"tool", "clang-format", clangFormat.view()},
+    };
+    static constexpr StringView phases[] = {
+        "resolveHostLLVMArchive",
+        "extractClangFormat",
+        "validateClangFormatVersion",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
 }
 
 static constexpr StringView hostLLVMExecutableName(StringView baseName)
@@ -1935,18 +2401,17 @@ static Result resolveHostLLVMArchive(StringView packageName, StringView packages
 
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package)
 {
-    CustomFunctions functions;
-    functions.keepDownloadedArchive = false;
-    Download   download;
-    StringView archiveRoot = {};
-    SC_TRY(resolveHostLLVMArchive("llvm"_a8, packagesCacheDirectory, packagesInstallDirectory, download, package,
-                                  archiveRoot));
+    PackageRecipe recipe;
+    recipe.functions.keepDownloadedArchive = false;
+    StringView archiveRoot                 = {};
+    SC_TRY(resolveHostLLVMArchive("llvm"_a8, packagesCacheDirectory, packagesInstallDirectory, recipe.download,
+                                  recipe.package, archiveRoot));
 
     static constexpr StringView wantedVersion = "20.1.8";
-    functions.extractFunction                 = [](StringView sourceFile, StringView destinationDirectory)
+    recipe.functions.extractFunction          = [](StringView sourceFile, StringView destinationDirectory)
     { return extractTarArchiveFlatteningRoot(sourceFile, destinationDirectory); };
 
-    functions.testFunction = [](const Download&, const Package& package)
+    recipe.functions.testFunction = [](const Download&, const Package& package)
     {
         String  clangExecutable  = StringEncoding::Utf8;
         String  llvmArExecutable = StringEncoding::Utf8;
@@ -1967,8 +2432,33 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
         SC_TRY_MSG(process2.getExitStatus() == 0, "LLVM archiver returned error");
         return Result(true);
     };
-    SC_TRY(packageInstall(download, package, functions));
-    return Result(true);
+    String clang   = StringEncoding::Utf8;
+    String clangxx = StringEncoding::Utf8;
+    String llvmAr  = StringEncoding::Utf8;
+    String lld     = StringEncoding::Utf8;
+    SC_TRY(Path::join(clang, {"bin", hostLLVMExecutableName("clang"_a8)}));
+    SC_TRY(Path::join(clangxx, {"bin", hostLLVMExecutableName("clang++"_a8)}));
+    SC_TRY(Path::join(llvmAr, {"bin", hostLLVMExecutableName("llvm-ar"_a8)}));
+    SC_TRY(Path::join(lld, {"bin", HostPlatform == Platform::Windows ? "lld.exe"_a8 : "ld.lld"_a8}));
+    const PackageReceiptExport exports[] = {
+        {"tool", "clang", clang.view()},
+        {"tool", "clang++", clangxx.view()},
+        {"tool", "llvm-ar", llvmAr.view()},
+        {"tool", "ld.lld", lld.view()},
+        {"capability", "tool.c-compiler", clang.view()},
+        {"capability", "tool.cxx-compiler", clangxx.view()},
+        {"capability", "tool.archiver", llvmAr.view()},
+        {"capability", "tool.linker", lld.view()},
+    };
+    static constexpr StringView phases[] = {
+        "resolveHostLLVMArchive",
+        "extractLLVMToolchain",
+        "validateLLVMToolchain",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
 }
 
 #if SC_PLATFORM_LINUX
@@ -2328,6 +2818,21 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
         SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
     }
 
+    const PackageReceiptExport exports[] = {
+        {"tool", "clang", "sc-filc/bin/clang"},
+        {"tool", "clang++", "sc-filc/bin/clang++"},
+        {"capability", "toolchain.filc.x86_64", "sc-filc/bin/clang"},
+    };
+    static constexpr StringView phases[] = {
+        "resolveFilCSource",
+        "prepareFilCCompilerLaunchers",
+        "validateFilCToolchain",
+        "writeReceipt",
+    };
+    SC_TRY(writeManualPackageReceipt(
+        package, "filc", packageVersion, packageFlavor, sourceIdentifier.view(),
+        importing ? StringView() : "sha256:8c515f704b3ba524566847d78a8c324708a64d0eefadabb40094bc5130aa8995"_a8,
+        exports, phases));
     return Result(true);
 }
 #else
@@ -2343,41 +2848,39 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     static constexpr StringView packageVersion = "20260324";
     static constexpr StringView llvmVersion    = "22.1.2";
 
-    CustomFunctions functions;
-    functions.keepDownloadedArchive = false;
-
-    Download download;
-    download.packagesCacheDirectory   = packagesCacheDirectory;
-    download.packagesInstallDirectory = packagesInstallDirectory;
-    download.packageName              = "llvm-mingw";
-    download.packageVersion           = packageVersion;
-    download.hashType                 = Hashing::TypeSHA256;
+    PackageRecipe recipe;
+    recipe.functions.keepDownloadedArchive   = false;
+    recipe.download.packagesCacheDirectory   = packagesCacheDirectory;
+    recipe.download.packagesInstallDirectory = packagesInstallDirectory;
+    recipe.download.packageName              = "llvm-mingw";
+    recipe.download.packageVersion           = packageVersion;
+    recipe.download.hashType                 = Hashing::TypeSHA256;
 
     switch (HostPlatform)
     {
     case Platform::Apple:
-        download.packagePlatform = "macos_universal";
-        download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
-                                   "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
-        download.expectedHash    = "1834ad45eb1a26c8bf3aa6137bc79db12fa1ef368af3ed0bbfba7c60adbe2fa6";
-        package.packageBaseName  = "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
+        recipe.download.packagePlatform = "macos_universal";
+        recipe.download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                          "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
+        recipe.download.expectedHash    = "1834ad45eb1a26c8bf3aa6137bc79db12fa1ef368af3ed0bbfba7c60adbe2fa6";
+        recipe.package.packageBaseName  = "llvm-mingw-20260324-ucrt-macos-universal.tar.xz";
         break;
     case Platform::Linux:
         switch (HostInstructionSet)
         {
         case InstructionSet::ARM64:
-            download.packagePlatform = "linux_arm64";
-            download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
-                                       "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
-            download.expectedHash    = "d28db713552e9d92699081b573a5b7c543d1d8095ed0d1c15dba184bf6e51440";
-            package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
+            recipe.download.packagePlatform = "linux_arm64";
+            recipe.download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                              "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
+            recipe.download.expectedHash    = "d28db713552e9d92699081b573a5b7c543d1d8095ed0d1c15dba184bf6e51440";
+            recipe.package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-aarch64.tar.xz";
             break;
         case InstructionSet::Intel64:
-            download.packagePlatform = "linux_intel64";
-            download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
-                                       "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
-            download.expectedHash    = "f92b02c4f835470deb5ac5fb92ddb458239e80ddff9ce8867155679ee5f57ffc";
-            package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
+            recipe.download.packagePlatform = "linux_intel64";
+            recipe.download.url             = "https://github.com/mstorsjo/llvm-mingw/releases/download/20260324/"
+                                              "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
+            recipe.download.expectedHash    = "f92b02c4f835470deb5ac5fb92ddb458239e80ddff9ce8867155679ee5f57ffc";
+            recipe.package.packageBaseName  = "llvm-mingw-20260324-ucrt-ubuntu-22.04-x86_64.tar.xz";
             break;
         case InstructionSet::Intel32: return Result::Error("Unsupported platform");
         }
@@ -2386,10 +2889,10 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     case Platform::Emscripten: return Result::Error("Unsupported platform");
     }
 
-    functions.extractFunction = [](StringView sourceFile, StringView destinationDirectory)
+    recipe.functions.extractFunction = [](StringView sourceFile, StringView destinationDirectory)
     { return extractTarArchiveFlatteningRoot(sourceFile, destinationDirectory); };
 
-    functions.testFunction = [](const Download&, const Package& package)
+    recipe.functions.testFunction = [](const Download&, const Package& package)
     {
         String  result;
         String  compilerExecutable;
@@ -2402,8 +2905,34 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
         return Result(true);
     };
 
-    SC_TRY(packageInstall(download, package, functions));
-    return Result(true);
+    String x64Compiler      = StringEncoding::Utf8;
+    String x64CompilerCpp   = StringEncoding::Utf8;
+    String arm64Compiler    = StringEncoding::Utf8;
+    String arm64CompilerCpp = StringEncoding::Utf8;
+    String archiver         = StringEncoding::Utf8;
+    SC_TRY(Path::join(x64Compiler, {"bin", "x86_64-w64-mingw32-clang"}));
+    SC_TRY(Path::join(x64CompilerCpp, {"bin", "x86_64-w64-mingw32-clang++"}));
+    SC_TRY(Path::join(arm64Compiler, {"bin", "aarch64-w64-mingw32-clang"}));
+    SC_TRY(Path::join(arm64CompilerCpp, {"bin", "aarch64-w64-mingw32-clang++"}));
+    SC_TRY(Path::join(archiver, {"bin", "llvm-ar"}));
+    const PackageReceiptExport exports[] = {
+        {"tool", "x86_64-w64-mingw32-clang", x64Compiler.view()},
+        {"tool", "x86_64-w64-mingw32-clang++", x64CompilerCpp.view()},
+        {"tool", "aarch64-w64-mingw32-clang", arm64Compiler.view()},
+        {"tool", "aarch64-w64-mingw32-clang++", arm64CompilerCpp.view()},
+        {"tool", "llvm-ar", archiver.view()},
+        {"capability", "toolchain.windows-gnu.x86_64", x64Compiler.view()},
+        {"capability", "toolchain.windows-gnu.arm64", arm64Compiler.view()},
+    };
+    static constexpr StringView phases[] = {
+        "resolveLLVMMingwArchive",
+        "extractLLVMMingwToolchain",
+        "validateLLVMMingwToolchain",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
 }
 
 static constexpr StringView linuxSysrootArchitectureName(InstructionSet architecture)
@@ -2530,6 +3059,43 @@ static Result validateLinuxSysrootPackage(StringView packageRoot, const Tools::L
     return Result(true);
 }
 
+static Result writeLinuxSysrootReceipt(const Package& package, const Tools::LinuxSysrootSpec& spec, StringView source)
+{
+    const StringView environment  = spec.environment == Tools::LinuxSysrootSpec::Glibc ? "glibc"_a8 : "musl"_a8;
+    const StringView architecture = linuxSysrootArchitectureName(spec.architecture);
+    String           packageName  = StringEncoding::Utf8;
+    String           capability   = StringEncoding::Utf8;
+    String           includeDir   = StringEncoding::Utf8;
+    String           libraryDir   = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(packageName, "linux-sysroot-{}-{}", environment, architecture));
+    SC_TRY(StringBuilder::format(capability, "sysroot.linux.{}.{}", environment, architecture));
+    if (spec.environment == Tools::LinuxSysrootSpec::Glibc and spec.architecture == InstructionSet::ARM64)
+    {
+        SC_TRY(includeDir.assign("usr/aarch64-linux-gnu/include"));
+        SC_TRY(libraryDir.assign("usr/aarch64-linux-gnu/lib"));
+    }
+    else
+    {
+        SC_TRY(includeDir.assign("usr/include"));
+        SC_TRY(libraryDir.assign("usr/lib"));
+    }
+    const PackageReceiptExport exports[] = {
+        {"sysroot", "sysroot", "."},
+        {"include-dir", "sysroot.include", includeDir.view()},
+        {"library-dir", "sysroot.lib", libraryDir.view()},
+        {"capability", capability.view(), "."},
+    };
+    static constexpr StringView phases[] = {
+        "resolveLinuxSysrootPackages",
+        "extractLinuxSysrootPackages",
+        "repairLinuxSysrootLayout",
+        "validateLinuxSysroot",
+        "writeReceipt",
+    };
+    return writeManualPackageReceipt(package, packageName.view(), "system", architecture, source, StringView(), exports,
+                                     phases);
+}
+
 static Result resolveUbuntuPackagesIndex(StringView downloadsDirectory, StringView indexURL, String& output)
 {
     String packageIndexPath = StringEncoding::Utf8;
@@ -2601,6 +3167,7 @@ static Result installLinuxGlibcSysroot(StringView packagesCacheDirectory, String
         if (repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec) and finalizePackage(fs) and
             testPackage(package))
         {
+            SC_TRY(writeLinuxSysrootReceipt(package, spec, "cached"));
             return Result(true);
         }
     }
@@ -2668,6 +3235,7 @@ static Result installLinuxGlibcSysroot(StringView packagesCacheDirectory, String
     SC_TRY(finalizePackage(fs));
     SC_TRY(testPackage(package));
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    SC_TRY(writeLinuxSysrootReceipt(package, spec, packageIndexURL));
     return Result(true);
 }
 
@@ -2716,6 +3284,7 @@ static Result installLinuxMuslSysroot(StringView packagesCacheDirectory, StringV
         if (repairLinuxSysrootLayout(package.packageLocalDirectory.view(), spec) and finalizePackage(fs) and
             testPackage(package))
         {
+            SC_TRY(writeLinuxSysrootReceipt(package, spec, "cached"));
             return Result(true);
         }
     }
@@ -2763,6 +3332,7 @@ static Result installLinuxMuslSysroot(StringView packagesCacheDirectory, StringV
     SC_TRY(finalizePackage(fs));
     SC_TRY(testPackage(package));
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    SC_TRY(writeLinuxSysrootReceipt(package, spec, packageBaseURL.view()));
     return Result(true);
 }
 
@@ -2906,6 +3476,17 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     SC_TRY(builder.append("SC_PACKAGE_URL_LIBUNWIND={}\n", libunwindURL));
     builder.finalize();
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    const PackageReceiptExport exports[] = {
+        {"runner", "wine", "bin/wine"},
+        {"capability", "runner.wine", "bin/wine"},
+    };
+    static constexpr StringView phases[] = {
+        "resolveLinuxWinePackages",
+        "repairLinuxWineRunner",
+        "validateWineRunner",
+        "writeReceipt",
+    };
+    SC_TRY(writeManualPackageReceipt(package, "wine-stable", "system", "linux", wineBinaryURL, {}, exports, phases));
 
     return Result(true);
 #else
@@ -3040,6 +3621,18 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     SC_TRY(builder.append("SC_PACKAGE_URL_EXTRA4={}\n", fontsWineURL));
     builder.finalize();
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
+    const PackageReceiptExport exports[] = {
+        {"runner", "wine", "bin/wine"},
+        {"capability", "runner.wine", "bin/wine"},
+    };
+    static constexpr StringView phases[] = {
+        "resolveLinuxArm64WinePackages",
+        "repairLinuxWineRunner",
+        "validateWineRunner",
+        "writeReceipt",
+    };
+    SC_TRY(writeManualPackageReceipt(package, "wine-stable", "6.0.3", "linux_arm64_native", wine64URL, {}, exports,
+                                     phases));
 
     return Result(true);
 #else
@@ -3092,6 +3685,16 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     };
 
     SC_TRY(packageInstall(download, package, functions));
+    const PackageReceiptExport exports[] = {
+        {"runner", "wine", "Wine Stable.app/Contents/Resources/wine/bin/wine"},
+        {"capability", "runner.wine", "Wine Stable.app/Contents/Resources/wine/bin/wine"},
+    };
+    static constexpr StringView phases[] = {
+        "extractWineStableRunner",
+        "validateWineRunner",
+        "writeReceipt",
+    };
+    SC_TRY(writeDownloadPackageReceipt(download, package, exports, phases));
     return Result(true);
 }
 
@@ -3233,10 +3836,628 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
         SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
     }
 
+    const PackageReceiptExport exports[] = {
+        {"tool", "cl.x64", "bin/x64/cl"},
+        {"tool", "link.x64", "bin/x64/link"},
+        {"tool", "lib.x64", "bin/x64/lib"},
+        {"tool", "cl.arm64", "bin/arm64/cl"},
+        {"tool", "link.arm64", "bin/arm64/link"},
+        {"tool", "lib.arm64", "bin/arm64/lib"},
+        {"capability", "toolchain.windows-msvc.x64", "bin/x64/cl"},
+        {"capability", "toolchain.windows-msvc.arm64", "bin/arm64/cl"},
+    };
+    static constexpr StringView phases[] = {
+        "fetchPortableMSVC", "repairMSVCLayout", "prepareMSVCWinePrefix", "validateMSVCLayout", "writeReceipt",
+    };
+    String source = StringEncoding::Utf8;
+    if (not resolvedImportDirectory.isEmpty())
+    {
+        SC_TRY(StringBuilder::format(source, "import:{}", resolvedImportDirectory.view()));
+    }
+    else
+    {
+        SC_TRY(source.assign("https://aka.ms/vs/17/release/channel"));
+    }
+    SC_TRY(writeManualPackageReceipt(package, "msvc", "portable", package.packageFullName.view(), source.view(),
+                                     StringView(), exports, phases));
     return Result(true);
 }
 
-Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
+static Result installDoxygenEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
+{
+    return installDoxygen(cache, install, package);
+}
+
+static Result installDoxygenAwesomeCssEntry(StringView cache, StringView install, Package& package,
+                                            Span<const StringView>)
+{
+    return installDoxygenAwesomeCss(cache, install, package);
+}
+
+static Result installClangEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
+{
+    return installClangBinaries(cache, install, package);
+}
+
+static Result installLLVMEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
+{
+    return installLLVMToolchain(cache, install, package);
+}
+
+static Result installQEMUEntry(StringView cache, StringView install, Package& package, Span<const StringView> arguments)
+{
+    QEMUPackageInstallOptions options;
+    SC_TRY(parseQEMUPackageInstallOptions(arguments, options));
+    return installQEMURunner(cache, install, package, options.importDirectory);
+}
+
+static Result installFilCEntry(StringView cache, StringView install, Package& package, Span<const StringView> arguments)
+{
+    FilCPackageInstallOptions options;
+    SC_TRY(parseFilCPackageInstallOptions(arguments, options));
+    return installFilCToolchain(cache, install, package, options.importDirectory);
+}
+
+static Result installLLVMMingwEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
+{
+    return installLLVMMingwToolchain(cache, install, package);
+}
+
+static Result installLinuxSysrootGlibcX64Entry(StringView cache, StringView install, Package& package,
+                                               Span<const StringView>)
+{
+    LinuxSysrootSpec spec;
+    spec.environment  = LinuxSysrootSpec::Glibc;
+    spec.architecture = InstructionSet::Intel64;
+    return installLinuxSysroot(cache, install, spec, package);
+}
+
+static Result installLinuxSysrootGlibcArm64Entry(StringView cache, StringView install, Package& package,
+                                                 Span<const StringView>)
+{
+    LinuxSysrootSpec spec;
+    spec.environment  = LinuxSysrootSpec::Glibc;
+    spec.architecture = InstructionSet::ARM64;
+    return installLinuxSysroot(cache, install, spec, package);
+}
+
+static Result installLinuxSysrootMuslX64Entry(StringView cache, StringView install, Package& package,
+                                              Span<const StringView>)
+{
+    LinuxSysrootSpec spec;
+    spec.environment  = LinuxSysrootSpec::Musl;
+    spec.architecture = InstructionSet::Intel64;
+    return installLinuxSysroot(cache, install, spec, package);
+}
+
+static Result installLinuxSysrootMuslArm64Entry(StringView cache, StringView install, Package& package,
+                                                Span<const StringView>)
+{
+    LinuxSysrootSpec spec;
+    spec.environment  = LinuxSysrootSpec::Musl;
+    spec.architecture = InstructionSet::ARM64;
+    return installLinuxSysroot(cache, install, spec, package);
+}
+
+static Result installWineEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
+{
+    return installWineStableRunner(cache, install, package);
+}
+
+static Result installMSVCEntry(StringView cache, StringView install, Package& package, Span<const StringView> arguments)
+{
+    MSVCPackageInstallOptions options;
+    SC_TRY(parseMSVCPackageInstallOptions(arguments, options));
+    return installMSVCToolchain(cache, install, package, options.importDirectory, options.wineExecutable);
+}
+
+static constexpr StringView DoxygenExports[] = {
+    "tool:doxygen",
+};
+static constexpr StringView DoxygenPhases[] = {
+    "resolveDoxygenRelease",
+    "extractDoxygenExecutable",
+    "validateDoxygenVersion",
+    "writeReceipt",
+};
+static constexpr StringView DoxygenAwesomeExports[] = {
+    "asset:doxygen-awesome-css",
+};
+static constexpr StringView DoxygenAwesomePhases[] = {
+    "fetchGitRevision",
+    "validateGitCommit",
+    "writeReceipt",
+};
+static constexpr StringView ClangExports[] = {
+    "tool:clang-format",
+};
+static constexpr StringView ClangPhases[] = {
+    "resolveHostLLVMArchive",
+    "extractClangFormat",
+    "validateClangFormatVersion",
+    "writeReceipt",
+};
+static constexpr StringView LLVMExports[] = {
+    "tool:clang",
+    "tool:clang++",
+    "tool:llvm-ar",
+    "tool:ld.lld",
+    "capability:tool.c-compiler",
+    "capability:tool.cxx-compiler",
+    "capability:tool.archiver",
+    "capability:tool.linker",
+};
+static constexpr StringView LLVMPhases[] = {
+    "resolveHostLLVMArchive",
+    "extractLLVMToolchain",
+    "validateLLVMToolchain",
+    "writeReceipt",
+};
+static constexpr StringView QEMUExports[] = {
+    "runner:qemu",
+    "capability:runner.qemu.x86_64",
+    "capability:runner.qemu.arm64",
+};
+static constexpr StringView QEMUPhases[] = {
+    "resolveImportedQEMU",
+    "validateQEMUTargets",
+    "writeReceipt",
+};
+static constexpr StringView FilCExports[] = {
+    "tool:clang",
+    "tool:clang++",
+    "capability:toolchain.filc.x86_64",
+};
+static constexpr StringView FilCPhases[] = {
+    "resolveFilCSource",
+    "prepareFilCCompilerLaunchers",
+    "validateFilCToolchain",
+    "writeReceipt",
+};
+static constexpr StringView LLVMMingwExports[] = {
+    "tool:x86_64-w64-mingw32-clang",
+    "tool:x86_64-w64-mingw32-clang++",
+    "tool:aarch64-w64-mingw32-clang",
+    "tool:aarch64-w64-mingw32-clang++",
+    "tool:llvm-ar",
+    "capability:toolchain.windows-gnu.x86_64",
+    "capability:toolchain.windows-gnu.arm64",
+};
+static constexpr StringView LLVMMingwPhases[] = {
+    "resolveLLVMMingwArchive",
+    "extractLLVMMingwToolchain",
+    "validateLLVMMingwToolchain",
+    "writeReceipt",
+};
+static constexpr StringView LinuxSysrootExports[] = {
+    "sysroot:sysroot",
+    "include-dir:sysroot.include",
+    "library-dir:sysroot.lib",
+    "capability:sysroot.linux.<environment>.<architecture>",
+};
+static constexpr StringView LinuxSysrootPhases[] = {
+    "resolveLinuxSysrootPackages",
+    "extractLinuxSysrootPackages",
+    "repairLinuxSysrootLayout",
+    "validateLinuxSysroot",
+    "writeReceipt",
+};
+static constexpr StringView WineExports[] = {
+    "runner:wine",
+    "capability:runner.wine",
+};
+static constexpr StringView WinePhases[] = {
+    "resolveWinePackages",
+    "repairLinuxWineRunner",
+    "validateWineRunner",
+    "writeReceipt",
+};
+static constexpr StringView MSVCExports[] = {
+    "tool:cl.x64",
+    "tool:link.x64",
+    "tool:lib.x64",
+    "tool:cl.arm64",
+    "tool:link.arm64",
+    "tool:lib.arm64",
+    "capability:toolchain.windows-msvc.x64",
+    "capability:toolchain.windows-msvc.arm64",
+};
+static constexpr StringView MSVCPhases[] = {
+    "fetchPortableMSVC", "repairMSVCLayout", "prepareMSVCWinePrefix", "validateMSVCLayout", "writeReceipt",
+};
+
+static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
+    {"doxygen", "doxygen", "tool", "Documentation generator binary", "host", "GitHub release archive", false,
+     DoxygenExports, DoxygenPhases, installDoxygenEntry},
+    {"doxygen-awesome-css", "doxygen-awesome-css", "asset", "Doxygen Awesome CSS theme checkout", "host",
+     "Pinned Git revision", false, DoxygenAwesomeExports, DoxygenAwesomePhases, installDoxygenAwesomeCssEntry},
+    {"clang", "clang-binaries", "tool", "Pinned host clang-format binary", "host", "Official LLVM release archive",
+     false, ClangExports, ClangPhases, installClangEntry},
+    {"llvm", "llvm", "toolchain", "Pinned host LLVM toolchain", "host", "Official LLVM release archive", false,
+     LLVMExports, LLVMPhases, installLLVMEntry},
+    {"qemu", "qemu", "runner", "Imported QEMU user-mode runner registration", "host", "Imported directory or PATH",
+     true, QEMUExports, QEMUPhases, installQEMUEntry},
+    {"filc", "filc", "toolchain", "Experimental Fil-C compiler toolchain", "linux-x86_64", "Pinned archive or import",
+     true, FilCExports, FilCPhases, installFilCEntry},
+    {"llvm-mingw", "llvm-mingw", "toolchain", "LLVM MinGW Windows GNU toolchain", "host", "llvm-mingw release archive",
+     false, LLVMMingwExports, LLVMMingwPhases, installLLVMMingwEntry},
+    {"linux-sysroot-glibc-x86_64", "linux-sysroot-glibc-x86_64", "sysroot", "Linux glibc x86_64 sysroot",
+     "linux-glibc-x86_64", "Ubuntu Jammy package index", false, LinuxSysrootExports, LinuxSysrootPhases,
+     installLinuxSysrootGlibcX64Entry},
+    {"linux-sysroot-glibc-arm64", "linux-sysroot-glibc-arm64", "sysroot", "Linux glibc arm64 sysroot",
+     "linux-glibc-arm64", "Ubuntu Jammy package index", false, LinuxSysrootExports, LinuxSysrootPhases,
+     installLinuxSysrootGlibcArm64Entry},
+    {"linux-sysroot-musl-x86_64", "linux-sysroot-musl-x86_64", "sysroot", "Linux musl x86_64 sysroot",
+     "linux-musl-x86_64", "Alpine APK index", false, LinuxSysrootExports, LinuxSysrootPhases,
+     installLinuxSysrootMuslX64Entry},
+    {"linux-sysroot-musl-arm64", "linux-sysroot-musl-arm64", "sysroot", "Linux musl arm64 sysroot", "linux-musl-arm64",
+     "Alpine APK index", false, LinuxSysrootExports, LinuxSysrootPhases, installLinuxSysrootMuslArm64Entry},
+    {"wine", "wine-stable", "runner", "Wine runner for Windows targets", "host", "Wine release archive or Linux DEBs",
+     false, WineExports, WinePhases, installWineEntry},
+    {"msvc", "msvc", "toolchain", "Portable MSVC and Windows SDK toolchain", "windows-msvc-x64/windows-msvc-arm64",
+     "Portable MSVC vendor fetch or import", true, MSVCExports, MSVCPhases, installMSVCEntry},
+};
+
+PackageRegistry builtinPackageRegistry() { return {BuiltinPackageRegistryEntries}; }
+
+Result addBuiltinPackages(PackageRegistryBuilder& registry) { return registry.add(builtinPackageRegistry()); }
+
+static Result printKnownPackages(Console& console, PackageRegistry registry)
+{
+    for (const PackageRegistryEntry& entry : registry.entries)
+    {
+        console.print(entry.name);
+        console.print(" [");
+        console.print(entry.kind);
+        console.print("] ");
+        console.printLine(entry.description);
+    }
+    return Result(true);
+}
+
+static Result printPackageHelp(Console& console)
+{
+    console.printLine("Usage: ./SC.sh package <action> [package] [options]");
+    console.printLine("");
+    console.printLine("Actions:");
+    console.printLine("  install [package]       Install a package (default package: clang)");
+    console.printLine("  list                    List known packages");
+    console.printLine("  info <package>          Show package registry metadata");
+    console.printLine("  status [package]        Show installed receipt status");
+    console.printLine("  verify [package]        Verify installed package receipts and exports");
+    console.printLine("  receipt <package>       Print the installed receipt JSON");
+    console.printLine("  exports <package>       Print resolved receipt exports");
+    console.printLine("  lock                    Write _Build/SC-package.lock");
+    console.printLine("");
+    console.printLine("Import-capable packages:");
+    console.printLine("  qemu --import-directory <path>");
+    console.printLine("  filc --import-directory <path>");
+    console.printLine("  msvc --import-directory <path> --wine <path>");
+    return Result(true);
+}
+
+static Result printStringViewList(Console& console, StringView label, Span<const StringView> values)
+{
+    console.print(label);
+    console.print(" = ");
+    if (values.empty())
+    {
+        console.printLine("-");
+        return Result(true);
+    }
+    for (size_t idx = 0; idx < values.sizeInElements(); ++idx)
+    {
+        if (idx > 0)
+        {
+            console.print(", ");
+        }
+        console.print(values[idx]);
+    }
+    console.printLine(""_a8);
+    return Result(true);
+}
+
+static Result printUnknownPackageError(Console& console, PackageRegistry registry, StringView packageName)
+{
+    console.print("Unknown package: ");
+    console.printLine(packageName);
+    console.print("Known packages: ");
+    for (size_t idx = 0; idx < registry.entries.sizeInElements(); ++idx)
+    {
+        if (idx > 0)
+        {
+            console.print(", ");
+        }
+        console.print(registry.entries[idx].name);
+    }
+    console.printLine(""_a8);
+    return Result::Error("Invalid package name");
+}
+
+static Result findInstalledPackageReceipt(StringView packagesInstallDirectory, StringView installedName,
+                                          String& receiptPath, String& packageRoot, bool& found)
+{
+    found = false;
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsDirectory(packagesInstallDirectory))
+    {
+        return Result(true);
+    }
+
+    FileSystemIterator::FolderState entries[8];
+    FileSystemIterator              iterator;
+    SC_TRY(iterator.init(packagesInstallDirectory, entries));
+
+    auto checkReceipt = [&](StringView candidateReceiptPath, StringView candidatePackageRoot) -> Result
+    {
+        if (not fs.existsAndIsFile(candidateReceiptPath))
+        {
+            return Result(true);
+        }
+        String receipt = StringEncoding::Utf8;
+        SC_TRY(readFileIntoString(candidateReceiptPath, receipt));
+        PackageReceiptJSON receiptJSON;
+        SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
+        if (receiptJSON.name.view() == installedName)
+        {
+            SC_TRY(receiptPath.assign(candidateReceiptPath));
+            SC_TRY(packageRoot.assign(candidatePackageRoot));
+            found = true;
+        }
+        return Result(true);
+    };
+
+    while (iterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry entry            = iterator.get();
+        String                          candidateReceipt = StringEncoding::Utf8;
+        SC_TRY(Path::join(candidateReceipt, {entry.path, PackageReceiptFileName}));
+        SC_TRY(checkReceipt(candidateReceipt.view(), entry.path));
+        if (found)
+        {
+            return Result(true);
+        }
+
+        if (entry.isDirectory() or StringView(entry.name) != PackageReceiptFileName)
+        {
+            continue;
+        }
+        SC_TRY(checkReceipt(entry.path, Path::dirname(entry.path, Path::AsNative)));
+        if (found)
+        {
+            return Result(true);
+        }
+    }
+    SC_TRY(iterator.checkErrors());
+    return Result(true);
+}
+
+static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoot)
+{
+    String receipt = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(receiptPath, receipt));
+
+    PackageReceiptJSON receiptJSON;
+    SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
+
+    SC_TRY(validatePackageReceiptHeader(receiptJSON));
+    SC_TRY_MSG(not receiptJSON.version.isEmpty(), "Package receipt is missing package version");
+    SC_TRY_MSG(not receiptJSON.source.isEmpty(), "Package receipt is missing source");
+    SC_TRY_MSG(not receiptJSON.installRoot.isEmpty(), "Package receipt is missing install root");
+    SC_TRY_MSG(receiptJSON.validation.view() == "passed"_a8, "Package receipt validation did not pass");
+    SC_TRY(validatePackageReceiptSourceHash(receiptJSON.sourceHash.view()));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    for (PackageReceiptExportJSON& exportView : receiptJSON.exports)
+    {
+        SC_TRY_MSG(not exportView.kind.isEmpty(), "Package receipt export is missing kind");
+        SC_TRY_MSG(not exportView.name.isEmpty(), "Package receipt export is missing name");
+        SC_TRY(validatePackageReceiptExportPath(exportView.path.view()));
+        if (exportView.path.view() == "."_a8)
+        {
+            continue;
+        }
+        String exportedPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(exportedPath, {packageRoot, exportView.path.view()}));
+        SC_TRY_MSG(fs.exists(exportedPath.view()), "Package receipt export is missing");
+    }
+    return Result(true);
+}
+
+static Result verifyPackageReceiptForEntry(const PackageRegistryEntry& entry, StringView receiptPath,
+                                           StringView packageRoot)
+{
+    SC_TRY(verifyPackageReceipt(receiptPath, packageRoot));
+    String receipt = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(receiptPath, receipt));
+    PackageReceiptJSON receiptJSON;
+    SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
+    SC_TRY_MSG(receiptJSON.name.view() == entry.installedName,
+               "Package receipt identity does not match registry entry");
+    return Result(true);
+}
+
+static Result printAllPackageStatuses(Console& console, PackageRegistry registry, StringView packagesInstallDirectory,
+                                      bool verify)
+{
+    size_t verifiedCount = 0;
+    for (const PackageRegistryEntry& entry : registry.entries)
+    {
+        String receiptPath = StringEncoding::Utf8;
+        String packageRoot = StringEncoding::Utf8;
+        bool   found       = false;
+        SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory, entry.installedName, receiptPath, packageRoot,
+                                           found));
+        if (not found)
+        {
+            if (not verify)
+            {
+                console.print("not installed: ");
+                console.printLine(entry.name);
+            }
+            continue;
+        }
+        if (verify)
+        {
+            SC_TRY(verifyPackageReceiptForEntry(entry, receiptPath.view(), packageRoot.view()));
+            console.print("verified: ");
+            verifiedCount += 1;
+        }
+        else
+        {
+            console.print("installed: ");
+        }
+        console.print(entry.name);
+        console.print(" at ");
+        console.print(packageRoot.view());
+        if (not verify)
+        {
+            const Result validation = verifyPackageReceiptForEntry(entry, receiptPath.view(), packageRoot.view());
+            console.print(validation ? " (receipt valid)"_a8 : " (receipt invalid)"_a8);
+        }
+        console.printLine(""_a8);
+    }
+    if (verify and verifiedCount == 0)
+    {
+        console.printLine("no installed package receipts found");
+    }
+    return Result(true);
+}
+
+static Result printPackageReceipt(Console& console, StringView packagesInstallDirectory,
+                                  const PackageRegistryEntry& entry)
+{
+    String receiptPath = StringEncoding::Utf8;
+    String packageRoot = StringEncoding::Utf8;
+    bool   found       = false;
+    SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory, entry.installedName, receiptPath, packageRoot, found));
+    if (not found)
+    {
+        console.print("not installed: ");
+        console.printLine(entry.name);
+        return Result::Error("Package receipt not found");
+    }
+
+    String receipt = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(receiptPath.view(), receipt));
+
+    console.print("packageRoot     = ");
+    console.printLine(packageRoot.view());
+    console.print("receipt         = ");
+    console.printLine(receiptPath.view());
+    console.printLine(receipt.view());
+    return Result(true);
+}
+
+static Result printPackageExports(Console& console, StringView packagesInstallDirectory,
+                                  const PackageRegistryEntry& entry)
+{
+    String receiptPath = StringEncoding::Utf8;
+    String packageRoot = StringEncoding::Utf8;
+    bool   found       = false;
+    SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory, entry.installedName, receiptPath, packageRoot, found));
+    if (not found)
+    {
+        console.print("not installed: ");
+        console.printLine(entry.name);
+        return Result::Error("Package receipt not found");
+    }
+
+    String receipt = StringEncoding::Utf8;
+    SC_TRY(readFileIntoString(receiptPath.view(), receipt));
+    console.print("packageRoot     = ");
+    console.printLine(packageRoot.view());
+    console.print("receipt         = ");
+    console.printLine(receiptPath.view());
+
+    bool hasExports = false;
+    SC_TRY(forEachReceiptExport(receipt.view(),
+                                [&](const PackageReceiptExportJSON& exportView) -> Result
+                                {
+                                    String exportedPath = StringEncoding::Utf8;
+                                    SC_TRY(Path::join(exportedPath, {packageRoot.view(), exportView.path.view()}));
+                                    console.print(exportView.kind.view());
+                                    console.print(":");
+                                    console.print(exportView.name.view());
+                                    console.print(" = ");
+                                    console.printLine(exportedPath.view());
+                                    hasExports = true;
+                                    return Result(true);
+                                }));
+    if (not hasExports)
+    {
+        console.printLine("no exports");
+    }
+    return Result(true);
+}
+
+static Result lockInstalledPackages(StringView packagesInstallDirectory, StringView lockPath)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    PackageLockJSON lockJSON;
+    auto            appendReceiptObject = [&](StringView receiptPath) -> Result
+    {
+        if (not fs.existsAndIsFile(receiptPath))
+        {
+            return Result(true);
+        }
+        String receipt = StringEncoding::Utf8;
+        SC_TRY(readFileIntoString(receiptPath, receipt));
+        SC_TRY(verifyPackageReceipt(receiptPath, Path::dirname(receiptPath, Path::AsNative)));
+
+        PackageReceiptJSON receiptJSON;
+        SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
+
+        PackageLockEntryJSON entry;
+        SC_TRY(assignJSONField(entry.name, receiptJSON.name.view()));
+        SC_TRY(assignJSONField(entry.version, receiptJSON.version.view()));
+        SC_TRY(assignJSONField(entry.recipeVersion, receiptJSON.recipeVersion.view()));
+        SC_TRY(assignJSONField(entry.hostPlatform, receiptJSON.hostPlatform.view()));
+        SC_TRY(assignJSONField(entry.variant, receiptJSON.variant.view()));
+        SC_TRY(assignJSONField(entry.source, receiptJSON.source.view()));
+        SC_TRY(assignJSONField(entry.sourceHash, receiptJSON.sourceHash.view()));
+        SC_TRY(assignJSONField(entry.installRoot, receiptJSON.installRoot.view()));
+        SC_TRY(assignJSONField(entry.receipt, receiptPath));
+        for (PackageReceiptExportJSON& exportView : receiptJSON.exports)
+        {
+            SC_TRY(appendJSONExport(entry.exports, exportView.kind.view(), exportView.name.view(),
+                                    exportView.path.view()));
+        }
+        SC_TRY(lockJSON.packages.push_back(move(entry)));
+        return Result(true);
+    };
+
+    if (fs.existsAndIsDirectory(packagesInstallDirectory))
+    {
+        FileSystemIterator::FolderState entries[8];
+        FileSystemIterator              iterator;
+        SC_TRY(iterator.init(packagesInstallDirectory, entries));
+        while (iterator.enumerateNext())
+        {
+            const FileSystemIterator::Entry entry            = iterator.get();
+            String                          candidateReceipt = StringEncoding::Utf8;
+            SC_TRY(Path::join(candidateReceipt, {entry.path, PackageReceiptFileName}));
+            SC_TRY(appendReceiptObject(candidateReceipt.view()));
+
+            if (entry.isDirectory() or StringView(entry.name) != PackageReceiptFileName)
+            {
+                continue;
+            }
+            SC_TRY(appendReceiptObject(entry.path));
+        }
+        SC_TRY(iterator.checkErrors());
+    }
+
+    String lock = StringEncoding::Utf8;
+    SC_TRY_MSG(SerializationJson::write(lockJSON, lock), "Failed writing package lock JSON");
+    return fs.writeString(lockPath, lock.view());
+}
+
+Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tools::Package* package)
 {
     Console& console = arguments.console;
 
@@ -3257,95 +4478,127 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     {
         package = &clangPackage;
     }
-    if (arguments.action == "install")
+    auto packageNameFromArguments = [&]() -> StringView
+    { return arguments.arguments.sizeInElements() > 0 ? arguments.arguments[0] : "clang"_a8; };
+
+    if (arguments.action == "help" or arguments.action == "--help" or
+        (arguments.action == "install" and arguments.arguments.sizeInElements() > 0 and
+         (arguments.arguments[0] == "--help"_a8 or arguments.arguments[0] == "-h"_a8)))
     {
-        StringView packageName = arguments.arguments.sizeInElements() > 0 ? arguments.arguments[0] : "clang";
-        if (packageName == "doxygen")
+        SC_TRY(printPackageHelp(console));
+    }
+    else if (arguments.action == "install")
+    {
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
         {
-            SC_TRY(Tools::installDoxygen(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+            return printUnknownPackageError(console, registry, packageName);
         }
-        else if (packageName == "doxygen-awesome-css")
+        SC_TRY_MSG(entry->install != nullptr, "Package registry entry is missing install handler");
+        SC_TRY(entry->install(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                              arguments.arguments));
+    }
+    else if (arguments.action == "list")
+    {
+        SC_TRY(printKnownPackages(console, registry));
+    }
+    else if (arguments.action == "info")
+    {
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
         {
-            SC_TRY(Tools::installDoxygenAwesomeCss(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
-                                                   *package));
+            return printUnknownPackageError(console, registry, packageName);
         }
-        else if (packageName == "clang")
+        console.print("name            = ");
+        console.printLine(entry->name);
+        console.print("kind            = ");
+        console.printLine(entry->kind);
+        console.print("installedName   = ");
+        console.printLine(entry->installedName);
+        console.print("variants        = ");
+        console.printLine(entry->variants);
+        console.print("source          = ");
+        console.printLine(entry->source);
+        console.print("supportsImport  = ");
+        console.printLine(entry->supportsImport ? "true"_a8 : "false"_a8);
+        console.print("description     = ");
+        console.printLine(entry->description);
+        SC_TRY(printStringViewList(console, "exports        "_a8, entry->exports));
+        SC_TRY(printStringViewList(console, "phases         "_a8, entry->phases));
+    }
+    else if (arguments.action == "status" or arguments.action == "verify")
+    {
+        if (arguments.arguments.empty())
         {
-            SC_TRY(
-                Tools::installClangBinaries(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+            SC_TRY(printAllPackageStatuses(console, registry, packagesInstallDirectory.view(),
+                                           arguments.action == "verify"));
+            return Result(true);
         }
-        else if (packageName == "llvm")
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
         {
-            SC_TRY(
-                Tools::installLLVMToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package));
+            return printUnknownPackageError(console, registry, packageName);
         }
-        else if (packageName == "qemu")
+        String receiptPath = StringEncoding::Utf8;
+        String packageRoot = StringEncoding::Utf8;
+        bool   found       = false;
+        SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory.view(), entry->installedName, receiptPath,
+                                           packageRoot, found));
+        if (not found)
         {
-            QEMUPackageInstallOptions options;
-            SC_TRY(parseQEMUPackageInstallOptions(arguments.arguments, options));
-            SC_TRY(Tools::installQEMURunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                                            options.importDirectory));
+            console.print("not installed: ");
+            console.printLine(entry->name);
+            return arguments.action == "verify" ? Result::Error("Package receipt not found") : Result(true);
         }
-        else if (packageName == "filc")
+        if (arguments.action == "verify")
         {
-            FilCPackageInstallOptions options;
-            SC_TRY(parseFilCPackageInstallOptions(arguments.arguments, options));
-            SC_TRY(Tools::installFilCToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                                               options.importDirectory));
-        }
-        else if (packageName == "llvm-mingw")
-        {
-            SC_TRY(Tools::installLLVMMingwToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
-                                                    *package));
-        }
-        else if (packageName == "linux-sysroot-glibc-x86_64")
-        {
-            Tools::LinuxSysrootSpec spec;
-            spec.environment  = Tools::LinuxSysrootSpec::Glibc;
-            spec.architecture = InstructionSet::Intel64;
-            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
-                                              *package));
-        }
-        else if (packageName == "linux-sysroot-glibc-arm64")
-        {
-            Tools::LinuxSysrootSpec spec;
-            spec.environment  = Tools::LinuxSysrootSpec::Glibc;
-            spec.architecture = InstructionSet::ARM64;
-            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
-                                              *package));
-        }
-        else if (packageName == "linux-sysroot-musl-x86_64")
-        {
-            Tools::LinuxSysrootSpec spec;
-            spec.environment  = Tools::LinuxSysrootSpec::Musl;
-            spec.architecture = InstructionSet::Intel64;
-            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
-                                              *package));
-        }
-        else if (packageName == "linux-sysroot-musl-arm64")
-        {
-            Tools::LinuxSysrootSpec spec;
-            spec.environment  = Tools::LinuxSysrootSpec::Musl;
-            spec.architecture = InstructionSet::ARM64;
-            SC_TRY(Tools::installLinuxSysroot(packagesCacheDirectory.view(), packagesInstallDirectory.view(), spec,
-                                              *package));
-        }
-        else if (packageName == "wine")
-        {
-            SC_TRY(Tools::installWineStableRunner(packagesCacheDirectory.view(), packagesInstallDirectory.view(),
-                                                  *package));
-        }
-        else if (packageName == "msvc")
-        {
-            MSVCPackageInstallOptions options;
-            SC_TRY(parseMSVCPackageInstallOptions(arguments.arguments, options));
-            SC_TRY(Tools::installMSVCToolchain(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                                               options.importDirectory, options.wineExecutable));
+            SC_TRY(verifyPackageReceiptForEntry(*entry, receiptPath.view(), packageRoot.view()));
+            console.print("verified: ");
         }
         else
         {
-            return Result::Error("Invalid package name");
+            console.print("installed: ");
         }
+        console.print(entry->name);
+        console.print(" at ");
+        console.print(packageRoot.view());
+        if (arguments.action == "status")
+        {
+            const Result validation = verifyPackageReceiptForEntry(*entry, receiptPath.view(), packageRoot.view());
+            console.print(validation ? " (receipt valid)"_a8 : " (receipt invalid)"_a8);
+        }
+        console.printLine(""_a8);
+    }
+    else if (arguments.action == "receipt")
+    {
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
+        {
+            return printUnknownPackageError(console, registry, packageName);
+        }
+        SC_TRY(printPackageReceipt(console, packagesInstallDirectory.view(), *entry));
+    }
+    else if (arguments.action == "exports")
+    {
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
+        {
+            return printUnknownPackageError(console, registry, packageName);
+        }
+        SC_TRY(printPackageExports(console, packagesInstallDirectory.view(), *entry));
+    }
+    else if (arguments.action == "lock")
+    {
+        String lockPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(lockPath, {arguments.toolDestination.view(), "SC-package.lock"}));
+        SC_TRY(lockInstalledPackages(packagesInstallDirectory.view(), lockPath.view()));
+        console.print("lock            = ");
+        console.printLine(lockPath.view());
     }
     else
     {
@@ -3355,6 +4608,12 @@ Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
     }
     return Result(true);
 }
+
+Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package)
+{
+    return runPackageTool(arguments, builtinPackageRegistry(), package);
+}
+
 #if !defined(SC_TOOLS_COMPILED_SEPARATELY) && !defined(SC_TOOLS_IMPORT)
 StringView Tool::getToolName() { return "SC-package"; }
 StringView Tool::getDefaultAction() { return "install"; }

@@ -380,12 +380,61 @@ This happens during regular development, where new code is frequently tested in 
 ## Actions
 
 - `install`: Downloads required tools (LLVM archives / documentation tools)
+- `list`: Lists known packages from the built-in package registry
+- `help`: Prints package actions and import options
+- `info <package>`: Prints package metadata such as kind, installed name, variants, source, exports, phases and import support
+- `status [package]`: Reports whether one package, or all known packages, have structured install receipts and whether
+  each found receipt validates
+- `verify [package]`: Checks one package, or all installed receipts, and validates exported paths
+- `receipt <package>`: Prints the installed package root, receipt path and raw `sc-package-receipt.json` contents
+- `exports <package>`: Prints the exports recorded by the installed receipt with resolved paths
+- `lock`: Writes a local `_Build/SC-package.lock` summary of installed package receipts
 
 ## Examples
 
 ```
 ./SC.sh package install
+./SC.sh package help
+./SC.sh package list
+./SC.sh package info llvm
+./SC.sh package status llvm
+./SC.sh package verify llvm
+./SC.sh package receipt llvm
+./SC.sh package exports llvm
 ```
+
+Installed packages now write a `sc-package-receipt.json` file next to the package root. The receipt records the schema,
+package identity, recipe version, host platform, variant, source provenance, optional source hash, install root,
+validation result, named phases and exported tools / sysroots / runners / include directories / library directories.
+`SC-build` consumes these exports for packaged LLVM, Linux sysroots, QEMU, Wine, Fil-C, llvm-mingw and portable MSVC
+resolution, while preserving the older layout-based fallback during migration.
+
+Simple archive/git packages are routed through an internal C++ recipe lifecycle. The recipe holds package source,
+extraction/test hooks, named phases and exports. Complex packages such as MSVC, Wine, QEMU, Fil-C and Linux sysroots
+still use custom C++ adapters, but their imperative parts are now named in the registry and receipts (for example
+`resolveImportedQEMU`, `prepareFilCCompilerLaunchers`, `resolveLinuxSysrootPackages`, `repairMSVCLayout` and
+`validateMSVCLayout`). This keeps the special behavior visible without introducing an external recipe DSL yet.
+
+External tools can compose their own package registry in C++ and reuse the built-in catalog when desired:
+
+```cpp
+PackageRegistryEntry entries[16];
+PackageRegistryBuilder registryBuilder = {{entries, 16}};
+SC_TRY(addBuiltinPackages(registryBuilder));
+SC_TRY(registryBuilder.add(myPackageEntry));
+
+Tools::Package package;
+SC_TRY(runPackageTool(arguments, registryBuilder.registry(), &package));
+```
+
+The builder uses caller-owned storage so registry entry lifetimes are explicit. A custom entry can provide its own
+`PackageInstallHandler` today; future recipe descriptors and named phase hooks should make the common cases data-only.
+
+`status` reports receipt validity without failing the command, while `verify` fails on invalid receipts after checking
+receipt shape, source-hash syntax and exported paths. `lock` writes `_Build/SC-package.lock` with the
+resolved package name, version, recipe version, host platform, variant, source, hash, install root, receipt path and
+exports for each installed receipt, making package state auditable without making imported packages look
+content-addressed.
 
 ## Packages
 These are the packages that are currently downloaded and extracted / symlinked by `SC-package.cpp`:

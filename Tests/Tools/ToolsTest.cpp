@@ -7,7 +7,7 @@
 #include "Libraries/Testing/Testing.h"
 #include "Tools/SC-build.h"
 #include "Tools/SC-build/BuildCLI.h"
-#include <stdlib.h>
+#include "Tools/SC-package.h"
 
 extern SC::Console* globalConsole;
 namespace SC
@@ -23,8 +23,46 @@ static bool writeBuildHelpAddendumToString(Build::Action::Type actionType, Strin
 
 static bool shouldRunHeavySupportToolsTests()
 {
-    const char* value = ::getenv("SC_RUN_HEAVY_SUPPORT_TOOLS_TESTS");
-    return value != nullptr and value[0] != '\0' and value[0] != '0';
+    ProcessEnvironment environment;
+    StringSpan         value;
+    return environment.get("SC_RUN_HEAVY_SUPPORT_TOOLS_TESTS", value) and not value.isEmpty() and value != "0";
+}
+
+static Result installFakeRegistryPackage(StringView, StringView packagesInstallDirectory, Tools::Package& package,
+                                         Span<const StringView>)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+
+    String packageRoot = StringEncoding::Utf8;
+    String binRoot     = StringEncoding::Utf8;
+    String toolPath    = StringEncoding::Utf8;
+    SC_TRY(Path::join(packageRoot, {packagesInstallDirectory, "external-fake"}));
+    SC_TRY(Path::join(binRoot, {packageRoot.view(), "bin"}));
+    SC_TRY(Path::join(toolPath, {binRoot.view(), "fake-tool"}));
+    if (fs.existsAndIsDirectory(packageRoot.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(packageRoot.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(binRoot.view()));
+    SC_TRY(fs.writeString(toolPath.view(), "fake"));
+
+    package.installDirectoryLink = packageRoot.view();
+    Tools::PackageReceiptInfo info;
+    info.packageName                            = "external-fake";
+    info.packageVersion                         = "1";
+    info.recipeVersion                          = "1";
+    info.hostPlatform                           = "test";
+    info.packageVariant                         = "host";
+    info.source                                 = "test";
+    info.sourceHash                             = "";
+    info.validation                             = "passed";
+    const StringView phases[]                   = {"installFakeRegistryPackage", "writeReceipt"};
+    info.phases                                 = phases;
+    const Tools::PackageReceiptExport exports[] = {
+        {"tool", "fake-tool", "bin/fake-tool"},
+    };
+    return Tools::writePackageReceipt(package, info, exports);
 }
 
 struct SupportToolsTest : public TestCase
@@ -864,6 +902,413 @@ struct SupportToolsTest : public TestCase
             args[2]             = "value";
             arguments.arguments = {args, 3};
             SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("package list is available"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "list";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package help is available"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "help";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package install help is available"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "--help";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package info describes llvm"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "info";
+            args[0]             = "llvm";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package info exposes custom adapter phases"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "info";
+            args[0]             = "msvc";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package info rejects unknown package"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "info";
+            args[0]             = "no-such-package";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("package commands accept external registry"))
+        {
+            static constexpr StringView fakeExports[] = {
+                "tool:fake-tool",
+            };
+            static constexpr StringView fakePhases[] = {
+                "installFakeRegistryPackage",
+                "writeReceipt",
+            };
+            const PackageRegistryEntry fakeEntry = {
+                "fake", "external-fake", "tool",     "External package registry fixture", "host", "test fixture",
+                false,  fakeExports,     fakePhases, installFakeRegistryPackage};
+            PackageRegistryEntry   registryStorage[16];
+            PackageRegistryBuilder registryBuilder = {{registryStorage, 16}};
+            SC_TEST_EXPECT(addBuiltinPackages(registryBuilder));
+            SC_TEST_EXPECT(registryBuilder.add(fakeEntry));
+            const PackageRegistry registry = registryBuilder.registry();
+            Package               package;
+
+            SC_TEST_EXPECT(registry.find("clang") != nullptr);
+            SC_TEST_EXPECT(registry.find("fake") != nullptr);
+
+            arguments.tool      = "package";
+            arguments.action    = "list";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            arguments.action    = "info";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            arguments.action    = "install";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry, &package));
+
+            arguments.action    = "status";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            arguments.action    = "exports";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            arguments.action    = "receipt";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            arguments.action    = "verify";
+            args[0]             = "fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+        }
+        if (test_section("package receipt resolves exports and capabilities"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packageRoot    = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String toolPath       = StringEncoding::Utf8;
+            String capabilityPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packageRoot, {outputDirectory.view(), "_PackageReceiptTest"}));
+            SC_TEST_EXPECT(Path::join(toolRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {toolRoot.view(), "fake-tool"}));
+            SC_TEST_EXPECT(Path::join(capabilityPath, {toolRoot.view(), "fake-capability"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(capabilityPath.view(), "fake"));
+
+            Package package;
+            package.installDirectoryLink = packageRoot.view();
+            PackageReceiptInfo info;
+            info.packageName          = "fake";
+            info.packageVersion       = "1";
+            info.recipeVersion        = "1";
+            info.hostPlatform         = "test";
+            info.packageVariant       = "host";
+            info.source               = "test";
+            info.sourceHash           = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+            info.validation           = "passed";
+            const StringView phases[] = {
+                "resolveFake",
+                "validateFake",
+                "writeReceipt",
+            };
+            info.phases                          = phases;
+            const PackageReceiptExport exports[] = {
+                {"tool", "fake-tool", "bin/fake-tool"},
+                {"tool", "tool.fake", "bin/fake-tool"},
+                {"capability", "tool.fake", "bin/fake-capability"},
+            };
+            SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageExportPath(packageRoot.view(), "fake-tool", resolved));
+            SC_TEST_EXPECT(resolved.view() == toolPath.view());
+            resolved = "";
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolved.view() == capabilityPath.view());
+        }
+        if (test_section("package receipt rejects invalid source hash"))
+        {
+            Package package;
+            package.installDirectoryLink = outputDirectory.view();
+            PackageReceiptInfo info;
+            info.packageName    = "fake";
+            info.packageVersion = "1";
+            info.recipeVersion  = "1";
+            info.hostPlatform   = "test";
+            info.packageVariant = "host";
+            info.source         = "test";
+            info.sourceHash     = "sha512:abc";
+            info.validation     = "passed";
+            SC_TEST_EXPECT(not writePackageReceipt(package, info));
+
+            info.sourceHash = "sha256";
+            SC_TEST_EXPECT(not writePackageReceipt(package, info));
+        }
+        if (test_section("package receipt parses multiline exports"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packageRoot = StringEncoding::Utf8;
+            String binRoot     = StringEncoding::Utf8;
+            String toolPath    = StringEncoding::Utf8;
+            String receiptPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packageRoot, {outputDirectory.view(), "_PackageReceiptMultilineTest"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "fake-tool"}));
+            SC_TEST_EXPECT(Path::join(receiptPath, {packageRoot.view(), PackageReceiptFileName}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(receiptPath.view(), "{\n"
+                                                              "  \"schema\": 1,\n"
+                                                              "  \"name\": \"fake\",\n"
+                                                              "  \"version\": \"1\",\n"
+                                                              "  \"source\": \"test\",\n"
+                                                              "  \"sourceHash\": \"\",\n"
+                                                              "  \"installRoot\": \"test\",\n"
+                                                              "  \"validation\": \"passed\",\n"
+                                                              "  \"exports\": [\n"
+                                                              "    {\n"
+                                                              "      \"kind\": \"capability\",\n"
+                                                              "      \"name\": \"tool.fake\",\n"
+                                                              "      \"path\": \"bin/fake-tool\"\n"
+                                                              "    }\n"
+                                                              "  ]\n"
+                                                              "}\n"));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolved.view() == toolPath.view());
+        }
+        if (test_section("package receipt rejects escaping export paths"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packageRoot = StringEncoding::Utf8;
+            String receiptPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packageRoot, {outputDirectory.view(), "_PackageReceiptEscapeTest"}));
+            SC_TEST_EXPECT(Path::join(receiptPath, {packageRoot.view(), PackageReceiptFileName}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(packageRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(
+                receiptPath.view(),
+                R"({"schema":1,"name":"fake","version":"1","source":"test","installRoot":"test","validation":"passed","exports":[{"kind":"capability","name":"tool.fake","path":"../escaped"}]})"_a8));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+        }
+        if (test_section("package receipt rejects unsupported schema during export lookup"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packageRoot = StringEncoding::Utf8;
+            String binRoot     = StringEncoding::Utf8;
+            String toolPath    = StringEncoding::Utf8;
+            String receiptPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packageRoot, {outputDirectory.view(), "_PackageReceiptSchemaTest"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "fake-tool"}));
+            SC_TEST_EXPECT(Path::join(receiptPath, {packageRoot.view(), PackageReceiptFileName}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(
+                receiptPath.view(),
+                R"({"schema":99,"name":"fake","exports":[{"kind":"capability","name":"tool.fake","path":"bin/fake-tool"}]})"_a8));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+        }
+        if (test_section("package receipt rejects duplicate exports during lookup"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packageRoot = StringEncoding::Utf8;
+            String binRoot     = StringEncoding::Utf8;
+            String firstPath   = StringEncoding::Utf8;
+            String secondPath  = StringEncoding::Utf8;
+            String receiptPath = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packageRoot, {outputDirectory.view(), "_PackageReceiptDuplicateTest"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(firstPath, {binRoot.view(), "first-tool"}));
+            SC_TEST_EXPECT(Path::join(secondPath, {binRoot.view(), "second-tool"}));
+            SC_TEST_EXPECT(Path::join(receiptPath, {packageRoot.view(), PackageReceiptFileName}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(firstPath.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(secondPath.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(
+                receiptPath.view(),
+                R"({"schema":1,"name":"fake","exports":[{"kind":"capability","name":"tool.fake","path":"bin/first-tool"},{"kind":"capability","name":"tool.fake","path":"bin/second-tool"}]})"_a8));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(not resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
+        }
+        if (test_section("package status can scan registry"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "status";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package verify can scan installed receipts"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "verify";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+        }
+        if (test_section("package receipt prints installed receipt"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packagesRoot = StringEncoding::Utf8;
+            String packageRoot  = StringEncoding::Utf8;
+            String binRoot      = StringEncoding::Utf8;
+            String toolPath     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), "_ReceiptCommandClang"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "clang-format"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+
+            Package package;
+            package.installDirectoryLink = packageRoot.view();
+            PackageReceiptInfo info;
+            info.packageName                     = "clang-binaries";
+            info.packageVersion                  = "1";
+            info.recipeVersion                   = "1";
+            info.hostPlatform                    = "test";
+            info.packageVariant                  = "host";
+            info.source                          = "test";
+            info.sourceHash                      = "";
+            info.validation                      = "passed";
+            const StringView phases[]            = {"writeReceipt"};
+            info.phases                          = phases;
+            const PackageReceiptExport exports[] = {
+                {"tool", "clang-format", "bin/clang-format"},
+            };
+            SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
+
+            arguments.tool      = "package";
+            arguments.action    = "receipt";
+            args[0]             = "clang";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+            SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+        }
+        if (test_section("package exports prints installed receipt exports"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packagesRoot = StringEncoding::Utf8;
+            String packageRoot  = StringEncoding::Utf8;
+            String binRoot      = StringEncoding::Utf8;
+            String toolPath     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), "_ExportsCommandClang"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "clang-format"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+
+            Package package;
+            package.installDirectoryLink = packageRoot.view();
+            PackageReceiptInfo info;
+            info.packageName                     = "clang-binaries";
+            info.packageVersion                  = "1";
+            info.recipeVersion                   = "1";
+            info.hostPlatform                    = "test";
+            info.packageVariant                  = "host";
+            info.source                          = "test";
+            info.sourceHash                      = "";
+            info.validation                      = "passed";
+            const StringView phases[]            = {"writeReceipt"};
+            info.phases                          = phases;
+            const PackageReceiptExport exports[] = {
+                {"tool", "clang-format", "bin/clang-format"},
+            };
+            SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
+
+            arguments.tool      = "package";
+            arguments.action    = "exports";
+            args[0]             = "clang";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+            SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+        }
+        if (test_section("package lock writes package identities"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "lock";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            String lockPath = StringEncoding::Utf8;
+            String lockText = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(lockPath, {outputDirectory.view(), "SC-package.lock"}));
+            SC_TEST_EXPECT(readFileIntoString(lockPath.view(), lockText));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"packages\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"exports\""));
         }
         if (runHeavySections and test_section("clang-format execute"))
         {
