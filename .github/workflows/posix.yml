@@ -45,10 +45,14 @@ jobs:
         path: |
           _Build/_PackagesCache/llvm
           _Build/_Packages/llvm_*
-        key: sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-posix-llvm-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-posix-llvm-v4-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: Prune restored LLVM package cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Restore Linux glibc x86_64 sysroot cache
       id: linux_sysroot_glibc_x64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'

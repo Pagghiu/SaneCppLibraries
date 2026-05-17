@@ -31,8 +31,9 @@ jobs:
         path: |
           _Build/_PackagesCache/llvm
           _Build/_Packages/llvm_*
-        key: sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-posix-llvm-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-posix-llvm-v4-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
     - name: Check restored LLVM package
       id: llvm-package
@@ -53,6 +54,8 @@ jobs:
     - name: Warm LLVM package
       if: steps.llvm-package.outputs.installed != 'true'
       run: ./SC.sh package install llvm
+    - name: Prune LLVM package cache
+      run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
