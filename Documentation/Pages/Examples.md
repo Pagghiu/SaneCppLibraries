@@ -68,6 +68,7 @@ Some relevant blog posts are:
 | AwaitFileCourier | Shows file copy followed by `AwaitEventLoop::fileSend()` over a socket                                                     |
 | AwaitFilePatch | Shows offset `fileWrite()` followed by `fileRead()` using caller-owned buffers                                             |
 | AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned coroutine arena                       |
+| AwaitManifestPreview | Shows bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage                                           |
 | AwaitProcessExitCodes | Shows concurrent child-process exit waits with `processExit()` and fixed job storage                                  |
 | AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |
 | AwaitThreadWakeUp | Shows another thread waking an Await coroutine through `AwaitLoopWakeUp`                                                   |

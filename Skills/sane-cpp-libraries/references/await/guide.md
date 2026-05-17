@@ -31,6 +31,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
 - Use `Examples/AwaitFilePatch` for offset `fileWrite()` followed by `fileRead()` with caller-owned buffers.
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.
+- Use `Examples/AwaitManifestPreview` for bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage.
 - Use `Examples/AwaitProcessExitCodes` for child process exit waits with `processExit()`.
 - Use `Examples/AwaitThreadWakeUp` for external thread notifications through `AwaitLoopWakeUp`.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
