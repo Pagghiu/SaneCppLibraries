@@ -129,6 +129,7 @@ Current CLI behavior:
 - `compile` / `run` accept `quiet`, `normal`, or `verbose` output control through `--output` or the `--quiet` / `--normal` / `--verbose` shortcuts
 - `--target` selects a friendly host or cross target profile without requiring the caller to spell the toolchain triple manually
 - `--toolchain` selects the compiler family orthogonally to `--target`
+- `--abi` is reserved for a future public ABI selector; use `--target` for glibc, musl, GNU, or MSVC selection today
 - `--triple` and `--sysroot` are raw escape hatches for advanced toolchain overrides
 - Raw overrides are applied after `--target`, so they win over the friendly profile defaults
 - `build run` can use `--runner` / `--runner-path` to control how foreign executables are launched
@@ -149,6 +150,8 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `Generator::{Native, XCode, VisualStudio2022, VisualStudio2019, Make}`
 - `Toolchain::{HostDefault, Clang, FilC, GCC, MSVC, ClangCL, LLVMMingw, CustomDriver}`
 - `RunnerSpec::{Auto, None, Wine, QEMU, Custom}`
+- `SupportMatrixEntry`, `SupportStatus`, `SupportTier`, and `getNativeBackendSupportMatrix()` for the native-backend
+  cross-compilation support matrix
 - `ExecutionOptions` for native-backend parallelism / verbosity knobs
 - `OutputMode::{Quiet, Normal, Verbose}` and `ExecutionOptions::outputMode` for native-backend presentation control
 - `Directories::projectDirectory` for the root of the project being configured, distinct from the SaneCppLibraries checkout
@@ -183,6 +186,29 @@ Call the helper after setting the project root directory, typically with
 | `VisualStudio2022` / `VisualStudio2019` | Windows | Console executable, GUI application, shared library, static library | No | Explicit generated-project workflow for Visual Studio |
 | `Make` | Apple, Linux | Console executable, GUI application, shared library, static library | Yes on clang-style flows | Explicit generated-project workflow for Make; GCC builds still compile, but Makefile-side compile database generation is unavailable there |
 
+# Native Cross Support Matrix
+
+The native backend exposes its current cross-compilation support claims through
+`Build::getNativeBackendSupportMatrix()`. Documentation and CI should treat that API as the source of truth for
+host / target rows, build support, run support, support tier, runner family, and validation notes.
+
+| Host | Target | Architecture | Build | Run | Runner | Tier |
+|:--|:--|:--|:--|:--|:--|:--|
+| macOS | windows-gnu | x86_64 | supported | supported | wine | tier1 |
+| macOS | windows-gnu | arm64 | supported | not-yet | wine | tier1 |
+| macOS | windows-msvc | x86_64 | supported | smoke-supported | wine | tier2 |
+| macOS | windows-msvc | arm64 | supported | not-yet | wine | tier2 |
+| macOS | linux-glibc | x86_64 | supported | smoke-supported | qemu | tier1 |
+| macOS | linux-glibc | arm64 | supported | smoke-supported | qemu | tier1 |
+| macOS | linux-musl | x86_64 | supported | smoke-supported | qemu | tier1 |
+| macOS | linux-musl | arm64 | supported | smoke-supported | qemu | tier1 |
+| Windows | linux-glibc | arm64 | supported | not-yet | qemu | tier2 |
+| Windows | linux-musl | x86_64 | supported | not-yet | qemu | tier2 |
+| Linux | windows-gnu | x86_64 | supported | supported | wine | tier1 |
+| Linux | windows-gnu | arm64 | supported | smoke-supported | wine | tier1 |
+| Linux | windows-msvc | x86_64 | supported | smoke-supported | wine | tier2 |
+| Linux | windows-msvc | arm64 | supported | smoke-supported | wine | tier2 |
+
 # Native Backend
 
 The standalone backend is selected through `SC::Build::Generator::Native`.
@@ -191,7 +217,7 @@ Current implemented scope:
 
 - Host platforms: macOS, Linux and Windows
 - Toolchain families exposed by the API: `HostDefault`, `Clang`, `FilC`, `GCC`, `MSVC`, `ClangCL`, `LLVMMingw`, and `CustomDriver`
-- Experimental compiler-first track: `FilC` is now exposed by the API and CLI through `--toolchain filc`, but it is Linux-only, compiler-first, and not a public target-profile row yet
+- Experimental compiler-first track: `FilC` is now exposed by the API and CLI through `--toolchain filc`, but it is Linux-only, compiler-first, and toolchain-only for now; no public `linux-filc-*` target profile exists
 - Target kinds: console executables, GUI applications, shared libraries, and static libraries
 - Dependency tracking: compiler-generated dependency files / dependency output
 - Incrementality: skips up-to-date compile and link steps
@@ -203,7 +229,7 @@ Current implemented scope:
 Current cross-compilation scope:
 
 - macOS and Linux hosts can compile `windows-gnu-x86_64` and `windows-gnu-arm64` through packaged `llvm-mingw`
-- Linux hosts can now experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is currently limited to native Linux `x86_64` output and is still outside the public support matrix while compile/start validation hardens
+- Linux hosts can now experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is currently limited to native Linux `x86_64` output and remains toolchain-only outside the public target-profile matrix
 - Linux `glibc` and `musl` target profiles now exist as first-class native-backend profiles; they shape canonical target
   triples and sysroot flags, and macOS hosts now auto-select both a packaged LLVM toolchain and packaged Linux sysroots
   for them when the caller has not provided explicit compiler paths
@@ -212,6 +238,10 @@ Current cross-compilation scope:
 - `build run` can now wrap foreign Linux targets through `qemu-user`; the native runner can reuse a managed
   `SC-package install qemu` registration or fall back to host `qemu-*` executables from `PATH`, and it passes
   `-L <sysroot>` so dynamically linked Linux targets can find their loader and libraries
+- macOS glibc and musl Linux target rows are promoted to smoke-supported when real host `qemu-x86_64` and
+  `qemu-aarch64` executables are available in CI
+- Windows hosts have packaged LLVM + Linux sysroot compile validation for representative `linux-glibc-arm64` and
+  `linux-musl-x86_64` target profiles; Windows-host Linux runs remain pending
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
 - Linux arm64 hosts can now validate the same portable MSVC path end-to-end for `windows-msvc-x86_64` and
   `windows-msvc-arm64`; the package tool auto-prefers a generated `box64 + wine64` wrapper when those host tools are
@@ -275,11 +305,11 @@ SC.bat build compile SCTest --config Debug
 
 Important current limits:
 
-- macOS is the only non-Linux host with a validated packaged Linux sysroot path today
-- The QEMU runner path can now reuse a managed imported `qemu-user` layout, but real repository-side QEMU execution is
-  not yet validated in CI against a real host QEMU install
-- Windows-host Linux-target packaging and validation are still pending
-- Fil-C is still an experimental compiler-first Linux track: no public `linux-filc-*` target profile exists yet, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
+- The QEMU runner path can reuse a managed imported `qemu-user` layout or host `qemu-*` executables; real host-QEMU
+  smoke validation is currently promoted for macOS `linux-glibc-*` and `linux-musl-*` rows
+- Windows-host Linux-target support is compile-only today and validated for representative glibc arm64 and musl x86_64
+  slices; Windows-host Linux run validation is still pending
+- Fil-C is still an experimental compiler-first Linux track: the public shape is `--toolchain filc`, no public `linux-filc-*` target profile exists, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
 - The repository `build configure` command remains available for generated-project workflows; native builds do not need

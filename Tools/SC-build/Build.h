@@ -253,6 +253,182 @@ struct RunnerSpec
     Vector<String> arguments;
 };
 
+/// @brief Support status for a build or run capability in the native backend support matrix
+struct SupportStatus
+{
+    enum Type
+    {
+        Unsupported,
+        NotYet,
+        SmokeSupported,
+        Supported,
+        Experimental,
+        Blocked,
+    };
+
+    /// @brief Get StringView from SupportStatus::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case Unsupported: return "unsupported";
+        case NotYet: return "not-yet";
+        case SmokeSupported: return "smoke-supported";
+        case Supported: return "supported";
+        case Experimental: return "experimental";
+        case Blocked: return "blocked";
+        }
+        Assert::unreachable();
+    }
+};
+
+/// @brief Confidence tier for a row in the native backend support matrix
+struct SupportTier
+{
+    enum Type
+    {
+        Unsupported,
+        Experimental,
+        Tier1,
+        Tier2,
+        Blocked,
+    };
+
+    /// @brief Get StringView from SupportTier::Type
+    static constexpr StringView toString(Type type)
+    {
+        switch (type)
+        {
+        case Unsupported: return "unsupported";
+        case Experimental: return "experimental";
+        case Tier1: return "tier1";
+        case Tier2: return "tier2";
+        case Blocked: return "blocked";
+        }
+        Assert::unreachable();
+    }
+};
+
+/// @brief One host->target support claim for the native backend
+struct SupportMatrixEntry
+{
+    Machine hostMachine;
+    Machine targetMachine;
+
+    SupportStatus::Type buildSupport = SupportStatus::Unsupported;
+    SupportStatus::Type runSupport   = SupportStatus::Unsupported;
+    SupportTier::Type   tier         = SupportTier::Unsupported;
+    RunnerSpec::Type    runner       = RunnerSpec::None;
+
+    StringView validation;
+};
+
+/// @brief Returns the current native-backend cross-compilation support matrix
+[[nodiscard]] inline Span<const SupportMatrixEntry> getNativeBackendSupportMatrix()
+{
+    static constexpr SupportMatrixEntry entries[] = {
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Intel64, TargetEnvironment::WindowsGNU},
+         SupportStatus::Supported,
+         SupportStatus::Supported,
+         SupportTier::Tier1,
+         RunnerSpec::Wine,
+         "fixture-compile-and-wine-run"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Arm64, TargetEnvironment::WindowsGNU},
+         SupportStatus::Supported,
+         SupportStatus::NotYet,
+         SupportTier::Tier1,
+         RunnerSpec::Wine,
+         "fixture-compile-packaged-wine-missing-arm64-loader"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Intel64, TargetEnvironment::WindowsMSVC},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier2,
+         RunnerSpec::Wine,
+         "portable-msvc-compile-link-and-smoke-run"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Arm64, TargetEnvironment::WindowsMSVC},
+         SupportStatus::Supported,
+         SupportStatus::NotYet,
+         SupportTier::Tier2,
+         RunnerSpec::Wine,
+         "portable-msvc-arm64-compile-packaged-wine-missing-arm64-loader"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Intel64, TargetEnvironment::LinuxGlibc},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier1,
+         RunnerSpec::QEMU,
+         "packaged-llvm-glibc-sysroot-compile-and-real-qemu-smoke"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Arm64, TargetEnvironment::LinuxGlibc},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier1,
+         RunnerSpec::QEMU,
+         "packaged-llvm-glibc-sysroot-compile-and-real-qemu-smoke"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Intel64, TargetEnvironment::LinuxMusl},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier1,
+         RunnerSpec::QEMU,
+         "packaged-llvm-musl-sysroot-compile-and-real-qemu-smoke"},
+        {{Platform::Apple, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Arm64, TargetEnvironment::LinuxMusl},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier1,
+         RunnerSpec::QEMU,
+         "packaged-llvm-musl-sysroot-compile-and-real-qemu-smoke"},
+        {{Platform::Windows, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Arm64, TargetEnvironment::LinuxGlibc},
+         SupportStatus::Supported,
+         SupportStatus::NotYet,
+         SupportTier::Tier2,
+         RunnerSpec::QEMU,
+         "windows-packaged-llvm-glibc-sysroot-compile"},
+        {{Platform::Windows, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Linux, Architecture::Intel64, TargetEnvironment::LinuxMusl},
+         SupportStatus::Supported,
+         SupportStatus::NotYet,
+         SupportTier::Tier2,
+         RunnerSpec::QEMU,
+         "windows-packaged-llvm-musl-sysroot-compile"},
+        {{Platform::Linux, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Intel64, TargetEnvironment::WindowsGNU},
+         SupportStatus::Supported,
+         SupportStatus::Supported,
+         SupportTier::Tier1,
+         RunnerSpec::Wine,
+         "fixture-compile-and-wine-run"},
+        {{Platform::Linux, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Arm64, TargetEnvironment::WindowsGNU},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier1,
+         RunnerSpec::Wine,
+         "linux-arm64-sctest-targeted-wine-smoke"},
+        {{Platform::Linux, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Intel64, TargetEnvironment::WindowsMSVC},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier2,
+         RunnerSpec::Wine,
+         "linux-arm64-portable-msvc-targeted-wine-smoke"},
+        {{Platform::Linux, Architecture::Any, TargetEnvironment::Native},
+         {Platform::Windows, Architecture::Arm64, TargetEnvironment::WindowsMSVC},
+         SupportStatus::Supported,
+         SupportStatus::SmokeSupported,
+         SupportTier::Tier2,
+         RunnerSpec::Wine,
+         "linux-arm64-portable-msvc-targeted-wine-smoke"},
+    };
+    return entries;
+}
+
 /// @brief Optimization level (Debug / Release)
 struct Optimization
 {

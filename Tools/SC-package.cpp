@@ -1009,7 +1009,13 @@ Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet archit
         }
     }
 
-    return Result::Error("QEMU package is missing the requested runner executable");
+    switch (architecture)
+    {
+    case InstructionSet::Intel64: return Result::Error("QEMU package is missing qemu-x86_64 runner executable");
+    case InstructionSet::ARM64: return Result::Error("QEMU package is missing qemu-aarch64 runner executable");
+    case InstructionSet::Intel32: return Result::Error("Unsupported QEMU runner architecture");
+    }
+    Assert::unreachable();
 }
 
 static Result testQEMURunnerExecutable(StringView executable, String* versionLine = nullptr)
@@ -1037,15 +1043,23 @@ static Result testQEMURunnerExecutable(StringView executable, String* versionLin
 
 static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTargets = nullptr)
 {
-    bool   foundAny = false;
-    String targets  = StringEncoding::Utf8;
+    bool   foundX86_64 = false;
+    bool   foundArm64  = false;
+    String targets     = StringEncoding::Utf8;
     for (const InstructionSet architecture : {InstructionSet::Intel64, InstructionSet::ARM64})
     {
         String executable = StringEncoding::Utf8;
         if (resolveQEMURunnerExecutable(packageRoot, architecture, executable))
         {
             SC_TRY(testQEMURunnerExecutable(executable.view()));
-            foundAny = true;
+            if (architecture == InstructionSet::Intel64)
+            {
+                foundX86_64 = true;
+            }
+            else
+            {
+                foundArm64 = true;
+            }
             if (detectedTargets != nullptr and not targets.isEmpty())
             {
                 SC_TRY(StringBuilder::createForAppendingTo(targets).append(","));
@@ -1055,7 +1069,18 @@ static Result testQEMUPackageRoot(StringView packageRoot, String* detectedTarget
         }
     }
 
-    SC_TRY_MSG(foundAny, "QEMU package must provide qemu-x86_64 or qemu-aarch64");
+    if (not foundX86_64 and not foundArm64)
+    {
+        return Result::Error("QEMU package must provide qemu-x86_64 and qemu-aarch64");
+    }
+    if (not foundX86_64)
+    {
+        return Result::Error("QEMU package is missing qemu-x86_64");
+    }
+    if (not foundArm64)
+    {
+        return Result::Error("QEMU package is missing qemu-aarch64");
+    }
     if (detectedTargets != nullptr)
     {
         SC_TRY(detectedTargets->assign(targets.view()));
@@ -1227,6 +1252,72 @@ static Result repairMSVCPackageLayout(StringView packageRoot, StringView wineExe
     return Result(true);
 }
 
+static Result msvcPackagePathExists(FileSystem& fs, StringView packageRoot, Span<const StringView> components,
+                                    const char* missingMessage)
+{
+    String path = StringEncoding::Utf8;
+    SC_TRY(Path::join(path, {packageRoot}));
+    SC_TRY(Path::append(path, components, Path::AsNative));
+    if (not fs.exists(path.view()))
+    {
+        return Result::FromStableCharPointer(missingMessage);
+    }
+    return Result(true);
+}
+
+static Result validateMSVCPackageLayout(FileSystem& fs, StringView packageRoot)
+{
+    String msvcVersion = StringEncoding::Utf8;
+    String sdkVersion  = StringEncoding::Utf8;
+    SC_TRY(resolveMSVCVersions(packageRoot, msvcVersion, sdkVersion));
+
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "include"},
+                                 "Portable MSVC package is missing the MSVC include directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "um"},
+                                 "Portable MSVC package is missing the Windows SDK um include directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "shared"},
+                                 "Portable MSVC package is missing the Windows SDK shared include directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "ucrt"},
+                                 "Portable MSVC package is missing the Windows SDK ucrt include directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "winrt"},
+                                 "Portable MSVC package is missing the Windows SDK winrt include directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Include", sdkVersion.view(), "cppwinrt"},
+                                 "Portable MSVC package is missing the Windows SDK cppwinrt include directory"));
+
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "lib", "x64"},
+                                 "Portable MSVC package is missing the x64 MSVC library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "um", "x64"},
+                                 "Portable MSVC package is missing the x64 Windows SDK um library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "ucrt", "x64"},
+                                 "Portable MSVC package is missing the x64 Windows SDK ucrt library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "cl.exe"},
+                                 "Portable MSVC package is missing the x64 cl.exe tool"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "link.exe"},
+                                 "Portable MSVC package is missing the x64 link.exe tool"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "x64", "lib.exe"},
+                                 "Portable MSVC package is missing the x64 lib.exe tool"));
+
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"VC", "Tools", "MSVC", msvcVersion.view(), "lib", "arm64"},
+                                 "Portable MSVC package is missing the arm64 MSVC library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "um", "arm64"},
+                                 "Portable MSVC package is missing the arm64 Windows SDK um library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot, {"Windows Kits", "10", "Lib", sdkVersion.view(), "ucrt", "arm64"},
+                                 "Portable MSVC package is missing the arm64 Windows SDK ucrt library directory"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "cl.exe"},
+                                 "Portable MSVC package is missing the arm64 cl.exe tool"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "link.exe"},
+                                 "Portable MSVC package is missing the arm64 link.exe tool"));
+    SC_TRY(msvcPackagePathExists(fs, packageRoot,
+                                 {"VC", "Tools", "MSVC", msvcVersion.view(), "bin", "Hostx64", "arm64", "lib.exe"},
+                                 "Portable MSVC package is missing the arm64 lib.exe tool"));
+    return Result(true);
+}
+
 static Result writeMSVCWrapperScripts(StringView packageRoot)
 {
     FileSystem fs;
@@ -1294,6 +1385,16 @@ static Result finalizeInstalledPackage(Package& package)
     return finalizeInstalledPackageFromRoot(package.packageLocalDirectory.view(), package);
 }
 
+static Result removePackageInstallLink(FileSystem& fs, const Package& package)
+{
+    SC_TRY(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+    if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+    }
+    return Result(true);
+}
+
 Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                          StringView importDirectory)
 {
@@ -1345,8 +1446,13 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
 
     SC_TRY(finalizeInstalledPackageFromRoot(sourceRoot.view(), package));
 
-    String detectedTargets = StringEncoding::Utf8;
-    SC_TRY(testQEMUPackageRoot(package.installDirectoryLink.view(), &detectedTargets));
+    String       detectedTargets = StringEncoding::Utf8;
+    const Result qemuValidation  = testQEMUPackageRoot(package.installDirectoryLink.view(), &detectedTargets);
+    if (not qemuValidation)
+    {
+        SC_TRY(removePackageInstallLink(fs, package));
+        return qemuValidation;
+    }
 
     String metadata = StringEncoding::Utf8;
     auto   builder  = StringBuilder::create(metadata);
@@ -1361,6 +1467,7 @@ static Result testMSVCToolchain(const Package& package)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
+    SC_TRY(validateMSVCPackageLayout(fs, package.installDirectoryLink.view()));
 
     static constexpr StringView targetArchitectures[] = {"x64", "arm64"};
     for (const StringView targetArchitecture : targetArchitectures)
@@ -2028,12 +2135,16 @@ static Result testFilCToolchain(const Package& package, String* detectedVersion 
     SC_TRY(extractVersionLineSuffix(versionOut.view(), "Fil-C "_a8, version));
     SC_TRY(extractVersionLineSuffix(versionOut.view(), "Target:"_a8, targetTriple));
     SC_TRY_MSG(targetTriple == "x86_64-unknown-linux-gnu",
-               "Fil-C package target triple doesn't match the supported x86_64 Linux slice");
+               "Fil-C package target triple is unsupported; expected x86_64-unknown-linux-gnu");
 
     Process process;
-    String  cVersionOut = StringEncoding::Utf8;
+    String  cVersionOut   = StringEncoding::Utf8;
+    String  cTargetTriple = StringEncoding::Utf8;
     SC_TRY(process.exec({compilerC.view(), "--version"}, cVersionOut));
     SC_TRY_MSG(process.getExitStatus() == 0, "Fil-C C compiler returned error");
+    SC_TRY_MSG(StringView(cVersionOut.view()).containsString("Fil-C"), "Fil-C C compiler marker missing");
+    SC_TRY(extractVersionLineSuffix(cVersionOut.view(), "Target:"_a8, cTargetTriple));
+    SC_TRY_MSG(cTargetTriple == targetTriple, "Fil-C C and C++ compiler target triples do not match");
 
     if (detectedVersion)
     {
@@ -2188,7 +2299,16 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
         SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang", compilerC));
         SC_TRY(resolveFilCCompilerPath(package.installDirectoryLink.view(), "clang++", compilerCpp));
         SC_TRY(resolveHostCommandPath("ar", archiver));
-        SC_TRY(testFilCToolchain(package, &detectedVersion, &detectedTarget));
+        const Result filcValidation = testFilCToolchain(package, &detectedVersion, &detectedTarget);
+        if (not filcValidation)
+        {
+            SC_TRY(removePackageInstallLink(fs, package));
+            if (not importing and fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
+            {
+                SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+            }
+            return filcValidation;
+        }
         SC_TRY(writeFilCPackageMetadata(activePackageRoot.view(), detectedVersion.view(), packageFlavor,
                                         compilerC.view(), compilerCpp.view(), compilerCpp.view(), archiver.view(),
                                         detectedTarget.view()));
@@ -3089,12 +3209,12 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
         const Result installResult = installPortableMSVC();
         if (not installResult)
         {
-            SC_TRUST_RESULT(fs.removeLinkIfExists(package.installDirectoryLink.view()));
+            SC_TRY(removePackageInstallLink(fs, package));
             if (fs.existsAndIsDirectory(package.packageLocalDirectory.view()))
             {
-                SC_TRUST_RESULT(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
+                SC_TRY(fs.removeDirectoriesRecursive(package.packageLocalDirectory.view()));
             }
-            return Result::Error("Portable MSVC install failed and the incomplete package layout was removed");
+            return installResult;
         }
 
         String packageTxt = StringEncoding::Utf8;

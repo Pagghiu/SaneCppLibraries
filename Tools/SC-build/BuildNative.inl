@@ -2693,9 +2693,16 @@ struct SC::Build::NativeBuild
 
     static constexpr bool canRunDirectly(const ResolvedTargetContext& context)
     {
-        return targetPlatform(context) == context.hostMachine.platform and
-               targetArchitecture(context) == context.hostMachine.architecture and
-               context.targetMachine.environment == TargetEnvironment::Native;
+        if (targetPlatform(context) != context.hostMachine.platform or
+            context.targetMachine.environment != TargetEnvironment::Native)
+        {
+            return false;
+        }
+        if (context.hostMachine.platform == Platform::Linux)
+        {
+            return true;
+        }
+        return targetArchitecture(context) == context.hostMachine.architecture;
     }
 
     static constexpr bool canRunThroughHostTranslation(const Parameters&            parameters,
@@ -2714,9 +2721,8 @@ struct SC::Build::NativeBuild
 
     static constexpr bool isQEMURunnableLinuxTarget(const ResolvedTargetContext& context)
     {
-        return targetPlatform(context) == Platform::Linux and
-               (context.hostMachine.platform != Platform::Linux or
-                targetArchitecture(context) != context.hostMachine.architecture);
+        return isLinuxTarget(context) and (context.hostMachine.platform != Platform::Linux or
+                                           targetArchitecture(context) != context.hostMachine.architecture);
     }
 
     static Result appendRunnerArgument(Vector<String>& arguments, StringView value)

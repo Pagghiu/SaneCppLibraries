@@ -204,6 +204,20 @@ static Result resolveHostToolPath(StringView toolName, String& toolPath)
     SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
     return Result(true);
 }
+
+#if SC_PLATFORM_APPLE
+static bool tryResolveHostToolPath(StringView toolName, String& toolPath)
+{
+    Process process;
+    String  output = StringEncoding::Utf8;
+    if (not process.exec({"which", toolName}, output) or process.getExitStatus() != 0)
+    {
+        return false;
+    }
+    return toolPath.assign(StringView(output.view()).trimWhiteSpaces());
+}
+#endif
+
 static Result writeToolWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath, StringView toolPath)
 {
     String scriptContents = StringEncoding::Utf8;
@@ -540,6 +554,14 @@ static Result unsetScopedEnvironmentVariable(StringView name, ScopedEnvironmentV
 }
 #endif
 
+#if SC_PLATFORM_APPLE
+static bool isEnvironmentFlagEnabled(const char* name)
+{
+    const char* value = ::getenv(name);
+    return value != nullptr and value[0] != '\0' and value[0] != '0';
+}
+#endif
+
 static Result writeFakeMSVCWineScript(FileSystem& fs, StringView scriptPath, StringView logPath)
 {
     String scriptContents = StringEncoding::Utf8;
@@ -674,7 +696,8 @@ static Result createPortableMSVCImportFixture(FileSystem& fs, StringView rootDir
 
 #if SC_PLATFORM_LINUX
 static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView scriptPath, StringView logPath,
-                                               StringView toolPath, StringView installedDir)
+                                               StringView toolPath, StringView installedDir,
+                                               StringView targetTriple = "x86_64-unknown-linux-gnu")
 {
     String scriptContents = StringEncoding::Utf8;
     auto   builder        = StringBuilder::create(scriptContents);
@@ -682,7 +705,7 @@ static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView script
     SC_TRY(builder.append("printf '%s\\n' \"$*\" >> \"{}\"\n", logPath));
     SC_TRY(builder.append("if [ \"$1\" = \"--version\" ]; then\n"));
     SC_TRY(builder.append("  printf '%s\\n' 'Fil-C 0.678 clang version 20.1.8'\n"));
-    SC_TRY(builder.append("  printf '%s\\n' 'Target: x86_64-unknown-linux-gnu'\n"));
+    SC_TRY(builder.append("  printf '%s\\n' 'Target: {}'\n", targetTriple));
     SC_TRY(builder.append("  printf '%s\\n' 'Thread model: posix'\n"));
     SC_TRY(builder.append("  printf '%s\\n' 'InstalledDir: {}'\n", installedDir));
     SC_TRY(builder.append("  printf '%s\\n' 'Build config: +assertions'\n"));
@@ -696,7 +719,8 @@ static Result writeFilCForwardingWrapperScript(FileSystem& fs, StringView script
 }
 
 static Result createFakeFilCImportFixture(FileSystem& fs, StringView rootDirectory, StringView compilerCLogPath,
-                                          StringView compilerCppLogPath)
+                                          StringView compilerCppLogPath,
+                                          StringView targetTriple = "x86_64-unknown-linux-gnu")
 {
     String binDirectory = StringEncoding::Utf8;
     String clangPath    = StringEncoding::Utf8;
@@ -714,9 +738,9 @@ static Result createFakeFilCImportFixture(FileSystem& fs, StringView rootDirecto
     SC_TRY(fs.writeString(compilerCLogPath, ""));
     SC_TRY(fs.writeString(compilerCppLogPath, ""));
     SC_TRY(writeFilCForwardingWrapperScript(fs, clangPath.view(), compilerCLogPath, hostClang.view(),
-                                            binDirectory.view()));
+                                            binDirectory.view(), targetTriple));
     SC_TRY(writeFilCForwardingWrapperScript(fs, clangCppPath.view(), compilerCppLogPath, hostClangCpp.view(),
-                                            binDirectory.view()));
+                                            binDirectory.view(), targetTriple));
     return Result(true);
 }
 #endif
@@ -2054,6 +2078,24 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(stdoutOutput == "self-hosting-build-file\n"_a8);
         }
 
+#if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX or SC_PLATFORM_WINDOWS
+        if (test_section("package install rejects unsupported Linux sysroot architecture"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            Tools::LinuxSysrootSpec spec;
+            spec.environment  = Tools::LinuxSysrootSpec::Glibc;
+            spec.architecture = InstructionSet::Intel32;
+
+            Tools::Package package;
+            SC_TEST_EXPECT(not Tools::installLinuxSysroot(directories.packagesCacheDirectory.view(),
+                                                          directories.packagesInstallDirectory.view(), spec, package));
+        }
+#endif
+
 #if SC_PLATFORM_APPLE or SC_PLATFORM_LINUX
         if (test_section("native backend cross compiles Windows x86_64 fixture with llvm-mingw"))
         {
@@ -2254,6 +2296,41 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(wineInvocation.view()).containsString("Ws2_32.lib"));
         }
 
+        if (test_section("package install rejects incomplete portable MSVC import"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot     = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String wineLog        = StringEncoding::Utf8;
+            String winePath       = StringEncoding::Utf8;
+            String removedSDKUCRT = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "PortableMSVCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(wineLog, {toolRoot.view(), "portable-msvc-incomplete-wine.log"}));
+            SC_TRUST_RESULT(Path::join(winePath, {toolRoot.view(), "wine"}));
+            SC_TRUST_RESULT(Path::join(removedSDKUCRT,
+                                       {importRoot.view(), "Windows Kits", "10", "Include", "10.0.26100.0", "ucrt"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createPortableMSVCImportFixture(fs, importRoot.view()));
+            SC_TRUST_RESULT(fs.removeDirectoriesRecursive(removedSDKUCRT.view()));
+            SC_TRUST_RESULT(writeFakeMSVCWineScript(fs, winePath.view(), wineLog.view()));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(not Tools::installMSVCToolchain(directories.packagesCacheDirectory.view(),
+                                                           directories.packagesInstallDirectory.view(), package,
+                                                           importRoot.view(), winePath.view()));
+            SC_TEST_EXPECT(not fs.existsAndIsDirectory(package.installDirectoryLink.view()));
+        }
+
         if (test_section("portable MSVC wrapper preserves slash defines"))
         {
             SC_TRUST_RESULT(verifyNativeBackendHostSupport());
@@ -2429,6 +2506,37 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(fs.read(compilerCppLog.view(), compilerCppInvocation));
             SC_TEST_EXPECT(StringView(compilerCInvocation.view()).containsString("--version"));
             SC_TEST_EXPECT(StringView(compilerCppInvocation.view()).containsString("--version"));
+        }
+
+        if (test_section("package install rejects filc import with unsupported target"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String importRoot     = StringEncoding::Utf8;
+            String toolRoot       = StringEncoding::Utf8;
+            String compilerCLog   = StringEncoding::Utf8;
+            String compilerCppLog = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(importRoot, {buildRoot.view(), "FilCImport"}));
+            SC_TRUST_RESULT(Path::join(toolRoot, {buildRoot.view(), "Toolchain"}));
+            SC_TRUST_RESULT(Path::join(compilerCLog, {toolRoot.view(), "filc-bad-target-clang.log"}));
+            SC_TRUST_RESULT(Path::join(compilerCppLog, {toolRoot.view(), "filc-bad-target-clangxx.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(toolRoot.view()));
+            SC_TRUST_RESULT(createFakeFilCImportFixture(fs, importRoot.view(), compilerCLog.view(),
+                                                        compilerCppLog.view(), "aarch64-unknown-linux-gnu"));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(not Tools::installFilCToolchain(directories.packagesCacheDirectory.view(),
+                                                           directories.packagesInstallDirectory.view(), package,
+                                                           importRoot.view()));
+            SC_TEST_EXPECT(not fs.existsAndIsDirectory(package.installDirectoryLink.view()));
         }
 
         if (test_section("package install reuses imported filc metadata without explicit import arguments"))
@@ -2785,6 +2893,35 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(fs.read(package.packageLocalTxt.view(), packageMetadata));
             SC_TEST_EXPECT(StringView(packageMetadata.view()).containsString("SC_PACKAGE_URL=import:"));
             SC_TEST_EXPECT(StringView(packageMetadata.view()).containsString("SC_PACKAGE_TARGETS=x86_64,arm64"));
+        }
+
+        if (test_section("package install rejects incomplete qemu imports"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(
+                createFixtureDirectories(report, buildRoot, directories, FixturePackageLayout::IsolatedRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String runnerRoot   = StringEncoding::Utf8;
+            String binDirectory = StringEncoding::Utf8;
+            String qemuX86Path  = StringEncoding::Utf8;
+            String qemuX86Log   = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(runnerRoot, {buildRoot.view(), "IncompleteQEMU"}));
+            SC_TRUST_RESULT(Path::join(binDirectory, {runnerRoot.view(), "bin"}));
+            SC_TRUST_RESULT(Path::join(qemuX86Path, {binDirectory.view(), "qemu-x86_64"}));
+            SC_TRUST_RESULT(Path::join(qemuX86Log, {buildRoot.view(), "qemu-x86_64.log"}));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(binDirectory.view()));
+            SC_TRUST_RESULT(
+                writeFakeQEMUWrapperScript(fs, qemuX86Path.view(), qemuX86Log.view(), "qemu-x86_64 version 10.0.0"));
+
+            Tools::Package package;
+            SC_TEST_EXPECT(not Tools::installQEMURunner(directories.packagesCacheDirectory.view(),
+                                                        directories.packagesInstallDirectory.view(), package,
+                                                        runnerRoot.view()));
+            SC_TEST_EXPECT(not fs.existsAndIsDirectory(package.installDirectoryLink.view()));
         }
 #endif
 
@@ -4060,6 +4197,66 @@ struct SCBuildFixtureTest : public SC::TestCase
 #endif
 
 #if SC_PLATFORM_APPLE
+        {
+            String     qemuX86_64      = StringEncoding::Utf8;
+            String     qemuArm64       = StringEncoding::Utf8;
+            const bool hasQEMUX86_64   = tryResolveHostToolPath("qemu-x86_64", qemuX86_64);
+            const bool hasQEMUArm64    = tryResolveHostToolPath("qemu-aarch64", qemuArm64);
+            const bool requireRealQEMU = isEnvironmentFlagEnabled("SC_BUILD_REQUIRE_REAL_QEMU");
+            if (test_section("native backend smoke-runs Linux target profiles through real qemu on macOS"))
+            {
+                if (requireRealQEMU)
+                {
+                    SC_TEST_EXPECT(hasQEMUX86_64);
+                    SC_TEST_EXPECT(hasQEMUArm64);
+                }
+                if (not(hasQEMUX86_64 or hasQEMUArm64))
+                {
+                    SC_TEST_EXPECT(true);
+                }
+                else
+                {
+                    SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+                    auto smokeRunLinuxTarget = [&](Build::TargetEnvironment::Type environment,
+                                                   Build::Architecture::Type      architecture,
+                                                   StringView                     qemuExecutable) -> Result
+                    {
+                        String             buildRoot = StringEncoding::Utf8;
+                        Build::Directories directories;
+                        SC_TRY(createFixtureDirectories(report, buildRoot, directories));
+
+                        Build::Action action          = makeNativeCompileAction(directories, FixtureProjectName);
+                        action.action                 = Build::Action::Run;
+                        action.parameters.runner.type = Build::RunnerSpec::QEMU;
+                        SC_TRY(action.parameters.runner.executable.assign(qemuExecutable));
+                        SC_TRY(configureLinuxTargetAction(action, environment, architecture));
+
+                        StringView forwardedArguments[] = {"--fixture", "runner"};
+                        action.additionalArguments      = {forwardedArguments,
+                                                           sizeof(forwardedArguments) / sizeof(forwardedArguments[0])};
+                        SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
+                        return Result(true);
+                    };
+
+                    if (hasQEMUX86_64)
+                    {
+                        SC_TRUST_RESULT(smokeRunLinuxTarget(Build::TargetEnvironment::LinuxGlibc,
+                                                            Build::Architecture::Intel64, qemuX86_64.view()));
+                        SC_TRUST_RESULT(smokeRunLinuxTarget(Build::TargetEnvironment::LinuxMusl,
+                                                            Build::Architecture::Intel64, qemuX86_64.view()));
+                    }
+                    if (hasQEMUArm64)
+                    {
+                        SC_TRUST_RESULT(smokeRunLinuxTarget(Build::TargetEnvironment::LinuxGlibc,
+                                                            Build::Architecture::Arm64, qemuArm64.view()));
+                        SC_TRUST_RESULT(smokeRunLinuxTarget(Build::TargetEnvironment::LinuxMusl,
+                                                            Build::Architecture::Arm64, qemuArm64.view()));
+                    }
+                }
+            }
+        }
+
         if (test_section("native backend auto-selects packaged LLVM toolchain and glibc sysroot for Linux target "
                          "profiles on macOS"))
         {

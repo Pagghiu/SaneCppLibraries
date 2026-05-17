@@ -37,6 +37,7 @@ struct BuildCLIParseContext
     StringSpan configuration    = {};
     StringSpan generator        = {};
     StringSpan architecture     = {};
+    StringSpan abi              = {};
     StringSpan targetTriple     = {};
     StringSpan sysroot          = {};
     StringSpan runner           = {};

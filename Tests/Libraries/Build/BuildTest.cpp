@@ -6,6 +6,7 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
+#include "Tools/SC-build/BuildCLI.h"
 
 namespace SC
 {
@@ -46,6 +47,81 @@ static Result computeGeneratedMakefilePath(const Build::Directories& directories
     }
     return Result(true);
 }
+
+static bool supportMatrixContains(Span<const Build::SupportMatrixEntry> matrix, Build::Platform::Type hostPlatform,
+                                  Build::TargetEnvironment::Type targetEnvironment,
+                                  Build::Architecture::Type targetArchitecture, Build::SupportStatus::Type buildSupport,
+                                  Build::SupportStatus::Type runSupport, Build::SupportTier::Type tier,
+                                  Build::RunnerSpec::Type runner)
+{
+    for (const Build::SupportMatrixEntry& entry : matrix)
+    {
+        if (entry.hostMachine.platform == hostPlatform and
+            entry.hostMachine.environment == Build::TargetEnvironment::Native and
+            entry.targetMachine.environment == targetEnvironment and
+            entry.targetMachine.architecture == targetArchitecture and entry.buildSupport == buildSupport and
+            entry.runSupport == runSupport and entry.tier == tier and entry.runner == runner)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static constexpr StringView supportMatrixHostName(Build::Platform::Type platform)
+{
+    switch (platform)
+    {
+    case Build::Platform::Windows: return "Windows";
+    case Build::Platform::Apple: return "macOS";
+    case Build::Platform::Linux: return "Linux";
+    case Build::Platform::Wasm: return "Wasm";
+    case Build::Platform::Unknown: return "unknown";
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView supportMatrixArchitectureName(Build::Architecture::Type architecture)
+{
+    switch (architecture)
+    {
+    case Build::Architecture::Intel64: return "x86_64";
+    case Build::Architecture::Arm64: return "arm64";
+    case Build::Architecture::Intel32: return "intel32";
+    case Build::Architecture::Wasm: return "wasm";
+    case Build::Architecture::Any: return "any";
+    }
+    Assert::unreachable();
+}
+
+static Result prepareBuildCLIAction(TestReport& report, Span<const StringView> cliArguments,
+                                    Build::Action::Type actionType, Build::Action& action,
+                                    Tools::detail::BuildCLIStatus& status)
+{
+    Console    console;
+    StringPath outputDirectory;
+    SC_TRY(StringBuilder::format(outputDirectory, "{}/_Build", report.libraryRootDirectory));
+
+    auto                                   arguments = Tools::Tool::Arguments{console,
+                                            report.libraryRootDirectory,
+                                            report.libraryRootDirectory,
+                                            outputDirectory,
+                                            report.libraryRootDirectory,
+                                            "build",
+                                            actionType == Build::Action::Run ? "run"_a8 : "compile"_a8,
+                                            cliArguments};
+    Tools::detail::BuildCLIResolvedStorage storage;
+    return Tools::detail::prepareBuildAction(actionType, arguments, action, storage, status);
+}
+
+static bool writeBuildHelpAddendumToString(Build::Action::Type actionType, String& text)
+{
+    GrowableBuffer<String> growable(text);
+    StringFormatOutput     output(StringEncoding::Utf8, growable);
+    const bool             result = Tools::detail::appendBuildActionHelpAddendum(output, actionType);
+    growable.finalize();
+    return result;
+}
 } // namespace
 } // namespace SC
 
@@ -77,6 +153,145 @@ struct SC::BuildTest : public SC::TestCase
 
         directories.libraryDirectory = report.libraryRootDirectory.view();
         directories.projectDirectory = report.libraryRootDirectory.view();
+
+        if (test_section("Native backend support matrix"))
+        {
+            Span<const Build::SupportMatrixEntry> matrix = Build::getNativeBackendSupportMatrix();
+            SC_TEST_EXPECT(matrix.sizeInElements() >= 14);
+            SC_TEST_EXPECT(Build::SupportStatus::toString(Build::SupportStatus::Supported) == "supported");
+            SC_TEST_EXPECT(Build::SupportStatus::toString(Build::SupportStatus::NotYet) == "not-yet");
+            SC_TEST_EXPECT(Build::SupportTier::toString(Build::SupportTier::Tier2) == "tier2");
+
+            size_t buildSupportedRows = 0;
+            for (const Build::SupportMatrixEntry& entry : matrix)
+            {
+                SC_TEST_EXPECT(entry.hostMachine.environment == Build::TargetEnvironment::Native);
+                SC_TEST_EXPECT(entry.targetMachine.environment != Build::TargetEnvironment::Native);
+                SC_TEST_EXPECT(not entry.validation.isEmpty());
+                if (entry.buildSupport == Build::SupportStatus::Supported)
+                {
+                    buildSupportedRows += 1;
+                }
+            }
+            SC_TEST_EXPECT(buildSupportedRows == matrix.sizeInElements());
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::WindowsGNU,
+                                                 Build::Architecture::Intel64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::Supported, Build::SupportTier::Tier1,
+                                                 Build::RunnerSpec::Wine));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::WindowsGNU,
+                                                 Build::Architecture::Arm64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::NotYet, Build::SupportTier::Tier1,
+                                                 Build::RunnerSpec::Wine));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::LinuxGlibc,
+                                                 Build::Architecture::Arm64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::SmokeSupported, Build::SupportTier::Tier1,
+                                                 Build::RunnerSpec::QEMU));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::LinuxMusl,
+                                                 Build::Architecture::Intel64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::SmokeSupported, Build::SupportTier::Tier1,
+                                                 Build::RunnerSpec::QEMU));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Windows, Build::TargetEnvironment::LinuxGlibc,
+                                                 Build::Architecture::Arm64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::NotYet, Build::SupportTier::Tier2,
+                                                 Build::RunnerSpec::QEMU));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Windows, Build::TargetEnvironment::LinuxMusl,
+                                                 Build::Architecture::Intel64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::NotYet, Build::SupportTier::Tier2,
+                                                 Build::RunnerSpec::QEMU));
+            SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Linux, Build::TargetEnvironment::WindowsMSVC,
+                                                 Build::Architecture::Arm64, Build::SupportStatus::Supported,
+                                                 Build::SupportStatus::SmokeSupported, Build::SupportTier::Tier2,
+                                                 Build::RunnerSpec::Wine));
+        }
+
+        if (test_section("Native backend support matrix documentation"))
+        {
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String buildDocument = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read("Documentation/Pages/Build.md", buildDocument));
+            const StringView documentView(buildDocument.view());
+
+            for (const Build::SupportMatrixEntry& entry : Build::getNativeBackendSupportMatrix())
+            {
+                String expectedRow = StringEncoding::Utf8;
+                SC_TRUST_RESULT(StringBuilder::format(
+                    expectedRow, "| {} | {} | {} | {} | {} | {} | {} |",
+                    supportMatrixHostName(entry.hostMachine.platform),
+                    Build::TargetEnvironment::toString(entry.targetMachine.environment),
+                    supportMatrixArchitectureName(entry.targetMachine.architecture),
+                    Build::SupportStatus::toString(entry.buildSupport),
+                    Build::SupportStatus::toString(entry.runSupport), Build::RunnerSpec::toString(entry.runner),
+                    Build::SupportTier::toString(entry.tier)));
+                SC_TEST_EXPECT(documentView.containsString(expectedRow.view()));
+            }
+        }
+
+        if (test_section("Build CLI reserves ABI option"))
+        {
+            StringView cliArguments[] = {"SCTest", "--target", "linux-glibc-x86_64", "--abi", "gnu"};
+
+            Build::Action                 cliAction;
+            Tools::detail::BuildCLIStatus status = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(
+                not prepareBuildCLIAction(report, {cliArguments, 5}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+        }
+
+        if (test_section("Build CLI runner diagnostics"))
+        {
+            auto expectRejectedRun = [&](Span<const StringView> cliArguments) -> Result
+            {
+                Build::Action                 cliAction;
+                Tools::detail::BuildCLIStatus status = Tools::detail::BuildCLIStatus::Ready;
+                SC_TEST_EXPECT(not prepareBuildCLIAction(report, cliArguments, Build::Action::Run, cliAction, status));
+                SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+                return Result(true);
+            };
+
+            StringView runnerNone[]   = {"SCTest", "--target", "windows-gnu-x86_64", "--runner", "none"};
+            StringView qemuWindows[]  = {"SCTest", "--target", "windows-gnu-x86_64", "--runner", "qemu"};
+            StringView wineLinux[]    = {"SCTest", "--target", "linux-glibc-x86_64", "--runner", "wine"};
+            StringView customNoPath[] = {"SCTest", "--target", "windows-gnu-x86_64", "--runner", "custom"};
+            SC_TRUST_RESULT(expectRejectedRun({runnerNone, 5}));
+            SC_TRUST_RESULT(expectRejectedRun({qemuWindows, 5}));
+            SC_TRUST_RESULT(expectRejectedRun({wineLinux, 5}));
+            SC_TRUST_RESULT(expectRejectedRun({customNoPath, 5}));
+        }
+
+        if (test_section("Build CLI keeps Fil-C toolchain-only"))
+        {
+            StringView filcTargetProfile[] = {"SCTest", "--target", "linux-filc-x86_64"};
+            StringView filcCrossTarget[]   = {"SCTest", "--target", "linux-glibc-x86_64", "--toolchain", "filc"};
+
+            Build::Action                 cliAction;
+            Tools::detail::BuildCLIStatus status = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(
+                not prepareBuildCLIAction(report, {filcTargetProfile, 3}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Error);
+
+            status = Tools::detail::BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(
+                not prepareBuildCLIAction(report, {filcCrossTarget, 5}, Build::Action::Compile, cliAction, status));
+            SC_TEST_EXPECT(status == Tools::detail::BuildCLIStatus::Ready);
+        }
+
+        if (test_section("Build CLI help reflects support matrix"))
+        {
+            String help = StringEncoding::Utf8;
+            SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, help));
+            SC_TEST_EXPECT(StringView(help.view()).containsString("Current native-backend support matrix"));
+            SC_TEST_EXPECT(StringView(help.view())
+                               .containsString("macOS -> linux-glibc-arm64: build=supported, run=smoke-supported"));
+            SC_TEST_EXPECT(StringView(help.view())
+                               .containsString("macOS -> linux-musl-x86_64: build=supported, run=smoke-supported"));
+            SC_TEST_EXPECT(
+                StringView(help.view()).containsString("Windows -> linux-musl-x86_64: build=supported, run=not-yet"));
+            SC_TEST_EXPECT(
+                StringView(help.view()).containsString("--abi is reserved for a future public ABI selector"));
+            SC_TEST_EXPECT(StringView(help.view()).containsString("Fil-C is toolchain-only for now"));
+        }
 
         if (test_section("Visual Studio 2022"))
         {

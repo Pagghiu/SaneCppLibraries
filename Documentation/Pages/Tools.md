@@ -156,6 +156,7 @@ Named options are:
 - `-a`, `--arch <NAME>`
 - `--target <PROFILE>` (`compile` / `run`)
 - `--toolchain <NAME>`
+- `--abi <NAME>` (reserved; use `--target` for glibc, musl, GNU, or MSVC today)
 - `--triple <VALUE>`
 - `--sysroot <PATH>`
 - `--runner <MODE>` (`run`)
@@ -174,8 +175,8 @@ Toolchain keywords currently exposed by the CLI are `default`, `host-default`, `
 
 Runner keywords currently exposed by the CLI are `auto`, `none`, `wine`, `qemu`, and `custom`.
 
-`--triple` and `--sysroot` are the current raw escape hatches for advanced toolchain overrides. When combined with
-`--target`, the raw overrides win.
+`--abi` is intentionally reserved for a future public ABI selector. `--triple` and `--sysroot` are the current raw
+escape hatches for advanced toolchain overrides. When combined with `--target`, the raw overrides win.
 
 Contradictory explicit combinations such as mismatched `--generator`, `--arch`, `--runner`, or `--triple` values now
 fail early with concrete CLI errors instead of drifting into backend-time failures.
@@ -188,11 +189,12 @@ Current defaults:
 - `configure` is for generated-project and IDE workflows
 - Linux `glibc` and `musl` target profiles now shape canonical target triples and sysroot flags; macOS and Windows
   hosts auto-select a packaged LLVM toolchain for those profiles when the caller does not provide explicit compiler
-  paths, and macOS now also auto-selects packaged Linux glibc/musl sysroots for them
+  paths, macOS auto-selects packaged Linux glibc/musl sysroots for them, and Windows has representative packaged
+  sysroot compile validation for `linux-glibc-arm64` and `linux-musl-x86_64`
 - macOS now has real native-backend `SCTest` compile validation for `linux-glibc-x86_64`, `linux-glibc-arm64`,
   `linux-musl-x86_64`, and `linux-musl-arm64`
 - macOS and Linux native builds can cross-compile Windows GNU `x86_64` and `arm64` targets through packaged `llvm-mingw`
-- Linux native builds can now also experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is compiler-first Linux support for native `x86_64` output only and is not yet a public target-profile row
+- Linux native builds can now also experiment with Fil-C through `SC-package install filc` plus `build ... --toolchain filc`; this is compiler-first Linux support for native `x86_64` output only and is toolchain-only for now, with no public `linux-filc-*` target profile
 - macOS native builds can also acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and
   compile `windows-msvc-x86_64` and `windows-msvc-arm64`
 - Linux arm64 hosts can now validate the portable MSVC path end-to-end for `windows-msvc-x86_64` and
@@ -217,6 +219,8 @@ Current defaults:
 - Foreign Linux targets can now use `--runner qemu` or `--runner auto` to wrap `build run` through a managed
   `SC-package install qemu` registration or a host `qemu-user` executable from `PATH`; the runner passes
   `-L <sysroot>` so the Linux loader and runtime libraries resolve from the selected sysroot
+- macOS `linux-glibc-*` and `linux-musl-*` runs are smoke-supported when real host `qemu-x86_64` and `qemu-aarch64`
+  executables are available in CI
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux, and Linux arm64 now also
   smoke-runs `windows-gnu-arm64` through the packaged native ARM64 Wine runner
 - On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host

@@ -247,7 +247,7 @@ int main(int argc, const char* argv[])
 
     // DebugVisualizers tests
     runDebugVisualizersTest(report);
-    // runSupportToolsTest(report);
+    runSupportToolsTest(report);
 
     SocketNetworking::shutdownNetworking();
     report.runGlobalMemoryReport(Globals::get(Globals::Global).allocator.statistics);

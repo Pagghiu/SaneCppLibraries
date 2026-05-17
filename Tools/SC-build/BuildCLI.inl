@@ -21,6 +21,58 @@ static bool isShortOptionToken(StringView token)
 
 static bool isLongOptionToken(StringView token) { return token.sizeInBytes() >= 3 and token.startsWith("--"); }
 
+template <typename... Types>
+static Result appendHelpLine(StringFormatOutput& output, StringView format, Types&&... types)
+{
+    String line = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(line, format, forward<Types>(types)...));
+    SC_TRY_MSG(output.append(line.view()), "Failed writing SC-build help");
+    return Result(true);
+}
+
+static constexpr StringView helpHostPlatformName(Build::Platform::Type platform)
+{
+    switch (platform)
+    {
+    case Build::Platform::Windows: return "Windows";
+    case Build::Platform::Apple: return "macOS";
+    case Build::Platform::Linux: return "Linux";
+    case Build::Platform::Wasm: return "Wasm";
+    case Build::Platform::Unknown: return "unknown";
+    }
+    Assert::unreachable();
+}
+
+static constexpr StringView helpArchitectureName(Build::Architecture::Type architecture)
+{
+    switch (architecture)
+    {
+    case Build::Architecture::Intel64: return "x86_64";
+    case Build::Architecture::Arm64: return "arm64";
+    case Build::Architecture::Intel32: return "intel32";
+    case Build::Architecture::Wasm: return "wasm";
+    case Build::Architecture::Any: return "any";
+    }
+    Assert::unreachable();
+}
+
+static Result appendNativeBackendSupportHelp(StringFormatOutput& output)
+{
+    SC_TRY_MSG(output.append("\nCurrent native-backend support matrix:\n"),
+               "Failed writing SC-build support matrix help");
+    for (const Build::SupportMatrixEntry& entry : Build::getNativeBackendSupportMatrix())
+    {
+        SC_TRY(appendHelpLine(output, "  - {} -> {}-{}: build={}, run={}, runner={}, tier={}\n",
+                              helpHostPlatformName(entry.hostMachine.platform),
+                              Build::TargetEnvironment::toString(entry.targetMachine.environment),
+                              helpArchitectureName(entry.targetMachine.architecture),
+                              Build::SupportStatus::toString(entry.buildSupport),
+                              Build::SupportStatus::toString(entry.runSupport),
+                              Build::RunnerSpec::toString(entry.runner), Build::SupportTier::toString(entry.tier)));
+    }
+    return Result(true);
+}
+
 Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::Type actionType)
 {
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
@@ -45,23 +97,16 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
                                  "  - llvm-mingw: packaged Windows GNU cross-toolchain\n"
                                  "  - filc: experimental Linux-only Fil-C compiler track\n"),
                    "Failed writing SC-build help");
-        SC_TRY_MSG(
-            output.append(
-                "\nCurrent tested cross-target support:\n"
-                "  - macOS and Linux hosts can compile windows-gnu-x86_64 and windows-gnu-arm64\n"
-                "  - macOS hosts can compile windows-msvc-x86_64 and windows-msvc-arm64 through portable MSVC + Wine\n"
-                "  - macOS hosts can compile linux-glibc-x86_64, linux-glibc-arm64, linux-musl-x86_64, and "
-                "linux-musl-arm64 through packaged LLVM + packaged sysroots\n"
-                "  - Linux hosts can also experiment with Fil-C through --toolchain filc for native Linux builds\n"
-                "  - build run can auto-route x86_64 Windows targets through Wine on macOS and Linux\n"
-                "  - build run can also wrap foreign Linux targets through qemu-user when a suitable packaged or "
-                "host qemu executable and sysroot are available\n"
-                "  - Linux arm64 can auto-wrap box64 + wine64 for build run when those host tools are installed\n"
-                "  - Windows arm64 runs now require a Wine runtime that ships an arm64 Windows loader; the packaged "
-                "macOS runner does not yet\n"),
-            "Failed writing SC-build help");
+        SC_TRY(appendNativeBackendSupportHelp(output));
+        SC_TRY_MSG(output.append("\nExperimental compiler track:\n"
+                                 "  - Linux hosts can experiment with Fil-C through --toolchain filc for native "
+                                 "x86_64 Linux builds\n"
+                                 "  - Fil-C is toolchain-only for now; no linux-filc-* target profile exists\n"),
+                   "Failed writing SC-build help");
         SC_TRY_MSG(output.append(
                        "\nRaw override escape hatches:\n"
+                       "  - --abi is reserved for a future public ABI selector; use --target for glibc/musl/GNU/MSVC "
+                       "selection today\n"
                        "  - --triple overrides the resolved compiler target triple\n"
                        "  - --sysroot overrides the resolved toolchain sysroot\n"
                        "  - raw overrides apply after --target and therefore take precedence over friendly profiles\n"),
@@ -630,6 +675,10 @@ static bool targetMachineCanRunDirectly(const Build::Machine& hostMachine, const
     {
         return false;
     }
+    if (hostMachine.platform == Build::Platform::Linux)
+    {
+        return true;
+    }
     return target.architecture == Build::Architecture::Any or target.architecture == hostMachine.architecture;
 }
 
@@ -847,6 +896,11 @@ static Result validateBuildActionCombination(Build::Action::Type actionType, con
             return printBuildActionCombinationError(console, "Fil-C does not accept --sysroot overrides yet");
         }
     }
+    if (not context.abi.isEmpty())
+    {
+        return printBuildActionCombinationError(
+            console, "--abi is reserved for a future ABI selector; use --target to choose glibc, musl, GNU, or MSVC");
+    }
 
     if (actionType != Build::Action::Run)
     {
@@ -1008,7 +1062,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[13];
+    CommandLineOption     options[14];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -1047,6 +1101,12 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].help      = "Build architecture (arm64, intel64, intel32, wasm, any)";
     options[numOptions].valueName = "NAME";
     options[numOptions].value     = CommandLineValue::stringSpan(context.architecture);
+    numOptions++;
+
+    options[numOptions].longName  = "abi";
+    options[numOptions].help      = "Reserved ABI selector; use --target for glibc/musl/GNU/MSVC today";
+    options[numOptions].valueName = "NAME";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.abi);
     numOptions++;
 
     options[numOptions].longName  = "triple";

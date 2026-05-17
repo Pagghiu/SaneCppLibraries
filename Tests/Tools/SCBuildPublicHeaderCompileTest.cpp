@@ -11,8 +11,10 @@ struct ConsumePublicBuildHeaderSymbols
 {
     ConsumePublicBuildHeaderSymbols()
     {
+        auto supportMatrix = SC::Build::getNativeBackendSupportMatrix();
         (void)buildConfigurePointer;
         (void)runBuildToolPointer;
+        (void)supportMatrix;
     }
 } consumePublicBuildHeaderSymbols;
 } // namespace

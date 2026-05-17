@@ -7,6 +7,7 @@
 #include "Libraries/Testing/Testing.h"
 #include "Tools/SC-build.h"
 #include "Tools/SC-build/BuildCLI.h"
+#include <stdlib.h>
 
 extern SC::Console* globalConsole;
 namespace SC
@@ -18,6 +19,12 @@ static bool writeBuildHelpAddendumToString(Build::Action::Type actionType, Strin
     const bool             result = Tools::detail::appendBuildActionHelpAddendum(output, actionType);
     growable.finalize();
     return result;
+}
+
+static bool shouldRunHeavySupportToolsTests()
+{
+    const char* value = ::getenv("SC_RUN_HEAVY_SUPPORT_TOOLS_TESTS");
+    return value != nullptr and value[0] != '\0' and value[0] != '0';
 }
 
 struct SupportToolsTest : public TestCase
@@ -37,6 +44,7 @@ struct SupportToolsTest : public TestCase
                                   StringView(),
                                   {}};
 
+        const bool runHeavySections = shouldRunHeavySupportToolsTests();
         StringView args[10];
         if (test_section("build cli parses legacy positional arguments"))
         {
@@ -123,16 +131,23 @@ struct SupportToolsTest : public TestCase
             args[0]             = "SCTest";
             args[1]             = "--toolchain";
             args[2]             = "filc";
-            arguments.arguments = {args, 3};
+            args[3]             = "--arch";
+            args[4]             = "intel64";
+            arguments.arguments = {args, 5};
 
             Build::Action           action;
             BuildCLIResolvedStorage storage;
             BuildCLIStatus          status = BuildCLIStatus::Error;
+#if SC_PLATFORM_LINUX
             SC_TEST_EXPECT(prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
             SC_TEST_EXPECT(action.parameters.toolchain.family == Build::Toolchain::FilC);
             SC_TEST_EXPECT(action.parameters.architecture == Build::Architecture::Intel64);
             SC_TEST_EXPECT(action.parameters.toolchain.architecture == Build::Architecture::Intel64);
+#else
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+#endif
         }
         if (test_section("build cli parses Windows GNU target profiles"))
         {
@@ -455,6 +470,23 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
+        if (test_section("build cli rejects reserved abi selector"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "compile";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "linux-glibc-x86_64";
+            args[3]             = "--abi";
+            args[4]             = "gnu";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Compile, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
         if (test_section("build target profile selects native backend automatically"))
         {
             arguments.tool      = "build";
@@ -553,6 +585,28 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
+#if SC_PLATFORM_LINUX
+        if (test_section("build run accepts direct Linux native architecture translation"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--arch";
+            args[2]             = "intel64";
+            args[3]             = "--runner";
+            args[4]             = "none";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+            SC_TEST_EXPECT(action.parameters.targetMachine.platform == Build::Platform::Linux);
+            SC_TEST_EXPECT(action.parameters.targetMachine.environment == Build::TargetEnvironment::Native);
+            SC_TEST_EXPECT(action.parameters.targetMachine.architecture == Build::Architecture::Intel64);
+        }
+#endif
         if (test_section("build run accepts auto-run for Windows GNU arm64"))
         {
             arguments.tool      = "build";
@@ -602,6 +656,40 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
         }
+        if (test_section("build run rejects runner none for foreign targets"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "windows-gnu-x86_64";
+            args[3]             = "--runner";
+            args[4]             = "none";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
+        if (test_section("build run rejects Wine for Linux targets"))
+        {
+            arguments.tool      = "build";
+            arguments.action    = "run";
+            args[0]             = "SCTest";
+            args[1]             = "--target";
+            args[2]             = "linux-glibc-x86_64";
+            args[3]             = "--runner";
+            args[4]             = "wine";
+            arguments.arguments = {args, 5};
+
+            Build::Action           action;
+            BuildCLIResolvedStorage storage;
+            BuildCLIStatus          status = BuildCLIStatus::Ready;
+            SC_TEST_EXPECT(not prepareBuildAction(Build::Action::Run, arguments, action, storage, status));
+            SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
+        }
         if (test_section("build run rejects custom runner without runner-path"))
         {
             arguments.tool      = "build";
@@ -642,10 +730,14 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(text.view()).containsString("windows-msvc-arm64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("linux-glibc-x86_64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("linux-musl-arm64"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("Current native-backend support matrix"));
+            SC_TEST_EXPECT(StringView(text.view())
+                               .containsString("macOS -> linux-glibc-arm64: build=supported, run=smoke-supported"));
+            SC_TEST_EXPECT(
+                StringView(text.view()).containsString("--abi is reserved for a future public ABI selector"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--triple overrides the resolved compiler target triple"));
-            SC_TEST_EXPECT(
-                StringView(text.view()).containsString("non-Linux hosts auto-select a packaged LLVM toolchain"));
+            SC_TEST_EXPECT(StringView(text.view()).containsString("Fil-C is toolchain-only for now"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Arguments after -- are forwarded"));
         }
         if (test_section("build cli rejects unknown options"))
@@ -677,7 +769,7 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(status == BuildCLIStatus::Ready);
             SC_TEST_EXPECT(action.configurationName == "DebugCoverage");
         }
-        if (test_section("coverage"))
+        if (runHeavySections and test_section("coverage"))
         {
             arguments.tool      = "build";
             arguments.action    = "coverage";
@@ -686,7 +778,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
-        if (test_section("compile"))
+        if (runHeavySections and test_section("compile"))
         {
             arguments.tool      = "build";
             arguments.action    = "compile";
@@ -695,7 +787,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
-        if (test_section("run"))
+        if (runHeavySections and test_section("run"))
         {
             arguments.tool      = "build";
             arguments.action    = "run";
@@ -704,14 +796,14 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 2};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
-        if (test_section("build documentation"))
+        if (runHeavySections and test_section("build documentation"))
         {
             arguments.tool      = "build";
             arguments.action    = "documentation";
             arguments.arguments = {};
             SC_TEST_EXPECT(runBuildTool(arguments));
         }
-        if (test_section("install doxygen-awesome-css"))
+        if (runHeavySections and test_section("install doxygen-awesome-css"))
         {
             arguments.tool      = "package";
             arguments.action    = "install";
@@ -719,7 +811,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
-        if (test_section("install doxygen"))
+        if (runHeavySections and test_section("install doxygen"))
         {
             arguments.tool      = "package";
             arguments.action    = "install";
@@ -727,7 +819,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
-        if (test_section("install clang"))
+        if (runHeavySections and test_section("install clang"))
         {
             arguments.tool      = "package";
             arguments.action    = "install";
@@ -773,7 +865,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 3};
             SC_TEST_EXPECT(not runPackageTool(arguments));
         }
-        if (test_section("clang-format execute"))
+        if (runHeavySections and test_section("clang-format execute"))
         {
             arguments.tool      = "format";
             arguments.action    = "execute";
@@ -781,7 +873,7 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runFormatTool(arguments));
         }
-        if (test_section("clang-format check"))
+        if (runHeavySections and test_section("clang-format check"))
         {
             arguments.tool      = "format";
             arguments.action    = "check";
