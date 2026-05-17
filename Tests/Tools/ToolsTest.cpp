@@ -1015,6 +1015,19 @@ struct SupportToolsTest : public TestCase
             args[0]             = "fake";
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments, registry));
+
+            static constexpr StringView missingExports[] = {
+                "tool:missing-tool",
+            };
+            const PackageRegistryEntry badEntry = {
+                "fake-missing", "external-fake",
+                "tool",         "External package registry fixture with a mismatched contract",
+                "host",         "test fixture",
+                false,          missingExports,
+                fakePhases,     installFakeRegistryPackage};
+            const PackageRegistry badRegistry = {{&badEntry, 1}};
+            args[0]                           = "fake-missing";
+            SC_TEST_EXPECT(not runPackageTool(arguments, badRegistry));
         }
         if (test_section("package receipt resolves exports and capabilities"))
         {

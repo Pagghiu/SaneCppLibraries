@@ -4298,6 +4298,35 @@ static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoo
     return Result(true);
 }
 
+static Result verifyPackageReceiptMatchesRegistryExports(const PackageRegistryEntry& entry,
+                                                         const PackageReceiptJSON&   receiptJSON)
+{
+    for (StringView expectedExport : entry.exports)
+    {
+        if (expectedExport.containsString("<"))
+        {
+            continue;
+        }
+
+        StringView expectedKind;
+        StringView expectedName;
+        SC_TRY_MSG(expectedExport.splitBefore(":", expectedKind) and expectedExport.splitAfter(":", expectedName),
+                   "Malformed package registry export contract");
+
+        bool found = false;
+        for (const PackageReceiptExportJSON& exportView : receiptJSON.exports)
+        {
+            if (exportView.kind.view() == expectedKind and exportView.name.view() == expectedName)
+            {
+                found = true;
+                break;
+            }
+        }
+        SC_TRY_MSG(found, "Package receipt is missing registry export");
+    }
+    return Result(true);
+}
+
 static Result verifyPackageReceiptForEntry(const PackageRegistryEntry& entry, StringView receiptPath,
                                            StringView packageRoot)
 {
@@ -4308,6 +4337,7 @@ static Result verifyPackageReceiptForEntry(const PackageRegistryEntry& entry, St
     SC_TRY(readPackageReceiptJSON(receipt.view(), receiptJSON));
     SC_TRY_MSG(receiptJSON.name.view() == entry.installedName,
                "Package receipt identity does not match registry entry");
+    SC_TRY(verifyPackageReceiptMatchesRegistryExports(entry, receiptJSON));
     return Result(true);
 }
 
