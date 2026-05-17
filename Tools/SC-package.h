@@ -82,6 +82,48 @@ struct PackageReceiptInfo
     Span<const StringView> phases;
 };
 
+namespace PackageExport
+{
+constexpr StringView Clang                   = "clang";
+constexpr StringView ClangXX                 = "clang++";
+constexpr StringView LLVMAr                  = "llvm-ar";
+constexpr StringView LLVMLinker              = "ld.lld";
+constexpr StringView Sysroot                 = "sysroot";
+constexpr StringView RunnerQEMU              = "qemu";
+constexpr StringView RunnerWine              = "wine";
+constexpr StringView MSVCClX64               = "cl.x64";
+constexpr StringView MSVCClArm64             = "cl.arm64";
+constexpr StringView MSVCLinkX64             = "link.x64";
+constexpr StringView MSVCLinkArm64           = "link.arm64";
+constexpr StringView MSVCLibX64              = "lib.x64";
+constexpr StringView MSVCLibArm64            = "lib.arm64";
+constexpr StringView LLVMMinGWClang_X86_64   = "x86_64-w64-mingw32-clang";
+constexpr StringView LLVMMinGWClangArm64     = "aarch64-w64-mingw32-clang";
+constexpr StringView LLVMMinGWClangXX_X86_64 = "x86_64-w64-mingw32-clang++";
+constexpr StringView LLVMMinGWClangXXArm64   = "aarch64-w64-mingw32-clang++";
+} // namespace PackageExport
+
+namespace PackageCapability
+{
+constexpr StringView ToolCCompiler             = "tool.c-compiler";
+constexpr StringView ToolCXXCompiler           = "tool.cxx-compiler";
+constexpr StringView ToolArchiver              = "tool.archiver";
+constexpr StringView ToolLinker                = "tool.linker";
+constexpr StringView RunnerWine                = "runner.wine";
+constexpr StringView RunnerQEMUX86_64          = "runner.qemu.x86_64";
+constexpr StringView RunnerQEMUArm64           = "runner.qemu.arm64";
+constexpr StringView ToolchainFilCX86_64       = "toolchain.filc.x86_64";
+constexpr StringView ToolchainWindowsGNUX86_64 = "toolchain.windows-gnu.x86_64";
+constexpr StringView ToolchainWindowsGNUArm64  = "toolchain.windows-gnu.arm64";
+constexpr StringView ToolchainWindowsMSVCX64   = "toolchain.windows-msvc.x64";
+constexpr StringView ToolchainWindowsMSVCArm64 = "toolchain.windows-msvc.arm64";
+
+[[nodiscard]] constexpr StringView qemuRunner(InstructionSet architecture)
+{
+    return architecture == InstructionSet::Intel64 ? RunnerQEMUX86_64 : RunnerQEMUArm64;
+}
+} // namespace PackageCapability
+
 using PackageInstallHandler = Result (*)(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package, Span<const StringView> packageArguments);
 

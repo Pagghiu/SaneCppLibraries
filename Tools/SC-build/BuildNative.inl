@@ -2489,20 +2489,20 @@ struct SC::Build::NativeBuild
         String defaultCompilerC   = StringEncoding::Utf8;
         String defaultCompilerCpp = StringEncoding::Utf8;
         String defaultArchiver    = StringEncoding::Utf8;
-        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(), "tool.c-compiler",
-                                                    defaultCompilerC))
+        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(),
+                                                    Tools::PackageCapability::ToolCCompiler, defaultCompilerC))
         {
             SC_TRY(Path::join(defaultCompilerC,
                               {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang"_a8)}));
         }
-        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(), "tool.cxx-compiler",
-                                                    defaultCompilerCpp))
+        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(),
+                                                    Tools::PackageCapability::ToolCXXCompiler, defaultCompilerCpp))
         {
             SC_TRY(Path::join(defaultCompilerCpp,
                               {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("clang++"_a8)}));
         }
-        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(), "tool.archiver",
-                                                    defaultArchiver))
+        if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(),
+                                                    Tools::PackageCapability::ToolArchiver, defaultArchiver))
         {
             SC_TRY(Path::join(defaultArchiver,
                               {llvmPackage.installDirectoryLink.view(), "bin", hostLLVMExecutableName("llvm-ar"_a8)}));
@@ -2531,11 +2531,13 @@ struct SC::Build::NativeBuild
         String defaultCompilerCpp = StringEncoding::Utf8;
         String wrappedCompilerC   = StringEncoding::Utf8;
         String wrappedCompilerCpp = StringEncoding::Utf8;
-        if (not Tools::resolvePackageExportPath(filCPackage.installDirectoryLink.view(), "clang", wrappedCompilerC))
+        if (not Tools::resolvePackageExportPath(filCPackage.installDirectoryLink.view(), Tools::PackageExport::Clang,
+                                                wrappedCompilerC))
         {
             SC_TRY(Path::join(wrappedCompilerC, {filCPackage.installDirectoryLink.view(), "sc-filc", "bin", "clang"}));
         }
-        if (not Tools::resolvePackageExportPath(filCPackage.installDirectoryLink.view(), "clang++", wrappedCompilerCpp))
+        if (not Tools::resolvePackageExportPath(filCPackage.installDirectoryLink.view(), Tools::PackageExport::ClangXX,
+                                                wrappedCompilerCpp))
         {
             SC_TRY(
                 Path::join(wrappedCompilerCpp, {filCPackage.installDirectoryLink.view(), "sc-filc", "bin", "clang++"}));
@@ -2569,8 +2571,8 @@ struct SC::Build::NativeBuild
                 SC_TRY(Tools::installLLVMToolchain(parameters.directories.packagesCacheDirectory.view(),
                                                    parameters.directories.packagesInstallDirectory.view(),
                                                    llvmPackage));
-                if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(), "tool.linker",
-                                                            linkerProvider))
+                if (not Tools::resolvePackageCapabilityPath(llvmPackage.installDirectoryLink.view(),
+                                                            Tools::PackageCapability::ToolLinker, linkerProvider))
                 {
                     SC_TRY(Path::join(linkerProvider, {llvmPackage.installDirectoryLink.view(), "bin", "ld.lld"}));
                 }
@@ -2624,7 +2626,8 @@ struct SC::Build::NativeBuild
         SC_TRY(Tools::installLinuxSysroot(parameters.directories.packagesCacheDirectory.view(),
                                           parameters.directories.packagesInstallDirectory.view(), spec,
                                           sysrootPackage));
-        if (not Tools::resolvePackageExportPath(sysrootPackage.installDirectoryLink.view(), "sysroot", sysroot))
+        if (not Tools::resolvePackageExportPath(sysrootPackage.installDirectoryLink.view(),
+                                                Tools::PackageExport::Sysroot, sysroot))
         {
             SC_TRY(sysroot.assign(sysrootPackage.installDirectoryLink.view()));
         }
@@ -2877,8 +2880,8 @@ struct SC::Build::NativeBuild
                                                          parameters.directories.packagesInstallDirectory.view(),
                                                          winePackage))
             {
-                if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(), "runner.wine",
-                                                            output))
+                if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(),
+                                                            Tools::PackageCapability::RunnerWine, output))
                 {
                     SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
                 }
@@ -2924,8 +2927,8 @@ struct SC::Build::NativeBuild
             if (Tools::installWineStableRunner(parameters.directories.packagesCacheDirectory.view(),
                                                parameters.directories.packagesInstallDirectory.view(), winePackage))
             {
-                if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(), "runner.wine",
-                                                            output))
+                if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(),
+                                                            Tools::PackageCapability::RunnerWine, output))
                 {
                     SC_TRY(Path::join(output, {winePackage.installDirectoryLink.view(), "bin", "wine"}));
                 }
@@ -2965,8 +2968,7 @@ struct SC::Build::NativeBuild
                                      parameters.directories.packagesInstallDirectory.view(), packagedQEMU))
         {
             const InstructionSet instructionSet = qemuRunnerInstructionSet(targetArchitecture(targetContext));
-            const StringView     capabilityName =
-                instructionSet == InstructionSet::Intel64 ? "runner.qemu.x86_64"_a8 : "runner.qemu.arm64"_a8;
+            const StringView     capabilityName = Tools::PackageCapability::qemuRunner(instructionSet);
             if (instructionSet != InstructionSet::Intel32 and
                 Tools::resolvePackageCapabilityPath(packagedQEMU.installDirectoryLink.view(), capabilityName,
                                                     output) and
@@ -3061,7 +3063,8 @@ struct SC::Build::NativeBuild
         Tools::Package winePackage;
         SC_TRY(Tools::installWineStableRunner(parameters.directories.packagesCacheDirectory.view(),
                                               parameters.directories.packagesInstallDirectory.view(), winePackage));
-        if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(), "runner.wine", output))
+        if (not Tools::resolvePackageCapabilityPath(winePackage.installDirectoryLink.view(),
+                                                    Tools::PackageCapability::RunnerWine, output))
         {
             SC_TRY(StringBuilder::format(output, "{}/Wine Stable.app/Contents/Resources/wine/bin/wine",
                                          winePackage.installDirectoryLink));
@@ -3837,30 +3840,28 @@ struct SC::Build::NativeBuild
                 return Result::Error("llvm-mingw only supports x86_64 and arm64 Windows GNU targets");
             }
 
-            String defaultCompilerC   = StringEncoding::Utf8;
-            String defaultCompilerCpp = StringEncoding::Utf8;
-            String defaultArchiver    = StringEncoding::Utf8;
-            String compilerCapability = StringEncoding::Ascii;
-            SC_TRY(StringBuilder::format(compilerCapability, "toolchain.windows-gnu.{}",
-                                         targetArchitecture(targetContext) == Architecture::Intel64 ? "x86_64"_a8
-                                                                                                    : "arm64"_a8));
+            const bool targetIntel64      = targetArchitecture(targetContext) == Architecture::Intel64;
+            String     defaultCompilerC   = StringEncoding::Utf8;
+            String     defaultCompilerCpp = StringEncoding::Utf8;
+            String     defaultArchiver    = StringEncoding::Utf8;
+            StringView compilerCapability = targetIntel64 ? Tools::PackageCapability::ToolchainWindowsGNUX86_64
+                                                          : Tools::PackageCapability::ToolchainWindowsGNUArm64;
             if (not Tools::resolvePackageCapabilityPath(llvmMingwPackage.installDirectoryLink.view(),
-                                                        compilerCapability.view(), defaultCompilerC))
+                                                        compilerCapability, defaultCompilerC))
             {
                 SC_TRY(StringBuilder::format(defaultCompilerC, "{}/bin/{}-clang", llvmMingwPackage.installDirectoryLink,
                                              compilerPrefix));
             }
-            const StringView compilerCppExport = targetArchitecture(targetContext) == Architecture::Intel64
-                                                     ? "x86_64-w64-mingw32-clang++"_a8
-                                                     : "aarch64-w64-mingw32-clang++"_a8;
+            const StringView compilerCppExport = targetIntel64 ? Tools::PackageExport::LLVMMinGWClangXX_X86_64
+                                                               : Tools::PackageExport::LLVMMinGWClangXXArm64;
             if (not Tools::resolvePackageExportPath(llvmMingwPackage.installDirectoryLink.view(), compilerCppExport,
                                                     defaultCompilerCpp))
             {
                 SC_TRY(StringBuilder::format(defaultCompilerCpp, "{}/bin/{}-clang++",
                                              llvmMingwPackage.installDirectoryLink, compilerPrefix));
             }
-            if (not Tools::resolvePackageExportPath(llvmMingwPackage.installDirectoryLink.view(), "llvm-ar",
-                                                    defaultArchiver))
+            if (not Tools::resolvePackageExportPath(llvmMingwPackage.installDirectoryLink.view(),
+                                                    Tools::PackageExport::LLVMAr, defaultArchiver))
             {
                 SC_TRY(StringBuilder::format(defaultArchiver, "{}/bin/llvm-ar", llvmMingwPackage.installDirectoryLink));
             }
@@ -3898,31 +3899,32 @@ struct SC::Build::NativeBuild
                 String     defaultArchiver    = StringEncoding::Utf8;
                 StringView targetDirectory;
                 SC_TRY(windowsMSVCTargetArchitectureDirectory(targetArchitecture(targetContext), targetDirectory));
-                String clExport   = StringEncoding::Ascii;
-                String linkExport = StringEncoding::Ascii;
-                String libExport  = StringEncoding::Ascii;
-                SC_TRY(StringBuilder::format(clExport, "cl.{}", targetDirectory));
-                SC_TRY(StringBuilder::format(linkExport, "link.{}", targetDirectory));
-                SC_TRY(StringBuilder::format(libExport, "lib.{}", targetDirectory));
-                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), clExport.view(),
+                const bool       targetIntel64 = targetArchitecture(targetContext) == Architecture::Intel64;
+                const StringView clExport =
+                    targetIntel64 ? Tools::PackageExport::MSVCClX64 : Tools::PackageExport::MSVCClArm64;
+                const StringView linkExport =
+                    targetIntel64 ? Tools::PackageExport::MSVCLinkX64 : Tools::PackageExport::MSVCLinkArm64;
+                const StringView libExport =
+                    targetIntel64 ? Tools::PackageExport::MSVCLibX64 : Tools::PackageExport::MSVCLibArm64;
+                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), clExport,
                                                         defaultCompilerC))
                 {
                     SC_TRY(Path::join(defaultCompilerC,
                                       {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "cl"}));
                 }
-                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), clExport.view(),
+                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), clExport,
                                                         defaultCompilerCpp))
                 {
                     SC_TRY(Path::join(defaultCompilerCpp,
                                       {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "cl"}));
                 }
-                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), linkExport.view(),
+                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), linkExport,
                                                         defaultLinker))
                 {
                     SC_TRY(Path::join(defaultLinker,
                                       {msvcPackage.installDirectoryLink.view(), "bin", targetDirectory, "link"}));
                 }
-                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), libExport.view(),
+                if (not Tools::resolvePackageExportPath(msvcPackage.installDirectoryLink.view(), libExport,
                                                         defaultArchiver))
                 {
                     SC_TRY(Path::join(defaultArchiver,

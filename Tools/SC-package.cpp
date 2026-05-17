@@ -1470,9 +1470,9 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
             SC_TRY(resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::ARM64,
                                                      qemuArm64Export));
             const PackageReceiptExport exports[] = {
-                {"runner", "qemu", "."},
-                {"capability", "runner.qemu.x86_64", qemuX86_64Export.view()},
-                {"capability", "runner.qemu.arm64", qemuArm64Export.view()},
+                {"runner", PackageExport::RunnerQEMU, "."},
+                {"capability", PackageCapability::RunnerQEMUX86_64, qemuX86_64Export.view()},
+                {"capability", PackageCapability::RunnerQEMUArm64, qemuArm64Export.view()},
             };
             static constexpr StringView phases[] = {
                 "resolveImportedQEMU",
@@ -1528,9 +1528,9 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
     SC_TRY(
         resolveQEMURunnerExecutableExport(package.installDirectoryLink.view(), InstructionSet::ARM64, qemuArm64Export));
     const PackageReceiptExport exports[] = {
-        {"runner", "qemu", "."},
-        {"capability", "runner.qemu.x86_64", qemuX86_64Export.view()},
-        {"capability", "runner.qemu.arm64", qemuArm64Export.view()},
+        {"runner", PackageExport::RunnerQEMU, "."},
+        {"capability", PackageCapability::RunnerQEMUX86_64, qemuX86_64Export.view()},
+        {"capability", PackageCapability::RunnerQEMUArm64, qemuArm64Export.view()},
     };
     static constexpr StringView phases[] = {
         "resolveImportedQEMU",
@@ -2441,14 +2441,14 @@ Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packag
     SC_TRY(Path::join(llvmAr, {"bin", hostLLVMExecutableName("llvm-ar"_a8)}));
     SC_TRY(Path::join(lld, {"bin", HostPlatform == Platform::Windows ? "lld.exe"_a8 : "ld.lld"_a8}));
     const PackageReceiptExport exports[] = {
-        {"tool", "clang", clang.view()},
-        {"tool", "clang++", clangxx.view()},
-        {"tool", "llvm-ar", llvmAr.view()},
-        {"tool", "ld.lld", lld.view()},
-        {"capability", "tool.c-compiler", clang.view()},
-        {"capability", "tool.cxx-compiler", clangxx.view()},
-        {"capability", "tool.archiver", llvmAr.view()},
-        {"capability", "tool.linker", lld.view()},
+        {"tool", PackageExport::Clang, clang.view()},
+        {"tool", PackageExport::ClangXX, clangxx.view()},
+        {"tool", PackageExport::LLVMAr, llvmAr.view()},
+        {"tool", PackageExport::LLVMLinker, lld.view()},
+        {"capability", PackageCapability::ToolCCompiler, clang.view()},
+        {"capability", PackageCapability::ToolCXXCompiler, clangxx.view()},
+        {"capability", PackageCapability::ToolArchiver, llvmAr.view()},
+        {"capability", PackageCapability::ToolLinker, lld.view()},
     };
     static constexpr StringView phases[] = {
         "resolveHostLLVMArchive",
@@ -2819,9 +2819,9 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
     }
 
     const PackageReceiptExport exports[] = {
-        {"tool", "clang", "sc-filc/bin/clang"},
-        {"tool", "clang++", "sc-filc/bin/clang++"},
-        {"capability", "toolchain.filc.x86_64", "sc-filc/bin/clang"},
+        {"tool", PackageExport::Clang, "sc-filc/bin/clang"},
+        {"tool", PackageExport::ClangXX, "sc-filc/bin/clang++"},
+        {"capability", PackageCapability::ToolchainFilCX86_64, "sc-filc/bin/clang"},
     };
     static constexpr StringView phases[] = {
         "resolveFilCSource",
@@ -2916,13 +2916,13 @@ Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView p
     SC_TRY(Path::join(arm64CompilerCpp, {"bin", "aarch64-w64-mingw32-clang++"}));
     SC_TRY(Path::join(archiver, {"bin", "llvm-ar"}));
     const PackageReceiptExport exports[] = {
-        {"tool", "x86_64-w64-mingw32-clang", x64Compiler.view()},
-        {"tool", "x86_64-w64-mingw32-clang++", x64CompilerCpp.view()},
-        {"tool", "aarch64-w64-mingw32-clang", arm64Compiler.view()},
-        {"tool", "aarch64-w64-mingw32-clang++", arm64CompilerCpp.view()},
-        {"tool", "llvm-ar", archiver.view()},
-        {"capability", "toolchain.windows-gnu.x86_64", x64Compiler.view()},
-        {"capability", "toolchain.windows-gnu.arm64", arm64Compiler.view()},
+        {"tool", PackageExport::LLVMMinGWClang_X86_64, x64Compiler.view()},
+        {"tool", PackageExport::LLVMMinGWClangXX_X86_64, x64CompilerCpp.view()},
+        {"tool", PackageExport::LLVMMinGWClangArm64, arm64Compiler.view()},
+        {"tool", PackageExport::LLVMMinGWClangXXArm64, arm64CompilerCpp.view()},
+        {"tool", PackageExport::LLVMAr, archiver.view()},
+        {"capability", PackageCapability::ToolchainWindowsGNUX86_64, x64Compiler.view()},
+        {"capability", PackageCapability::ToolchainWindowsGNUArm64, arm64Compiler.view()},
     };
     static constexpr StringView phases[] = {
         "resolveLLVMMingwArchive",
@@ -3080,7 +3080,7 @@ static Result writeLinuxSysrootReceipt(const Package& package, const Tools::Linu
         SC_TRY(libraryDir.assign("usr/lib"));
     }
     const PackageReceiptExport exports[] = {
-        {"sysroot", "sysroot", "."},
+        {"sysroot", PackageExport::Sysroot, "."},
         {"include-dir", "sysroot.include", includeDir.view()},
         {"library-dir", "sysroot.lib", libraryDir.view()},
         {"capability", capability.view(), "."},
@@ -3477,8 +3477,8 @@ Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView pack
     builder.finalize();
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
     const PackageReceiptExport exports[] = {
-        {"runner", "wine", "bin/wine"},
-        {"capability", "runner.wine", "bin/wine"},
+        {"runner", PackageExport::RunnerWine, "bin/wine"},
+        {"capability", PackageCapability::RunnerWine, "bin/wine"},
     };
     static constexpr StringView phases[] = {
         "resolveLinuxWinePackages",
@@ -3622,8 +3622,8 @@ Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, Stri
     builder.finalize();
     SC_TRY(fs.writeString(package.packageLocalTxt.view(), packageTxt.view()));
     const PackageReceiptExport exports[] = {
-        {"runner", "wine", "bin/wine"},
-        {"capability", "runner.wine", "bin/wine"},
+        {"runner", PackageExport::RunnerWine, "bin/wine"},
+        {"capability", PackageCapability::RunnerWine, "bin/wine"},
     };
     static constexpr StringView phases[] = {
         "resolveLinuxArm64WinePackages",
@@ -3686,8 +3686,8 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 
     SC_TRY(packageInstall(download, package, functions));
     const PackageReceiptExport exports[] = {
-        {"runner", "wine", "Wine Stable.app/Contents/Resources/wine/bin/wine"},
-        {"capability", "runner.wine", "Wine Stable.app/Contents/Resources/wine/bin/wine"},
+        {"runner", PackageExport::RunnerWine, "Wine Stable.app/Contents/Resources/wine/bin/wine"},
+        {"capability", PackageCapability::RunnerWine, "Wine Stable.app/Contents/Resources/wine/bin/wine"},
     };
     static constexpr StringView phases[] = {
         "extractWineStableRunner",
@@ -3837,14 +3837,14 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
     }
 
     const PackageReceiptExport exports[] = {
-        {"tool", "cl.x64", "bin/x64/cl"},
-        {"tool", "link.x64", "bin/x64/link"},
-        {"tool", "lib.x64", "bin/x64/lib"},
-        {"tool", "cl.arm64", "bin/arm64/cl"},
-        {"tool", "link.arm64", "bin/arm64/link"},
-        {"tool", "lib.arm64", "bin/arm64/lib"},
-        {"capability", "toolchain.windows-msvc.x64", "bin/x64/cl"},
-        {"capability", "toolchain.windows-msvc.arm64", "bin/arm64/cl"},
+        {"tool", PackageExport::MSVCClX64, "bin/x64/cl"},
+        {"tool", PackageExport::MSVCLinkX64, "bin/x64/link"},
+        {"tool", PackageExport::MSVCLibX64, "bin/x64/lib"},
+        {"tool", PackageExport::MSVCClArm64, "bin/arm64/cl"},
+        {"tool", PackageExport::MSVCLinkArm64, "bin/arm64/link"},
+        {"tool", PackageExport::MSVCLibArm64, "bin/arm64/lib"},
+        {"capability", PackageCapability::ToolchainWindowsMSVCX64, "bin/x64/cl"},
+        {"capability", PackageCapability::ToolchainWindowsMSVCArm64, "bin/arm64/cl"},
     };
     static constexpr StringView phases[] = {
         "fetchPortableMSVC", "repairMSVCLayout", "prepareMSVCWinePrefix", "validateMSVCLayout", "writeReceipt",

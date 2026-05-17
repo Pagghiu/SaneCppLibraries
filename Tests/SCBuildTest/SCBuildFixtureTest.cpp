@@ -2896,7 +2896,8 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TRUST_RESULT(Tools::resolveQEMURunnerExecutable(package.installDirectoryLink.view(),
                                                                InstructionSet::ARM64, installedQEMU));
             String installedQEMUFromCapability = StringEncoding::Utf8;
-            SC_TEST_EXPECT(Tools::resolvePackageCapabilityPath(package.installDirectoryLink.view(), "runner.qemu.arm64",
+            SC_TEST_EXPECT(Tools::resolvePackageCapabilityPath(package.installDirectoryLink.view(),
+                                                               Tools::PackageCapability::RunnerQEMUArm64,
                                                                installedQEMUFromCapability));
             SC_TEST_EXPECT(installedQEMUFromCapability.view() == installedQEMU.view());
 
