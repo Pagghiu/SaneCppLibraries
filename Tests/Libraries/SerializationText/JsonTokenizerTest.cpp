@@ -67,6 +67,30 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         return true;
     }
 
+    static constexpr bool testTokenizeEndOfInput(StringView text)
+    {
+        auto                 it = text.getIterator<It>();
+        JsonTokenizer::Token token;
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
+        SC_TRY(not JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
+        return true;
+    }
+
+    static constexpr bool testInvalidTokenResetsState(StringView text)
+    {
+        auto                 it = text.getIterator<It>();
+        JsonTokenizer::Token token;
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
+        SC_TRY(JsonTokenizer::tokenizeNext(it, token));
+        SC_TRY(token.getType() == JsonTokenizer::Token::Invalid);
+        return true;
+    }
+
     [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringView text)
     {
         auto                 it = text.getIterator<It>();
@@ -129,11 +153,15 @@ struct SC::JsonTokenizerTest : public SC::TestCase
             static_assert(not testTokenizeObject(" {_} "), "Invalid");
             static_assert(testTokenizeObjectWithField("{  \"x\"\t   :   \t1.2\t  }"), "Invalid");
             static_assert(testTokenizeObjectWithTwoFields("{\"x\":1,\"y\":2}"), "Invalid");
+            static_assert(testTokenizeEndOfInput("{}   "), "Invalid");
+            static_assert(testInvalidTokenResetsState("{_}"), "Invalid");
             SC_TEST_EXPECT(testTokenizeObject("{}"));
             SC_TEST_EXPECT(testTokenizeObject(" { \n\t} "));
             SC_TEST_EXPECT(not testTokenizeObject(" {_} "));
             SC_TEST_EXPECT(testTokenizeObjectWithField("{  \"x\"\t   :   \t1.2\t  }"));
             SC_TEST_EXPECT(testTokenizeObjectWithTwoFields("{\"x\":1,\"y\":2}"));
+            SC_TEST_EXPECT(testTokenizeEndOfInput("{}   "));
+            SC_TEST_EXPECT(testInvalidTokenResetsState("{_}"));
         }
     }
 };

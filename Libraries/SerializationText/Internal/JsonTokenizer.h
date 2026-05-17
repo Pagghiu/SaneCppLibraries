@@ -87,6 +87,8 @@ constexpr bool SC::JsonTokenizer::tokenizeNext(StringIteratorASCII& it, Token& t
 
 constexpr bool SC::JsonTokenizer::scanToken(StringIteratorASCII& it, Token& token)
 {
+    token = Token();
+
     StringIteratorASCII::CodePoint current = 0;
     const StringIteratorASCII      start   = it;
     if (not it.advanceRead(current))
@@ -123,11 +125,11 @@ constexpr bool SC::JsonTokenizer::skipWhitespaces(StringIteratorASCII& it)
     {
         if (not table.matches[current])
         {
-            break;
+            (void)it.stepBackward(); // put back the read character
+            return true;
         }
     }
-    (void)it.stepBackward(); // put back the read character (if any)
-    return not it.isAtEnd();
+    return false;
 }
 
 constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start, Token& token)
