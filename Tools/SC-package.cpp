@@ -4157,6 +4157,7 @@ static Result printPackageHelp(Console& console)
     console.printLine("  info <package>          Show package registry metadata");
     console.printLine("  status [package]        Show installed receipt status");
     console.printLine("  verify [package]        Verify installed package receipts and exports");
+    console.printLine("  doctor [package]        Explain package receipt and export health");
     console.printLine("  receipt <package>       Print the installed receipt JSON");
     console.printLine("  exports <package>       Print resolved receipt exports");
     console.printLine("  lock                    Write _Build/SC-package.lock");
@@ -4385,6 +4386,96 @@ static Result printAllPackageStatuses(Console& console, PackageRegistry registry
     {
         console.printLine("no installed package receipts found");
     }
+    return Result(true);
+}
+
+static Result printPackageDoctorForEntry(Console& console, StringView packagesInstallDirectory,
+                                         const PackageRegistryEntry& entry, bool& hasIssues)
+{
+    String receiptPath = StringEncoding::Utf8;
+    String packageRoot = StringEncoding::Utf8;
+    bool   found       = false;
+    SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory, entry.installedName, receiptPath, packageRoot, found));
+    if (not found)
+    {
+        hasIssues = true;
+        console.print("missing: ");
+        console.printLine(entry.name);
+        console.print("  expected receipt for installedName: ");
+        console.printLine(entry.installedName);
+        console.print("  suggested action: ./SC.sh package install ");
+        console.printLine(entry.name);
+        return Result(true);
+    }
+
+    const Result validation = verifyPackageReceiptForEntry(entry, receiptPath.view(), packageRoot.view());
+    if (validation)
+    {
+        console.print("healthy: ");
+        console.print(entry.name);
+        console.print(" at ");
+        console.printLine(packageRoot.view());
+        return Result(true);
+    }
+
+    hasIssues = true;
+    console.print("problem: ");
+    console.print(entry.name);
+    console.print(" at ");
+    console.printLine(packageRoot.view());
+    console.print("  receipt: ");
+    console.printLine(receiptPath.view());
+    console.print("  reason: ");
+    console.printLine(StringView::fromNullTerminated(validation.message, StringEncoding::Ascii));
+    console.printLine("  suggested action: re-run install or remove the stale package directory before reinstalling");
+    return Result(true);
+}
+
+static Result printLegacyPackageSidecars(Console& console, StringView packagesInstallDirectory, bool& hasIssues)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsDirectory(packagesInstallDirectory))
+    {
+        return Result(true);
+    }
+
+    FileSystemIterator::FolderState entries[8];
+    FileSystemIterator              iterator;
+    SC_TRY(iterator.init(packagesInstallDirectory, entries));
+    while (iterator.enumerateNext())
+    {
+        const FileSystemIterator::Entry entry = iterator.get();
+        if (not entry.isDirectory() and StringView(entry.name).endsWith(".txt"))
+        {
+            hasIssues = true;
+            console.print("legacy sidecar: ");
+            console.printLine(entry.path);
+            console.printLine("  suggested action: reinstall the package so a structured receipt is written");
+        }
+    }
+    SC_TRY(iterator.checkErrors());
+    return Result(true);
+}
+
+static Result printPackageDoctor(Console& console, PackageRegistry registry, StringView packagesInstallDirectory,
+                                 const PackageRegistryEntry* singleEntry)
+{
+    bool hasIssues = false;
+    if (singleEntry != nullptr)
+    {
+        SC_TRY(printPackageDoctorForEntry(console, packagesInstallDirectory, *singleEntry, hasIssues));
+    }
+    else
+    {
+        for (const PackageRegistryEntry& entry : registry.entries)
+        {
+            SC_TRY(printPackageDoctorForEntry(console, packagesInstallDirectory, entry, hasIssues));
+        }
+        SC_TRY(printLegacyPackageSidecars(console, packagesInstallDirectory, hasIssues));
+    }
+
+    console.printLine(hasIssues ? "doctor: issues found"_a8 : "doctor: ok"_a8);
     return Result(true);
 }
 
@@ -4680,6 +4771,21 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
             console.print(validation ? " (receipt valid)"_a8 : " (receipt invalid)"_a8);
         }
         console.printLine(""_a8);
+    }
+    else if (arguments.action == "doctor")
+    {
+        if (arguments.arguments.empty())
+        {
+            SC_TRY(printPackageDoctor(console, registry, packagesInstallDirectory.view(), nullptr));
+            return Result(true);
+        }
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
+        {
+            return printUnknownPackageError(console, registry, packageName);
+        }
+        SC_TRY(printPackageDoctor(console, registry, packagesInstallDirectory.view(), entry));
     }
     else if (arguments.action == "receipt")
     {

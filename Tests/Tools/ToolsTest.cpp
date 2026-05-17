@@ -1028,6 +1028,12 @@ struct SupportToolsTest : public TestCase
             const PackageRegistry badRegistry = {{&badEntry, 1}};
             args[0]                           = "fake-missing";
             SC_TEST_EXPECT(not runPackageTool(arguments, badRegistry));
+
+            arguments.action = "doctor";
+            args[0]          = "fake";
+            SC_TEST_EXPECT(runPackageTool(arguments, registry));
+            args[0] = "fake-missing";
+            SC_TEST_EXPECT(runPackageTool(arguments, badRegistry));
         }
         if (test_section("package receipt resolves exports and capabilities"))
         {
