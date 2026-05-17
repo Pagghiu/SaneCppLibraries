@@ -103,8 +103,20 @@ struct SerializationTextVersionedVector
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, Container& object, SerializerStream& stream)
     {
-        // TODO: Allow customizing allowed conversions
-        return SerializationTextExactVector<SerializerStream, Container, T>::serialize(index, object, stream);
+        uint32_t arraySize = 0;
+        if (not stream.startArray(index, object, arraySize))
+            return false;
+
+        for (decltype(object.size()) idx = 0; idx < static_cast<decltype(idx)>(arraySize); ++idx)
+        {
+            auto data = Reflection::ExtendedTypeInfo<Container>::data(object);
+            if (not SerializationTextReadVersioned<SerializerStream, T, void>::loadVersioned(static_cast<uint32_t>(idx),
+                                                                                             data[idx], stream))
+                return false;
+            if (not stream.endArrayItem(object, arraySize))
+                return false;
+        }
+        return stream.endArray();
     }
 };
 } // namespace Serialization

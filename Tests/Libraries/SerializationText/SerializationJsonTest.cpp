@@ -11,6 +11,8 @@ namespace SC
 struct Test;
 struct EscapedStringTest;
 struct BorrowedStringTest;
+struct VersionedVectorItem;
+struct VersionedVectorTest;
 } // namespace SC
 
 //! [serializationJsonSnippet1]
@@ -56,6 +58,24 @@ struct SC::BorrowedStringTest
 SC_REFLECT_STRUCT_VISIT(SC::BorrowedStringTest)
 SC_REFLECT_STRUCT_FIELD(0, spanValue)
 SC_REFLECT_STRUCT_FIELD(1, viewValue)
+SC_REFLECT_STRUCT_LEAVE()
+
+struct SC::VersionedVectorItem
+{
+    int    first = 0;
+    String second;
+};
+SC_REFLECT_STRUCT_VISIT(SC::VersionedVectorItem)
+SC_REFLECT_STRUCT_FIELD(0, first)
+SC_REFLECT_STRUCT_FIELD(1, second)
+SC_REFLECT_STRUCT_LEAVE()
+
+struct SC::VersionedVectorTest
+{
+    Vector<VersionedVectorItem> items;
+};
+SC_REFLECT_STRUCT_VISIT(SC::VersionedVectorTest)
+SC_REFLECT_STRUCT_FIELD(0, items)
 SC_REFLECT_STRUCT_LEAVE()
 
 //! [serializationJsonSnippet1]
@@ -172,6 +192,15 @@ void SC::SerializationJsonTest::jsonLoadVersioned()
     SC_TEST_EXPECT(borrowed.viewValue == "view"_a8);
     constexpr StringView escapedBorrowedJSON = R"({"spanValue":"line\n","viewValue":"view"})"_a8;
     SC_TEST_EXPECT(not SerializationJson::loadVersioned(borrowed, escapedBorrowedJSON));
+
+    constexpr StringView versionedVectorJSON = R"({"items":[{"second":"b","first":1},{"second":"c","first":2}]})"_a8;
+    VersionedVectorTest  versionedVector;
+    SC_TEST_EXPECT(SerializationJson::loadVersioned(versionedVector, versionedVectorJSON));
+    SC_TEST_EXPECT(versionedVector.items.size() == 2);
+    SC_TEST_EXPECT(versionedVector.items[0].first == 1);
+    SC_TEST_EXPECT(versionedVector.items[0].second == "b");
+    SC_TEST_EXPECT(versionedVector.items[1].first == 2);
+    SC_TEST_EXPECT(versionedVector.items[1].second == "c");
 
     //! [serializationJsonLoadVersionedSnippet]
 }
