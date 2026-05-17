@@ -17,7 +17,8 @@ prune_root() {
       local name
       name="$(basename "${path}")"
       case "${name}" in
-        clang|clang++|clang-20|ld.lld|lld|llvm-ar|llvm-lib|llvm-ranlib)
+        clang|clang++|clang-20|ld.lld|lld|llvm-ar|llvm-lib|llvm-ranlib|\
+        clang.exe|clang++.exe|clang-20.exe|lld.exe|llvm-ar.exe|llvm-lib.exe|llvm-ranlib.exe)
           ;;
         *)
           rm -rf "${path}"

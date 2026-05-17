@@ -182,6 +182,34 @@ jobs:
           _Build/_Packages/llvm-mingw_*
         key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
 
+  windows-llvm:
+    runs-on: windows-2025
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore LLVM package cache
+      id: llvm-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: _Build/_PackagesCache/llvm
+        key: sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: Warm LLVM package
+      shell: cmd
+      run: call SC.bat package install llvm
+    - name: Prune LLVM package cache
+      shell: bash
+      run: ./Support/Scripts/PruneLLVMPackageCache.sh .
+    - name: Save LLVM package cache
+      if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: _Build/_PackagesCache/llvm
+        key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
+
   filc:
     runs-on: ubuntu-latest
     timeout-minutes: 20

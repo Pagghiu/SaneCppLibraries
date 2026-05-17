@@ -16,35 +16,23 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
-    - name: Restore Linux sysroot cache
-      id: linux-sysroot-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: _Build/_PackagesCache/linux-sysroot
-        key: sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
-        restore-keys: |
-          sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
-    - name: Warm packaged Linux cross toolchains
+    - name: Warm packaged LLVM toolchain
       shell: cmd
       run: |
-        SC.bat package install llvm
-        SC.bat package install linux-sysroot-glibc-arm64
-        SC.bat package install linux-sysroot-musl-x86_64
+        call SC.bat package install llvm
+    - name: Prune LLVM package cache
+      shell: bash
+      run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
       with:
         path: _Build/_PackagesCache/llvm
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
-    - name: Save Linux sysroot cache
-      if: always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v4
-      with:
-        path: _Build/_PackagesCache/linux-sysroot
-        key: ${{ steps.linux-sysroot-cache.outputs.cache-primary-key }}
 
   build:
     needs: package-warmup
@@ -64,18 +52,14 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        key: sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
-    - name: Restore Linux sysroot cache
-      id: linux-sysroot-cache
+    - name: Prune restored LLVM package cache
       if: matrix.config == 'Release'
-      uses: actions/cache/restore@v4
-      with:
-        path: _Build/_PackagesCache/linux-sysroot
-        key: sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
-        restore-keys: |
-          sc-packages-windows-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
+      shell: bash
+      run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
