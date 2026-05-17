@@ -386,9 +386,10 @@ This happens during regular development, where new code is frequently tested in 
 - `status [package]`: Reports whether one package, or all known packages, have structured install receipts and whether
   each found receipt validates
 - `verify [package]`: Checks one package, or all installed receipts, and validates exported paths
+- `doctor [package]`: Explains receipt/export health and suggests install or repair actions without replacing `verify`
 - `receipt <package>`: Prints the installed package root, receipt path and raw `sc-package-receipt.json` contents
 - `exports <package>`: Prints the exports recorded by the installed receipt with resolved paths
-- `lock`: Writes a local `_Build/SC-package.lock` summary of installed package receipts
+- `lock`: Writes a local `_Build/SC-package.lock` summary of installed package receipts and lock metadata
 
 ## Examples
 
@@ -399,6 +400,7 @@ This happens during regular development, where new code is frequently tested in 
 ./SC.sh package info llvm
 ./SC.sh package status llvm
 ./SC.sh package verify llvm
+./SC.sh package doctor llvm
 ./SC.sh package receipt llvm
 ./SC.sh package exports llvm
 ```
@@ -428,13 +430,35 @@ SC_TRY(runPackageTool(arguments, registryBuilder.registry(), &package));
 ```
 
 The builder uses caller-owned storage so registry entry lifetimes are explicit. A custom entry can provide its own
-`PackageInstallHandler` today; future recipe descriptors and named phase hooks should make the common cases data-only.
+`PackageInstallHandler`, or can point at a `PackageRecipe` descriptor for data-only copy/download recipes:
+
+```cpp
+static constexpr StringView recipeExports[] = {"tool:my-tool"};
+static constexpr StringView recipePhases[]  = {"copyDirectory", "writeReceipt"};
+static constexpr PackageReceiptExport receiptExports[] = {
+    {"tool", "my-tool", "bin/my-tool"},
+};
+
+PackageRecipe recipe;
+recipe.kind                = PackageRecipeKind::CopyDirectory;
+recipe.copySourceDirectory = myToolSourceDirectory;
+recipe.download.packageName    = "my-tool";
+recipe.download.packageVersion = "1";
+recipe.exports                 = receiptExports;
+recipe.phases                  = recipePhases;
+
+PackageRegistryEntry myPackageEntry = {
+    "my-tool", "my-tool", "tool", "My external tool", "host", "local directory", false,
+    recipeExports, recipePhases, nullptr, &recipe,
+};
+```
 
 `status` reports receipt validity without failing the command, while `verify` fails on invalid receipts after checking
-receipt shape, source-hash syntax and exported paths. `lock` writes `_Build/SC-package.lock` with the
-resolved package name, version, recipe version, host platform, variant, source, hash, install root, receipt path and
-exports for each installed receipt, making package state auditable without making imported packages look
-content-addressed.
+receipt shape, source-hash syntax, exported paths and the registry export contract. `doctor` prints the same health
+information with suggested actions for humans. `lock` writes `_Build/SC-package.lock` with generator metadata, host
+platform, generation timestamp, package count and the resolved package name, version, recipe version, host platform,
+variant, source, hash, install root, receipt path and exports for each installed receipt, making package state auditable
+without making imported packages look content-addressed.
 
 ## Packages
 These are the packages that are currently downloaded and extracted / symlinked by `SC-package.cpp`:

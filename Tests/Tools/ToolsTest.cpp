@@ -1035,6 +1035,61 @@ struct SupportToolsTest : public TestCase
             args[0] = "fake-missing";
             SC_TEST_EXPECT(runPackageTool(arguments, badRegistry));
         }
+        if (test_section("package commands accept external copy recipe"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String sourceRoot = StringEncoding::Utf8;
+            String binRoot    = StringEncoding::Utf8;
+            String toolPath   = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(sourceRoot, {outputDirectory.view(), "ExternalCopyRecipeSource"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {sourceRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "fake-tool"}));
+            if (fs.existsAndIsDirectory(sourceRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(sourceRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+
+            static constexpr StringView registryExports[] = {
+                "tool:fake-tool",
+            };
+            static constexpr StringView phases[] = {
+                "copyDirectory",
+                "writeReceipt",
+            };
+            static constexpr PackageReceiptExport receiptExports[] = {
+                {"tool", "fake-tool", "bin/fake-tool"},
+            };
+            PackageRecipe recipe;
+            recipe.kind                    = PackageRecipeKind::CopyDirectory;
+            recipe.copySourceDirectory     = sourceRoot.view();
+            recipe.download.packageName    = "external-copy";
+            recipe.download.packageVersion = "1";
+            recipe.exports                 = receiptExports;
+            recipe.phases                  = phases;
+
+            const PackageRegistryEntry recipeEntry = {
+                "copy-fake", "external-copy", "tool", "External copy recipe fixture",
+                "host",      "test fixture",  false,  registryExports,
+                phases,      nullptr,         &recipe};
+            const PackageRegistry recipeRegistry = {{&recipeEntry, 1}};
+
+            Package package;
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "copy-fake";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments, recipeRegistry, &package));
+            SC_TEST_EXPECT(fs.existsAndIsDirectory(package.installDirectoryLink.view()));
+
+            arguments.action = "verify";
+            SC_TEST_EXPECT(runPackageTool(arguments, recipeRegistry));
+            arguments.action = "exports";
+            SC_TEST_EXPECT(runPackageTool(arguments, recipeRegistry));
+        }
         if (test_section("package receipt resolves exports and capabilities"))
         {
             FileSystem fs;

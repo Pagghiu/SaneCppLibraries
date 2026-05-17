@@ -2041,18 +2041,39 @@ Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilit
     return resolvePackageReceiptExportPath(packageRoot, "capability"_a8, capabilityName, output);
 }
 
-struct PackageRecipe
-{
-    Download                         download;
-    Package                          package;
-    CustomFunctions                  functions;
-    Span<const PackageReceiptExport> exports;
-    Span<const StringView>           phases;
-};
-
-static Result installPackageRecipe(const PackageRecipe& recipe, Package& package)
+Result installPackageRecipe(const PackageRecipe& recipe, Package& package)
 {
     package = recipe.package;
+    if (recipe.kind == PackageRecipeKind::CopyDirectory)
+    {
+        SC_TRY_MSG(not recipe.copySourceDirectory.isEmpty(), "Package copy recipe is missing source directory");
+        SC_TRY_MSG(not package.installDirectoryLink.isEmpty(), "Package copy recipe is missing install directory");
+
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+        if (fs.existsAndIsDirectory(package.installDirectoryLink.view()))
+        {
+            SC_TRY(fs.removeDirectoriesRecursive(package.installDirectoryLink.view()));
+        }
+        else
+        {
+            SC_TRY(fs.removeFileIfExists(package.installDirectoryLink.view()));
+        }
+        SC_TRY(fs.copyDirectory(recipe.copySourceDirectory, package.installDirectoryLink.view()));
+
+        PackageReceiptInfo info;
+        info.packageName = recipe.download.packageName.view();
+        info.packageVersion =
+            recipe.download.packageVersion.isEmpty() ? "local"_a8 : recipe.download.packageVersion.view();
+        info.recipeVersion  = "1";
+        info.hostPlatform   = recipe.download.packagePlatform.view();
+        info.packageVariant = recipe.download.packagePlatform.view();
+        info.source         = recipe.copySourceDirectory;
+        info.sourceHash     = {};
+        info.validation     = "passed";
+        info.phases         = recipe.phases;
+        return writePackageReceipt(package, info, recipe.exports);
+    }
     SC_TRY(packageInstall(recipe.download, package, recipe.functions));
     return writeDownloadPackageReceipt(recipe.download, package, recipe.exports, recipe.phases);
 }
@@ -4695,9 +4716,41 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
         {
             return printUnknownPackageError(console, registry, packageName);
         }
-        SC_TRY_MSG(entry->install != nullptr, "Package registry entry is missing install handler");
-        SC_TRY(entry->install(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
-                              arguments.arguments));
+        if (entry->install != nullptr)
+        {
+            SC_TRY(entry->install(packagesCacheDirectory.view(), packagesInstallDirectory.view(), *package,
+                                  arguments.arguments));
+        }
+        else if (entry->recipe != nullptr)
+        {
+            PackageRecipe recipe = *entry->recipe;
+            if (recipe.download.packagesCacheDirectory.isEmpty())
+            {
+                SC_TRY(recipe.download.packagesCacheDirectory.assign(packagesCacheDirectory.view()));
+            }
+            if (recipe.download.packagesInstallDirectory.isEmpty())
+            {
+                SC_TRY(recipe.download.packagesInstallDirectory.assign(packagesInstallDirectory.view()));
+            }
+            if (recipe.download.packageName.isEmpty())
+            {
+                SC_TRY(recipe.download.packageName.assign(entry->installedName));
+            }
+            if (recipe.download.packageVersion.isEmpty())
+            {
+                SC_TRY(recipe.download.packageVersion.assign("local"));
+            }
+            if (recipe.package.installDirectoryLink.isEmpty())
+            {
+                SC_TRY(Path::join(recipe.package.installDirectoryLink,
+                                  {packagesInstallDirectory.view(), entry->installedName}));
+            }
+            SC_TRY(installPackageRecipe(recipe, *package));
+        }
+        else
+        {
+            return Result::Error("Package registry entry is missing install handler or recipe");
+        }
     }
     else if (arguments.action == "list")
     {

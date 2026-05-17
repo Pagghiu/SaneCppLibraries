@@ -127,6 +127,8 @@ constexpr StringView ToolchainWindowsMSVCArm64 = "toolchain.windows-msvc.arm64";
 using PackageInstallHandler = Result (*)(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package, Span<const StringView> packageArguments);
 
+struct PackageRecipe;
+
 struct PackageRegistryEntry
 {
     StringView             name;
@@ -139,6 +141,7 @@ struct PackageRegistryEntry
     Span<const StringView> exports;
     Span<const StringView> phases;
     PackageInstallHandler  install = nullptr;
+    const PackageRecipe*   recipe  = nullptr;
 };
 
 struct PackageRegistry
@@ -191,6 +194,23 @@ struct CustomFunctions
     Function<Result(const Download&, const Package&)> testFunction;
     Function<Result(StringView, StringView)>          extractFunction;
     bool                                              keepDownloadedArchive = true;
+};
+
+enum class PackageRecipeKind
+{
+    Download,
+    CopyDirectory,
+};
+
+struct PackageRecipe
+{
+    PackageRecipeKind                kind = PackageRecipeKind::Download;
+    StringView                       copySourceDirectory;
+    Download                         download;
+    Package                          package;
+    CustomFunctions                  functions;
+    Span<const PackageReceiptExport> exports;
+    Span<const StringView>           phases;
 };
 
 [[nodiscard]] inline Result createLink(StringView sourceFileOrDirectory, StringView linkFile)
@@ -622,6 +642,7 @@ Result installMSVCToolchain(StringView packagesCacheDirectory, StringView packag
 Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet architecture, String& output);
 Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
                            Span<const PackageReceiptExport> exports = {});
+Result installPackageRecipe(const PackageRecipe& recipe, Package& package);
 Result resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output);
 Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output);
 PackageRegistry builtinPackageRegistry();
