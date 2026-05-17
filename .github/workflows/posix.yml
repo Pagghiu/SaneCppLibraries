@@ -35,27 +35,30 @@ jobs:
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/llvm
-        key: sc-packages-posix-llvm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
+        key: sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore Linux sysroot cache
       id: linux-sysroot-cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/linux-sysroot
-        key: sc-packages-posix-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        path: |
+          _Build/_PackagesCache/linux-sysroot
+          _Build/_Packages/linux-sysroot_*
+        key: sc-packages-posix-linux-sysroot-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-posix-linux-sysroot-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: install
       run:  |
         sudo apt-get update
         sudo apt-get install -y liburing-dev
       if: matrix.params.os == 'ubuntu-latest'
-    - name: Install QEMU user runners
-      run: brew install qemu
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Probe QEMU user runners
       id: qemu-user-runners
       shell: bash
@@ -66,14 +69,17 @@ jobs:
           echo "available=false" >> "$GITHUB_OUTPUT"
         fi
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
-    - name: Warm macOS Linux cross packages
+    - name: Warm macOS LLVM package
       run: |
         ./SC.sh package install llvm
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.llvm-cache.outputs.cache-hit != 'true'
+    - name: Warm macOS Linux sysroot packages
+      run: |
         ./SC.sh package install linux-sysroot-glibc-x86_64
         ./SC.sh package install linux-sysroot-glibc-arm64
         ./SC.sh package install linux-sysroot-musl-x86_64
         ./SC.sh package install linux-sysroot-musl-arm64
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
@@ -119,13 +125,17 @@ jobs:
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/llvm
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
     - name: Save Linux sysroot cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/linux-sysroot
+        path: |
+          _Build/_PackagesCache/linux-sysroot
+          _Build/_Packages/linux-sysroot_*
         key: ${{ steps.linux-sysroot-cache.outputs.cache-primary-key }}
     # - name: install gdb
     #   run: sudo apt install -y gdb
