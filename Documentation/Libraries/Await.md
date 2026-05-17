@@ -118,6 +118,7 @@ as `Async`.
 Complete console examples live in:
 
 - `Examples/AwaitBackgroundDigest`, showing ThreadPool-backed CPU work with `loopWork()` and caller-owned job state.
+- `Examples/AwaitConfigReload`, showing `spawnAndWait()` for a single child coroutine that loads a config file.
 - `Examples/AwaitDeadline`, showing a child coroutine deadline with `waitFor()` and cooperative cancellation.
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.

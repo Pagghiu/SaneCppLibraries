@@ -25,6 +25,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
+- Use `Examples/AwaitConfigReload` for the one-child `spawnAndWait()` convenience pattern.
 - Use `Examples/AwaitDeadline` for child task deadlines through `waitFor()` and `AwaitTimeoutResult`.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
 - Use `Examples/AwaitFileCourier` for file copy plus `fileSend()` workflows.
