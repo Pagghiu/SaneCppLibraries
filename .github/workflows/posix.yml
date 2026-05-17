@@ -7,6 +7,10 @@ on:
 env:
   UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
 
+permissions:
+  actions: read
+  contents: read
+
 jobs:
   build:
     strategy:
@@ -26,9 +30,12 @@ jobs:
       if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/llvm-mingw
-        key: sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
+        key: sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Restore LLVM package cache
       id: llvm-cache
@@ -42,9 +49,61 @@ jobs:
         restore-keys: |
           sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
-    - name: Restore Linux sysroot cache
-      id: linux-sysroot-cache
+    - name: Restore Linux glibc x86_64 sysroot cache
+      id: linux_sysroot_glibc_x64_cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-x86_64
+          _Build/_PackagesCache/linux-sysroot/glibc-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-x86_64
+          _Build/_Packages/linux-sysroot_glibc_x86_64
+        key: sc-packages-posix-linux-sysroot-glibc-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-glibc-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux glibc arm64 sysroot cache
+      id: linux_sysroot_glibc_arm64_cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-arm64
+          _Build/_Packages/linux-sysroot_glibc_arm64
+        key: sc-packages-posix-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux musl x86_64 sysroot cache
+      id: linux_sysroot_musl_x64_cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-x86_64
+          _Build/_Packages/linux-sysroot_musl_x86_64
+        key: sc-packages-posix-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux musl arm64 sysroot cache
+      id: linux_sysroot_musl_arm64_cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-arm64
+          _Build/_PackagesCache/linux-sysroot/musl-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-arm64
+          _Build/_Packages/linux-sysroot_musl_arm64
+        key: sc-packages-posix-linux-sysroot-musl-arm64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-musl-arm64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore legacy Linux sysroot cache
+      id: linux_sysroot_legacy_cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && (steps.linux_sysroot_glibc_x64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_arm64_cache.outputs.cache-hit != 'true')
       uses: actions/cache/restore@v4
       with:
         path: |
@@ -160,7 +219,9 @@ jobs:
       if: matrix.config == 'Release' && always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/llvm-mingw
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
         key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
     - name: Save LLVM package cache
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
@@ -170,14 +231,46 @@ jobs:
           _Build/_PackagesCache/llvm
           _Build/_Packages/llvm_*
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
-    - name: Save Linux sysroot cache
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
+    - name: Save Linux glibc x86_64 sysroot cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_glibc_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_x86_64/sc-package-receipt.json') != ''
       uses: actions/cache/save@v4
       with:
         path: |
-          _Build/_PackagesCache/linux-sysroot
-          _Build/_Packages/linux-sysroot_*
-        key: ${{ steps.linux-sysroot-cache.outputs.cache-primary-key }}
+          _Build/_PackagesCache/linux-sysroot/glibc-x86_64
+          _Build/_PackagesCache/linux-sysroot/glibc-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-x86_64
+          _Build/_Packages/linux-sysroot_glibc_x86_64
+        key: ${{ steps.linux_sysroot_glibc_x64_cache.outputs.cache-primary-key }}
+    - name: Save Linux glibc arm64 sysroot cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_arm64/sc-package-receipt.json') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-arm64
+          _Build/_Packages/linux-sysroot_glibc_arm64
+        key: ${{ steps.linux_sysroot_glibc_arm64_cache.outputs.cache-primary-key }}
+    - name: Save Linux musl x86_64 sysroot cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_x86_64/sc-package-receipt.json') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-x86_64
+          _Build/_Packages/linux-sysroot_musl_x86_64
+        key: ${{ steps.linux_sysroot_musl_x64_cache.outputs.cache-primary-key }}
+    - name: Save Linux musl arm64 sysroot cache
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && always() && steps.linux_sysroot_musl_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_arm64/sc-package-receipt.json') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-arm64
+          _Build/_PackagesCache/linux-sysroot/musl-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-arm64
+          _Build/_Packages/linux-sysroot_musl_arm64
+        key: ${{ steps.linux_sysroot_musl_arm64_cache.outputs.cache-primary-key }}
     # - name: install gdb
     #   run: sudo apt install -y gdb
     # - name: test in gdb
@@ -195,9 +288,12 @@ jobs:
       id: filc-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/filc
-        key: sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h') }}
         restore-keys: |
+          sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
@@ -211,5 +307,89 @@ jobs:
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/filc
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
         key: ${{ steps.filc-cache.outputs.cache-primary-key }}
+
+  timing-summary:
+    runs-on: ubuntu-latest
+    needs: [build, filc-linux-experimental]
+    if: always()
+
+    steps:
+    - name: Print CI timing summary
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GITHUB_REPOSITORY: ${{ github.repository }}
+        GITHUB_RUN_ID: ${{ github.run_id }}
+      run: |
+        python3 - <<'PY'
+        import datetime
+        import json
+        import os
+        import urllib.request
+
+        repo = os.environ["GITHUB_REPOSITORY"]
+        run_id = os.environ["GITHUB_RUN_ID"]
+        token = os.environ["GH_TOKEN"]
+
+        req = urllib.request.Request(
+            f"https://api.github.com/repos/{repo}/actions/runs/{run_id}/jobs?per_page=100",
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "X-GitHub-Api-Version": "2022-11-28",
+            },
+        )
+
+        with urllib.request.urlopen(req) as response:
+            jobs = json.load(response)["jobs"]
+
+        def parse_time(value):
+            if not value:
+                return None
+            return datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+        def duration_seconds(start, end):
+            start_time = parse_time(start)
+            end_time = parse_time(end)
+            if start_time is None or end_time is None:
+                return None
+            return int((end_time - start_time).total_seconds())
+
+        def fmt(seconds):
+            if seconds is None:
+                return "running"
+            minutes, remaining = divmod(seconds, 60)
+            return f"{minutes}m {remaining:02d}s" if minutes else f"{remaining}s"
+
+        job_rows = []
+        step_rows = []
+        for job in jobs:
+            job_seconds = duration_seconds(job.get("started_at"), job.get("completed_at"))
+            job_rows.append((job_seconds or 0, job["name"], fmt(job_seconds), job.get("conclusion") or job["status"]))
+            for step in job.get("steps", []):
+                step_seconds = duration_seconds(step.get("started_at"), step.get("completed_at"))
+                if step_seconds is None:
+                    continue
+                step_rows.append((step_seconds, job["name"], step["name"], fmt(step_seconds), step.get("conclusion") or step["status"]))
+
+        job_rows.sort(reverse=True)
+        step_rows.sort(reverse=True)
+
+        lines = ["## CI timing summary", "", "| Job | Duration | Result |", "| --- | ---: | --- |"]
+        for _, name, duration, result in job_rows:
+            lines.append(f"| {name} | {duration} | {result} |")
+
+        lines.extend(["", "### Slowest steps", "", "| Job | Step | Duration | Result |", "| --- | --- | ---: | --- |"])
+        for _, job, step, duration, result in step_rows[:15]:
+            lines.append(f"| {job} | {step} | {duration} | {result} |")
+
+        output = "\n".join(lines) + "\n"
+        print(output)
+        summary = os.environ.get("GITHUB_STEP_SUMMARY")
+        if summary:
+            with open(summary, "a", encoding="utf-8") as handle:
+                handle.write(output)
+        PY

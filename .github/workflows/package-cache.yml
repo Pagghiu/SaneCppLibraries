@@ -1,0 +1,208 @@
+name: Package Cache
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
+  push:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/package-cache.yml'
+      - '.github/workflows/posix.yml'
+      - '.github/workflows/windows.yml'
+      - 'Tools/SC-package.cpp'
+      - 'Tools/SC-package.h'
+      - 'Tools/SC-package-versions.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  macos-llvm:
+    runs-on: macos-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore LLVM package cache
+      id: llvm-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
+        key: sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
+    - name: Check restored LLVM package
+      id: llvm-package
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${{ runner.arch }}" in
+          ARM64) host_arch="arm64" ;;
+          X64) host_arch="x86_64" ;;
+          *) host_arch="$(printf '%s' "${{ runner.arch }}" | tr '[:upper:]' '[:lower:]')" ;;
+        esac
+        root="_Build/_Packages/llvm_macos_${host_arch}"
+        if [[ -f "${root}/sc-package-receipt.json" && -x "${root}/bin/clang" ]]; then
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Warm LLVM package
+      if: steps.llvm-package.outputs.installed != 'true'
+      run: ./SC.sh package install llvm
+    - name: Save LLVM package cache
+      if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
+        key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
+
+  macos-linux-sysroot:
+    runs-on: macos-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        sysroot:
+          - package: linux-sysroot-glibc-x86_64
+            key: glibc-x86_64
+            cache_dir: glibc-x86_64
+            install_root: linux-sysroot_glibc_x86_64
+          - package: linux-sysroot-glibc-arm64
+            key: glibc-arm64
+            cache_dir: glibc-arm64
+            install_root: linux-sysroot_glibc_arm64
+          - package: linux-sysroot-musl-x86_64
+            key: musl-x86_64
+            cache_dir: musl-x86_64
+            install_root: linux-sysroot_musl_x86_64
+          - package: linux-sysroot-musl-arm64
+            key: musl-arm64
+            cache_dir: musl-arm64
+            install_root: linux-sysroot_musl_arm64
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore Linux sysroot cache
+      id: linux_sysroot_cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
+          _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/${{ matrix.sysroot.cache_dir }}
+          _Build/_Packages/${{ matrix.sysroot.install_root }}
+        key: sc-packages-posix-linux-sysroot-${{ matrix.sysroot.key }}-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-${{ matrix.sysroot.key }}-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore legacy Linux sysroot cache
+      if: steps.linux_sysroot_cache.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot
+          _Build/_Packages/linux-sysroot_*
+        key: sc-packages-posix-linux-sysroot-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-linux-sysroot-v2-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-linux-sysroot-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Check restored Linux sysroot
+      id: linux_sysroot
+      shell: bash
+      run: |
+        set -euo pipefail
+        root="_Build/_Packages/${{ matrix.sysroot.install_root }}"
+        if [[ -f "${root}/sc-package-receipt.json" ]]; then
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Warm Linux sysroot
+      if: steps.linux_sysroot.outputs.installed != 'true'
+      run: ./SC.sh package install ${{ matrix.sysroot.package }}
+    - name: Check Linux sysroot cache payload
+      id: linux_sysroot_ready
+      shell: bash
+      run: |
+        set -euo pipefail
+        root="_Build/_Packages/${{ matrix.sysroot.install_root }}"
+        if [[ -f "${root}/sc-package-receipt.json" ]]; then
+          echo "installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "installed=false" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Save Linux sysroot cache
+      if: always() && steps.linux_sysroot_cache.outputs.cache-hit != 'true' && steps.linux_sysroot_ready.outputs.installed == 'true'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}
+          _Build/_PackagesCache/linux-sysroot/${{ matrix.sysroot.cache_dir }}.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/${{ matrix.sysroot.cache_dir }}
+          _Build/_Packages/${{ matrix.sysroot.install_root }}
+        key: ${{ steps.linux_sysroot_cache.outputs.cache-primary-key }}
+
+  posix-llvm-mingw:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore llvm-mingw cache
+      id: llvm-mingw-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
+        key: sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-posix-llvm-mingw-v3-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: Warm llvm-mingw package
+      run: ./SC.sh package install llvm-mingw
+    - name: Save llvm-mingw cache
+      if: always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/llvm-mingw
+          _Build/_Packages/llvm-mingw_*
+        key: ${{ steps.llvm-mingw-cache.outputs.cache-primary-key }}
+
+  filc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Restore Fil-C cache
+      id: filc-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        restore-keys: |
+          sc-packages-posix-filc-v2-${{ runner.os }}-${{ runner.arch }}-
+          sc-packages-posix-filc-${{ runner.os }}-${{ runner.arch }}-
+    - name: Warm Fil-C package
+      run: ./SC.sh package install filc
+    - name: Save Fil-C cache
+      if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/filc
+          _Build/_Packages/filc_*
+        key: ${{ steps.filc-cache.outputs.cache-primary-key }}
