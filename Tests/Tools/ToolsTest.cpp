@@ -1317,6 +1317,10 @@ struct SupportToolsTest : public TestCase
             String lockText = StringEncoding::Utf8;
             SC_TEST_EXPECT(Path::join(lockPath, {outputDirectory.view(), "SC-package.lock"}));
             SC_TEST_EXPECT(readFileIntoString(lockPath.view(), lockText));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"tool\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"generatedAt\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"hostPlatform\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"packageCount\""));
             SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"packages\""));
             SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"exports\""));
         }

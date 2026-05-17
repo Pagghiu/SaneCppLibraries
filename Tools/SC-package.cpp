@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 #include "SC-package.h"
+#include "../Libraries/Containers/Algorithms/AlgorithmBubbleSort.h"
 #include "../Libraries/ContainersReflection/ContainersSerialization.h"
 #include "../Libraries/ContainersReflection/MemorySerialization.h"
 #include "../Libraries/FileSystemIterator/FileSystemIterator.h"
 #include "../Libraries/Memory/String.h"
 #include "../Libraries/SerializationText/SerializationJson.h"
+#include "../Libraries/Time/Time.h"
 #include <stdlib.h>
 namespace SC
 {
@@ -128,6 +130,23 @@ static constexpr StringView portableMSVCCacheLeafName()
     return HostPlatform == Platform::Apple   ? StringView::fromNullTerminated("portable-macos", StringEncoding::Ascii)
            : HostPlatform == Platform::Linux ? StringView::fromNullTerminated("portable-linux", StringEncoding::Ascii)
                                              : StringView::fromNullTerminated("portable-host", StringEncoding::Ascii);
+}
+
+static constexpr StringView hostPlatformName()
+{
+    return HostPlatform == Platform::Apple        ? StringView::fromNullTerminated("apple", StringEncoding::Ascii)
+           : HostPlatform == Platform::Linux      ? StringView::fromNullTerminated("linux", StringEncoding::Ascii)
+           : HostPlatform == Platform::Windows    ? StringView::fromNullTerminated("windows", StringEncoding::Ascii)
+           : HostPlatform == Platform::Emscripten ? StringView::fromNullTerminated("emscripten", StringEncoding::Ascii)
+                                                  : StringView::fromNullTerminated("unknown", StringEncoding::Ascii);
+}
+
+static constexpr StringView hostInstructionSetName()
+{
+    return HostInstructionSet == InstructionSet::ARM64 ? StringView::fromNullTerminated("arm64", StringEncoding::Ascii)
+           : HostInstructionSet == InstructionSet::Intel64
+               ? StringView::fromNullTerminated("x86_64", StringEncoding::Ascii)
+               : StringView::fromNullTerminated("x86", StringEncoding::Ascii);
 }
 
 static Result resolveHostCommandPath(StringView executable, String& output)
@@ -1705,7 +1724,14 @@ struct PackageLockEntryJSON
 
 struct PackageLockJSON
 {
-    int                          schema = 1;
+    int    schema       = 2;
+    String tool         = StringEncoding::Utf8;
+    String toolVersion  = StringEncoding::Utf8;
+    String generatedAt  = StringEncoding::Utf8;
+    String hostPlatform = StringEncoding::Utf8;
+    String hostArch     = StringEncoding::Utf8;
+    int    packageCount = 0;
+
     Vector<PackageLockEntryJSON> packages;
 };
 
@@ -1748,7 +1774,13 @@ SC_REFLECT_STRUCT_LEAVE()
 
 SC_REFLECT_STRUCT_VISIT(SC::Tools::PackageLockJSON)
 SC_REFLECT_STRUCT_FIELD(0, schema)
-SC_REFLECT_STRUCT_FIELD(1, packages)
+SC_REFLECT_STRUCT_FIELD(1, tool)
+SC_REFLECT_STRUCT_FIELD(2, toolVersion)
+SC_REFLECT_STRUCT_FIELD(3, generatedAt)
+SC_REFLECT_STRUCT_FIELD(4, hostPlatform)
+SC_REFLECT_STRUCT_FIELD(5, hostArch)
+SC_REFLECT_STRUCT_FIELD(6, packageCount)
+SC_REFLECT_STRUCT_FIELD(7, packages)
 SC_REFLECT_STRUCT_LEAVE()
 
 namespace SC
@@ -4393,13 +4425,58 @@ static Result printPackageExports(Console& console, StringView packagesInstallDi
     return Result(true);
 }
 
+static bool isSmaller(StringView left, StringView right)
+{
+    return left.compare(right) == StringView::Comparison::Smaller;
+}
+
+static bool isPackageLockExportSmaller(const PackageReceiptExportJSON& left, const PackageReceiptExportJSON& right)
+{
+    if (left.kind.view() != right.kind.view())
+    {
+        return isSmaller(left.kind.view(), right.kind.view());
+    }
+    if (left.name.view() != right.name.view())
+    {
+        return isSmaller(left.name.view(), right.name.view());
+    }
+    return isSmaller(left.path.view(), right.path.view());
+}
+
+static bool isPackageLockEntrySmaller(const PackageLockEntryJSON& left, const PackageLockEntryJSON& right)
+{
+    if (left.name.view() != right.name.view())
+    {
+        return isSmaller(left.name.view(), right.name.view());
+    }
+    if (left.variant.view() != right.variant.view())
+    {
+        return isSmaller(left.variant.view(), right.variant.view());
+    }
+    return isSmaller(left.installRoot.view(), right.installRoot.view());
+}
+
+static void sortPackageLock(PackageLockJSON& lockJSON)
+{
+    for (PackageLockEntryJSON& entry : lockJSON.packages)
+    {
+        Algorithms::bubbleSort(entry.exports.begin(), entry.exports.end(), isPackageLockExportSmaller);
+    }
+    Algorithms::bubbleSort(lockJSON.packages.begin(), lockJSON.packages.end(), isPackageLockEntrySmaller);
+}
+
 static Result lockInstalledPackages(StringView packagesInstallDirectory, StringView lockPath)
 {
     FileSystem fs;
     SC_TRY(fs.init("."));
 
     PackageLockJSON lockJSON;
-    auto            appendReceiptObject = [&](StringView receiptPath) -> Result
+    SC_TRY(assignJSONField(lockJSON.tool, "SC-package"));
+    SC_TRY(assignJSONField(lockJSON.toolVersion, "1"));
+    SC_TRY(StringBuilder::format(lockJSON.generatedAt, "{}", Time::Realtime::now().milliseconds));
+    SC_TRY(assignJSONField(lockJSON.hostPlatform, hostPlatformName()));
+    SC_TRY(assignJSONField(lockJSON.hostArch, hostInstructionSetName()));
+    auto appendReceiptObject = [&](StringView receiptPath) -> Result
     {
         if (not fs.existsAndIsFile(receiptPath))
         {
@@ -4428,6 +4505,7 @@ static Result lockInstalledPackages(StringView packagesInstallDirectory, StringV
                                     exportView.path.view()));
         }
         SC_TRY(lockJSON.packages.push_back(move(entry)));
+        lockJSON.packageCount = static_cast<int>(lockJSON.packages.size());
         return Result(true);
     };
 
@@ -4452,6 +4530,7 @@ static Result lockInstalledPackages(StringView packagesInstallDirectory, StringV
         SC_TRY(iterator.checkErrors());
     }
 
+    sortPackageLock(lockJSON);
     String lock = StringEncoding::Utf8;
     SC_TRY_MSG(SerializationJson::write(lockJSON, lock), "Failed writing package lock JSON");
     return fs.writeString(lockPath, lock.view());
