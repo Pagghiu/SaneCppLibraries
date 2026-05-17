@@ -446,12 +446,17 @@ recipe.download.packageName    = "my-tool";
 recipe.download.packageVersion = "1";
 recipe.exports                 = receiptExports;
 recipe.phases                  = recipePhases;
+recipe.phaseRegistry           = builtinPackagePhaseRegistry();
 
 PackageRegistryEntry myPackageEntry = {
     "my-tool", "my-tool", "tool", "My external tool", "host", "local directory", false,
     recipeExports, recipePhases, nullptr, &recipe,
 };
 ```
+
+Recipe phases are resolved through a `PackagePhaseRegistry`. The built-in phase registry currently provides
+`copyDirectory` and `writeReceipt`; external code can provide its own phase table for package-specific behavior.
+Unknown phases fail explicitly during install.
 
 `status` reports receipt validity without failing the command, while `verify` fails on invalid receipts after checking
 receipt shape, source-hash syntax, exported paths and the registry export contract. `doctor` prints the same health

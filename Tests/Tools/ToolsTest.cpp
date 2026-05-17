@@ -1070,6 +1070,7 @@ struct SupportToolsTest : public TestCase
             recipe.download.packageVersion = "1";
             recipe.exports                 = receiptExports;
             recipe.phases                  = phases;
+            recipe.phaseRegistry           = builtinPackagePhaseRegistry();
 
             const PackageRegistryEntry recipeEntry = {
                 "copy-fake", "external-copy", "tool", "External copy recipe fixture",
@@ -1089,6 +1090,23 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments, recipeRegistry));
             arguments.action = "exports";
             SC_TEST_EXPECT(runPackageTool(arguments, recipeRegistry));
+
+            static constexpr StringView badPhases[] = {
+                "missingPhase",
+            };
+            PackageRecipe badRecipe                   = recipe;
+            badRecipe.phases                          = badPhases;
+            const PackageRegistryEntry badRecipeEntry = {
+                "copy-fake-bad", "external-copy-bad",
+                "tool",          "External copy recipe fixture with an unknown phase",
+                "host",          "test fixture",
+                false,           registryExports,
+                badPhases,       nullptr,
+                &badRecipe};
+            const PackageRegistry badRecipeRegistry = {{&badRecipeEntry, 1}};
+            args[0]                                 = "copy-fake-bad";
+            arguments.action                        = "install";
+            SC_TEST_EXPECT(not runPackageTool(arguments, badRecipeRegistry, &package));
         }
         if (test_section("package receipt resolves exports and capabilities"))
         {

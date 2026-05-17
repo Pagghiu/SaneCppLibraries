@@ -128,6 +128,30 @@ using PackageInstallHandler = Result (*)(StringView packagesCacheDirectory, Stri
                                          Package& package, Span<const StringView> packageArguments);
 
 struct PackageRecipe;
+using PackagePhaseHandler = Result (*)(const PackageRecipe& recipe, Package& package);
+
+struct PackagePhaseRegistryEntry
+{
+    StringView          name;
+    PackagePhaseHandler handler = nullptr;
+};
+
+struct PackagePhaseRegistry
+{
+    Span<const PackagePhaseRegistryEntry> entries;
+
+    [[nodiscard]] const PackagePhaseRegistryEntry* find(StringView phaseName) const
+    {
+        for (const PackagePhaseRegistryEntry& entry : entries)
+        {
+            if (entry.name == phaseName)
+            {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
+};
 
 struct PackageRegistryEntry
 {
@@ -211,6 +235,7 @@ struct PackageRecipe
     CustomFunctions                  functions;
     Span<const PackageReceiptExport> exports;
     Span<const StringView>           phases;
+    PackagePhaseRegistry             phaseRegistry;
 };
 
 [[nodiscard]] inline Result createLink(StringView sourceFileOrDirectory, StringView linkFile)
@@ -643,12 +668,13 @@ Result resolveQEMURunnerExecutable(StringView packageRoot, InstructionSet archit
 Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
                            Span<const PackageReceiptExport> exports = {});
 Result installPackageRecipe(const PackageRecipe& recipe, Package& package);
-Result resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output);
-Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output);
-PackageRegistry builtinPackageRegistry();
-Result          addBuiltinPackages(PackageRegistryBuilder& registry);
-Result          runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tools::Package* package = nullptr);
-Result          runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
+PackagePhaseRegistry builtinPackagePhaseRegistry();
+Result               resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output);
+Result               resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output);
+PackageRegistry      builtinPackageRegistry();
+Result               addBuiltinPackages(PackageRegistryBuilder& registry);
+Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tools::Package* package = nullptr);
+Result runPackageTool(Tool::Arguments& arguments, Tools::Package* package);
 
 } // namespace Tools
 } // namespace SC
