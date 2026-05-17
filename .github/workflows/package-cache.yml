@@ -198,9 +198,11 @@ jobs:
           sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Warm LLVM package
+      if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: cmd
       run: call SC.bat package install llvm
     - name: Prune LLVM package cache
+      if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Save LLVM package cache
