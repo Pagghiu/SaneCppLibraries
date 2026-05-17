@@ -72,7 +72,17 @@ struct SupportToolsTest : public TestCase
         using namespace SC::Tools;
         using namespace SC::Tools::detail;
         StringPath outputDirectory;
-        (void)StringBuilder::format(outputDirectory, "{0}/_Build", report.libraryRootDirectory);
+        (void)StringBuilder::format(outputDirectory, "{0}/_Build/_TestScratch/SupportToolsTest",
+                                    report.libraryRootDirectory);
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            if (fs.existsAndIsDirectory(outputDirectory.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(outputDirectory.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(outputDirectory.view()));
+        }
         Tool::Arguments arguments{*globalConsole,
                                   report.libraryRootDirectory,
                                   report.libraryRootDirectory,
