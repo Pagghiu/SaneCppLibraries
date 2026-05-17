@@ -66,6 +66,7 @@ struct SC::JsonTokenizer
     [[nodiscard]] static constexpr bool skipWhitespaces(StringIteratorASCII& it);
 
     static constexpr void tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start, Token& token);
+    [[nodiscard]] static constexpr bool isEscapedQuote(StringIteratorASCII it);
     static constexpr void tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
                                          Token& token);
     static constexpr void tokenizeTrue(StringIteratorASCII& it, Token& token);
@@ -136,8 +137,11 @@ constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const 
 {
     while (it.advanceUntilMatches('"')) // find the end of the string
     {
-        if (it.isPrecededBy('\\')) // if the quote is escaped continue search
+        if (isEscapedQuote(it)) // if the quote is escaped continue search
+        {
+            (void)it.stepForward();
             continue;
+        }
         StringIteratorASCII startNext = start;
         (void)startNext.stepForward();  // but let's slice away leading '"'
         token.type     = Token::String; // Ok we have a (not validated) string
@@ -148,6 +152,17 @@ constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const 
         (void)it.advanceCodePoints(1); // eat the ending \" in the iterator
         break;
     }
+}
+
+constexpr bool SC::JsonTokenizer::isEscapedQuote(StringIteratorASCII it)
+{
+    size_t backslashes = 0;
+    while (it.isPrecededBy('\\'))
+    {
+        backslashes += 1;
+        (void)it.stepBackward();
+    }
+    return (backslashes % 2) == 1;
 }
 
 constexpr void SC::JsonTokenizer::tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,

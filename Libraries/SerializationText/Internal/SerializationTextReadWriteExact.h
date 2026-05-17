@@ -3,9 +3,25 @@
 #pragma once
 #include "../../Foundation/StringSpan.h"
 #include "../../Reflection/Reflection.h"
+#include "../../Strings/StringView.h"
 
 namespace SC
 {
+namespace Reflection
+{
+template <>
+struct Reflect<StringSpan>
+{
+    static constexpr TypeCategory getCategory() { return TypeCategory::TypeInvalid; }
+};
+
+template <>
+struct Reflect<StringView>
+{
+    static constexpr TypeCategory getCategory() { return TypeCategory::TypeInvalid; }
+};
+} // namespace Reflection
+
 /// @brief Serializes structured formats mostly text based, like JSON (see @ref library_serialization_text).
 namespace Serialization
 {
@@ -16,6 +32,24 @@ template <typename TextStream, typename T, typename SFINAESelector>
 struct SerializationTextReadWriteExact
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
+    {
+        return stream.serialize(index, object);
+    }
+};
+
+template <typename TextStream>
+struct SerializationTextReadWriteExact<TextStream, StringSpan, void>
+{
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, StringSpan& object, TextStream& stream)
+    {
+        return stream.serialize(index, object);
+    }
+};
+
+template <typename TextStream>
+struct SerializationTextReadWriteExact<TextStream, StringView, void>
+{
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, StringView& object, TextStream& stream)
     {
         return stream.serialize(index, object);
     }

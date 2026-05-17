@@ -150,6 +150,8 @@ struct SC::SerializationJson
             return serializeStringView(index, text.view());
         }
 
+        [[nodiscard]] bool serialize(uint32_t index, StringSpan text);
+        [[nodiscard]] bool serialize(uint32_t index, StringView text);
         [[nodiscard]] bool serialize(uint32_t index, float value);
         [[nodiscard]] bool serialize(uint32_t index, double value);
         [[nodiscard]] bool serialize(uint32_t index, int value);
@@ -204,17 +206,32 @@ struct SC::SerializationJson
         [[nodiscard]] bool serialize(uint32_t index, bool& value);
         [[nodiscard]] bool serialize(uint32_t index, float& value);
         [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
+        [[nodiscard]] bool serialize(uint32_t index, StringSpan& value);
+        [[nodiscard]] bool serialize(uint32_t index, StringView& value);
 
         template <typename T>
         [[nodiscard]] bool serialize(uint32_t index, T& text)
         {
             bool succeeded;
-            auto result = serializeInternal(index, succeeded);
-            return succeeded and text.assign(result);
+            auto escaped = serializeInternal(index, succeeded);
+            if (not succeeded)
+                return false;
+
+            GrowableBuffer<T>  gb = {text};
+            StringFormatOutput output(StringEncoding::Utf8, gb);
+            gb.clear();
+            output.onFormatBegin();
+            if (not appendJSONStringUnescaped(escaped, output))
+            {
+                output.onFormatFailed();
+                return false;
+            }
+            return output.onFormatSucceeded();
         }
 
       private:
-        [[nodiscard]] StringView serializeInternal(uint32_t index, bool& succeeded);
+        [[nodiscard]] static bool appendJSONStringUnescaped(StringView escaped, StringFormatOutput& output);
+        [[nodiscard]] StringView  serializeInternal(uint32_t index, bool& succeeded);
 
         [[nodiscard]] bool tokenizeArrayStart(uint32_t index);
         [[nodiscard]] bool tokenizeArrayEnd(uint32_t& size);

@@ -9,6 +9,8 @@
 namespace SC
 {
 struct Test;
+struct EscapedStringTest;
+struct BorrowedStringTest;
 } // namespace SC
 
 //! [serializationJsonSnippet1]
@@ -37,6 +39,25 @@ SC_REFLECT_STRUCT_FIELD(2, xy)
 SC_REFLECT_STRUCT_FIELD(3, myTest)
 SC_REFLECT_STRUCT_FIELD(4, myVector)
 SC_REFLECT_STRUCT_LEAVE()
+
+struct SC::EscapedStringTest
+{
+    String value;
+};
+SC_REFLECT_STRUCT_VISIT(SC::EscapedStringTest)
+SC_REFLECT_STRUCT_FIELD(0, value)
+SC_REFLECT_STRUCT_LEAVE()
+
+struct SC::BorrowedStringTest
+{
+    StringSpan spanValue;
+    StringView viewValue;
+};
+SC_REFLECT_STRUCT_VISIT(SC::BorrowedStringTest)
+SC_REFLECT_STRUCT_FIELD(0, spanValue)
+SC_REFLECT_STRUCT_FIELD(1, viewValue)
+SC_REFLECT_STRUCT_LEAVE()
+
 //! [serializationJsonSnippet1]
 
 namespace SC
@@ -78,6 +99,23 @@ void SC::SerializationJsonTest::jsonWrite()
     // Note: StringFormatOutput will NOT null terminate the string
     const StringView serializedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(serializedJSON == testJSON);
+
+    constexpr StringView escapedJSON = R"({"value":"quote\"slash\\line\nunicode A"})"_a8;
+    EscapedStringTest    escaped;
+    escaped.value = "quote\"slash\\line\nunicode A"_a8;
+    buffer.clear();
+    SC_TEST_EXPECT(SerializationJson::write(escaped, buffer));
+    const StringView serializedEscapedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
+    SC_TEST_EXPECT(serializedEscapedJSON == escapedJSON);
+
+    constexpr StringView borrowedJSON = R"({"spanValue":"quote\"span","viewValue":"line\nview"})"_a8;
+    BorrowedStringTest   borrowed;
+    borrowed.spanValue = "quote\"span"_a8;
+    borrowed.viewValue = "line\nview"_a8;
+    buffer.clear();
+    SC_TEST_EXPECT(SerializationJson::write(borrowed, buffer));
+    const StringView serializedBorrowedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
+    SC_TEST_EXPECT(serializedBorrowedJSON == borrowedJSON);
     //! [serializationJsonWriteSnippet]
 }
 void SC::SerializationJsonTest::jsonLoadExact()
@@ -94,6 +132,19 @@ void SC::SerializationJsonTest::jsonLoadExact()
     test.myVector = {"LPDFSOK", "DSAFKO"};
     SC_TEST_EXPECT(SerializationJson::loadExact(test, testJSON));
     SC_TEST_EXPECT(test == Test());
+
+    constexpr StringView escapedJSON = R"({"value":"quote\"slash\\line\nunicode \u0041"})"_a8;
+    EscapedStringTest    escaped;
+    SC_TEST_EXPECT(SerializationJson::loadExact(escaped, escapedJSON));
+    SC_TEST_EXPECT(escaped.value == "quote\"slash\\line\nunicode A");
+
+    constexpr StringView borrowedJSON = R"({"spanValue":"span","viewValue":"view"})"_a8;
+    BorrowedStringTest   borrowed;
+    SC_TEST_EXPECT(SerializationJson::loadExact(borrowed, borrowedJSON));
+    SC_TEST_EXPECT(borrowed.spanValue == "span"_a8);
+    SC_TEST_EXPECT(borrowed.viewValue == "view"_a8);
+    constexpr StringView escapedBorrowedJSON = R"({"spanValue":"line\n","viewValue":"view"})"_a8;
+    SC_TEST_EXPECT(not SerializationJson::loadExact(borrowed, escapedBorrowedJSON));
     //! [serializationJsonLoadExactSnippet]
 }
 void SC::SerializationJsonTest::jsonLoadVersioned()
@@ -108,6 +159,20 @@ void SC::SerializationJsonTest::jsonLoadVersioned()
     (void)test.myTest.assign("FDFSA"_a8);
     SC_TEST_EXPECT(SerializationJson::loadVersioned(test, scrambledJson));
     SC_TEST_EXPECT(test == Test());
+
+    constexpr StringView escapedJSON = R"({"value":"quote\"slash\\line\nunicode \u0041"})"_a8;
+    EscapedStringTest    escaped;
+    SC_TEST_EXPECT(SerializationJson::loadVersioned(escaped, escapedJSON));
+    SC_TEST_EXPECT(escaped.value == "quote\"slash\\line\nunicode A");
+
+    constexpr StringView borrowedJSON = R"({"viewValue":"view","spanValue":"span"})"_a8;
+    BorrowedStringTest   borrowed;
+    SC_TEST_EXPECT(SerializationJson::loadVersioned(borrowed, borrowedJSON));
+    SC_TEST_EXPECT(borrowed.spanValue == "span"_a8);
+    SC_TEST_EXPECT(borrowed.viewValue == "view"_a8);
+    constexpr StringView escapedBorrowedJSON = R"({"spanValue":"line\n","viewValue":"view"})"_a8;
+    SC_TEST_EXPECT(not SerializationJson::loadVersioned(borrowed, escapedBorrowedJSON));
+
     //! [serializationJsonLoadVersionedSnippet]
 }
 

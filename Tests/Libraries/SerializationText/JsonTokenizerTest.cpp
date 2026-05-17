@@ -104,6 +104,8 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         if (test_section("scanToken"))
         {
             constexpr StringView asdString("\"ASD\"");
+            constexpr StringView escapedQuoteString("\"A\\\"B\"");
+            constexpr StringView escapedBackslashString("\"A\\\\\"B");
 
             static_assert(scanToken("").getType() == JsonTokenizer::Token::Invalid, "Error");
             static_assert(scanToken(" ").getType() == JsonTokenizer::Token::Invalid, "Error");
@@ -120,6 +122,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
             static_assert(scanToken("\"\"").getType() == JsonTokenizer::Token::String, "Error");
             static_assert(scanToken("\"String\"").getType() == JsonTokenizer::Token::String, "Error");
             static_assert(scanToken(asdString).getToken(asdString) == "ASD", "Error");
+            static_assert(scanToken(escapedQuoteString).getType() == JsonTokenizer::Token::String, "Error");
+            static_assert(scanToken(escapedQuoteString).getToken(escapedQuoteString) == "A\\\"B", "Error");
+            static_assert(scanToken(escapedBackslashString).getType() == JsonTokenizer::Token::String, "Error");
+            static_assert(scanToken(escapedBackslashString).getToken(escapedBackslashString) == "A\\\\", "Error");
             static_assert(scanToken("\"ASD").getType() == JsonTokenizer::Token::Invalid, "Error");
             static_assert(scanToken("\"ASD\"\"").getType() == JsonTokenizer::Token::String, "Error");
             static_assert(scanToken("123").getType() == JsonTokenizer::Token::Number, "Error");
@@ -141,6 +147,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
             SC_TEST_EXPECT(scanToken("\"\"").getType() == JsonTokenizer::Token::String);
             SC_TEST_EXPECT(scanToken("\"String\"").getType() == JsonTokenizer::Token::String);
             SC_TEST_EXPECT(scanToken(asdString).getToken(asdString) == "ASD");
+            SC_TEST_EXPECT(scanToken(escapedQuoteString).getType() == JsonTokenizer::Token::String);
+            SC_TEST_EXPECT(scanToken(escapedQuoteString).getToken(escapedQuoteString) == "A\\\"B");
+            SC_TEST_EXPECT(scanToken(escapedBackslashString).getType() == JsonTokenizer::Token::String);
+            SC_TEST_EXPECT(scanToken(escapedBackslashString).getToken(escapedBackslashString) == "A\\\\");
             SC_TEST_EXPECT(scanToken("\"ASD").getType() == JsonTokenizer::Token::Invalid);
             SC_TEST_EXPECT(scanToken("\"ASD\"\"").getType() == JsonTokenizer::Token::String);
             SC_TEST_EXPECT(scanToken("123").getType() == JsonTokenizer::Token::Number);

@@ -18,6 +18,24 @@ struct SerializationTextReadVersioned
     }
 };
 
+template <typename SerializerStream>
+struct SerializationTextReadVersioned<SerializerStream, StringSpan, void>
+{
+    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, StringSpan& object, SerializerStream& stream)
+    {
+        return stream.serialize(index, object);
+    }
+};
+
+template <typename SerializerStream>
+struct SerializationTextReadVersioned<SerializerStream, StringView, void>
+{
+    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, StringView& object, SerializerStream& stream)
+    {
+        return stream.serialize(index, object);
+    }
+};
+
 template <typename SerializerStream, typename T, int N>
 struct SerializationTextReadVersioned<SerializerStream, T[N], void>
 {
