@@ -69,17 +69,58 @@ jobs:
           echo "available=false" >> "$GITHUB_OUTPUT"
         fi
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
+    - name: Check restored macOS cross packages
+      id: macos-cross-packages
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        case "${{ runner.arch }}" in
+          ARM64) host_arch="arm64" ;;
+          X64) host_arch="x86_64" ;;
+          *) host_arch="$(printf '%s' "${{ runner.arch }}" | tr '[:upper:]' '[:lower:]')" ;;
+        esac
+
+        llvm_root="_Build/_Packages/llvm_macos_${host_arch}"
+        if [[ -f "${llvm_root}/sc-package-receipt.json" && -x "${llvm_root}/bin/clang" ]]; then
+          echo "llvm-installed=true" >> "$GITHUB_OUTPUT"
+          echo "LLVM install root restored: ${llvm_root}"
+        else
+          echo "llvm-installed=false" >> "$GITHUB_OUTPUT"
+          echo "LLVM install root missing: ${llvm_root}"
+        fi
+
+        sysroot_missing=0
+        for sysroot in \
+          _Build/_Packages/linux-sysroot_glibc_x86_64 \
+          _Build/_Packages/linux-sysroot_glibc_arm64 \
+          _Build/_Packages/linux-sysroot_musl_x86_64 \
+          _Build/_Packages/linux-sysroot_musl_arm64
+        do
+          if [[ ! -f "${sysroot}/sc-package-receipt.json" ]]; then
+            echo "Linux sysroot install root missing: ${sysroot}"
+            sysroot_missing=1
+          fi
+        done
+
+        if [[ "${sysroot_missing}" == 0 ]]; then
+          echo "linux-sysroots-installed=true" >> "$GITHUB_OUTPUT"
+          echo "Linux sysroot install roots restored"
+        else
+          echo "linux-sysroots-installed=false" >> "$GITHUB_OUTPUT"
+        fi
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Warm macOS LLVM package
       run: |
         ./SC.sh package install llvm
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.llvm-cache.outputs.cache-hit != 'true'
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.macos-cross-packages.outputs.llvm-installed != 'true'
     - name: Warm macOS Linux sysroot packages
       run: |
         ./SC.sh package install linux-sysroot-glibc-x86_64
         ./SC.sh package install linux-sysroot-glibc-arm64
         ./SC.sh package install linux-sysroot-musl-x86_64
         ./SC.sh package install linux-sysroot-musl-arm64
-      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.linux-sysroot-cache.outputs.cache-hit != 'true'
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.macos-cross-packages.outputs.linux-sysroots-installed != 'true'
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
