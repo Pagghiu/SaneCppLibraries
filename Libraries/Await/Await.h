@@ -56,6 +56,7 @@ struct AwaitTaskGroup;
 struct AwaitTaskRegistry;
 struct AwaitTaskGroupWaitAllAwaiter;
 struct AwaitTaskGroupWaitAnyAwaiter;
+struct AwaitTaskRegistryWaitAllAwaiter;
 struct AwaitTaskSpawnAwaiter;
 struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
@@ -277,6 +278,7 @@ struct SC_AWAIT_EXPORT AwaitTask
     friend struct AwaitTaskGroup;
     friend struct AwaitTaskGroupWaitAllAwaiter;
     friend struct AwaitTaskGroupWaitAnyAwaiter;
+    friend struct AwaitTaskRegistryWaitAllAwaiter;
     friend struct AwaitTaskSpawnAwaiter;
     friend struct AwaitTaskTimeoutAwaiter;
 
@@ -1009,8 +1011,9 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistry
 {
     AwaitTaskRegistry(AwaitEventLoop& await, Span<AwaitTask> taskStorage);
 
-    Result spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* outResult = nullptr);
-    Result cancelAll();
+    Result                          spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* outResult = nullptr);
+    Result                          cancelAll();
+    AwaitTaskRegistryWaitAllAwaiter waitAll();
 
     size_t clearCompleted(AwaitTaskGroupResultSummary* outSummary = nullptr);
 
@@ -1022,8 +1025,38 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistry
     [[nodiscard]] size_t           capacity() const;
 
   private:
+    friend struct AwaitTaskRegistryWaitAllAwaiter;
+
     AwaitEventLoop& await;
     Span<AwaitTask> tasks;
+};
+
+/// @brief Awaiter that waits for every valid task in an AwaitTaskRegistry.
+struct SC_AWAIT_EXPORT AwaitTaskRegistryWaitAllAwaiter
+{
+    explicit AwaitTaskRegistryWaitAllAwaiter(AwaitTaskRegistry& registry);
+
+    AwaitTaskRegistry& registry;
+    Result             operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+    static void   onTaskCompleted(void* object);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   onTaskCompleted();
+    void   finish(Result result);
+    void   clearTaskCallbacks();
+    Result collectResult() const;
+
+    AwaitTask::Handle continuation;
+    size_t            totalTasks     = 0;
+    size_t            completedTasks = 0;
+    bool              finished       = false;
 };
 
 /// @brief Awaiter that waits for every active task in an AwaitTaskGroup.

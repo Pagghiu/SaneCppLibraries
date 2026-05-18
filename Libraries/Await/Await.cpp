@@ -2011,6 +2011,8 @@ Result AwaitTaskRegistry::cancelAll()
     return result;
 }
 
+AwaitTaskRegistryWaitAllAwaiter AwaitTaskRegistry::waitAll() { return AwaitTaskRegistryWaitAllAwaiter(*this); }
+
 size_t AwaitTaskRegistry::clearCompleted(AwaitTaskGroupResultSummary* outSummary)
 {
     AwaitTaskGroupResultSummary summary;
@@ -2105,6 +2107,145 @@ size_t AwaitTaskRegistry::completedCount() const
 }
 
 size_t AwaitTaskRegistry::capacity() const { return tasks.sizeInElements(); }
+
+AwaitTaskRegistryWaitAllAwaiter::AwaitTaskRegistryWaitAllAwaiter(AwaitTaskRegistry& registry) : registry(registry) {}
+
+bool AwaitTaskRegistryWaitAllAwaiter::await_ready() const { return false; }
+
+bool AwaitTaskRegistryWaitAllAwaiter::await_suspend(AwaitTask::Handle newContinuation)
+{
+    continuation = newContinuation;
+
+    for (size_t idx = 0; idx < registry.tasks.sizeInElements(); ++idx)
+    {
+        AwaitTask& task = registry.tasks[idx];
+        if (not task.isValid())
+        {
+            continue;
+        }
+
+        totalTasks++;
+        if (task.isCompleted())
+        {
+            completedTasks++;
+            continue;
+        }
+        if (not task.isActive())
+        {
+            operationResult = Result::Error("AwaitTaskRegistry contains inactive task");
+            clearTaskCallbacks();
+            return false;
+        }
+
+        AwaitTask::Promise& promise = task.handle.promise();
+        if (promise.completionCallback != nullptr or promise.continuation != nullptr)
+        {
+            operationResult = Result::Error("AwaitTask is already being awaited");
+            clearTaskCallbacks();
+            return false;
+        }
+
+        promise.completionObject   = this;
+        promise.completionCallback = AwaitTaskRegistryWaitAllAwaiter::onTaskCompleted;
+    }
+
+    if (completedTasks == totalTasks)
+    {
+        operationResult = collectResult();
+        return false;
+    }
+
+    continuation.promise().cancellation = {this, AwaitTaskRegistryWaitAllAwaiter::cancel};
+    return true;
+}
+
+Result AwaitTaskRegistryWaitAllAwaiter::await_resume()
+{
+    clearCancellation(continuation, this);
+    return operationResult;
+}
+
+Result AwaitTaskRegistryWaitAllAwaiter::cancel(void* object, AwaitEventLoop& eventLoop)
+{
+    return static_cast<AwaitTaskRegistryWaitAllAwaiter*>(object)->cancel(eventLoop);
+}
+
+Result AwaitTaskRegistryWaitAllAwaiter::cancel(AwaitEventLoop&)
+{
+    operationResult     = AwaitCancelledResult();
+    Result cancelResult = registry.cancelAll();
+    if (not cancelResult)
+    {
+        return cancelResult;
+    }
+    if (registry.activeCount() == 0)
+    {
+        finish(operationResult);
+    }
+    return Result(true);
+}
+
+void AwaitTaskRegistryWaitAllAwaiter::onTaskCompleted(void* object)
+{
+    static_cast<AwaitTaskRegistryWaitAllAwaiter*>(object)->onTaskCompleted();
+}
+
+void AwaitTaskRegistryWaitAllAwaiter::onTaskCompleted()
+{
+    if (finished)
+    {
+        return;
+    }
+
+    completedTasks++;
+    if (completedTasks == totalTasks)
+    {
+        finish(operationResult ? collectResult() : operationResult);
+    }
+}
+
+void AwaitTaskRegistryWaitAllAwaiter::finish(Result result)
+{
+    if (finished)
+    {
+        return;
+    }
+    finished        = true;
+    operationResult = result;
+    clearTaskCallbacks();
+    continuation.resume();
+}
+
+void AwaitTaskRegistryWaitAllAwaiter::clearTaskCallbacks()
+{
+    for (size_t idx = 0; idx < registry.tasks.sizeInElements(); ++idx)
+    {
+        AwaitTask& task = registry.tasks[idx];
+        if (not task.isValid())
+        {
+            continue;
+        }
+        AwaitTask::Promise& promise = task.handle.promise();
+        if (promise.completionObject == this)
+        {
+            promise.completionObject   = nullptr;
+            promise.completionCallback = nullptr;
+        }
+    }
+}
+
+Result AwaitTaskRegistryWaitAllAwaiter::collectResult() const
+{
+    for (size_t idx = 0; idx < registry.tasks.sizeInElements(); ++idx)
+    {
+        const AwaitTask& task = registry.tasks[idx];
+        if (task.isValid())
+        {
+            SC_TRY(task.result());
+        }
+    }
+    return Result(true);
+}
 
 AwaitTaskGroupWaitAllAwaiter::AwaitTaskGroupWaitAllAwaiter(AwaitTaskGroup& group) : group(group) {}
 

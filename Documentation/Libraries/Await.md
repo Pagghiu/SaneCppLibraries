@@ -62,6 +62,7 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitTaskGroupResultSummary](@ref SC::AwaitTaskGroupResultSummary) | @copybrief SC::AwaitTaskGroupResultSummary |
 | [AwaitTaskGroupWaitAllAwaiter](@ref SC::AwaitTaskGroupWaitAllAwaiter) | @copybrief SC::AwaitTaskGroupWaitAllAwaiter |
 | [AwaitTaskGroupWaitAnyAwaiter](@ref SC::AwaitTaskGroupWaitAnyAwaiter) | @copybrief SC::AwaitTaskGroupWaitAnyAwaiter |
+| [AwaitTaskRegistryWaitAllAwaiter](@ref SC::AwaitTaskRegistryWaitAllAwaiter) | @copybrief SC::AwaitTaskRegistryWaitAllAwaiter |
 | [AwaitProcessExitAwaiter](@ref SC::AwaitProcessExitAwaiter) | @copybrief SC::AwaitProcessExitAwaiter |
 | [AwaitSignalAwaiter](@ref SC::AwaitSignalAwaiter) | @copybrief SC::AwaitSignalAwaiter         |
 | [AwaitTaskSpawnAwaiter](@ref SC::AwaitTaskSpawnAwaiter) | @copybrief SC::AwaitTaskSpawnAwaiter     |
@@ -356,7 +357,8 @@ still follows Sane C++'s plain-`Result` style.
 The preferred model remains structured: keep child `AwaitTask` objects in caller-owned storage and wait through
 `AwaitTaskGroup` or `spawnAndWait()`. When a workflow really needs detached/background ownership,
 `AwaitTaskRegistry` provides the no-allocation shape: fixed caller-provided task slots, explicit `spawn()` into the
-first free slot, `cancelAll()` during shutdown, and `clearCompleted()` for cleanup and optional result aggregation.
+first free slot, `waitAll()` to drain currently registered tasks, `cancelAll()` during shutdown, and
+`clearCompleted()` for cleanup and optional result aggregation.
 
 `AwaitTaskRegistry` owns only task bookkeeping. It does not allocate, create coroutine frames, or hide lifetime
 management. Coroutine frames still come from each task's normal storage policy, usually an `AwaitArena`, and active
