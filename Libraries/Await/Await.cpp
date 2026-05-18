@@ -5,18 +5,23 @@
 #if defined(SC_COMPILER_ENABLE_STD_CPP) && SC_LANGUAGE_CPP_AT_LEAST_20
 
 #include "../Foundation/Assert.h"
+#include "../Foundation/LibC.h"
 #include "Await.h"
+#include <stdlib.h>
+#if SC_PLATFORM_WINDOWS
+#include <windows.h>
+#ifdef CopyFile
+#undef CopyFile
+#endif
+#else
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 
 namespace SC
 {
 namespace
 {
-struct AwaitAllocationHeader
-{
-    AwaitArena* arena      = nullptr;
-    void*       allocation = nullptr;
-};
-
 static const char AwaitCancellationMessageStorage[] = "AwaitTask cancelled";
 
 static constexpr size_t AwaitFrameAlignment =
@@ -33,9 +38,44 @@ static void* alignPointer(void* pointer, size_t alignment)
     return reinterpret_cast<void*>(alignedAddress);
 }
 
-static AwaitAllocationHeader& allocationHeaderFromFrame(void* frame)
+static size_t alignSize(size_t value, size_t alignment) { return (value + alignment - 1) & ~(alignment - 1); }
+
+static bool isPowerOfTwo(size_t value) { return value != 0 and (value & (value - 1)) == 0; }
+
+static size_t awaitAllocatorPageSize()
 {
-    return *(reinterpret_cast<AwaitAllocationHeader*>(frame) - 1);
+#if SC_PLATFORM_WINDOWS
+    static const size_t pageSize = []()
+    {
+        SYSTEM_INFO sysInfo;
+        GetSystemInfo(&sysInfo);
+        return static_cast<size_t>(sysInfo.dwPageSize);
+    }();
+#else
+    static const size_t pageSize = static_cast<size_t>(sysconf(_SC_PAGESIZE));
+#endif
+    return pageSize;
+}
+
+static size_t roundUpToAwaitAllocatorPageSize(size_t size)
+{
+    const size_t pageSize = awaitAllocatorPageSize();
+    return (size + pageSize - 1) / pageSize * pageSize;
+}
+
+struct AwaitAllocationHeader
+{
+    AwaitAllocator* allocator          = nullptr;
+    void*           rawAllocation      = nullptr;
+    void*           blockHeader        = nullptr;
+    size_t          requestedBytes     = 0;
+    size_t          allocatedBytes     = 0;
+    size_t          requestedAlignment = 0;
+};
+
+static AwaitAllocationHeader& allocationHeaderFromMemory(void* memory)
+{
+    return *(reinterpret_cast<AwaitAllocationHeader*>(memory) - 1);
 }
 
 static void clearCancellation(AwaitTask::Handle continuation, void* object)
@@ -77,42 +117,491 @@ Result AwaitCancelledResult() { return Result::FromStableCharPointer(AwaitCancel
 
 bool AwaitIsCancelled(Result result) { return result.message == AwaitCancellationMessageStorage; }
 
-AwaitArena::AwaitArena(Span<char> memory) : storage(memory) {}
-
-void* AwaitArena::allocate(size_t size, size_t alignment)
+struct AwaitAllocator::BlockHeader
 {
-    char*  base           = storage.data();
-    void*  current        = base + offset;
-    void*  aligned        = alignPointer(current, alignment);
-    size_t alignedOffset  = static_cast<size_t>(static_cast<char*>(aligned) - base);
-    size_t requiredOffset = alignedOffset + size;
-    if (requiredOffset > storage.sizeInBytes())
+    AwaitAllocator* allocator  = nullptr;
+    BlockHeader*    previous   = nullptr;
+    BlockHeader*    next       = nullptr;
+    size_t          blockBytes = 0;
+    bool            free       = true;
+};
+
+AwaitAllocator::~AwaitAllocator()
+{
+    Result result = close();
+    SC_ASSERT_RELEASE(result);
+}
+
+Result AwaitAllocator::createFixed(Span<char> storage)
+{
+    if (isOpen())
     {
-        lastFailedAllocationSize = size;
+        return Result::Error("AwaitAllocator is already open");
+    }
+    if (storage.empty())
+    {
+        return Result::Error("AwaitAllocator fixed storage is empty");
+    }
+
+    resetState();
+    SC_TRY(initializeFixedStorage(storage));
+    currentMode = AwaitAllocatorMode::Fixed;
+    return Result(true);
+}
+
+Result AwaitAllocator::createVirtual(AwaitAllocatorVirtualOptions options)
+{
+    if (isOpen())
+    {
+        return Result::Error("AwaitAllocator is already open");
+    }
+    if (options.reserveBytes == 0)
+    {
+        return Result::Error("AwaitAllocator virtual reservation is empty");
+    }
+
+    resetState();
+    virtualReservedBytes  = roundUpToAwaitAllocatorPageSize(options.reserveBytes);
+    virtualCommittedBytes = 0;
+#if SC_PLATFORM_WINDOWS
+    virtualMemory = ::VirtualAlloc(nullptr, virtualReservedBytes, MEM_RESERVE, PAGE_NOACCESS);
+#else
+    virtualMemory = ::mmap(nullptr, virtualReservedBytes, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (virtualMemory == MAP_FAILED)
+    {
+        virtualMemory = nullptr;
+    }
+#endif
+    if (virtualMemory == nullptr)
+    {
+        resetState();
+        return Result::Error("AwaitAllocator virtual reservation failed");
+    }
+
+    currentMode = AwaitAllocatorMode::Virtual;
+    if (options.initialCommitBytes > 0 and not ensureCommitted(options.initialCommitBytes))
+    {
+        releaseVirtualMemory();
+        resetState();
+        return Result::Error("AwaitAllocator virtual initial commit failed");
+    }
+    return Result(true);
+}
+
+Result AwaitAllocator::createMalloc()
+{
+    if (isOpen())
+    {
+        return Result::Error("AwaitAllocator is already open");
+    }
+    resetState();
+    currentMode = AwaitAllocatorMode::Malloc;
+    return Result(true);
+}
+
+Result AwaitAllocator::createPolymorphic(AwaitAllocatorInterface& customAllocatorInterface)
+{
+    if (isOpen())
+    {
+        return Result::Error("AwaitAllocator is already open");
+    }
+    resetState();
+    allocatorInterface = &customAllocatorInterface;
+    currentMode        = AwaitAllocatorMode::Polymorphic;
+    return Result(true);
+}
+
+Result AwaitAllocator::close()
+{
+    if (not isOpen())
+    {
+        return Result(true);
+    }
+    if (currentStatistics.bytesInUse != 0 or currentStatistics.numAllocations != currentStatistics.numReleases)
+    {
+        SC_ASSERT_RELEASE(false);
+        return Result::Error("AwaitAllocator closed with live allocations");
+    }
+
+    releaseVirtualMemory();
+    currentMode           = AwaitAllocatorMode::None;
+    fixedStorage          = {};
+    firstBlock            = nullptr;
+    allocatorInterface    = nullptr;
+    virtualMemory         = nullptr;
+    virtualReservedBytes  = 0;
+    virtualCommittedBytes = 0;
+    return Result(true);
+}
+
+void* AwaitAllocator::allocate(const void* owner, size_t numBytes, size_t alignment)
+{
+    if (not isOpen() or numBytes == 0 or not isPowerOfTwo(alignment))
+    {
+        recordAllocationFailure(numBytes);
         return nullptr;
     }
-    offset = requiredOffset;
-    if (offset > peakOffset)
+
+    if (currentMode == AwaitAllocatorMode::Fixed or currentMode == AwaitAllocatorMode::Virtual)
     {
-        peakOffset = offset;
+        return allocateFromBlocks(owner, numBytes, alignment);
     }
-    return aligned;
+
+    const size_t rawBytes = numBytes + sizeof(AwaitAllocationHeader) + alignment;
+    void*        raw      = nullptr;
+    if (currentMode == AwaitAllocatorMode::Malloc)
+    {
+        raw = ::malloc(rawBytes);
+    }
+    else if (currentMode == AwaitAllocatorMode::Polymorphic)
+    {
+        raw = allocatorInterface->allocateImpl(owner, rawBytes, alignof(AwaitAllocationHeader));
+    }
+
+    if (raw == nullptr)
+    {
+        recordAllocationFailure(numBytes);
+        return nullptr;
+    }
+
+    void*                  memory = alignPointer(static_cast<char*>(raw) + sizeof(AwaitAllocationHeader), alignment);
+    AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
+    header.allocator              = this;
+    header.rawAllocation          = raw;
+    header.blockHeader            = nullptr;
+    header.requestedBytes         = numBytes;
+    header.allocatedBytes         = rawBytes;
+    header.requestedAlignment     = alignment;
+
+    currentStatistics.numAllocations++;
+    currentStatistics.requestedBytesAllocated += numBytes;
+    currentStatistics.bytesInUse += rawBytes;
+    if (currentStatistics.bytesInUse > currentStatistics.peakBytesInUse)
+    {
+        currentStatistics.peakBytesInUse = currentStatistics.bytesInUse;
+    }
+    return memory;
 }
 
-void AwaitArena::reset()
+void AwaitAllocator::release(void* memory)
 {
-    offset                   = 0;
-    peakOffset               = 0;
-    lastFailedAllocationSize = 0;
+    if (memory == nullptr)
+    {
+        return;
+    }
+
+    AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
+    SC_ASSERT_RELEASE(header.allocator == this);
+    if (header.allocator != this)
+    {
+        return;
+    }
+
+    currentStatistics.numReleases++;
+    currentStatistics.requestedBytesReleased += header.requestedBytes;
+    SC_ASSERT_RELEASE(currentStatistics.bytesInUse >= header.allocatedBytes);
+    currentStatistics.bytesInUse -= header.allocatedBytes;
+
+    if (currentMode == AwaitAllocatorMode::Fixed or currentMode == AwaitAllocatorMode::Virtual)
+    {
+        releaseBlock(*static_cast<BlockHeader*>(header.blockHeader));
+    }
+    else if (currentMode == AwaitAllocatorMode::Malloc)
+    {
+        ::free(header.rawAllocation);
+    }
+    else if (currentMode == AwaitAllocatorMode::Polymorphic)
+    {
+        allocatorInterface->releaseImpl(header.rawAllocation);
+    }
 }
 
-size_t AwaitArena::used() const { return offset; }
+void AwaitAllocator::releaseFromAnyAllocator(void* memory)
+{
+    if (memory == nullptr)
+    {
+        return;
+    }
+    AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
+    SC_ASSERT_RELEASE(header.allocator != nullptr);
+    if (header.allocator != nullptr)
+    {
+        header.allocator->release(memory);
+    }
+}
 
-size_t AwaitArena::capacity() const { return storage.sizeInBytes(); }
+AwaitAllocatorMode AwaitAllocator::mode() const { return currentMode; }
 
-size_t AwaitArena::peakUsed() const { return peakOffset; }
+AwaitAllocatorStatistics AwaitAllocator::statistics() const { return currentStatistics; }
 
-size_t AwaitArena::failedAllocationSize() const { return lastFailedAllocationSize; }
+bool AwaitAllocator::isOpen() const { return currentMode != AwaitAllocatorMode::None; }
+
+size_t AwaitAllocator::used() const { return currentStatistics.bytesInUse; }
+
+size_t AwaitAllocator::capacity() const
+{
+    if (currentMode == AwaitAllocatorMode::Fixed)
+    {
+        return fixedStorage.sizeInBytes();
+    }
+    if (currentMode == AwaitAllocatorMode::Virtual)
+    {
+        return virtualReservedBytes;
+    }
+    return 0;
+}
+
+size_t AwaitAllocator::peakUsed() const { return currentStatistics.peakBytesInUse; }
+
+size_t AwaitAllocator::failedAllocationSize() const { return currentStatistics.lastFailedAllocationSize; }
+
+size_t AwaitAllocator::reservedBytes() const
+{
+    return currentMode == AwaitAllocatorMode::Virtual ? virtualReservedBytes : 0;
+}
+
+size_t AwaitAllocator::committedBytes() const
+{
+    return currentMode == AwaitAllocatorMode::Virtual ? virtualCommittedBytes : 0;
+}
+
+Result AwaitAllocator::initializeFixedStorage(Span<char> storage)
+{
+    char* base        = storage.data();
+    char* storageEnd  = base + storage.sizeInBytes();
+    char* alignedBase = static_cast<char*>(alignPointer(base, alignof(BlockHeader)));
+    if (alignedBase >= storageEnd or static_cast<size_t>(storageEnd - alignedBase) < sizeof(BlockHeader))
+    {
+        fixedStorage = storage;
+        firstBlock   = nullptr;
+        return Result(true);
+    }
+
+    fixedStorage           = storage;
+    firstBlock             = reinterpret_cast<BlockHeader*>(alignedBase);
+    firstBlock->allocator  = this;
+    firstBlock->previous   = nullptr;
+    firstBlock->next       = nullptr;
+    firstBlock->blockBytes = static_cast<size_t>(storageEnd - alignedBase);
+    firstBlock->free       = true;
+    return Result(true);
+}
+
+void* AwaitAllocator::allocateFromBlocks(const void*, size_t numBytes, size_t alignment)
+{
+    for (;;)
+    {
+        for (BlockHeader* block = firstBlock; block != nullptr; block = block->next)
+        {
+            if (not block->free)
+            {
+                continue;
+            }
+
+            char* blockStart = reinterpret_cast<char*>(block);
+            char* blockEnd   = blockStart + block->blockBytes;
+            void* memory    = alignPointer(blockStart + sizeof(BlockHeader) + sizeof(AwaitAllocationHeader), alignment);
+            char* headerPtr = static_cast<char*>(memory) - sizeof(AwaitAllocationHeader);
+            if (headerPtr < blockStart + sizeof(BlockHeader))
+            {
+                continue;
+            }
+
+            size_t usedBytes = static_cast<size_t>(static_cast<char*>(memory) + numBytes - blockStart);
+            usedBytes        = alignSize(usedBytes, alignof(BlockHeader));
+            if (blockStart + usedBytes > blockEnd)
+            {
+                continue;
+            }
+
+            const size_t remainingBytes = block->blockBytes - usedBytes;
+            if (remainingBytes > sizeof(BlockHeader) + sizeof(AwaitAllocationHeader) + alignof(BlockHeader))
+            {
+                BlockHeader* nextBlock = reinterpret_cast<BlockHeader*>(blockStart + usedBytes);
+                nextBlock->allocator   = this;
+                nextBlock->previous    = block;
+                nextBlock->next        = block->next;
+                nextBlock->blockBytes  = remainingBytes;
+                nextBlock->free        = true;
+                if (block->next != nullptr)
+                {
+                    block->next->previous = nextBlock;
+                }
+                block->next       = nextBlock;
+                block->blockBytes = usedBytes;
+            }
+
+            block->free = false;
+
+            AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
+            header.allocator              = this;
+            header.rawAllocation          = block;
+            header.blockHeader            = block;
+            header.requestedBytes         = numBytes;
+            header.allocatedBytes         = block->blockBytes;
+            header.requestedAlignment     = alignment;
+
+            currentStatistics.numAllocations++;
+            currentStatistics.requestedBytesAllocated += numBytes;
+            currentStatistics.bytesInUse += block->blockBytes;
+            if (currentStatistics.bytesInUse > currentStatistics.peakBytesInUse)
+            {
+                currentStatistics.peakBytesInUse = currentStatistics.bytesInUse;
+            }
+            return memory;
+        }
+
+        if (currentMode != AwaitAllocatorMode::Virtual)
+        {
+            recordAllocationFailure(numBytes);
+            return nullptr;
+        }
+
+        const size_t previousCommittedBytes = virtualCommittedBytes;
+        const size_t requestedBytes =
+            previousCommittedBytes + sizeof(BlockHeader) + sizeof(AwaitAllocationHeader) + alignment + numBytes;
+        if (not ensureCommitted(requestedBytes) or virtualCommittedBytes == previousCommittedBytes)
+        {
+            recordAllocationFailure(numBytes);
+            return nullptr;
+        }
+    }
+}
+
+void AwaitAllocator::releaseBlock(BlockHeader& header)
+{
+    SC_ASSERT_RELEASE(header.allocator == this);
+    header.free = true;
+
+    if (header.next != nullptr and header.next->free)
+    {
+        BlockHeader* next = header.next;
+        header.blockBytes += next->blockBytes;
+        header.next = next->next;
+        if (header.next != nullptr)
+        {
+            header.next->previous = &header;
+        }
+    }
+
+    if (header.previous != nullptr and header.previous->free)
+    {
+        BlockHeader* previous = header.previous;
+        previous->blockBytes += header.blockBytes;
+        previous->next = header.next;
+        if (previous->next != nullptr)
+        {
+            previous->next->previous = previous;
+        }
+    }
+}
+
+bool AwaitAllocator::ensureCommitted(size_t sizeInBytes)
+{
+    if (currentMode != AwaitAllocatorMode::Virtual or virtualMemory == nullptr)
+    {
+        return false;
+    }
+    if (sizeInBytes <= virtualCommittedBytes)
+    {
+        return true;
+    }
+    if (sizeInBytes > virtualReservedBytes)
+    {
+        return false;
+    }
+
+    const size_t previousCommittedBytes = virtualCommittedBytes;
+    const size_t targetCommittedBytes   = roundUpToAwaitAllocatorPageSize(sizeInBytes);
+    void*        commitAddress          = static_cast<char*>(virtualMemory) + previousCommittedBytes;
+    const size_t bytesToCommit          = targetCommittedBytes - previousCommittedBytes;
+#if SC_PLATFORM_WINDOWS
+    if (::VirtualAlloc(commitAddress, bytesToCommit, MEM_COMMIT, PAGE_READWRITE) == nullptr)
+    {
+        return false;
+    }
+#else
+    if (::mprotect(commitAddress, bytesToCommit, PROT_READ | PROT_WRITE) != 0)
+    {
+        return false;
+    }
+#endif
+    virtualCommittedBytes = targetCommittedBytes;
+
+    if (firstBlock == nullptr)
+    {
+        firstBlock             = static_cast<BlockHeader*>(virtualMemory);
+        firstBlock->allocator  = this;
+        firstBlock->previous   = nullptr;
+        firstBlock->next       = nullptr;
+        firstBlock->blockBytes = virtualCommittedBytes;
+        firstBlock->free       = true;
+        return true;
+    }
+
+    BlockHeader* lastBlock = firstBlock;
+    while (lastBlock->next != nullptr)
+    {
+        lastBlock = lastBlock->next;
+    }
+
+    const size_t addedBytes = virtualCommittedBytes - previousCommittedBytes;
+    if (lastBlock->free)
+    {
+        lastBlock->blockBytes += addedBytes;
+    }
+    else
+    {
+        BlockHeader* nextBlock =
+            reinterpret_cast<BlockHeader*>(static_cast<char*>(virtualMemory) + previousCommittedBytes);
+        nextBlock->allocator  = this;
+        nextBlock->previous   = lastBlock;
+        nextBlock->next       = nullptr;
+        nextBlock->blockBytes = addedBytes;
+        nextBlock->free       = true;
+        lastBlock->next       = nextBlock;
+    }
+    return true;
+}
+
+void AwaitAllocator::releaseVirtualMemory()
+{
+    if (virtualMemory == nullptr)
+    {
+        return;
+    }
+#if SC_PLATFORM_WINDOWS
+    const bool result = ::VirtualFree(virtualMemory, 0, MEM_RELEASE) == TRUE;
+#else
+    const bool result = ::munmap(virtualMemory, virtualReservedBytes) == 0;
+#endif
+    SC_ASSERT_RELEASE(result);
+    virtualMemory         = nullptr;
+    virtualReservedBytes  = 0;
+    virtualCommittedBytes = 0;
+}
+
+void AwaitAllocator::recordAllocationFailure(size_t numBytes)
+{
+    currentStatistics.numAllocationFailures++;
+    currentStatistics.lastFailedAllocationSize = numBytes;
+    if (numBytes > currentStatistics.largestFailedAllocationSize)
+    {
+        currentStatistics.largestFailedAllocationSize = numBytes;
+    }
+}
+
+void AwaitAllocator::resetState()
+{
+    currentMode           = AwaitAllocatorMode::None;
+    currentStatistics     = {};
+    fixedStorage          = {};
+    firstBlock            = nullptr;
+    allocatorInterface    = nullptr;
+    virtualMemory         = nullptr;
+    virtualReservedBytes  = 0;
+    virtualCommittedBytes = 0;
+}
 
 AwaitTask::AwaitTask(Handle newHandle) : handle(newHandle) {}
 
@@ -260,37 +749,11 @@ AwaitEventLoop* AwaitTask::Promise::findEventLoop(AwaitEventLoop& await) { retur
 void* AwaitTask::Promise::allocateFrame(size_t size, AwaitEventLoop* eventLoop) noexcept
 {
     constexpr size_t alignment = AwaitFrameAlignment;
-    const size_t     totalSize = size + sizeof(AwaitAllocationHeader) + alignment;
-
-    AwaitArena* arena = eventLoop == nullptr ? nullptr : eventLoop->arena();
-    void*       raw   = nullptr;
-    if (arena != nullptr)
-    {
-        raw = arena->allocate(totalSize, alignof(AwaitAllocationHeader));
-    }
-#if SC_AWAIT_REQUIRE_ARENA
-    else
+    if (eventLoop == nullptr)
     {
         return nullptr;
     }
-#else
-    else
-    {
-        raw = ::operator new(totalSize, std::nothrow);
-    }
-#endif
-
-    if (raw == nullptr)
-    {
-        return nullptr;
-    }
-
-    void* frame = alignPointer(static_cast<char*>(raw) + sizeof(AwaitAllocationHeader), alignment);
-
-    AwaitAllocationHeader& header = allocationHeaderFromFrame(frame);
-    header.arena                  = arena;
-    header.allocation             = raw;
-    return frame;
+    return eventLoop->allocator().allocate(nullptr, size, alignment);
 }
 
 void AwaitTask::Promise::deallocateFrame(void* frame) noexcept
@@ -300,11 +763,7 @@ void AwaitTask::Promise::deallocateFrame(void* frame) noexcept
         return;
     }
 
-    AwaitAllocationHeader& header = allocationHeaderFromFrame(frame);
-    if (header.arena == nullptr)
-    {
-        ::operator delete(header.allocation);
-    }
+    AwaitAllocator::releaseFromAnyAllocator(frame);
 }
 
 void* AwaitTask::Promise::operator new(size_t size) noexcept { return allocateFrame(size, nullptr); }
@@ -353,17 +812,17 @@ void AwaitTask::Promise::return_value(Result newResult) noexcept { taskResult = 
 
 void AwaitTask::Promise::unhandled_exception() noexcept { taskResult = Result::Error("AwaitTask unhandled exception"); }
 
-AwaitEventLoop::AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitArena* arena)
-    : eventLoop(asyncEventLoop), frameArena(arena), deferredDestroyList({})
-{}
+AwaitEventLoop::AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitAllocator& allocator)
+    : eventLoop(asyncEventLoop), frameAllocator(&allocator), deferredDestroyList({})
+{
+    SC_ASSERT_RELEASE(allocator.isOpen());
+}
 
 AsyncEventLoop& AwaitEventLoop::asyncEventLoop() { return eventLoop; }
 
 const AsyncEventLoop& AwaitEventLoop::asyncEventLoop() const { return eventLoop; }
 
-AwaitArena* AwaitEventLoop::arena() { return frameArena; }
-
-bool AwaitEventLoop::hasArena() const { return frameArena != nullptr; }
+AwaitAllocator& AwaitEventLoop::allocator() { return *frameAllocator; }
 
 Result AwaitEventLoop::spawn(AwaitTask& task)
 {

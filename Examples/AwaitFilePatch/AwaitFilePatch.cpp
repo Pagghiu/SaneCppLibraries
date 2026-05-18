@@ -69,9 +69,10 @@ static Result runAwaitFilePatch()
     SC_TRY(file.open(path.view(), FileOpen::ReadWrite));
     auto closeFile = MakeDeferred([&file] { (void)file.close(); });
 
-    char           arenaMemory[12 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[12 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     char                 readBuffer[12] = {};
     AwaitFileReadResult  readResult;

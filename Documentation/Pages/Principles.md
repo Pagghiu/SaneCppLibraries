@@ -59,3 +59,5 @@
 - Anything behind libraries API should not allocate on the heap
 - API should give control over allocations to the caller where dynamic allocation can't be avoided
 - Consider using pre-defined fixed buffers to avoid dynamic allocation callbacks
+- Draft coroutine layers such as `Await` must keep allocation policy explicit; fixed caller-owned storage is preferred,
+  while malloc, virtual memory, or polymorphic allocation must be visible opt-in configuration.

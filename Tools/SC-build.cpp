@@ -317,10 +317,9 @@ static Result addHotReloadIncludePathsDefine(Project& project, const Parameters&
     return Result(true);
 }
 
-static constexpr StringView TEST_PROJECT_NAME             = "SCTest";
-static constexpr StringView AWAIT_TEST_PROJECT_NAME       = "SCAwaitTest";
-static constexpr StringView AWAIT_ARENA_TEST_PROJECT_NAME = "SCAwaitArenaTest";
-static constexpr StringView BUILD_TEST_PROJECT_NAME       = "SCBuildTest";
+static constexpr StringView TEST_PROJECT_NAME       = "SCTest";
+static constexpr StringView AWAIT_TEST_PROJECT_NAME = "SCAwaitTest";
+static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
 
 Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
@@ -449,35 +448,6 @@ Result configureSCAwaitTest(const Parameters& parameters, Workspace& workspace)
     project.addFiles("Tests/SCAwaitTest", "*.cpp");
     project.addFiles("Tests/SCAwaitTest", "*.h");
     project.addFiles("Tests/Libraries/Await", "**.cpp");
-
-    SC_TRY(workspace.projects.push_back(move(project)));
-    return Result(true);
-}
-
-Result configureSCAwaitArenaTest(const Parameters& parameters, Workspace& workspace)
-{
-    Project project = {AWAIT_ARENA_TEST_PROJECT_NAME};
-    project.setRootDirectory(parameters.directories.projectDirectory.view());
-
-    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
-    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
-
-    project.files.compile.enableStdCpp = true;
-    project.files.compile.cppStandard  = CppStandard::CPP20;
-
-    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_COMPILER_ENABLE_STD_CPP=1", "SC_TOOLS_COMPILED_SEPARATELY=1",
-                        "SC_AWAIT_REQUIRE_ARENA=1"});
-    SC_TRY(addCompiledLibraryRootDefine(project, parameters));
-    project.addIncludePaths({
-        ".",
-        "Tests/SCAwaitArenaTest",
-    });
-
-    SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
-    SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
-    addSaneCppDebugVisualizers(project, parameters);
-    project.addFiles("Tests/SCAwaitArenaTest", "*.cpp");
-    project.addFiles("Tests/SCAwaitArenaTest", "*.h");
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
@@ -718,7 +688,6 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureTests(parameters, defaultWorkspace));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
-    SC_TRY(configureSCAwaitArenaTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));

@@ -23,6 +23,8 @@
 
 Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal [dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html) between them and follow a strict **No Allocations** (*) policy.
 
+(*) `Await` is a C++20 draft library that needs explicit coroutine frame storage. Its default/recommended mode uses caller-owned fixed buffers, while virtual memory, malloc/free, and polymorphic allocators are explicit opt-in modes.
+
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, tasks)        | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h)                   

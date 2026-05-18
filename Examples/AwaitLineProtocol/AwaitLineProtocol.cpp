@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //---------------------------------------------------------------------------------------------------------------------
 // Description:
-// A tiny C++20 coroutine line protocol using receiveLine(), sendAll(), task groups, and caller-owned arena storage.
+// A tiny C++20 coroutine line protocol using receiveLine(), sendAll(), task groups, and caller-owned allocator storage.
 //---------------------------------------------------------------------------------------------------------------------
 // Instructions:
 // Run `./SC.sh build configure` from repo root, then build/run the `AwaitLineProtocol` console executable.
@@ -134,9 +134,10 @@ static Result runAwaitLineProtocol()
     AsyncEventLoop async;
     SC_TRY(async.create());
 
-    char           arenaMemory[16 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[16 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     SocketDescriptor serverSocket;
     SocketIPAddress  address;
@@ -164,7 +165,7 @@ static Result runAwaitLineProtocol()
 
     StringView value({valueLine.line.data(), valueLine.line.sizeInBytes()}, false, StringEncoding::Ascii);
     console.print("AwaitLineProtocol read: {}\n", value);
-    console.print("AwaitLineProtocol arena capacity: {} bytes\n", arena.capacity());
+    console.print("AwaitLineProtocol allocator capacity: {} bytes\n", allocator.capacity());
 
     SC_TRY(client.close());
     SC_TRY(accepted.close());

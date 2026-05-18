@@ -8,10 +8,6 @@
 #endif
 #define SC_AWAIT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_AWAIT)
 
-#ifndef SC_AWAIT_REQUIRE_ARENA
-#define SC_AWAIT_REQUIRE_ARENA 0
-#endif
-
 #include "../Async/Async.h"
 #include "../Foundation/Result.h"
 #include "Internal/AwaitCoroutine.h"
@@ -28,7 +24,8 @@
 namespace SC
 {
 struct AwaitEventLoop;
-struct AwaitArena;
+struct AwaitAllocator;
+struct AwaitAllocatorInterface;
 struct AwaitTask;
 struct AwaitCancellationHandler;
 struct AwaitSleepAwaiter;
@@ -214,6 +211,44 @@ enum class AwaitTaskRegistryWaitAnyPolicy : uint8_t
     LeaveRemainingRunning,
 };
 
+enum class AwaitAllocatorMode : uint8_t
+{
+    None,
+    Fixed,
+    Virtual,
+    Malloc,
+    Polymorphic,
+};
+
+struct AwaitAllocatorStatistics
+{
+    size_t numAllocations = 0;
+    size_t numReleases    = 0;
+
+    size_t requestedBytesAllocated = 0;
+    size_t requestedBytesReleased  = 0;
+
+    size_t bytesInUse     = 0;
+    size_t peakBytesInUse = 0;
+
+    size_t numAllocationFailures       = 0;
+    size_t lastFailedAllocationSize    = 0;
+    size_t largestFailedAllocationSize = 0;
+};
+
+struct AwaitAllocatorVirtualOptions
+{
+    size_t reserveBytes       = 0;
+    size_t initialCommitBytes = 0;
+};
+
+struct AwaitAllocatorInterface
+{
+    virtual void* allocateImpl(const void* owner, size_t numBytes, size_t alignment) = 0;
+    virtual void  releaseImpl(void* memory)                                          = 0;
+    virtual ~AwaitAllocatorInterface() {}
+};
+
 enum class AwaitFileSystemOperationType : uint8_t
 {
     Open,
@@ -235,24 +270,57 @@ struct AwaitCancellationHandler
     Result (*cancel)(void* object, AwaitEventLoop& eventLoop) = nullptr;
 };
 
-/// @brief Caller-owned monotonic arena for coroutine frame allocation.
-struct SC_AWAIT_EXPORT AwaitArena
+/// @brief Explicit allocator used by AwaitTask coroutine frame allocation.
+struct SC_AWAIT_EXPORT AwaitAllocator
 {
-    explicit AwaitArena(Span<char> memory);
+    AwaitAllocator()                                 = default;
+    AwaitAllocator(const AwaitAllocator&)            = delete;
+    AwaitAllocator& operator=(const AwaitAllocator&) = delete;
+    AwaitAllocator(AwaitAllocator&&)                 = delete;
+    AwaitAllocator& operator=(AwaitAllocator&&)      = delete;
+    ~AwaitAllocator();
 
-    [[nodiscard]] void* allocate(size_t size, size_t alignment);
-    void                reset();
+    [[nodiscard]] Result createFixed(Span<char> storage);
+    [[nodiscard]] Result createVirtual(AwaitAllocatorVirtualOptions options);
+    [[nodiscard]] Result createMalloc();
+    [[nodiscard]] Result createPolymorphic(AwaitAllocatorInterface& customAllocatorInterface);
+    [[nodiscard]] Result close();
+
+    [[nodiscard]] void* allocate(const void* owner, size_t numBytes, size_t alignment);
+    void                release(void* memory);
+    static void         releaseFromAnyAllocator(void* memory);
+
+    [[nodiscard]] AwaitAllocatorMode       mode() const;
+    [[nodiscard]] AwaitAllocatorStatistics statistics() const;
+    [[nodiscard]] bool                     isOpen() const;
 
     [[nodiscard]] size_t used() const;
     [[nodiscard]] size_t capacity() const;
     [[nodiscard]] size_t peakUsed() const;
     [[nodiscard]] size_t failedAllocationSize() const;
+    [[nodiscard]] size_t reservedBytes() const;
+    [[nodiscard]] size_t committedBytes() const;
 
   private:
-    Span<char> storage;
-    size_t     offset                   = 0;
-    size_t     peakOffset               = 0;
-    size_t     lastFailedAllocationSize = 0;
+    struct BlockHeader;
+
+    Result initializeFixedStorage(Span<char> storage);
+    void*  allocateFromBlocks(const void* owner, size_t numBytes, size_t alignment);
+    void   releaseBlock(BlockHeader& header);
+    bool   ensureCommitted(size_t sizeInBytes);
+    void   releaseVirtualMemory();
+    void   recordAllocationFailure(size_t numBytes);
+    void   resetState();
+
+    AwaitAllocatorMode       currentMode = AwaitAllocatorMode::None;
+    AwaitAllocatorStatistics currentStatistics;
+    Span<char>               fixedStorage;
+    BlockHeader*             firstBlock         = nullptr;
+    AwaitAllocatorInterface* allocatorInterface = nullptr;
+
+    void*  virtualMemory         = nullptr;
+    size_t virtualReservedBytes  = 0;
+    size_t virtualCommittedBytes = 0;
 };
 
 /// @brief Caller-owned coroutine task returning a plain SC::Result.
@@ -314,6 +382,12 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
         eventLoop = findEventLoop(first, rest...);
     }
 
+    template <typename... Rest>
+    Promise(AwaitEventLoop& await, Rest&...) : Promise()
+    {
+        eventLoop = &await;
+    }
+
     static AwaitEventLoop* findEventLoop();
     static AwaitEventLoop* findEventLoop(AwaitEventLoop& await);
 
@@ -332,6 +406,12 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
     static void* operator new(size_t size, First& first, Rest&... rest) noexcept
     {
         return allocateFrame(size, findEventLoop(first, rest...));
+    }
+
+    template <typename... Rest>
+    static void* operator new(size_t size, AwaitEventLoop& await, Rest&...) noexcept
+    {
+        return allocateFrame(size, &await);
     }
 
     static void operator delete(void* frame, size_t) noexcept;
@@ -374,12 +454,11 @@ struct SC_AWAIT_EXPORT AwaitTask::Promise
 /// @brief Coroutine-friendly wrapper around an existing AsyncEventLoop.
 struct SC_AWAIT_EXPORT AwaitEventLoop
 {
-    explicit AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitArena* arena = nullptr);
+    explicit AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitAllocator& allocator);
 
     [[nodiscard]] AsyncEventLoop&       asyncEventLoop();
     [[nodiscard]] const AsyncEventLoop& asyncEventLoop() const;
-    [[nodiscard]] AwaitArena*           arena();
-    [[nodiscard]] bool                  hasArena() const;
+    [[nodiscard]] AwaitAllocator&       allocator();
 
     Result spawn(AwaitTask& task);
 
@@ -455,7 +534,7 @@ struct SC_AWAIT_EXPORT AwaitEventLoop
     void drainDeferredDestroys();
 
     AsyncEventLoop&   eventLoop;
-    AwaitArena*       frameArena;
+    AwaitAllocator*   frameAllocator;
     AwaitTask::Handle deferredDestroyList;
 };
 

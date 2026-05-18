@@ -108,9 +108,10 @@ static Result runAwaitDatagramPing()
     AsyncEventLoop async;
     SC_TRY(async.create());
 
-    char           arenaMemory[16 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[16 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     SocketDescriptor server;
     SocketIPAddress  serverAddress;
@@ -135,7 +136,7 @@ static Result runAwaitDatagramPing()
 
     StringView replyText({reply.data.data(), reply.data.sizeInBytes()}, false, StringEncoding::Ascii);
     console.print("Await UDP reply: {}\n", replyText);
-    console.print("Await arena capacity: {} bytes\n", arena.capacity());
+    console.print("Await allocator capacity: {} bytes\n", allocator.capacity());
 
     SC_TRY(client.close());
     SC_TRY(server.close());

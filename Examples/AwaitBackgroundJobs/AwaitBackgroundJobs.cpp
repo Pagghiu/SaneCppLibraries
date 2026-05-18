@@ -34,9 +34,10 @@ static Result runAwaitBackgroundJobs()
     AsyncEventLoop async;
     SC_TRY(async.create());
 
-    char           arenaMemory[12 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[12 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     AwaitTask         taskStorage[2];
     AwaitTaskRegistry registry(await, taskStorage);

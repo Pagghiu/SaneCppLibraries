@@ -17,12 +17,10 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`,
   `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`, and cancellation of
   the currently suspended operation. `AwaitTaskRegistry` covers explicit fixed-slot detached/background task ownership.
-- Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The experimental target still
-  allows no-arena standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
-- Use `AwaitArena::capacity()`, `used()`, `peakUsed()`, and `failedAllocationSize()` when sizing caller-provided
-  coroutine frame storage.
-- Define `SC_AWAIT_REQUIRE_ARENA=1` when exploring production-style builds that must reject standard coroutine
-  allocation fallback.
+- Prefer fixed `AwaitAllocator` examples when discussing no-hidden-allocation coroutine frame storage.
+- Use `AwaitAllocator::capacity()`, `used()`, `peakUsed()`, `failedAllocationSize()`, and `statistics()` when sizing
+  caller-provided coroutine frame storage.
+- Mention `createVirtual()`, `createMalloc()`, and `createPolymorphic()` only as explicit opt-in allocation modes.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
 - Use `Examples/AwaitBackgroundJobs` for detached/background jobs through fixed caller-owned `AwaitTaskRegistry` slots.
@@ -44,8 +42,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 ## What To Watch
 
 - `SCAwaitTest` is C++20 and standard-library enabled; it is intentionally separate from `SCTest`.
-- `SCAwaitArenaTest` is the focused `SC_AWAIT_REQUIRE_ARENA=1` target; use it when changing coroutine frame allocation
-  or arena behavior.
+- `SCAwaitTest` owns allocator coverage; Await stays separate from `SCTest` because it needs C++20 and standard-library
+  coroutine support.
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
 - Completed child task frames can be destroyed while an `Async` callback is unwinding; `AwaitEventLoop` defers that
   destruction until `run()`, `runOnce()`, or `runNoWait()` returns so embedded `AsyncRequest` storage stays alive.
@@ -91,13 +89,12 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
   completed slot without building a separate task-pointer array.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
-  would need coroutine traits/handles/suspend types plus compiler builtin mapping, and should require
-  `SC_AWAIT_REQUIRE_ARENA=1`. This is stable-track work, not required for MVP usage.
+  would need coroutine traits/handles/suspend types plus compiler builtin mapping. This is stable-track work, not
+  required for MVP usage.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
   useful on the POSIX backends for normal file/pipe handles.
-- For validation, run the smallest relevant `SCAwaitTest` section on macOS, then Linux, then Windows. Run
-  `SCAwaitArenaTest` when arena allocation behavior changes.
+- For validation, run the smallest relevant `SCAwaitTest` section on macOS, then Linux, then Windows.
 
 ## References
 
@@ -105,4 +102,3 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Public header: `Libraries/Await/Await.h`
 - Tests: `Tests/Libraries/Await/AwaitTest.cpp`
 - Test target: `Tests/SCAwaitTest/SCAwaitTest.cpp`
-- Arena-required target: `Tests/SCAwaitArenaTest/SCAwaitArenaTest.cpp`

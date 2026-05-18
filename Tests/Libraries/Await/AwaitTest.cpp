@@ -12,6 +12,7 @@
 #include "Libraries/Time/Time.h"
 
 #include <signal.h>
+#include <stdlib.h>
 #if SC_PLATFORM_APPLE
 #include <sys/sysctl.h>
 #endif
@@ -41,6 +42,12 @@ namespace SC
 struct AwaitTest;
 }
 
+#define SC_AWAIT_TEST_EVENT_LOOP(name, asyncLoop)                                                                      \
+    static char    name##AllocatorMemory[512 * 1024] = {};                                                             \
+    AwaitAllocator name##Allocator;                                                                                    \
+    SC_TEST_EXPECT(name##Allocator.createFixed(name##AllocatorMemory));                                                \
+    AwaitEventLoop name(asyncLoop, name##Allocator)
+
 struct SC::AwaitTest : public SC::TestCase
 {
     AwaitTest(SC::TestReport& report) : TestCase(report, "AwaitTest")
@@ -57,10 +64,12 @@ struct SC::AwaitTest : public SC::TestCase
         {
             taskLifetimeEdgeCases();
         }
+#if !SC_PLATFORM_WINDOWS
         if (test_section("task cross loop guards"))
         {
             taskCrossLoopGuards();
         }
+#endif
         if (test_section("move active task frames"))
         {
             moveActiveTaskFrames();
@@ -217,13 +226,17 @@ struct SC::AwaitTest : public SC::TestCase
         {
             cancelWaitFor();
         }
-        if (test_section("arena"))
+        if (test_section("allocator"))
         {
-            arena();
+            allocator();
         }
-        if (test_section("arena exhaustion"))
+        if (test_section("allocator exhaustion"))
         {
-            arenaExhaustion();
+            allocatorExhaustion();
+        }
+        if (test_section("allocator modes"))
+        {
+            allocatorModes();
         }
         if (test_section("child task teardown during callback"))
         {
@@ -231,7 +244,11 @@ struct SC::AwaitTest : public SC::TestCase
         }
     }
 
-    AwaitTask immediate(AwaitEventLoop&) { co_return Result(true); }
+    static AwaitTask immediate(AwaitEventLoop& await)
+    {
+        (void)await;
+        co_return Result(true);
+    }
 
     struct FrameAddressProbe
     {
@@ -239,7 +256,7 @@ struct SC::AwaitTest : public SC::TestCase
         void* afterResume   = nullptr;
     };
 
-    AwaitTask captureFrameAddress(AwaitEventLoop& await, FrameAddressProbe& probe)
+    static AwaitTask captureFrameAddress(AwaitEventLoop& await, FrameAddressProbe& probe)
     {
         int frameLocal      = 0;
         probe.beforeSuspend = &frameLocal;
@@ -248,8 +265,8 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask captureParentAndChildFrameAddress(AwaitEventLoop& await, AwaitTask& child, FrameAddressProbe& parentProbe,
-                                                FrameAddressProbe& childProbe)
+    static AwaitTask captureParentAndChildFrameAddress(AwaitEventLoop& await, AwaitTask& child,
+                                                       FrameAddressProbe& parentProbe, FrameAddressProbe& childProbe)
     {
         int parentLocal           = 0;
         parentProbe.beforeSuspend = &parentLocal;
@@ -260,86 +277,104 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask waitTwice(AwaitEventLoop& await)
+    static AwaitTask waitTwice(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1_ms));
         SC_CO_TRY(co_await await.sleep(1_ms));
         co_return Result(true);
     }
 
-    AwaitTask waitLong(AwaitEventLoop& await)
+    static AwaitTask waitLong(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1000_ms));
         co_return Result(true);
     }
 
-    AwaitTask failSoon(AwaitEventLoop& await)
+    static AwaitTask failSoon(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1_ms));
         co_return Result::Error("AwaitTest failSoon");
     }
 
-    AwaitTask wakeUpOnce(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& result)
+    static AwaitTask wakeUpOnce(AwaitEventLoop& await, AwaitLoopWakeUp& wakeUp, AwaitLoopWakeUpResult& result)
     {
         SC_CO_TRY(co_await await.wakeUp(wakeUp, result));
-        SC_TEST_EXPECT(result.deliveryCount >= 1);
+        if (result.deliveryCount < 1)
+        {
+            co_return Result::Error("Await wakeUp did not deliver");
+        }
         co_return Result(true);
     }
 
-    AwaitTask acceptOne(AwaitEventLoop& await, const SocketDescriptor& serverSocket, SocketDescriptor& acceptedClient)
+    static AwaitTask acceptOne(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                               SocketDescriptor& acceptedClient)
     {
         SC_CO_TRY(co_await await.accept(serverSocket, acceptedClient));
         co_return Result(true);
     }
 
-    AwaitTask connectOne(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address)
+    static AwaitTask connectOne(AwaitEventLoop& await, const SocketDescriptor& socket, SocketIPAddress address)
     {
         SC_CO_TRY(co_await await.connect(socket, address));
         co_return Result(true);
     }
 
-    AwaitTask sendReceiveOnce(AwaitEventLoop& await, const SocketDescriptor& sender, const SocketDescriptor& receiver)
+    static AwaitTask sendReceiveOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                     const SocketDescriptor& receiver)
     {
         const char sendBuffer[]      = {1, 2, 3};
         char       receiveBuffer[16] = {0};
 
         AwaitSocketSendResult sendResult;
         SC_CO_TRY(co_await await.send(sender, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
-        SC_TEST_EXPECT(sendResult.numBytes == sizeof(sendBuffer));
+        if (sendResult.numBytes != sizeof(sendBuffer))
+        {
+            co_return Result::Error("Await send wrote unexpected byte count");
+        }
 
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(sendBuffer));
-        SC_TEST_EXPECT(receiveResult.data.data()[0] == sendBuffer[0]);
-        SC_TEST_EXPECT(receiveResult.data.data()[1] == sendBuffer[1]);
-        SC_TEST_EXPECT(receiveResult.data.data()[2] == sendBuffer[2]);
+        if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != sizeof(sendBuffer) or
+            receiveResult.data.data()[0] != sendBuffer[0] or receiveResult.data.data()[1] != sendBuffer[1] or
+            receiveResult.data.data()[2] != sendBuffer[2])
+        {
+            co_return Result::Error("Await receive read unexpected data");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask sendAllOnce(AwaitEventLoop& await, const SocketDescriptor& sender, const SocketDescriptor& receiver)
+    static AwaitTask sendAllOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                 const SocketDescriptor& receiver)
     {
         const char sendBuffer[]      = {1, 2, 3, 4, 5};
         char       receiveBuffer[16] = {0};
 
         AwaitSocketSendResult sendResult;
         SC_CO_TRY(co_await await.sendAll(sender, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
-        SC_TEST_EXPECT(sendResult.numBytes == sizeof(sendBuffer));
+        if (sendResult.numBytes != sizeof(sendBuffer))
+        {
+            co_return Result::Error("Await sendAll wrote unexpected byte count");
+        }
 
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(sendBuffer));
+        if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != sizeof(sendBuffer))
+        {
+            co_return Result::Error("Await sendAll receive length mismatch");
+        }
         for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
         {
-            SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
+            if (receiveResult.data.data()[idx] != sendBuffer[idx])
+            {
+                co_return Result::Error("Await sendAll receive data mismatch");
+            }
         }
 
         co_return Result(true);
     }
 
-    AwaitTask sendSplitMessage(AwaitEventLoop& await, const SocketDescriptor& sender)
+    static AwaitTask sendSplitMessage(AwaitEventLoop& await, const SocketDescriptor& sender)
     {
         const char first[]  = {'h', 'e'};
         const char second[] = {'l', 'l', 'o'};
@@ -351,28 +386,30 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask receiveExactMessage(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
-                                  AwaitSocketReceiveResult& receiveResult)
+    static AwaitTask receiveExactMessage(AwaitEventLoop& await, const SocketDescriptor& receiver,
+                                         Span<char> receiveBuffer, AwaitSocketReceiveResult& receiveResult)
     {
         SC_CO_TRY(co_await await.receiveExact(receiver, receiveBuffer, &receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == receiveBuffer.sizeInBytes());
-        SC_TEST_EXPECT(StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false,
-                                  StringEncoding::Ascii) == "hello");
+        if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != receiveBuffer.sizeInBytes() or
+            StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false, StringEncoding::Ascii) !=
+                "hello")
+        {
+            co_return Result::Error("Await receiveExact data mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask receiveExactCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
-                                      AwaitSocketReceiveResult& receiveResult)
+    static AwaitTask receiveExactCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver,
+                                             Span<char> receiveBuffer, AwaitSocketReceiveResult& receiveResult)
     {
         SC_CO_TRY(co_await await.receiveExact(receiver, receiveBuffer, &receiveResult));
         co_return Result(true);
     }
 
-    AwaitTask receiveExactConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
-                                           const SocketDescriptor& receiver, Span<char> receiveBuffer,
-                                           AwaitSocketReceiveResult& receiveResult)
+    static AwaitTask receiveExactConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                                  const SocketDescriptor& receiver, Span<char> receiveBuffer,
+                                                  AwaitSocketReceiveResult& receiveResult)
     {
         AwaitTask senderTask   = sendSplitMessage(await, sender);
         AwaitTask receiverTask = receiveExactMessage(await, receiver, receiveBuffer, receiveResult);
@@ -386,7 +423,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask sendSplitLine(AwaitEventLoop& await, const SocketDescriptor& sender)
+    static AwaitTask sendSplitLine(AwaitEventLoop& await, const SocketDescriptor& sender)
     {
         const char first[]  = {'h', 'e', 'l'};
         const char second[] = {'l', 'o', '\r', '\n'};
@@ -398,28 +435,30 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask receiveLineMessage(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> lineBuffer,
-                                 AwaitSocketReceiveLineResult& lineResult)
+    static AwaitTask receiveLineMessage(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> lineBuffer,
+                                        AwaitSocketReceiveLineResult& lineResult)
     {
         SC_CO_TRY(co_await await.receiveLine(receiver, lineBuffer, lineResult));
-        SC_TEST_EXPECT(not lineResult.disconnected);
-        SC_TEST_EXPECT(lineResult.lineComplete);
-        SC_TEST_EXPECT(StringView({lineResult.line.data(), lineResult.line.sizeInBytes()}, false,
-                                  StringEncoding::Ascii) == "hello");
+        if (lineResult.disconnected or not lineResult.lineComplete or
+            StringView({lineResult.line.data(), lineResult.line.sizeInBytes()}, false, StringEncoding::Ascii) !=
+                "hello")
+        {
+            co_return Result::Error("Await receiveLine data mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask receiveLineCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> lineBuffer,
-                                     AwaitSocketReceiveLineResult& lineResult)
+    static AwaitTask receiveLineCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver,
+                                            Span<char> lineBuffer, AwaitSocketReceiveLineResult& lineResult)
     {
         SC_CO_TRY(co_await await.receiveLine(receiver, lineBuffer, lineResult));
         co_return Result(true);
     }
 
-    AwaitTask receiveLineConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
-                                          const SocketDescriptor& receiver, Span<char> lineBuffer,
-                                          AwaitSocketReceiveLineResult& lineResult)
+    static AwaitTask receiveLineConversationOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                                 const SocketDescriptor& receiver, Span<char> lineBuffer,
+                                                 AwaitSocketReceiveLineResult& lineResult)
     {
         AwaitTask senderTask   = sendSplitLine(await, sender);
         AwaitTask receiverTask = receiveLineMessage(await, receiver, lineBuffer, lineResult);
@@ -433,8 +472,8 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask scatterGatherSocketOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
-                                      const SocketDescriptor& receiver)
+    static AwaitTask scatterGatherSocketOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                             const SocketDescriptor& receiver)
     {
         const char       first[]   = {'A', 'w', 'a', 'i', 't'};
         const char       second[]  = {' ', 'S', 'G'};
@@ -446,7 +485,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             co_return Result::Error("TCP scatter/gather sendAll failed");
         }
-        SC_TEST_EXPECT(sendResult.numBytes == sizeof(first) + sizeof(second));
+        if (sendResult.numBytes != sizeof(first) + sizeof(second))
+        {
+            co_return Result::Error("TCP scatter/gather send byte count mismatch");
+        }
 
         char   receiveBuffer[16] = {};
         size_t receivedBytes     = 0;
@@ -454,7 +496,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             Span<char> receiveStorage = {receiveBuffer, sizeof(receiveBuffer)};
             Span<char> remaining;
-            SC_TEST_EXPECT(receiveStorage.sliceStart(receivedBytes, remaining));
+            if (not receiveStorage.sliceStart(receivedBytes, remaining))
+            {
+                co_return Result::Error("TCP scatter/gather receive slice failed");
+            }
 
             AwaitSocketReceiveResult receiveResult;
             SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
@@ -464,13 +509,16 @@ struct SC::AwaitTest : public SC::TestCase
             }
             receivedBytes += receiveResult.data.sizeInBytes();
         }
-        SC_TEST_EXPECT(receivedBytes == sizeof(first) + sizeof(second));
-        SC_TEST_EXPECT(StringView({receiveBuffer, receivedBytes}, false, StringEncoding::Ascii) == "Await SG");
+        if (receivedBytes != sizeof(first) + sizeof(second) or
+            StringView({receiveBuffer, receivedBytes}, false, StringEncoding::Ascii) != "Await SG")
+        {
+            co_return Result::Error("TCP scatter/gather receive data mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask scatterGatherSocketSendOnly(AwaitEventLoop& await, const SocketDescriptor& sender)
+    static AwaitTask scatterGatherSocketSendOnly(AwaitEventLoop& await, const SocketDescriptor& sender)
     {
         const char       first[]   = {'c', 'a', 'n'};
         const char       second[]  = {'c', 'e', 'l'};
@@ -482,8 +530,8 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask scatterGatherDatagramOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
-                                        const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
+    static AwaitTask scatterGatherDatagramOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                               const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
     {
         const char       first[]   = {'U', 'D', 'P'};
         const char       second[]  = {' ', 'S', 'G'};
@@ -495,19 +543,25 @@ struct SC::AwaitTest : public SC::TestCase
         {
             co_return Result::Error("UDP scatter/gather sendTo failed");
         }
-        SC_TEST_EXPECT(sendResult.numBytes == sizeof(first) + sizeof(second));
+        if (sendResult.numBytes != sizeof(first) + sizeof(second))
+        {
+            co_return Result::Error("UDP scatter/gather send byte count mismatch");
+        }
 
         char                         receiveBuffer[16] = {};
         AwaitSocketReceiveFromResult receiveResult;
         SC_CO_TRY(co_await await.receiveFrom(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(first) + sizeof(second));
-        SC_TEST_EXPECT(StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false,
-                                  StringEncoding::Ascii) == "UDP SG");
+        if (receiveResult.data.sizeInBytes() != sizeof(first) + sizeof(second) or
+            StringView({receiveResult.data.data(), receiveResult.data.sizeInBytes()}, false, StringEncoding::Ascii) !=
+                "UDP SG")
+        {
+            co_return Result::Error("UDP scatter/gather receive data mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask receiveForever(AwaitEventLoop& await, const SocketDescriptor& receiver)
+    static AwaitTask receiveForever(AwaitEventLoop& await, const SocketDescriptor& receiver)
     {
         char                     receiveBuffer[16] = {};
         AwaitSocketReceiveResult receiveResult;
@@ -515,7 +569,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask receiveFromCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver)
+    static AwaitTask receiveFromCancellable(AwaitEventLoop& await, const SocketDescriptor& receiver)
     {
         char                         receiveBuffer[16] = {};
         AwaitSocketReceiveFromResult receiveResult;
@@ -523,7 +577,8 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask tinyEchoServer(AwaitEventLoop& await, const SocketDescriptor& serverSocket, SocketDescriptor& accepted)
+    static AwaitTask tinyEchoServer(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                                    SocketDescriptor& accepted)
     {
         char                     receiveBuffer[64] = {};
         AwaitSocketReceiveResult receiveResult;
@@ -535,8 +590,8 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask tinyEchoClient(AwaitEventLoop& await, const SocketDescriptor& client, SocketIPAddress address,
-                             Span<char> receiveBuffer, AwaitSocketReceiveResult& reply)
+    static AwaitTask tinyEchoClient(AwaitEventLoop& await, const SocketDescriptor& client, SocketIPAddress address,
+                                    Span<char> receiveBuffer, AwaitSocketReceiveResult& reply)
     {
         const char message[] = "niche readable await";
 
@@ -547,10 +602,10 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask tinyEchoConversationOnce(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
-                                       const SocketDescriptor& client, SocketIPAddress address,
-                                       SocketDescriptor& accepted, Span<char> replyBuffer,
-                                       AwaitSocketReceiveResult& reply)
+    static AwaitTask tinyEchoConversationOnce(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                                              const SocketDescriptor& client, SocketIPAddress address,
+                                              SocketDescriptor& accepted, Span<char> replyBuffer,
+                                              AwaitSocketReceiveResult& reply)
     {
         AwaitTask server     = tinyEchoServer(await, serverSocket, accepted);
         AwaitTask clientTask = tinyEchoClient(await, client, address, replyBuffer, reply);
@@ -564,39 +619,50 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask sendToReceiveFromOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
-                                    const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
+    static AwaitTask sendToReceiveFromOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
+                                           const SocketDescriptor& receiver, SocketIPAddress receiverAddress)
     {
         const char sendBuffer[]      = {'P', 'I', 'N', 'G'};
         char       receiveBuffer[16] = {0};
 
         AwaitSocketSendResult sendResult;
         SC_CO_TRY(co_await await.sendTo(sender, receiverAddress, {sendBuffer, sizeof(sendBuffer)}, &sendResult));
-        SC_TEST_EXPECT(sendResult.numBytes == sizeof(sendBuffer));
+        if (sendResult.numBytes != sizeof(sendBuffer))
+        {
+            co_return Result::Error("Await sendTo wrote unexpected byte count");
+        }
 
         AwaitSocketReceiveFromResult receiveResult;
         SC_CO_TRY(co_await await.receiveFrom(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.sourceAddress.isValid());
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == sizeof(sendBuffer));
+        if (receiveResult.disconnected or not receiveResult.sourceAddress.isValid() or
+            receiveResult.data.sizeInBytes() != sizeof(sendBuffer))
+        {
+            co_return Result::Error("Await receiveFrom result mismatch");
+        }
         for (size_t idx = 0; idx < sizeof(sendBuffer); ++idx)
         {
-            SC_TEST_EXPECT(receiveResult.data.data()[idx] == sendBuffer[idx]);
+            if (receiveResult.data.data()[idx] != sendBuffer[idx])
+            {
+                co_return Result::Error("Await receiveFrom data mismatch");
+            }
         }
 
         co_return Result(true);
     }
 
-    AwaitTask writeFileOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    static AwaitTask writeFileOnce(AwaitEventLoop& await, const FileDescriptor& file)
     {
         const char           writeBuffer[] = {'t', 'e', 's', 't'};
         AwaitFileWriteResult writeResult;
         SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult));
-        SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        if (writeResult.numBytes != sizeof(writeBuffer))
+        {
+            co_return Result::Error("Await file write byte count mismatch");
+        }
         co_return Result(true);
     }
 
-    AwaitTask writeFileScatterGatherOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    static AwaitTask writeFileScatterGatherOnce(AwaitEventLoop& await, const FileDescriptor& file)
     {
         const char       first[]   = {'f', 'i', 'l', 'e'};
         const char       second[]  = {'-', 's', 'g'};
@@ -608,11 +674,14 @@ struct SC::AwaitTest : public SC::TestCase
         {
             co_return Result::Error("file scatter/gather write failed");
         }
-        SC_TEST_EXPECT(writeResult.numBytes == sizeof(first) + sizeof(second));
+        if (writeResult.numBytes != sizeof(first) + sizeof(second))
+        {
+            co_return Result::Error("Await file scatter/gather write byte count mismatch");
+        }
         co_return Result(true);
     }
 
-    AwaitTask writeFileScatterGatherCancellable(AwaitEventLoop& await, const FileDescriptor& file)
+    static AwaitTask writeFileScatterGatherCancellable(AwaitEventLoop& await, const FileDescriptor& file)
     {
         const char       first[]   = {'c', 'a', 'n'};
         const char       second[]  = {'c', 'e', 'l'};
@@ -623,14 +692,14 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask readFileOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
-                           AwaitFileReadResult& readResult)
+    static AwaitTask readFileOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
+                                  AwaitFileReadResult& readResult)
     {
         SC_CO_TRY(co_await await.fileRead(file, readBuffer, readResult));
         co_return Result(true);
     }
 
-    AwaitTask writeFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    static AwaitTask writeFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file)
     {
         const char            writeBuffer[] = {'O', 'K'};
         AwaitFileWriteResult  writeResult;
@@ -638,12 +707,15 @@ struct SC::AwaitTest : public SC::TestCase
         options.useOffset = true;
         options.offset    = 2;
         SC_CO_TRY(co_await await.fileWrite(file, {writeBuffer, sizeof(writeBuffer)}, &writeResult, options));
-        SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        if (writeResult.numBytes != sizeof(writeBuffer))
+        {
+            co_return Result::Error("Await file offset write byte count mismatch");
+        }
         co_return Result(true);
     }
 
-    AwaitTask readFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
-                                   AwaitFileReadResult& readResult)
+    static AwaitTask readFileAtOffsetOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
+                                          AwaitFileReadResult& readResult)
     {
         AwaitFileReadOptions options;
         options.useOffset = true;
@@ -652,15 +724,15 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask readFileUntilFullOrEOFOnce(AwaitEventLoop& await, const FileDescriptor& file, Span<char> readBuffer,
-                                         AwaitFileReadResult& readResult)
+    static AwaitTask readFileUntilFullOrEOFOnce(AwaitEventLoop& await, const FileDescriptor& file,
+                                                Span<char> readBuffer, AwaitFileReadResult& readResult)
     {
         SC_CO_TRY(co_await await.fileReadUntilFullOrEOF(file, readBuffer, readResult));
         co_return Result(true);
     }
 
-    AwaitTask fileSendOnce(AwaitEventLoop& await, const FileDescriptor& file, const SocketDescriptor& sender,
-                           const SocketDescriptor& receiver, ThreadPool& threadPool, Span<const char> expected)
+    static AwaitTask fileSendOnce(AwaitEventLoop& await, const FileDescriptor& file, const SocketDescriptor& sender,
+                                  const SocketDescriptor& receiver, ThreadPool& threadPool, Span<const char> expected)
     {
         char receiveBuffer[256] = {0};
 
@@ -670,34 +742,47 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitFileSendResult sendResult;
         SC_CO_TRY(co_await await.fileSend(file, sender, sendResult, sendOptions));
-        SC_TEST_EXPECT(sendResult.bytesTransferred == expected.sizeInBytes());
-        SC_TEST_EXPECT(sendResult.complete);
+        if (sendResult.bytesTransferred != expected.sizeInBytes() or not sendResult.complete)
+        {
+            co_return Result::Error("Await fileSend transfer mismatch");
+        }
 
         AwaitSocketReceiveResult receiveResult;
         SC_CO_TRY(co_await await.receive(receiver, {receiveBuffer, sizeof(receiveBuffer)}, receiveResult));
-        SC_TEST_EXPECT(not receiveResult.disconnected);
-        SC_TEST_EXPECT(receiveResult.data.sizeInBytes() == expected.sizeInBytes());
+        if (receiveResult.disconnected or receiveResult.data.sizeInBytes() != expected.sizeInBytes())
+        {
+            co_return Result::Error("Await fileSend receive length mismatch");
+        }
         for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
         {
-            SC_TEST_EXPECT(receiveResult.data.data()[idx] == expected.data()[idx]);
+            if (receiveResult.data.data()[idx] != expected.data()[idx])
+            {
+                co_return Result::Error("Await fileSend receive data mismatch");
+            }
         }
 
         co_return Result(true);
     }
 
-    AwaitTask fileSystemOperationsOnce(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan sourcePath,
-                                       StringSpan copyPath, StringSpan renamePath, StringSpan directoryPath,
-                                       StringSpan directoryCopyPath, StringSpan directoryFilePath,
-                                       StringSpan directoryCopyFilePath)
+    static AwaitTask fileSystemOperationsOnce(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan sourcePath,
+                                              StringSpan copyPath, StringSpan renamePath, StringSpan directoryPath,
+                                              StringSpan directoryCopyPath, StringSpan directoryFilePath,
+                                              StringSpan directoryCopyFilePath)
     {
         FileDescriptor openedFile;
         SC_CO_TRY(co_await await.fsOpen(threadPool, sourcePath, FileOpen::Read, openedFile));
 
         String text;
         SC_CO_TRY(openedFile.readUntilEOF(text));
-        SC_TEST_EXPECT(text.view() == "AwaitFileSystemOperations");
+        if (text.view() != "AwaitFileSystemOperations")
+        {
+            co_return Result::Error("Await fsOpen read text mismatch");
+        }
         SC_CO_TRY(co_await await.fsClose(threadPool, openedFile));
-        SC_TEST_EXPECT(not openedFile.isValid());
+        if (openedFile.isValid())
+        {
+            co_return Result::Error("Await fsClose left descriptor valid");
+        }
 
         SC_CO_TRY(co_await await.fsCopyFile(threadPool, sourcePath, copyPath));
         SC_CO_TRY(co_await await.fsRename(threadPool, copyPath, renamePath));
@@ -712,7 +797,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask fileSystemReadWriteOnce(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
+    static AwaitTask fileSystemReadWriteOnce(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
     {
         FileDescriptor file;
         SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::ReadWrite, file));
@@ -720,25 +805,32 @@ struct SC::AwaitTest : public SC::TestCase
         char                readBuffer[16] = {0};
         AwaitFileReadResult readResult;
         SC_CO_TRY(co_await await.fsRead(threadPool, file, readBuffer, readResult));
-        SC_TEST_EXPECT(readResult.data.sizeInBytes() == 6);
-        SC_TEST_EXPECT(readResult.data.data()[0] == 'a');
-        SC_TEST_EXPECT(readResult.data.data()[1] == 'b');
-        SC_TEST_EXPECT(readResult.data.data()[2] == 'c');
+        if (readResult.data.sizeInBytes() != 6 or readResult.data.data()[0] != 'a' or
+            readResult.data.data()[1] != 'b' or readResult.data.data()[2] != 'c')
+        {
+            co_return Result::Error("Await fsRead data mismatch");
+        }
 
         const char           writeBuffer[] = {'X', 'Y', 'Z'};
         AwaitFileWriteResult writeResult;
         SC_CO_TRY(co_await await.fsWrite(threadPool, file, {writeBuffer, sizeof(writeBuffer)}, &writeResult, 3));
-        SC_TEST_EXPECT(writeResult.numBytes == sizeof(writeBuffer));
+        if (writeResult.numBytes != sizeof(writeBuffer))
+        {
+            co_return Result::Error("Await fsWrite byte count mismatch");
+        }
 
         SC_CO_TRY(co_await await.fsClose(threadPool, file));
-        SC_TEST_EXPECT(not file.isValid());
+        if (file.isValid())
+        {
+            co_return Result::Error("Await fsClose left descriptor valid");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask readFileWithThreadPoolCancellable(AwaitEventLoop& await, const FileDescriptor& file,
-                                                ThreadPool& threadPool, Span<char> readBuffer,
-                                                AwaitFileReadResult& readResult)
+    static AwaitTask readFileWithThreadPoolCancellable(AwaitEventLoop& await, const FileDescriptor& file,
+                                                       ThreadPool& threadPool, Span<char> readBuffer,
+                                                       AwaitFileReadResult& readResult)
     {
         AwaitFileReadOptions options;
         options.threadPool = &threadPool;
@@ -746,22 +838,26 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask fsOpenCancellable(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path, FileDescriptor& file)
+    static AwaitTask fsOpenCancellable(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path,
+                                       FileDescriptor& file)
     {
         SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
         co_return Result(true);
     }
 
-    AwaitTask fsOpenCloseChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
+    static AwaitTask fsOpenCloseChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
     {
         FileDescriptor file;
         SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
         SC_CO_TRY(co_await await.fsClose(threadPool, file));
-        SC_TEST_EXPECT(not file.isValid());
+        if (file.isValid())
+        {
+            co_return Result::Error("Await fsOpenCloseChild left descriptor valid");
+        }
         co_return Result(true);
     }
 
-    AwaitTask spawnAndWaitFsChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
+    static AwaitTask spawnAndWaitFsChild(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path)
     {
         AwaitTask child = fsOpenCloseChild(await, threadPool, path);
         SC_CO_TRY(co_await await.spawnAndWait(child));
@@ -797,14 +893,17 @@ struct SC::AwaitTest : public SC::TestCase
             }));
     }
 
-    AwaitTask receiveExpectedOnce(AwaitEventLoop& await, const SocketDescriptor& receiver, Span<char> receiveBuffer,
-                                  Span<const char> expected)
+    static AwaitTask receiveExpectedOnce(AwaitEventLoop& await, const SocketDescriptor& receiver,
+                                         Span<char> receiveBuffer, Span<const char> expected)
     {
         size_t receivedBytes = 0;
         while (receivedBytes < expected.sizeInBytes())
         {
             Span<char> remaining;
-            SC_TEST_EXPECT(receiveBuffer.sliceStart(receivedBytes, remaining));
+            if (not receiveBuffer.sliceStart(receivedBytes, remaining))
+            {
+                co_return Result::Error("Await receiveExpectedOnce slice failed");
+            }
 
             AwaitSocketReceiveResult receiveResult;
             SC_CO_TRY(co_await await.receive(receiver, remaining, receiveResult));
@@ -815,18 +914,24 @@ struct SC::AwaitTest : public SC::TestCase
             receivedBytes += receiveResult.data.sizeInBytes();
         }
 
-        SC_TEST_EXPECT(receivedBytes == expected.sizeInBytes());
+        if (receivedBytes != expected.sizeInBytes())
+        {
+            co_return Result::Error("Await receiveExpectedOnce length mismatch");
+        }
         for (size_t idx = 0; idx < expected.sizeInBytes(); ++idx)
         {
-            SC_TEST_EXPECT(receiveBuffer.data()[idx] == expected.data()[idx]);
+            if (receiveBuffer.data()[idx] != expected.data()[idx])
+            {
+                co_return Result::Error("Await receiveExpectedOnce data mismatch");
+            }
         }
 
         co_return Result(true);
     }
 
-    AwaitTask openFileAndSendToSocket(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path,
-                                      const SocketDescriptor& sender, const SocketDescriptor& receiver,
-                                      Span<const char> expected)
+    static AwaitTask openFileAndSendToSocket(AwaitEventLoop& await, ThreadPool& threadPool, StringSpan path,
+                                             const SocketDescriptor& sender, const SocketDescriptor& receiver,
+                                             Span<const char> expected)
     {
         FileDescriptor file;
         SC_CO_TRY(co_await await.fsOpen(threadPool, path, FileOpen::Read, file));
@@ -844,14 +949,16 @@ struct SC::AwaitTest : public SC::TestCase
         Result              closeStatus = file.close();
         SC_CO_TRY(sendStatus);
         SC_CO_TRY(closeStatus);
-        SC_TEST_EXPECT(sendResult.bytesTransferred == expected.sizeInBytes());
-        SC_TEST_EXPECT(sendResult.complete);
+        if (sendResult.bytesTransferred != expected.sizeInBytes() or not sendResult.complete)
+        {
+            co_return Result::Error("Await openFileAndSendToSocket transfer mismatch");
+        }
         SC_CO_TRY(co_await receiveTask);
 
         co_return Result(true);
     }
 
-    AwaitTask loopWorkOnce(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
+    static AwaitTask loopWorkOnce(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
     {
         Function<Result()> work = [&workCount]
         {
@@ -862,7 +969,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask loopWorkCancellable(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
+    static AwaitTask loopWorkCancellable(AwaitEventLoop& await, ThreadPool& threadPool, Atomic<int>& workCount)
     {
         Function<Result()> work = [&workCount]
         {
@@ -873,64 +980,68 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask filePollOnce(AwaitEventLoop& await, const FileDescriptor& file)
+    static AwaitTask filePollOnce(AwaitEventLoop& await, const FileDescriptor& file)
     {
 #if SC_PLATFORM_WINDOWS
         Result pollResult = co_await await.filePoll(file);
-        SC_TEST_EXPECT(not pollResult);
+        if (pollResult)
+        {
+            co_return Result::Error("Await filePoll unexpectedly succeeded on Windows");
+        }
 #else
         SC_CO_TRY(co_await await.filePoll(file));
 #endif
         co_return Result(true);
     }
 
-    AwaitTask processExitOnce(AwaitEventLoop& await, Process& process, AwaitProcessExitResult& result)
+    static AwaitTask processExitOnce(AwaitEventLoop& await, Process& process, AwaitProcessExitResult& result)
     {
         SC_CO_TRY(co_await await.processExit(process.handle, result));
         co_return Result(true);
     }
 
-    AwaitTask signalOnce(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& result)
+    static AwaitTask signalOnce(AwaitEventLoop& await, int signalNumber, AwaitSignalResult& result)
     {
         SC_CO_TRY(co_await await.signal(signalNumber, result));
         co_return Result(true);
     }
 
-    AwaitTask awaitChild(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask awaitChild(AwaitEventLoop& await, AwaitTask& child)
     {
         SC_CO_TRY(await.spawn(child));
         SC_CO_TRY(co_await child);
         co_return Result(true);
     }
 
-    AwaitTask awaitExistingChild(AwaitEventLoop&, AwaitTask& child)
+    static AwaitTask awaitExistingChild(AwaitEventLoop& await, AwaitTask& child)
     {
+        (void)await;
         SC_CO_TRY(co_await child);
         co_return Result(true);
     }
 
-    AwaitTask spawnAndWaitExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask spawnAndWaitExistingChild(AwaitEventLoop& await, AwaitTask& child)
     {
         SC_CO_TRY(co_await await.spawnAndWait(child));
         co_return Result(true);
     }
 
-    AwaitTask spawnAndWaitChild(AwaitEventLoop& await)
+    static AwaitTask spawnAndWaitChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitTwice(await);
         SC_CO_TRY(co_await await.spawnAndWait(child));
-        SC_TEST_EXPECT(child.result());
+        SC_CO_TRY(child.result());
         co_return Result(true);
     }
 
-    AwaitTask spawnAndWaitLongChild(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask spawnAndWaitLongChild(AwaitEventLoop& await, AwaitTask& child)
     {
         child = waitLong(await);
         SC_CO_TRY(co_await await.spawnAndWait(child));
         co_return Result(true);
     }
 
-    AwaitTask waitTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(waitTwice(await)));
         SC_CO_TRY(registry.spawn(waitTwice(await)));
@@ -938,16 +1049,19 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask waitFailingTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitFailingTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(waitTwice(await)));
         SC_CO_TRY(registry.spawn(failSoon(await)));
         Result result = co_await registry.waitAll();
-        SC_TEST_EXPECT(not result);
+        if (result)
+        {
+            co_return Result::Error("Await registry waitAll unexpectedly succeeded");
+        }
         co_return Result(true);
     }
 
-    AwaitTask waitCancellableTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitCancellableTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(waitLong(await)));
         SC_CO_TRY(registry.spawn(waitLong(await)));
@@ -955,72 +1069,75 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask waitAnyTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitAnyTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(waitTwice(await)));
         SC_CO_TRY(registry.spawn(waitLong(await)));
 
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         SC_CO_TRY(co_await registry.waitAny(waitAnyResult));
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
-        SC_TEST_EXPECT(waitAnyResult.task->result());
-        SC_TEST_EXPECT(registry.taskAt(1)->isCompleted());
-        SC_TEST_EXPECT(AwaitIsCancelled(registry.taskAt(1)->result()));
+        if (waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or not waitAnyResult.task->result() or
+            not registry.taskAt(1)->isCompleted() or not AwaitIsCancelled(registry.taskAt(1)->result()))
+        {
+            co_return Result::Error("Await registry waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyFailingTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitAnyFailingTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(failSoon(await)));
         SC_CO_TRY(registry.spawn(waitLong(await)));
 
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         Result                         waitResult = co_await registry.waitAny(waitAnyResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
-        SC_TEST_EXPECT(not waitAnyResult.task->result());
-        SC_TEST_EXPECT(registry.taskAt(1)->isCompleted());
-        SC_TEST_EXPECT(AwaitIsCancelled(registry.taskAt(1)->result()));
+        if (waitResult or waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or
+            waitAnyResult.task->result() or not registry.taskAt(1)->isCompleted() or
+            not AwaitIsCancelled(registry.taskAt(1)->result()))
+        {
+            co_return Result::Error("Await registry failing waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyLeaveRunningTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    static AwaitTask waitAnyLeaveRunningTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
         SC_CO_TRY(registry.spawn(waitTwice(await)));
         SC_CO_TRY(registry.spawn(waitLong(await)));
 
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         SC_CO_TRY(co_await registry.waitAny(waitAnyResult, AwaitTaskRegistryWaitAnyPolicy::LeaveRemainingRunning));
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
-        SC_TEST_EXPECT(waitAnyResult.task->result());
-        SC_TEST_EXPECT(registry.taskAt(1)->isActive());
+        if (waitAnyResult.index != 0 or waitAnyResult.task != registry.taskAt(0) or not waitAnyResult.task->result() or
+            not registry.taskAt(1)->isActive())
+        {
+            co_return Result::Error("Await registry leave-running waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyEmptyTaskRegistry(AwaitTaskRegistry& registry)
+    static AwaitTask waitAnyEmptyTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
     {
+        (void)await;
         AwaitTaskRegistryWaitAnyResult waitAnyResult;
         Result                         waitResult = co_await registry.waitAny(waitAnyResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+        if (waitResult or waitAnyResult.task != nullptr)
+        {
+            co_return Result::Error("Await registry empty waitAny result mismatch");
+        }
         co_return Result(true);
     }
 
-    AwaitTask waitForExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask waitForExistingChild(AwaitEventLoop& await, AwaitTask& child)
     {
         AwaitTimeoutResult timeoutResult;
         SC_CO_TRY(co_await await.waitFor(child, 100_ms, &timeoutResult));
-        SC_TEST_EXPECT(not timeoutResult.timedOut);
         co_return Result(true);
     }
 
-    AwaitTask waitTaskGroupExistingChild(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask waitTaskGroupExistingChild(AwaitEventLoop& await, AwaitTask& child)
     {
         AwaitTask*     groupStorage[1] = {};
         AwaitTaskGroup group(await, groupStorage);
@@ -1029,7 +1146,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
-    AwaitTask waitTaskGroup(AwaitEventLoop& await)
+    static AwaitTask waitTaskGroup(AwaitEventLoop& await)
     {
         AwaitTask childA = waitTwice(await);
         AwaitTask childB = waitTwice(await);
@@ -1038,15 +1155,18 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTaskGroup group(await, groupStorage);
         SC_CO_TRY(group.spawn(childA));
         SC_CO_TRY(group.spawn(childB));
-        SC_TEST_EXPECT(group.size() == 2);
+        if (group.size() != 2)
+        {
+            co_return Result::Error("Await task group size mismatch");
+        }
         SC_CO_TRY(co_await group.waitAll());
-        SC_TEST_EXPECT(childA.result());
-        SC_TEST_EXPECT(childB.result());
+        SC_CO_TRY(childA.result());
+        SC_CO_TRY(childB.result());
 
         co_return Result(true);
     }
 
-    AwaitTask waitTaskGroupAndCollectResults(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
+    static AwaitTask waitTaskGroupAndCollectResults(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
     {
         childA = waitTwice(await);
         childB = failSoon(await);
@@ -1057,29 +1177,31 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(group.spawn(childB));
 
         Result waitResult = co_await group.waitAll();
-        SC_TEST_EXPECT(not waitResult);
+        if (waitResult)
+        {
+            co_return Result::Error("Await task group waitAll unexpectedly succeeded");
+        }
 
         Result shortResults[1] = {Result(true)};
-        SC_TEST_EXPECT(not group.collectResults(shortResults));
+        if (group.collectResults(shortResults))
+        {
+            co_return Result::Error("Await task group short collect unexpectedly succeeded");
+        }
 
         Result                      results[2] = {Result(true), Result(true)};
         AwaitTaskGroupResultSummary summary;
         Result                      aggregate = group.collectResults(results, &summary);
-        SC_TEST_EXPECT(not aggregate);
-        SC_TEST_EXPECT(results[0]);
-        SC_TEST_EXPECT(not results[1]);
-        SC_TEST_EXPECT(summary.numTasks == 2);
-        SC_TEST_EXPECT(summary.numCompleted == 2);
-        SC_TEST_EXPECT(summary.numSucceeded == 1);
-        SC_TEST_EXPECT(summary.numFailed == 1);
-        SC_TEST_EXPECT(summary.firstFailureIndex == 1);
-        SC_TEST_EXPECT(summary.firstFailureTask == &childB);
-        SC_TEST_EXPECT(not summary.firstFailure);
+        if (aggregate or not results[0] or results[1] or summary.numTasks != 2 or summary.numCompleted != 2 or
+            summary.numSucceeded != 1 or summary.numFailed != 1 or summary.firstFailureIndex != 1 or
+            summary.firstFailureTask != &childB or summary.firstFailure)
+        {
+            co_return Result::Error("Await task group collected result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
+    static AwaitTask waitCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
     {
         childA = waitLong(await);
         childB = waitLong(await);
@@ -1090,12 +1212,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(group.spawn(childB));
 
         Result groupResult = co_await group.waitAll();
-        SC_TEST_EXPECT(not groupResult);
+        if (groupResult)
+        {
+            co_return Result::Error("Await cancellable task group unexpectedly succeeded");
+        }
 
         co_return groupResult;
     }
 
-    AwaitTask waitAnyTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    static AwaitTask waitAnyTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
     {
         AwaitTask fastChild = waitTwice(await);
         slowChild           = waitLong(await);
@@ -1107,28 +1232,30 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         SC_CO_TRY(co_await group.waitAny(waitAnyResult));
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == &fastChild);
-        SC_TEST_EXPECT(fastChild.result());
-        SC_TEST_EXPECT(slowChild.isCompleted());
-        SC_TEST_EXPECT(not slowChild.result());
+        if (waitAnyResult.index != 0 or waitAnyResult.task != &fastChild or not fastChild.result() or
+            not slowChild.isCompleted() or slowChild.result())
+        {
+            co_return Result::Error("Await task group waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyEmptyTaskGroup(AwaitEventLoop& await)
+    static AwaitTask waitAnyEmptyTaskGroup(AwaitEventLoop& await)
     {
         Span<AwaitTask*>            emptyStorage;
         AwaitTaskGroup              group(await, emptyStorage);
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+        if (waitResult or waitAnyResult.task != nullptr)
+        {
+            co_return Result::Error("Await empty task group waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyCompletedTaskGroup(AwaitEventLoop& await)
+    static AwaitTask waitAnyCompletedTaskGroup(AwaitEventLoop& await)
     {
         AwaitTask completed = immediate(await);
         AwaitTask slow      = waitLong(await);
@@ -1140,16 +1267,16 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         SC_CO_TRY(co_await group.waitAny(waitAnyResult));
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == &completed);
-        SC_TEST_EXPECT(completed.result());
-        SC_TEST_EXPECT(slow.isCompleted());
-        SC_TEST_EXPECT(not slow.result());
+        if (waitAnyResult.index != 0 or waitAnyResult.task != &completed or not completed.result() or
+            not slow.isCompleted() or slow.result())
+        {
+            co_return Result::Error("Await completed task group waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyFailingWinnerTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    static AwaitTask waitAnyFailingWinnerTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
     {
         AwaitTask failing = failSoon(await);
         slowChild         = waitLong(await);
@@ -1161,18 +1288,16 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == &failing);
-        SC_TEST_EXPECT(failing.isCompleted());
-        SC_TEST_EXPECT(not failing.result());
-        SC_TEST_EXPECT(slowChild.isCompleted());
-        SC_TEST_EXPECT(not slowChild.result());
+        if (waitResult or waitAnyResult.index != 0 or waitAnyResult.task != &failing or not failing.isCompleted() or
+            failing.result() or not slowChild.isCompleted() or slowChild.result())
+        {
+            co_return Result::Error("Await failing task group waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyLeaveRemainingRunningTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
+    static AwaitTask waitAnyLeaveRemainingRunningTaskGroup(AwaitEventLoop& await, AwaitTask& slowChild)
     {
         AwaitTask fastChild = waitTwice(await);
         slowChild           = waitLong(await);
@@ -1184,15 +1309,16 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         SC_CO_TRY(co_await group.waitAny(waitAnyResult, AwaitTaskGroupWaitAnyPolicy::LeaveRemainingRunning));
-        SC_TEST_EXPECT(waitAnyResult.index == 0);
-        SC_TEST_EXPECT(waitAnyResult.task == &fastChild);
-        SC_TEST_EXPECT(fastChild.result());
-        SC_TEST_EXPECT(slowChild.isActive());
+        if (waitAnyResult.index != 0 or waitAnyResult.task != &fastChild or not fastChild.result() or
+            not slowChild.isActive())
+        {
+            co_return Result::Error("Await leave-running task group waitAny result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitAnyCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
+    static AwaitTask waitAnyCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& childA, AwaitTask& childB)
     {
         childA = waitLong(await);
         childB = waitLong(await);
@@ -1204,13 +1330,15 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTaskGroupWaitAnyResult waitAnyResult;
         Result                      waitResult = co_await group.waitAny(waitAnyResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+        if (waitResult or waitAnyResult.task != nullptr)
+        {
+            co_return Result::Error("Await cancellable task group waitAny result mismatch");
+        }
 
         co_return waitResult;
     }
 
-    AwaitTask waitAllLeaveChildrenRunning(AwaitEventLoop& await, AwaitTask& child)
+    static AwaitTask waitAllLeaveChildrenRunning(AwaitEventLoop& await, AwaitTask& child)
     {
         child = waitLong(await);
 
@@ -1219,12 +1347,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(group.spawn(child));
 
         Result groupResult = co_await group.waitAll();
-        SC_TEST_EXPECT(not groupResult);
+        if (groupResult)
+        {
+            co_return Result::Error("Await leave-children-running task group unexpectedly succeeded");
+        }
 
         co_return groupResult;
     }
 
-    AwaitTask waitNestedCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& leafA, AwaitTask& leafB)
+    static AwaitTask waitNestedCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& leafA, AwaitTask& leafB)
     {
         leafA = waitLong(await);
         leafB = waitLong(await);
@@ -1235,13 +1366,16 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(group.spawn(leafB));
 
         Result groupResult = co_await group.waitAll();
-        SC_TEST_EXPECT(not groupResult);
+        if (groupResult)
+        {
+            co_return Result::Error("Await nested cancellable task group unexpectedly succeeded");
+        }
 
         co_return groupResult;
     }
 
-    AwaitTask waitOuterCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& nested, AwaitTask& leafA,
-                                            AwaitTask& leafB, AwaitTask& sibling)
+    static AwaitTask waitOuterCancellableTaskGroup(AwaitEventLoop& await, AwaitTask& nested, AwaitTask& leafA,
+                                                   AwaitTask& leafB, AwaitTask& sibling)
     {
         nested  = waitNestedCancellableTaskGroup(await, leafA, leafB);
         sibling = waitLong(await);
@@ -1252,52 +1386,60 @@ struct SC::AwaitTest : public SC::TestCase
         SC_CO_TRY(group.spawn(sibling));
 
         Result groupResult = co_await group.waitAll();
-        SC_TEST_EXPECT(not groupResult);
+        if (groupResult)
+        {
+            co_return Result::Error("Await outer cancellable task group unexpectedly succeeded");
+        }
 
         co_return groupResult;
     }
 
-    AwaitTask waitForCompletedChild(AwaitEventLoop& await)
+    static AwaitTask waitForCompletedChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitTwice(await);
         SC_CO_TRY(await.spawn(child));
 
         AwaitTimeoutResult timeoutResult;
         SC_CO_TRY(co_await await.waitFor(child, 100_ms, &timeoutResult));
-        SC_TEST_EXPECT(not timeoutResult.timedOut);
-        SC_TEST_EXPECT(child.result());
+        if (timeoutResult.timedOut)
+        {
+            co_return Result::Error("Await waitFor completed child timed out");
+        }
+        SC_CO_TRY(child.result());
 
         co_return Result(true);
     }
 
-    AwaitTask waitForTimedOutChild(AwaitEventLoop& await)
+    static AwaitTask waitForTimedOutChild(AwaitEventLoop& await)
     {
         AwaitTask child = waitLong(await);
         SC_CO_TRY(await.spawn(child));
 
         AwaitTimeoutResult timeoutResult;
         Result             waitResult = co_await await.waitFor(child, 1_ms, &timeoutResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(timeoutResult.timedOut);
-        SC_TEST_EXPECT(child.isCompleted());
-        SC_TEST_EXPECT(not child.result());
+        if (waitResult or not timeoutResult.timedOut or not child.isCompleted() or child.result())
+        {
+            co_return Result::Error("Await waitFor timed-out child result mismatch");
+        }
 
         co_return Result(true);
     }
 
-    AwaitTask waitForCancellableChild(AwaitEventLoop& await, AwaitTask& child, AwaitTimeoutResult& timeoutResult)
+    static AwaitTask waitForCancellableChild(AwaitEventLoop& await, AwaitTask& child, AwaitTimeoutResult& timeoutResult)
     {
         child = waitLong(await);
         SC_CO_TRY(await.spawn(child));
 
         Result waitResult = co_await await.waitFor(child, 10000_ms, &timeoutResult);
-        SC_TEST_EXPECT(not waitResult);
-        SC_TEST_EXPECT(not timeoutResult.timedOut);
+        if (waitResult or timeoutResult.timedOut)
+        {
+            co_return Result::Error("Await cancellable waitFor result mismatch");
+        }
 
         co_return waitResult;
     }
 
-    static AwaitTask arenaWait(AwaitEventLoop& await)
+    static AwaitTask allocatorWait(AwaitEventLoop& await)
     {
         SC_CO_TRY(co_await await.sleep(1_ms));
         co_return Result(true);
@@ -1345,8 +1487,8 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
-        SC_TEST_EXPECT(not await.hasArena());
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
+        SC_TEST_EXPECT(await.allocator().isOpen());
 
         AwaitTask task = immediate(await);
         SC_TEST_EXPECT(task.isValid());
@@ -1366,10 +1508,12 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask task  = waitTwice(await);
         AwaitTask moved = move(task);
+        SC_TEST_EXPECT(moved.isValid());
+        SC_TEST_EXPECT(awaitAllocator.used() < awaitAllocator.capacity());
 
         SC_TEST_EXPECT(not task.isValid());
         SC_TEST_EXPECT(not task.result());
@@ -1385,7 +1529,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask invalid;
         SC_TEST_EXPECT(not invalid.isValid());
@@ -1400,7 +1544,8 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(not task.cancel(await));
         SC_TEST_EXPECT(not await.spawn(task));
 
-        AwaitTask invalidChildParent = awaitExistingChild(await, task);
+        AwaitTask invalidChildParent = spawnAndWaitExistingChild(await, task);
+        SC_TEST_EXPECT(awaitAllocator.statistics().numAllocationFailures == 0);
         SC_TEST_EXPECT(await.spawn(invalidChildParent));
         SC_TEST_EXPECT(invalidChildParent.isCompleted());
         SC_TEST_EXPECT(not invalidChildParent.result());
@@ -1420,21 +1565,21 @@ struct SC::AwaitTest : public SC::TestCase
 
         {
             char           storage[1024] = {};
-            AwaitArena     arena({storage, sizeof(storage)});
-            AwaitEventLoop arenaAwait(async, &arena);
+            AwaitAllocator allocator;
+            SC_TEST_EXPECT(allocator.createFixed(storage));
+            AwaitEventLoop allocatorAwait(async, allocator);
 
             {
-                AwaitTask arenaTask = arenaWait(arenaAwait);
-                SC_TEST_EXPECT(arenaAwait.spawn(arenaTask));
-                SC_TEST_EXPECT(arenaAwait.run());
-                SC_TEST_EXPECT(arenaTask.result());
-                SC_TEST_EXPECT(arena.used() > 0);
+                AwaitTask allocatorTask = allocatorWait(allocatorAwait);
+                SC_TEST_EXPECT(allocatorAwait.spawn(allocatorTask));
+                SC_TEST_EXPECT(allocatorAwait.run());
+                SC_TEST_EXPECT(allocatorTask.result());
+                SC_TEST_EXPECT(allocator.used() > 0);
             }
 
-            SC_TEST_EXPECT(arena.used() > 0);
-            arena.reset();
-            SC_TEST_EXPECT(arena.used() == 0);
-            SC_TEST_EXPECT(arena.peakUsed() == 0);
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(allocator.peakUsed() > 0);
+            SC_TEST_EXPECT(allocator.close());
         }
 
         SC_TEST_EXPECT(async.close());
@@ -1447,8 +1592,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(asyncA.create());
         SC_TEST_EXPECT(asyncB.create());
 
-        AwaitEventLoop awaitA(asyncA);
-        AwaitEventLoop awaitB(asyncB);
+        char           allocatorMemoryA[512 * 1024] = {};
+        AwaitAllocator allocatorA;
+        SC_TEST_EXPECT(allocatorA.createFixed(allocatorMemoryA));
+        AwaitEventLoop awaitA(asyncA, allocatorA);
+
+        char           allocatorMemoryB[512 * 1024] = {};
+        AwaitAllocator allocatorB;
+        SC_TEST_EXPECT(allocatorB.createFixed(allocatorMemoryB));
+        AwaitEventLoop awaitB(asyncB, allocatorB);
 
         AwaitTask task = waitTwice(awaitA);
         SC_TEST_EXPECT(not awaitB.spawn(task));
@@ -1485,10 +1637,12 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         FrameAddressProbe standaloneProbe;
         AwaitTask         standalone = captureFrameAddress(await, standaloneProbe);
+        SC_TEST_EXPECT(awaitAllocator.statistics().numAllocationFailures == 0);
+        SC_TEST_EXPECT(standalone.isValid());
         SC_TEST_EXPECT(await.spawn(standalone));
         SC_TEST_EXPECT(standalone.isActive());
 
@@ -1522,7 +1676,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask task = waitTwice(await);
         SC_TEST_EXPECT(await.spawn(task));
@@ -1542,7 +1696,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask task = waitLong(await);
         SC_TEST_EXPECT(await.spawn(task));
@@ -1563,7 +1717,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask notStarted = waitTwice(await);
         SC_TEST_EXPECT(not notStarted.cancel(await));
@@ -1592,7 +1746,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitLoopWakeUp       wakeUp;
             AwaitLoopWakeUpResult result;
@@ -1608,7 +1762,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             PipeDescriptor pipe;
             PipeOptions    pipeOptions;
@@ -1634,7 +1788,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor client;
             SocketDescriptor serverSideClient;
@@ -1654,7 +1808,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor serverSocket;
             SocketIPAddress  nativeAddress;
@@ -1677,7 +1831,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor serverSocket;
             SocketIPAddress  nativeAddress;
@@ -1697,7 +1851,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor client;
             SocketDescriptor serverSideClient;
@@ -1717,7 +1871,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SmallStringNative<255> filePath = StringEncoding::Native;
             SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), "await-cancel-sg.txt"}));
@@ -1745,7 +1899,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             ThreadPool threadPool;
             SC_TEST_EXPECT(threadPool.create(1));
@@ -1789,7 +1943,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             ThreadPool threadPool;
             SC_TEST_EXPECT(threadPool.create(1));
@@ -1831,7 +1985,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor client;
             SocketDescriptor serverSideClient;
@@ -1853,7 +2007,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor client;
             SocketDescriptor serverSideClient;
@@ -1875,7 +2029,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             const uint16_t port = report.mapPort(5054);
 
@@ -1899,7 +2053,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             ThreadPool threadPool;
             SC_TEST_EXPECT(threadPool.create(1));
@@ -1931,7 +2085,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitLoopWakeUp       wakeUp;
             AwaitLoopWakeUpResult wakeUpResult;
@@ -1951,7 +2105,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitTwice(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -1970,7 +2124,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         int              callbackCount = 0;
         AsyncLoopTimeout callbackTimeout;
@@ -1994,7 +2148,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitLoopWakeUp       wakeUp;
         AwaitLoopWakeUpResult result;
@@ -2031,8 +2185,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(asyncA.create());
         SC_TEST_EXPECT(asyncB.create());
 
-        AwaitEventLoop awaitA(asyncA);
-        AwaitEventLoop awaitB(asyncB);
+        char           allocatorMemoryA[64 * 1024] = {};
+        AwaitAllocator allocatorA;
+        SC_TEST_EXPECT(allocatorA.createFixed(allocatorMemoryA));
+        AwaitEventLoop awaitA(asyncA, allocatorA);
+
+        char           allocatorMemoryB[64 * 1024] = {};
+        AwaitAllocator allocatorB;
+        SC_TEST_EXPECT(allocatorB.createFixed(allocatorMemoryB));
+        AwaitEventLoop awaitB(asyncB, allocatorB);
 
         AwaitTask task = waitTwice(awaitA);
         SC_TEST_EXPECT(not awaitB.spawn(task));
@@ -2046,7 +2207,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor serverSocket;
         SocketIPAddress  nativeAddress;
@@ -2074,7 +2235,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor serverSocket;
         SocketIPAddress  nativeAddress;
@@ -2105,7 +2266,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor client;
         SocketDescriptor serverSideClient;
@@ -2125,7 +2286,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         const uint16_t port = report.mapPort(5052);
 
@@ -2155,7 +2316,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor client;
         SocketDescriptor serverSideClient;
@@ -2175,7 +2336,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor client;
         SocketDescriptor serverSideClient;
@@ -2197,7 +2358,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor client;
         SocketDescriptor serverSideClient;
@@ -2220,13 +2381,15 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SocketDescriptor client;
             SocketDescriptor serverSideClient;
             createTCPSocketPair(async, client, serverSideClient);
 
             AwaitTask task = scatterGatherSocketOnce(await, client, serverSideClient);
+            SC_TEST_EXPECT(awaitAllocator.statistics().numAllocationFailures == 0);
+            SC_TEST_EXPECT(task.isValid());
             SC_TEST_EXPECT(await.spawn(task));
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(task.result());
@@ -2238,7 +2401,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             const uint16_t port = report.mapPort(5053);
 
@@ -2266,7 +2429,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             SmallStringNative<255> filePath = StringEncoding::Native;
             const StringView       fileName = "await-file-sg.txt";
@@ -2298,7 +2461,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SocketDescriptor serverSocket;
         SocketIPAddress  nativeAddress;
@@ -2331,7 +2494,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         SmallStringNative<255> filePath = StringEncoding::Native;
         SmallStringNative<255> dirPath  = StringEncoding::Native;
@@ -2427,7 +2590,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(2));
@@ -2477,7 +2640,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(1));
@@ -2531,7 +2694,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(1));
@@ -2563,7 +2726,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(2));
@@ -2599,7 +2762,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         PipeDescriptor pipe;
         PipeOptions    pipeOptions;
@@ -2622,7 +2785,7 @@ struct SC::AwaitTest : public SC::TestCase
 #if SC_PLATFORM_WINDOWS
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         FileDescriptor invalidFile;
         AwaitTask      task = filePollOnce(await, invalidFile);
@@ -2642,7 +2805,7 @@ struct SC::AwaitTest : public SC::TestCase
 
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         Atomic<int> workCount = 0;
         AwaitTask   task      = loopWorkOnce(await, threadPool, workCount);
@@ -2659,7 +2822,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         Process processSuccess;
         Process processFailure;
@@ -2690,7 +2853,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
 #if SC_PLATFORM_WINDOWS
         SC_TEST_EXPECT(async.close());
@@ -2725,7 +2888,7 @@ struct SC::AwaitTest : public SC::TestCase
 
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
 #if SC_PLATFORM_WINDOWS
         AwaitSignalResult result;
@@ -2755,7 +2918,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitSignalResult result;
         AwaitTask         task = signalOnce(await, SIGINT, result);
@@ -2773,7 +2936,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask child  = waitTwice(await);
         AwaitTask parent = awaitChild(await, child);
@@ -2791,7 +2954,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask parent = spawnAndWaitChild(await);
             SC_TEST_EXPECT(await.spawn(parent));
@@ -2802,7 +2965,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask child;
             AwaitTask parent = spawnAndWaitLongChild(await, child);
@@ -2827,7 +2990,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2865,11 +3028,12 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
             AwaitTask         parent = waitTaskRegistry(await, registry);
+            SC_TEST_EXPECT(parent.isValid());
             SC_TEST_EXPECT(await.spawn(parent));
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(parent.result());
@@ -2880,7 +3044,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2895,7 +3059,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2917,7 +3081,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2932,7 +3096,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2947,7 +3111,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
@@ -2968,11 +3132,11 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[1];
             AwaitTaskRegistry registry(await, storage);
-            AwaitTask         parent = waitAnyEmptyTaskRegistry(registry);
+            AwaitTask         parent = waitAnyEmptyTaskRegistry(await, registry);
             SC_TEST_EXPECT(await.spawn(parent));
             SC_TEST_EXPECT(parent.isCompleted());
             SC_TEST_EXPECT(parent.result());
@@ -2982,7 +3146,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[1];
             AwaitTaskRegistry registry(await, storage);
@@ -3006,7 +3170,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask         storage[1];
             AwaitTaskRegistry registry(await, storage);
@@ -3022,7 +3186,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitTaskGroup(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -3033,7 +3197,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask childA;
             AwaitTask childB;
@@ -3048,7 +3212,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask childA;
             AwaitTask childB;
@@ -3074,7 +3238,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask nested;
             AwaitTask leafA;
@@ -3109,7 +3273,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitAnyEmptyTaskGroup(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -3119,7 +3283,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitAnyCompletedTaskGroup(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -3130,7 +3294,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask slowChild;
             AwaitTask task = waitAnyTaskGroup(await, slowChild);
@@ -3144,7 +3308,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask slowChild;
             AwaitTask task = waitAnyFailingWinnerTaskGroup(await, slowChild);
@@ -3158,7 +3322,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask slowChild;
             AwaitTask task = waitAnyLeaveRemainingRunningTaskGroup(await, slowChild);
@@ -3177,11 +3341,12 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask childA;
             AwaitTask childB;
             AwaitTask parent = waitAnyCancellableTaskGroup(await, childA, childB);
+            SC_TEST_EXPECT(parent.isValid());
             SC_TEST_EXPECT(await.spawn(parent));
             SC_TEST_EXPECT(parent.isActive());
             SC_TEST_EXPECT(childA.isActive());
@@ -3202,7 +3367,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask child;
             AwaitTask parent = waitAllLeaveChildrenRunning(await, child);
@@ -3226,7 +3391,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask child  = waitLong(await);
         AwaitTask parent = awaitChild(await, child);
@@ -3253,7 +3418,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitForCompletedChild(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -3264,7 +3429,7 @@ struct SC::AwaitTest : public SC::TestCase
         {
             AsyncEventLoop async;
             SC_TEST_EXPECT(async.create());
-            AwaitEventLoop await(async);
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
             AwaitTask task = waitForTimedOutChild(await);
             SC_TEST_EXPECT(await.spawn(task));
@@ -3278,7 +3443,7 @@ struct SC::AwaitTest : public SC::TestCase
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         AwaitTask          child;
         AwaitTimeoutResult timeoutResult;
@@ -3300,72 +3465,149 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(async.close());
     }
 
-    void arena()
+    struct TrackingAllocatorInterface : public AwaitAllocatorInterface
+    {
+        void*  lastOwner      = nullptr;
+        size_t lastNumBytes   = 0;
+        size_t lastAlignment  = 0;
+        size_t numAllocations = 0;
+        size_t numReleases    = 0;
+
+        virtual void* allocateImpl(const void* owner, size_t numBytes, size_t alignment) override
+        {
+            lastOwner     = const_cast<void*>(owner);
+            lastNumBytes  = numBytes;
+            lastAlignment = alignment;
+            numAllocations++;
+            return ::malloc(numBytes);
+        }
+
+        virtual void releaseImpl(void* memory) override
+        {
+            numReleases++;
+            ::free(memory);
+        }
+    };
+
+    void allocator()
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
 
-        char           arenaMemory[16 * 1024] = {0};
-        AwaitArena     arenaStorage({arenaMemory, sizeof(arenaMemory)});
-        AwaitEventLoop await(async, &arenaStorage);
-        SC_TEST_EXPECT(await.hasArena());
+        char           allocatorStorage[16 * 1024] = {0};
+        AwaitAllocator allocator;
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        AwaitEventLoop await(async, allocator);
 
-        AwaitTask task = arenaWait(await);
-        SC_TEST_EXPECT(arenaStorage.used() > 0);
-        SC_TEST_EXPECT(arenaStorage.peakUsed() >= arenaStorage.used());
-        SC_TEST_EXPECT(arenaStorage.failedAllocationSize() == 0);
+        AwaitTask task = allocatorWait(await);
+        SC_TEST_EXPECT(allocator.used() > 0);
+        SC_TEST_EXPECT(allocator.peakUsed() >= allocator.used());
+        SC_TEST_EXPECT(allocator.failedAllocationSize() == 0);
 
         SC_TEST_EXPECT(await.spawn(task));
         SC_TEST_EXPECT(await.run());
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(async.close());
 
-        char       diagnosticsMemory[16] = {};
-        AwaitArena diagnostics({diagnosticsMemory, sizeof(diagnosticsMemory)});
+        char           diagnosticsMemory[16] = {};
+        AwaitAllocator diagnostics;
+        SC_TEST_EXPECT(diagnostics.createFixed(diagnosticsMemory));
         SC_TEST_EXPECT(diagnostics.capacity() == sizeof(diagnosticsMemory));
         SC_TEST_EXPECT(diagnostics.used() == 0);
         SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
         SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 0);
-        SC_TEST_EXPECT(diagnostics.allocate(4, 1) != nullptr);
-        SC_TEST_EXPECT(diagnostics.used() == 4);
-        SC_TEST_EXPECT(diagnostics.peakUsed() == 4);
-        SC_TEST_EXPECT(diagnostics.allocate(8, 1) != nullptr);
-        SC_TEST_EXPECT(diagnostics.used() == 12);
-        SC_TEST_EXPECT(diagnostics.peakUsed() == 12);
-        SC_TEST_EXPECT(diagnostics.allocate(8, 1) == nullptr);
-        SC_TEST_EXPECT(diagnostics.used() == 12);
-        SC_TEST_EXPECT(diagnostics.peakUsed() == 12);
-        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 8);
-        diagnostics.reset();
+        SC_TEST_EXPECT(diagnostics.allocate(nullptr, 4, 1) == nullptr);
         SC_TEST_EXPECT(diagnostics.used() == 0);
         SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
-        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 0);
+        SC_TEST_EXPECT(diagnostics.allocate(nullptr, 8, 1) == nullptr);
+        SC_TEST_EXPECT(diagnostics.used() == 0);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
+        SC_TEST_EXPECT(diagnostics.allocate(nullptr, 8, 1) == nullptr);
+        SC_TEST_EXPECT(diagnostics.used() == 0);
+        SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
+        SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 8);
+        SC_TEST_EXPECT(diagnostics.close());
     }
 
-    void arenaExhaustion()
+    void allocatorExhaustion()
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
 
-        char           arenaMemory[1] = {0};
-        AwaitArena     arenaStorage({arenaMemory, sizeof(arenaMemory)});
-        AwaitEventLoop await(async, &arenaStorage);
-        SC_TEST_EXPECT(await.hasArena());
+        char           allocatorStorage[1] = {0};
+        AwaitAllocator allocator;
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        AwaitEventLoop await(async, allocator);
 
-        AwaitTask task = arenaWait(await);
+        AwaitTask task = allocatorWait(await);
         SC_TEST_EXPECT(not task.isValid());
         SC_TEST_EXPECT(not await.spawn(task));
-        SC_TEST_EXPECT(arenaStorage.used() == 0);
-        SC_TEST_EXPECT(arenaStorage.peakUsed() == 0);
-        SC_TEST_EXPECT(arenaStorage.failedAllocationSize() > arenaStorage.capacity());
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.peakUsed() == 0);
+        SC_TEST_EXPECT(allocator.failedAllocationSize() > 0);
         SC_TEST_EXPECT(async.close());
+    }
+
+    void allocatorModes()
+    {
+        char fixedMemory[2048] = {};
+
+        AwaitAllocator fixed;
+        SC_TEST_EXPECT(fixed.createFixed(fixedMemory));
+        void* fixedA = fixed.allocate(nullptr, 64, alignof(void*));
+        void* fixedB = fixed.allocate(nullptr, 32, alignof(void*));
+        SC_TEST_EXPECT(fixedA != nullptr);
+        SC_TEST_EXPECT(fixedB != nullptr);
+        SC_TEST_EXPECT(fixed.used() > 0);
+        fixed.release(fixedA);
+        fixed.release(fixedB);
+        SC_TEST_EXPECT(fixed.used() == 0);
+        SC_TEST_EXPECT(fixed.statistics().numAllocations == 2);
+        SC_TEST_EXPECT(fixed.statistics().numReleases == 2);
+        SC_TEST_EXPECT(fixed.close());
+
+        AwaitAllocator mallocAllocator;
+        SC_TEST_EXPECT(mallocAllocator.createMalloc());
+        void* mallocMemory = mallocAllocator.allocate(nullptr, 128, alignof(void*));
+        SC_TEST_EXPECT(mallocMemory != nullptr);
+        SC_TEST_EXPECT(mallocAllocator.statistics().requestedBytesAllocated == 128);
+        mallocAllocator.release(mallocMemory);
+        SC_TEST_EXPECT(mallocAllocator.statistics().requestedBytesReleased == 128);
+        SC_TEST_EXPECT(mallocAllocator.used() == 0);
+        SC_TEST_EXPECT(mallocAllocator.close());
+
+        TrackingAllocatorInterface tracking;
+        AwaitAllocator             polymorphic;
+        int                        owner = 0;
+        SC_TEST_EXPECT(polymorphic.createPolymorphic(tracking));
+        void* polymorphicMemory = polymorphic.allocate(&owner, 24, alignof(void*));
+        SC_TEST_EXPECT(polymorphicMemory != nullptr);
+        SC_TEST_EXPECT(tracking.lastOwner == &owner);
+        SC_TEST_EXPECT(tracking.lastNumBytes >= 24);
+        polymorphic.release(polymorphicMemory);
+        SC_TEST_EXPECT(tracking.numAllocations == 1);
+        SC_TEST_EXPECT(tracking.numReleases == 1);
+        SC_TEST_EXPECT(polymorphic.close());
+
+        AwaitAllocator virtualAllocator;
+        SC_TEST_EXPECT(not virtualAllocator.createVirtual({}));
+        SC_TEST_EXPECT(virtualAllocator.createVirtual({64 * 1024, 0}));
+        SC_TEST_EXPECT(virtualAllocator.mode() == AwaitAllocatorMode::Virtual);
+        SC_TEST_EXPECT(virtualAllocator.reservedBytes() >= 64 * 1024);
+        SC_TEST_EXPECT(virtualAllocator.committedBytes() == 0);
+        void* virtualMemory = virtualAllocator.allocate(nullptr, 1024, alignof(void*));
+        SC_TEST_EXPECT(virtualMemory != nullptr);
+        SC_TEST_EXPECT(virtualAllocator.committedBytes() > 0);
+        virtualAllocator.release(virtualMemory);
+        SC_TEST_EXPECT(virtualAllocator.used() == 0);
+        SC_TEST_EXPECT(virtualAllocator.close());
     }
 
     void childTaskTeardownDuringCallback()
     {
         AsyncEventLoop async;
         SC_TEST_EXPECT(async.create());
-        AwaitEventLoop await(async);
+        SC_AWAIT_TEST_EVENT_LOOP(await, async);
 
         ThreadPool threadPool;
         SC_TEST_EXPECT(threadPool.create(1));

@@ -30,7 +30,7 @@ The goal is to let the compiler generate the callback state machine while preser
 - coroutine completion returns plain `Result`;
 - extra outputs are passed through explicit caller-provided objects;
 - callback-style `SC::Async` code can coexist on the same event loop;
-- coroutine frame allocation can be routed through caller-owned `AwaitArena` storage.
+- coroutine frame allocation is explicit through a mandatory `AwaitAllocator`.
 
 # Features
 
@@ -38,7 +38,7 @@ The goal is to let the compiler generate the callback state machine while preser
 |:-----------------------------------------------|:-----------------------------------------------|
 | [AwaitEventLoop](@ref SC::AwaitEventLoop)      | @copybrief SC::AwaitEventLoop                  |
 | [AwaitTask](@ref SC::AwaitTask)                | @copybrief SC::AwaitTask                       |
-| [AwaitArena](@ref SC::AwaitArena)              | @copybrief SC::AwaitArena                      |
+| [AwaitAllocator](@ref SC::AwaitAllocator)      | @copybrief SC::AwaitAllocator                  |
 | [AwaitSleepAwaiter](@ref SC::AwaitSleepAwaiter)| @copybrief SC::AwaitSleepAwaiter               |
 | [AwaitSocketAcceptAwaiter](@ref SC::AwaitSocketAcceptAwaiter) | @copybrief SC::AwaitSocketAcceptAwaiter |
 | [AwaitSocketConnectAwaiter](@ref SC::AwaitSocketConnectAwaiter) | @copybrief SC::AwaitSocketConnectAwaiter |
@@ -126,7 +126,7 @@ Complete console examples live in:
 - `Examples/AwaitFirstResponse`, racing caller-owned registry jobs with `waitAny()` and cancelling the slower response.
 - `Examples/AwaitConfigReload`, showing `spawnAndWait()` for a single child coroutine that loads a config file.
 - `Examples/AwaitDeadline`, showing a child coroutine deadline with `waitFor()` and cooperative cancellation.
-- `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
+- `Examples/AwaitEcho`, showing sockets, task groups, and fixed-allocator-backed tasks.
 - `Examples/AwaitDatagramPing`, showing UDP `sendTo()` / `receiveFrom()` request and reply flow.
 - `Examples/AwaitTaskGroupFiles`, showing Python `asyncio.TaskGroup`-style fan-out over two file reads while keeping
   task storage caller-owned.
@@ -194,11 +194,10 @@ Current support includes:
 - structured `AwaitTaskGroup` waiting with caller-provided task pointer storage, `waitAll()`, and `waitAny()`;
 - fixed-slot `AwaitTaskRegistry` ownership for detached/background tasks that are cleaned up explicitly;
 - child task timeout with `waitFor()`;
-- optional arena-backed coroutine frame allocation.
+- mandatory explicit coroutine frame allocation through `AwaitAllocator`.
 
 `Await` is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
-coroutine header. `SCAwaitArenaTest` additionally compiles with `SC_AWAIT_REQUIRE_ARENA=1` to keep the production-style
-no-fallback allocation path covered.
+coroutine header.
 
 # Details
 
@@ -216,9 +215,9 @@ their stable objects remain alive while active.
 
 @copydoc SC::AwaitTask
 
-## AwaitArena
+## AwaitAllocator
 
-@copydoc SC::AwaitArena
+@copydoc SC::AwaitAllocator
 
 # Socket receive helpers
 
@@ -283,7 +282,7 @@ Thread-pool-backed file and filesystem awaiters use `AsyncFileRead`, `AsyncFileW
 already running on a worker thread, completion may arrive before the stop request can take effect.
 
 Local validation for Await changes should run macOS first, then Linux, then Windows. For targeted changes, prefer the
-smallest relevant `SCAwaitTest` section plus `SCAwaitArenaTest` when arena allocation behavior changes. Windows changes
+smallest relevant `SCAwaitTest` section when allocator behavior changes. Windows changes
 should include focused `SCAwaitTest` Debug and Release runs before committing when the touched awaiter has
 platform-specific behavior.
 
@@ -367,38 +366,27 @@ winner is known. Pass `AwaitTaskRegistryWaitAnyPolicy::LeaveRemainingRunning` on
 background lifetime owner and shutdown will later call `cancelAll()` or drain the active tasks.
 
 `AwaitTaskRegistry` owns only task bookkeeping. It does not allocate, create coroutine frames, or hide lifetime
-management. Coroutine frames still come from each task's normal storage policy, usually an `AwaitArena`, and active
-registry tasks must be cancelled or drained before the registry storage is destroyed.
+management. Coroutine frames come from the `AwaitAllocator` bound to the task's `AwaitEventLoop`, and active registry
+tasks must be cancelled or drained before the registry storage is destroyed.
 
 # Memory allocation
 
-`AwaitArena` can hold coroutine frames in caller-provided storage. `Await` currently supports two allocation modes:
+`AwaitAllocator` is mandatory: every `AwaitEventLoop` receives an already opened allocator, and coroutine frame
+allocation fails cleanly if no `AwaitEventLoop&` can be discovered from the coroutine parameters. There is no hidden
+standard allocation fallback.
 
-- Passing an arena to `AwaitEventLoop` gives no-allocation coroutine frame storage for production-style Sane C++ usage.
-- Omitting the arena keeps experiments ergonomic and falls back to standard nothrow coroutine allocation.
+The default and recommended mode is fixed caller-owned storage through `createFixed(Span<char>)`. This preserves the
+Sane C++ no-hidden-allocation rule while still allowing coroutine frames to be allocated and released individually.
 
-The arena exposes lightweight diagnostics for tuning frame storage: `capacity()` reports caller-provided bytes,
-`used()` reports current bump-pointer usage, `peakUsed()` reports the high-water mark since the last `reset()`, and
-`failedAllocationSize()` reports the last frame allocation request that did not fit.
+Explicit opt-in modes exist for integration and experiments:
 
-Arena-backed frames are not individually freed. The caller must only reset the arena after all tasks using it have been
-destroyed.
+- `createVirtual()` reserves virtual address space and commits pages lazily until `close()`;
+- `createMalloc()` uses one `malloc()` / `free()` pair per allocation;
+- `createPolymorphic()` delegates to a caller-provided `AwaitAllocatorInterface` without depending on the Memory
+  library.
 
-`AwaitEventLoop::hasArena()` can be used by tests and examples to make the selected mode explicit. The intended
-direction is:
-
-- examples and production-style code should pass an arena;
-- tests may cover both arena and no-arena modes;
-- production builds can define `SC_AWAIT_REQUIRE_ARENA=1` to make coroutine frame allocation fail instead of falling
-  back to standard allocation when no `AwaitArena` is discoverable from the coroutine parameters.
-
-The `SCAwaitArenaTest` target is compiled with `SC_AWAIT_REQUIRE_ARENA=1` and verifies both sides of that contract:
-tasks fail cleanly without an arena and run normally when `AwaitEventLoop` receives caller-provided arena storage.
-
-There is no separate explicit frame-storage API today. The current arena discovery through an `AwaitEventLoop&`
-parameter keeps coroutine signatures close to normal async code and avoids adding a second ownership concept. If this
-proves too compiler-dependent, the fallback should be an explicit task/factory type that binds a frame arena before
-creating the coroutine, not hidden allocation.
+All modes expose the same diagnostics through `AwaitAllocatorStatistics`: allocation/release counts, requested
+allocated/released bytes, bytes in use, peak bytes in use, failed allocation count, and failed allocation sizes.
 
 # Exceptions
 
@@ -411,14 +399,13 @@ compiling against the standard coroutine header.
 
 The no-stdlib story is intentionally not part of the current MVP bar. Today
 `Libraries/Await/Internal/AwaitCoroutine.h` includes `<coroutine>` for `std::coroutine_traits`,
-`std::coroutine_handle`, and `std::suspend_always`. It also includes `<new>` so no-arena experimental builds can use
-`std::nothrow` fallback allocation.
+`std::coroutine_handle`, and `std::suspend_always`. Coroutine frame storage is still provided by `AwaitAllocator`;
+there is no `std::nothrow` allocation fallback.
 
 A future `-nostdinc++` shim looks technically possible but should be treated as Stable-track work. It would need to
-provide the compiler-facing coroutine names expected by C++20, map handles to the compiler coroutine builtins on each
-supported compiler, and require `SC_AWAIT_REQUIRE_ARENA=1` so `<new>` and fallback allocation are not needed. Until that
-is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` / `SCAwaitArenaTest` instead of the normal
-`SCTest` path.
+provide the compiler-facing coroutine names expected by C++20 and map handles to the compiler coroutine builtins on
+each supported compiler. Until that is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` instead of
+the normal `SCTest` path.
 
 # Roadmap
 
@@ -427,7 +414,7 @@ is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` / `SCAwai
 - Add only the next `Async` operations that have concrete examples or migration pressure.
 - Add ASan-focused teardown coverage for thread-pool-backed awaiters and child-task destruction.
 - Decide whether filesystem watcher integration should become an explicit stream/channel-style adapter.
-- Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for production-style builds.
+- Continue tightening coroutine allocation portability, especially around member coroutine allocation discovery.
 - Prototype and validate the no-stdlib coroutine shim behind an opt-in macro before moving `Await` into `SCTest`.
 
 # Statistics

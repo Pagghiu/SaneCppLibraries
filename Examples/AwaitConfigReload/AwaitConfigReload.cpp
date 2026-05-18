@@ -76,9 +76,10 @@ static Result runAwaitConfigReload()
     SC_TRY(async.create());
     auto closeAsync = MakeDeferred([&async] { (void)async.close(); });
 
-    char           arenaMemory[12 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[12 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     ConfigLoadJob job  = {path.view()};
     AwaitTask     task = reloadConfig(await, threadPool, job);

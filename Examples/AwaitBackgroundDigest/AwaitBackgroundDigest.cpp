@@ -70,9 +70,10 @@ static Result runAwaitBackgroundDigest()
     SC_TRY(async.create());
     auto closeAsync = MakeDeferred([&async] { (void)async.close(); });
 
-    char           arenaMemory[12 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[12 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     constexpr char leftInput[]  = "await background digest left";
     constexpr char rightInput[] = "await background digest right";

@@ -65,11 +65,11 @@ Some relevant blog posts are:
 | AwaitConfigReload | Shows `spawnAndWait()` for a single child coroutine that loads a config file                                                |
 | AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |
 | AwaitDeadline | Shows a child coroutine deadline with `waitFor()` and cooperative cancellation                                                  |
-| AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned coroutine arena                                        |
+| AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned allocator storage                                      |
 | AwaitFileCourier | Shows file copy followed by `AwaitEventLoop::fileSend()` over a socket                                                     |
 | AwaitFilePatch | Shows offset `fileWrite()` followed by `fileRead()` using caller-owned buffers                                             |
 | AwaitFirstResponse | Races two caller-owned registry jobs with `waitAny()` and cancels the slower response                                    |
-| AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned coroutine arena                       |
+| AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned allocator storage                    |
 | AwaitManifestPreview | Shows bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage                                           |
 | AwaitProcessExitCodes | Shows concurrent child-process exit waits with `processExit()` and fixed job storage                                  |
 | AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |

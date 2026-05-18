@@ -31,9 +31,10 @@ static Result runAwaitCallbackBridge()
     AsyncEventLoop async;
     SC_TRY(async.create());
 
-    char           arenaMemory[8 * 1024] = {};
-    AwaitArena     arena({arenaMemory, sizeof(arenaMemory)});
-    AwaitEventLoop await(async, &arena);
+    char           allocatorStorage[8 * 1024] = {};
+    AwaitAllocator allocator;
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    AwaitEventLoop await(async, allocator);
 
     bool             callbackFired = false;
     AsyncLoopTimeout legacyTimeout;
