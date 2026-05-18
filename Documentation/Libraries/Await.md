@@ -58,6 +58,7 @@ The goal is to let the compiler generate the callback state machine while preser
 | [AwaitFilePollAwaiter](@ref SC::AwaitFilePollAwaiter) | @copybrief SC::AwaitFilePollAwaiter       |
 | [AwaitFileSystemOperationAwaiter](@ref SC::AwaitFileSystemOperationAwaiter) | @copybrief SC::AwaitFileSystemOperationAwaiter |
 | [AwaitTaskGroup](@ref SC::AwaitTaskGroup)       | @copybrief SC::AwaitTaskGroup                  |
+| [AwaitTaskRegistry](@ref SC::AwaitTaskRegistry) | @copybrief SC::AwaitTaskRegistry               |
 | [AwaitTaskGroupResultSummary](@ref SC::AwaitTaskGroupResultSummary) | @copybrief SC::AwaitTaskGroupResultSummary |
 | [AwaitTaskGroupWaitAllAwaiter](@ref SC::AwaitTaskGroupWaitAllAwaiter) | @copybrief SC::AwaitTaskGroupWaitAllAwaiter |
 | [AwaitTaskGroupWaitAnyAwaiter](@ref SC::AwaitTaskGroupWaitAnyAwaiter) | @copybrief SC::AwaitTaskGroupWaitAnyAwaiter |
@@ -118,6 +119,8 @@ as `Async`.
 Complete console examples live in:
 
 - `Examples/AwaitBackgroundDigest`, showing ThreadPool-backed CPU work with `loopWork()` and caller-owned job state.
+- `Examples/AwaitBackgroundJobs`, showing detached background coroutines through fixed caller-owned
+  `AwaitTaskRegistry` slots.
 - `Examples/AwaitConfigReload`, showing `spawnAndWait()` for a single child coroutine that loads a config file.
 - `Examples/AwaitDeadline`, showing a child coroutine deadline with `waitFor()` and cooperative cancellation.
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
@@ -186,6 +189,7 @@ Current support includes:
   waits covered by tests;
 - awaiting explicitly spawned child tasks, or starting and awaiting one with `spawnAndWait()`;
 - structured `AwaitTaskGroup` waiting with caller-provided task pointer storage, `waitAll()`, and `waitAny()`;
+- fixed-slot `AwaitTaskRegistry` ownership for detached/background tasks that are cleaned up explicitly;
 - child task timeout with `waitFor()`;
 - optional arena-backed coroutine frame allocation.
 
@@ -295,8 +299,8 @@ should still return `Result` and write any extra output into an explicit caller-
 Before `Await` should move from MVP / Experimental to a stable status, the remaining design forks should be resolved:
 
 - lifecycle hardening: ASan-covered teardown tests for thread-pool-backed operations and child-task destruction;
-- optional helper APIs: whether detached/background task registries or filesystem watcher stream adapters are useful
-  enough to add as explicit caller-owned `Await*` objects.
+- optional helper APIs: whether filesystem watcher stream adapters are useful enough to add as explicit caller-owned
+  `Await*` objects.
 
 No-stdlib coroutine support is not required for the current MVP status. `Await` can remain isolated in `SCAwaitTest`
 while the API is still moving; a `<coroutine>` replacement and normal `SCTest` participation are stable-track work.
@@ -349,13 +353,14 @@ still follows Sane C++'s plain-`Result` style.
 
 # Detached tasks
 
-`Await` does not currently provide detached/background task ownership. The preferred model remains structured: keep
-child `AwaitTask` objects in caller-owned storage and wait through `AwaitTaskGroup` or `spawnAndWait()`.
+The preferred model remains structured: keep child `AwaitTask` objects in caller-owned storage and wait through
+`AwaitTaskGroup` or `spawnAndWait()`. When a workflow really needs detached/background ownership,
+`AwaitTaskRegistry` provides the no-allocation shape: fixed caller-provided task slots, explicit `spawn()` into the
+first free slot, `cancelAll()` during shutdown, and `clearCompleted()` for cleanup and optional result aggregation.
 
-If detached tasks become necessary, the no-allocation shape should be a caller-owned registry, roughly: fixed task slots,
-explicit `spawn()` into a free slot, explicit `cancelAll()` during shutdown, and an optional `waitAll()`/`pollCompleted()`
-surface for cleanup. Such a registry should own only task bookkeeping; coroutine frames still come from each task's
-normal storage policy, usually an `AwaitArena`.
+`AwaitTaskRegistry` owns only task bookkeeping. It does not allocate, create coroutine frames, or hide lifetime
+management. Coroutine frames still come from each task's normal storage policy, usually an `AwaitArena`, and active
+registry tasks must be cancelled or drained before the registry storage is destroyed.
 
 # Memory allocation
 
@@ -413,7 +418,6 @@ is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` / `SCAwai
 
 - Add only the next `Async` operations that have concrete examples or migration pressure.
 - Add ASan-focused teardown coverage for thread-pool-backed awaiters and child-task destruction.
-- Decide whether detached/background task registries deserve a caller-owned `Await*` helper.
 - Decide whether filesystem watcher integration should become an explicit stream/channel-style adapter.
 - Decide if `SC_AWAIT_REQUIRE_ARENA=1` should become the default for production-style builds.
 - Prototype and validate the no-stdlib coroutine shim behind an opt-in macro before moving `Await` into `SCTest`.

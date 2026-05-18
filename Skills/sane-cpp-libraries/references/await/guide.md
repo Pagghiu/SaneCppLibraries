@@ -16,7 +16,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   fsOpen/fsClose/fsRead/fsWrite/fsCopyFile/fsCopyDirectory/fsRename/
   fsRemoveEmptyDirectory/fsRemoveFile, processExit, one-shot signal, loopWork, child tasks, `spawnAndWait()`,
   `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`, and cancellation of
-  the currently suspended operation.
+  the currently suspended operation. `AwaitTaskRegistry` covers explicit fixed-slot detached/background task ownership.
 - Prefer `AwaitArena` examples when discussing no-allocation coroutine frame storage. The experimental target still
   allows no-arena standard nothrow allocation for ergonomic experiments; production-style examples should pass an arena.
 - Use `AwaitArena::capacity()`, `used()`, `peakUsed()`, and `failedAllocationSize()` when sizing caller-provided
@@ -25,6 +25,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   allocation fallback.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
+- Use `Examples/AwaitBackgroundJobs` for detached/background jobs through fixed caller-owned `AwaitTaskRegistry` slots.
 - Use `Examples/AwaitConfigReload` for the one-child `spawnAndWait()` convenience pattern.
 - Use `Examples/AwaitDeadline` for child task deadlines through `waitFor()` and `AwaitTimeoutResult`.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.
@@ -84,8 +85,9 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - New awaiters must keep returning plain `Result`; if more information is needed, add an explicit result object parameter.
 - Keep `spawn()` immediate for now. Revisit only if Await grows a ready queue or runnable tasks that are not backed by an
   active `AsyncRequest`.
-- Prefer structured children through `AwaitTaskGroup`. If detached/background tasks are needed, design a caller-owned
-  registry with fixed task slots, explicit shutdown cancellation, and no hidden allocation.
+- Prefer structured children through `AwaitTaskGroup`. If detached/background tasks are needed, use
+  `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
+  allocation.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
   would need coroutine traits/handles/suspend types plus compiler builtin mapping, and should require
   `SC_AWAIT_REQUIRE_ARENA=1`. This is stable-track work, not required for MVP usage.

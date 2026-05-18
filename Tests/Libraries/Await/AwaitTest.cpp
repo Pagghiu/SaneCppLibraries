@@ -193,6 +193,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             spawnAndWaitChildTask();
         }
+        if (test_section("task registry"))
+        {
+            taskRegistry();
+        }
         if (test_section("task group"))
         {
             taskGroup();
@@ -2732,6 +2736,84 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(parent.isCompleted());
             SC_TEST_EXPECT(not child.result());
             SC_TEST_EXPECT(not parent.result());
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
+    void taskRegistry()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[2];
+            AwaitTaskRegistry registry(await, storage);
+
+            AwaitTaskRegistrySpawnResult first;
+            SC_TEST_EXPECT(registry.spawn(waitTwice(await), &first));
+            SC_TEST_EXPECT(first.index == 0);
+            SC_TEST_EXPECT(first.task == &storage[0]);
+            SC_TEST_EXPECT(registry.size() == 1);
+            SC_TEST_EXPECT(registry.activeCount() == 1);
+            SC_TEST_EXPECT(registry.completedCount() == 0);
+            SC_TEST_EXPECT(registry.capacity() == 2);
+
+            AwaitTaskRegistrySpawnResult second;
+            SC_TEST_EXPECT(registry.spawn(failSoon(await), &second));
+            SC_TEST_EXPECT(second.index == 1);
+            SC_TEST_EXPECT(second.task == &storage[1]);
+
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(registry.size() == 2);
+            SC_TEST_EXPECT(registry.activeCount() == 0);
+            SC_TEST_EXPECT(registry.completedCount() == 2);
+
+            AwaitTaskGroupResultSummary summary;
+            SC_TEST_EXPECT(registry.clearCompleted(&summary) == 2);
+            SC_TEST_EXPECT(summary.numTasks == 2);
+            SC_TEST_EXPECT(summary.numCompleted == 2);
+            SC_TEST_EXPECT(summary.numSucceeded == 1);
+            SC_TEST_EXPECT(summary.numFailed == 1);
+            SC_TEST_EXPECT(summary.firstFailureIndex == 1);
+            SC_TEST_EXPECT(not summary.firstFailure);
+            SC_TEST_EXPECT(registry.size() == 0);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[1];
+            AwaitTaskRegistry registry(await, storage);
+
+            SC_TEST_EXPECT(registry.spawn(waitLong(await)));
+            SC_TEST_EXPECT(registry.activeCount() == 1);
+            SC_TEST_EXPECT(not registry.spawn(waitTwice(await)));
+            SC_TEST_EXPECT(registry.size() == 1);
+            SC_TEST_EXPECT(registry.taskAt(0) == &storage[0]);
+            SC_TEST_EXPECT(registry.taskAt(1) == nullptr);
+
+            SC_TEST_EXPECT(registry.cancelAll());
+            SC_TEST_EXPECT(registry.cancelAll());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(storage[0].isCompleted());
+            SC_TEST_EXPECT(AwaitIsCancelled(storage[0].result()));
+            SC_TEST_EXPECT(registry.clearCompleted() == 1);
+            SC_TEST_EXPECT(registry.size() == 0);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[1];
+            AwaitTaskRegistry registry(await, storage);
+
+            SC_TEST_EXPECT(not registry.spawn(AwaitTask()));
+            SC_TEST_EXPECT(registry.size() == 0);
             SC_TEST_EXPECT(async.close());
         }
     }

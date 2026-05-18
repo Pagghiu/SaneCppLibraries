@@ -1952,6 +1952,160 @@ size_t AwaitTaskGroup::size() const { return numTasks; }
 
 size_t AwaitTaskGroup::capacity() const { return tasks.sizeInElements(); }
 
+AwaitTaskRegistry::AwaitTaskRegistry(AwaitEventLoop& await, Span<AwaitTask> taskStorage)
+    : await(await), tasks(taskStorage)
+{}
+
+Result AwaitTaskRegistry::spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* outResult)
+{
+    if (not task.isValid())
+    {
+        return Result::Error("AwaitTask is invalid");
+    }
+    if (task.isStarted())
+    {
+        return Result::Error("AwaitTaskRegistry can only spawn unstarted tasks");
+    }
+
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        AwaitTask& slot = tasks[idx];
+        if (slot.isValid())
+        {
+            continue;
+        }
+
+        slot               = move(task);
+        Result spawnResult = await.spawn(slot);
+        if (not spawnResult)
+        {
+            slot = AwaitTask();
+            return spawnResult;
+        }
+
+        if (outResult != nullptr)
+        {
+            outResult->index = idx;
+            outResult->task  = &slot;
+        }
+        return Result(true);
+    }
+    return Result::Error("AwaitTaskRegistry storage is full");
+}
+
+Result AwaitTaskRegistry::cancelAll()
+{
+    Result result(true);
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        AwaitTask& task = tasks[idx];
+        if (task.isActive())
+        {
+            Result cancelResult = task.cancel(await);
+            if (result and not cancelResult)
+            {
+                result = cancelResult;
+            }
+        }
+    }
+    return result;
+}
+
+size_t AwaitTaskRegistry::clearCompleted(AwaitTaskGroupResultSummary* outSummary)
+{
+    AwaitTaskGroupResultSummary summary;
+    size_t                      numCleared = 0;
+
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        AwaitTask& task = tasks[idx];
+        if (not task.isValid())
+        {
+            continue;
+        }
+
+        summary.numTasks++;
+        if (not task.isCompleted())
+        {
+            continue;
+        }
+
+        summary.numCompleted++;
+        Result taskResult = task.result();
+        if (taskResult)
+        {
+            summary.numSucceeded++;
+        }
+        else
+        {
+            summary.numFailed++;
+            if (summary.firstFailureTask == nullptr)
+            {
+                summary.firstFailureIndex = idx;
+                summary.firstFailureTask  = &task;
+                summary.firstFailure      = taskResult;
+            }
+        }
+
+        task = AwaitTask();
+        numCleared++;
+    }
+
+    if (outSummary != nullptr)
+    {
+        *outSummary = summary;
+    }
+    return numCleared;
+}
+
+AwaitTask* AwaitTaskRegistry::taskAt(size_t index) { return index < tasks.sizeInElements() ? &tasks[index] : nullptr; }
+
+const AwaitTask* AwaitTaskRegistry::taskAt(size_t index) const
+{
+    return index < tasks.sizeInElements() ? &tasks[index] : nullptr;
+}
+
+size_t AwaitTaskRegistry::size() const
+{
+    size_t count = 0;
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        if (tasks[idx].isValid())
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+size_t AwaitTaskRegistry::activeCount() const
+{
+    size_t count = 0;
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        if (tasks[idx].isActive())
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+size_t AwaitTaskRegistry::completedCount() const
+{
+    size_t count = 0;
+    for (size_t idx = 0; idx < tasks.sizeInElements(); ++idx)
+    {
+        if (tasks[idx].isCompleted())
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
+size_t AwaitTaskRegistry::capacity() const { return tasks.sizeInElements(); }
+
 AwaitTaskGroupWaitAllAwaiter::AwaitTaskGroupWaitAllAwaiter(AwaitTaskGroup& group) : group(group) {}
 
 bool AwaitTaskGroupWaitAllAwaiter::await_ready() const { return group.numTasks == 0; }

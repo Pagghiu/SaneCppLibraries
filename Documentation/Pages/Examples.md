@@ -60,6 +60,7 @@ Some relevant blog posts are:
 | Example       | Description                                                                                                                       |
 |:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
 | AwaitBackgroundDigest | Shows ThreadPool-backed CPU work with `AwaitEventLoop::loopWork()` and caller-owned result jobs                            |
+| AwaitBackgroundJobs | Shows detached background coroutines through fixed caller-owned `AwaitTaskRegistry` slots                                   |
 | AwaitCallbackBridge | Shows callback-style `Async` and coroutine-style `Await` sharing one caller-owned event loop                                |
 | AwaitConfigReload | Shows `spawnAndWait()` for a single child coroutine that loads a config file                                                |
 | AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |

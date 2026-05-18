@@ -53,6 +53,7 @@ struct AwaitFileSystemOperationAwaiter;
 struct AwaitProcessExitAwaiter;
 struct AwaitSignalAwaiter;
 struct AwaitTaskGroup;
+struct AwaitTaskRegistry;
 struct AwaitTaskGroupWaitAllAwaiter;
 struct AwaitTaskGroupWaitAnyAwaiter;
 struct AwaitTaskSpawnAwaiter;
@@ -179,6 +180,12 @@ struct AwaitTaskGroupResultSummary
     size_t     firstFailureIndex = size_t(-1);
     AwaitTask* firstFailureTask  = nullptr;
     Result     firstFailure      = Result(true);
+};
+
+struct AwaitTaskRegistrySpawnResult
+{
+    size_t     index = size_t(-1);
+    AwaitTask* task  = nullptr;
 };
 
 enum class AwaitTaskGroupCancelPolicy : uint8_t
@@ -995,6 +1002,28 @@ struct SC_AWAIT_EXPORT AwaitTaskGroup
     Span<AwaitTask*>           tasks;
     AwaitTaskGroupCancelPolicy cancelPolicy;
     size_t                     numTasks = 0;
+};
+
+/// @brief Caller-owned fixed-slot registry for detached/background tasks.
+struct SC_AWAIT_EXPORT AwaitTaskRegistry
+{
+    AwaitTaskRegistry(AwaitEventLoop& await, Span<AwaitTask> taskStorage);
+
+    Result spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* outResult = nullptr);
+    Result cancelAll();
+
+    size_t clearCompleted(AwaitTaskGroupResultSummary* outSummary = nullptr);
+
+    [[nodiscard]] AwaitTask*       taskAt(size_t index);
+    [[nodiscard]] const AwaitTask* taskAt(size_t index) const;
+    [[nodiscard]] size_t           size() const;
+    [[nodiscard]] size_t           activeCount() const;
+    [[nodiscard]] size_t           completedCount() const;
+    [[nodiscard]] size_t           capacity() const;
+
+  private:
+    AwaitEventLoop& await;
+    Span<AwaitTask> tasks;
 };
 
 /// @brief Awaiter that waits for every active task in an AwaitTaskGroup.
