@@ -57,6 +57,7 @@ struct AwaitTaskRegistry;
 struct AwaitTaskGroupWaitAllAwaiter;
 struct AwaitTaskGroupWaitAnyAwaiter;
 struct AwaitTaskRegistryWaitAllAwaiter;
+struct AwaitTaskRegistryWaitAnyAwaiter;
 struct AwaitTaskSpawnAwaiter;
 struct AwaitTaskTimeoutAwaiter;
 struct AwaitLoopWorkAwaiter;
@@ -189,6 +190,12 @@ struct AwaitTaskRegistrySpawnResult
     AwaitTask* task  = nullptr;
 };
 
+struct AwaitTaskRegistryWaitAnyResult
+{
+    size_t     index = size_t(-1);
+    AwaitTask* task  = nullptr;
+};
+
 enum class AwaitTaskGroupCancelPolicy : uint8_t
 {
     CancelChildren,
@@ -196,6 +203,12 @@ enum class AwaitTaskGroupCancelPolicy : uint8_t
 };
 
 enum class AwaitTaskGroupWaitAnyPolicy : uint8_t
+{
+    CancelRemaining,
+    LeaveRemainingRunning,
+};
+
+enum class AwaitTaskRegistryWaitAnyPolicy : uint8_t
 {
     CancelRemaining,
     LeaveRemainingRunning,
@@ -279,6 +292,7 @@ struct SC_AWAIT_EXPORT AwaitTask
     friend struct AwaitTaskGroupWaitAllAwaiter;
     friend struct AwaitTaskGroupWaitAnyAwaiter;
     friend struct AwaitTaskRegistryWaitAllAwaiter;
+    friend struct AwaitTaskRegistryWaitAnyAwaiter;
     friend struct AwaitTaskSpawnAwaiter;
     friend struct AwaitTaskTimeoutAwaiter;
 
@@ -1014,6 +1028,9 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistry
     Result                          spawn(AwaitTask&& task, AwaitTaskRegistrySpawnResult* outResult = nullptr);
     Result                          cancelAll();
     AwaitTaskRegistryWaitAllAwaiter waitAll();
+    AwaitTaskRegistryWaitAnyAwaiter waitAny(
+        AwaitTaskRegistryWaitAnyResult& outResult,
+        AwaitTaskRegistryWaitAnyPolicy  waitAnyPolicy = AwaitTaskRegistryWaitAnyPolicy::CancelRemaining);
 
     size_t clearCompleted(AwaitTaskGroupResultSummary* outSummary = nullptr);
 
@@ -1026,6 +1043,7 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistry
 
   private:
     friend struct AwaitTaskRegistryWaitAllAwaiter;
+    friend struct AwaitTaskRegistryWaitAnyAwaiter;
 
     AwaitEventLoop& await;
     Span<AwaitTask> tasks;
@@ -1056,6 +1074,40 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistryWaitAllAwaiter
     AwaitTask::Handle continuation;
     size_t            totalTasks     = 0;
     size_t            completedTasks = 0;
+    bool              finished       = false;
+};
+
+/// @brief Awaiter that waits for the first valid task in an AwaitTaskRegistry to complete.
+struct SC_AWAIT_EXPORT AwaitTaskRegistryWaitAnyAwaiter
+{
+    AwaitTaskRegistryWaitAnyAwaiter(AwaitTaskRegistry& registry, AwaitTaskRegistryWaitAnyResult& outResult,
+                                    AwaitTaskRegistryWaitAnyPolicy waitAnyPolicy);
+
+    AwaitTaskRegistry&              registry;
+    AwaitTaskRegistryWaitAnyResult& outResult;
+    AwaitTaskRegistryWaitAnyPolicy  waitAnyPolicy;
+    Result                          operationResult = Result(true);
+
+    bool   await_ready() const;
+    bool   await_suspend(AwaitTask::Handle continuation);
+    Result await_resume();
+
+  private:
+    static Result cancel(void* object, AwaitEventLoop& eventLoop);
+    static void   onTaskCompleted(void* object);
+
+    Result cancel(AwaitEventLoop& eventLoop);
+    void   onTaskCompleted();
+    void   finish(Result result);
+    void   clearTaskCallbacks();
+    Result setWinner(size_t index);
+    Result cancelRemaining(AwaitEventLoop& eventLoop);
+
+    AwaitTask::Handle continuation;
+    size_t            totalTasks     = 0;
+    size_t            completedTasks = 0;
+    size_t            winnerIndex    = size_t(-1);
+    bool              cancelling     = false;
     bool              finished       = false;
 };
 

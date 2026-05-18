@@ -955,6 +955,63 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    AwaitTask waitAnyTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    {
+        SC_CO_TRY(registry.spawn(waitTwice(await)));
+        SC_CO_TRY(registry.spawn(waitLong(await)));
+
+        AwaitTaskRegistryWaitAnyResult waitAnyResult;
+        SC_CO_TRY(co_await registry.waitAny(waitAnyResult));
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
+        SC_TEST_EXPECT(waitAnyResult.task->result());
+        SC_TEST_EXPECT(registry.taskAt(1)->isCompleted());
+        SC_TEST_EXPECT(AwaitIsCancelled(registry.taskAt(1)->result()));
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyFailingTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    {
+        SC_CO_TRY(registry.spawn(failSoon(await)));
+        SC_CO_TRY(registry.spawn(waitLong(await)));
+
+        AwaitTaskRegistryWaitAnyResult waitAnyResult;
+        Result                         waitResult = co_await registry.waitAny(waitAnyResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
+        SC_TEST_EXPECT(not waitAnyResult.task->result());
+        SC_TEST_EXPECT(registry.taskAt(1)->isCompleted());
+        SC_TEST_EXPECT(AwaitIsCancelled(registry.taskAt(1)->result()));
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyLeaveRunningTaskRegistry(AwaitEventLoop& await, AwaitTaskRegistry& registry)
+    {
+        SC_CO_TRY(registry.spawn(waitTwice(await)));
+        SC_CO_TRY(registry.spawn(waitLong(await)));
+
+        AwaitTaskRegistryWaitAnyResult waitAnyResult;
+        SC_CO_TRY(co_await registry.waitAny(waitAnyResult, AwaitTaskRegistryWaitAnyPolicy::LeaveRemainingRunning));
+        SC_TEST_EXPECT(waitAnyResult.index == 0);
+        SC_TEST_EXPECT(waitAnyResult.task == registry.taskAt(0));
+        SC_TEST_EXPECT(waitAnyResult.task->result());
+        SC_TEST_EXPECT(registry.taskAt(1)->isActive());
+
+        co_return Result(true);
+    }
+
+    AwaitTask waitAnyEmptyTaskRegistry(AwaitTaskRegistry& registry)
+    {
+        AwaitTaskRegistryWaitAnyResult waitAnyResult;
+        Result                         waitResult = co_await registry.waitAny(waitAnyResult);
+        SC_TEST_EXPECT(not waitResult);
+        SC_TEST_EXPECT(waitAnyResult.task == nullptr);
+        co_return Result(true);
+    }
+
     AwaitTask waitForExistingChild(AwaitEventLoop& await, AwaitTask& child)
     {
         AwaitTimeoutResult timeoutResult;
@@ -2855,6 +2912,71 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(AwaitIsCancelled(storage[0].result()));
             SC_TEST_EXPECT(AwaitIsCancelled(storage[1].result()));
             SC_TEST_EXPECT(registry.clearCompleted() == 2);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[2];
+            AwaitTaskRegistry registry(await, storage);
+            AwaitTask         parent = waitAnyTaskRegistry(await, registry);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(parent.result());
+            SC_TEST_EXPECT(registry.completedCount() == 2);
+            SC_TEST_EXPECT(registry.clearCompleted() == 2);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[2];
+            AwaitTaskRegistry registry(await, storage);
+            AwaitTask         parent = waitAnyFailingTaskRegistry(await, registry);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(parent.result());
+            SC_TEST_EXPECT(registry.completedCount() == 2);
+            SC_TEST_EXPECT(registry.clearCompleted() == 2);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[2];
+            AwaitTaskRegistry registry(await, storage);
+            AwaitTask         parent = waitAnyLeaveRunningTaskRegistry(await, registry);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(await.runOnce());
+            SC_TEST_EXPECT(await.runOnce());
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(parent.result());
+            SC_TEST_EXPECT(storage[0].isCompleted());
+            SC_TEST_EXPECT(storage[1].isActive());
+            SC_TEST_EXPECT(registry.cancelAll());
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(AwaitIsCancelled(storage[1].result()));
+            SC_TEST_EXPECT(registry.clearCompleted() == 2);
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            AwaitEventLoop await(async);
+
+            AwaitTask         storage[1];
+            AwaitTaskRegistry registry(await, storage);
+            AwaitTask         parent = waitAnyEmptyTaskRegistry(registry);
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(parent.isCompleted());
+            SC_TEST_EXPECT(parent.result());
+            SC_TEST_EXPECT(registry.size() == 0);
             SC_TEST_EXPECT(async.close());
         }
         {

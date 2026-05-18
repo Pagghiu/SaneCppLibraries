@@ -87,8 +87,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   active `AsyncRequest`.
 - Prefer structured children through `AwaitTaskGroup`. If detached/background tasks are needed, use
   `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
-  allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks without building a separate task-pointer
-  array.
+  allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
+  completed slot without building a separate task-pointer array.
 - The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
   would need coroutine traits/handles/suspend types plus compiler builtin mapping, and should require
   `SC_AWAIT_REQUIRE_ARENA=1`. This is stable-track work, not required for MVP usage.
