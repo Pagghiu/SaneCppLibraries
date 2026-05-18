@@ -26,6 +26,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
 - Use `Examples/AwaitBackgroundJobs` for detached/background jobs through fixed caller-owned `AwaitTaskRegistry` slots.
+- Use `Examples/AwaitFirstResponse` for registry `waitAny()` races that cancel slower background responses.
 - Use `Examples/AwaitConfigReload` for the one-child `spawnAndWait()` convenience pattern.
 - Use `Examples/AwaitDeadline` for child task deadlines through `waitFor()` and `AwaitTimeoutResult`.
 - Use `Examples/AwaitDatagramPing` for UDP sendTo/receiveFrom request/reply flows.

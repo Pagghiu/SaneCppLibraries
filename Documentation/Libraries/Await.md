@@ -123,6 +123,7 @@ Complete console examples live in:
 - `Examples/AwaitBackgroundDigest`, showing ThreadPool-backed CPU work with `loopWork()` and caller-owned job state.
 - `Examples/AwaitBackgroundJobs`, showing detached background coroutines through fixed caller-owned
   `AwaitTaskRegistry` slots.
+- `Examples/AwaitFirstResponse`, racing caller-owned registry jobs with `waitAny()` and cancelling the slower response.
 - `Examples/AwaitConfigReload`, showing `spawnAndWait()` for a single child coroutine that loads a config file.
 - `Examples/AwaitDeadline`, showing a child coroutine deadline with `waitFor()` and cooperative cancellation.
 - `Examples/AwaitEcho`, showing sockets, task groups, and arena-backed tasks.
