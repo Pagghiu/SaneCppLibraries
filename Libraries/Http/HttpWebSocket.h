@@ -272,5 +272,36 @@ struct SC_HTTP_EXPORT HttpWebSocketEndpoint
     bool closeReceived       = false;
 };
 
+/// @brief Fixed-slot WebSocket hub client entry
+struct SC_HTTP_EXPORT HttpWebSocketHubClient
+{
+    HttpWebSocketTransportView transport;
+    bool                       active = false;
+
+    void reset();
+};
+
+/// @brief Small fixed-capacity broadcast helper for server-side WebSocket fan-out
+struct SC_HTTP_EXPORT HttpWebSocketSmallHub
+{
+    Function<Result(size_t, Span<const char>)> onBroadcastFrame;
+
+    Result init(Span<HttpWebSocketHubClient> clientStorage);
+
+    Result join(const HttpWebSocketTransportView& transport, size_t& clientIndex);
+    Result leave(size_t clientIndex);
+
+    Result broadcastFrame(Span<const char> encodedFrame);
+    Result broadcastText(Span<const char> payload, Span<char> frameStorage);
+
+    [[nodiscard]] size_t getNumClients() const { return numClients; }
+    [[nodiscard]] size_t getCapacity() const { return clients.sizeInElements(); }
+    [[nodiscard]] bool   isClientActive(size_t clientIndex) const;
+
+  private:
+    Span<HttpWebSocketHubClient> clients;
+    size_t                       numClients = 0;
+};
+
 //! @}
 } // namespace SC

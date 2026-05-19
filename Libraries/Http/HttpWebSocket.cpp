@@ -1216,4 +1216,94 @@ Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, 
     pendingControlFrame = {automaticControlStorage, encodedHeader.sizeInBytes() + payload.sizeInBytes()};
     return Result(true);
 }
+
+void HttpWebSocketHubClient::reset()
+{
+    transport.reset();
+    active = false;
+}
+
+Result HttpWebSocketSmallHub::init(Span<HttpWebSocketHubClient> clientStorage)
+{
+    clients    = clientStorage;
+    numClients = 0;
+    for (HttpWebSocketHubClient& client : clients)
+    {
+        client.reset();
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketSmallHub::join(const HttpWebSocketTransportView& transport, size_t& clientIndex)
+{
+    SC_TRY_MSG(transport.isValid(), "HttpWebSocketSmallHub transport is invalid");
+    for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
+    {
+        HttpWebSocketHubClient& client = clients[idx];
+        if (not client.active)
+        {
+            client.transport = transport;
+            client.active    = true;
+            clientIndex      = idx;
+            numClients++;
+            return Result(true);
+        }
+    }
+    return Result::Error("HttpWebSocketSmallHub is full");
+}
+
+Result HttpWebSocketSmallHub::leave(size_t clientIndex)
+{
+    SC_TRY_MSG(clientIndex < clients.sizeInElements(), "HttpWebSocketSmallHub client index out of range");
+    HttpWebSocketHubClient& client = clients[clientIndex];
+    if (client.active)
+    {
+        client.reset();
+        numClients--;
+    }
+    return Result(true);
+}
+
+bool HttpWebSocketSmallHub::isClientActive(size_t clientIndex) const
+{
+    return clientIndex < clients.sizeInElements() and clients[clientIndex].active;
+}
+
+Result HttpWebSocketSmallHub::broadcastFrame(Span<const char> encodedFrame)
+{
+    SC_TRY_MSG(not encodedFrame.empty(), "HttpWebSocketSmallHub cannot broadcast an empty frame");
+    for (size_t idx = 0; idx < clients.sizeInElements(); ++idx)
+    {
+        HttpWebSocketHubClient& client = clients[idx];
+        if (not client.active)
+        {
+            continue;
+        }
+        if (onBroadcastFrame.isValid())
+        {
+            SC_TRY(onBroadcastFrame(idx, encodedFrame));
+            continue;
+        }
+
+        AsyncBufferView::ID bufferID;
+        Span<char>          writableData;
+        SC_TRY(client.transport.buffersPool->requestNewBuffer(encodedFrame.sizeInBytes(), bufferID, writableData));
+        ::memcpy(writableData.data(), encodedFrame.data(), encodedFrame.sizeInBytes());
+        client.transport.buffersPool->setNewBufferSize(bufferID, encodedFrame.sizeInBytes());
+        const Result writeResult = client.transport.writableStream->write(bufferID);
+        client.transport.buffersPool->unrefBuffer(bufferID);
+        SC_TRY(writeResult);
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketSmallHub::broadcastText(Span<const char> payload, Span<char> frameStorage)
+{
+    HttpWebSocketEndpoint endpoint;
+    endpoint.reset(HttpWebSocketEndpointRole::Server);
+
+    Span<const char> encodedFrame;
+    SC_TRY(endpoint.sendData(HttpWebSocketOpcode::Text, payload, true, nullptr, frameStorage, encodedFrame));
+    return broadcastFrame(encodedFrame);
+}
 } // namespace SC
