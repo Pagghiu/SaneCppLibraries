@@ -142,6 +142,18 @@ struct HttpAsyncServer::EventEndListener
     }
 };
 
+struct HttpAsyncServer::EventCloseListener
+{
+    HttpAsyncServer& pself;
+    HttpConnection&  client;
+
+    void operator()()
+    {
+        // Upgraded owners may destroy streams directly on protocol errors.
+        pself.closeAsync(client);
+    }
+};
+
 void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
@@ -231,6 +243,16 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             SC_TRUST_RESULT(client.request.startBodyStream());
         }
 
+        if (client.isWebSocketUpgraded())
+        {
+            EventCloseListener closeListener{*this, client};
+            if (not client.readableSocketStream.eventClose.addListener(closeListener))
+            {
+                closeAsync(client);
+            }
+            return;
+        }
+
         // Using a struct instead of a lambda so it can unregister itself
         struct AfterWrite
         {
@@ -240,12 +262,6 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             void operator()()
             {
                 SC_ASSERT_RELEASE(client.response.getWritableStream().eventFinish.removeListener(*this));
-
-                if (client.isWebSocketUpgraded())
-                {
-                    pself.closeAsync(client);
-                    return;
-                }
 
                 // Determine if we should keep the connection alive
                 const bool underMaxRequests =
@@ -326,6 +342,8 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
     (void)client.readableSocketStream.eventData.removeListener(bodyDataListener);
     EventEndListener endListener{*this, client};
     (void)client.readableSocketStream.eventEnd.removeListener(endListener);
+    EventCloseListener closeListener{*this, client};
+    (void)client.readableSocketStream.eventClose.removeListener(closeListener);
 
     const bool readWasDestroyed  = client.readableSocketStream.hasBeenDestroyed();
     const bool writeWasDestroyed = client.writableSocketStream.hasBeenDestroyed();

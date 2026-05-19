@@ -117,7 +117,6 @@ struct AsyncWebServerExample
             if (not received)
             {
                 connection->readableSocketStream.destroy();
-                connection->writableSocketStream.destroy();
             }
         }
 
@@ -127,6 +126,15 @@ struct AsyncWebServerExample
             {
                 (void)owner->webSocketHub.leave(hubIndex);
                 hubIndex = size_t(-1);
+            }
+            if (connection != nullptr)
+            {
+                (void)connection->readableSocketStream.eventData
+                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onData>(*this);
+                (void)connection->readableSocketStream.eventEnd
+                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
+                (void)connection->readableSocketStream.eventClose
+                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
             }
             connection = nullptr;
         }
@@ -227,6 +235,9 @@ struct AsyncWebServerExample
         SC_TRY_MSG(
             (connection.readableSocketStream.eventEnd.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime)),
             "WebSocket end listener limit reached");
+        SC_TRY_MSG((connection.readableSocketStream.eventClose.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(
+                       runtime)),
+                   "WebSocket close listener limit reached");
         return Result(true);
     }
 

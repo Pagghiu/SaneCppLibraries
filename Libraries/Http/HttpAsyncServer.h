@@ -125,5 +125,6 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     struct EventDataListener;
     struct EventBodyDataListener;
     struct EventEndListener;
+    struct EventCloseListener;
 };
 } // namespace SC
