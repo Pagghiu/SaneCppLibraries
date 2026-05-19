@@ -193,5 +193,84 @@ struct SC_HTTP_EXPORT HttpWebSocketFrameWriter
     uint64_t payloadBytesWritten   = 0;
 };
 
+/// @brief Optional caller-buffered message assembly helper for applications that want complete messages
+struct SC_HTTP_EXPORT HttpWebSocketMessageAssembler
+{
+    Function<Result(HttpWebSocketOpcode, Span<const char>)> onMessage;
+
+    void reset(Span<char> messageStorage);
+
+    Result onFrameHeader(const HttpWebSocketFrameHeaderView& header);
+    Result onFramePayload(Span<char> payload, bool frameFinished);
+
+    [[nodiscard]] size_t getCurrentMessageSize() const { return messageSize; }
+
+  private:
+    Span<char> messageStorage;
+
+    HttpWebSocketFrameHeaderView currentFrame;
+    HttpWebSocketOpcode          messageOpcode = HttpWebSocketOpcode::Text;
+
+    size_t messageSize = 0;
+
+    bool assemblingMessage = false;
+    bool ignoringFrame     = false;
+};
+
+/// @brief Small frame-lifecycle helper for ping / pong, close, and explicit fixed-buffer send backpressure
+struct SC_HTTP_EXPORT HttpWebSocketEndpoint
+{
+    Function<Result(const HttpWebSocketFrameHeaderView&)>   onFrameHeader;
+    Function<Result(HttpWebSocketOpcode, Span<char>, bool)> onDataFramePayload;
+    Function<Result(Span<char>)>                            onPing;
+    Function<Result(Span<char>)>                            onPong;
+    Function<Result(uint16_t, Span<char>)>                  onClose;
+
+    void reset(HttpWebSocketEndpointRole endpointRole);
+    void setAutomaticMaskKey(const uint8_t maskKey[4]);
+
+    Result receive(Span<char> data, size_t& consumedBytes);
+
+    Result sendFrame(const HttpWebSocketFrameHeaderView& header, Span<const char> payload, Span<char> storage,
+                     Span<const char>& encodedFrame);
+    Result sendData(HttpWebSocketOpcode opcode, Span<const char> payload, bool fin, const uint8_t* maskKey,
+                    Span<char> storage, Span<const char>& encodedFrame);
+    Result sendPing(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
+                    Span<const char>& encodedFrame);
+    Result sendPong(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
+                    Span<const char>& encodedFrame);
+    Result sendClose(uint16_t statusCode, Span<const char> reason, const uint8_t* maskKey, Span<char> storage,
+                     Span<const char>& encodedFrame);
+
+    [[nodiscard]] bool hasPendingControlFrame() const { return pendingControlFrame.sizeInBytes() > 0; }
+    Result             getPendingControlFrame(Span<const char>& frame) const;
+    void               clearPendingControlFrame();
+
+    [[nodiscard]] bool hasCloseBeenSent() const { return closeSent; }
+    [[nodiscard]] bool hasCloseBeenReceived() const { return closeReceived; }
+
+  private:
+    Result onReaderFrameHeader(const HttpWebSocketFrameHeaderView& header);
+    Result onReaderPayload(Span<char> payload, bool frameFinished);
+    Result handleControlFrame(Span<char> payload);
+    Result queueAutomaticControl(HttpWebSocketOpcode opcode, Span<const char> payload);
+    Result applyOutgoingMask(HttpWebSocketFrameHeaderView& header, const uint8_t* maskKey) const;
+
+    HttpWebSocketEndpointRole    endpointRole = HttpWebSocketEndpointRole::Client;
+    HttpWebSocketFrameReader     reader;
+    HttpWebSocketFrameWriter     writer;
+    HttpWebSocketFrameHeaderView currentFrame;
+
+    char             controlPayload[125]                      = {0};
+    size_t           controlPayloadSize                       = 0;
+    char             automaticControlStorage[2 + 8 + 4 + 125] = {0};
+    Span<const char> pendingControlFrame;
+    uint8_t          automaticMaskKey[4] = {0, 0, 0, 0};
+
+    bool automaticMaskKeySet = false;
+    bool closeSent           = false;
+    bool closeReceived       = false;
+};
+
 //! @}
 } // namespace SC

@@ -878,4 +878,342 @@ Result HttpWebSocketFrameWriter::finishFrame()
     payloadBytesWritten = 0;
     return Result(true);
 }
+
+void HttpWebSocketMessageAssembler::reset(Span<char> storage)
+{
+    messageStorage    = storage;
+    currentFrame      = {};
+    messageOpcode     = HttpWebSocketOpcode::Text;
+    messageSize       = 0;
+    assemblingMessage = false;
+    ignoringFrame     = false;
+}
+
+Result HttpWebSocketMessageAssembler::onFrameHeader(const HttpWebSocketFrameHeaderView& header)
+{
+    currentFrame  = header;
+    ignoringFrame = header.isControlFrame();
+    if (ignoringFrame)
+    {
+        return Result(true);
+    }
+
+    if (header.opcode == HttpWebSocketOpcode::Continuation)
+    {
+        SC_TRY_MSG(assemblingMessage, "HttpWebSocketMessageAssembler unexpected continuation");
+    }
+    else
+    {
+        SC_TRY_MSG(not assemblingMessage, "HttpWebSocketMessageAssembler new message before final continuation");
+        messageOpcode     = header.opcode;
+        messageSize       = 0;
+        assemblingMessage = true;
+    }
+
+    if (header.payloadLength == 0 and header.fin)
+    {
+        if (onMessage.isValid())
+        {
+            SC_TRY(onMessage(messageOpcode, {messageStorage.data(), messageSize}));
+        }
+        assemblingMessage = false;
+        messageSize       = 0;
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketMessageAssembler::onFramePayload(Span<char> payload, bool frameFinished)
+{
+    if (ignoringFrame)
+    {
+        return Result(true);
+    }
+
+    SC_TRY_MSG(assemblingMessage, "HttpWebSocketMessageAssembler payload without message");
+    SC_TRY_MSG(messageSize + payload.sizeInBytes() <= messageStorage.sizeInBytes(),
+               "HttpWebSocketMessageAssembler message storage too small");
+    if (payload.sizeInBytes() > 0)
+    {
+        ::memcpy(messageStorage.data() + messageSize, payload.data(), payload.sizeInBytes());
+        messageSize += payload.sizeInBytes();
+    }
+
+    if (frameFinished and currentFrame.fin)
+    {
+        if (onMessage.isValid())
+        {
+            SC_TRY(onMessage(messageOpcode, {messageStorage.data(), messageSize}));
+        }
+        assemblingMessage = false;
+        messageSize       = 0;
+    }
+    return Result(true);
+}
+
+void HttpWebSocketEndpoint::reset(HttpWebSocketEndpointRole role)
+{
+    endpointRole = role;
+    reader.reset(role);
+    writer.reset(role);
+    reader.onFrameHeader.bind<HttpWebSocketEndpoint, &HttpWebSocketEndpoint::onReaderFrameHeader>(*this);
+    reader.onFramePayload.bind<HttpWebSocketEndpoint, &HttpWebSocketEndpoint::onReaderPayload>(*this);
+
+    currentFrame        = {};
+    controlPayloadSize  = 0;
+    pendingControlFrame = {};
+    automaticMaskKeySet = false;
+    closeSent           = false;
+    closeReceived       = false;
+}
+
+void HttpWebSocketEndpoint::setAutomaticMaskKey(const uint8_t maskKey[4])
+{
+    for (size_t idx = 0; idx < 4; ++idx)
+    {
+        automaticMaskKey[idx] = maskKey[idx];
+    }
+    automaticMaskKeySet = true;
+}
+
+Result HttpWebSocketEndpoint::receive(Span<char> data, size_t& consumedBytes)
+{
+    return reader.parse(data, consumedBytes);
+}
+
+Result HttpWebSocketEndpoint::applyOutgoingMask(HttpWebSocketFrameHeaderView& header, const uint8_t* maskKey) const
+{
+    const bool requiresMask = scHttpWebSocketRequiresOutgoingMask(endpointRole);
+    header.masked           = requiresMask;
+    if (requiresMask)
+    {
+        SC_TRY_MSG(maskKey != nullptr, "HttpWebSocketEndpoint mask key required for client frames");
+        for (size_t idx = 0; idx < 4; ++idx)
+        {
+            header.maskKey[idx] = maskKey[idx];
+        }
+    }
+    else
+    {
+        for (size_t idx = 0; idx < 4; ++idx)
+        {
+            header.maskKey[idx] = 0;
+        }
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::sendFrame(const HttpWebSocketFrameHeaderView& header, Span<const char> payload,
+                                        Span<char> storage, Span<const char>& encodedFrame)
+{
+    SC_TRY_MSG(header.payloadLength == payload.sizeInBytes(),
+               "HttpWebSocketEndpoint payload does not match frame length");
+
+    Span<const char> encodedHeader;
+    SC_TRY(writer.beginFrame(header, storage, encodedHeader));
+    SC_TRY_MSG(storage.sizeInBytes() >= encodedHeader.sizeInBytes() + payload.sizeInBytes(),
+               "HttpWebSocketEndpoint frame storage too small");
+
+    if (payload.sizeInBytes() > 0)
+    {
+        Span<char> destinationPayload = {storage.data() + encodedHeader.sizeInBytes(), payload.sizeInBytes()};
+        ::memcpy(destinationPayload.data(), payload.data(), payload.sizeInBytes());
+        SC_TRY(writer.writePayload(destinationPayload));
+    }
+    SC_TRY(writer.finishFrame());
+
+    encodedFrame = {storage.data(), encodedHeader.sizeInBytes() + payload.sizeInBytes()};
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::sendData(HttpWebSocketOpcode opcode, Span<const char> payload, bool fin,
+                                       const uint8_t* maskKey, Span<char> storage, Span<const char>& encodedFrame)
+{
+    SC_TRY_MSG(opcode == HttpWebSocketOpcode::Text or opcode == HttpWebSocketOpcode::Binary or
+                   opcode == HttpWebSocketOpcode::Continuation,
+               "HttpWebSocketEndpoint sendData requires a data opcode");
+    HttpWebSocketFrameHeaderView header;
+    header.opcode        = opcode;
+    header.fin           = fin;
+    header.payloadLength = payload.sizeInBytes();
+    SC_TRY(applyOutgoingMask(header, maskKey));
+    return sendFrame(header, payload, storage, encodedFrame);
+}
+
+Result HttpWebSocketEndpoint::sendPing(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
+                                       Span<const char>& encodedFrame)
+{
+    SC_TRY_MSG(payload.sizeInBytes() <= sizeof(controlPayload), "HttpWebSocketEndpoint ping payload too large");
+    HttpWebSocketFrameHeaderView header;
+    header.opcode        = HttpWebSocketOpcode::Ping;
+    header.fin           = true;
+    header.payloadLength = payload.sizeInBytes();
+    SC_TRY(applyOutgoingMask(header, maskKey));
+    return sendFrame(header, payload, storage, encodedFrame);
+}
+
+Result HttpWebSocketEndpoint::sendPong(Span<const char> payload, const uint8_t* maskKey, Span<char> storage,
+                                       Span<const char>& encodedFrame)
+{
+    SC_TRY_MSG(payload.sizeInBytes() <= sizeof(controlPayload), "HttpWebSocketEndpoint pong payload too large");
+    HttpWebSocketFrameHeaderView header;
+    header.opcode        = HttpWebSocketOpcode::Pong;
+    header.fin           = true;
+    header.payloadLength = payload.sizeInBytes();
+    SC_TRY(applyOutgoingMask(header, maskKey));
+    return sendFrame(header, payload, storage, encodedFrame);
+}
+
+Result HttpWebSocketEndpoint::sendClose(uint16_t statusCode, Span<const char> reason, const uint8_t* maskKey,
+                                        Span<char> storage, Span<const char>& encodedFrame)
+{
+    SC_TRY_MSG(statusCode != 0 or reason.empty(), "HttpWebSocketEndpoint close reason requires a status code");
+    SC_TRY_MSG(reason.sizeInBytes() + (statusCode == 0 ? 0 : 2) <= sizeof(controlPayload),
+               "HttpWebSocketEndpoint close payload too large");
+
+    char   closePayload[125] = {0};
+    size_t closePayloadSize  = 0;
+    if (statusCode != 0)
+    {
+        closePayload[closePayloadSize++] = static_cast<char>((statusCode >> 8) & 0xFF);
+        closePayload[closePayloadSize++] = static_cast<char>(statusCode & 0xFF);
+    }
+    if (reason.sizeInBytes() > 0)
+    {
+        ::memcpy(closePayload + closePayloadSize, reason.data(), reason.sizeInBytes());
+        closePayloadSize += reason.sizeInBytes();
+    }
+
+    HttpWebSocketFrameHeaderView header;
+    header.opcode        = HttpWebSocketOpcode::Close;
+    header.fin           = true;
+    header.payloadLength = closePayloadSize;
+    SC_TRY(applyOutgoingMask(header, maskKey));
+    SC_TRY(sendFrame(header, {closePayload, closePayloadSize}, storage, encodedFrame));
+    closeSent = true;
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::getPendingControlFrame(Span<const char>& frame) const
+{
+    SC_TRY_MSG(hasPendingControlFrame(), "HttpWebSocketEndpoint no pending control frame");
+    frame = pendingControlFrame;
+    return Result(true);
+}
+
+void HttpWebSocketEndpoint::clearPendingControlFrame() { pendingControlFrame = {}; }
+
+Result HttpWebSocketEndpoint::onReaderFrameHeader(const HttpWebSocketFrameHeaderView& header)
+{
+    currentFrame = header;
+    if (header.isControlFrame())
+    {
+        controlPayloadSize = 0;
+    }
+    if (onFrameHeader.isValid())
+    {
+        SC_TRY(onFrameHeader(header));
+    }
+    if (header.isControlFrame() and header.payloadLength == 0)
+    {
+        SC_TRY(handleControlFrame({controlPayload, 0}));
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::onReaderPayload(Span<char> payload, bool frameFinished)
+{
+    if (currentFrame.isControlFrame())
+    {
+        SC_TRY_MSG(controlPayloadSize + payload.sizeInBytes() <= sizeof(controlPayload),
+                   "HttpWebSocketEndpoint control payload too large");
+        if (payload.sizeInBytes() > 0)
+        {
+            ::memcpy(controlPayload + controlPayloadSize, payload.data(), payload.sizeInBytes());
+            controlPayloadSize += payload.sizeInBytes();
+        }
+        if (frameFinished)
+        {
+            SC_TRY(handleControlFrame({controlPayload, controlPayloadSize}));
+        }
+        return Result(true);
+    }
+
+    if (onDataFramePayload.isValid())
+    {
+        SC_TRY(onDataFramePayload(currentFrame.opcode, payload, frameFinished));
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::handleControlFrame(Span<char> payload)
+{
+    switch (currentFrame.opcode)
+    {
+    case HttpWebSocketOpcode::Ping:
+        if (onPing.isValid())
+        {
+            SC_TRY(onPing(payload));
+        }
+        return queueAutomaticControl(HttpWebSocketOpcode::Pong, payload);
+    case HttpWebSocketOpcode::Pong:
+        if (onPong.isValid())
+        {
+            SC_TRY(onPong(payload));
+        }
+        return Result(true);
+    case HttpWebSocketOpcode::Close: {
+        SC_TRY_MSG(payload.sizeInBytes() != 1, "HttpWebSocketEndpoint malformed close payload");
+        uint16_t   statusCode = 0;
+        Span<char> reason;
+        if (payload.sizeInBytes() >= 2)
+        {
+            statusCode =
+                static_cast<uint16_t>((static_cast<uint8_t>(payload[0]) << 8) | static_cast<uint8_t>(payload[1]));
+            (void)payload.sliceStart(2, reason);
+        }
+        closeReceived = true;
+        if (onClose.isValid())
+        {
+            SC_TRY(onClose(statusCode, reason));
+        }
+        if (not closeSent)
+        {
+            SC_TRY(queueAutomaticControl(HttpWebSocketOpcode::Close, payload));
+            closeSent = true;
+        }
+        return Result(true);
+    }
+    default: break;
+    }
+    return Result(true);
+}
+
+Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, Span<const char> payload)
+{
+    SC_TRY_MSG(not hasPendingControlFrame(), "HttpWebSocketEndpoint pending control frame backpressure");
+
+    HttpWebSocketFrameHeaderView header;
+    header.opcode        = opcode;
+    header.fin           = true;
+    header.payloadLength = payload.sizeInBytes();
+    SC_TRY(applyOutgoingMask(header, automaticMaskKeySet ? automaticMaskKey : nullptr));
+
+    HttpWebSocketFrameWriter controlWriter;
+    controlWriter.reset(endpointRole);
+
+    Span<const char> encodedHeader;
+    SC_TRY(controlWriter.beginFrame(header, automaticControlStorage, encodedHeader));
+    SC_TRY_MSG(sizeof(automaticControlStorage) >= encodedHeader.sizeInBytes() + payload.sizeInBytes(),
+               "HttpWebSocketEndpoint automatic control storage too small");
+    if (payload.sizeInBytes() > 0)
+    {
+        Span<char> destinationPayload = {automaticControlStorage + encodedHeader.sizeInBytes(), payload.sizeInBytes()};
+        ::memcpy(destinationPayload.data(), payload.data(), payload.sizeInBytes());
+        SC_TRY(controlWriter.writePayload(destinationPayload));
+    }
+    SC_TRY(controlWriter.finishFrame());
+
+    pendingControlFrame = {automaticControlStorage, encodedHeader.sizeInBytes() + payload.sizeInBytes()};
+    return Result(true);
+}
 } // namespace SC
