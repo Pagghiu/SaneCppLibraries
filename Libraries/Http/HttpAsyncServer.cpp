@@ -195,38 +195,24 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         {
             SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.removeListener(EventEndListener{*this, client}));
         }
-        StringSpan transferEncoding;
-        const bool hasTransferEncoding = client.request.getHeader("Transfer-Encoding", transferEncoding);
-        if (hasTransferEncoding)
-        {
-            Result prepareBody = client.request.prepareBodyStream(client.buffersPool,
-                                                                  {[&client]() -> Result
+        Result prepareBody = client.request.prepareBodyStream(client.buffersPool,
+                                                              {[&client]() -> Result
+                                                               {
+                                                                   if (not client.request.isBodyComplete())
                                                                    {
-                                                                       if (not client.request.isBodyComplete())
-                                                                       {
-                                                                           client.readableSocketStream.resumeReading();
-                                                                       }
-                                                                       return Result(true);
-                                                                   }},
-                                                                  false);
-            if (not prepareBody)
-            {
-                closeAsync(client);
-                return;
-            }
-        }
-        else if (client.request.getBodyBytesRemaining() > 0)
+                                                                       client.readableSocketStream.resumeReading();
+                                                                   }
+                                                                   return Result(true);
+                                                               }},
+                                                              false);
+        if (not prepareBody)
         {
-            client.request.setBodyFramingKind(HttpBodyFramingKind::ContentLength);
-            client.request.setBodyComplete(false);
-        }
-        else
-        {
-            client.request.setBodyFramingKind(HttpBodyFramingKind::None);
-            client.request.setBodyComplete(true);
+            closeAsync(client);
+            return;
         }
 
-        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked)
+        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked or
+            client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
         {
             const bool addedBodyData =
                 client.readableSocketStream.eventData.addListener(EventBodyDataListener{*this, client});
@@ -239,7 +225,8 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         {
             client.readableSocketStream.pause();
         }
-        else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked)
+        else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked or
+                 client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
         {
             SC_TRUST_RESULT(client.request.startBodyStream());
         }

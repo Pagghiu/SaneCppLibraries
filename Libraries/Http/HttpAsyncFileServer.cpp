@@ -245,7 +245,6 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
     SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
     if (remainingBytes == data.sizeInBytes())
     {
-        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
         // Last chunk, we can remove this listener and terminate the writable stream
         const bool removedBodyListener =
             readable.eventData.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
@@ -263,12 +262,10 @@ void HttpAsyncFileServer::Stream::PutFileListener::onData(AsyncBufferView::ID bu
     else if (remainingBytes > data.sizeInBytes())
     {
         // Intermediate chunk, we need to continue streaming data
-        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
         remainingBytes -= data.sizeInBytes();
     }
     else if (remainingBytes < data.sizeInBytes())
     {
-        SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(remainingBytes));
         // HTTP Pipelining: excess data belongs to next request
         // Create a child view for the excess bytes and unshift it back into the stream
         const size_t excessOffset = remainingBytes;
