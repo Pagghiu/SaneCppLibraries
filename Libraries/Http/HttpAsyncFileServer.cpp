@@ -455,6 +455,13 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
     {
         SC_ASSERT_RELEASE(stream->multipartParser.parse(data, readBytes, parsedData));
 
+        const bool streamedBody =
+            stream->multipartParser.token == HttpMultipartParser::Token::PartBody and parsedData.sizeInBytes() > 0;
+        if (streamedBody and currentFd.isValid())
+        {
+            SC_ASSERT_RELEASE(currentFd.write(parsedData));
+        }
+
         bool tokenProcessed = false;
         if (stream->multipartParser.state != HttpMultipartParser::State::Parsing)
         {
@@ -501,7 +508,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
             break;
 
             case HttpMultipartParser::Token::PartBody: {
-                if (currentFd.isValid())
+                if (currentFd.isValid() and not streamedBody)
                 {
                     SC_ASSERT_RELEASE(currentFd.write(parsedData));
                 }

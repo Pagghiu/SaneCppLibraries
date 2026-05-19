@@ -14,6 +14,7 @@
 #include "Libraries/Http/HttpMultipartParser.cpp"
 #include "Libraries/Http/HttpParser.cpp"
 #include "Libraries/Http/HttpURLParser.cpp"
+#include "Libraries/Http/HttpWebSocket.cpp"
 #include "Libraries/HttpClient/HttpClient.cpp"
 #include "Libraries/Memory/Memory.cpp"
 #include "Libraries/Plugin/Plugin.cpp"

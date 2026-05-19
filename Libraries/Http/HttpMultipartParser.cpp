@@ -58,6 +58,8 @@ void HttpMultipartParser::reset()
     nestedParserCoroutine = 0;
     matchIndex            = 0;
     boundaryMatchIndex    = 0;
+    boundaryCandidateLength = 0;
+    emitBoundaryCandidate   = false;
     ::memset(boundaryBuffer, 0, sizeof(boundaryBuffer));
 }
 
@@ -69,134 +71,98 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
         return Result(false);
     }
 
+    if (emitBoundaryCandidate)
+    {
+        token                 = Token::PartBody;
+        state                 = State::Result;
+        parsedData            = {boundaryBuffer, boundaryCandidateLength};
+        readBytes             = 0;
+        emitBoundaryCandidate = false;
+        boundaryCandidateLength = 0;
+        return Result(true);
+    }
+
     // Check if we are in "CheckingBoundary" state
     if (boundaryMatchIndex == 1)
     {
-        // We peek for \r\n--boundary
-        // Or if globalStart == 0, maybe just --boundary (preamble)
-        // But let's assume standard format: \r\n--boundary
+        const size_t newPartLength = 4 + boundary.sizeInBytes() + 2; // \r\n--boundary\r\n
+        const size_t finalLength   = 4 + boundary.sizeInBytes() + 2; // \r\n--boundary--
+        size_t       consumed      = 0;
 
-        const char* current  = data.data();
-        size_t      avail    = data.sizeInBytes();
-        size_t      verified = 0;
-
-        // 1. CRLF
-        if (avail > verified and current[verified] == '\r')
-            verified++;
-        else if (avail <= verified)
-            return Result(true);
-        else
-            goto mismatch;
-        if (avail > verified and current[verified] == '\n')
-            verified++;
-        else if (avail <= verified)
-            return Result(true);
-        else
-            goto mismatch;
-
-        // 2. DashDash
-        if (avail > verified and current[verified] == '-')
-            verified++;
-        else if (avail <= verified)
-            return Result(true);
-        else
-            goto mismatch;
-        if (avail > verified and current[verified] == '-')
-            verified++;
-        else if (avail <= verified)
-            return Result(true);
-        else
-            goto mismatch;
-
-        // 3. Boundary string
+        const auto isPrefix = [&](const char* suffix) -> bool
         {
-            const auto   boundarySpan  = boundary;
-            const size_t boundaryLen   = boundarySpan.sizeInBytes();
-            const char*  boundaryBytes = boundarySpan.bytesWithoutTerminator();
-            for (size_t i = 0; i < boundaryLen; ++i)
+            for (size_t idx = 0; idx < boundaryCandidateLength; ++idx)
             {
-                if (avail > verified and current[verified] == boundaryBytes[i])
-                    verified++;
-                else if (avail <= verified)
-                    return Result(true);
+                char expected = 0;
+                if (idx == 0)
+                    expected = '\r';
+                else if (idx == 1)
+                    expected = '\n';
+                else if (idx == 2 or idx == 3)
+                    expected = '-';
+                else if (idx < 4 + boundary.sizeInBytes())
+                    expected = boundary.bytesWithoutTerminator()[idx - 4];
                 else
-                    goto mismatch;
+                    expected = suffix[idx - 4 - boundary.sizeInBytes()];
+
+                if (boundaryBuffer[idx] != expected)
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        while (consumed < data.sizeInBytes())
+        {
+            SC_TRY_MSG(boundaryCandidateLength < sizeof(boundaryBuffer),
+                       "HttpMultipartParser boundary candidate too large");
+            boundaryBuffer[boundaryCandidateLength++] = data[consumed++];
+
+            const bool newPartPrefix = isPrefix("\r\n");
+            const bool finalPrefix   = isPrefix("--");
+            if (not newPartPrefix and not finalPrefix)
+            {
+                boundaryMatchIndex    = 0;
+                emitBoundaryCandidate = true;
+                state                 = State::Parsing;
+                readBytes             = consumed;
+                globalLength += consumed;
+                parsedData            = {};
+                return Result(true);
+            }
+            if (newPartPrefix and boundaryCandidateLength == newPartLength)
+            {
+                token                   = Token::Boundary;
+                state                   = State::Result;
+                boundaryMatchIndex      = 0;
+                boundaryCandidateLength = 0;
+                readBytes               = consumed;
+                globalLength += consumed;
+                parsedData              = {};
+                return Result(true);
+            }
+            if (finalPrefix and boundaryCandidateLength == finalLength)
+            {
+                token                   = Token::Finished;
+                state                   = State::Finished;
+                boundaryMatchIndex      = 0;
+                boundaryCandidateLength = 0;
+                readBytes               = consumed;
+                globalLength += consumed;
+                parsedData              = {};
+                return Result(true);
             }
         }
 
-        // 4. Suffix (CRLF or --)
-        if (avail > verified)
-        {
-            if (current[verified] == '\r')
-            {
-                // CRLF case
-                verified++;
-                if (avail > verified and current[verified] == '\n')
-                {
-                    verified++;
-                    // FULL MATCH found (New Part)
-                    token              = Token::Boundary;
-                    state              = State::Result;
-                    boundaryMatchIndex = 0;
-                    SC_TRY(data.sliceStartLength(0, verified, parsedData));
-                    readBytes = verified;
-                    return Result(true);
-                }
-                else if (avail <= verified)
-                {
-                    return Result(true);
-                }
-                else
-                {
-                    goto mismatch;
-                }
-            }
-            else if (current[verified] == '-')
-            {
-                // -- case
-                verified++;
-                if (avail > verified and current[verified] == '-')
-                {
-                    verified++;
-                    // FULL MATCH found (End of Multipart)
-                    token              = Token::Finished;
-                    state              = State::Finished;
-                    boundaryMatchIndex = 0;
-                    SC_TRY(data.sliceStartLength(0, verified, parsedData));
-                    readBytes = verified;
-                    return Result(true);
-                }
-                else if (avail <= verified)
-                {
-                    return Result(true);
-                }
-                else
-                {
-                    goto mismatch;
-                }
-            }
-            else
-            {
-                goto mismatch;
-            }
-        }
-        else
+        readBytes  = consumed;
+        globalLength += consumed;
+        parsedData = {};
+        state      = State::Parsing;
+        if (readBytes > 0)
         {
             return Result(true);
         }
-
-    mismatch:
-        boundaryMatchIndex = 0; // Reset
-        if (verified > 0)
-        {
-            // We must return the mismatched prefix as part of the body
-            token = Token::PartBody;
-            state = State::Result; // We still want to emit the token
-            SC_TRY(data.sliceStartLength(0, verified, parsedData));
-            readBytes = verified;
-            return Result(true);
-        }
-        // Fallthrough to topLevelCoroutine if verified == 0
     }
 
     if (data.sizeInBytes() == 0)

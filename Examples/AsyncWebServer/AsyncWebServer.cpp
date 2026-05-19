@@ -11,10 +11,13 @@
 #include "../../Libraries/Containers/VirtualArray.h"
 #include "../../Libraries/Http/HttpAsyncFileServer.h"
 #include "../../Libraries/Http/HttpAsyncServer.h"
+#include "../../Libraries/Http/HttpWebSocket.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
+
+#include <string.h>
 
 SC::Console* globalConsole;
 
@@ -56,24 +59,127 @@ struct AsyncWebServerExample
     VirtualArray<char>                         allHeaders     = {MAX_CONNECTIONS * MAX_HEADER_SIZE};
     VirtualArray<char>                         allStreams     = {MAX_CONNECTIONS * MAX_REQUEST_SIZE};
 
+    struct WebSocketRuntime
+    {
+        AsyncWebServerExample* owner      = nullptr;
+        HttpConnection*        connection = nullptr;
+        size_t                 hubIndex   = size_t(-1);
+        HttpWebSocketEndpoint  endpoint;
+
+        Result writeFrame(Span<const char> frame)
+        {
+            SC_TRY_MSG(connection != nullptr, "WebSocketRuntime connection missing");
+            AsyncBufferView::ID bufferID;
+            Span<char>          writableData;
+            SC_TRY(connection->buffersPool.requestNewBuffer(frame.sizeInBytes(), bufferID, writableData));
+            ::memcpy(writableData.data(), frame.data(), frame.sizeInBytes());
+            connection->buffersPool.setNewBufferSize(bufferID, frame.sizeInBytes());
+            const Result writeResult = connection->writableSocketStream.write(bufferID);
+            connection->buffersPool.unrefBuffer(bufferID);
+            return writeResult;
+        }
+
+        Result onPayload(HttpWebSocketOpcode opcode, Span<char> payload, bool frameFinished)
+        {
+            if (not frameFinished)
+            {
+                return Result(true);
+            }
+            if (opcode != HttpWebSocketOpcode::Text and opcode != HttpWebSocketOpcode::Binary)
+            {
+                return Result(true);
+            }
+
+            char frameStorage[2048] = {0};
+            return owner->webSocketHub.broadcastText(payload, frameStorage);
+        }
+
+        void onData(AsyncBufferView::ID bufferID)
+        {
+            Span<char> data;
+            if (connection == nullptr or not connection->buffersPool.getWritableData(bufferID, data))
+            {
+                return;
+            }
+
+            size_t consumed = 0;
+            Result received = endpoint.receive(data, consumed);
+            if (received and endpoint.hasPendingControlFrame())
+            {
+                Span<const char> controlFrame;
+                received = endpoint.getPendingControlFrame(controlFrame);
+                if (received)
+                {
+                    received = writeFrame(controlFrame);
+                }
+                endpoint.clearPendingControlFrame();
+            }
+            if (not received)
+            {
+                connection->readableSocketStream.destroy();
+                connection->writableSocketStream.destroy();
+            }
+        }
+
+        void onEnd()
+        {
+            if (owner != nullptr and hubIndex != size_t(-1))
+            {
+                (void)owner->webSocketHub.leave(hubIndex);
+                hubIndex = size_t(-1);
+            }
+            connection = nullptr;
+        }
+    };
+
+    VirtualArray<HttpWebSocketHubClient> webSocketHubClients = {MAX_CONNECTIONS};
+    VirtualArray<WebSocketRuntime>       webSocketRuntimes   = {MAX_CONNECTIONS};
+    HttpWebSocketSmallHub                webSocketHub;
+
     Result start()
     {
-        SC_TRY(assignConnectionMemory(static_cast<size_t>(maxClients)));
+        Result result = assignConnectionMemory(static_cast<size_t>(maxClients));
+        if (not result)
+        {
+            globalConsole->printError("AsyncWebServer assignConnectionMemory failed: {}\n", result.message);
+            return result;
+        }
         // Optimization: only create a thread pool for FS operations if needed (i.e. when async backend != io_uring)
         if (eventLoop->needsThreadPoolForFileOperations())
         {
-            SC_TRY(threadPool.create(static_cast<size_t>(numThreads)));
+            result = threadPool.create(static_cast<size_t>(numThreads));
+            if (not result)
+            {
+                globalConsole->printError("AsyncWebServer threadPool.create failed: {}\n", result.message);
+                return result;
+            }
             if (not useSendFile)
             {
                 globalConsole->print("IO/Threads: {}\n", numThreads);
             }
         }
         // Initialize and start http and file servers, delegating requests to the latter in order to serve files
-        SC_TRY(httpServer.init(clients.toSpan()));
-        SC_TRY(httpServer.start(*eventLoop, interface.view(), static_cast<uint16_t>(port)));
-        SC_TRY(fileServer.init(threadPool, *eventLoop, directory.view()));
+        result = httpServer.init(clients.toSpan());
+        if (not result)
+        {
+            globalConsole->printError("AsyncWebServer httpServer.init failed: {}\n", result.message);
+            return result;
+        }
+        result = httpServer.start(*eventLoop, interface.view(), static_cast<uint16_t>(port));
+        if (not result)
+        {
+            globalConsole->printError("AsyncWebServer httpServer.start failed: {}\n", result.message);
+            return result;
+        }
+        result = fileServer.init(threadPool, *eventLoop, directory.view());
+        if (not result)
+        {
+            globalConsole->printError("AsyncWebServer fileServer.init failed: {}\n", result.message);
+            return result;
+        }
         fileServer.setUseAsyncFileSend(useSendFile);
         globalConsole->print("Serving files from folder: {}\n", directory);
+        globalConsole->print("Routes: GET /path, PUT /path, POST /path, multipart POST /upload, WebSocket /ws\n");
         globalConsole->print("AsyncFileSend optimization: {}\n", useSendFile);
         globalConsole->print("Max clients: {}\n", maxClients);
 #if SC_PLATFORM_LINUX
@@ -81,9 +187,46 @@ struct AsyncWebServerExample
 #endif
         httpServer.onRequest = [&](HttpConnection& connection)
         {
+            if (connection.request.getURL() == "/ws")
+            {
+                SC_ASSERT_RELEASE(handleWebSocketRequest(connection));
+                return;
+            }
             HttpAsyncFileServer::Stream& stream = fileStreams.toSpan()[connection.getConnectionID().getIndex()];
             SC_ASSERT_RELEASE(fileServer.handleRequest(stream, connection));
         };
+        return Result(true);
+    }
+
+    Result handleWebSocketRequest(HttpConnection& connection)
+    {
+        const size_t connectionIndex = connection.getConnectionID().getIndex();
+        SC_TRY_MSG(connectionIndex < webSocketRuntimes.size(), "WebSocket connection index out of range");
+
+        WebSocketRuntime& runtime = webSocketRuntimes.toSpan()[connectionIndex];
+        runtime.owner             = this;
+        runtime.connection        = &connection;
+        runtime.hubIndex          = size_t(-1);
+        runtime.endpoint.reset(HttpWebSocketEndpointRole::Server);
+        runtime.endpoint.onDataFramePayload.bind<WebSocketRuntime, &WebSocketRuntime::onPayload>(runtime);
+
+        HttpWebSocketTransportView transport;
+        char                       acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
+        const auto                 validation = HttpWebSocketHandshake::validateServerRequest(connection.request);
+        if (not validation.accepted())
+        {
+            return HttpWebSocketHandshake::rejectServerConnection(connection.response, validation);
+        }
+
+        SC_TRY(HttpWebSocketHandshake::acceptServerConnection(connection, transport, acceptStorage));
+        SC_TRY(webSocketHub.join(transport, runtime.hubIndex));
+
+        SC_TRY_MSG((connection.readableSocketStream.eventData.addListener<WebSocketRuntime, &WebSocketRuntime::onData>(
+                       runtime)),
+                   "WebSocket data listener limit reached");
+        SC_TRY_MSG(
+            (connection.readableSocketStream.eventEnd.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime)),
+            "WebSocket end listener limit reached");
         return Result(true);
     }
 
@@ -91,6 +234,8 @@ struct AsyncWebServerExample
     {
         SC_TRY(clients.resize(numClients));
         SC_TRY(fileStreams.resize(numClients));
+        SC_TRY(webSocketHubClients.resize(numClients));
+        SC_TRY(webSocketRuntimes.resize(numClients));
         SC_TRY(allReadQueues.resize(numClients * asyncConfiguration.readQueueSize));
         SC_TRY(allWriteQueues.resize(numClients * asyncConfiguration.writeQueueSize));
         SC_TRY(allBuffers.resize(numClients * asyncConfiguration.buffersQueueSize));
@@ -103,6 +248,7 @@ struct AsyncWebServerExample
         memory.allHeaders    = allHeaders;
         memory.allStreams    = allStreams;
         SC_TRY(memory.assignTo(asyncConfiguration, clients.toSpan()));
+        SC_TRY(webSocketHub.init(webSocketHubClients.toSpan()));
         return Result(true);
     }
 

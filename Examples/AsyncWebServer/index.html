@@ -3,10 +3,421 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello from AsyncWebServer!</title>
+    <title>SC Async Web Server Lab</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --ink: #132238;
+            --muted: rgba(19, 34, 56, 0.64);
+            --paper: #fff9ed;
+            --card: rgba(255, 255, 255, 0.72);
+            --accent: #f28c28;
+            --blue: #2a9d8f;
+            --line: rgba(19, 34, 56, 0.16);
+            --shadow: 0 24px 80px rgba(19, 34, 56, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Georgia, "Times New Roman", serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 14% 10%, rgba(242, 140, 40, 0.27), transparent 24rem),
+                radial-gradient(circle at 86% 13%, rgba(42, 157, 143, 0.20), transparent 23rem),
+                linear-gradient(135deg, #fff9ed 0%, #f3ead9 100%);
+        }
+
+        main {
+            width: min(1180px, calc(100vw - 32px));
+            margin: 0 auto;
+            padding: 38px 0 48px;
+        }
+
+        header {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 24px;
+            align-items: end;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            max-width: 760px;
+            margin: 0;
+            font-size: clamp(2.7rem, 7vw, 6rem);
+            line-height: 0.9;
+            letter-spacing: -0.06em;
+        }
+
+        h2 {
+            margin: 0 0 10px;
+            font-size: 1.45rem;
+            letter-spacing: -0.02em;
+        }
+
+        p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.55;
+        }
+
+        code {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 2px 6px;
+            background: rgba(255, 255, 255, 0.7);
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        .status {
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 10px 14px;
+            background: rgba(255, 255, 255, 0.58);
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+            gap: 18px;
+            align-items: stretch;
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            background: var(--card);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .panel {
+            padding: 24px;
+        }
+
+        .toolbar {
+            display: grid;
+            gap: 12px;
+            margin-top: 18px;
+        }
+
+        .file-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            border: 1px dashed var(--line);
+            border-radius: 16px;
+            padding: 14px;
+            background: rgba(255, 255, 255, 0.62);
+            color: var(--muted);
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 16px;
+            background: var(--ink);
+            color: #fffdf7;
+            cursor: pointer;
+            font: inherit;
+            transition: transform 160ms ease, background 160ms ease;
+        }
+
+        button.secondary {
+            background: var(--blue);
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            transform: none;
+        }
+
+        .result {
+            min-height: 48px;
+            border: 1px solid var(--line);
+            border-radius: 18px;
+            padding: 12px 14px;
+            background: rgba(255, 255, 255, 0.58);
+            color: var(--muted);
+        }
+
+        .result a {
+            color: var(--ink);
+        }
+
+        .methods {
+            display: grid;
+            gap: 10px;
+            margin-top: 18px;
+        }
+
+        .method {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            border-top: 1px solid var(--line);
+            padding-top: 10px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: min(58vh, 650px);
+            touch-action: none;
+            cursor: crosshair;
+            background:
+                linear-gradient(var(--line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--line) 1px, transparent 1px),
+                #fffdf8;
+            background-size: 28px 28px;
+        }
+
+        .canvas-copy {
+            padding: 16px 20px 20px;
+        }
+
+        @media (max-width: 860px) {
+            header,
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                align-items: start;
+            }
+
+            canvas {
+                height: 62vh;
+            }
+
+            .file-row {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
-    <h1>Hello from AsyncWebServer!</h1>
-    Well, this is a simple example of an HTML page served by an AsyncWebServer.
+    <main>
+        <header>
+            <div>
+                <h1>Async Web Server Lab</h1>
+                <p>Serve static files, stream uploads, and share a live WebSocket canvas from one small SC example.</p>
+            </div>
+            <div class="status" id="status">Connecting canvas...</div>
+        </header>
+
+        <section class="grid">
+            <article class="card">
+                <canvas id="canvas"></canvas>
+                <div class="canvas-copy">
+                    <h2>Shared canvas</h2>
+                    <p>Open this page in another browser window and draw. Strokes are broadcast through the SC
+                        WebSocket hub at <code>/ws</code>.</p>
+                </div>
+            </article>
+
+            <aside class="card panel">
+                <h2>Static files and uploads</h2>
+                <p>The same server can fetch files with <code>GET</code>, write raw bytes with <code>PUT</code>, and
+                    accept browser multipart uploads with <code>POST /upload</code>.</p>
+
+                <div class="toolbar">
+                    <input id="file" type="file">
+                    <div class="file-row">
+                        <button id="putUpload" type="button">Upload with PUT</button>
+                        <button class="secondary" id="postUpload" type="button">Upload multipart</button>
+                    </div>
+                    <div class="result" id="uploadResult">Choose a file to create it in the served directory.</div>
+                </div>
+
+                <div class="methods">
+                    <div class="method"><strong>GET</strong><span><code>/index.html</code></span></div>
+                    <div class="method"><strong>PUT</strong><span><code>/filename.ext</code></span></div>
+                    <div class="method"><strong>POST</strong><span><code>/upload</code></span></div>
+                </div>
+            </aside>
+        </section>
+    </main>
+
+    <script>
+        const canvas = document.getElementById("canvas");
+        const status = document.getElementById("status");
+        const ctx = canvas.getContext("2d");
+        const fileInput = document.getElementById("file");
+        const putUpload = document.getElementById("putUpload");
+        const postUpload = document.getElementById("postUpload");
+        const uploadResult = document.getElementById("uploadResult");
+        const color = `hsl(${Math.floor(Math.random() * 360)} 76% 42%)`;
+
+        let socket;
+        let drawing = false;
+        let previous = null;
+
+        function resizeCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            const ratio = window.devicePixelRatio || 1;
+            const snapshot = document.createElement("canvas");
+            snapshot.width = canvas.width;
+            snapshot.height = canvas.height;
+            snapshot.getContext("2d").drawImage(canvas, 0, 0);
+
+            canvas.width = Math.max(1, Math.floor(rect.width * ratio));
+            canvas.height = Math.max(1, Math.floor(rect.height * ratio));
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.drawImage(snapshot, 0, 0, snapshot.width / ratio, snapshot.height / ratio);
+        }
+
+        function drawStroke(stroke) {
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = stroke.width;
+            ctx.beginPath();
+            ctx.moveTo(stroke.previousX, stroke.previousY);
+            ctx.lineTo(stroke.x, stroke.y);
+            ctx.stroke();
+        }
+
+        function sendStroke(point) {
+            if (!previous || !socket || socket.readyState !== WebSocket.OPEN) {
+                previous = point;
+                return;
+            }
+
+            const stroke = {
+                previousX: previous.x,
+                previousY: previous.y,
+                x: point.x,
+                y: point.y,
+                color,
+                width: 4
+            };
+            drawStroke(stroke);
+            socket.send(JSON.stringify(stroke));
+            previous = point;
+        }
+
+        function pointFromEvent(event) {
+            const rect = canvas.getBoundingClientRect();
+            return {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            };
+        }
+
+        function safeFileName(file) {
+            return file.name.replace(/[^A-Za-z0-9._-]/g, "_") || "upload.bin";
+        }
+
+        function uploadPath(file) {
+            return `/${safeFileName(file)}`;
+        }
+
+        function renderUploadResult(file, response) {
+            const path = uploadPath(file);
+            if (response.ok) {
+                uploadResult.innerHTML = `Uploaded <a href="${path}" target="_blank" rel="noreferrer">${path}</a>`;
+            } else {
+                uploadResult.textContent = `Upload failed with HTTP ${response.status}`;
+            }
+        }
+
+        async function uploadWithPut() {
+            const file = fileInput.files[0];
+            if (!file) {
+                uploadResult.textContent = "Choose a file before uploading.";
+                return;
+            }
+            putUpload.disabled = true;
+            try {
+                const response = await fetch(uploadPath(file), { method: "PUT", body: file });
+                renderUploadResult(file, response);
+            } catch (error) {
+                uploadResult.textContent = `Upload failed: ${error.message}`;
+            } finally {
+                putUpload.disabled = false;
+            }
+        }
+
+        async function uploadWithPost() {
+            const file = fileInput.files[0];
+            if (!file) {
+                uploadResult.textContent = "Choose a file before uploading.";
+                return;
+            }
+            postUpload.disabled = true;
+            try {
+                const form = new FormData();
+                form.append("file", file, safeFileName(file));
+                const response = await fetch("/upload", { method: "POST", body: form });
+                renderUploadResult(file, response);
+            } catch (error) {
+                uploadResult.textContent = `Upload failed: ${error.message}`;
+            } finally {
+                postUpload.disabled = false;
+            }
+        }
+
+        function connect() {
+            socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws`);
+            socket.addEventListener("open", () => {
+                status.textContent = "Canvas connected";
+            });
+            socket.addEventListener("close", () => {
+                status.textContent = "Canvas disconnected. Reconnecting...";
+                setTimeout(connect, 800);
+            });
+            socket.addEventListener("message", (event) => {
+                try {
+                    drawStroke(JSON.parse(event.data));
+                } catch {
+                    status.textContent = "Ignored malformed stroke";
+                }
+            });
+        }
+
+        canvas.addEventListener("pointerdown", (event) => {
+            drawing = true;
+            previous = pointFromEvent(event);
+            canvas.setPointerCapture(event.pointerId);
+        });
+        canvas.addEventListener("pointermove", (event) => {
+            if (drawing) {
+                sendStroke(pointFromEvent(event));
+            }
+        });
+        canvas.addEventListener("pointerup", () => {
+            drawing = false;
+            previous = null;
+        });
+        canvas.addEventListener("pointercancel", () => {
+            drawing = false;
+            previous = null;
+        });
+        putUpload.addEventListener("click", uploadWithPut);
+        postUpload.addEventListener("click", uploadWithPost);
+
+        window.addEventListener("resize", resizeCanvas);
+        resizeCanvas();
+        connect();
+    </script>
 </body>
 </html>

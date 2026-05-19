@@ -9,6 +9,8 @@
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
+#include <string.h>
+
 namespace SC
 {
 struct HttpAsyncFileServerTest;
@@ -88,6 +90,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
         HttpTestClient postMultipart = {};
+        Buffer         multipartPayload;
 
         String fileURL   = StringEncoding::Ascii;
         String streamURL = StringEncoding::Ascii;
@@ -147,9 +150,28 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(content == "InlineBody");
         SC_TEST_EXPECT(context.fs.removeFile("inline.html"));
 
-        // Test multipart POST with file upload
+        SC_TEST_EXPECT(context.multipartPayload.resizeWithoutInitializing(8 * 1024));
+        for (size_t idx = 0; idx < context.multipartPayload.size(); ++idx)
+        {
+            context.multipartPayload.data()[idx] = static_cast<char>((idx * 37 + 11) & 0xFF);
+        }
+        for (size_t idx = 997; idx + 8 < context.multipartPayload.size(); idx += 997)
+        {
+            context.multipartPayload.data()[idx + 0] = '\r';
+            context.multipartPayload.data()[idx + 1] = '\n';
+            context.multipartPayload.data()[idx + 2] = '-';
+            context.multipartPayload.data()[idx + 3] = '-';
+            context.multipartPayload.data()[idx + 4] = 'n';
+            context.multipartPayload.data()[idx + 5] = 'o';
+            context.multipartPayload.data()[idx + 6] = 'p';
+            context.multipartPayload.data()[idx + 7] = 'e';
+        }
+
+        // Test multipart POST with binary file upload spanning multiple request buffers.
+        StringSpan multipartContent = {{context.multipartPayload.data(), context.multipartPayload.size()}, false,
+                                       StringEncoding::Ascii};
         SC_TEST_EXPECT(context.postMultipart.postMultipart(*context.loop, context.uploadURL.view(), "file",
-                                                           "multipart.txt", "MultipartContent"));
+                                                           "multipart.bin", multipartContent));
     };
 
     context.postMultipart.callback = [this, &context](HttpTestClient& result)
@@ -160,10 +182,11 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("201 Created"));
 
         // Verify file content
-        String content;
-        SC_TEST_EXPECT(context.fs.read("multipart.txt", content));
-        SC_TEST_EXPECT(content == "MultipartContent");
-        SC_TEST_EXPECT(context.fs.removeFile("multipart.txt"));
+        Buffer content;
+        SC_TEST_EXPECT(context.fs.read("multipart.bin", content));
+        SC_TEST_EXPECT(content.size() == context.multipartPayload.size());
+        SC_TEST_EXPECT(::memcmp(content.data(), context.multipartPayload.data(), content.size()) == 0);
+        SC_TEST_EXPECT(context.fs.removeFile("multipart.bin"));
 
         SC_TEST_EXPECT(context.httpServer.stop());
     };
