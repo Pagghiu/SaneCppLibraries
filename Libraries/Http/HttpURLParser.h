@@ -10,6 +10,26 @@ namespace SC
 //! @addtogroup group_http
 //! @{
 
+/// @brief One raw query string item parsed from a URL search component.
+struct SC_HTTP_EXPORT HttpURLQueryItem
+{
+    StringSpan name;
+    StringSpan value;
+    bool       hasValue = false;
+};
+
+/// @brief Iterates raw query string items without allocation or percent-decoding.
+struct SC_HTTP_EXPORT HttpURLQueryIterator
+{
+    explicit HttpURLQueryIterator(StringSpan search);
+
+    bool next(HttpURLQueryItem& item);
+
+  private:
+    StringSpan search;
+    size_t     cursor = 0;
+};
+
 /// @brief Parse an URL splitting it into its base components
 struct SC_HTTP_EXPORT HttpURLParser
 {
@@ -28,6 +48,12 @@ struct SC_HTTP_EXPORT HttpURLParser
     /// @param url The url to be parsed
     /// @return Valid Result if parse was successful
     Result parse(StringSpan url);
+
+    /// @brief Finds first raw query value matching name in this URL search component.
+    bool getQueryValue(StringSpan name, StringSpan& value) const;
+
+    /// @brief Finds first raw query value matching name in a search component, with or without leading '?'.
+    static bool getQueryValue(StringSpan search, StringSpan name, StringSpan& value);
 
   private:
     StringEncoding encoding;

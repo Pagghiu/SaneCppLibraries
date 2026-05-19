@@ -252,18 +252,27 @@ void SC::HttpURLParserTest::testProtocols()
 void SC::HttpURLParserTest::testQueryParams()
 {
     HttpURLParser urlParser;
+    StringSpan    value;
 
     // Multiple query parameters
     SC_TEST_EXPECT(urlParser.parse("http://example.com/path?key1=value1&key2=value2&key3=value3"));
     SC_TEST_EXPECT(urlParser.search == "?key1=value1&key2=value2&key3=value3");
+    SC_TEST_EXPECT(urlParser.getQueryValue("key2", value));
+    SC_TEST_EXPECT(value == "value2");
+    SC_TEST_EXPECT(HttpURLParser::getQueryValue("key1=value1&key2=value2", "key1", value));
+    SC_TEST_EXPECT(value == "value1");
 
     // Query parameter with empty value
     SC_TEST_EXPECT(urlParser.parse("http://example.com/path?empty=&key=value"));
     SC_TEST_EXPECT(urlParser.search == "?empty=&key=value");
+    SC_TEST_EXPECT(urlParser.getQueryValue("empty", value));
+    SC_TEST_EXPECT(value.isEmpty());
 
     // Query parameter with no value
     SC_TEST_EXPECT(urlParser.parse("http://example.com/path?flag&key=value"));
     SC_TEST_EXPECT(urlParser.search == "?flag&key=value");
+    SC_TEST_EXPECT(urlParser.getQueryValue("flag", value));
+    SC_TEST_EXPECT(value.isEmpty());
 
     // Only query parameters, no path
     SC_TEST_EXPECT(urlParser.parse("http://example.com?query=value"));
@@ -273,6 +282,44 @@ void SC::HttpURLParserTest::testQueryParams()
     // Query parameters with special characters
     SC_TEST_EXPECT(urlParser.parse("http://example.com/path?q=hello%20world&special=%2B%2D"));
     SC_TEST_EXPECT(urlParser.search == "?q=hello%20world&special=%2B%2D");
+    SC_TEST_EXPECT(urlParser.getQueryValue("q", value));
+    SC_TEST_EXPECT(value == "hello%20world");
+    SC_TEST_EXPECT(urlParser.getQueryValue("special", value));
+    SC_TEST_EXPECT(value == "%2B%2D");
+
+    // First repeated key wins
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?name=first&name=second"));
+    SC_TEST_EXPECT(urlParser.getQueryValue("name", value));
+    SC_TEST_EXPECT(value == "first");
+
+    // Missing and empty search
+    SC_TEST_EXPECT(not urlParser.getQueryValue("missing", value));
+    SC_TEST_EXPECT(value.isEmpty());
+    SC_TEST_EXPECT(not HttpURLParser::getQueryValue("", "missing", value));
+    SC_TEST_EXPECT(not HttpURLParser::getQueryValue("?", "missing", value));
+
+    // UTF8 values stay raw and zero-copy.
+    SC_TEST_EXPECT(urlParser.parse("http://example.com/path?q=tëst&vâlue=ok"_u8));
+    SC_TEST_EXPECT(urlParser.getQueryValue("q", value));
+    SC_TEST_EXPECT(value == "tëst"_u8);
+    SC_TEST_EXPECT(urlParser.getQueryValue("vâlue"_u8, value));
+    SC_TEST_EXPECT(value == "ok");
+
+    HttpURLQueryIterator iterator("?flag&empty=&key=value");
+    HttpURLQueryItem     item;
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "flag");
+    SC_TEST_EXPECT(item.value.isEmpty());
+    SC_TEST_EXPECT(not item.hasValue);
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "empty");
+    SC_TEST_EXPECT(item.value.isEmpty());
+    SC_TEST_EXPECT(item.hasValue);
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "key");
+    SC_TEST_EXPECT(item.value == "value");
+    SC_TEST_EXPECT(item.hasValue);
+    SC_TEST_EXPECT(not iterator.next(item));
 }
 
 void SC::HttpURLParserTest::testSpecialChars()

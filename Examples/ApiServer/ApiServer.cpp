@@ -193,8 +193,8 @@ struct ApiServerExample
 
         if (url.pathname == "/hello")
         {
-            StringSpan name = queryValue(url.search, "name");
-            if (name.isEmpty())
+            StringSpan name;
+            if (not url.getQueryValue("name", name) or name.isEmpty())
             {
                 name = "world";
             }
@@ -275,48 +275,6 @@ struct ApiServerExample
     }
 
     Result notFound(HttpConnection& connection) { return sendText(connection, 404, "text/plain", "not found\n"); }
-
-    static StringSpan queryValue(StringSpan search, StringSpan key)
-    {
-        if (search.sizeInBytes() <= 1)
-        {
-            return {};
-        }
-
-        const char* data   = search.bytesWithoutTerminator();
-        size_t      cursor = 1; // skip '?'
-        while (cursor < search.sizeInBytes())
-        {
-            const size_t nameStart = cursor;
-            while (cursor < search.sizeInBytes() and data[cursor] != '=' and data[cursor] != '&')
-            {
-                cursor++;
-            }
-            const size_t nameEnd  = cursor;
-            const bool   hasValue = cursor < search.sizeInBytes() and data[cursor] == '=';
-            if (hasValue)
-            {
-                cursor++;
-            }
-            const size_t valueStart = cursor;
-            while (cursor < search.sizeInBytes() and data[cursor] != '&')
-            {
-                cursor++;
-            }
-            const size_t valueEnd = cursor;
-            if (cursor < search.sizeInBytes() and data[cursor] == '&')
-            {
-                cursor++;
-            }
-
-            const StringSpan name = {{data + nameStart, nameEnd - nameStart}, false, search.getEncoding()};
-            if (name == key)
-            {
-                return {{data + valueStart, valueEnd - valueStart}, false, search.getEncoding()};
-            }
-        }
-        return {};
-    }
 };
 
 Result saneMain(Span<const StringSpan> args)

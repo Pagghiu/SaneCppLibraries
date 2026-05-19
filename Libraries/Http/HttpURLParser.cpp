@@ -10,6 +10,53 @@
 // - `@` (at sign) - code point 64
 // - `[` and `]` (IPv6 brackets) - code points 91, 93
 
+SC::HttpURLQueryIterator::HttpURLQueryIterator(StringSpan query) : search(query)
+{
+    if (search.sizeInBytes() > 0 and search.bytesWithoutTerminator()[0] == '?')
+    {
+        cursor = 1;
+    }
+}
+
+bool SC::HttpURLQueryIterator::next(HttpURLQueryItem& item)
+{
+    item = {};
+    if (cursor >= search.sizeInBytes())
+    {
+        return false;
+    }
+
+    const char* data      = search.bytesWithoutTerminator();
+    const size_t nameStart = cursor;
+    while (cursor < search.sizeInBytes() and data[cursor] != '=' and data[cursor] != '&')
+    {
+        cursor++;
+    }
+    const size_t nameEnd = cursor;
+
+    const bool hasValue = cursor < search.sizeInBytes() and data[cursor] == '=';
+    if (hasValue)
+    {
+        cursor++;
+    }
+
+    const size_t valueStart = cursor;
+    while (cursor < search.sizeInBytes() and data[cursor] != '&')
+    {
+        cursor++;
+    }
+    const size_t valueEnd = cursor;
+    if (cursor < search.sizeInBytes() and data[cursor] == '&')
+    {
+        cursor++;
+    }
+
+    item.name     = {{data + nameStart, nameEnd - nameStart}, false, search.getEncoding()};
+    item.value    = {{data + valueStart, valueEnd - valueStart}, false, search.getEncoding()};
+    item.hasValue = hasValue;
+    return true;
+}
+
 SC::Result SC::HttpURLParser::parse(StringSpan url)
 {
     encoding = url.getEncoding();
@@ -90,6 +137,28 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
         hash = HttpStringIterator::fromIteratorUntilEnd(it, encoding);
     }
     return Result(true);
+}
+
+bool SC::HttpURLParser::getQueryValue(StringSpan name, StringSpan& value) const
+{
+    return getQueryValue(search, name, value);
+}
+
+bool SC::HttpURLParser::getQueryValue(StringSpan query, StringSpan name, StringSpan& value)
+{
+    value = {};
+
+    HttpURLQueryIterator it(query);
+    HttpURLQueryItem     item;
+    while (it.next(item))
+    {
+        if (item.name == name)
+        {
+            value = item.value;
+            return true;
+        }
+    }
+    return false;
 }
 
 SC::Result SC::HttpURLParser::parsePath()
