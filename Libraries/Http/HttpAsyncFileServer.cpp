@@ -327,15 +327,23 @@ StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extens
     {
         return "image/png";
     }
+    if (extension == "webp")
+    {
+        return "image/webp";
+    }
+    if (extension == "gif")
+    {
+        return "image/gif";
+    }
     if (extension == "jpeg" or extension == "jpg")
     {
-        return "image/jpg";
+        return "image/jpeg";
     }
     if (extension == "svg")
     {
         return "image/svg+xml";
     }
-    if (extension == "js")
+    if (extension == "js" or extension == "mjs")
     {
         return "application/javascript";
     }
@@ -358,6 +366,14 @@ StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extens
     if (extension == "txt")
     {
         return "text/plain";
+    }
+    if (extension == "wasm")
+    {
+        return "application/wasm";
+    }
+    if (extension == "map")
+    {
+        return "application/json";
     }
     return "text/html";
 }
