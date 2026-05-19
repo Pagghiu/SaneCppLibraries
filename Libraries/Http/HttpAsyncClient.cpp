@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpAsyncClient.h"
 #include "HttpURLParser.h"
+#include "HttpWebSocket.h"
 #include "Internal/HttpStringIterator.h"
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
@@ -26,8 +27,9 @@ Result HttpAsyncClient::close()
     response.failBodyStream(Result::Error("HttpAsyncClient closed"));
     response.abortBodyStream();
     closeConnection();
-    state          = State::Idle;
-    currentRequest = nullptr;
+    state             = State::Idle;
+    currentRequest    = nullptr;
+    webSocketUpgraded = false;
     request.reset();
     return Result(true);
 }
@@ -91,6 +93,7 @@ Result HttpAsyncClient::postMultipart(AsyncEventLoop& loop, StringSpan url, Http
 Result HttpAsyncClient::startRequest(AsyncEventLoop& loop, const RequestPreset& preset)
 {
     SC_TRY_MSG(connection != nullptr, "HttpAsyncClient::start init not called");
+    SC_TRY_MSG(not webSocketUpgraded, "HttpAsyncClient connection is upgraded to WebSocket");
 
     if (state != State::Idle and response.isBodyComplete() and not responseFinalized)
     {
@@ -111,6 +114,36 @@ Result HttpAsyncClient::startPreparedRequest(const RequestPreset& preset)
 
     SC_TRY(prepareRequest(currentPreset));
     SC_TRY(ensureConnected());
+    return Result(true);
+}
+
+Result HttpAsyncClient::detachWebSocketTransport(HttpWebSocketTransportView& transport)
+{
+    SC_TRY_MSG(connection != nullptr, "HttpAsyncClient::detachWebSocketTransport init not called");
+    SC_TRY_MSG(response.hasReceivedHeaders(), "HttpAsyncClient::detachWebSocketTransport response headers missing");
+    SC_TRY_MSG(response.getParser().statusCode == 101, "HttpAsyncClient::detachWebSocketTransport expected 101");
+
+    transport.readableStream = &connection->readableSocketStream;
+    transport.writableStream = &connection->writableSocketStream;
+    transport.buffersPool    = &connection->buffersPool;
+
+    (void)connection->readableSocketStream.eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(
+        *this);
+    (void)connection->readableSocketStream.eventData
+        .removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
+    (void)connection->readableSocketStream.eventError
+        .removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
+    (void)connection->writableSocketStream.eventError
+        .removeListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
+    (void)connection->readableSocketStream.eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(
+        *this);
+    (void)connection->pipeline.eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
+    (void)connection->pipeline.unpipe();
+
+    hasOpenConnection = false;
+    currentHost       = {};
+    currentPort       = 0;
+    webSocketUpgraded = true;
     return Result(true);
 }
 
@@ -695,6 +728,17 @@ void HttpAsyncClient::finalizeResponse(bool shouldFinishBodyStream)
 
     requestCount++;
 
+    if (webSocketUpgraded)
+    {
+        state          = State::Idle;
+        currentRequest = nullptr;
+        if (shouldFinishBodyStream)
+        {
+            response.finishBodyStream();
+        }
+        return;
+    }
+
     const bool keepAlive = currentRequest != nullptr and currentRequest->getKeepAlive() and response.getKeepAlive() and
                            response.getBodyFramingKind() != HttpBodyFramingKind::CloseDelimited;
 
@@ -750,6 +794,7 @@ void HttpAsyncClient::closeConnection()
     hasOpenConnection = false;
     currentHost       = {};
     currentPort       = 0;
+    webSocketUpgraded = false;
 }
 
 void HttpAsyncClient::fail(Result error)

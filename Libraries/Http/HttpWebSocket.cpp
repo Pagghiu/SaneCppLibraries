@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpWebSocket.h"
+#include "HttpAsyncClient.h"
 #include "HttpConnection.h"
 #include "Internal/HttpStringIterator.h"
 
@@ -569,6 +570,61 @@ Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&             
     SC_TRY(response.addHeader("Connection", "close"));
     SC_TRY(response.sendHeaders());
     return response.end();
+}
+
+Result HttpWebSocketClientHandshake::connect(HttpAsyncClient& newClient, AsyncEventLoop& loop, StringSpan url,
+                                             StringSpan newClientKey, HttpWebSocketTransportView& newTransport)
+{
+    SC_TRY(HttpWebSocketHandshake::validateClientKey(newClientKey));
+    client    = &newClient;
+    transport = &newTransport;
+    clientKey = newClientKey;
+    transport->reset();
+
+    client->onPrepareRequest.bind<HttpWebSocketClientHandshake, &HttpWebSocketClientHandshake::onPrepareRequest>(*this);
+    client->onResponse.bind<HttpWebSocketClientHandshake, &HttpWebSocketClientHandshake::onResponse>(*this);
+    client->onError.bind<HttpWebSocketClientHandshake, &HttpWebSocketClientHandshake::onClientError>(*this);
+    return client->start(loop, HttpParser::Method::HttpGET, url, false);
+}
+
+void HttpWebSocketClientHandshake::onPrepareRequest(HttpAsyncClientRequest& request)
+{
+    const Result result = HttpWebSocketHandshake::prepareClientRequest(request, clientKey);
+    if (not result)
+    {
+        fail(result);
+    }
+}
+
+void HttpWebSocketClientHandshake::onResponse(HttpAsyncClientResponse& response)
+{
+    SC_ASSERT_RELEASE(client != nullptr);
+    SC_ASSERT_RELEASE(transport != nullptr);
+
+    Result result = HttpWebSocketHandshake::validateClientResponse(response, clientKey);
+    if (result)
+    {
+        result = client->detachWebSocketTransport(*transport);
+    }
+    if (not result)
+    {
+        fail(result);
+        return;
+    }
+    if (onConnected.isValid())
+    {
+        onConnected(*transport);
+    }
+}
+
+void HttpWebSocketClientHandshake::onClientError(Result result) { fail(result); }
+
+void HttpWebSocketClientHandshake::fail(Result result)
+{
+    if (onError.isValid())
+    {
+        onError(result);
+    }
 }
 
 void HttpWebSocketFrameReader::reset(HttpWebSocketEndpointRole role)

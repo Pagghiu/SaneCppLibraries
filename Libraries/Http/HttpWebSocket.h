@@ -10,6 +10,8 @@
 
 namespace SC
 {
+struct AsyncEventLoop;
+struct HttpAsyncClient;
 struct HttpAsyncClientRequest;
 struct HttpAsyncClientResponse;
 struct HttpConnection;
@@ -131,6 +133,26 @@ struct SC_HTTP_EXPORT HttpWebSocketHandshake
     static Result acceptServerConnection(HttpConnection& connection, HttpWebSocketTransportView& transport,
                                          Span<char> acceptStorage);
     static Result rejectServerConnection(HttpResponse& response, const HttpWebSocketHandshakeResult& result);
+};
+
+/// @brief Small client-side helper that upgrades an `HttpAsyncClient` connection to a WebSocket transport.
+struct SC_HTTP_EXPORT HttpWebSocketClientHandshake
+{
+    Function<void(HttpWebSocketTransportView&)> onConnected;
+    Function<void(Result)>                      onError;
+
+    Result connect(HttpAsyncClient& client, AsyncEventLoop& loop, StringSpan url, StringSpan clientKey,
+                   HttpWebSocketTransportView& transport);
+
+  private:
+    void onPrepareRequest(HttpAsyncClientRequest& request);
+    void onResponse(HttpAsyncClientResponse& response);
+    void onClientError(Result result);
+    void fail(Result result);
+
+    HttpAsyncClient*            client    = nullptr;
+    HttpWebSocketTransportView* transport = nullptr;
+    StringSpan                  clientKey;
 };
 
 /// @brief Incremental WebSocket frame reader operating on caller-owned mutable byte slices

@@ -8,6 +8,7 @@
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.cpp"
 #include "Libraries/Foundation/Foundation.cpp"
 #include "Libraries/Hashing/Hashing.cpp"
+#include "Libraries/Http/HttpAsyncClient.cpp"
 #include "Libraries/Http/HttpAsyncFileServer.cpp"
 #include "Libraries/Http/HttpAsyncServer.cpp"
 #include "Libraries/Http/HttpConnection.cpp"

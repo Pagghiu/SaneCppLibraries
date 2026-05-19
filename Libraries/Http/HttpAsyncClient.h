@@ -10,6 +10,8 @@ namespace SC
 //! @addtogroup group_http
 //! @{
 
+struct HttpWebSocketTransportView;
+
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
 struct SC_HTTP_EXPORT HttpAsyncClientConnection
     : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 8, HttpConnectionBase>
@@ -60,6 +62,9 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     /// @brief Disables response decompression for future requests.
     void clearResponseDecompression() { responseDecoder = nullptr; }
+
+    /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
+    Result detachWebSocketTransport(HttpWebSocketTransportView& transport);
 
     /// @brief Starts a request that must be configured inside `onPrepareRequest`
     /// `onPrepareRequest` must send the headers before returning, typically by calling
@@ -192,6 +197,7 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     bool hasOpenConnection = false;
     bool responseDelivered = false;
     bool responseFinalized = false;
+    bool webSocketUpgraded = false;
 };
 
 //! @}

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpTestClient.h"
+#include "Libraries/Http/HttpAsyncClient.h"
 #include "Libraries/Http/HttpAsyncServer.h"
 #include "Libraries/Http/HttpWebSocket.h"
 #include "Libraries/Memory/String.h"
@@ -34,12 +35,17 @@ struct SC::HttpWebSocketHandshakeTest : public SC::TestCase
         {
             asyncServerAcceptIntegration();
         }
+        if (test_section("async client connect integration"))
+        {
+            asyncClientConnectIntegration();
+        }
     }
 
     void clientKeyAndAcceptGeneration();
     void serverRequestValidation();
     void clientResponseValidation();
     void asyncServerAcceptIntegration();
+    void asyncClientConnectIntegration();
 };
 
 void SC::HttpWebSocketHandshakeTest::clientKeyAndAcceptGeneration()
@@ -174,6 +180,94 @@ void SC::HttpWebSocketHandshakeTest::asyncServerAcceptIntegration()
     eventLoop.excludeFromActiveCount(timeout);
 
     SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpWebSocketHandshakeTest::asyncClientConnectIntegration()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using ServerConnection = HttpAsyncConnection<3, 3, 8 * 1024, 8 * 1024>;
+    using ClientConnection = HttpAsyncClientConnection<4, 4, 8 * 1024, 8 * 1024>;
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   serverPort = report.mapPort(6182);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    struct ServerContext
+    {
+        HttpWebSocketTransportView transport;
+        HttpConnection*            connection = nullptr;
+        bool                       accepted   = false;
+    } serverContext;
+
+    httpServer.onRequest = [this, &serverContext](HttpConnection& connection)
+    {
+        serverContext.connection                                    = &connection;
+        char acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
+        SC_TEST_EXPECT(
+            HttpWebSocketHandshake::acceptServerConnection(connection, serverContext.transport, acceptStorage));
+        serverContext.accepted = serverContext.transport.isValid();
+    };
+
+    ClientConnection             clientStorage;
+    HttpAsyncClient              client;
+    HttpWebSocketClientHandshake handshake;
+    HttpWebSocketTransportView   clientTransport;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    struct ClientContext
+    {
+        HttpWebSocketHandshakeTest* test;
+        HttpAsyncServer*            httpServer;
+        HttpAsyncClient*            client;
+        ServerContext*              serverContext;
+        bool                        connected = false;
+
+        void onConnected(HttpWebSocketTransportView& transport)
+        {
+            connected = true;
+            test->recordExpectation("server accepted", serverContext->accepted);
+            test->recordExpectation("client transport valid", transport.isValid());
+            test->recordExpectation("server transport valid", serverContext->transport.isValid());
+
+            transport.readableStream->destroy();
+            transport.writableStream->destroy();
+            if (serverContext->connection != nullptr)
+            {
+                serverContext->connection->readableSocketStream.destroy();
+                serverContext->connection->writableSocketStream.destroy();
+                if (serverContext->connection->socket.isValid())
+                {
+                    (void)serverContext->connection->socket.close();
+                }
+            }
+            test->recordExpectation("stop server", httpServer->stop());
+        }
+
+        void onError(Result result) { test->recordExpectation("client websocket connect", result); }
+    } clientContext = {this, &httpServer, &client, &serverContext, false};
+
+    handshake.onConnected.bind<ClientContext, &ClientContext::onConnected>(clientContext);
+    handshake.onError.bind<ClientContext, &ClientContext::onError>(clientContext);
+
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/chat", serverPort));
+    SC_TEST_EXPECT(handshake.connect(client, eventLoop, endpoint.view(), "dGhlIHNhbXBsZSBub25jZQ==", clientTransport));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(clientContext.connected);
+    SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
 }
