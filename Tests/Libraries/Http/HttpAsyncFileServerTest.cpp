@@ -85,7 +85,10 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int getCount       = 0;
         int putCount       = 0;
         int multipartCount = 0;
+        int safetyCount    = 0;
 
+        HttpTestClient queryClient   = {};
+        HttpTestClient badPathClient = {};
         HttpTestClient getClient     = {};
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
@@ -93,6 +96,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         Buffer         multipartPayload;
 
         String fileURL   = StringEncoding::Ascii;
+        String queryURL  = StringEncoding::Ascii;
+        String serverURL = StringEncoding::Ascii;
         String streamURL = StringEncoding::Ascii;
         String inlineURL = StringEncoding::Ascii;
         String uploadURL = StringEncoding::Ascii;
@@ -103,12 +108,35 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
 
     SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://127.0.0.1:{}/file.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.queryURL, "http://127.0.0.1:{}/file.html?download=1", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.serverURL, "http://127.0.0.1:{}", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://127.0.0.1:{}/stream.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://127.0.0.1:{}/inline.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.uploadURL, "http://127.0.0.1:{}/upload", serverPort));
 
-    // Create an Http Client request for that file
-    SC_TEST_EXPECT(context.getClient.get(eventLoop, context.fileURL.view()));
+    // Query strings must not be treated as part of the file name.
+    SC_TEST_EXPECT(context.queryClient.get(eventLoop, context.queryURL.view()));
+    context.queryClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.safetyCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("Response from file"));
+
+        static constexpr StringSpan badRequest =
+            "GET /../file.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+        SC_TEST_EXPECT(context.badPathClient.sendRaw(*context.loop, context.serverURL.view(), badRequest));
+    };
+
+    context.badPathClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.safetyCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("400 Bad Request"));
+
+        // Create an Http Client request for that file
+        SC_TEST_EXPECT(context.getClient.get(*context.loop, context.fileURL.view()));
+    };
+
     context.getClient.callback = [this, &context](HttpTestClient& result)
     {
         context.getCount++;
@@ -205,6 +233,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.getCount == 1);
     SC_TEST_EXPECT(context.putCount == 2);
     SC_TEST_EXPECT(context.multipartCount == 1);
+    SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
 }
 

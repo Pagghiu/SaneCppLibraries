@@ -22,6 +22,8 @@ struct HttpAsyncFileServer::Internal
     static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response, int64_t millisecondsSinceEpoch);
     static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
     static Result formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize, size_t& outLength);
+    static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
+    static Result sendEmptyResponse(HttpResponse& response, int statusCode);
 
     static int64_t    getCurrentTimeMilliseconds();
     static StringSpan getContentType(const StringSpan extension);
@@ -50,22 +52,17 @@ void HttpAsyncFileServer::setUseAsyncFileSend(bool value) { useAsyncFileSend = v
 
 Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
-    auto url = connection.request.getURL();
-    if (not HttpStringIterator::startsWith(url, "/"))
+    StringSpan filePath;
+    const Result safePath = Internal::extractSafeFilePath(connection.request.getURL(), filePath);
+    if (not safePath)
     {
-        return Result::Error("Wrong url");
-    }
-    StringSpan filePath = HttpStringIterator::sliceStart(url, 1);
-    if (filePath.isEmpty())
-    {
-        filePath = "index.html";
+        return Internal::sendEmptyResponse(connection.response, 400);
     }
 
     if (connection.request.isMultipart())
     {
         return postMultipart(stream, connection);
     }
-    // TODO: Resolve and validate final path to check that is inside allowed folders for GET/PUT
 
     FileSystem fileSystem;
     SC_TRY(fileSystem.init(directory.view()));
@@ -78,6 +75,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
         SC_TRY(connection.response.startResponse(405));
         SC_TRY(connection.response.addHeader("Allow", "GET, PUT, POST"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
+        SC_TRY(connection.response.addHeader("Content-Length", "0"));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }
@@ -362,6 +360,64 @@ StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extens
         return "text/plain";
     }
     return "text/html";
+}
+
+Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath)
+{
+    SC_TRY_MSG(HttpStringIterator::startsWith(requestTarget, "/"), "HttpAsyncFileServer request target must be path");
+
+    const char* data       = requestTarget.bytesWithoutTerminator();
+    size_t      pathLength = requestTarget.sizeInBytes();
+    for (size_t idx = 0; idx < requestTarget.sizeInBytes(); ++idx)
+    {
+        if (data[idx] == '?' or data[idx] == '#')
+        {
+            pathLength = idx;
+            break;
+        }
+    }
+
+    StringSpan path = {{data, pathLength}, false, requestTarget.getEncoding()};
+    filePath        = HttpStringIterator::sliceStart(path, 1);
+    if (filePath.isEmpty())
+    {
+        filePath = "index.html";
+        return Result(true);
+    }
+
+    const char* fileData     = filePath.bytesWithoutTerminator();
+    size_t      segmentStart = 0;
+    for (size_t idx = 0; idx <= filePath.sizeInBytes(); ++idx)
+    {
+        const bool atEnd     = idx == filePath.sizeInBytes();
+        const char current   = atEnd ? '/' : fileData[idx];
+        const bool separator = current == '/';
+        SC_TRY_MSG(current != '\\' and current != ':', "HttpAsyncFileServer invalid path character");
+        if (separator)
+        {
+            const size_t segmentLength = idx - segmentStart;
+            if (segmentLength == 1)
+            {
+                SC_TRY_MSG(fileData[segmentStart] != '.', "HttpAsyncFileServer dot path segment rejected");
+            }
+            else if (segmentLength == 2)
+            {
+                SC_TRY_MSG(fileData[segmentStart] != '.' or fileData[segmentStart + 1] != '.',
+                           "HttpAsyncFileServer parent path segment rejected");
+            }
+            segmentStart = idx + 1;
+        }
+    }
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, int statusCode)
+{
+    SC_TRY(response.startResponse(statusCode));
+    SC_TRY(response.addHeader("Content-Length", "0"));
+    SC_TRY(response.addHeader("Server", "SC"));
+    SC_TRY(response.sendHeaders());
+    return response.end();
 }
 
 int64_t HttpAsyncFileServer::Internal::getCurrentTimeMilliseconds()
