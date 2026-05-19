@@ -3,6 +3,7 @@
 #include "HttpConnection.h"
 #include "Internal/HttpStringIterator.h"
 
+#include "../AsyncStreams/ZLibTransformStreams.h"
 #include "../Foundation/Assert.h"
 #include "Internal/HttpFixedBufferWriter.inl"
 #include "Internal/HttpParsedHeaders.inl"
@@ -92,6 +93,54 @@ static SC::Result scHttpFormatChunkHeader(uint64_t size, SC::Span<char> storage,
 
 namespace SC
 {
+StringSpan httpContentEncodingName(HttpContentEncoding encoding)
+{
+    switch (encoding)
+    {
+    case HttpContentEncoding::Identity: return "identity";
+    case HttpContentEncoding::GZip: return "gzip";
+    case HttpContentEncoding::Deflate: return "deflate";
+    }
+    return {};
+}
+
+Result httpContentEncodingFromHeader(StringSpan headerValue, HttpContentEncoding& encoding)
+{
+    HttpStringIterator it(headerValue);
+    while (it.match(' ') or it.match('\t'))
+    {
+        if (not it.stepForward())
+        {
+            break;
+        }
+    }
+    const auto start = it;
+    while (not it.isAtEnd() and not it.match(' ') and not it.match('\t') and not it.match(','))
+    {
+        if (not it.stepForward())
+        {
+            break;
+        }
+    }
+    StringSpan token = HttpStringIterator::fromIterators(start, it, headerValue.getEncoding());
+    if (token.isEmpty() or HttpStringIterator::equalsIgnoreCase(token, "identity"))
+    {
+        encoding = HttpContentEncoding::Identity;
+        return Result(true);
+    }
+    if (HttpStringIterator::equalsIgnoreCase(token, "gzip"))
+    {
+        encoding = HttpContentEncoding::GZip;
+        return Result(true);
+    }
+    if (HttpStringIterator::equalsIgnoreCase(token, "deflate"))
+    {
+        encoding = HttpContentEncoding::Deflate;
+        return Result(true);
+    }
+    return Result::Error("HttpContentEncoding unsupported content encoding");
+}
+
 //-------------------------------------------------------------------------------------------------------
 // HttpMultipartWriter
 //-------------------------------------------------------------------------------------------------------
@@ -758,6 +807,8 @@ bool HttpOutgoingMessage::hasHeader(KnownHeader header) const
     case KnownHeader::ContentLength: return contentLengthAdded;
     case KnownHeader::ContentType: return contentTypeAdded;
     case KnownHeader::TransferEncoding: return transferEncodingAdded;
+    case KnownHeader::ContentEncoding: return contentEncodingAdded;
+    case KnownHeader::AcceptEncoding: return acceptEncodingAdded;
     }
     return false;
 }
@@ -803,6 +854,14 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
     else if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Transfer-Encoding")))
     {
         transferEncodingAdded = true;
+    }
+    else if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Content-Encoding")))
+    {
+        contentEncodingAdded = true;
+    }
+    else if (HttpStringIterator::equalsIgnoreCase(headerName, StringSpan("Accept-Encoding")))
+    {
+        acceptEncodingAdded = true;
     }
 
     SC_TRY(responseHeaders.appendHeader(headerName, headerValue,
@@ -874,6 +933,8 @@ void HttpOutgoingMessage::reset()
     contentLengthAdded             = false;
     contentTypeAdded               = false;
     transferEncodingAdded          = false;
+    contentEncodingAdded           = false;
+    acceptEncodingAdded            = false;
     chunkedTransferEncodingEnabled = false;
     forceDisableKeepAlive          = false;
     writableStream                 = destinationStream;
@@ -942,9 +1003,11 @@ void HttpAsyncClientRequest::reset()
     method                      = HttpParser::Method::HttpGET;
     url                         = {};
     bodyStream                  = nullptr;
+    bodyTransform               = nullptr;
     bodyType                    = BodyType::None;
     bodySpan                    = {};
     contentLength               = 0;
+    contentEncoding             = HttpContentEncoding::Identity;
     multipartWriter             = nullptr;
     defaultHost                 = {};
     userHeadersSentCallback     = {};
@@ -978,8 +1041,10 @@ Result HttpAsyncClientRequest::setExpectedBodyLength(uint64_t value)
     bodyType                       = value > 0 ? BodyType::Manual : BodyType::None;
     bodySpan                       = {};
     bodyStream                     = nullptr;
+    bodyTransform                  = nullptr;
     multipartWriter                = nullptr;
     contentLength                  = value;
+    contentEncoding                = HttpContentEncoding::Identity;
     chunkedTransferEncodingEnabled = false;
     return Result(true);
 }
@@ -989,7 +1054,9 @@ Result HttpAsyncClientRequest::setBody(Span<const char> value)
     bodyType                       = BodyType::Span;
     bodySpan                       = value;
     bodyStream                     = nullptr;
+    bodyTransform                  = nullptr;
     contentLength                  = value.sizeInBytes();
+    contentEncoding                = HttpContentEncoding::Identity;
     multipartWriter                = nullptr;
     chunkedTransferEncodingEnabled = false;
     return Result(true);
@@ -1000,7 +1067,9 @@ Result HttpAsyncClientRequest::setBody(AsyncReadableStream& stream)
     bodyType        = BodyType::Stream;
     bodySpan        = {};
     bodyStream      = &stream;
+    bodyTransform   = nullptr;
     contentLength   = 0;
+    contentEncoding = HttpContentEncoding::Identity;
     multipartWriter = nullptr;
     return setChunkedTransferEncoding();
 }
@@ -1010,9 +1079,32 @@ void HttpAsyncClientRequest::setBody(AsyncReadableStream& stream, uint64_t conte
     bodyType                       = BodyType::Stream;
     bodySpan                       = {};
     bodyStream                     = &stream;
+    bodyTransform                  = nullptr;
     contentLength                  = contentLengthValue;
+    contentEncoding                = HttpContentEncoding::Identity;
     multipartWriter                = nullptr;
     chunkedTransferEncodingEnabled = false;
+}
+
+Result HttpAsyncClientRequest::setCompressedBody(AsyncReadableStream& stream, SyncZLibTransformStream& compressor,
+                                                 HttpContentEncoding encoding)
+{
+    SC_TRY_MSG(encoding == HttpContentEncoding::GZip or encoding == HttpContentEncoding::Deflate,
+               "HttpAsyncClientRequest compressed body requires gzip or deflate");
+
+    bodyType        = BodyType::Stream;
+    bodySpan        = {};
+    bodyStream      = &stream;
+    bodyTransform   = &compressor;
+    contentLength   = 0;
+    contentEncoding = encoding;
+    multipartWriter = nullptr;
+
+    const ZLibStream::Algorithm algorithm =
+        encoding == HttpContentEncoding::GZip ? ZLibStream::CompressGZip : ZLibStream::CompressDeflate;
+    SC_TRY(compressor.stream.init(algorithm));
+    SC_TRY(HttpOutgoingMessage::addHeader("Content-Encoding", httpContentEncodingName(encoding)));
+    return setChunkedTransferEncoding();
 }
 
 void HttpAsyncClientRequest::setMultipart(HttpMultipartWriter& value)
@@ -1020,8 +1112,10 @@ void HttpAsyncClientRequest::setMultipart(HttpMultipartWriter& value)
     bodyType                       = BodyType::Multipart;
     bodySpan                       = {};
     bodyStream                     = nullptr;
+    bodyTransform                  = nullptr;
     multipartWriter                = &value;
     contentLength                  = value.getContentLength();
+    contentEncoding                = HttpContentEncoding::Identity;
     chunkedTransferEncodingEnabled = false;
 }
 

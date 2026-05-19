@@ -51,6 +51,16 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// @brief Closes any active connection and releases references to the initialized storage
     Result close();
 
+    /// @brief Enables opt-in gzip/deflate response decompression.
+    ///
+    /// The caller owns the transform and must initialize its read/write queues with the client's buffer pool before
+    /// starting a request. When a response declares `Content-Encoding: gzip` or `deflate`, `onResponse` observes the
+    /// decoded body through `HttpAsyncClientResponse::getReadableStream()`.
+    void setResponseDecompression(SyncZLibTransformStream& decoder) { responseDecoder = &decoder; }
+
+    /// @brief Disables response decompression for future requests.
+    void clearResponseDecompression() { responseDecoder = nullptr; }
+
     /// @brief Starts a request that must be configured inside `onPrepareRequest`
     /// `onPrepareRequest` must send the headers before returning, typically by calling
     /// `HttpAsyncClientRequest::sendHeaders()`.
@@ -147,19 +157,28 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     void onHeadersBufferWritten(AsyncBufferView::ID bufferID);
     void onResponseData(AsyncBufferView::ID bufferID);
     void onResponseBodyData(AsyncBufferView::ID bufferID);
+    void onCompressedResponseBodyData(AsyncBufferView::ID bufferID);
+    void onCompressedResponseBodyWritten(AsyncBufferView::ID bufferID);
+    void onCompressedResponseBodyEnd();
+    void onCompressedResponseError(Result result);
 
-    [[nodiscard]] bool canReuseConnectionFor(StringSpan host, uint16_t port) const;
-    [[nodiscard]] bool responseMustNotHaveBody() const;
-    [[nodiscard]] bool responseHasKnownLength() const;
+    [[nodiscard]] bool   canReuseConnectionFor(StringSpan host, uint16_t port) const;
+    [[nodiscard]] bool   responseMustNotHaveBody() const;
+    [[nodiscard]] bool   responseHasKnownLength() const;
+    [[nodiscard]] Result prepareResponseDecompression();
+    [[nodiscard]] Result startResponseStreams();
+    void                 detachResponseDecompression();
 
     HttpConnectionBase* connection = nullptr;
 
-    AsyncEventLoop*         eventLoop      = nullptr;
-    HttpAsyncClientRequest* currentRequest = nullptr;
-    HttpAsyncClientRequest  request;
-    HttpAsyncClientResponse response;
-    AsyncSocketConnect      connectAsync;
-    RequestPreset           currentPreset;
+    AsyncEventLoop*          eventLoop      = nullptr;
+    HttpAsyncClientRequest*  currentRequest = nullptr;
+    HttpAsyncClientRequest   request;
+    HttpAsyncClientResponse  response;
+    AsyncSocketConnect       connectAsync;
+    RequestPreset            currentPreset;
+    SyncZLibTransformStream* responseDecoder       = nullptr;
+    bool                     responseDecoderActive = false;
 
     State state = State::Idle;
 

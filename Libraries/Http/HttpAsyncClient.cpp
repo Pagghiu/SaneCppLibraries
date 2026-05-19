@@ -4,6 +4,7 @@
 #include "HttpURLParser.h"
 #include "Internal/HttpStringIterator.h"
 
+#include "../AsyncStreams/ZLibTransformStreams.h"
 #include "../Foundation/Assert.h"
 
 #include <string.h>
@@ -21,6 +22,7 @@ Result HttpAsyncClient::init(HttpConnectionBase& storage)
 
 Result HttpAsyncClient::close()
 {
+    detachResponseDecompression();
     response.failBodyStream(Result::Error("HttpAsyncClient closed"));
     response.abortBodyStream();
     closeConnection();
@@ -262,6 +264,11 @@ Result HttpAsyncClient::beginRequestSend()
         break;
     }
 
+    if (responseDecoder != nullptr and not request.hasAcceptEncodingHeader())
+    {
+        SC_TRY(request.addHeader("Accept-Encoding", "gzip, deflate"));
+    }
+
     if (onPrepareRequest.isValid())
     {
         onPrepareRequest(request);
@@ -301,6 +308,13 @@ Result HttpAsyncClient::validateActiveRequest() const
         SC_TRY_MSG(request.getBodyStream() != nullptr, "HttpAsyncClient body stream missing");
         SC_TRY_MSG(&request.getBodyStream()->getBuffersPool() == &connection->buffersPool,
                    "HttpAsyncClient body stream must use the client buffers pool");
+        if (request.getBodyTransform() != nullptr)
+        {
+            SC_TRY_MSG(&request.getBodyTransform()->AsyncReadableStream::getBuffersPool() == &connection->buffersPool,
+                       "HttpAsyncClient body transform readable side must use the client buffers pool");
+            SC_TRY_MSG(&request.getBodyTransform()->AsyncWritableStream::getBuffersPool() == &connection->buffersPool,
+                       "HttpAsyncClient body transform writable side must use the client buffers pool");
+        }
     }
     if (request.getBodyType() == HttpAsyncClientRequest::BodyType::Multipart)
     {
@@ -320,6 +334,108 @@ Result HttpAsyncClient::onResponseBodyStreamRead()
     return Result(true);
 }
 
+Result HttpAsyncClient::prepareResponseDecompression()
+{
+    responseDecoderActive = false;
+    if (responseDecoder == nullptr or response.getBodyFramingKind() == HttpBodyFramingKind::None)
+    {
+        return Result(true);
+    }
+
+    StringSpan contentEncodingHeader;
+    if (not response.getHeader("Content-Encoding", contentEncodingHeader))
+    {
+        return Result(true);
+    }
+
+    HttpContentEncoding encoding = HttpContentEncoding::Identity;
+    SC_TRY(httpContentEncodingFromHeader(contentEncodingHeader, encoding));
+    if (encoding == HttpContentEncoding::Identity)
+    {
+        return Result(true);
+    }
+
+    const ZLibStream::Algorithm algorithm =
+        encoding == HttpContentEncoding::GZip ? ZLibStream::DecompressGZip : ZLibStream::DecompressDeflate;
+    SC_TRY(responseDecoder->stream.init(algorithm));
+
+    HttpIncomingMessage::BodyStream& rawBody = response.rawBodyStream();
+    SC_TRY_MSG((rawBody.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyData>(*this)),
+               "HttpAsyncClient response decoder data listener limit reached");
+    SC_TRY_MSG((rawBody.eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyEnd>(*this)),
+               "HttpAsyncClient response decoder end listener limit reached");
+    SC_TRY_MSG((rawBody.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
+               "HttpAsyncClient response decoder raw error listener limit reached");
+    SC_TRY_MSG((responseDecoder->AsyncReadableStream::eventError
+                    .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
+               "HttpAsyncClient response decoder readable error listener limit reached");
+    SC_TRY_MSG((responseDecoder->AsyncWritableStream::eventError
+                    .addListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this)),
+               "HttpAsyncClient response decoder writable error listener limit reached");
+
+    response.attachReadableStream(*responseDecoder);
+    responseDecoderActive = true;
+    return Result(true);
+}
+
+Result HttpAsyncClient::startResponseStreams()
+{
+    if (responseDecoderActive)
+    {
+        if (responseDecoder->AsyncReadableStream::canStart())
+        {
+            SC_TRY(responseDecoder->AsyncReadableStream::start());
+        }
+        else
+        {
+            responseDecoder->AsyncReadableStream::resumeReading();
+        }
+    }
+    return response.startBodyStream();
+}
+
+void HttpAsyncClient::detachResponseDecompression()
+{
+    if (not responseDecoderActive)
+    {
+        return;
+    }
+    HttpIncomingMessage::BodyStream& rawBody = response.rawBodyStream();
+    (void)rawBody.eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyData>(*this);
+    (void)rawBody.eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseBodyEnd>(*this);
+    (void)rawBody.eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this);
+    if (responseDecoder != nullptr)
+    {
+        (void)responseDecoder->AsyncReadableStream::eventError
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this);
+        (void)responseDecoder->AsyncWritableStream::eventError
+            .removeListener<HttpAsyncClient, &HttpAsyncClient::onCompressedResponseError>(*this);
+    }
+    responseDecoderActive = false;
+}
+
+void HttpAsyncClient::onCompressedResponseBodyData(AsyncBufferView::ID bufferID)
+{
+    SC_ASSERT_RELEASE(responseDecoder != nullptr);
+    Result writeResult = responseDecoder->AsyncWritableStream::write(
+        bufferID, {[this](AsyncBufferView::ID writtenBufferID) { onCompressedResponseBodyWritten(writtenBufferID); }});
+    if (not writeResult)
+    {
+        fail(writeResult);
+    }
+}
+
+void HttpAsyncClient::onCompressedResponseBodyWritten(AsyncBufferView::ID) {}
+
+void HttpAsyncClient::onCompressedResponseBodyEnd()
+{
+    SC_ASSERT_RELEASE(responseDecoder != nullptr);
+    detachResponseDecompression();
+    responseDecoder->AsyncWritableStream::end();
+}
+
+void HttpAsyncClient::onCompressedResponseError(Result result) { fail(result); }
+
 void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
 {
     if (currentRequest == nullptr)
@@ -328,8 +444,11 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
     }
     if (currentRequest->getBodyType() == HttpAsyncClientRequest::BodyType::Stream)
     {
-        connection->pipeline.source   = currentRequest->getBodyStream();
-        connection->pipeline.sinks[0] = &currentRequest->getWritableStream();
+        connection->pipeline.source        = currentRequest->getBodyStream();
+        connection->pipeline.transforms[0] = currentRequest->getBodyTransform();
+        connection->pipeline.transforms[1] = nullptr;
+        connection->pipeline.sinks[0]      = &currentRequest->getWritableStream();
+        connection->pipeline.sinks[1]      = nullptr;
 
         Result res = connection->pipeline.pipe();
         if (res)
@@ -476,6 +595,13 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
         return;
     }
 
+    Result prepareDecompression = prepareResponseDecompression();
+    if (not prepareDecompression)
+    {
+        fail(prepareDecompression);
+        return;
+    }
+
     const size_t bufferedBodyBytes = readData.sizeInBytes() - response.getHeadersLength();
     SC_COMPILER_UNUSED(bufferedBodyBytes);
 
@@ -485,7 +611,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
         onResponse(response);
     }
 
-    Result startBodyStream = response.startBodyStream();
+    Result startBodyStream = startResponseStreams();
     if (not startBodyStream)
     {
         fail(startBodyStream);
@@ -628,6 +754,7 @@ void HttpAsyncClient::closeConnection()
 
 void HttpAsyncClient::fail(Result error)
 {
+    detachResponseDecompression();
     response.failBodyStream(error);
     response.abortBodyStream();
     closeConnection();

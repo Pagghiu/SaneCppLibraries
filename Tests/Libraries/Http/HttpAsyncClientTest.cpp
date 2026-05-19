@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpAsyncClient.h"
 #include "HttpStringAppend.h"
+#include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Foundation/Assert.h"
 #include "Libraries/Http/HttpAsyncFileServer.h"
@@ -165,6 +166,44 @@ struct TimeoutGuard
         return SC::Result(true);
     }
 };
+
+static bool compressionTestsAvailable(SC::TestReport& report)
+{
+#if SC_COMPILER_FILC
+    if (not report.quietMode)
+    {
+        report.console.printLine("HttpAsyncClientTest compression sections skipped under Fil-C");
+    }
+    return false;
+#else
+    SC_COMPILER_UNUSED(report);
+    auto host           = SC::HostPlatform;
+    auto instructionSet = SC::HostInstructionSet;
+    if (host == SC::Platform::Windows and instructionSet == SC::InstructionSet::ARM64)
+    {
+        return false;
+    }
+    return true;
+#endif
+}
+
+static SC::Result decompressForTest(SC::ZLibStream::Algorithm algorithm, SC::Span<const char> input,
+                                    SC::Span<char>& decoded)
+{
+    SC::ZLibStream stream;
+    SC_TRY(stream.init(algorithm));
+
+    static char    outputStorage[512];
+    SC::Span<char> remaining = outputStorage;
+    SC_TRY(stream.process(input, remaining));
+    SC_TRY_MSG(input.empty(), "HttpAsyncClientTest compressed fixture output too small");
+
+    bool streamEnded = false;
+    SC_TRY(stream.finalize(remaining, streamEnded));
+    SC_TRY_MSG(streamEnded, "HttpAsyncClientTest compressed fixture did not end");
+    decoded = {outputStorage, sizeof(outputStorage) - remaining.sizeInBytes()};
+    return SC::Result(true);
+}
 } // namespace
 
 struct SC::HttpAsyncClientTest : public SC::TestCase
@@ -211,6 +250,18 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             closeDelimitedResponse();
         }
+        if (test_section("gzip response decompression") and compressionTestsAvailable(report))
+        {
+            gzipResponseDecompression();
+        }
+        if (test_section("deflate response decompression") and compressionTestsAvailable(report))
+        {
+            deflateResponseDecompression();
+        }
+        if (test_section("gzip request compression") and compressionTestsAvailable(report))
+        {
+            gzipRequestCompression();
+        }
         if (test_section("multipart upload"))
         {
             multipartUpload();
@@ -227,6 +278,9 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void chunkedResponse();
     void chunkedResponseRejectsTrailers();
     void closeDelimitedResponse();
+    void gzipResponseDecompression();
+    void deflateResponseDecompression();
+    void gzipRequestCompression();
     void multipartUpload();
 };
 
@@ -1011,6 +1065,257 @@ void SC::HttpAsyncClientTest::closeDelimitedResponse()
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::gzipResponseDecompression()
+{
+    static constexpr uint8_t compressedGzip[] = {0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                                 0x00, 0x13, 0x2B, 0x49, 0x2D, 0x2E, 0x01, 0x00,
+                                                 0x0C, 0x7E, 0x7F, 0xD8, 0x04, 0x00, 0x00, 0x00};
+
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26111);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        String contentLength = StringEncoding::Ascii;
+        SC_TEST_EXPECT(StringBuilder::format(contentLength, "{}", sizeof(compressedGzip)));
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Encoding", "gzip"));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", contentLength.view()));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        const Span<const char> body = Span<const uint8_t>(compressedGzip).reinterpret_as_span_of<const char>();
+        SC_TEST_EXPECT(connection.response.getWritableStream().write(AsyncBufferView(body)));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    SyncZLibTransformStream      decoder;
+    AsyncReadableStream::Request decoderReadQueue[4];
+    AsyncWritableStream::Request decoderWriteQueue[4];
+    SC_TEST_EXPECT(decoder.init(clientStorage.buffersPool, decoderReadQueue, decoderWriteQueue));
+    client.setResponseDecompression(decoder);
+
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    String            url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/gzip", port));
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view() == "test");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::deflateResponseDecompression()
+{
+    static constexpr uint8_t compressedDeflate[] = {0x2B, 0x49, 0x2D, 0x2E, 0x01, 0x00};
+
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26112);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        String contentLength = StringEncoding::Ascii;
+        SC_TEST_EXPECT(StringBuilder::format(contentLength, "{}", sizeof(compressedDeflate)));
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Encoding", "deflate"));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", contentLength.view()));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        const Span<const char> body = Span<const uint8_t>(compressedDeflate).reinterpret_as_span_of<const char>();
+        SC_TEST_EXPECT(connection.response.getWritableStream().write(AsyncBufferView(body)));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    SyncZLibTransformStream      decoder;
+    AsyncReadableStream::Request decoderReadQueue[4];
+    AsyncWritableStream::Request decoderWriteQueue[4];
+    SC_TEST_EXPECT(decoder.init(clientStorage.buffersPool, decoderReadQueue, decoderWriteQueue));
+    client.setResponseDecompression(decoder);
+
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    String            url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/deflate", port));
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view() == "test");
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::gzipRequestCompression()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26113);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    struct ServerContext
+    {
+        HttpAsyncClientTest* test;
+        HttpConnection*      connection = nullptr;
+        HttpAsyncServer*     httpServer = nullptr;
+        Buffer               compressedBody;
+
+        Result append(Span<const char> data)
+        {
+            GrowableBuffer<Buffer> gb(compressedBody);
+            HttpStringAppend&      sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+            return Result(sb.append(data, 0));
+        }
+
+        void onData(AsyncBufferView::ID bufferID)
+        {
+            Span<const char> data;
+            SC_ASSERT_RELEASE(connection != nullptr);
+            SC_ASSERT_RELEASE(connection->request.getReadableStream().getBuffersPool().getReadableData(bufferID, data));
+            SC_ASSERT_RELEASE(append(data));
+            SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+        }
+
+        void onEnd()
+        {
+            StringSpan contentEncoding;
+            test->recordExpectation("request content encoding",
+                                    connection->request.getHeader("Content-Encoding", contentEncoding) and
+                                        contentEncoding == "gzip");
+            test->recordExpectation("request transfer encoding",
+                                    connection->request.getBodyFramingKind() == HttpBodyFramingKind::Chunked);
+
+            Span<char> decoded;
+            test->recordExpectation(
+                "decompress request body",
+                decompressForTest(ZLibStream::DecompressGZip, compressedBody.toSpanConst(), decoded));
+            test->recordExpectation("decoded request body",
+                                    StringView(decoded, false, StringEncoding::Ascii) == "compressed hello");
+
+            test->recordExpectation("startResponse", connection->response.startResponse(200));
+            test->recordExpectation("addHeader", connection->response.addHeader("Content-Length", "0"));
+            test->recordExpectation("sendHeaders", connection->response.sendHeaders());
+            test->recordExpectation("end response", connection->response.end());
+        }
+    } serverContext = {this, nullptr, &httpServer, {}};
+
+    httpServer.onRequest = [this, &serverContext](HttpConnection& connection)
+    {
+        serverContext.connection = &connection;
+        const bool addedData =
+            connection.request.getReadableStream().eventData.addListener<ServerContext, &ServerContext::onData>(
+                serverContext);
+        SC_TEST_EXPECT(addedData);
+        const bool addedEnd =
+            connection.request.getReadableStream().eventEnd.addListener<ServerContext, &ServerContext::onEnd>(
+                serverContext);
+        SC_TEST_EXPECT(addedEnd);
+    };
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    SC_TEST_EXPECT(client.init(clientStorage));
+
+    ChunkedBodyStream bodyStream;
+    SC_TEST_EXPECT(bodyStream.init(clientStorage.buffersPool, StringSpan("compressed hello").toCharSpan(), 4));
+
+    SyncZLibTransformStream      compressor;
+    AsyncReadableStream::Request compressorReadQueue[4];
+    AsyncWritableStream::Request compressorWriteQueue[4];
+    SC_TEST_EXPECT(compressor.init(clientStorage.buffersPool, compressorReadQueue, compressorWriteQueue));
+
+    TimeoutGuard timeout;
+    String       url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/compressed-upload", port));
+
+    struct ClientPrepareContext
+    {
+        HttpAsyncClientTest*     test;
+        ChunkedBodyStream*       bodyStream;
+        SyncZLibTransformStream* compressor;
+
+        void onPrepare(HttpAsyncClientRequest& request)
+        {
+            test->recordExpectation("set compressed body",
+                                    request.setCompressedBody(*bodyStream, *compressor, HttpContentEncoding::GZip));
+            test->recordExpectation("send compressed headers", request.sendHeaders());
+        }
+    } prepareContext = {this, &bodyStream, &compressor};
+
+    client.onPrepareRequest.bind<ClientPrepareContext, &ClientPrepareContext::onPrepare>(prepareContext);
+    client.onResponse = [this, &httpServer](HttpAsyncClientResponse& response)
+    {
+        ResponseCollector* unusedCollector = nullptr;
+        SC_COMPILER_UNUSED(unusedCollector);
+        SC_TEST_EXPECT(response.getParser().statusCode == 200);
+        SC_TEST_EXPECT(httpServer.stop());
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.start(loop, HttpParser::Method::HttpPUT, url.view()));
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(loop.close());

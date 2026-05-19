@@ -23,7 +23,18 @@ enum class HttpBodyFramingKind : uint8_t
     CloseDelimited,
 };
 
+enum class HttpContentEncoding : uint8_t
+{
+    Identity,
+    GZip,
+    Deflate,
+};
+
+SC_HTTP_EXPORT StringSpan httpContentEncodingName(HttpContentEncoding encoding);
+SC_HTTP_EXPORT Result     httpContentEncodingFromHeader(StringSpan headerValue, HttpContentEncoding& encoding);
+
 struct HttpAsyncClient;
+struct SyncZLibTransformStream;
 
 struct SC_HTTP_EXPORT HttpMultipartWriter
 {
@@ -230,9 +241,10 @@ struct SC_HTTP_EXPORT HttpAsyncClientResponse : public HttpIncomingMessage
   private:
     friend struct HttpAsyncClient;
 
-    void   reset(Span<char> memory);
-    Result writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
-                        AsyncBufferView::ID bufferID);
+    void        reset(Span<char> memory);
+    Result      writeHeaders(uint32_t maxHeaderSize, Span<const char> readData, AsyncReadableStream& stream,
+                             AsyncBufferView::ID bufferID);
+    BodyStream& rawBodyStream() { return bodyStream; }
 };
 
 /// @brief Outgoing message from the perspective of the participants of an HTTP transaction
@@ -305,6 +317,8 @@ struct SC_HTTP_EXPORT HttpOutgoingMessage
         ContentLength,
         ContentType,
         TransferEncoding,
+        ContentEncoding,
+        AcceptEncoding,
     };
 
     void setHeaderMemory(Span<char> memory);
@@ -333,6 +347,8 @@ struct SC_HTTP_EXPORT HttpOutgoingMessage
     bool contentLengthAdded             = false;
     bool contentTypeAdded               = false;
     bool transferEncodingAdded          = false;
+    bool contentEncodingAdded           = false;
+    bool acceptEncodingAdded            = false;
     bool chunkedTransferEncodingEnabled = false;
 
     AsyncWritableStream*  destinationStream = nullptr;
@@ -374,15 +390,18 @@ struct SC_HTTP_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
     Result setBody(StringSpan value) { return setBody(value.toCharSpan()); }
     Result setBody(AsyncReadableStream& stream);
     void   setBody(AsyncReadableStream& stream, uint64_t contentLengthValue);
+    Result setCompressedBody(AsyncReadableStream& stream, SyncZLibTransformStream& compressor,
+                             HttpContentEncoding encoding);
     void   setMultipart(HttpMultipartWriter& value);
     Result sendHeaders(Function<void(AsyncBufferView::ID)> callback = {});
 
     [[nodiscard]] HttpParser::Method getMethod() const { return method; }
 
-    [[nodiscard]] StringSpan getURL() const { return url; }
-    [[nodiscard]] BodyType   getBodyType() const { return bodyType; }
-    [[nodiscard]] uint64_t   getContentLength() const { return contentLength; }
-    [[nodiscard]] bool       usesChunkedTransferEncoding() const { return chunkedTransferEncodingEnabled; }
+    [[nodiscard]] StringSpan          getURL() const { return url; }
+    [[nodiscard]] BodyType            getBodyType() const { return bodyType; }
+    [[nodiscard]] uint64_t            getContentLength() const { return contentLength; }
+    [[nodiscard]] bool                usesChunkedTransferEncoding() const { return chunkedTransferEncodingEnabled; }
+    [[nodiscard]] HttpContentEncoding getContentEncoding() const { return contentEncoding; }
 
   private:
     friend struct HttpAsyncClient;
@@ -390,19 +409,23 @@ struct SC_HTTP_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
     void setDefaultHost(StringSpan value) { defaultHost = value; }
 
     [[nodiscard]] bool hasTransferEncodingHeader() const { return hasHeader(KnownHeader::TransferEncoding); }
+    [[nodiscard]] bool hasAcceptEncodingHeader() const { return hasHeader(KnownHeader::AcceptEncoding); }
 
     [[nodiscard]] AsyncReadableStream*       getBodyStream() const { return bodyStream; }
+    [[nodiscard]] SyncZLibTransformStream*   getBodyTransform() const { return bodyTransform; }
     [[nodiscard]] const HttpMultipartWriter* getMultipartWriter() const { return multipartWriter; }
     [[nodiscard]] Span<const char>           getBodySpan() const { return bodySpan; }
 
-    HttpParser::Method   method = HttpParser::Method::HttpGET;
-    StringSpan           url;
-    AsyncReadableStream* bodyStream = nullptr;
-    BodyType             bodyType   = BodyType::None;
-    Span<const char>     bodySpan;
-    uint64_t             contentLength   = 0;
-    HttpMultipartWriter* multipartWriter = nullptr;
-    StringSpan           defaultHost;
+    HttpParser::Method       method = HttpParser::Method::HttpGET;
+    StringSpan               url;
+    AsyncReadableStream*     bodyStream    = nullptr;
+    SyncZLibTransformStream* bodyTransform = nullptr;
+    BodyType                 bodyType      = BodyType::None;
+    Span<const char>         bodySpan;
+    uint64_t                 contentLength   = 0;
+    HttpContentEncoding      contentEncoding = HttpContentEncoding::Identity;
+    HttpMultipartWriter*     multipartWriter = nullptr;
+    StringSpan               defaultHost;
 
     Function<void(AsyncBufferView::ID)> userHeadersSentCallback;
     Function<void(AsyncBufferView::ID)> internalHeadersSentCallback;
