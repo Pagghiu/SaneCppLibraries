@@ -418,6 +418,19 @@ bool SC::HttpParser::parseMethod(char currentChar)
         tokenLength--;
         method = Method::HttpGET;
     }
+    else if (currentChar == 'H' or currentChar == 'h')
+    {
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'E' or currentChar == 'e');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'A' or currentChar == 'a');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'D' or currentChar == 'd');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == ' ');
+        tokenLength--;
+        method = Method::HttpHEAD;
+    }
     else if (currentChar == 'P' or currentChar == 'p')
     {
         SC_CO_RETURN(nestedParserCoroutine, true);

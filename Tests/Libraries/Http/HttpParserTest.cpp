@@ -39,6 +39,18 @@ struct HttpParserTest : public TestCase
                         "POST");
             SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpPOST);
         }
+        if (test_section("request HEAD"))
+        {
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpPUT;
+            testRequest(parser,
+                        "HEAD /asd HTTP/1.1\r\n"
+                        "User-agent: Mozilla/1.1\r\n"
+                        "Host:   github.com\r\n"
+                        "\r\n",
+                        "HEAD");
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpHEAD);
+        }
         if (test_section("request PUT"))
         {
             HttpParser parser;

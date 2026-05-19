@@ -18,6 +18,7 @@ struct SC_HTTP_EXPORT HttpParser
     enum class Method
     {
         HttpGET,  ///< `GET` method
+        HttpHEAD, ///< `HEAD` method
         HttpPUT,  ///< `PUT` method
         HttpPOST, ///< `POST` method
     };

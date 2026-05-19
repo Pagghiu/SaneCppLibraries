@@ -70,10 +70,11 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
     {
     case HttpParser::Method::HttpPOST:
     case HttpParser::Method::HttpPUT: return putFile(stream, connection, filePath);
-    case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath);
+    case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath, true);
+    case HttpParser::Method::HttpHEAD: return getFile(stream, connection, filePath, false);
     default: {
         SC_TRY(connection.response.startResponse(405));
-        SC_TRY(connection.response.addHeader("Allow", "GET, PUT, POST"));
+        SC_TRY(connection.response.addHeader("Allow", "GET, HEAD, PUT, POST"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
         SC_TRY(connection.response.addHeader("Content-Length", "0"));
         SC_TRY(connection.response.sendHeaders());
@@ -85,7 +86,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
 }
 
 Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection,
-                                    StringSpan filePath)
+                                    StringSpan filePath, bool sendBody)
 {
     FileSystem fileSystem;
     SC_TRY(fileSystem.init(directory.view()));
@@ -110,6 +111,12 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
         SC_TRY(connection.response.addHeader("Server", "SC"));
+
+        if (not sendBody)
+        {
+            SC_TRY(connection.response.sendHeaders());
+            return connection.response.end();
+        }
 
         if (useAsyncFileSend)
         {

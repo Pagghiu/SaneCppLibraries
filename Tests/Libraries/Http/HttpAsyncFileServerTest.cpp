@@ -87,10 +87,12 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int multipartCount = 0;
         int safetyCount    = 0;
         int mimeCount      = 0;
+        int headCount      = 0;
 
         HttpTestClient queryClient   = {};
         HttpTestClient badPathClient = {};
         HttpTestClient mimeClient    = {};
+        HttpTestClient headClient    = {};
         HttpTestClient getClient     = {};
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
@@ -146,6 +148,17 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         context.mimeCount++;
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Content-Type: image/webp"));
+
+        SC_TEST_EXPECT(context.headClient.head(*context.loop, context.fileURL.view()));
+    };
+
+    context.headClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.headCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Content-Type: text/html"));
+        SC_TEST_EXPECT(not str.containsString("Response from file"));
 
         // Create an Http Client request for that file
         SC_TEST_EXPECT(context.getClient.get(*context.loop, context.fileURL.view()));
@@ -249,6 +262,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.multipartCount == 1);
     SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.mimeCount == 1);
+    SC_TEST_EXPECT(context.headCount == 1);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
     SC_TEST_EXPECT(context.fs.removeFile("asset.webp"));
 }

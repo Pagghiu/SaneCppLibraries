@@ -1027,6 +1027,7 @@ Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan
     switch (method)
     {
     case HttpParser::Method::HttpGET: SC_TRY(responseHeaders.appendLiteral("GET ", HeaderSpaceFinished)); break;
+    case HttpParser::Method::HttpHEAD: SC_TRY(responseHeaders.appendLiteral("HEAD ", HeaderSpaceFinished)); break;
     case HttpParser::Method::HttpPUT: SC_TRY(responseHeaders.appendLiteral("PUT ", HeaderSpaceFinished)); break;
     case HttpParser::Method::HttpPOST: SC_TRY(responseHeaders.appendLiteral("POST ", HeaderSpaceFinished)); break;
     }

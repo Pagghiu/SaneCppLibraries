@@ -91,7 +91,7 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
   private:
     bool   useAsyncFileSend = true;
     Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
-    Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
+    Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath, bool sendBody);
     Result postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
     StringPath directory;
