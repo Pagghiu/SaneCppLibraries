@@ -181,7 +181,8 @@ void HttpConnection::reset()
 {
     request.reset();
     response.reset();
-    state = State::Inactive;
+    state             = State::Inactive;
+    webSocketUpgraded = false;
 }
 
 void HttpConnectionBase::reset()
@@ -252,6 +253,13 @@ bool HttpIncomingMessage::findParserToken(HttpParser::Token token, StringSpan& r
 bool HttpIncomingMessage::getHeader(StringSpan headerName, StringSpan& value) const
 {
     return parsedHeaders.getHeader(headerName, value);
+}
+
+StringSpan HttpIncomingMessage::getVersion() const
+{
+    StringSpan version;
+    (void)findParserToken(HttpParser::Token::Version, version);
+    return version;
 }
 
 AsyncReadableStream& HttpIncomingMessage::getReadableStream()
@@ -892,6 +900,10 @@ Result HttpResponse::startResponse(int code)
     SC_TRY(responseHeaders.appendLiteral("HTTP/1.1 ", "HttpResponse::appendAscii - header space is finished"));
     switch (code)
     {
+    case 101:
+        SC_TRY(responseHeaders.appendLiteral("101 Switching Protocols\r\n",
+                                             "HttpResponse::appendAscii - header space is finished"));
+        break;
     case 200:
         SC_TRY(responseHeaders.appendLiteral("200 OK\r\n", "HttpResponse::appendAscii - header space is finished"));
         break;
@@ -899,12 +911,20 @@ Result HttpResponse::startResponse(int code)
         SC_TRY(
             responseHeaders.appendLiteral("201 Created\r\n", "HttpResponse::appendAscii - header space is finished"));
         break;
+    case 400:
+        SC_TRY(responseHeaders.appendLiteral("400 Bad Request\r\n",
+                                             "HttpResponse::appendAscii - header space is finished"));
+        break;
     case 404:
         SC_TRY(
             responseHeaders.appendLiteral("404 Not Found\r\n", "HttpResponse::appendAscii - header space is finished"));
         break;
     case 405:
         SC_TRY(responseHeaders.appendLiteral("405 Method Not Allowed\r\n",
+                                             "HttpResponse::appendAscii - header space is finished"));
+        break;
+    case 426:
+        SC_TRY(responseHeaders.appendLiteral("426 Upgrade Required\r\n",
                                              "HttpResponse::appendAscii - header space is finished"));
         break;
     }

@@ -104,6 +104,9 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
     /// @brief Gets whether the other party requested the connection to stay alive
     [[nodiscard]] bool getKeepAlive() const { return parsedHeaders.parser.connectionKeepAlive; }
 
+    /// @brief Gets the parsed HTTP protocol version token, for example `HTTP/1.1`
+    [[nodiscard]] StringSpan getVersion() const;
+
     /// @brief Returns the effective framing mode for the incoming body
     [[nodiscard]] HttpBodyFramingKind getBodyFramingKind() const { return bodyFramingKind; }
 
@@ -425,6 +428,12 @@ struct SC_HTTP_EXPORT HttpConnection : public HttpConnectionBase
     /// @brief The ID used to find this client in HttpConnectionsPool
     ID getConnectionID() const { return connectionID; }
 
+    /// @brief Marks this HTTP connection as handed off to a WebSocket owner after a successful upgrade.
+    void markWebSocketUpgraded() { webSocketUpgraded = true; }
+
+    /// @brief Returns true after the HTTP layer handed this connection to WebSocket code.
+    [[nodiscard]] bool isWebSocketUpgraded() const { return webSocketUpgraded; }
+
     HttpRequest  request;
     HttpResponse response;
 
@@ -441,6 +450,7 @@ struct SC_HTTP_EXPORT HttpConnection : public HttpConnectionBase
 
     State state = State::Inactive;
     ID    connectionID;
+    bool  webSocketUpgraded = false;
 };
 
 /// @brief View over a contiguous sequence of items with a custom stride between elements.

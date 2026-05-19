@@ -1,12 +1,52 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpWebSocket.h"
+#include "HttpConnection.h"
+#include "Internal/HttpStringIterator.h"
+
+#if SC_PLATFORM_APPLE
+#include <CommonCrypto/CommonDigest.h>
+#elif SC_PLATFORM_WINDOWS
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <wincrypt.h>
+#elif SC_PLATFORM_LINUX
+#if defined(__has_include)
+#if __has_include(<linux/if_alg.h>)
+#include <linux/if_alg.h>
+#else
+#include <stdint.h>
+#ifndef AF_ALG
+#define AF_ALG 38
+#endif
+struct sockaddr_alg
+{
+    uint16_t salg_family;
+    char     salg_type[14];
+    uint32_t salg_feat;
+    uint32_t salg_mask;
+    char     salg_name[64];
+};
+#endif
+#else
+#include <linux/if_alg.h>
+#endif
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
+
+#include <string.h>
 
 namespace
 {
 using size_t   = SC::size_t;
 using uint8_t  = SC::uint8_t;
+using uint32_t = SC::uint32_t;
 using uint64_t = SC::uint64_t;
+
+static constexpr const char SC_HTTP_WEBSOCKET_GUID[] = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+static constexpr const char SC_HTTP_WEBSOCKET_BASE64[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
 static bool scHttpWebSocketIsSupportedOpcode(SC::HttpWebSocketOpcode opcode)
 {
@@ -39,10 +79,288 @@ static void scHttpWebSocketApplyMask(SC::Span<char> payload, const uint8_t maskK
         payload[idx] = static_cast<char>(static_cast<uint8_t>(payload[idx]) ^ maskKey[(payloadOffset + idx) & 3]);
     }
 }
+
+static bool scHttpWebSocketEqualsIgnoreCase(SC::StringSpan lhs, SC::StringSpan rhs)
+{
+    return SC::HttpStringIterator::equalsIgnoreCase(lhs, rhs);
+}
+
+static bool scHttpWebSocketIsSpace(char value) { return value == ' ' or value == '\t'; }
+
+static SC::StringSpan scHttpWebSocketTrim(SC::StringSpan value)
+{
+    const char* start = value.bytesWithoutTerminator();
+    const char* end   = start + value.sizeInBytes();
+    while (start < end and scHttpWebSocketIsSpace(*start))
+    {
+        start++;
+    }
+    while (end > start and scHttpWebSocketIsSpace(*(end - 1)))
+    {
+        end--;
+    }
+    return {{start, static_cast<size_t>(end - start)}, false, value.getEncoding()};
+}
+
+static SC::Result scHttpWebSocketBase64Encode(SC::Span<const uint8_t> data, SC::Span<char> storage,
+                                              SC::StringSpan& output)
+{
+    const size_t encodedLength = ((data.sizeInBytes() + 2) / 3) * 4;
+    SC_TRY_MSG(storage.sizeInBytes() >= encodedLength, "HttpWebSocketHandshake base64 output too small");
+
+    size_t inputOffset  = 0;
+    size_t outputOffset = 0;
+    while (inputOffset < data.sizeInBytes())
+    {
+        const uint32_t a = data[inputOffset++];
+        const uint32_t b = inputOffset < data.sizeInBytes() ? data[inputOffset++] : 0;
+        const uint32_t c = inputOffset < data.sizeInBytes() ? data[inputOffset++] : 0;
+        const uint32_t n = (a << 16) | (b << 8) | c;
+
+        storage[outputOffset++] = SC_HTTP_WEBSOCKET_BASE64[(n >> 18) & 0x3F];
+        storage[outputOffset++] = SC_HTTP_WEBSOCKET_BASE64[(n >> 12) & 0x3F];
+        storage[outputOffset++] =
+            inputOffset - 1 <= data.sizeInBytes() ? SC_HTTP_WEBSOCKET_BASE64[(n >> 6) & 0x3F] : '=';
+        storage[outputOffset++] = inputOffset <= data.sizeInBytes() ? SC_HTTP_WEBSOCKET_BASE64[n & 0x3F] : '=';
+    }
+
+    const size_t remainder = data.sizeInBytes() % 3;
+    if (remainder == 1)
+    {
+        storage[encodedLength - 2] = '=';
+        storage[encodedLength - 1] = '=';
+    }
+    else if (remainder == 2)
+    {
+        storage[encodedLength - 1] = '=';
+    }
+
+    output = {{storage.data(), encodedLength}, false, SC::StringEncoding::Ascii};
+    return SC::Result(true);
+}
+
+static int scHttpWebSocketBase64Value(char value)
+{
+    if (value >= 'A' and value <= 'Z')
+    {
+        return value - 'A';
+    }
+    if (value >= 'a' and value <= 'z')
+    {
+        return 26 + value - 'a';
+    }
+    if (value >= '0' and value <= '9')
+    {
+        return 52 + value - '0';
+    }
+    if (value == '+')
+    {
+        return 62;
+    }
+    if (value == '/')
+    {
+        return 63;
+    }
+    return -1;
+}
+
+static SC::Result scHttpWebSocketBase64Decode(SC::StringSpan value, SC::Span<uint8_t> output, size_t& decodedBytes)
+{
+    decodedBytes = 0;
+    SC_TRY_MSG((value.sizeInBytes() % 4) == 0, "HttpWebSocketHandshake malformed base64 length");
+
+    for (size_t offset = 0; offset < value.sizeInBytes(); offset += 4)
+    {
+        int sextets[4] = {0, 0, 0, 0};
+        int padding    = 0;
+        for (size_t idx = 0; idx < 4; ++idx)
+        {
+            const char current = value.bytesWithoutTerminator()[offset + idx];
+            if (current == '=')
+            {
+                SC_TRY_MSG(offset + idx >= value.sizeInBytes() - 2, "HttpWebSocketHandshake malformed base64 padding");
+                sextets[idx] = 0;
+                padding++;
+            }
+            else
+            {
+                SC_TRY_MSG(padding == 0, "HttpWebSocketHandshake malformed base64 padding");
+                sextets[idx] = scHttpWebSocketBase64Value(current);
+                SC_TRY_MSG(sextets[idx] >= 0, "HttpWebSocketHandshake malformed base64 character");
+            }
+        }
+
+        const uint32_t combined = (static_cast<uint32_t>(sextets[0]) << 18) |
+                                  (static_cast<uint32_t>(sextets[1]) << 12) | (static_cast<uint32_t>(sextets[2]) << 6) |
+                                  static_cast<uint32_t>(sextets[3]);
+        const size_t bytesThisBlock = 3 - static_cast<size_t>(padding);
+        SC_TRY_MSG(decodedBytes + bytesThisBlock <= output.sizeInBytes(),
+                   "HttpWebSocketHandshake base64 decode output too small");
+        if (bytesThisBlock >= 1)
+        {
+            output[decodedBytes++] = static_cast<uint8_t>((combined >> 16) & 0xFF);
+        }
+        if (bytesThisBlock >= 2)
+        {
+            output[decodedBytes++] = static_cast<uint8_t>((combined >> 8) & 0xFF);
+        }
+        if (bytesThisBlock >= 3)
+        {
+            output[decodedBytes++] = static_cast<uint8_t>(combined & 0xFF);
+        }
+    }
+    return SC::Result(true);
+}
+
+struct HttpWebSocketSha1
+{
+#if SC_PLATFORM_APPLE
+#if SC_COMPILER_CLANG
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#endif
+    CC_SHA1_CTX context;
+
+    HttpWebSocketSha1() { CC_SHA1_Init(&context); }
+    ~HttpWebSocketSha1() {}
+
+    SC::Result add(SC::Span<const uint8_t> data)
+    {
+        CC_SHA1_Update(&context, data.data(), static_cast<CC_LONG>(data.sizeInBytes()));
+        return SC::Result(true);
+    }
+
+    SC::Result finish(uint8_t digest[20])
+    {
+        CC_SHA1_Final(digest, &context);
+        return SC::Result(true);
+    }
+#if SC_COMPILER_CLANG
+#pragma clang diagnostic pop
+#endif
+#elif SC_PLATFORM_WINDOWS
+    HCRYPTPROV provider = 0;
+    HCRYPTHASH hash     = 0;
+
+    HttpWebSocketSha1()
+    {
+        if (not CryptAcquireContext(&provider, NULL, MS_ENH_RSA_AES_PROV, PROV_RSA_AES, CRYPT_VERIFYCONTEXT))
+        {
+            return;
+        }
+        if (not CryptCreateHash(provider, CALG_SHA1, 0, 0, &hash))
+        {
+            CryptReleaseContext(provider, 0);
+            provider = 0;
+        }
+    }
+
+    ~HttpWebSocketSha1()
+    {
+        if (hash != 0)
+        {
+            CryptDestroyHash(hash);
+        }
+        if (provider != 0)
+        {
+            CryptReleaseContext(provider, 0);
+        }
+    }
+
+    SC::Result add(SC::Span<const uint8_t> data)
+    {
+        SC_TRY_MSG(hash != 0, "HttpWebSocketHandshake SHA1 init failed");
+        SC_TRY_MSG(CryptHashData(hash, data.data(), static_cast<DWORD>(data.sizeInBytes()), 0),
+                   "HttpWebSocketHandshake SHA1 update failed");
+        return SC::Result(true);
+    }
+
+    SC::Result finish(uint8_t digest[20])
+    {
+        SC_TRY_MSG(hash != 0, "HttpWebSocketHandshake SHA1 init failed");
+        DWORD hashSize = 20;
+        SC_TRY_MSG(CryptGetHashParam(hash, HP_HASHVAL, digest, &hashSize, 0),
+                   "HttpWebSocketHandshake SHA1 final failed");
+        SC_TRY_MSG(hashSize == 20, "HttpWebSocketHandshake SHA1 digest size invalid");
+        return SC::Result(true);
+    }
+#elif SC_PLATFORM_LINUX
+    int mainSocket = -1;
+    int hashSocket = -1;
+
+    HttpWebSocketSha1()
+    {
+        sockaddr_alg sa = {};
+        sa.salg_family  = AF_ALG;
+        ::memcpy(sa.salg_type, "hash", sizeof("hash"));
+        ::memcpy(sa.salg_name, "sha1", sizeof("sha1"));
+
+        mainSocket = ::socket(AF_ALG, SOCK_SEQPACKET, 0);
+        if (mainSocket == -1)
+        {
+            return;
+        }
+        if (::bind(mainSocket, reinterpret_cast<struct sockaddr*>(&sa), sizeof(sa)) == -1)
+        {
+            ::close(mainSocket);
+            mainSocket = -1;
+            return;
+        }
+        hashSocket = ::accept(mainSocket, NULL, 0);
+        if (hashSocket == -1)
+        {
+            ::close(mainSocket);
+            mainSocket = -1;
+        }
+    }
+
+    ~HttpWebSocketSha1()
+    {
+        if (hashSocket != -1)
+        {
+            ::close(hashSocket);
+        }
+        if (mainSocket != -1)
+        {
+            ::close(mainSocket);
+        }
+    }
+
+    SC::Result add(SC::Span<const uint8_t> data)
+    {
+        SC_TRY_MSG(hashSocket != -1, "HttpWebSocketHandshake SHA1 init failed");
+        const ssize_t written = ::send(hashSocket, data.data(), data.sizeInBytes(), MSG_MORE);
+        SC_TRY_MSG(written == static_cast<ssize_t>(data.sizeInBytes()), "HttpWebSocketHandshake SHA1 update failed");
+        return SC::Result(true);
+    }
+
+    SC::Result finish(uint8_t digest[20])
+    {
+        SC_TRY_MSG(hashSocket != -1, "HttpWebSocketHandshake SHA1 init failed");
+        const ssize_t readBytes = ::recv(hashSocket, digest, 20, 0);
+        SC_TRY_MSG(readBytes == 20, "HttpWebSocketHandshake SHA1 final failed");
+        return SC::Result(true);
+    }
+#else
+    SC::Result add(SC::Span<const uint8_t>) { return SC::Result::Error("HttpWebSocketHandshake SHA1 unsupported"); }
+    SC::Result finish(uint8_t[20]) { return SC::Result::Error("HttpWebSocketHandshake SHA1 unsupported"); }
+#endif
+};
 } // namespace
 
 namespace SC
 {
+int HttpWebSocketHandshakeResult::httpStatusCode() const
+{
+    switch (status)
+    {
+    case Status::Accepted: return 101;
+    case Status::BadRequest: return 400;
+    case Status::UnsupportedVersion: return 426;
+    }
+    return 400;
+}
+
 bool HttpWebSocketFrameHeaderView::isControlFrame() const
 {
     return static_cast<uint8_t>(opcode) >= static_cast<uint8_t>(HttpWebSocketOpcode::Close);
@@ -53,6 +371,204 @@ void HttpWebSocketTransportView::reset()
     readableStream = nullptr;
     writableStream = nullptr;
     buffersPool    = nullptr;
+}
+
+Result HttpWebSocketHandshake::createClientKey(Span<const uint8_t> nonce, Span<char> storage, StringSpan& key)
+{
+    SC_TRY_MSG(nonce.sizeInBytes() == NonceLength, "HttpWebSocketHandshake nonce must be 16 bytes");
+    return scHttpWebSocketBase64Encode(nonce, storage, key);
+}
+
+Result HttpWebSocketHandshake::validateClientKey(StringSpan key)
+{
+    SC_TRY_MSG(key.sizeInBytes() == ClientKeyLength, "HttpWebSocketHandshake Sec-WebSocket-Key length invalid");
+
+    uint8_t decoded[NonceLength] = {0};
+    size_t  decodedBytes         = 0;
+    SC_TRY(scHttpWebSocketBase64Decode(key, decoded, decodedBytes));
+    SC_TRY_MSG(decodedBytes == NonceLength, "HttpWebSocketHandshake Sec-WebSocket-Key decoded length invalid");
+    return Result(true);
+}
+
+Result HttpWebSocketHandshake::computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept)
+{
+    SC_TRY(validateClientKey(clientKey));
+
+    HttpWebSocketSha1 sha1;
+    SC_TRY(sha1.add(Span<const uint8_t>::reinterpret_bytes(clientKey.bytesWithoutTerminator(), clientKey.sizeInBytes())));
+    SC_TRY(sha1.add({reinterpret_cast<const uint8_t*>(SC_HTTP_WEBSOCKET_GUID), sizeof(SC_HTTP_WEBSOCKET_GUID) - 1}));
+
+    uint8_t digest[20] = {0};
+    SC_TRY(sha1.finish(digest));
+    return scHttpWebSocketBase64Encode({digest, sizeof(digest)}, storage, accept);
+}
+
+bool HttpWebSocketHandshake::headerContainsToken(StringSpan headerValue, StringSpan token)
+{
+    const char* start      = headerValue.bytesWithoutTerminator();
+    const char* end        = start + headerValue.sizeInBytes();
+    const char* tokenStart = start;
+    for (const char* it = start; it <= end; ++it)
+    {
+        if (it == end or *it == ',')
+        {
+            StringSpan part = scHttpWebSocketTrim(
+                {{tokenStart, static_cast<size_t>(it - tokenStart)}, false, headerValue.getEncoding()});
+            if (scHttpWebSocketEqualsIgnoreCase(part, token))
+            {
+                return true;
+            }
+            tokenStart = it + 1;
+        }
+    }
+    return false;
+}
+
+HttpWebSocketHandshakeResult HttpWebSocketHandshake::validateServerRequest(
+    const HttpWebSocketServerHandshakeRequestView& request)
+{
+    HttpWebSocketHandshakeResult result;
+
+    if (request.method != HttpParser::Method::HttpGET or
+        not scHttpWebSocketEqualsIgnoreCase(request.version, "HTTP/1.1"))
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::BadRequest;
+        return result;
+    }
+    if (not scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(request.upgrade), "websocket"))
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::BadRequest;
+        return result;
+    }
+    if (not headerContainsToken(request.connection, "Upgrade"))
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::BadRequest;
+        return result;
+    }
+    if (not validateClientKey(scHttpWebSocketTrim(request.secWebSocketKey)))
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::BadRequest;
+        return result;
+    }
+    if (request.secWebSocketVersion.isEmpty())
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::BadRequest;
+        return result;
+    }
+    if (not scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(request.secWebSocketVersion), "13"))
+    {
+        result.status = HttpWebSocketHandshakeResult::Status::UnsupportedVersion;
+        return result;
+    }
+
+    result.status = HttpWebSocketHandshakeResult::Status::Accepted;
+    return result;
+}
+
+HttpWebSocketHandshakeResult HttpWebSocketHandshake::validateServerRequest(
+    const HttpRequest& request, HttpWebSocketServerHandshakeRequestView* view)
+{
+    HttpWebSocketServerHandshakeRequestView local;
+    local.method  = request.getParser().method;
+    local.version = request.getVersion();
+    (void)request.getHeader("Upgrade", local.upgrade);
+    (void)request.getHeader("Connection", local.connection);
+    (void)request.getHeader("Sec-WebSocket-Key", local.secWebSocketKey);
+    (void)request.getHeader("Sec-WebSocket-Version", local.secWebSocketVersion);
+
+    if (view != nullptr)
+    {
+        *view = local;
+    }
+    return validateServerRequest(local);
+}
+
+Result HttpWebSocketHandshake::validateClientResponse(const HttpWebSocketClientHandshakeResponseView& response,
+                                                      StringSpan                                      expectedClientKey)
+{
+    SC_TRY_MSG(response.statusCode == 101, "HttpWebSocketHandshake expected 101 Switching Protocols");
+    SC_TRY_MSG(scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(response.upgrade), "websocket"),
+               "HttpWebSocketHandshake response Upgrade header invalid");
+    SC_TRY_MSG(headerContainsToken(response.connection, "Upgrade"),
+               "HttpWebSocketHandshake response Connection header invalid");
+
+    char       acceptStorage[AcceptKeyLength] = {0};
+    StringSpan expectedAccept;
+    SC_TRY(computeAccept(expectedClientKey, acceptStorage, expectedAccept));
+    SC_TRY_MSG(scHttpWebSocketEqualsIgnoreCase(scHttpWebSocketTrim(response.secWebSocketAccept), expectedAccept),
+               "HttpWebSocketHandshake response Sec-WebSocket-Accept invalid");
+    return Result(true);
+}
+
+Result HttpWebSocketHandshake::validateClientResponse(const HttpAsyncClientResponse& response,
+                                                      StringSpan                     expectedClientKey)
+{
+    HttpWebSocketClientHandshakeResponseView view;
+    view.statusCode = response.getParser().statusCode;
+    (void)response.getHeader("Upgrade", view.upgrade);
+    (void)response.getHeader("Connection", view.connection);
+    (void)response.getHeader("Sec-WebSocket-Accept", view.secWebSocketAccept);
+    return validateClientResponse(view, expectedClientKey);
+}
+
+Result HttpWebSocketHandshake::prepareClientRequest(HttpAsyncClientRequest& request, StringSpan clientKey)
+{
+    SC_TRY(validateClientKey(clientKey));
+    SC_TRY(request.addHeader("Upgrade", "websocket"));
+    SC_TRY(request.addHeader("Connection", "Upgrade"));
+    SC_TRY(request.addHeader("Sec-WebSocket-Key", clientKey));
+    SC_TRY(request.addHeader("Sec-WebSocket-Version", "13"));
+    return request.sendHeaders();
+}
+
+Result HttpWebSocketHandshake::writeServerAccept(HttpResponse& response, StringSpan clientKey, Span<char> acceptStorage,
+                                                 StringSpan& accept)
+{
+    SC_TRY(computeAccept(clientKey, acceptStorage, accept));
+    SC_TRY(response.startResponse(101));
+    SC_TRY(response.addHeader("Upgrade", "websocket"));
+    SC_TRY(response.addHeader("Connection", "Upgrade"));
+    SC_TRY(response.addHeader("Sec-WebSocket-Accept", accept));
+    return response.sendHeaders();
+}
+
+Result HttpWebSocketHandshake::acceptServerConnection(HttpConnection& connection, HttpWebSocketTransportView& transport,
+                                                      Span<char> acceptStorage)
+{
+    HttpWebSocketServerHandshakeRequestView request;
+    const HttpWebSocketHandshakeResult      validation = validateServerRequest(connection.request, &request);
+    SC_TRY_MSG(validation.accepted(), "HttpWebSocketHandshake server request is not acceptable");
+
+    StringSpan accept;
+    SC_TRY(computeAccept(request.secWebSocketKey, acceptStorage, accept));
+    SC_TRY(connection.response.startResponse(101));
+    SC_TRY(connection.response.addHeader("Upgrade", "websocket"));
+    SC_TRY(connection.response.addHeader("Connection", "Upgrade"));
+    SC_TRY(connection.response.addHeader("Sec-WebSocket-Accept", accept));
+
+    connection.markWebSocketUpgraded();
+    transport.readableStream = &connection.readableSocketStream;
+    transport.writableStream = &connection.writableSocketStream;
+    transport.buffersPool    = &connection.buffersPool;
+
+    return connection.response.sendHeaders(
+        {[&connection](AsyncBufferView::ID) { connection.readableSocketStream.resumeReading(); }});
+}
+
+Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&                       response,
+                                                      const HttpWebSocketHandshakeResult& result)
+{
+    const int statusCode = result.httpStatusCode();
+    SC_TRY_MSG(statusCode != 101, "HttpWebSocketHandshake cannot reject an accepted request");
+    SC_TRY(response.startResponse(statusCode));
+    if (statusCode == 426)
+    {
+        SC_TRY(response.addHeader("Sec-WebSocket-Version", "13"));
+    }
+    SC_TRY(response.addHeader("Content-Length", "0"));
+    SC_TRY(response.addHeader("Connection", "close"));
+    SC_TRY(response.sendHeaders());
+    return response.end();
 }
 
 void HttpWebSocketFrameReader::reset(HttpWebSocketEndpointRole role)

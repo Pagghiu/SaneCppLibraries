@@ -59,6 +59,7 @@ void runHttpURLParserTest(TestReport& report);
 void runHttpKeepAliveTest(TestReport& report);
 void runHttpMultipartParserTest(TestReport& report);
 void runHttpWebSocketFrameTest(TestReport& report);
+void runHttpWebSocketHandshakeTest(TestReport& report);
 
 // HttpClient
 void runHttpClientTest(TestReport& report);
@@ -195,6 +196,7 @@ int main(int argc, const char* argv[])
     runHttpKeepAliveTest(report);
     runHttpMultipartParserTest(report);
     runHttpWebSocketFrameTest(report);
+    runHttpWebSocketHandshakeTest(report);
 
     // HttpClient tests
     runHttpClientTest(report);

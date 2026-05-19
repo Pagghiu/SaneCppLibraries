@@ -254,6 +254,12 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             {
                 SC_ASSERT_RELEASE(client.response.getWritableStream().eventFinish.removeListener(*this));
 
+                if (client.isWebSocketUpgraded())
+                {
+                    pself.closeAsync(client);
+                    return;
+                }
+
                 // Determine if we should keep the connection alive
                 const bool underMaxRequests =
                     (pself.maxRequestsPerConnection == 0) or (client.requestCount + 1 < pself.maxRequestsPerConnection);

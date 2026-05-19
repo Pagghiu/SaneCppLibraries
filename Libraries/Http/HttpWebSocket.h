@@ -6,9 +6,16 @@
 #include "../Foundation/Result.h"
 #include "../Foundation/Span.h"
 #include "HttpExport.h"
+#include "HttpParser.h"
 
 namespace SC
 {
+struct HttpAsyncClientRequest;
+struct HttpAsyncClientResponse;
+struct HttpConnection;
+struct HttpRequest;
+struct HttpResponse;
+
 //! @addtogroup group_http
 //! @{
 
@@ -57,6 +64,73 @@ struct SC_HTTP_EXPORT HttpWebSocketTransportView
     {
         return readableStream != nullptr and writableStream != nullptr and buffersPool != nullptr;
     }
+};
+
+/// @brief Normalized server-side WebSocket opening handshake data
+struct SC_HTTP_EXPORT HttpWebSocketServerHandshakeRequestView
+{
+    HttpParser::Method method = HttpParser::Method::HttpGET;
+
+    StringSpan version;
+    StringSpan upgrade;
+    StringSpan connection;
+    StringSpan secWebSocketKey;
+    StringSpan secWebSocketVersion;
+};
+
+/// @brief Normalized client-side WebSocket opening handshake response data
+struct SC_HTTP_EXPORT HttpWebSocketClientHandshakeResponseView
+{
+    uint32_t statusCode = 0;
+
+    StringSpan upgrade;
+    StringSpan connection;
+    StringSpan secWebSocketAccept;
+};
+
+/// @brief Outcome of validating a WebSocket opening handshake
+struct SC_HTTP_EXPORT HttpWebSocketHandshakeResult
+{
+    enum class Status : uint8_t
+    {
+        Accepted,
+        BadRequest,
+        UnsupportedVersion,
+    };
+
+    Status status = Status::BadRequest;
+
+    [[nodiscard]] bool accepted() const { return status == Status::Accepted; }
+    [[nodiscard]] int  httpStatusCode() const;
+};
+
+/// @brief Dependency-free RFC 6455 opening handshake helpers
+struct SC_HTTP_EXPORT HttpWebSocketHandshake
+{
+    static constexpr size_t ClientKeyLength = 24;
+    static constexpr size_t AcceptKeyLength = 28;
+    static constexpr size_t NonceLength     = 16;
+
+    static Result createClientKey(Span<const uint8_t> nonce, Span<char> storage, StringSpan& key);
+    static Result validateClientKey(StringSpan key);
+    static Result computeAccept(StringSpan clientKey, Span<char> storage, StringSpan& accept);
+
+    static bool headerContainsToken(StringSpan headerValue, StringSpan token);
+
+    static HttpWebSocketHandshakeResult validateServerRequest(const HttpWebSocketServerHandshakeRequestView& request);
+    static HttpWebSocketHandshakeResult validateServerRequest(const HttpRequest&                       request,
+                                                              HttpWebSocketServerHandshakeRequestView* view = nullptr);
+
+    static Result validateClientResponse(const HttpWebSocketClientHandshakeResponseView& response,
+                                         StringSpan                                      expectedClientKey);
+    static Result validateClientResponse(const HttpAsyncClientResponse& response, StringSpan expectedClientKey);
+
+    static Result prepareClientRequest(HttpAsyncClientRequest& request, StringSpan clientKey);
+    static Result writeServerAccept(HttpResponse& response, StringSpan clientKey, Span<char> acceptStorage,
+                                    StringSpan& accept);
+    static Result acceptServerConnection(HttpConnection& connection, HttpWebSocketTransportView& transport,
+                                         Span<char> acceptStorage);
+    static Result rejectServerConnection(HttpResponse& response, const HttpWebSocketHandshakeResult& result);
 };
 
 /// @brief Incremental WebSocket frame reader operating on caller-owned mutable byte slices
