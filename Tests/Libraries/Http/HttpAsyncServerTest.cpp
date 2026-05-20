@@ -169,6 +169,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             httpAsyncServerTest();
         }
+        if (test_section("custom response status"))
+        {
+            customResponseStatus();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -187,6 +191,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         }
     }
     void httpAsyncServerTest();
+    void customResponseStatus();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void chunkedResponseWriting();
@@ -312,6 +317,50 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(serverContext.numRequests == clientContext.wantedNumRequests);
     SC_TEST_EXPECT(clientContext.numRequests == clientContext.wantedNumRequests);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncServerTest::customResponseStatus()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType connections[1];
+    HttpAsyncServer    httpServer;
+    const uint16_t     serverPort = report.mapPort(6153);
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(418, "I'm a Teapot"));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "0"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    HttpTestClient client;
+    client.callback = [this, &httpServer](HttpTestClient& result)
+    {
+        StringView response(result.getResponse());
+        SC_TEST_EXPECT(response.containsString("418 I'm a Teapot"));
+        SC_TEST_EXPECT(httpServer.stop());
+    };
+
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/status", serverPort));
+    SC_TEST_EXPECT(client.get(eventLoop, endpoint.view()));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
 }
 

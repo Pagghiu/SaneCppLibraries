@@ -972,44 +972,45 @@ void HttpOutgoingMessage::setKeepAlive(bool value) { keepAlive = value; }
 //-------------------------------------------------------------------------------------------------------
 Result HttpResponse::startResponse(int code)
 {
-    SC_TRY_MSG(not headersSent, "Headers already sent");
-    SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startResponse must be the first call");
-    SC_TRY(responseHeaders.appendLiteral("HTTP/1.1 ", "HttpResponse::appendAscii - header space is finished"));
+    StringSpan reasonPhrase;
     switch (code)
     {
-    case 101:
-        SC_TRY(responseHeaders.appendLiteral("101 Switching Protocols\r\n",
-                                             "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 200:
-        SC_TRY(responseHeaders.appendLiteral("200 OK\r\n", "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 201:
-        SC_TRY(
-            responseHeaders.appendLiteral("201 Created\r\n", "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 204:
-        SC_TRY(responseHeaders.appendLiteral("204 No Content\r\n",
-                                             "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 400:
-        SC_TRY(responseHeaders.appendLiteral("400 Bad Request\r\n",
-                                             "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 404:
-        SC_TRY(
-            responseHeaders.appendLiteral("404 Not Found\r\n", "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 405:
-        SC_TRY(responseHeaders.appendLiteral("405 Method Not Allowed\r\n",
-                                             "HttpResponse::appendAscii - header space is finished"));
-        break;
-    case 426:
-        SC_TRY(responseHeaders.appendLiteral("426 Upgrade Required\r\n",
-                                             "HttpResponse::appendAscii - header space is finished"));
-        break;
+    case 101: reasonPhrase = "Switching Protocols"; break;
+    case 200: reasonPhrase = "OK"; break;
+    case 201: reasonPhrase = "Created"; break;
+    case 204: reasonPhrase = "No Content"; break;
+    case 400: reasonPhrase = "Bad Request"; break;
+    case 404: reasonPhrase = "Not Found"; break;
+    case 405: reasonPhrase = "Method Not Allowed"; break;
+    case 426: reasonPhrase = "Upgrade Required"; break;
     default: return Result::Error("HttpResponse unsupported status code");
     }
+    return startResponse(code, reasonPhrase);
+}
+
+Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
+{
+    static constexpr const char* HeaderSpaceFinished = "HttpResponse::appendAscii - header space is finished";
+
+    SC_TRY_MSG(not headersSent, "Headers already sent");
+    SC_TRY_MSG(responseHeaders.writtenBytes() == 0, "startResponse must be the first call");
+    SC_TRY_MSG(code >= 100 and code <= 999, "HttpResponse status code must have three digits");
+    SC_TRY_MSG(not reasonPhrase.isEmpty(), "HttpResponse reason phrase must not be empty");
+
+    for (char current : reasonPhrase.toCharSpan())
+    {
+        SC_TRY_MSG(current != '\r' and current != '\n', "HttpResponse reason phrase must not contain CR or LF");
+    }
+
+    char      codeBuffer[4];
+    const int len = ::snprintf(codeBuffer, sizeof(codeBuffer), "%d", code);
+    SC_TRY_MSG(len == 3, "HttpResponse failed formatting status code");
+
+    SC_TRY(responseHeaders.appendLiteral("HTTP/1.1 ", HeaderSpaceFinished));
+    SC_TRY(responseHeaders.append({codeBuffer, 3}, HeaderSpaceFinished));
+    SC_TRY(responseHeaders.appendLiteral(" ", HeaderSpaceFinished));
+    SC_TRY(responseHeaders.append(reasonPhrase, HeaderSpaceFinished));
+    SC_TRY(responseHeaders.appendLiteral("\r\n", HeaderSpaceFinished));
     return Result(true);
 }
 

@@ -364,6 +364,9 @@ struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
     /// @brief Starts the response with a http standard code (200 OK, 404 NOT FOUND etc.)
     Result startResponse(int httpCode);
 
+    /// @brief Starts the response with an explicit status code and reason phrase.
+    Result startResponse(int httpCode, StringSpan reasonPhrase);
+
   private:
     friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;
