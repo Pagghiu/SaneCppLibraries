@@ -30,9 +30,10 @@ struct SC_HTTP_EXPORT HttpAsyncClientConnection
 /// `HttpAsyncClient` processes a single request at a time and can sequentially reuse the same connection when
 /// keep-alive is enabled and the next request targets the same host and port.
 ///
-/// Use the convenience wrappers (`get`, `put`, `post`, `postMultipart`) when the request body is already available
-/// in memory. Use `start()` when the request must be customized inside `onPrepareRequest`, for example to stream the
-/// request body with `HttpAsyncClientRequest::setBody(AsyncReadableStream&, uint64_t)` or to write it manually through
+/// Use the convenience wrappers (`get`, `head`, `put`, `post`, `patch`, `deleteRequest`, `options`,
+/// `postMultipart`) when the request body is already available in memory. Use `start()` when the request must be
+/// customized inside `onPrepareRequest`, for example to stream the request body with
+/// `HttpAsyncClientRequest::setBody(AsyncReadableStream&, uint64_t)` or to write it manually through
 /// `HttpAsyncClientRequest::getWritableStream()`.
 ///
 /// `onResponse` is called after response headers have been parsed. The response body is then read incrementally from
@@ -77,6 +78,12 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// @brief Convenience wrapper for a HEAD request without a request body
     Result head(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
 
+    /// @brief Convenience wrapper for an OPTIONS request without a request body
+    Result options(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
+
+    /// @brief Convenience wrapper for a DELETE request without a request body
+    Result deleteRequest(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
+
     /// @brief Convenience wrapper for a PUT request with a fixed in-memory body
     Result put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive = false);
     Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body, bool keepAlive = false)
@@ -89,6 +96,13 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     Result post(AsyncEventLoop& loop, StringSpan url, StringSpan body, bool keepAlive = false)
     {
         return post(loop, url, body.toCharSpan(), keepAlive);
+    }
+
+    /// @brief Convenience wrapper for a PATCH request with a fixed in-memory body
+    Result patch(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive = false);
+    Result patch(AsyncEventLoop& loop, StringSpan url, StringSpan body, bool keepAlive = false)
+    {
+        return patch(loop, url, body.toCharSpan(), keepAlive);
     }
 
     /// @brief Convenience wrapper for a multipart/form-data POST request

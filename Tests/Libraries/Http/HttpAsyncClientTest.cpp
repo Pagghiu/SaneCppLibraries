@@ -270,10 +270,15 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             headResponse();
         }
+        if (test_section("common method wrappers"))
+        {
+            commonMethodWrappers();
+        }
     }
 
     void basicGet();
     void headResponse();
+    void commonMethodWrappers();
     void putSpanBody();
     void putStreamBody();
     void putChunkedStreamBody();
@@ -399,6 +404,201 @@ void SC::HttpAsyncClientTest::headResponse()
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::commonMethodWrappers()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[2];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26111);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    struct ServerContext
+    {
+        HttpAsyncClientTest* test       = nullptr;
+        HttpConnection*      connection = nullptr;
+
+        Buffer patchBody;
+
+        int patchRequests   = 0;
+        int optionsRequests = 0;
+        int deleteRequests  = 0;
+
+        Result append(Span<const char> data)
+        {
+            GrowableBuffer<Buffer> gb(patchBody);
+            HttpStringAppend&      sb = static_cast<HttpStringAppend&>(static_cast<IGrowableBuffer&>(gb));
+            return Result(sb.append(data, 0));
+        }
+
+        Result sendEmptyResponse(int statusCode)
+        {
+            SC_TRY(connection->response.startResponse(statusCode));
+            SC_TRY(connection->response.addHeader("Content-Length", "0"));
+            SC_TRY(connection->response.sendHeaders());
+            return connection->response.end();
+        }
+
+        void onPatchData(AsyncBufferView::ID bufferID)
+        {
+            Span<const char> data;
+            SC_ASSERT_RELEASE(connection != nullptr);
+            SC_ASSERT_RELEASE(connection->request.getReadableStream().getBuffersPool().getReadableData(bufferID, data));
+            SC_ASSERT_RELEASE(append(data));
+            SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+        }
+
+        void onPatchEnd()
+        {
+            test->recordExpectation("patch body",
+                                    StringView(patchBody.toSpanConst(), false, StringEncoding::Ascii) == "patch");
+            test->recordExpectation("patch response", sendEmptyResponse(200));
+        }
+    } serverContext = {this};
+
+    httpServer.onRequest = [this, &serverContext](HttpConnection& connection)
+    {
+        serverContext.connection = &connection;
+        if (connection.request.getParser().method == HttpParser::Method::HttpPATCH)
+        {
+            serverContext.patchRequests++;
+            SC_TEST_EXPECT(connection.request.getURL() == "/patch");
+            const bool addedData =
+                connection.request.getReadableStream()
+                    .eventData.addListener<ServerContext, &ServerContext::onPatchData>(serverContext);
+            const bool addedEnd =
+                connection.request.getReadableStream().eventEnd.addListener<ServerContext, &ServerContext::onPatchEnd>(
+                    serverContext);
+            SC_TEST_EXPECT(addedData);
+            SC_TEST_EXPECT(addedEnd);
+            return;
+        }
+        if (connection.request.getParser().method == HttpParser::Method::HttpOPTIONS)
+        {
+            serverContext.optionsRequests++;
+            SC_TEST_EXPECT(connection.request.getURL() == "/options");
+            SC_TEST_EXPECT(serverContext.sendEmptyResponse(204));
+            return;
+        }
+        if (connection.request.getParser().method == HttpParser::Method::HttpDELETE)
+        {
+            serverContext.deleteRequests++;
+            SC_TEST_EXPECT(connection.request.getURL() == "/delete");
+            SC_TEST_EXPECT(serverContext.sendEmptyResponse(204));
+            return;
+        }
+        SC_TEST_EXPECT(false);
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    AsyncLoopTimeout  deferredStep;
+
+    String patchURL   = StringEncoding::Ascii;
+    String optionsURL = StringEncoding::Ascii;
+    String deleteURL  = StringEncoding::Ascii;
+
+    int completions = 0;
+    struct ClientContext
+    {
+        enum class DeferredAction : uint8_t
+        {
+            None,
+            Options,
+            Delete,
+            StopServer,
+        };
+
+        HttpAsyncClientTest* test = nullptr;
+
+        HttpAsyncClient&   client;
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+
+        AsyncEventLoop&   loop;
+        AsyncLoopTimeout& deferredStep;
+
+        String& patchURL;
+        String& optionsURL;
+        String& deleteURL;
+
+        int& completions;
+
+        DeferredAction deferredAction = DeferredAction::None;
+
+        Result scheduleDeferred(DeferredAction action)
+        {
+            deferredAction = action;
+            deferredStep.callback.bind<ClientContext, &ClientContext::onDeferred>(*this);
+            return deferredStep.start(loop, TimeMs{0});
+        }
+
+        void onDeferred(AsyncLoopTimeout::Result&)
+        {
+            switch (deferredAction)
+            {
+            case DeferredAction::Options:
+                test->recordExpectation("options", client.options(loop, optionsURL.view(), true));
+                break;
+            case DeferredAction::Delete:
+                test->recordExpectation("deleteRequest", client.deleteRequest(loop, deleteURL.view(), true));
+                break;
+            case DeferredAction::StopServer: test->recordExpectation("stop server", httpServer.stop()); break;
+            case DeferredAction::None: break;
+            }
+            deferredAction = DeferredAction::None;
+        }
+    } clientContext = {this,         client,   collector,  httpServer, loop,
+                       deferredStep, patchURL, optionsURL, deleteURL,  completions};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(patchURL, "http://127.0.0.1:{}/patch", port));
+    SC_TEST_EXPECT(StringBuilder::format(optionsURL, "http://127.0.0.1:{}/options", port));
+    SC_TEST_EXPECT(StringBuilder::format(deleteURL, "http://127.0.0.1:{}/delete", port));
+
+    client.onResponse = [this, &clientContext](HttpAsyncClientResponse& response)
+    {
+        clientContext.collector.attach(
+            response,
+            [this, &clientContext](HttpAsyncClientResponse& completedResponse)
+            {
+                clientContext.collector.detach();
+                clientContext.completions++;
+                SC_TEST_EXPECT(clientContext.collector.view().isEmpty());
+                if (clientContext.completions == 1)
+                {
+                    SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                    SC_TEST_EXPECT(clientContext.scheduleDeferred(ClientContext::DeferredAction::Options));
+                }
+                else if (clientContext.completions == 2)
+                {
+                    SC_TEST_EXPECT(completedResponse.getParser().statusCode == 204);
+                    SC_TEST_EXPECT(clientContext.scheduleDeferred(ClientContext::DeferredAction::Delete));
+                }
+                else
+                {
+                    SC_TEST_EXPECT(completedResponse.getParser().statusCode == 204);
+                    SC_TEST_EXPECT(clientContext.scheduleDeferred(ClientContext::DeferredAction::StopServer));
+                }
+            });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.patch(loop, patchURL.view(), StringSpan("patch"), true));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(serverContext.patchRequests == 1);
+    SC_TEST_EXPECT(serverContext.optionsRequests == 1);
+    SC_TEST_EXPECT(serverContext.deleteRequests == 1);
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(loop.close());

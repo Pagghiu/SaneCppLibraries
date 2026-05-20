@@ -64,6 +64,26 @@ Result HttpAsyncClient::head(AsyncEventLoop& loop, StringSpan url, bool keepAliv
     return startRequest(loop, preset);
 }
 
+Result HttpAsyncClient::options(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
+{
+    RequestPreset preset;
+    preset.method    = HttpParser::Method::HttpOPTIONS;
+    preset.url       = url;
+    preset.keepAlive = keepAlive;
+    preset.autoSend  = true;
+    return startRequest(loop, preset);
+}
+
+Result HttpAsyncClient::deleteRequest(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
+{
+    RequestPreset preset;
+    preset.method    = HttpParser::Method::HttpDELETE;
+    preset.url       = url;
+    preset.keepAlive = keepAlive;
+    preset.autoSend  = true;
+    return startRequest(loop, preset);
+}
+
 Result HttpAsyncClient::put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
     RequestPreset preset;
@@ -80,6 +100,18 @@ Result HttpAsyncClient::post(AsyncEventLoop& loop, StringSpan url, Span<const ch
 {
     RequestPreset preset;
     preset.method    = HttpParser::Method::HttpPOST;
+    preset.url       = url;
+    preset.keepAlive = keepAlive;
+    preset.autoSend  = true;
+    preset.bodyMode  = RequestPreset::BodyMode::Span;
+    preset.bodySpan  = body;
+    return startRequest(loop, preset);
+}
+
+Result HttpAsyncClient::patch(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
+{
+    RequestPreset preset;
+    preset.method    = HttpParser::Method::HttpPATCH;
     preset.url       = url;
     preset.keepAlive = keepAlive;
     preset.autoSend  = true;
