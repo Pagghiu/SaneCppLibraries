@@ -44,6 +44,7 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
             StringSpan     currentFileName;
             StringSpan     currentHeaderName;
             bool           isContentDisposition = false;
+            bool           rejectedFileName     = false;
 
             void onData(AsyncBufferView::ID bufferID);
         } multipartListener;

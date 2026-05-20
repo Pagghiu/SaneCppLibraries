@@ -85,6 +85,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int getCount       = 0;
         int putCount       = 0;
         int multipartCount = 0;
+        int badMultipartCount = 0;
         int safetyCount    = 0;
         int mimeCount      = 0;
         int headCount      = 0;
@@ -97,6 +98,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
         HttpTestClient postMultipart = {};
+        HttpTestClient badMultipart  = {};
         Buffer         multipartPayload;
 
         String fileURL   = StringEncoding::Ascii;
@@ -243,6 +245,17 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(::memcmp(content.data(), context.multipartPayload.data(), content.size()) == 0);
         SC_TEST_EXPECT(context.fs.removeFile("multipart.bin"));
 
+        SC_TEST_EXPECT(context.badMultipart.postMultipart(*context.loop, context.uploadURL.view(), "file",
+                                                          "../multipart_escape.bin", "bad"));
+    };
+
+    context.badMultipart.callback = [this, &context](HttpTestClient& result)
+    {
+        context.badMultipartCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("400 Bad Request"));
+        SC_TEST_EXPECT(not context.fs.existsAndIsFile("multipart_escape.bin"));
+
         SC_TEST_EXPECT(context.httpServer.stop());
     };
 
@@ -260,6 +273,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.getCount == 1);
     SC_TEST_EXPECT(context.putCount == 2);
     SC_TEST_EXPECT(context.multipartCount == 1);
+    SC_TEST_EXPECT(context.badMultipartCount == 1);
     SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.mimeCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);

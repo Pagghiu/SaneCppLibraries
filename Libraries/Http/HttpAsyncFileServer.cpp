@@ -23,6 +23,7 @@ struct HttpAsyncFileServer::Internal
     static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
     static Result formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize, size_t& outLength);
     static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
+    static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
 
     static int64_t    getCurrentTimeMilliseconds();
@@ -434,6 +435,24 @@ Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarg
     return Result(true);
 }
 
+bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)
+{
+    if (fileName.isEmpty() or fileName == "." or fileName == "..")
+    {
+        return false;
+    }
+
+    const char* data = fileName.bytesWithoutTerminator();
+    for (size_t idx = 0; idx < fileName.sizeInBytes(); ++idx)
+    {
+        if (data[idx] == '/' or data[idx] == '\\' or data[idx] == ':')
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, int statusCode)
 {
     SC_TRY(response.startResponse(statusCode));
@@ -507,6 +526,10 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
     stream.multipartListener.server     = this;
     stream.multipartListener.stream     = &stream;
     stream.multipartListener.connection = &connection;
+    stream.multipartListener.currentFileName      = {};
+    stream.multipartListener.currentHeaderName    = {};
+    stream.multipartListener.isContentDisposition = false;
+    stream.multipartListener.rejectedFileName     = false;
 
     SC_ASSERT_RELEASE((
         connection.request.getReadableStream()
@@ -544,7 +567,16 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
             tokenProcessed = true;
             switch (stream->multipartParser.token)
             {
-            case HttpMultipartParser::Token::Boundary: break;
+            case HttpMultipartParser::Token::Boundary: {
+                if (currentFd.isValid())
+                {
+                    (void)currentFd.close();
+                }
+                currentFileName      = {};
+                currentHeaderName    = {};
+                isContentDisposition = false;
+            }
+            break;
 
             case HttpMultipartParser::Token::HeaderName: {
                 currentHeaderName    = {parsedData, false, StringEncoding::Ascii};
@@ -566,6 +598,11 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
                             while (!it.isAtEnd() && !it.match('"'))
                                 (void)it.stepForward();
                             currentFileName = HttpStringIterator::fromIterators(start, it, StringEncoding::Ascii);
+                            if (not Internal::isSafeMultipartFileName(currentFileName))
+                            {
+                                rejectedFileName = true;
+                                currentFileName  = {};
+                            }
                         }
                     }
                 }
@@ -600,7 +637,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
                     readable.eventData.removeListener<HttpAsyncFileServer::Stream::MultipartListener,
                                                       &HttpAsyncFileServer::Stream::MultipartListener::onData>(*this)));
 
-                SC_ASSERT_RELEASE(connection->response.startResponse(201));
+                SC_ASSERT_RELEASE(connection->response.startResponse(rejectedFileName ? 400 : 201));
                 (void)connection->response.addHeader("Content-Length", "0");
                 SC_ASSERT_RELEASE(connection->response.sendHeaders());
                 SC_ASSERT_RELEASE(connection->response.end());
