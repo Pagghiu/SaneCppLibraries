@@ -988,6 +988,10 @@ Result HttpResponse::startResponse(int code)
         SC_TRY(
             responseHeaders.appendLiteral("201 Created\r\n", "HttpResponse::appendAscii - header space is finished"));
         break;
+    case 204:
+        SC_TRY(responseHeaders.appendLiteral("204 No Content\r\n",
+                                             "HttpResponse::appendAscii - header space is finished"));
+        break;
     case 400:
         SC_TRY(responseHeaders.appendLiteral("400 Bad Request\r\n",
                                              "HttpResponse::appendAscii - header space is finished"));
@@ -1004,6 +1008,7 @@ Result HttpResponse::startResponse(int code)
         SC_TRY(responseHeaders.appendLiteral("426 Upgrade Required\r\n",
                                              "HttpResponse::appendAscii - header space is finished"));
         break;
+    default: return Result::Error("HttpResponse unsupported status code");
     }
     return Result(true);
 }

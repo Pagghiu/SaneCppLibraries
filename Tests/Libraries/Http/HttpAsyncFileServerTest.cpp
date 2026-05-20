@@ -173,7 +173,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     {
         context.optionsCount++;
         StringView str(result.getResponse());
-        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("204 No Content"));
         SC_TEST_EXPECT(str.containsString("Allow: GET, HEAD, PUT, POST, OPTIONS"));
 
         // Create an Http Client request for that file

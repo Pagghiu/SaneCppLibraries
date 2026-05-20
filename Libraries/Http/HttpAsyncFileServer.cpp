@@ -74,7 +74,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
     case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath, true);
     case HttpParser::Method::HttpHEAD: return getFile(stream, connection, filePath, false);
     case HttpParser::Method::HttpOPTIONS:
-        SC_TRY(connection.response.startResponse(200));
+        SC_TRY(connection.response.startResponse(204));
         SC_TRY(connection.response.addHeader("Allow", "GET, HEAD, PUT, POST, OPTIONS"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
         SC_TRY(connection.response.addHeader("Content-Length", "0"));
