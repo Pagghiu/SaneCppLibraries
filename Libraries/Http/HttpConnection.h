@@ -112,6 +112,9 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
     /// @brief Gets the associated HttpParser
     const HttpParser& getParser() const { return parsedHeaders.parser; }
 
+    /// @brief Returns true once the incoming message headers have been parsed.
+    [[nodiscard]] bool hasReceivedHeaders() const { return parsedHeaders.headersEndReceived; }
+
     /// @brief Gets whether the other party requested the connection to stay alive
     [[nodiscard]] bool getKeepAlive() const { return parsedHeaders.parser.connectionKeepAlive; }
 
@@ -151,7 +154,6 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
   protected:
     void resetIncoming(HttpParser::Type type, Span<char> memory);
 
-    [[nodiscard]] bool       hasReceivedHeaders() const { return parsedHeaders.headersEndReceived; }
     [[nodiscard]] Span<char> getUnusedHeaderMemory() const { return parsedHeaders.availableHeader; }
 
     Result initBodyStream(AsyncBuffersPool& buffersPool, Function<Result()>&& onReadRequest);

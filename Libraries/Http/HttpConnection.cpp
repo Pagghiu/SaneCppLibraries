@@ -331,6 +331,10 @@ Result HttpIncomingMessage::consumeBodyBytes(size_t bytes)
     }
     SC_TRY_MSG(bytes <= bodyBytesRemaining, "HttpIncomingMessage body exceeds Content-Length");
     bodyBytesRemaining -= bytes;
+    if (bodyBytesRemaining == 0)
+    {
+        bodyComplete = true;
+    }
     return Result(true);
 }
 
@@ -441,8 +445,20 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             return Result::Error("HttpIncomingMessage received body beyond Content-Length");
         }
 
-        const bool shouldContinue = pushBodyData(bufferID, readData.sizeInBytes());
-        SC_TRY(consumeBodyBytes(readData.sizeInBytes()));
+        const uint64_t remainingBeforePush = bodyBytesRemaining;
+        const bool     shouldContinue      = pushBodyData(bufferID, readData.sizeInBytes());
+        if (bodyFramingKind == HttpBodyFramingKind::ContentLength)
+        {
+            if (bodyBytesRemaining == remainingBeforePush)
+            {
+                SC_TRY(consumeBodyBytes(readData.sizeInBytes()));
+            }
+            else
+            {
+                SC_TRY_MSG(bodyBytesRemaining + readData.sizeInBytes() == remainingBeforePush,
+                           "HttpIncomingMessage body stream consumed an unexpected byte count");
+            }
+        }
         if (bodyFramingKind == HttpBodyFramingKind::ContentLength and bodyBytesRemaining == 0)
         {
             finishBodyStream();

@@ -137,7 +137,11 @@ struct HttpAsyncServer::EventEndListener
 
     void operator()()
     {
-        // other party disconnected
+        // A peer may half-close after sending a complete request and still wait for the response.
+        if (client.request.hasReceivedHeaders() and client.request.isBodyComplete())
+        {
+            return;
+        }
         pself.closeAsync(client);
     }
 };
@@ -233,16 +237,6 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
 
         onRequest(client);
 
-        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::None)
-        {
-            client.readableSocketStream.pause();
-        }
-        else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked or
-                 client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
-        {
-            SC_TRUST_RESULT(client.request.startBodyStream());
-        }
-
         if (client.isWebSocketUpgraded())
         {
             EventCloseListener closeListener{*this, client};
@@ -253,7 +247,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             return;
         }
 
-        // Using a struct instead of a lambda so it can unregister itself
+        // Register before starting the body stream, which can synchronously emit buffered body data.
         struct AfterWrite
         {
             HttpAsyncServer& pself;
@@ -299,6 +293,17 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             }
         };
         SC_ASSERT_RELEASE(client.response.getWritableStream().eventFinish.addListener(AfterWrite{*this, client}));
+
+        if (client.request.getBodyFramingKind() == HttpBodyFramingKind::None)
+        {
+            client.readableSocketStream.pause();
+        }
+        else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked or
+                 client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
+        {
+            SC_TRUST_RESULT(client.request.startBodyStream());
+        }
+
     }
 }
 
