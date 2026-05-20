@@ -89,11 +89,13 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int safetyCount    = 0;
         int mimeCount      = 0;
         int headCount      = 0;
+        int optionsCount   = 0;
 
         HttpTestClient queryClient   = {};
         HttpTestClient badPathClient = {};
         HttpTestClient mimeClient    = {};
         HttpTestClient headClient    = {};
+        HttpTestClient optionsClient = {};
         HttpTestClient getClient     = {};
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
@@ -161,6 +163,18 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("200 OK"));
         SC_TEST_EXPECT(str.containsString("Content-Type: text/html"));
         SC_TEST_EXPECT(not str.containsString("Response from file"));
+
+        static constexpr StringSpan optionsRequest =
+            "OPTIONS /file.html HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+        SC_TEST_EXPECT(context.optionsClient.sendRaw(*context.loop, context.serverURL.view(), optionsRequest));
+    };
+
+    context.optionsClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.optionsCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Allow: GET, HEAD, PUT, POST, OPTIONS"));
 
         // Create an Http Client request for that file
         SC_TEST_EXPECT(context.getClient.get(*context.loop, context.fileURL.view()));
@@ -277,6 +291,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.mimeCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);
+    SC_TEST_EXPECT(context.optionsCount == 1);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
     SC_TEST_EXPECT(context.fs.removeFile("asset.webp"));
 }
