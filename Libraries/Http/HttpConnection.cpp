@@ -975,14 +975,22 @@ Result HttpResponse::startResponse(int code)
     StringSpan reasonPhrase;
     switch (code)
     {
+    case 100: reasonPhrase = "Continue"; break;
     case 101: reasonPhrase = "Switching Protocols"; break;
     case 200: reasonPhrase = "OK"; break;
     case 201: reasonPhrase = "Created"; break;
     case 204: reasonPhrase = "No Content"; break;
+    case 206: reasonPhrase = "Partial Content"; break;
+    case 301: reasonPhrase = "Moved Permanently"; break;
+    case 302: reasonPhrase = "Found"; break;
+    case 304: reasonPhrase = "Not Modified"; break;
     case 400: reasonPhrase = "Bad Request"; break;
+    case 403: reasonPhrase = "Forbidden"; break;
     case 404: reasonPhrase = "Not Found"; break;
     case 405: reasonPhrase = "Method Not Allowed"; break;
+    case 416: reasonPhrase = "Range Not Satisfiable"; break;
     case 426: reasonPhrase = "Upgrade Required"; break;
+    case 500: reasonPhrase = "Internal Server Error"; break;
     default: return Result::Error("HttpResponse unsupported status code");
     }
     return startResponse(code, reasonPhrase);

@@ -173,6 +173,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             customResponseStatus();
         }
+        if (test_section("standard response statuses"))
+        {
+            standardResponseStatuses();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -192,6 +196,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     }
     void httpAsyncServerTest();
     void customResponseStatus();
+    void standardResponseStatuses();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void chunkedResponseWriting();
@@ -362,6 +367,45 @@ void SC::HttpAsyncServerTest::customResponseStatus()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncServerTest::standardResponseStatuses()
+{
+    struct ProbeResponse : public HttpResponse
+    {
+        using HttpOutgoingMessage::setHeaderMemory;
+
+        [[nodiscard]] StringSpan written() const
+        {
+            return {responseHeaders.written(), false, StringEncoding::Ascii};
+        }
+    };
+
+    struct StatusCase
+    {
+        int        code;
+        StringSpan statusLine;
+    };
+
+    const StatusCase cases[] = {
+        {100, "HTTP/1.1 100 Continue\r\n"},
+        {206, "HTTP/1.1 206 Partial Content\r\n"},
+        {301, "HTTP/1.1 301 Moved Permanently\r\n"},
+        {302, "HTTP/1.1 302 Found\r\n"},
+        {304, "HTTP/1.1 304 Not Modified\r\n"},
+        {403, "HTTP/1.1 403 Forbidden\r\n"},
+        {416, "HTTP/1.1 416 Range Not Satisfiable\r\n"},
+        {500, "HTTP/1.1 500 Internal Server Error\r\n"},
+    };
+
+    for (const StatusCase& statusCase : cases)
+    {
+        char          headerStorage[128];
+        ProbeResponse response;
+        response.setHeaderMemory(headerStorage);
+        SC_TEST_EXPECT(response.startResponse(statusCase.code));
+        SC_TEST_EXPECT(response.written() == statusCase.statusLine);
+    }
 }
 
 void SC::HttpAsyncServerTest::chunkedRequestDecoding()
