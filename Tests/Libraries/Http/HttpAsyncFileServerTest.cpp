@@ -88,12 +88,14 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int badMultipartCount = 0;
         int safetyCount    = 0;
         int mimeCount      = 0;
+        int missingCount   = 0;
         int headCount      = 0;
         int optionsCount   = 0;
 
         HttpTestClient queryClient   = {};
         HttpTestClient badPathClient = {};
         HttpTestClient mimeClient    = {};
+        HttpTestClient missingClient = {};
         HttpTestClient headClient    = {};
         HttpTestClient optionsClient = {};
         HttpTestClient getClient     = {};
@@ -106,6 +108,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         String fileURL   = StringEncoding::Ascii;
         String queryURL  = StringEncoding::Ascii;
         String webpURL   = StringEncoding::Ascii;
+        String missingURL = StringEncoding::Ascii;
         String serverURL = StringEncoding::Ascii;
         String streamURL = StringEncoding::Ascii;
         String inlineURL = StringEncoding::Ascii;
@@ -120,6 +123,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://127.0.0.1:{}/file.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.queryURL, "http://127.0.0.1:{}/file.html?download=1", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.webpURL, "http://127.0.0.1:{}/asset.webp", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.missingURL, "http://127.0.0.1:{}/missing.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.serverURL, "http://127.0.0.1:{}", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://127.0.0.1:{}/stream.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://127.0.0.1:{}/inline.html", serverPort));
@@ -152,6 +156,16 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         context.mimeCount++;
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Content-Type: image/webp"));
+
+        SC_TEST_EXPECT(context.missingClient.get(*context.loop, context.missingURL.view()));
+    };
+
+    context.missingClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.missingCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("404 Not Found"));
+        SC_TEST_EXPECT(str.containsString("Content-Length: 0"));
 
         SC_TEST_EXPECT(context.headClient.head(*context.loop, context.fileURL.view()));
     };
@@ -290,6 +304,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.badMultipartCount == 1);
     SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.mimeCount == 1);
+    SC_TEST_EXPECT(context.missingCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);
     SC_TEST_EXPECT(context.optionsCount == 1);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));

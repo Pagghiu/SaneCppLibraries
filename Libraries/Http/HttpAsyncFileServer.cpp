@@ -197,10 +197,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
     }
     else
     {
-        SC_TRY(connection.response.startResponse(404));
-        SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.sendHeaders());
-        SC_TRY(connection.response.end());
+        return Internal::sendEmptyResponse(connection.response, 404);
     }
     return Result(true);
 }
