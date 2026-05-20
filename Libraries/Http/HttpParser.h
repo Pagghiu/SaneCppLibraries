@@ -17,10 +17,13 @@ struct SC_HTTP_EXPORT HttpParser
     /// @brief Method of the current request / response
     enum class Method
     {
-        HttpGET,  ///< `GET` method
-        HttpPUT,  ///< `PUT` method
-        HttpPOST, ///< `POST` method
-        HttpHEAD, ///< `HEAD` method
+        HttpGET,     ///< `GET` method
+        HttpPUT,     ///< `PUT` method
+        HttpPOST,    ///< `POST` method
+        HttpHEAD,    ///< `HEAD` method
+        HttpPATCH,   ///< `PATCH` method
+        HttpDELETE,  ///< `DELETE` method
+        HttpOPTIONS, ///< `OPTIONS` method
     };
     Method method = Method::HttpGET; ///< Http method
 

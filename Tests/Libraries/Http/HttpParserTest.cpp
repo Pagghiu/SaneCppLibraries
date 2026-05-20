@@ -63,6 +63,42 @@ struct HttpParserTest : public TestCase
                         "PUT");
             SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpPUT);
         }
+        if (test_section("request PATCH"))
+        {
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpGET;
+            testRequest(parser,
+                        "PATCH /asd HTTP/1.1\r\n"
+                        "User-agent: Mozilla/1.1\r\n"
+                        "Host:   github.com\r\n"
+                        "\r\n",
+                        "PATCH");
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpPATCH);
+        }
+        if (test_section("request DELETE"))
+        {
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpGET;
+            testRequest(parser,
+                        "DELETE /asd HTTP/1.1\r\n"
+                        "User-agent: Mozilla/1.1\r\n"
+                        "Host:   github.com\r\n"
+                        "\r\n",
+                        "DELETE");
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpDELETE);
+        }
+        if (test_section("request OPTIONS"))
+        {
+            HttpParser parser;
+            parser.method = HttpParser::Method::HttpGET;
+            testRequest(parser,
+                        "OPTIONS /asd HTTP/1.1\r\n"
+                        "User-agent: Mozilla/1.1\r\n"
+                        "Host:   github.com\r\n"
+                        "\r\n",
+                        "OPTIONS");
+            SC_TEST_EXPECT(parser.method == HttpParser::Method::HttpOPTIONS);
+        }
         if (test_section("response"))
         {
             HttpParser parser;

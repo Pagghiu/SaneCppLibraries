@@ -434,7 +434,20 @@ bool SC::HttpParser::parseMethod(char currentChar)
     else if (currentChar == 'P' or currentChar == 'p')
     {
         SC_CO_RETURN(nestedParserCoroutine, true);
-        if (currentChar == 'U' or currentChar == 'u')
+        if (currentChar == 'A' or currentChar == 'a')
+        {
+            SC_CO_RETURN(nestedParserCoroutine, true);
+            SC_TRY(currentChar == 'T' or currentChar == 't');
+            SC_CO_RETURN(nestedParserCoroutine, true);
+            SC_TRY(currentChar == 'C' or currentChar == 'c');
+            SC_CO_RETURN(nestedParserCoroutine, true);
+            SC_TRY(currentChar == 'H' or currentChar == 'h');
+            SC_CO_RETURN(nestedParserCoroutine, true);
+            SC_TRY(currentChar == ' ');
+            tokenLength--;
+            method = Method::HttpPATCH;
+        }
+        else if (currentChar == 'U' or currentChar == 'u')
         {
             SC_CO_RETURN(nestedParserCoroutine, true);
             SC_TRY(currentChar == 'T' or currentChar == 't');
@@ -458,6 +471,42 @@ bool SC::HttpParser::parseMethod(char currentChar)
         {
             return false;
         }
+    }
+    else if (currentChar == 'D' or currentChar == 'd')
+    {
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'E' or currentChar == 'e');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'L' or currentChar == 'l');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'E' or currentChar == 'e');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'T' or currentChar == 't');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'E' or currentChar == 'e');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == ' ');
+        tokenLength--;
+        method = Method::HttpDELETE;
+    }
+    else if (currentChar == 'O' or currentChar == 'o')
+    {
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'P' or currentChar == 'p');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'T' or currentChar == 't');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'I' or currentChar == 'i');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'O' or currentChar == 'o');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'N' or currentChar == 'n');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == 'S' or currentChar == 's');
+        SC_CO_RETURN(nestedParserCoroutine, true);
+        SC_TRY(currentChar == ' ');
+        tokenLength--;
+        method = Method::HttpOPTIONS;
     }
     else
     {

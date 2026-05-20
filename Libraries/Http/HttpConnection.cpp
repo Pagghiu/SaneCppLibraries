@@ -1046,6 +1046,9 @@ Result HttpAsyncClientRequest::startRequest(HttpParser::Method value, StringSpan
     case HttpParser::Method::HttpHEAD: SC_TRY(responseHeaders.appendLiteral("HEAD ", HeaderSpaceFinished)); break;
     case HttpParser::Method::HttpPUT: SC_TRY(responseHeaders.appendLiteral("PUT ", HeaderSpaceFinished)); break;
     case HttpParser::Method::HttpPOST: SC_TRY(responseHeaders.appendLiteral("POST ", HeaderSpaceFinished)); break;
+    case HttpParser::Method::HttpPATCH: SC_TRY(responseHeaders.appendLiteral("PATCH ", HeaderSpaceFinished)); break;
+    case HttpParser::Method::HttpDELETE: SC_TRY(responseHeaders.appendLiteral("DELETE ", HeaderSpaceFinished)); break;
+    case HttpParser::Method::HttpOPTIONS: SC_TRY(responseHeaders.appendLiteral("OPTIONS ", HeaderSpaceFinished)); break;
     }
 
     SC_TRY(responseHeaders.append(url, HeaderSpaceFinished));
