@@ -54,6 +54,16 @@ Result HttpAsyncClient::get(AsyncEventLoop& loop, StringSpan url, bool keepAlive
     return startRequest(loop, preset);
 }
 
+Result HttpAsyncClient::head(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
+{
+    RequestPreset preset;
+    preset.method    = HttpParser::Method::HttpHEAD;
+    preset.url       = url;
+    preset.keepAlive = keepAlive;
+    preset.autoSend  = true;
+    return startRequest(loop, preset);
+}
+
 Result HttpAsyncClient::put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
     RequestPreset preset;
@@ -562,6 +572,10 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
 
 bool HttpAsyncClient::responseMustNotHaveBody() const
 {
+    if (currentRequest != nullptr and currentRequest->getMethod() == HttpParser::Method::HttpHEAD)
+    {
+        return true;
+    }
     if (response.getParser().statusCode == 204 or response.getParser().statusCode == 304)
     {
         return true;

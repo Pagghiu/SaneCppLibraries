@@ -266,9 +266,14 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             multipartUpload();
         }
+        if (test_section("HEAD response"))
+        {
+            headResponse();
+        }
     }
 
     void basicGet();
+    void headResponse();
     void putSpanBody();
     void putStreamBody();
     void putChunkedStreamBody();
@@ -338,6 +343,63 @@ void SC::HttpAsyncClientTest::basicGet()
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::headResponse()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[2];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26110);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.request.getParser().method == HttpParser::Method::HttpHEAD);
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "5"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+
+    TimeoutGuard timeout;
+    String       url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+    } ctx = {collector, httpServer};
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/hello", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                 SC_TEST_EXPECT(ctx.collector.view().isEmpty());
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(client.head(loop, url.view()));
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(loop.close());
 }

@@ -74,6 +74,9 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// @brief Convenience wrapper for a GET request without a request body
     Result get(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
 
+    /// @brief Convenience wrapper for a HEAD request without a request body
+    Result head(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
+
     /// @brief Convenience wrapper for a PUT request with a fixed in-memory body
     Result put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive = false);
     Result put(AsyncEventLoop& loop, StringSpan url, StringSpan body, bool keepAlive = false)
