@@ -99,8 +99,8 @@ SC::Result SC::HttpTestClient::head(AsyncEventLoop& loop, StringSpan url)
         headerBytes = content.size();
     }
 
-    uint16_t port;
-    char     buffer[256];
+    uint16_t   port;
+    char       buffer[256];
     Span<char> ipAddress = {buffer};
     SC_TRY(SocketDNS::resolveDNS(urlParser.hostname, ipAddress))
     port = urlParser.port;
@@ -115,8 +115,8 @@ SC::Result SC::HttpTestClient::head(AsyncEventLoop& loop, StringSpan url)
 
 SC::Result SC::HttpTestClient::put(AsyncEventLoop& loop, StringSpan url, StringSpan body, TimeMs delay)
 {
-    bodyDelay          = delay;
-    eventLoop          = &loop;
+    bodyDelay         = delay;
+    eventLoop         = &loop;
     responseHasNoBody = false;
 
     uint16_t      port;
@@ -162,8 +162,8 @@ SC::Result SC::HttpTestClient::put(AsyncEventLoop& loop, StringSpan url, StringS
 SC::Result SC::HttpTestClient::postMultipart(AsyncEventLoop& loop, StringSpan url, StringSpan fieldName,
                                              StringSpan fileName, StringSpan fileContent, TimeMs delay)
 {
-    bodyDelay          = delay;
-    eventLoop          = &loop;
+    bodyDelay         = delay;
+    eventLoop         = &loop;
     responseHasNoBody = false;
 
     uint16_t      port;

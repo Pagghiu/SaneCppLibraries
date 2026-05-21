@@ -1500,7 +1500,7 @@ void AsyncPipeline::endPipes()
         return;
     }
 
-    endingPipes  = true;
+    endingPipes   = true;
     bool allEnded = true;
     for (AsyncWritableStream* sink : sinks)
     {

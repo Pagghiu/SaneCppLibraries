@@ -161,7 +161,7 @@ struct HttpAsyncServer::EventCloseListener
 void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
-    Result accepted = result.moveTo(acceptedClient);
+    Result           accepted = result.moveTo(acceptedClient);
     if (not accepted)
     {
         if (onError.isValid())
@@ -316,7 +316,6 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         {
             SC_TRUST_RESULT(client.request.startBodyStream());
         }
-
     }
 }
 

@@ -65,7 +65,7 @@ struct HttpTestClient
     HttpParser parser;
     Buffer     content;
 
-    bool headersReceived = false;
+    bool headersReceived   = false;
     bool responseHasNoBody = false;
 
     TimeMs bodyDelay;

@@ -95,15 +95,15 @@ struct SC::CollaborativeCanvasModel
 
     struct WebSocketRuntime
     {
-        CollaborativeCanvasModel* owner      = nullptr;
-        HttpConnection*           connection = nullptr;
-        size_t                    hubIndex   = size_t(-1);
-        HttpWebSocketEndpoint     endpoint;
+        CollaborativeCanvasModel*     owner      = nullptr;
+        HttpConnection*               connection = nullptr;
+        size_t                        hubIndex   = size_t(-1);
+        HttpWebSocketEndpoint         endpoint;
         HttpWebSocketMessageAssembler messageAssembler;
         char                          messageStorage[16 * 1024] = {0};
-        bool                          dataListenerAdded    = false;
-        bool                          endListenerAdded     = false;
-        bool                          closeListenerAdded   = false;
+        bool                          dataListenerAdded         = false;
+        bool                          endListenerAdded          = false;
+        bool                          closeListenerAdded        = false;
 
         Result writeFrame(Span<const char> frame)
         {
@@ -132,9 +132,9 @@ struct SC::CollaborativeCanvasModel
 
             owner->totalFrames++;
             owner->totalBytes += message.sizeInBytes();
-            char frameStorage[16 * 1024] = {0};
+            char frameStorage[16 * 1024]     = {0};
             owner->currentBroadcastSourceHub = hubIndex;
-            Result broadcast = owner->webSocketHub.broadcastText(message, frameStorage);
+            Result broadcast                 = owner->webSocketHub.broadcastText(message, frameStorage);
             owner->currentBroadcastSourceHub = size_t(-1);
             return broadcast;
         }
@@ -176,13 +176,13 @@ struct SC::CollaborativeCanvasModel
 
         void detach()
         {
-            const size_t connectionIndex = connection != nullptr ? connection->getConnectionID().getIndex() : size_t(-1);
+            const size_t connectionIndex =
+                connection != nullptr ? connection->getConnectionID().getIndex() : size_t(-1);
             if (connection != nullptr or hubIndex != size_t(-1))
             {
-                ::printf(
-                    "[CanvasWS] detach conn=%zu hub=%zu listeners data/end/close=%d/%d/%d activeBefore=%zu\n",
-                    connectionIndex, hubIndex, dataListenerAdded ? 1 : 0, endListenerAdded ? 1 : 0,
-                    closeListenerAdded ? 1 : 0, owner != nullptr ? owner->webSocketHub.getNumClients() : 0);
+                ::printf("[CanvasWS] detach conn=%zu hub=%zu listeners data/end/close=%d/%d/%d activeBefore=%zu\n",
+                         connectionIndex, hubIndex, dataListenerAdded ? 1 : 0, endListenerAdded ? 1 : 0,
+                         closeListenerAdded ? 1 : 0, owner != nullptr ? owner->webSocketHub.getNumClients() : 0);
                 ::fflush(stdout);
             }
             if (owner != nullptr and hubIndex != size_t(-1))
@@ -246,10 +246,10 @@ struct SC::CollaborativeCanvasModel
     VirtualArray<WebSocketRuntime>       webSocketRuntimes   = {MAX_CONNECTIONS};
     HttpWebSocketSmallHub                webSocketHub;
 
-    size_t totalFrames   = 0;
-    size_t totalBytes    = 0;
-    size_t controlFrames = 0;
-    size_t droppedBroadcasts = 0;
+    size_t totalFrames               = 0;
+    size_t totalBytes                = 0;
+    size_t controlFrames             = 0;
+    size_t droppedBroadcasts         = 0;
     size_t currentBroadcastSourceHub = size_t(-1);
 
     Result start()
@@ -335,8 +335,8 @@ struct SC::CollaborativeCanvasModel
 
         AsyncBufferView::ID bufferID;
         Span<char>          writableData;
-        Result              buffer = client.transport.buffersPool->requestNewBuffer(encodedFrame.sizeInBytes(), bufferID,
-                                                                       writableData);
+        Result              buffer =
+            client.transport.buffersPool->requestNewBuffer(encodedFrame.sizeInBytes(), bufferID, writableData);
         if (not buffer)
         {
             droppedBroadcasts++;
@@ -414,9 +414,9 @@ struct SC::CollaborativeCanvasModel
 
         WebSocketRuntime& runtime = webSocketRuntimes.toSpan()[connectionIndex];
         runtime.detach();
-        runtime.owner             = this;
-        runtime.connection        = &connection;
-        runtime.hubIndex          = size_t(-1);
+        runtime.owner      = this;
+        runtime.connection = &connection;
+        runtime.hubIndex   = size_t(-1);
         runtime.endpoint.reset(HttpWebSocketEndpointRole::Server);
         runtime.messageAssembler.reset(runtime.messageStorage);
         runtime.messageAssembler.onMessage.bind<WebSocketRuntime, &WebSocketRuntime::onMessage>(runtime);

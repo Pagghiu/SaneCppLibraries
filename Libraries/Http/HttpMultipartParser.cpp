@@ -48,16 +48,16 @@ Result HttpMultipartParser::initWithBoundary(StringSpan boundaryValue)
 
 void HttpMultipartParser::reset()
 {
-    tokenStart            = 0;
-    tokenLength           = 0;
-    token                 = Token::Boundary;
-    state                 = State::Parsing;
-    globalStart           = 0;
-    globalLength          = 0;
-    topLevelCoroutine     = 0;
-    nestedParserCoroutine = 0;
-    matchIndex            = 0;
-    boundaryMatchIndex    = 0;
+    tokenStart              = 0;
+    tokenLength             = 0;
+    token                   = Token::Boundary;
+    state                   = State::Parsing;
+    globalStart             = 0;
+    globalLength            = 0;
+    topLevelCoroutine       = 0;
+    nestedParserCoroutine   = 0;
+    matchIndex              = 0;
+    boundaryMatchIndex      = 0;
     boundaryCandidateLength = 0;
     emitBoundaryCandidate   = false;
     ::memset(boundaryBuffer, 0, sizeof(boundaryBuffer));
@@ -73,11 +73,11 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
 
     if (emitBoundaryCandidate)
     {
-        token                 = Token::PartBody;
-        state                 = State::Result;
-        parsedData            = {boundaryBuffer, boundaryCandidateLength};
-        readBytes             = 0;
-        emitBoundaryCandidate = false;
+        token                   = Token::PartBody;
+        state                   = State::Result;
+        parsedData              = {boundaryBuffer, boundaryCandidateLength};
+        readBytes               = 0;
+        emitBoundaryCandidate   = false;
         boundaryCandidateLength = 0;
         return Result(true);
     }
@@ -128,7 +128,7 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
                 state                 = State::Parsing;
                 readBytes             = consumed;
                 globalLength += consumed;
-                parsedData            = {};
+                parsedData = {};
                 return Result(true);
             }
             if (newPartPrefix and boundaryCandidateLength == newPartLength)
@@ -139,7 +139,7 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
                 boundaryCandidateLength = 0;
                 readBytes               = consumed;
                 globalLength += consumed;
-                parsedData              = {};
+                parsedData = {};
                 return Result(true);
             }
             if (finalPrefix and boundaryCandidateLength == finalLength)
@@ -150,12 +150,12 @@ Result HttpMultipartParser::parse(Span<const char> data, size_t& readBytes, Span
                 boundaryCandidateLength = 0;
                 readBytes               = consumed;
                 globalLength += consumed;
-                parsedData              = {};
+                parsedData = {};
                 return Result(true);
             }
         }
 
-        readBytes  = consumed;
+        readBytes = consumed;
         globalLength += consumed;
         parsedData = {};
         state      = State::Parsing;

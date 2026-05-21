@@ -62,7 +62,7 @@ struct SC_HTTP_EXPORT HttpMultipartParser
     int topLevelCoroutine     = 0;
     int nestedParserCoroutine = 0;
 
-    uint8_t boundaryMatchIndex = 0;
+    uint8_t boundaryMatchIndex      = 0;
     size_t  boundaryCandidateLength = 0;
     bool    emitBoundaryCandidate   = false;
 

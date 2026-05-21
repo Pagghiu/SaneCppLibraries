@@ -396,7 +396,8 @@ Result HttpWebSocketHandshake::computeAccept(StringSpan clientKey, Span<char> st
     SC_TRY(validateClientKey(clientKey));
 
     HttpWebSocketSha1 sha1;
-    SC_TRY(sha1.add(Span<const uint8_t>::reinterpret_bytes(clientKey.bytesWithoutTerminator(), clientKey.sizeInBytes())));
+    SC_TRY(
+        sha1.add(Span<const uint8_t>::reinterpret_bytes(clientKey.bytesWithoutTerminator(), clientKey.sizeInBytes())));
     SC_TRY(sha1.add({reinterpret_cast<const uint8_t*>(SC_HTTP_WEBSOCKET_GUID), sizeof(SC_HTTP_WEBSOCKET_GUID) - 1}));
 
     uint8_t digest[20] = {0};

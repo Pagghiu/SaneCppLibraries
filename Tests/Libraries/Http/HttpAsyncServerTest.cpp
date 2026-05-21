@@ -385,10 +385,7 @@ void SC::HttpAsyncServerTest::standardResponseStatuses()
     {
         using HttpOutgoingMessage::setHeaderMemory;
 
-        [[nodiscard]] StringSpan written() const
-        {
-            return {responseHeaders.written(), false, StringEncoding::Ascii};
-        }
+        [[nodiscard]] StringSpan written() const { return {responseHeaders.written(), false, StringEncoding::Ascii}; }
     };
 
     struct StatusCase
@@ -652,8 +649,7 @@ void SC::HttpAsyncServerTest::maxHeaderSizeError()
                                    "X-Large: 01234567890123456789012345678901234567890123456789\r\n"
                                    "\r\n";
 
-    client.callback = [this, &httpServer](HttpTestClient&)
-    { SC_TEST_EXPECT(httpServer.stop()); };
+    client.callback = [this, &httpServer](HttpTestClient&) { SC_TEST_EXPECT(httpServer.stop()); };
     SC_TEST_EXPECT(client.sendRaw(eventLoop, endpoint.view(), request));
 
     AsyncLoopTimeout timeout;
