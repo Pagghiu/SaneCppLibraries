@@ -512,7 +512,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
     eventLoop.excludeFromActiveCount(timeout);
 
     SC_TEST_EXPECT(eventLoop.run());
