@@ -125,10 +125,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
 
         // Send HTTP headers first
         SC_TRY(connection.response.startResponse(200));
-        char buffer[20];
-        ::snprintf(buffer, sizeof(buffer), "%zu", fileStat.fileSize);
-        StringSpan contentLength = {{buffer, ::strlen(buffer)}, true, StringEncoding::Ascii};
-        SC_TRY(connection.response.addHeader("Content-Length", contentLength));
+        SC_TRY(connection.response.addContentLength(fileStat.fileSize));
         SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
@@ -467,7 +464,7 @@ bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)
 Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, int statusCode)
 {
     SC_TRY(response.startResponse(statusCode));
-    SC_TRY(response.addHeader("Content-Length", "0"));
+    SC_TRY(response.addContentLength(0));
     SC_TRY(response.addHeader("Server", "SC"));
     SC_TRY(response.sendHeaders());
     return response.end();

@@ -289,6 +289,9 @@ struct SC_HTTP_EXPORT HttpOutgoingMessage
     /// @warning Adding a "Connection" header can fail if keep-alive has been force disabled
     Result addHeader(StringSpan headerName, StringSpan headerValue);
 
+    /// @brief Adds a formatted `Content-Length` header without caller-side temporary formatting.
+    Result addContentLength(uint64_t value);
+
     /// @brief Enables chunked transfer-encoding for subsequent body writes
     Result setChunkedTransferEncoding();
 

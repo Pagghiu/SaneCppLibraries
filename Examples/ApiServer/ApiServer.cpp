@@ -35,7 +35,6 @@ struct ApiServerExample
         bool                hasPendingBuffer = false;
         bool                drainListening   = false;
         bool                endAfterPending  = false;
-        String              contentLength    = StringEncoding::Ascii;
 
         Result start(HttpConnection& newConnection)
         {
@@ -48,8 +47,7 @@ struct ApiServerExample
             SC_TRY(connection->response.addHeader("Content-Type", "text/plain"));
             if (connection->request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
             {
-                SC_TRY(StringBuilder::format(contentLength, "{}", connection->request.getBodyBytesRemaining()));
-                SC_TRY(connection->response.addHeader("Content-Length", contentLength.view()));
+                SC_TRY(connection->response.addContentLength(connection->request.getBodyBytesRemaining()));
             }
             else
             {
@@ -245,11 +243,9 @@ struct ApiServerExample
 
     Result sendText(HttpConnection& connection, int code, StringSpan contentType, StringSpan body)
     {
-        String contentLength = StringEncoding::Ascii;
-        SC_TRY(StringBuilder::format(contentLength, "{}", body.sizeInBytes()));
         SC_TRY(connection.response.startResponse(code));
         SC_TRY(connection.response.addHeader("Content-Type", contentType));
-        SC_TRY(connection.response.addHeader("Content-Length", contentLength.view()));
+        SC_TRY(connection.response.addContentLength(body.sizeInBytes()));
         SC_TRY(connection.response.sendHeaders());
         if (body.sizeInBytes() > 0)
         {
@@ -269,7 +265,7 @@ struct ApiServerExample
     {
         SC_TRY(connection.response.startResponse(405));
         SC_TRY(connection.response.addHeader("Allow", allow));
-        SC_TRY(connection.response.addHeader("Content-Length", "0"));
+        SC_TRY(connection.response.addContentLength(0));
         SC_TRY(connection.response.sendHeaders());
         return connection.response.end();
     }

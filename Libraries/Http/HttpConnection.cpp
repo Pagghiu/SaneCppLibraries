@@ -885,6 +885,18 @@ Result HttpOutgoingMessage::addHeader(StringSpan headerName, StringSpan headerVa
     return Result(true);
 }
 
+Result HttpOutgoingMessage::addContentLength(uint64_t value)
+{
+    SC_TRY_MSG(not headersSent, "Headers already sent");
+    SC_TRY_MSG(responseHeaders.writtenBytes() != 0, "startResponse or startRequest must be the first call");
+    SC_TRY_MSG(not chunkedTransferEncodingEnabled and not transferEncodingAdded,
+               "HttpOutgoingMessage does not support Content-Length with Transfer-Encoding");
+    SC_TRY(responseHeaders.appendContentLength(value, "HttpOutgoingMessage::appendAscii - header space is finished",
+                                               "HttpOutgoingMessage failed formatting Content-Length"));
+    contentLengthAdded = true;
+    return Result(true);
+}
+
 Result HttpOutgoingMessage::setChunkedTransferEncoding()
 {
     SC_TRY_MSG(not headersSent, "Headers already sent");
@@ -1025,7 +1037,7 @@ Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
 Result HttpResponse::sendEmpty(int code)
 {
     SC_TRY(startResponse(code));
-    SC_TRY(addHeader("Content-Length", "0"));
+    SC_TRY(addContentLength(0));
     SC_TRY(sendHeaders());
     return end();
 }
