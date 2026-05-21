@@ -96,6 +96,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int disabledRangeCount     = 0;
         int etagCount              = 0;
         int rangeCount             = 0;
+        int ifRangeMismatchCount   = 0;
         int invalidRangeCount      = 0;
         int conditionalCount       = 0;
         int headCount              = 0;
@@ -112,6 +113,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient disabledRangeClient     = {};
         HttpTestClient etagClient              = {};
         HttpTestClient rangeClient             = {};
+        HttpTestClient ifRangeMismatchClient   = {};
         HttpTestClient invalidRangeClient      = {};
         HttpTestClient conditionalClient       = {};
         HttpTestClient headClient              = {};
@@ -310,6 +312,24 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("Accept-Ranges: bytes"));
         SC_TEST_EXPECT(str.containsString("<bod"));
         SC_TEST_EXPECT(not str.containsString("Response from file"));
+
+        static constexpr StringSpan ifRangeMismatchRequest = "GET /file.html HTTP/1.1\r\n"
+                                                             "Host: 127.0.0.1\r\n"
+                                                             "Range: bytes=6-9\r\n"
+                                                             "If-Range: W/\"different\"\r\n"
+                                                             "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(
+            context.ifRangeMismatchClient.sendRaw(*context.loop, context.serverURL.view(), ifRangeMismatchRequest));
+    };
+
+    context.ifRangeMismatchClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.ifRangeMismatchCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Content-Length: 44"));
+        SC_TEST_EXPECT(str.containsString("Response from file"));
+        SC_TEST_EXPECT(not str.containsString("Content-Range:"));
 
         static constexpr StringSpan invalidRangeRequest = "GET /file.html HTTP/1.1\r\n"
                                                           "Host: 127.0.0.1\r\n"
@@ -512,6 +532,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.disabledRangeCount == 1);
     SC_TEST_EXPECT(context.etagCount == 1);
     SC_TEST_EXPECT(context.rangeCount == 1);
+    SC_TEST_EXPECT(context.ifRangeMismatchCount == 1);
     SC_TEST_EXPECT(context.invalidRangeCount == 1);
     SC_TEST_EXPECT(context.conditionalCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);

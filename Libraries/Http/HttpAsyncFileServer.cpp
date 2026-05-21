@@ -40,6 +40,7 @@ struct HttpAsyncFileServer::Internal
     static bool   parseDecimalSize(StringSpan text, size_t& value);
     static bool   parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range);
     static bool   etagMatchesIfNoneMatch(StringSpan ifNoneMatch, StringSpan etag);
+    static bool   ifRangeMatches(StringSpan ifRange, StringSpan etag, StringSpan lastModified);
     static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
     static Result sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag);
@@ -181,7 +182,16 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             StringSpan rangeHeader;
             if (connection.request.getHeader("Range", rangeHeader))
             {
-                if (not Internal::parseSingleByteRange(rangeHeader, fileStat.fileSize, byteRange))
+                bool rangeAllowed = true;
+                if (options.enableValidators)
+                {
+                    StringSpan ifRange;
+                    if (connection.request.getHeader("If-Range", ifRange))
+                    {
+                        rangeAllowed = Internal::ifRangeMatches(ifRange, etag, lastModified);
+                    }
+                }
+                if (rangeAllowed and not Internal::parseSingleByteRange(rangeHeader, fileStat.fileSize, byteRange))
                 {
                     return Internal::sendRangeNotSatisfiable(connection.response, fileStat.fileSize);
                 }
@@ -699,6 +709,31 @@ bool HttpAsyncFileServer::Internal::etagMatchesIfNoneMatch(StringSpan ifNoneMatc
     }
 
     return false;
+}
+
+bool HttpAsyncFileServer::Internal::ifRangeMatches(StringSpan ifRange, StringSpan etag, StringSpan lastModified)
+{
+    const char*  data   = ifRange.bytesWithoutTerminator();
+    const size_t length = ifRange.sizeInBytes();
+
+    size_t start = 0;
+    size_t end   = length;
+    while (start < end and (data[start] == ' ' or data[start] == '\t'))
+    {
+        start++;
+    }
+    while (end > start and (data[end - 1] == ' ' or data[end - 1] == '\t'))
+    {
+        end--;
+    }
+
+    if (end == start)
+    {
+        return false;
+    }
+
+    StringSpan value = {{data + start, end - start}, false, ifRange.getEncoding()};
+    return value == etag or value == lastModified;
 }
 
 bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)
