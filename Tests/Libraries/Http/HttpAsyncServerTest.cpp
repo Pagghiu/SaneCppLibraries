@@ -256,7 +256,7 @@ void SC::HttpAsyncServerTest::httpAsyncServerTest()
             SC_TEST_EXPECT(response.end());
             return;
         }
-        if (request.getURL() != "/index.html" and request.getURL() != "/")
+        if (request.getRequestTarget() != "/index.html" and request.getRequestTarget() != "/")
         {
             SC_TEST_EXPECT(response.startResponse(404));
             SC_TEST_EXPECT(response.sendHeaders());

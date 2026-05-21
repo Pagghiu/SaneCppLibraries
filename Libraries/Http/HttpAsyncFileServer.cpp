@@ -55,7 +55,7 @@ void HttpAsyncFileServer::setUseAsyncFileSend(bool value) { useAsyncFileSend = v
 Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
     StringSpan filePath;
-    const Result safePath = Internal::extractSafeFilePath(connection.request.getURL(), filePath);
+    const Result safePath = Internal::extractSafeFilePath(connection.request.getRequestTarget(), filePath);
     if (not safePath)
     {
         return Internal::sendEmptyResponse(connection.response, 400);

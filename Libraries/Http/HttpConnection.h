@@ -217,6 +217,9 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
 /// @brief Incoming HTTP request received by the server
 struct SC_HTTP_EXPORT HttpRequest : public HttpIncomingMessage
 {
+    /// @brief Gets the raw request target from the request line
+    StringSpan getRequestTarget() const { return url; }
+
     /// @brief Gets the request URL
     StringSpan getURL() const { return url; }
 
@@ -405,6 +408,7 @@ struct SC_HTTP_EXPORT HttpAsyncClientRequest : public HttpOutgoingMessage
 
     [[nodiscard]] HttpParser::Method getMethod() const { return method; }
 
+    [[nodiscard]] StringSpan          getRequestTarget() const { return url; }
     [[nodiscard]] StringSpan          getURL() const { return url; }
     [[nodiscard]] BodyType            getBodyType() const { return bodyType; }
     [[nodiscard]] uint64_t            getContentLength() const { return contentLength; }

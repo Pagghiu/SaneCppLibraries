@@ -195,7 +195,7 @@ struct AsyncWebServerExample
 #endif
         httpServer.onRequest = [&](HttpConnection& connection)
         {
-            if (connection.request.getURL() == "/ws")
+            if (connection.request.getRequestTarget() == "/ws")
             {
                 SC_ASSERT_RELEASE(handleWebSocketRequest(connection));
                 return;

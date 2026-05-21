@@ -469,7 +469,7 @@ void SC::HttpAsyncClientTest::commonMethodWrappers()
         if (connection.request.getParser().method == HttpParser::Method::HttpPATCH)
         {
             serverContext.patchRequests++;
-            SC_TEST_EXPECT(connection.request.getURL() == "/patch");
+            SC_TEST_EXPECT(connection.request.getRequestTarget() == "/patch");
             const bool addedData =
                 connection.request.getReadableStream()
                     .eventData.addListener<ServerContext, &ServerContext::onPatchData>(serverContext);
@@ -483,14 +483,14 @@ void SC::HttpAsyncClientTest::commonMethodWrappers()
         if (connection.request.getParser().method == HttpParser::Method::HttpOPTIONS)
         {
             serverContext.optionsRequests++;
-            SC_TEST_EXPECT(connection.request.getURL() == "/options");
+            SC_TEST_EXPECT(connection.request.getRequestTarget() == "/options");
             SC_TEST_EXPECT(serverContext.sendEmptyResponse(204));
             return;
         }
         if (connection.request.getParser().method == HttpParser::Method::HttpDELETE)
         {
             serverContext.deleteRequests++;
-            SC_TEST_EXPECT(connection.request.getURL() == "/delete");
+            SC_TEST_EXPECT(connection.request.getRequestTarget() == "/delete");
             SC_TEST_EXPECT(serverContext.sendEmptyResponse(204));
             return;
         }

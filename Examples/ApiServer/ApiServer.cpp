@@ -182,7 +182,7 @@ struct ApiServerExample
     {
         String        targetURL = StringEncoding::Ascii;
         HttpURLParser url;
-        SC_ASSERT_RELEASE(StringBuilder::format(targetURL, "http://localhost{}", connection.request.getURL()));
+        SC_ASSERT_RELEASE(StringBuilder::format(targetURL, "http://localhost{}", connection.request.getRequestTarget()));
         SC_ASSERT_RELEASE(url.parse(targetURL.view()));
 
         if (url.pathname == "/health")
