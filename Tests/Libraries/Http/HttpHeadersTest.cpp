@@ -13,9 +13,14 @@ struct HttpHeadersTest : public TestCase
         {
             cookieIterator();
         }
+        if (test_section("authorization helpers"))
+        {
+            authorizationHelpers();
+        }
     }
 
     void cookieIterator();
+    void authorizationHelpers();
 };
 
 void HttpHeadersTest::cookieIterator()
@@ -59,6 +64,36 @@ void HttpHeadersTest::cookieIterator()
     SC_TEST_EXPECT(pair.hasValue);
 
     SC_TEST_EXPECT(not it.next(pair));
+}
+
+void HttpHeadersTest::authorizationHelpers()
+{
+    HttpAuthorizationView authorization;
+    SC_TEST_EXPECT(authorization.parse("  bEaReR token-123  "));
+    SC_TEST_EXPECT(authorization.isBearer());
+    SC_TEST_EXPECT(not authorization.isBasic());
+    SC_TEST_EXPECT(authorization.scheme == "bEaReR");
+    SC_TEST_EXPECT(authorization.credentials == "token-123");
+
+    StringSpan token;
+    SC_TEST_EXPECT(HttpParseBearerToken("Bearer abc.def", token));
+    SC_TEST_EXPECT(token == "abc.def");
+
+    char       storage[64];
+    StringSpan username;
+    StringSpan password;
+    SC_TEST_EXPECT(HttpParseBasicCredentials("Basic dXNlcjpwYXNz", {storage, sizeof(storage)}, username, password));
+    SC_TEST_EXPECT(username == "user");
+    SC_TEST_EXPECT(password == "pass");
+
+    SC_TEST_EXPECT(HttpParseBasicCredentials("Basic dXNlcjo=", {storage, sizeof(storage)}, username, password));
+    SC_TEST_EXPECT(username == "user");
+    SC_TEST_EXPECT(password.isEmpty());
+
+    SC_TEST_EXPECT(not HttpParseBearerToken("Basic dXNlcjpwYXNz", token));
+    SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic !!!=", {storage, sizeof(storage)}, username, password));
+    SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic bm9jb2xvbg==", {storage, sizeof(storage)}, username, password));
+    SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic dXNlcjpwYXNz", {storage, 3}, username, password));
 }
 
 void runHttpHeadersTest(SC::TestReport& report) { HttpHeadersTest test(report); }
