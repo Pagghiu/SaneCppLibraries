@@ -35,6 +35,8 @@ struct HttpAsyncFileServer::Internal
                                      size_t& outLength);
     static Result formatUnsatisfiedContentRange(size_t fileSize, char* buffer, size_t bufferSize, size_t& outLength);
     static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
+    static Result normalizeOptionFilePath(StringSpan filePath, StringSpan& normalizedPath);
+    static Result validateSafeRelativePath(StringSpan filePath);
     static bool   parseDecimalSize(StringSpan text, size_t& value);
     static bool   parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range);
     static bool   isSafeMultipartFileName(StringSpan fileName);
@@ -69,6 +71,9 @@ void HttpAsyncFileServer::setUseAsyncFileSend(bool value) { useAsyncFileSend = v
 
 Result HttpAsyncFileServer::setOptions(const HttpAsyncFileServerOptions& newOptions)
 {
+    StringSpan normalizedFallback;
+    SC_TRY(Internal::normalizeOptionFilePath(newOptions.spaFallbackPath, normalizedFallback));
+    SC_COMPILER_UNUSED(normalizedFallback);
     options = newOptions;
     return Result(true);
 }
@@ -93,8 +98,8 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
     {
     case HttpParser::Method::HttpPOST:
     case HttpParser::Method::HttpPUT: return putFile(stream, connection, filePath);
-    case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath, true);
-    case HttpParser::Method::HttpHEAD: return getFile(stream, connection, filePath, false);
+    case HttpParser::Method::HttpGET: return getFile(stream, connection, filePath, true, true);
+    case HttpParser::Method::HttpHEAD: return getFile(stream, connection, filePath, false, true);
     case HttpParser::Method::HttpOPTIONS:
         SC_TRY(connection.response.startResponse(204));
         SC_TRY(connection.response.addHeader("Allow", "GET, HEAD, PUT, POST, OPTIONS"));
@@ -117,7 +122,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
 }
 
 Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection,
-                                    StringSpan filePath, bool sendBody)
+                                    StringSpan filePath, bool sendBody, bool allowSpaFallback)
 {
     FileSystem fileSystem;
     SC_TRY(fileSystem.init(directory.view()));
@@ -291,6 +296,12 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
     }
     else
     {
+        StringSpan fallbackPath;
+        SC_TRY(Internal::normalizeOptionFilePath(options.spaFallbackPath, fallbackPath));
+        if (allowSpaFallback and not fallbackPath.isEmpty() and fallbackPath != filePath)
+        {
+            return getFile(stream, connection, fallbackPath, sendBody, false);
+        }
         return Internal::sendEmptyResponse(connection.response, 404);
     }
     return Result(true);
@@ -455,6 +466,32 @@ Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarg
         filePath = "index.html";
         return Result(true);
     }
+
+    return validateSafeRelativePath(filePath);
+}
+
+Result HttpAsyncFileServer::Internal::normalizeOptionFilePath(StringSpan filePath, StringSpan& normalizedPath)
+{
+    normalizedPath = {};
+    if (filePath.isEmpty())
+    {
+        return Result(true);
+    }
+
+    const char* data   = filePath.bytesWithoutTerminator();
+    size_t      length = filePath.sizeInBytes();
+    if (length > 0 and data[0] == '/')
+    {
+        data += 1;
+        length -= 1;
+    }
+    normalizedPath = {{data, length}, false, filePath.getEncoding()};
+    return validateSafeRelativePath(normalizedPath);
+}
+
+Result HttpAsyncFileServer::Internal::validateSafeRelativePath(StringSpan filePath)
+{
+    SC_TRY_MSG(not filePath.isEmpty(), "HttpAsyncFileServer empty file path rejected");
 
     const char* fileData     = filePath.bytesWithoutTerminator();
     size_t      segmentStart = 0;

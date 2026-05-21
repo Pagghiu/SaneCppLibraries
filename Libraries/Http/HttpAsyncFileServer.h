@@ -110,7 +110,8 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
     HttpAsyncFileServerOptions options          = {};
 
     Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
-    Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath, bool sendBody);
+    Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath, bool sendBody,
+                   bool allowSpaFallback);
     Result postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
     StringPath directory;

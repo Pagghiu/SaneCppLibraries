@@ -78,9 +78,10 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 
     struct Context
     {
-        HttpAsyncServer& httpServer;
-        AsyncEventLoop*  loop = nullptr;
-        FileSystem       fs   = {};
+        HttpAsyncServer&     httpServer;
+        AsyncEventLoop*      loop       = nullptr;
+        HttpAsyncFileServer* fileServer = nullptr;
+        FileSystem           fs         = {};
 
         int getCount          = 0;
         int putCount          = 0;
@@ -90,6 +91,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int mimeCount         = 0;
         int binaryMimeCount   = 0;
         int missingCount      = 0;
+        int spaCount          = 0;
         int etagCount         = 0;
         int rangeCount        = 0;
         int invalidRangeCount = 0;
@@ -103,6 +105,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient zipMimeClient      = {};
         HttpTestClient binaryMimeClient   = {};
         HttpTestClient missingClient      = {};
+        HttpTestClient spaClient          = {};
         HttpTestClient etagClient         = {};
         HttpTestClient rangeClient        = {};
         HttpTestClient invalidRangeClient = {};
@@ -124,13 +127,15 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         String zipURL     = StringEncoding::Ascii;
         String binaryURL  = StringEncoding::Ascii;
         String missingURL = StringEncoding::Ascii;
+        String spaURL     = StringEncoding::Ascii;
         String serverURL  = StringEncoding::Ascii;
         String streamURL  = StringEncoding::Ascii;
         String inlineURL  = StringEncoding::Ascii;
         String largeURL   = StringEncoding::Ascii;
         String uploadURL  = StringEncoding::Ascii;
-    } context    = {httpServer};
-    context.loop = &eventLoop;
+    } context          = {httpServer};
+    context.loop       = &eventLoop;
+    context.fileServer = &fileServer;
 
     SC_TEST_EXPECT(context.fs.init(webServerFolder));
     SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
@@ -138,6 +143,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.fs.writeString("asset.webp", "webp"));
     SC_TEST_EXPECT(context.fs.writeString("archive.zip", "zip"));
     SC_TEST_EXPECT(context.fs.writeString("payload.unknown", "unknown"));
+    SC_TEST_EXPECT(context.fs.writeString("app.html", "<html><body>SPA fallback</body></html>"));
 
     SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://127.0.0.1:{}/file.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.queryURL, "http://127.0.0.1:{}/file.html?download=1", serverPort));
@@ -145,6 +151,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(StringBuilder::format(context.zipURL, "http://127.0.0.1:{}/archive.zip", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.binaryURL, "http://127.0.0.1:{}/payload.unknown", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.missingURL, "http://127.0.0.1:{}/missing.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.spaURL, "http://127.0.0.1:{}/app/route", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.serverURL, "http://127.0.0.1:{}", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://127.0.0.1:{}/stream.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://127.0.0.1:{}/inline.html", serverPort));
@@ -206,6 +213,20 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("404 Not Found"));
         SC_TEST_EXPECT(str.containsString("Content-Length: 0"));
+
+        HttpAsyncFileServerOptions options;
+        options.spaFallbackPath = "app.html";
+        SC_TEST_EXPECT(context.fileServer->setOptions(options));
+        SC_TEST_EXPECT(context.spaClient.get(*context.loop, context.spaURL.view()));
+    };
+
+    context.spaClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.spaCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Content-Type: text/html"));
+        SC_TEST_EXPECT(str.containsString("SPA fallback"));
 
         SC_TEST_EXPECT(context.etagClient.get(*context.loop, context.fileURL.view()));
     };
@@ -432,6 +453,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.mimeCount == 1);
     SC_TEST_EXPECT(context.binaryMimeCount == 2);
     SC_TEST_EXPECT(context.missingCount == 1);
+    SC_TEST_EXPECT(context.spaCount == 1);
     SC_TEST_EXPECT(context.etagCount == 1);
     SC_TEST_EXPECT(context.rangeCount == 1);
     SC_TEST_EXPECT(context.invalidRangeCount == 1);
@@ -442,6 +464,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.fs.removeFile("asset.webp"));
     SC_TEST_EXPECT(context.fs.removeFile("archive.zip"));
     SC_TEST_EXPECT(context.fs.removeFile("payload.unknown"));
+    SC_TEST_EXPECT(context.fs.removeFile("app.html"));
 }
 
 namespace SC
