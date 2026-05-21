@@ -39,6 +39,7 @@ struct HttpAsyncFileServer::Internal
     static Result validateSafeRelativePath(StringSpan filePath);
     static bool   parseDecimalSize(StringSpan text, size_t& value);
     static bool   parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range);
+    static bool   etagMatchesIfNoneMatch(StringSpan ifNoneMatch, StringSpan etag);
     static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
     static Result sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag);
@@ -157,7 +158,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             StringSpan ifNoneMatch;
             if (connection.request.getHeader("If-None-Match", ifNoneMatch))
             {
-                if (ifNoneMatch == etag)
+                if (Internal::etagMatchesIfNoneMatch(ifNoneMatch, etag))
                 {
                     return Internal::sendNotModified(connection.response, lastModified, etag);
                 }
@@ -649,6 +650,55 @@ bool HttpAsyncFileServer::Internal::parseSingleByteRange(StringSpan header, size
     range.length  = end - start + 1;
     range.partial = true;
     return true;
+}
+
+bool HttpAsyncFileServer::Internal::etagMatchesIfNoneMatch(StringSpan ifNoneMatch, StringSpan etag)
+{
+    const char*  data   = ifNoneMatch.bytesWithoutTerminator();
+    const size_t length = ifNoneMatch.sizeInBytes();
+    size_t       cursor = 0;
+
+    while (cursor <= length)
+    {
+        size_t tokenEnd = cursor;
+        while (tokenEnd < length and data[tokenEnd] != ',')
+        {
+            tokenEnd++;
+        }
+
+        size_t start = cursor;
+        size_t end   = tokenEnd;
+        while (start < end and (data[start] == ' ' or data[start] == '\t'))
+        {
+            start++;
+        }
+        while (end > start and (data[end - 1] == ' ' or data[end - 1] == '\t'))
+        {
+            end--;
+        }
+
+        const size_t tokenLength = end - start;
+        if (tokenLength == 1 and data[start] == '*')
+        {
+            return true;
+        }
+        if (tokenLength > 0)
+        {
+            StringSpan token = {{data + start, tokenLength}, false, ifNoneMatch.getEncoding()};
+            if (token == etag)
+            {
+                return true;
+            }
+        }
+
+        if (tokenEnd == length)
+        {
+            break;
+        }
+        cursor = tokenEnd + 1;
+    }
+
+    return false;
 }
 
 bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)

@@ -329,7 +329,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 
         static constexpr StringSpan conditionalRequest = "GET /file.html HTTP/1.1\r\n"
                                                          "Host: 127.0.0.1\r\n"
-                                                         "If-None-Match: W/\"44-1445412480000\"\r\n"
+                                                         "If-None-Match: \"miss\", W/\"44-1445412480000\"\r\n"
                                                          "If-Modified-Since: Tue, 20 Oct 2015 07:28:00 GMT\r\n"
                                                          "Connection: close\r\n\r\n";
         SC_TEST_EXPECT(context.conditionalClient.sendRaw(*context.loop, context.serverURL.view(), conditionalRequest));
