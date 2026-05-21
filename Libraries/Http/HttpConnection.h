@@ -367,6 +367,9 @@ struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
     /// @brief Starts the response with an explicit status code and reason phrase.
     Result startResponse(int httpCode, StringSpan reasonPhrase);
 
+    /// @brief Sends an empty response with `Content-Length: 0`.
+    Result sendEmpty(int httpCode);
+
   private:
     friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;

@@ -1022,6 +1022,14 @@ Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
     return Result(true);
 }
 
+Result HttpResponse::sendEmpty(int code)
+{
+    SC_TRY(startResponse(code));
+    SC_TRY(addHeader("Content-Length", "0"));
+    SC_TRY(sendHeaders());
+    return end();
+}
+
 void HttpResponse::grabUnusedHeaderMemory(HttpRequest& request) { setHeaderMemory(request.getUnusedHeaderMemory()); }
 
 //-------------------------------------------------------------------------------------------------------

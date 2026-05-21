@@ -177,6 +177,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             standardResponseStatuses();
         }
+        if (test_section("empty response helper"))
+        {
+            emptyResponseHelper();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -201,6 +205,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void httpAsyncServerTest();
     void customResponseStatus();
     void standardResponseStatuses();
+    void emptyResponseHelper();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void maxHeaderSizeError();
@@ -411,6 +416,45 @@ void SC::HttpAsyncServerTest::standardResponseStatuses()
         SC_TEST_EXPECT(response.startResponse(statusCase.code));
         SC_TEST_EXPECT(response.written() == statusCase.statusLine);
     }
+}
+
+void SC::HttpAsyncServerTest::emptyResponseHelper()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType connections[1];
+    HttpAsyncServer    httpServer;
+    const uint16_t     serverPort = report.mapPort(6157);
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    httpServer.onRequest = [this](HttpConnection& connection) { SC_TEST_EXPECT(connection.response.sendEmpty(204)); };
+
+    HttpTestClient client;
+    client.callback = [this, &httpServer](HttpTestClient& result)
+    {
+        StringView response(result.getResponse());
+        SC_TEST_EXPECT(response.containsString("204 No Content"));
+        SC_TEST_EXPECT(response.containsString("Content-Length: 0"));
+        SC_TEST_EXPECT(httpServer.stop());
+    };
+
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/empty", serverPort));
+    SC_TEST_EXPECT(client.get(eventLoop, endpoint.view()));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::HttpAsyncServerTest::chunkedRequestDecoding()

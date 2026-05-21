@@ -228,11 +228,7 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
     if (totalFileUploadBytes == 0)
     {
         SC_TRY(fd.close());
-        SC_TRY(connection.response.startResponse(201));
-        SC_TRY(connection.response.addHeader("Content-Length", "0"));
-        SC_TRY(connection.response.sendHeaders());
-        SC_TRY(connection.response.end());
-        return Result(true);
+        return connection.response.sendEmpty(201);
     }
 
     SC_TRY(stream.writableFileStream.init(connection.buffersPool, *eventLoop, fd));
@@ -325,10 +321,7 @@ void HttpAsyncFileServer::Stream::PutFileListener::onDrain()
                                            &HttpAsyncFileServer::Stream::PutFileListener::onDrain>(*this);
     SC_ASSERT_RELEASE(removedDrainListener);
     writable.destroy();
-    SC_ASSERT_RELEASE(connection->response.startResponse(201));
-    SC_ASSERT_RELEASE(connection->response.addHeader("Content-Length", "0"));
-    SC_ASSERT_RELEASE(connection->response.sendHeaders());
-    SC_ASSERT_RELEASE(connection->response.end());
+    SC_ASSERT_RELEASE(connection->response.sendEmpty(201));
 }
 
 StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)
@@ -665,10 +658,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
                     readable.eventData.removeListener<HttpAsyncFileServer::Stream::MultipartListener,
                                                       &HttpAsyncFileServer::Stream::MultipartListener::onData>(*this)));
 
-                SC_ASSERT_RELEASE(connection->response.startResponse(rejectedFileName ? 400 : 201));
-                (void)connection->response.addHeader("Content-Length", "0");
-                SC_ASSERT_RELEASE(connection->response.sendHeaders());
-                SC_ASSERT_RELEASE(connection->response.end());
+                SC_ASSERT_RELEASE(connection->response.sendEmpty(rejectedFileName ? 400 : 201));
             }
             break;
             default: break;
