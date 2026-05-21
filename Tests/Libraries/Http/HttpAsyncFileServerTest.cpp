@@ -83,41 +83,45 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpAsyncFileServer* fileServer = nullptr;
         FileSystem           fs         = {};
 
-        int getCount          = 0;
-        int putCount          = 0;
-        int multipartCount    = 0;
-        int badMultipartCount = 0;
-        int safetyCount       = 0;
-        int mimeCount         = 0;
-        int binaryMimeCount   = 0;
-        int missingCount      = 0;
-        int spaCount          = 0;
-        int etagCount         = 0;
-        int rangeCount        = 0;
-        int invalidRangeCount = 0;
-        int conditionalCount  = 0;
-        int headCount         = 0;
-        int optionsCount      = 0;
+        int getCount               = 0;
+        int putCount               = 0;
+        int multipartCount         = 0;
+        int badMultipartCount      = 0;
+        int safetyCount            = 0;
+        int mimeCount              = 0;
+        int binaryMimeCount        = 0;
+        int missingCount           = 0;
+        int spaCount               = 0;
+        int disabledValidatorCount = 0;
+        int disabledRangeCount     = 0;
+        int etagCount              = 0;
+        int rangeCount             = 0;
+        int invalidRangeCount      = 0;
+        int conditionalCount       = 0;
+        int headCount              = 0;
+        int optionsCount           = 0;
 
-        HttpTestClient queryClient        = {};
-        HttpTestClient badPathClient      = {};
-        HttpTestClient mimeClient         = {};
-        HttpTestClient zipMimeClient      = {};
-        HttpTestClient binaryMimeClient   = {};
-        HttpTestClient missingClient      = {};
-        HttpTestClient spaClient          = {};
-        HttpTestClient etagClient         = {};
-        HttpTestClient rangeClient        = {};
-        HttpTestClient invalidRangeClient = {};
-        HttpTestClient conditionalClient  = {};
-        HttpTestClient headClient         = {};
-        HttpTestClient optionsClient      = {};
-        HttpTestClient getClient          = {};
-        HttpTestClient putStream          = {};
-        HttpTestClient putInline          = {};
-        HttpTestClient putLarge           = {};
-        HttpTestClient postMultipart      = {};
-        HttpTestClient badMultipart       = {};
+        HttpTestClient queryClient             = {};
+        HttpTestClient badPathClient           = {};
+        HttpTestClient mimeClient              = {};
+        HttpTestClient zipMimeClient           = {};
+        HttpTestClient binaryMimeClient        = {};
+        HttpTestClient missingClient           = {};
+        HttpTestClient spaClient               = {};
+        HttpTestClient disabledValidatorClient = {};
+        HttpTestClient disabledRangeClient     = {};
+        HttpTestClient etagClient              = {};
+        HttpTestClient rangeClient             = {};
+        HttpTestClient invalidRangeClient      = {};
+        HttpTestClient conditionalClient       = {};
+        HttpTestClient headClient              = {};
+        HttpTestClient optionsClient           = {};
+        HttpTestClient getClient               = {};
+        HttpTestClient putStream               = {};
+        HttpTestClient putInline               = {};
+        HttpTestClient putLarge                = {};
+        HttpTestClient postMultipart           = {};
+        HttpTestClient badMultipart            = {};
         Buffer         multipartPayload;
         Buffer         largePutPayload;
 
@@ -227,6 +231,56 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("200 OK"));
         SC_TEST_EXPECT(str.containsString("Content-Type: text/html"));
         SC_TEST_EXPECT(str.containsString("SPA fallback"));
+
+        HttpAsyncFileServerOptions options;
+        options.spaFallbackPath  = "app.html";
+        options.enableValidators = false;
+        SC_TEST_EXPECT(context.fileServer->setOptions(options));
+
+        static constexpr StringSpan disabledValidatorRequest = "GET /file.html HTTP/1.1\r\n"
+                                                               "Host: 127.0.0.1\r\n"
+                                                               "If-None-Match: W/\"44-1445412480000\"\r\n"
+                                                               "If-Modified-Since: Wed, 21 Oct 2015 07:28:00 GMT\r\n"
+                                                               "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(
+            context.disabledValidatorClient.sendRaw(*context.loop, context.serverURL.view(), disabledValidatorRequest));
+    };
+
+    context.disabledValidatorClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.disabledValidatorCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Response from file"));
+        SC_TEST_EXPECT(not str.containsString("ETag:"));
+        SC_TEST_EXPECT(not str.containsString("Last-Modified:"));
+
+        HttpAsyncFileServerOptions options;
+        options.spaFallbackPath     = "app.html";
+        options.enableRangeRequests = false;
+        SC_TEST_EXPECT(context.fileServer->setOptions(options));
+
+        static constexpr StringSpan disabledRangeRequest = "GET /file.html HTTP/1.1\r\n"
+                                                           "Host: 127.0.0.1\r\n"
+                                                           "Range: bytes=6-9\r\n"
+                                                           "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(
+            context.disabledRangeClient.sendRaw(*context.loop, context.serverURL.view(), disabledRangeRequest));
+    };
+
+    context.disabledRangeClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.disabledRangeCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("Content-Length: 44"));
+        SC_TEST_EXPECT(str.containsString("Response from file"));
+        SC_TEST_EXPECT(not str.containsString("Content-Range:"));
+        SC_TEST_EXPECT(not str.containsString("Accept-Ranges:"));
+
+        HttpAsyncFileServerOptions options;
+        options.spaFallbackPath = "app.html";
+        SC_TEST_EXPECT(context.fileServer->setOptions(options));
 
         SC_TEST_EXPECT(context.etagClient.get(*context.loop, context.fileURL.view()));
     };
@@ -454,6 +508,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.binaryMimeCount == 2);
     SC_TEST_EXPECT(context.missingCount == 1);
     SC_TEST_EXPECT(context.spaCount == 1);
+    SC_TEST_EXPECT(context.disabledValidatorCount == 1);
+    SC_TEST_EXPECT(context.disabledRangeCount == 1);
     SC_TEST_EXPECT(context.etagCount == 1);
     SC_TEST_EXPECT(context.rangeCount == 1);
     SC_TEST_EXPECT(context.invalidRangeCount == 1);

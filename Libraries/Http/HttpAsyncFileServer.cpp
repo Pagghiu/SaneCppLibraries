@@ -202,9 +202,9 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(connection.response.addContentLength(byteRange.length));
         SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
-        SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
         if (options.enableValidators)
         {
+            SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
             SC_TRY(connection.response.addHeader("ETag", etag));
         }
         if (options.enableRangeRequests)
