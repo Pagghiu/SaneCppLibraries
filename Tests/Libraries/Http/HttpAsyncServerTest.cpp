@@ -516,9 +516,16 @@ void SC::HttpAsyncServerTest::chunkedRequestRejectsTrailers()
     {
         bool sawRequest = false;
         bool sawEnd     = false;
+        bool sawError   = false;
 
         void onEnd() { sawEnd = true; }
     } serverContext;
+
+    httpServer.onError = [this, &serverContext](Result result)
+    {
+        serverContext.sawError = true;
+        SC_TEST_EXPECT(not result);
+    };
 
     httpServer.onRequest = [this, &serverContext](HttpConnection& client)
     {
@@ -555,6 +562,7 @@ void SC::HttpAsyncServerTest::chunkedRequestRejectsTrailers()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(serverContext.sawRequest);
     SC_TEST_EXPECT(not serverContext.sawEnd);
+    SC_TEST_EXPECT(serverContext.sawError);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
 }

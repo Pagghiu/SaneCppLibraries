@@ -76,6 +76,9 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @brief Called after enough data from a newly connected client has arrived, causing all headers to be parsed.
     Function<void(HttpConnection&)> onRequest;
 
+    /// @brief Called on accept, parse, protocol, or streaming errors before the affected connection is closed.
+    Function<void(Result)> onError;
+
     /// @brief Set default keep-alive behavior for all connections
     /// @param enabled true to keep connections alive by default (HTTP/1.1 default)
     /// @note Can be overridden per-response via HttpResponse::setKeepAlive()

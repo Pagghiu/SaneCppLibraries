@@ -161,9 +161,13 @@ struct HttpAsyncServer::EventCloseListener
 void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
 {
     SocketDescriptor acceptedClient;
-    if (not result.moveTo(acceptedClient))
+    Result accepted = result.moveTo(acceptedClient);
+    if (not accepted)
     {
-        // TODO: Invoke an error
+        if (onError.isValid())
+        {
+            onError(accepted);
+        }
         return;
     }
     HttpConnection::ID idx;
@@ -196,9 +200,14 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
     Span<char> readData;
     SC_ASSERT_RELEASE(client.buffersPool.getWritableData(bufferID, readData));
 
-    if (not client.request.writeHeaders(maxHeaderSize, readData, client.readableSocketStream, bufferID))
+    Result headerWrite = client.request.writeHeaders(maxHeaderSize, readData, client.readableSocketStream, bufferID);
+    if (not headerWrite)
     {
-        // TODO: Invoke on error
+        if (onError.isValid())
+        {
+            onError(headerWrite);
+        }
+        closeAsync(client);
         return;
     }
     else if (client.request.hasReceivedHeaders())
@@ -223,6 +232,10 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                                                               false);
         if (not prepareBody)
         {
+            if (onError.isValid())
+            {
+                onError(prepareBody);
+            }
             closeAsync(client);
             return;
         }
@@ -313,6 +326,10 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
     Result           readable = client.buffersPool.getReadableData(bufferID, readData);
     if (not readable)
     {
+        if (onError.isValid())
+        {
+            onError(readable);
+        }
         closeAsync(client);
         return;
     }
@@ -320,6 +337,10 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
     Result process = client.request.processBodyData(client.readableSocketStream, bufferID, readData, true);
     if (not process)
     {
+        if (onError.isValid())
+        {
+            onError(process);
+        }
         closeAsync(client);
         return;
     }
