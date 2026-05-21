@@ -25,6 +25,7 @@ struct HttpAsyncFileServer::Internal
     static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
     static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
+    static Result sendNotModified(HttpResponse& response, StringSpan lastModified);
 
     static int64_t    getCurrentTimeMilliseconds();
     static StringSpan getContentType(const StringSpan extension);
@@ -110,6 +111,18 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(path.append("/"));
         SC_TRY(path.append(filePath));
 
+        char      lastModifiedData[128];
+        size_t    lastModifiedLength = 0;
+        SC_TRY(Internal::formatHttpDate(fileStat.modifiedTime.milliseconds, lastModifiedData,
+                                        sizeof(lastModifiedData), lastModifiedLength));
+        StringSpan lastModified = {{lastModifiedData, lastModifiedLength}, false, StringEncoding::Ascii};
+
+        StringSpan ifModifiedSince;
+        if (connection.request.getHeader("If-Modified-Since", ifModifiedSince) and ifModifiedSince == lastModified)
+        {
+            return Internal::sendNotModified(connection.response, lastModified);
+        }
+
         // Send HTTP headers first
         SC_TRY(connection.response.startResponse(200));
         char buffer[20];
@@ -118,7 +131,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(connection.response.addHeader("Content-Length", contentLength));
         SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
-        SC_TRY(Internal::writeGMTHeaderTime("Last-Modified", connection.response, fileStat.modifiedTime.milliseconds));
+        SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
         SC_TRY(connection.response.addHeader("Server", "SC"));
 
         if (not sendBody)
@@ -462,6 +475,16 @@ Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, 
 {
     SC_TRY(response.startResponse(statusCode));
     SC_TRY(response.addHeader("Content-Length", "0"));
+    SC_TRY(response.addHeader("Server", "SC"));
+    SC_TRY(response.sendHeaders());
+    return response.end();
+}
+
+Result HttpAsyncFileServer::Internal::sendNotModified(HttpResponse& response, StringSpan lastModified)
+{
+    SC_TRY(response.startResponse(304));
+    SC_TRY(writeGMTHeaderTime("Date", response, getCurrentTimeMilliseconds()));
+    SC_TRY(response.addHeader("Last-Modified", lastModified));
     SC_TRY(response.addHeader("Server", "SC"));
     SC_TRY(response.sendHeaders());
     return response.end();
