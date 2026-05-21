@@ -15,6 +15,7 @@
 #include "Libraries/Http/HttpHeaders.cpp"
 #include "Libraries/Http/HttpMultipartParser.cpp"
 #include "Libraries/Http/HttpParser.cpp"
+#include "Libraries/Http/HttpRouter.cpp"
 #include "Libraries/Http/HttpURLParser.cpp"
 #include "Libraries/Http/HttpWebSocket.cpp"
 #include "Libraries/HttpClient/HttpClient.cpp"

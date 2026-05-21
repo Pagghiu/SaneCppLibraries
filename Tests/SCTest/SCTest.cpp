@@ -57,6 +57,7 @@ void runHttpAsyncServerTest(TestReport& report);
 void runHttpAsyncFileServerTest(TestReport& report);
 void runHttpURLParserTest(TestReport& report);
 void runHttpHeadersTest(TestReport& report);
+void runHttpRouterTest(TestReport& report);
 void runHttpKeepAliveTest(TestReport& report);
 void runHttpMultipartParserTest(TestReport& report);
 void runHttpWebSocketFrameTest(TestReport& report);
@@ -197,6 +198,7 @@ int main(int argc, const char* argv[])
     runHttpAsyncFileServerTest(report);
     runHttpURLParserTest(report);
     runHttpHeadersTest(report);
+    runHttpRouterTest(report);
     runHttpKeepAliveTest(report);
     runHttpMultipartParserTest(report);
     runHttpWebSocketFrameTest(report);

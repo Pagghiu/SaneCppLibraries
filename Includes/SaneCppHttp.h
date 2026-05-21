@@ -6,5 +6,6 @@
 #include "../Libraries/Http/HttpHeaders.h"
 #include "../Libraries/Http/HttpMultipartParser.h"
 #include "../Libraries/Http/HttpParser.h"
+#include "../Libraries/Http/HttpRouter.h"
 #include "../Libraries/Http/HttpURLParser.h"
 #include "../Libraries/Http/HttpWebSocket.h"
