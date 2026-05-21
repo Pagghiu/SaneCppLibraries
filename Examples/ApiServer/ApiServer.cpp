@@ -11,6 +11,7 @@
 //   curl -X POST --data "hello" http://127.0.0.1:8091/echo
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Http/HttpAsyncServer.h"
+#include "../../Libraries/Http/HttpRouter.h"
 #include "../../Libraries/Http/HttpURLParser.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/CommandLine.h"
@@ -76,8 +77,8 @@ struct ApiServerExample
                 return;
             }
 
-            const AsyncBufferView::ID bufferID = pendingBufferID;
-            const Result writeResult           = connection->response.getWritableStream().write(bufferID);
+            const AsyncBufferView::ID bufferID    = pendingBufferID;
+            const Result              writeResult = connection->response.getWritableStream().write(bufferID);
             if (not writeResult)
             {
                 return;
@@ -130,8 +131,9 @@ struct ApiServerExample
             connection->request.getReadableStream().pause();
             if (not drainListening)
             {
-                drainListening = connection->response.getWritableStream()
-                                     .eventDrain.addListener<EchoStream, &EchoStream::onDrain>(*this);
+                drainListening =
+                    connection->response.getWritableStream().eventDrain.addListener<EchoStream, &EchoStream::onDrain>(
+                        *this);
             }
             if (not drainListening)
             {
@@ -164,6 +166,12 @@ struct ApiServerExample
     Connection      connections[MaxConnections];
     EchoStream      echoStreams[MaxConnections];
     HttpAsyncServer server;
+    HttpRouter      router;
+    HttpRoute       routes[3] = {
+        {HttpParser::Method::HttpGET, "/health"},
+        {HttpParser::Method::HttpGET, "/hello"},
+        {HttpParser::Method::HttpPOST, "/echo"},
+    };
 
     String  interface = "127.0.0.1";
     int32_t port      = 8091;
@@ -171,6 +179,7 @@ struct ApiServerExample
     Result start(AsyncEventLoop& loop)
     {
         SC_TRY(server.init(Span<Connection>(connections)));
+        SC_TRY(router.init(routes));
         SC_TRY(server.start(loop, interface.view(), static_cast<uint16_t>(port)));
         server.onRequest.bind<ApiServerExample, &ApiServerExample::onRequest>(*this);
         return Result(true);
@@ -178,19 +187,41 @@ struct ApiServerExample
 
     void onRequest(HttpConnection& connection)
     {
-        String        targetURL = StringEncoding::Ascii;
-        HttpURLParser url;
-        SC_ASSERT_RELEASE(StringBuilder::format(targetURL, "http://localhost{}", connection.request.getRequestTarget()));
-        SC_ASSERT_RELEASE(url.parse(targetURL.view()));
+        HttpRouteMatch match;
+        SC_ASSERT_RELEASE(
+            router.match(connection.request.getParser().method, connection.request.getRequestTarget(), {}, match));
+        if (match.status == HttpRouteMatchStatus::NotFound)
+        {
+            SC_ASSERT_RELEASE(notFound(connection));
+            return;
+        }
+        if (match.status == HttpRouteMatchStatus::MethodNotAllowed)
+        {
+            char       allowStorage[64];
+            StringSpan allow;
+            SC_ASSERT_RELEASE(router.formatAllowHeader(connection.request.getRequestTarget(), allowStorage, allow));
+            SC_ASSERT_RELEASE(methodNotAllowed(connection, allow));
+            return;
+        }
+        if (match.status != HttpRouteMatchStatus::Matched)
+        {
+            SC_ASSERT_RELEASE(sendText(connection, 500, "text/plain", "route error\n"));
+            return;
+        }
 
-        if (url.pathname == "/health")
+        if (match.route == &routes[0])
         {
             SC_ASSERT_RELEASE(sendText(connection, 200, "application/json", "{\"status\":\"ok\"}"));
             return;
         }
-
-        if (url.pathname == "/hello")
+        if (match.route == &routes[1])
         {
+            String        targetURL = StringEncoding::Ascii;
+            HttpURLParser url;
+            SC_ASSERT_RELEASE(
+                StringBuilder::format(targetURL, "http://localhost{}", connection.request.getRequestTarget()));
+            SC_ASSERT_RELEASE(url.parse(targetURL.view()));
+
             StringSpan name;
             if (not url.getQueryValue("name", name) or name.isEmpty())
             {
@@ -201,19 +232,13 @@ struct ApiServerExample
             SC_ASSERT_RELEASE(sendText(connection, 200, "application/json", response.view()));
             return;
         }
-
-        if (url.pathname == "/echo")
+        if (match.route == &routes[2])
         {
-            if (connection.request.getParser().method != HttpParser::Method::HttpPOST)
-            {
-                SC_ASSERT_RELEASE(methodNotAllowed(connection, "POST"));
-                return;
-            }
             receiveEchoBody(connection);
             return;
         }
 
-        SC_ASSERT_RELEASE(notFound(connection));
+        SC_ASSERT_RELEASE(sendText(connection, 500, "text/plain", "route error\n"));
     }
 
     void receiveEchoBody(HttpConnection& connection)
@@ -223,18 +248,18 @@ struct ApiServerExample
         EchoStream& echo = echoStreams[index];
         SC_ASSERT_RELEASE(echo.start(connection));
 
-        const bool addedData = connection.request.getReadableStream().eventData.addListener<EchoStream, &EchoStream::onData>(
-            echo);
-        const bool addedEnd = connection.request.getReadableStream().eventEnd.addListener<EchoStream, &EchoStream::onEnd>(
-            echo);
+        const bool addedData =
+            connection.request.getReadableStream().eventData.addListener<EchoStream, &EchoStream::onData>(echo);
+        const bool addedEnd =
+            connection.request.getReadableStream().eventEnd.addListener<EchoStream, &EchoStream::onEnd>(echo);
         SC_ASSERT_RELEASE(addedData);
         SC_ASSERT_RELEASE(addedEnd);
         if (connection.request.getBodyFramingKind() == HttpBodyFramingKind::None or
             (connection.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength and
              connection.request.getBodyBytesRemaining() == 0))
         {
-            (void)connection.request.getReadableStream()
-                .eventData.removeListener<EchoStream, &EchoStream::onData>(echo);
+            (void)connection.request.getReadableStream().eventData.removeListener<EchoStream, &EchoStream::onData>(
+                echo);
             (void)connection.request.getReadableStream().eventEnd.removeListener<EchoStream, &EchoStream::onEnd>(echo);
             SC_ASSERT_RELEASE(connection.response.end());
             echo.connection = nullptr;
@@ -279,7 +304,7 @@ Result saneMain(Span<const StringSpan> args)
     Console console;
 
     static ApiServerExample sample;
-    uint16_t         port = static_cast<uint16_t>(sample.port);
+    uint16_t                port = static_cast<uint16_t>(sample.port);
 
     CommandLineOption options[1];
     options[0].longName  = "port";
