@@ -22,10 +22,12 @@ struct HttpAsyncFileServer::Internal
     static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response, int64_t millisecondsSinceEpoch);
     static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
     static Result formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize, size_t& outLength);
+    static Result formatWeakETag(const FileSystem::FileStat& fileStat, char* buffer, size_t bufferSize,
+                                 size_t& outLength);
     static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
     static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
-    static Result sendNotModified(HttpResponse& response, StringSpan lastModified);
+    static Result sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag);
 
     static int64_t    getCurrentTimeMilliseconds();
     static StringSpan getContentType(const StringSpan extension);
@@ -52,9 +54,15 @@ Result HttpAsyncFileServer::close()
 
 void HttpAsyncFileServer::setUseAsyncFileSend(bool value) { useAsyncFileSend = value; }
 
+Result HttpAsyncFileServer::setOptions(const HttpAsyncFileServerOptions& newOptions)
+{
+    options = newOptions;
+    return Result(true);
+}
+
 Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection)
 {
-    StringSpan filePath;
+    StringSpan   filePath;
     const Result safePath = Internal::extractSafeFilePath(connection.request.getRequestTarget(), filePath);
     if (not safePath)
     {
@@ -111,16 +119,40 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(path.append("/"));
         SC_TRY(path.append(filePath));
 
-        char      lastModifiedData[128];
-        size_t    lastModifiedLength = 0;
-        SC_TRY(Internal::formatHttpDate(fileStat.modifiedTime.milliseconds, lastModifiedData,
-                                        sizeof(lastModifiedData), lastModifiedLength));
+        char   lastModifiedData[128];
+        size_t lastModifiedLength = 0;
+        SC_TRY(Internal::formatHttpDate(fileStat.modifiedTime.milliseconds, lastModifiedData, sizeof(lastModifiedData),
+                                        lastModifiedLength));
         StringSpan lastModified = {{lastModifiedData, lastModifiedLength}, false, StringEncoding::Ascii};
 
-        StringSpan ifModifiedSince;
-        if (connection.request.getHeader("If-Modified-Since", ifModifiedSince) and ifModifiedSince == lastModified)
+        char       etagData[64];
+        size_t     etagLength = 0;
+        StringSpan etag;
+        if (options.enableValidators)
         {
-            return Internal::sendNotModified(connection.response, lastModified);
+            SC_TRY(Internal::formatWeakETag(fileStat, etagData, sizeof(etagData), etagLength));
+            etag = {{etagData, etagLength}, false, StringEncoding::Ascii};
+        }
+
+        if (options.enableValidators)
+        {
+            StringSpan ifNoneMatch;
+            if (connection.request.getHeader("If-None-Match", ifNoneMatch))
+            {
+                if (ifNoneMatch == etag)
+                {
+                    return Internal::sendNotModified(connection.response, lastModified, etag);
+                }
+            }
+            else
+            {
+                StringSpan ifModifiedSince;
+                if (connection.request.getHeader("If-Modified-Since", ifModifiedSince) and
+                    ifModifiedSince == lastModified)
+                {
+                    return Internal::sendNotModified(connection.response, lastModified, etag);
+                }
+            }
         }
 
         // Send HTTP headers first
@@ -129,6 +161,10 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
+        if (options.enableValidators)
+        {
+            SC_TRY(connection.response.addHeader("ETag", etag));
+        }
         SC_TRY(connection.response.addHeader("Server", "SC"));
 
         if (not sendBody)
@@ -425,11 +461,15 @@ Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, 
     return response.end();
 }
 
-Result HttpAsyncFileServer::Internal::sendNotModified(HttpResponse& response, StringSpan lastModified)
+Result HttpAsyncFileServer::Internal::sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag)
 {
     SC_TRY(response.startResponse(304));
     SC_TRY(writeGMTHeaderTime("Date", response, getCurrentTimeMilliseconds()));
     SC_TRY(response.addHeader("Last-Modified", lastModified));
+    if (not etag.isEmpty())
+    {
+        SC_TRY(response.addHeader("ETag", etag));
+    }
     SC_TRY(response.addHeader("Server", "SC"));
     SC_TRY(response.sendHeaders());
     return response.end();
@@ -481,6 +521,19 @@ Result HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEp
     return Result(true);
 }
 
+Result HttpAsyncFileServer::Internal::formatWeakETag(const FileSystem::FileStat& fileStat, char* buffer,
+                                                     size_t bufferSize, size_t& outLength)
+{
+    outLength = static_cast<size_t>(snprintf(buffer, bufferSize, "W/\"%llu-%lld\"",
+                                             static_cast<unsigned long long>(fileStat.fileSize),
+                                             static_cast<long long>(fileStat.modifiedTime.milliseconds)));
+    if (outLength == 0 or outLength >= bufferSize)
+    {
+        return Result::Error("Failed to format ETag");
+    }
+    return Result(true);
+}
+
 Result HttpAsyncFileServer::Internal::writeGMTHeaderTime(StringSpan headerName, HttpResponse& response,
                                                          int64_t millisecondsSinceEpoch)
 {
@@ -496,9 +549,9 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
 {
     SC_TRY(stream.multipartParser.initWithBoundary(connection.request.getBoundary()));
 
-    stream.multipartListener.server     = this;
-    stream.multipartListener.stream     = &stream;
-    stream.multipartListener.connection = &connection;
+    stream.multipartListener.server               = this;
+    stream.multipartListener.stream               = &stream;
+    stream.multipartListener.connection           = &connection;
     stream.multipartListener.currentFileName      = {};
     stream.multipartListener.currentHeaderName    = {};
     stream.multipartListener.isContentDisposition = false;

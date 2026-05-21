@@ -9,6 +9,19 @@
 
 namespace SC
 {
+/// @brief Options controlling optional HttpAsyncFileServer semantics.
+struct SC_HTTP_EXPORT HttpAsyncFileServerOptions
+{
+    /// @brief Optional SPA fallback path. The StringSpan must outlive the file server.
+    StringSpan spaFallbackPath = {};
+
+    /// @brief Enables Last-Modified / ETag validators (default: true).
+    bool enableValidators = true;
+
+    /// @brief Enables byte range requests once supported (default: true).
+    bool enableRangeRequests = true;
+};
+
 /// @brief Http file server statically serves files from a directory
 ///
 /// This class registers the onRequest callback provided by HttpAsyncServer to serves files from a given directory.
@@ -83,12 +96,17 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
     /// @brief Gets whether AsyncFileSend optimization is used for GET requests
     [[nodiscard]] bool getUseAsyncFileSend() const { return useAsyncFileSend; }
 
+    /// @brief Sets optional file server behavior.
+    Result setOptions(const HttpAsyncFileServerOptions& options);
+
     /// @brief Handles the request, serving the requested file (GET) or creating a new one (PUT/POST)
     /// Call this method in response to HttpConnectionsPool::onRequest.
     Result handleRequest(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);
 
   private:
-    bool   useAsyncFileSend = true;
+    bool                       useAsyncFileSend = true;
+    HttpAsyncFileServerOptions options          = {};
+
     Result putFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath);
     Result getFile(HttpAsyncFileServer::Stream& stream, HttpConnection& connection, StringSpan filePath, bool sendBody);
     Result postMultipart(HttpAsyncFileServer::Stream& stream, HttpConnection& connection);

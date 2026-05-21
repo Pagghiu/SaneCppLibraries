@@ -82,47 +82,49 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         AsyncEventLoop*  loop = nullptr;
         FileSystem       fs   = {};
 
-        int getCount       = 0;
-        int putCount       = 0;
-        int multipartCount = 0;
+        int getCount          = 0;
+        int putCount          = 0;
+        int multipartCount    = 0;
         int badMultipartCount = 0;
-        int safetyCount    = 0;
-        int mimeCount      = 0;
-        int binaryMimeCount = 0;
-        int missingCount   = 0;
-        int conditionalCount = 0;
-        int headCount      = 0;
-        int optionsCount   = 0;
+        int safetyCount       = 0;
+        int mimeCount         = 0;
+        int binaryMimeCount   = 0;
+        int missingCount      = 0;
+        int etagCount         = 0;
+        int conditionalCount  = 0;
+        int headCount         = 0;
+        int optionsCount      = 0;
 
-        HttpTestClient queryClient   = {};
-        HttpTestClient badPathClient = {};
-        HttpTestClient mimeClient    = {};
-        HttpTestClient zipMimeClient = {};
-        HttpTestClient binaryMimeClient = {};
-        HttpTestClient missingClient = {};
+        HttpTestClient queryClient       = {};
+        HttpTestClient badPathClient     = {};
+        HttpTestClient mimeClient        = {};
+        HttpTestClient zipMimeClient     = {};
+        HttpTestClient binaryMimeClient  = {};
+        HttpTestClient missingClient     = {};
+        HttpTestClient etagClient        = {};
         HttpTestClient conditionalClient = {};
-        HttpTestClient headClient    = {};
-        HttpTestClient optionsClient = {};
-        HttpTestClient getClient     = {};
-        HttpTestClient putStream     = {};
-        HttpTestClient putInline     = {};
-        HttpTestClient putLarge      = {};
-        HttpTestClient postMultipart = {};
-        HttpTestClient badMultipart  = {};
+        HttpTestClient headClient        = {};
+        HttpTestClient optionsClient     = {};
+        HttpTestClient getClient         = {};
+        HttpTestClient putStream         = {};
+        HttpTestClient putInline         = {};
+        HttpTestClient putLarge          = {};
+        HttpTestClient postMultipart     = {};
+        HttpTestClient badMultipart      = {};
         Buffer         multipartPayload;
         Buffer         largePutPayload;
 
-        String fileURL   = StringEncoding::Ascii;
-        String queryURL  = StringEncoding::Ascii;
-        String webpURL   = StringEncoding::Ascii;
-        String zipURL    = StringEncoding::Ascii;
-        String binaryURL = StringEncoding::Ascii;
+        String fileURL    = StringEncoding::Ascii;
+        String queryURL   = StringEncoding::Ascii;
+        String webpURL    = StringEncoding::Ascii;
+        String zipURL     = StringEncoding::Ascii;
+        String binaryURL  = StringEncoding::Ascii;
         String missingURL = StringEncoding::Ascii;
-        String serverURL = StringEncoding::Ascii;
-        String streamURL = StringEncoding::Ascii;
-        String inlineURL = StringEncoding::Ascii;
-        String largeURL  = StringEncoding::Ascii;
-        String uploadURL = StringEncoding::Ascii;
+        String serverURL  = StringEncoding::Ascii;
+        String streamURL  = StringEncoding::Ascii;
+        String inlineURL  = StringEncoding::Ascii;
+        String largeURL   = StringEncoding::Ascii;
+        String uploadURL  = StringEncoding::Ascii;
     } context    = {httpServer};
     context.loop = &eventLoop;
 
@@ -201,11 +203,22 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("404 Not Found"));
         SC_TEST_EXPECT(str.containsString("Content-Length: 0"));
 
-        static constexpr StringSpan conditionalRequest =
-            "GET /file.html HTTP/1.1\r\n"
-            "Host: 127.0.0.1\r\n"
-            "If-Modified-Since: Wed, 21 Oct 2015 07:28:00 GMT\r\n"
-            "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(context.etagClient.get(*context.loop, context.fileURL.view()));
+    };
+
+    context.etagClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.etagCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("200 OK"));
+        SC_TEST_EXPECT(str.containsString("ETag: W/\"44-1445412480000\""));
+        SC_TEST_EXPECT(str.containsString("Response from file"));
+
+        static constexpr StringSpan conditionalRequest = "GET /file.html HTTP/1.1\r\n"
+                                                         "Host: 127.0.0.1\r\n"
+                                                         "If-None-Match: W/\"44-1445412480000\"\r\n"
+                                                         "If-Modified-Since: Tue, 20 Oct 2015 07:28:00 GMT\r\n"
+                                                         "Connection: close\r\n\r\n";
         SC_TEST_EXPECT(context.conditionalClient.sendRaw(*context.loop, context.serverURL.view(), conditionalRequest));
     };
 
@@ -215,6 +228,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("304 Not Modified"));
         SC_TEST_EXPECT(str.containsString("Last-Modified: Wed, 21 Oct 2015 07:28:00 GMT"));
+        SC_TEST_EXPECT(str.containsString("ETag: W/\"44-1445412480000\""));
         SC_TEST_EXPECT(not str.containsString("Response from file"));
 
         SC_TEST_EXPECT(context.headClient.head(*context.loop, context.fileURL.view()));
@@ -290,8 +304,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         {
             context.largePutPayload.data()[idx] = static_cast<char>((idx * 17 + 3) & 0x7F);
         }
-        StringSpan largePutContent = {{context.largePutPayload.data(), context.largePutPayload.size()}, false,
-                                      StringEncoding::Ascii};
+        StringSpan largePutContent = {
+            {context.largePutPayload.data(), context.largePutPayload.size()}, false, StringEncoding::Ascii};
         SC_TEST_EXPECT(context.putLarge.put(*context.loop, context.largeURL.view(), largePutContent));
     };
 
@@ -327,8 +341,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         }
 
         // Test multipart POST with binary file upload spanning multiple request buffers.
-        StringSpan multipartContent = {{context.multipartPayload.data(), context.multipartPayload.size()}, false,
-                                       StringEncoding::Ascii};
+        StringSpan multipartContent = {
+            {context.multipartPayload.data(), context.multipartPayload.size()}, false, StringEncoding::Ascii};
         SC_TEST_EXPECT(context.postMultipart.postMultipart(*context.loop, context.uploadURL.view(), "file",
                                                            "multipart.bin", multipartContent));
     };
@@ -380,6 +394,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.mimeCount == 1);
     SC_TEST_EXPECT(context.binaryMimeCount == 2);
     SC_TEST_EXPECT(context.missingCount == 1);
+    SC_TEST_EXPECT(context.etagCount == 1);
     SC_TEST_EXPECT(context.conditionalCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);
     SC_TEST_EXPECT(context.optionsCount == 1);
