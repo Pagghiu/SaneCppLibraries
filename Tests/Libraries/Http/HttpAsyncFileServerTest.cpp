@@ -91,26 +91,30 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int binaryMimeCount   = 0;
         int missingCount      = 0;
         int etagCount         = 0;
+        int rangeCount        = 0;
+        int invalidRangeCount = 0;
         int conditionalCount  = 0;
         int headCount         = 0;
         int optionsCount      = 0;
 
-        HttpTestClient queryClient       = {};
-        HttpTestClient badPathClient     = {};
-        HttpTestClient mimeClient        = {};
-        HttpTestClient zipMimeClient     = {};
-        HttpTestClient binaryMimeClient  = {};
-        HttpTestClient missingClient     = {};
-        HttpTestClient etagClient        = {};
-        HttpTestClient conditionalClient = {};
-        HttpTestClient headClient        = {};
-        HttpTestClient optionsClient     = {};
-        HttpTestClient getClient         = {};
-        HttpTestClient putStream         = {};
-        HttpTestClient putInline         = {};
-        HttpTestClient putLarge          = {};
-        HttpTestClient postMultipart     = {};
-        HttpTestClient badMultipart      = {};
+        HttpTestClient queryClient        = {};
+        HttpTestClient badPathClient      = {};
+        HttpTestClient mimeClient         = {};
+        HttpTestClient zipMimeClient      = {};
+        HttpTestClient binaryMimeClient   = {};
+        HttpTestClient missingClient      = {};
+        HttpTestClient etagClient         = {};
+        HttpTestClient rangeClient        = {};
+        HttpTestClient invalidRangeClient = {};
+        HttpTestClient conditionalClient  = {};
+        HttpTestClient headClient         = {};
+        HttpTestClient optionsClient      = {};
+        HttpTestClient getClient          = {};
+        HttpTestClient putStream          = {};
+        HttpTestClient putInline          = {};
+        HttpTestClient putLarge           = {};
+        HttpTestClient postMultipart      = {};
+        HttpTestClient badMultipart       = {};
         Buffer         multipartPayload;
         Buffer         largePutPayload;
 
@@ -213,6 +217,40 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(str.containsString("200 OK"));
         SC_TEST_EXPECT(str.containsString("ETag: W/\"44-1445412480000\""));
         SC_TEST_EXPECT(str.containsString("Response from file"));
+
+        static constexpr StringSpan rangeRequest = "GET /file.html HTTP/1.1\r\n"
+                                                   "Host: 127.0.0.1\r\n"
+                                                   "Range: bytes=6-9\r\n"
+                                                   "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(context.rangeClient.sendRaw(*context.loop, context.serverURL.view(), rangeRequest));
+    };
+
+    context.rangeClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.rangeCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("206 Partial Content"));
+        SC_TEST_EXPECT(str.containsString("Content-Length: 4"));
+        SC_TEST_EXPECT(str.containsString("Content-Range: bytes 6-9/44"));
+        SC_TEST_EXPECT(str.containsString("Accept-Ranges: bytes"));
+        SC_TEST_EXPECT(str.containsString("<bod"));
+        SC_TEST_EXPECT(not str.containsString("Response from file"));
+
+        static constexpr StringSpan invalidRangeRequest = "GET /file.html HTTP/1.1\r\n"
+                                                          "Host: 127.0.0.1\r\n"
+                                                          "Range: bytes=1000-1001\r\n"
+                                                          "Connection: close\r\n\r\n";
+        SC_TEST_EXPECT(
+            context.invalidRangeClient.sendRaw(*context.loop, context.serverURL.view(), invalidRangeRequest));
+    };
+
+    context.invalidRangeClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.invalidRangeCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("416 Range Not Satisfiable"));
+        SC_TEST_EXPECT(str.containsString("Content-Range: bytes */44"));
+        SC_TEST_EXPECT(str.containsString("Content-Length: 0"));
 
         static constexpr StringSpan conditionalRequest = "GET /file.html HTTP/1.1\r\n"
                                                          "Host: 127.0.0.1\r\n"
@@ -395,6 +433,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.binaryMimeCount == 2);
     SC_TEST_EXPECT(context.missingCount == 1);
     SC_TEST_EXPECT(context.etagCount == 1);
+    SC_TEST_EXPECT(context.rangeCount == 1);
+    SC_TEST_EXPECT(context.invalidRangeCount == 1);
     SC_TEST_EXPECT(context.conditionalCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);
     SC_TEST_EXPECT(context.optionsCount == 1);

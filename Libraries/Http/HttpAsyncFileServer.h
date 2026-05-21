@@ -45,6 +45,8 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
         HttpMultipartParser multipartParser;
         AsyncFileSend       asyncFileSend;
         FileDescriptor      sourceFileDescriptor;
+        size_t              fileSendOffset = 0;
+        size_t              fileSendLength = 0;
 
         struct MultipartListener
         {

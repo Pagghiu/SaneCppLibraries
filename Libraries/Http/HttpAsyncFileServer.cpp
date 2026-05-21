@@ -19,15 +19,28 @@ namespace SC
 {
 struct HttpAsyncFileServer::Internal
 {
+    struct ByteRange
+    {
+        size_t offset  = 0;
+        size_t length  = 0;
+        bool   partial = false;
+    };
+
     static Result writeGMTHeaderTime(StringSpan headerName, HttpResponse& response, int64_t millisecondsSinceEpoch);
     static Result readFile(StringSpan initialDirectory, size_t index, StringSpan url, HttpResponse& response);
     static Result formatHttpDate(int64_t millisecondsSinceEpoch, char* buffer, size_t bufferSize, size_t& outLength);
     static Result formatWeakETag(const FileSystem::FileStat& fileStat, char* buffer, size_t bufferSize,
                                  size_t& outLength);
+    static Result formatContentRange(const ByteRange& range, size_t fileSize, char* buffer, size_t bufferSize,
+                                     size_t& outLength);
+    static Result formatUnsatisfiedContentRange(size_t fileSize, char* buffer, size_t bufferSize, size_t& outLength);
     static Result extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath);
+    static bool   parseDecimalSize(StringSpan text, size_t& value);
+    static bool   parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range);
     static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
     static Result sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag);
+    static Result sendRangeNotSatisfiable(HttpResponse& response, size_t fileSize);
 
     static int64_t    getCurrentTimeMilliseconds();
     static StringSpan getContentType(const StringSpan extension);
@@ -155,15 +168,47 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             }
         }
 
+        Internal::ByteRange byteRange;
+        byteRange.length = fileStat.fileSize;
+        if (options.enableRangeRequests)
+        {
+            StringSpan rangeHeader;
+            if (connection.request.getHeader("Range", rangeHeader))
+            {
+                if (not Internal::parseSingleByteRange(rangeHeader, fileStat.fileSize, byteRange))
+                {
+                    return Internal::sendRangeNotSatisfiable(connection.response, fileStat.fileSize);
+                }
+            }
+        }
+
+        char       contentRangeData[64];
+        size_t     contentRangeLength = 0;
+        StringSpan contentRange;
+        if (byteRange.partial)
+        {
+            SC_TRY(Internal::formatContentRange(byteRange, fileStat.fileSize, contentRangeData,
+                                                sizeof(contentRangeData), contentRangeLength));
+            contentRange = {{contentRangeData, contentRangeLength}, false, StringEncoding::Ascii};
+        }
+
         // Send HTTP headers first
-        SC_TRY(connection.response.startResponse(200));
-        SC_TRY(connection.response.addContentLength(fileStat.fileSize));
+        SC_TRY(connection.response.startResponse(byteRange.partial ? 206 : 200));
+        SC_TRY(connection.response.addContentLength(byteRange.length));
         SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         SC_TRY(connection.response.addHeader("Last-Modified", lastModified));
         if (options.enableValidators)
         {
             SC_TRY(connection.response.addHeader("ETag", etag));
+        }
+        if (options.enableRangeRequests)
+        {
+            SC_TRY(connection.response.addHeader("Accept-Ranges", "bytes"));
+        }
+        if (byteRange.partial)
+        {
+            SC_TRY(connection.response.addHeader("Content-Range", contentRange));
         }
         SC_TRY(connection.response.addHeader("Server", "SC"));
 
@@ -173,15 +218,17 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             return connection.response.end();
         }
 
-        if (useAsyncFileSend)
+        if (useAsyncFileSend or byteRange.partial)
         {
             // Context for the callback
             stream.multipartListener.server     = this;
             stream.multipartListener.stream     = &stream;
             stream.multipartListener.connection = &static_cast<HttpConnection&>(connection);
+            stream.fileSendOffset               = byteRange.offset;
+            stream.fileSendLength               = byteRange.length;
             SC_TRY(stream.sourceFileDescriptor.open(path.view(), FileOpen::Read));
 
-            auto onHeadersSent = [&stream, fileSize = fileStat.fileSize](AsyncBufferView::ID)
+            auto onHeadersSent = [&stream](AsyncBufferView::ID)
             {
                 HttpConnection&      connection = *stream.multipartListener.connection;
                 HttpAsyncFileServer* server     = stream.multipartListener.server;
@@ -211,8 +258,9 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
                     }
                 };
 
-                Result res = stream.asyncFileSend.start(*server->eventLoop, stream.sourceFileDescriptor,
-                                                        connection.socket, 0, fileSize);
+                Result res =
+                    stream.asyncFileSend.start(*server->eventLoop, stream.sourceFileDescriptor, connection.socket,
+                                               static_cast<int64_t>(stream.fileSendOffset), stream.fileSendLength);
                 if (not res)
                 {
                     // Failed to start sending file
@@ -434,6 +482,138 @@ Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarg
     return Result(true);
 }
 
+bool HttpAsyncFileServer::Internal::parseDecimalSize(StringSpan text, size_t& value)
+{
+    if (text.isEmpty())
+    {
+        return false;
+    }
+
+    const char*  data   = text.bytesWithoutTerminator();
+    const size_t length = text.sizeInBytes();
+    size_t       parsed = 0;
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        if (data[idx] < '0' or data[idx] > '9')
+        {
+            return false;
+        }
+        const size_t digit = static_cast<size_t>(data[idx] - '0');
+        if (parsed > (static_cast<size_t>(-1) - digit) / 10)
+        {
+            return false;
+        }
+        parsed = parsed * 10 + digit;
+    }
+    value = parsed;
+    return true;
+}
+
+bool HttpAsyncFileServer::Internal::parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range)
+{
+    static constexpr StringSpan Prefix = "bytes=";
+
+    range.offset  = 0;
+    range.length  = fileSize;
+    range.partial = false;
+
+    const char*  data   = header.bytesWithoutTerminator();
+    const size_t length = header.sizeInBytes();
+    if (length <= Prefix.sizeInBytes() or fileSize == 0)
+    {
+        return false;
+    }
+    for (size_t idx = 0; idx < Prefix.sizeInBytes(); ++idx)
+    {
+        if (data[idx] != Prefix.bytesWithoutTerminator()[idx])
+        {
+            return false;
+        }
+    }
+
+    size_t dashIndex = static_cast<size_t>(-1);
+    for (size_t idx = Prefix.sizeInBytes(); idx < length; ++idx)
+    {
+        if (data[idx] == ',')
+        {
+            return false;
+        }
+        if (data[idx] == '-')
+        {
+            if (dashIndex != static_cast<size_t>(-1))
+            {
+                return false;
+            }
+            dashIndex = idx;
+        }
+    }
+    if (dashIndex == static_cast<size_t>(-1))
+    {
+        return false;
+    }
+
+    const size_t startBegin  = Prefix.sizeInBytes();
+    const size_t startLength = dashIndex - startBegin;
+    const size_t endBegin    = dashIndex + 1;
+    const size_t endLength   = length - endBegin;
+
+    if (startLength == 0 and endLength == 0)
+    {
+        return false;
+    }
+
+    size_t start = 0;
+    size_t end   = fileSize - 1;
+    if (startLength == 0)
+    {
+        size_t suffixLength = 0;
+        if (not parseDecimalSize({{data + endBegin, endLength}, false, header.getEncoding()}, suffixLength) or
+            suffixLength == 0)
+        {
+            return false;
+        }
+        if (suffixLength >= fileSize)
+        {
+            start = 0;
+        }
+        else
+        {
+            start = fileSize - suffixLength;
+        }
+    }
+    else
+    {
+        if (not parseDecimalSize({{data + startBegin, startLength}, false, header.getEncoding()}, start))
+        {
+            return false;
+        }
+        if (start >= fileSize)
+        {
+            return false;
+        }
+        if (endLength > 0)
+        {
+            if (not parseDecimalSize({{data + endBegin, endLength}, false, header.getEncoding()}, end))
+            {
+                return false;
+            }
+            if (end < start)
+            {
+                return false;
+            }
+            if (end >= fileSize)
+            {
+                end = fileSize - 1;
+            }
+        }
+    }
+
+    range.offset  = start;
+    range.length  = end - start + 1;
+    range.partial = true;
+    return true;
+}
+
 bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)
 {
     if (fileName.isEmpty() or fileName == "." or fileName == "..")
@@ -471,6 +651,23 @@ Result HttpAsyncFileServer::Internal::sendNotModified(HttpResponse& response, St
         SC_TRY(response.addHeader("ETag", etag));
     }
     SC_TRY(response.addHeader("Server", "SC"));
+    SC_TRY(response.sendHeaders());
+    return response.end();
+}
+
+Result HttpAsyncFileServer::Internal::sendRangeNotSatisfiable(HttpResponse& response, size_t fileSize)
+{
+    char   contentRangeData[64];
+    size_t contentRangeLength = 0;
+    SC_TRY(formatUnsatisfiedContentRange(fileSize, contentRangeData, sizeof(contentRangeData), contentRangeLength));
+    StringSpan contentRange = {{contentRangeData, contentRangeLength}, false, StringEncoding::Ascii};
+
+    SC_TRY(response.startResponse(416));
+    SC_TRY(writeGMTHeaderTime("Date", response, getCurrentTimeMilliseconds()));
+    SC_TRY(response.addHeader("Content-Range", contentRange));
+    SC_TRY(response.addHeader("Accept-Ranges", "bytes"));
+    SC_TRY(response.addHeader("Server", "SC"));
+    SC_TRY(response.addContentLength(0));
     SC_TRY(response.sendHeaders());
     return response.end();
 }
@@ -518,6 +715,31 @@ Result HttpAsyncFileServer::Internal::formatHttpDate(int64_t millisecondsSinceEp
         return Result::Error("Failed to format time");
     }
 
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::Internal::formatContentRange(const ByteRange& range, size_t fileSize, char* buffer,
+                                                         size_t bufferSize, size_t& outLength)
+{
+    outLength = static_cast<size_t>(snprintf(
+        buffer, bufferSize, "bytes %llu-%llu/%llu", static_cast<unsigned long long>(range.offset),
+        static_cast<unsigned long long>(range.offset + range.length - 1), static_cast<unsigned long long>(fileSize)));
+    if (outLength == 0 or outLength >= bufferSize)
+    {
+        return Result::Error("Failed to format Content-Range");
+    }
+    return Result(true);
+}
+
+Result HttpAsyncFileServer::Internal::formatUnsatisfiedContentRange(size_t fileSize, char* buffer, size_t bufferSize,
+                                                                    size_t& outLength)
+{
+    outLength =
+        static_cast<size_t>(snprintf(buffer, bufferSize, "bytes */%llu", static_cast<unsigned long long>(fileSize)));
+    if (outLength == 0 or outLength >= bufferSize)
+    {
+        return Result::Error("Failed to format Content-Range");
+    }
     return Result(true);
 }
 
