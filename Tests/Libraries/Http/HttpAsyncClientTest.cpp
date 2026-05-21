@@ -461,7 +461,9 @@ void SC::HttpAsyncClientTest::commonMethodWrappers()
                                     StringView(patchBody.toSpanConst(), false, StringEncoding::Ascii) == "patch");
             test->recordExpectation("patch response", sendEmptyResponse(200));
         }
-    } serverContext = {this};
+
+        explicit ServerContext(HttpAsyncClientTest* testCase) : test(testCase) {}
+    } serverContext(this);
 
     httpServer.onRequest = [this, &serverContext](HttpConnection& connection)
     {

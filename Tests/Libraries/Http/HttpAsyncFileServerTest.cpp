@@ -139,7 +139,9 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         String inlineURL  = StringEncoding::Ascii;
         String largeURL   = StringEncoding::Ascii;
         String uploadURL  = StringEncoding::Ascii;
-    } context          = {httpServer};
+
+        explicit Context(HttpAsyncServer& server) : httpServer(server) {}
+    } context(httpServer);
     context.loop       = &eventLoop;
     context.fileServer = &fileServer;
 

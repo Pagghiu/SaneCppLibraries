@@ -15,12 +15,13 @@
 #if defined(__has_include)
 #if __has_include(<linux/if_alg.h>)
 #include <linux/if_alg.h>
+using SCHttpWebSocketSockAddrAlg = sockaddr_alg;
 #else
 #include <stdint.h>
 #ifndef AF_ALG
 #define AF_ALG 38
 #endif
-struct sockaddr_alg
+struct SCHttpWebSocketSockAddrAlg
 {
     uint16_t salg_family;
     char     salg_type[14];
@@ -31,6 +32,7 @@ struct sockaddr_alg
 #endif
 #else
 #include <linux/if_alg.h>
+using SCHttpWebSocketSockAddrAlg = sockaddr_alg;
 #endif
 #include <sys/socket.h>
 #include <unistd.h>
@@ -291,8 +293,8 @@ struct HttpWebSocketSha1
 
     HttpWebSocketSha1()
     {
-        sockaddr_alg sa = {};
-        sa.salg_family  = AF_ALG;
+        SCHttpWebSocketSockAddrAlg sa = {};
+        sa.salg_family                = AF_ALG;
         ::memcpy(sa.salg_type, "hash", sizeof("hash"));
         ::memcpy(sa.salg_name, "sha1", sizeof("sha1"));
 
