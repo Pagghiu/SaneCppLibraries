@@ -337,6 +337,8 @@ Result AsyncReadableStream::init(AsyncBuffersPool& buffersPool)
 
 AsyncReadableStream::~AsyncReadableStream() {}
 
+Result AsyncReadableStream::asyncResumeReading() { return Result(true); }
+
 Result AsyncReadableStream::asyncDestroyReadable() { return finishedDestroyingReadable(); }
 
 Result AsyncReadableStream::start()
@@ -493,6 +495,14 @@ void AsyncReadableStream::resumeReading()
     break;
     case State::CanRead: {
         executeRead(); // -> State::Reading
+    }
+    break;
+    case State::AsyncReading: {
+        Result res = asyncResumeReading();
+        if (not res)
+        {
+            emitError(res);
+        }
     }
     break;
     case State::Stopped:
@@ -1058,6 +1068,8 @@ Result AsyncPipeline::pipe()
     bool res;
     res = readable->eventData.addListener<AsyncPipeline, &AsyncPipeline::dispatchToPipes>(*this);
     SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventData");
+    res = readable->eventEnd.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
+    SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventEnd");
     res = readable->eventClose.addListener<AsyncPipeline, &AsyncPipeline::endPipes>(*this);
     SC_TRY_MSG(res, "AsyncPipeline::pipe() run out of eventClose");
     res = readable->eventError.addListener<AsyncPipeline, &AsyncPipeline::emitError>(*this);
@@ -1077,6 +1089,7 @@ bool AsyncPipeline::unpipe()
     bool res = true;
     releasePendingWrites();
     shouldEndWhenDrained = false;
+    endingPipes          = false;
 
     // Deregister all source events
     if (source)
@@ -1090,6 +1103,8 @@ bool AsyncPipeline::unpipe()
         if (validTransforms == 0)
         {
             res = source->eventData.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+            res = source->eventEnd.removeAllListenersBoundTo(*this);
             SC_TRY(res);
             res = source->eventClose.removeAllListenersBoundTo(*this);
             SC_TRY(res);
@@ -1118,6 +1133,8 @@ bool AsyncPipeline::unpipe()
         if ((idx + 1 == MaxTransforms) or transforms[idx + 1] == nullptr)
         {
             res = transform->eventData.removeAllListenersBoundTo(*this);
+            SC_TRY(res);
+            res = transform->AsyncReadableStream::eventEnd.removeAllListenersBoundTo(*this);
             SC_TRY(res);
             res = transform->AsyncReadableStream::eventClose.removeAllListenersBoundTo(*this);
             SC_TRY(res);
@@ -1421,6 +1438,11 @@ void AsyncPipeline::afterWrite(AsyncBufferView::ID bufferID)
 
     if (shouldEndWhenDrained)
     {
+        if (source != nullptr and source->hasQueuedData())
+        {
+            source->resumeReading();
+            return;
+        }
         shouldEndWhenDrained = false;
         endPipes();
         return;
@@ -1464,12 +1486,21 @@ void AsyncPipeline::dispatchToPipes(AsyncBufferView::ID bufferID)
 
 void AsyncPipeline::endPipes()
 {
-    if (hasPendingWrites())
+    if (endingPipes)
+    {
+        return;
+    }
+    if (hasPendingWrites() or (source != nullptr and source->hasQueuedData()))
     {
         shouldEndWhenDrained = true;
+        if (not hasPendingWrites() and source != nullptr)
+        {
+            source->resumeReading();
+        }
         return;
     }
 
+    endingPipes  = true;
     bool allEnded = true;
     for (AsyncWritableStream* sink : sinks)
     {

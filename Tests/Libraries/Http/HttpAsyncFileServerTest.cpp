@@ -88,6 +88,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         int badMultipartCount = 0;
         int safetyCount    = 0;
         int mimeCount      = 0;
+        int binaryMimeCount = 0;
         int missingCount   = 0;
         int conditionalCount = 0;
         int headCount      = 0;
@@ -96,6 +97,8 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient queryClient   = {};
         HttpTestClient badPathClient = {};
         HttpTestClient mimeClient    = {};
+        HttpTestClient zipMimeClient = {};
+        HttpTestClient binaryMimeClient = {};
         HttpTestClient missingClient = {};
         HttpTestClient conditionalClient = {};
         HttpTestClient headClient    = {};
@@ -103,17 +106,22 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         HttpTestClient getClient     = {};
         HttpTestClient putStream     = {};
         HttpTestClient putInline     = {};
+        HttpTestClient putLarge      = {};
         HttpTestClient postMultipart = {};
         HttpTestClient badMultipart  = {};
         Buffer         multipartPayload;
+        Buffer         largePutPayload;
 
         String fileURL   = StringEncoding::Ascii;
         String queryURL  = StringEncoding::Ascii;
         String webpURL   = StringEncoding::Ascii;
+        String zipURL    = StringEncoding::Ascii;
+        String binaryURL = StringEncoding::Ascii;
         String missingURL = StringEncoding::Ascii;
         String serverURL = StringEncoding::Ascii;
         String streamURL = StringEncoding::Ascii;
         String inlineURL = StringEncoding::Ascii;
+        String largeURL  = StringEncoding::Ascii;
         String uploadURL = StringEncoding::Ascii;
     } context    = {httpServer};
     context.loop = &eventLoop;
@@ -122,14 +130,19 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(context.fs.writeString("file.html", "<html><body>Response from file</body></html>"));
     SC_TEST_EXPECT(context.fs.setLastModifiedTime("file.html", TimeMs{static_cast<int64_t>(1445412480000LL)}));
     SC_TEST_EXPECT(context.fs.writeString("asset.webp", "webp"));
+    SC_TEST_EXPECT(context.fs.writeString("archive.zip", "zip"));
+    SC_TEST_EXPECT(context.fs.writeString("payload.unknown", "unknown"));
 
     SC_TEST_EXPECT(StringBuilder::format(context.fileURL, "http://127.0.0.1:{}/file.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.queryURL, "http://127.0.0.1:{}/file.html?download=1", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.webpURL, "http://127.0.0.1:{}/asset.webp", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.zipURL, "http://127.0.0.1:{}/archive.zip", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.binaryURL, "http://127.0.0.1:{}/payload.unknown", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.missingURL, "http://127.0.0.1:{}/missing.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.serverURL, "http://127.0.0.1:{}", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.streamURL, "http://127.0.0.1:{}/stream.html", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.inlineURL, "http://127.0.0.1:{}/inline.html", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(context.largeURL, "http://127.0.0.1:{}/large-put.bin", serverPort));
     SC_TEST_EXPECT(StringBuilder::format(context.uploadURL, "http://127.0.0.1:{}/upload", serverPort));
 
     // Query strings must not be treated as part of the file name.
@@ -159,6 +172,24 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         context.mimeCount++;
         StringView str(result.getResponse());
         SC_TEST_EXPECT(str.containsString("Content-Type: image/webp"));
+
+        SC_TEST_EXPECT(context.zipMimeClient.get(*context.loop, context.zipURL.view()));
+    };
+
+    context.zipMimeClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.binaryMimeCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("Content-Type: application/zip"));
+
+        SC_TEST_EXPECT(context.binaryMimeClient.get(*context.loop, context.binaryURL.view()));
+    };
+
+    context.binaryMimeClient.callback = [this, &context](HttpTestClient& result)
+    {
+        context.binaryMimeCount++;
+        StringView str(result.getResponse());
+        SC_TEST_EXPECT(str.containsString("Content-Type: application/octet-stream"));
 
         SC_TEST_EXPECT(context.missingClient.get(*context.loop, context.missingURL.view()));
     };
@@ -254,6 +285,30 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(content == "InlineBody");
         SC_TEST_EXPECT(context.fs.removeFile("inline.html"));
 
+        SC_TEST_EXPECT(context.largePutPayload.resizeWithoutInitializing(600 * 1024 + 17));
+        for (size_t idx = 0; idx < context.largePutPayload.size(); ++idx)
+        {
+            context.largePutPayload.data()[idx] = static_cast<char>((idx * 17 + 3) & 0x7F);
+        }
+        StringSpan largePutContent = {{context.largePutPayload.data(), context.largePutPayload.size()}, false,
+                                      StringEncoding::Ascii};
+        SC_TEST_EXPECT(context.putLarge.put(*context.loop, context.largeURL.view(), largePutContent));
+    };
+
+    context.putLarge.callback = [this, &context](HttpTestClient& result)
+    {
+        context.putCount++;
+        StringView str(result.getResponse());
+        // Expect 201 Created and Content-Length: 0
+        SC_TEST_EXPECT(str.containsString("201 Created"));
+
+        // Verify file content
+        Buffer content;
+        SC_TEST_EXPECT(context.fs.read("large-put.bin", content));
+        SC_TEST_EXPECT(content.size() == context.largePutPayload.size());
+        SC_TEST_EXPECT(::memcmp(content.data(), context.largePutPayload.data(), content.size()) == 0);
+        SC_TEST_EXPECT(context.fs.removeFile("large-put.bin"));
+
         SC_TEST_EXPECT(context.multipartPayload.resizeWithoutInitializing(8 * 1024));
         for (size_t idx = 0; idx < context.multipartPayload.size(); ++idx)
         {
@@ -318,17 +373,20 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
     SC_TEST_EXPECT(httpServer.close());
 
     SC_TEST_EXPECT(context.getCount == 1);
-    SC_TEST_EXPECT(context.putCount == 2);
+    SC_TEST_EXPECT(context.putCount == 3);
     SC_TEST_EXPECT(context.multipartCount == 1);
     SC_TEST_EXPECT(context.badMultipartCount == 1);
     SC_TEST_EXPECT(context.safetyCount == 2);
     SC_TEST_EXPECT(context.mimeCount == 1);
+    SC_TEST_EXPECT(context.binaryMimeCount == 2);
     SC_TEST_EXPECT(context.missingCount == 1);
     SC_TEST_EXPECT(context.conditionalCount == 1);
     SC_TEST_EXPECT(context.headCount == 1);
     SC_TEST_EXPECT(context.optionsCount == 1);
     SC_TEST_EXPECT(context.fs.removeFile("file.html"));
     SC_TEST_EXPECT(context.fs.removeFile("asset.webp"));
+    SC_TEST_EXPECT(context.fs.removeFile("archive.zip"));
+    SC_TEST_EXPECT(context.fs.removeFile("payload.unknown"));
 }
 
 namespace SC

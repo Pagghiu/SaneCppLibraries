@@ -51,11 +51,9 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
 
         struct PutFileListener
         {
-            HttpConnection* connection     = nullptr;
-            size_t          remainingBytes = 0;
+            HttpConnection* connection = nullptr;
 
-            void onData(AsyncBufferView::ID bufferID);
-            void onDrain();
+            void onFinish();
         } putFileListener;
     };
 

@@ -333,8 +333,10 @@
 
         function renderUploadResult(file, response) {
             const path = uploadPath(file);
+            const name = safeFileName(file);
             if (response.ok) {
-                uploadResult.innerHTML = `Uploaded <a href="${path}" target="_blank" rel="noreferrer">${path}</a>`;
+                uploadResult.innerHTML =
+                    `Uploaded <a href="${path}" download="${name}" target="_blank" rel="noreferrer">${path}</a>`;
             } else {
                 uploadResult.textContent = `Upload failed with HTTP ${response.status}`;
             }

@@ -107,6 +107,7 @@ struct SC_HTTP_EXPORT HttpIncomingMessage
 
       private:
         virtual Result asyncRead() override;
+        virtual Result asyncResumeReading() override;
     };
 
     /// @brief Gets the associated HttpParser

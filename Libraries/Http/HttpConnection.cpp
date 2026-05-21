@@ -294,6 +294,15 @@ Result HttpIncomingMessage::BodyStream::asyncRead()
     return Result(true);
 }
 
+Result HttpIncomingMessage::BodyStream::asyncResumeReading()
+{
+    if (onReadRequest.isValid())
+    {
+        return onReadRequest();
+    }
+    return Result(true);
+}
+
 bool HttpIncomingMessage::findParserToken(HttpParser::Token token, StringSpan& res) const
 {
     return parsedHeaders.findParserToken(token, res);
@@ -447,6 +456,10 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
 
         const uint64_t remainingBeforePush = bodyBytesRemaining;
         const bool     shouldContinue      = pushBodyData(bufferID, readData.sizeInBytes());
+        if (not bodyStream.hasBeenDestroyed())
+        {
+            bodyStream.reactivate(shouldContinue);
+        }
         if (bodyFramingKind == HttpBodyFramingKind::ContentLength)
         {
             if (bodyBytesRemaining == remainingBeforePush)
@@ -537,6 +550,10 @@ Result HttpIncomingMessage::processBodyData(AsyncReadableStream& sourceStream, A
             SC_TRY(sourceStream.getBuffersPool().createChildView(bufferID, rawOffset, toEmit, childID));
             const bool shouldContinue = pushBodyData(childID, toEmit);
             sourceStream.getBuffersPool().unrefBuffer(childID);
+            if (not bodyStream.hasBeenDestroyed())
+            {
+                bodyStream.reactivate(shouldContinue);
+            }
             chunkedBytesRemaining -= toEmit;
             rawOffset += toEmit;
             if (chunkedBytesRemaining == 0)
@@ -1264,6 +1281,7 @@ bool HttpConnectionsPool::activateNew(HttpConnection::ID& connectionID)
                 highestActiveConnection = idx;
             }
             connection.request.setHeaderMemory(connection.getHeaderMemory());
+            connection.response.setHeaderMemory(connection.getHeaderMemory());
             numConnections++;
             if (numConnections == connections.sizeInElements())
             {

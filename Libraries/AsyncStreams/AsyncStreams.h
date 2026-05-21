@@ -254,6 +254,9 @@ struct SC_ASYNC_STREAMS_EXPORT AsyncReadableStream
     /// @brief Returns true if the stream is ended (AsyncReadableStream::end has been called)
     [[nodiscard]] bool isEnded() const { return state == State::Ended; }
 
+    /// @brief Returns true if there are buffered reads waiting to be emitted
+    [[nodiscard]] bool hasQueuedData() const { return not readQueue.isEmpty(); }
+
     /// @brief Returns true if the stream has been already destroyed (asynchronously through destroy())
     [[nodiscard]] bool hasBeenDestroyed() const { return destroyed; }
 
@@ -300,6 +303,9 @@ struct SC_ASYNC_STREAMS_EXPORT AsyncReadableStream
 
     /// @brief Function that every stream must define to implement its custom read operation
     virtual Result asyncRead() = 0;
+
+    /// @brief Function that streams may define to resume an already pending async read
+    virtual Result asyncResumeReading();
 
     /// @brief Function that a readable stream can re-implement to release its internal resources
     /// @note The re-implementation MUST call finishedDestroyingReadable once it has finished stopping.
@@ -581,6 +587,7 @@ struct SC_ASYNC_STREAMS_EXPORT AsyncPipeline
     };
     PendingWrite pendingWrites[MaxTransforms + MaxSinks] = {};
     bool         shouldEndWhenDrained                    = false;
+    bool         endingPipes                             = false;
 
     // TODO: Add a pause and cancel/step
   private:

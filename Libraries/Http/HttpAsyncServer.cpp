@@ -184,12 +184,11 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
     client.readableSocketStream.setAutoDestroy(true);
     client.writableSocketStream.setAutoDestroy(false); // needed for keep-alive logic
+    client.response.setWritableStream(client.writableSocketStream);
 
     EventDataListener dataListener{*this, client};
     SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(dataListener));
     SC_TRUST_RESULT(client.readableSocketStream.start());
-
-    client.response.setWritableStream(client.writableSocketStream);
 
     // Only reactivate asyncAccept if there are available clients (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(connections.getNumActiveConnections() < connections.getNumTotalConnections());
@@ -213,6 +212,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
     else if (client.request.hasReceivedHeaders())
     {
         client.response.grabUnusedHeaderMemory(client.request);
+        client.response.reset();
 
         // Both with and without body we should stop listening to data events
         SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
