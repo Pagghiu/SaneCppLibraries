@@ -52,6 +52,10 @@ struct SC::HttpURLParserTest : public SC::TestCase
         {
             testQueryParams();
         }
+        if (test_section("formUrlEncoded"))
+        {
+            testFormUrlEncoded();
+        }
         if (test_section("specialChars"))
         {
             testSpecialChars();
@@ -72,6 +76,7 @@ struct SC::HttpURLParserTest : public SC::TestCase
     void testEdgeCases();
     void testProtocols();
     void testQueryParams();
+    void testFormUrlEncoded();
     void testSpecialChars();
     void testIPAddresses();
 };
@@ -319,6 +324,44 @@ void SC::HttpURLParserTest::testQueryParams()
     SC_TEST_EXPECT(item.name == "key");
     SC_TEST_EXPECT(item.value == "value");
     SC_TEST_EXPECT(item.hasValue);
+    SC_TEST_EXPECT(not iterator.next(item));
+}
+
+void SC::HttpURLParserTest::testFormUrlEncoded()
+{
+    HttpFormUrlEncodedIterator iterator("name=Sane+Cpp&empty=&flag&encoded=%7Bok%7D&bad=%ZZ");
+    HttpURLQueryItem           item;
+    char                       storage[64];
+    StringSpan                 decoded;
+
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "name");
+    SC_TEST_EXPECT(item.value == "Sane+Cpp");
+    SC_TEST_EXPECT(item.hasValue);
+    SC_TEST_EXPECT(HttpFormUrlDecode(item.value, storage, decoded));
+    SC_TEST_EXPECT(decoded == "Sane Cpp");
+
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "empty");
+    SC_TEST_EXPECT(item.value.isEmpty());
+    SC_TEST_EXPECT(item.hasValue);
+
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "flag");
+    SC_TEST_EXPECT(item.value.isEmpty());
+    SC_TEST_EXPECT(not item.hasValue);
+
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "encoded");
+    SC_TEST_EXPECT(HttpPercentDecode(item.value, storage, decoded));
+    SC_TEST_EXPECT(decoded == "{ok}");
+
+    SC_TEST_EXPECT(iterator.next(item));
+    SC_TEST_EXPECT(item.name == "bad");
+    SC_TEST_EXPECT(not HttpPercentDecode(item.value, storage, decoded));
+    SC_TEST_EXPECT(not HttpFormUrlDecode("%2", storage, decoded));
+    SC_TEST_EXPECT(not HttpFormUrlDecode("abc", {storage, 2}, decoded));
+
     SC_TEST_EXPECT(not iterator.next(item));
 }
 

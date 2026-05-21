@@ -26,7 +26,7 @@ bool SC::HttpURLQueryIterator::next(HttpURLQueryItem& item)
         return false;
     }
 
-    const char* data      = search.bytesWithoutTerminator();
+    const char*  data      = search.bytesWithoutTerminator();
     const size_t nameStart = cursor;
     while (cursor < search.sizeInBytes() and data[cursor] != '=' and data[cursor] != '&')
     {
@@ -55,6 +55,104 @@ bool SC::HttpURLQueryIterator::next(HttpURLQueryItem& item)
     item.value    = {{data + valueStart, valueEnd - valueStart}, false, search.getEncoding()};
     item.hasValue = hasValue;
     return true;
+}
+
+SC::HttpFormUrlEncodedIterator::HttpFormUrlEncodedIterator(StringSpan formBody) : body(formBody) {}
+
+bool SC::HttpFormUrlEncodedIterator::next(HttpURLQueryItem& item)
+{
+    item = {};
+    if (cursor >= body.sizeInBytes())
+    {
+        return false;
+    }
+
+    const char*  data      = body.bytesWithoutTerminator();
+    const size_t nameStart = cursor;
+    while (cursor < body.sizeInBytes() and data[cursor] != '=' and data[cursor] != '&')
+    {
+        cursor++;
+    }
+    const size_t nameEnd = cursor;
+
+    const bool hasValue = cursor < body.sizeInBytes() and data[cursor] == '=';
+    if (hasValue)
+    {
+        cursor++;
+    }
+
+    const size_t valueStart = cursor;
+    while (cursor < body.sizeInBytes() and data[cursor] != '&')
+    {
+        cursor++;
+    }
+    const size_t valueEnd = cursor;
+    if (cursor < body.sizeInBytes() and data[cursor] == '&')
+    {
+        cursor++;
+    }
+
+    item.name     = {{data + nameStart, nameEnd - nameStart}, false, body.getEncoding()};
+    item.value    = {{data + valueStart, valueEnd - valueStart}, false, body.getEncoding()};
+    item.hasValue = hasValue;
+    return true;
+}
+
+static int scHttpHexValue(char value)
+{
+    if (value >= '0' and value <= '9')
+    {
+        return value - '0';
+    }
+    if (value >= 'A' and value <= 'F')
+    {
+        return value - 'A' + 10;
+    }
+    if (value >= 'a' and value <= 'f')
+    {
+        return value - 'a' + 10;
+    }
+    return -1;
+}
+
+static SC::Result scHttpDecodeComponent(SC::StringSpan input, SC::Span<char> storage, SC::StringSpan& output,
+                                        bool plusAsSpace)
+{
+    output             = {};
+    const char*  data  = input.bytesWithoutTerminator();
+    const size_t size  = input.sizeInBytes();
+    size_t       write = 0;
+    for (size_t read = 0; read < size; ++read)
+    {
+        char decoded = data[read];
+        if (decoded == '%')
+        {
+            SC_TRY_MSG(read + 2 < size, "Malformed percent escape");
+            const int high = scHttpHexValue(data[read + 1]);
+            const int low  = scHttpHexValue(data[read + 2]);
+            SC_TRY_MSG(high >= 0 and low >= 0, "Malformed percent escape");
+            decoded = static_cast<char>((high << 4) | low);
+            read += 2;
+        }
+        else if (plusAsSpace and decoded == '+')
+        {
+            decoded = ' ';
+        }
+        SC_TRY_MSG(write < storage.sizeInBytes(), "Decoded output buffer is too small");
+        storage.data()[write++] = decoded;
+    }
+    output = {{storage.data(), write}, false, input.getEncoding()};
+    return SC::Result(true);
+}
+
+SC::Result SC::HttpPercentDecode(StringSpan input, Span<char> storage, StringSpan& output)
+{
+    return scHttpDecodeComponent(input, storage, output, false);
+}
+
+SC::Result SC::HttpFormUrlDecode(StringSpan input, Span<char> storage, StringSpan& output)
+{
+    return scHttpDecodeComponent(input, storage, output, true);
 }
 
 SC::Result SC::HttpURLParser::parse(StringSpan url)

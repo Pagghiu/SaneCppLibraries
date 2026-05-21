@@ -30,6 +30,24 @@ struct SC_HTTP_EXPORT HttpURLQueryIterator
     size_t     cursor = 0;
 };
 
+/// @brief Iterates raw application/x-www-form-urlencoded name/value pairs without decoding.
+struct SC_HTTP_EXPORT HttpFormUrlEncodedIterator
+{
+    explicit HttpFormUrlEncodedIterator(StringSpan body);
+
+    bool next(HttpURLQueryItem& item);
+
+  private:
+    StringSpan body;
+    size_t     cursor = 0;
+};
+
+/// @brief Percent-decodes a URI component into caller-provided storage.
+SC_HTTP_EXPORT Result HttpPercentDecode(StringSpan input, Span<char> storage, StringSpan& output);
+
+/// @brief Decodes an application/x-www-form-urlencoded component into caller-provided storage.
+SC_HTTP_EXPORT Result HttpFormUrlDecode(StringSpan input, Span<char> storage, StringSpan& output);
+
 /// @brief Parse an URL splitting it into its base components
 struct SC_HTTP_EXPORT HttpURLParser
 {
