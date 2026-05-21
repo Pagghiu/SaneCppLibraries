@@ -78,7 +78,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
         SC_TRY(connection.response.startResponse(204));
         SC_TRY(connection.response.addHeader("Allow", "GET, HEAD, PUT, POST, OPTIONS"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Content-Length", "0"));
+        SC_TRY(connection.response.addContentLength(0));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
         break;
@@ -86,7 +86,7 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
         SC_TRY(connection.response.startResponse(405));
         SC_TRY(connection.response.addHeader("Allow", "GET, HEAD, PUT, POST, OPTIONS"));
         SC_TRY(connection.response.addHeader("Server", "SC"));
-        SC_TRY(connection.response.addHeader("Content-Length", "0"));
+        SC_TRY(connection.response.addContentLength(0));
         SC_TRY(connection.response.sendHeaders());
         SC_TRY(connection.response.end());
     }

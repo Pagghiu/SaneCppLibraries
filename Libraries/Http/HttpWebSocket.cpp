@@ -566,7 +566,7 @@ Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&             
     {
         SC_TRY(response.addHeader("Sec-WebSocket-Version", "13"));
     }
-    SC_TRY(response.addHeader("Content-Length", "0"));
+    SC_TRY(response.addContentLength(0));
     SC_TRY(response.addHeader("Connection", "close"));
     SC_TRY(response.sendHeaders());
     return response.end();
