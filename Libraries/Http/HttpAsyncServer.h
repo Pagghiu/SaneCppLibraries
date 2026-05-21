@@ -68,6 +68,13 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @warning Consider calling HttpAsyncServer::close before reclaiming memory used by this class
     Result stop();
 
+    /// @brief Sets the maximum accepted request-header size in bytes.
+    /// The limit must fit inside the per-connection header storage passed to init().
+    void setMaxHeaderSize(uint32_t bytes) { maxHeaderSize = bytes; }
+
+    /// @brief Gets the maximum accepted request-header size in bytes.
+    [[nodiscard]] uint32_t getMaxHeaderSize() const { return maxHeaderSize; }
+
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return state == State::Started; }
 

@@ -185,6 +185,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             chunkedRequestRejectsTrailers();
         }
+        if (test_section("max header size error"))
+        {
+            maxHeaderSizeError();
+        }
         if (test_section("chunked response writing"))
         {
             chunkedResponseWriting();
@@ -199,6 +203,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void standardResponseStatuses();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
+    void maxHeaderSizeError();
     void chunkedResponseWriting();
     void chunkedClientRequestWriting();
 };
@@ -562,6 +567,59 @@ void SC::HttpAsyncServerTest::chunkedRequestRejectsTrailers()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(serverContext.sawRequest);
     SC_TEST_EXPECT(not serverContext.sawEnd);
+    SC_TEST_EXPECT(serverContext.sawError);
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncServerTest::maxHeaderSizeError()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType connections[1];
+    HttpAsyncServer    httpServer;
+    const uint16_t     serverPort = report.mapPort(6156);
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    httpServer.setMaxHeaderSize(64);
+    SC_TEST_EXPECT(httpServer.getMaxHeaderSize() == 64);
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    struct ServerContext
+    {
+        bool sawRequest = false;
+        bool sawError   = false;
+    } serverContext;
+
+    httpServer.onRequest = [&serverContext](HttpConnection&) { serverContext.sawRequest = true; };
+    httpServer.onError   = [this, &serverContext](Result result)
+    {
+        serverContext.sawError = true;
+        SC_TEST_EXPECT(not result);
+    };
+
+    HttpTestClient client;
+    String         endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}", serverPort));
+    constexpr StringView request = "GET /oversized HTTP/1.1\r\n"
+                                   "Host: 127.0.0.1\r\n"
+                                   "X-Large: 01234567890123456789012345678901234567890123456789\r\n"
+                                   "\r\n";
+
+    client.callback = [this, &httpServer](HttpTestClient&)
+    { SC_TEST_EXPECT(httpServer.stop()); };
+    SC_TEST_EXPECT(client.sendRaw(eventLoop, endpoint.view(), request));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(not serverContext.sawRequest);
     SC_TEST_EXPECT(serverContext.sawError);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
