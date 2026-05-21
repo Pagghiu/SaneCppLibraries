@@ -17,10 +17,15 @@ struct HttpHeadersTest : public TestCase
         {
             authorizationHelpers();
         }
+        if (test_section("set-cookie helpers"))
+        {
+            setCookieHelpers();
+        }
     }
 
     void cookieIterator();
     void authorizationHelpers();
+    void setCookieHelpers();
 };
 
 void HttpHeadersTest::cookieIterator()
@@ -94,6 +99,66 @@ void HttpHeadersTest::authorizationHelpers()
     SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic !!!=", {storage, sizeof(storage)}, username, password));
     SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic bm9jb2xvbg==", {storage, sizeof(storage)}, username, password));
     SC_TEST_EXPECT(not HttpParseBasicCredentials("Basic dXNlcjpwYXNz", {storage, 3}, username, password));
+}
+
+void HttpHeadersTest::setCookieHelpers()
+{
+    HttpSetCookieView cookie;
+    SC_TEST_EXPECT(cookie.parse(" id = 42 ; Path=/app; Domain=example.com; Expires=Wed, 21 Oct 2015 07:28:00 GMT; "
+                                "Max-Age=3600; Secure; HttpOnly; SameSite=Lax; Priority=High "));
+    SC_TEST_EXPECT(cookie.name == "id");
+    SC_TEST_EXPECT(cookie.value == "42");
+    SC_TEST_EXPECT(cookie.path == "/app");
+    SC_TEST_EXPECT(cookie.domain == "example.com");
+    SC_TEST_EXPECT(cookie.expires == "Wed, 21 Oct 2015 07:28:00 GMT");
+    SC_TEST_EXPECT(cookie.maxAge == "3600");
+    SC_TEST_EXPECT(cookie.hasMaxAge);
+    SC_TEST_EXPECT(cookie.secure);
+    SC_TEST_EXPECT(cookie.httpOnly);
+    SC_TEST_EXPECT(cookie.sameSite == "Lax");
+
+    HttpSetCookieAttributeIterator it(cookie.attributes);
+    HttpHeaderKeyValue             attribute;
+    bool                           foundPriority = false;
+    while (it.next(attribute))
+    {
+        if (attribute.name == "Priority")
+        {
+            foundPriority = true;
+            SC_TEST_EXPECT(attribute.value == "High");
+            SC_TEST_EXPECT(attribute.hasValue);
+        }
+    }
+    SC_TEST_EXPECT(foundPriority);
+
+    char                 storage[256];
+    StringSpan           output;
+    HttpSetCookieBuilder builder;
+    builder.name     = "id";
+    builder.value    = "42";
+    builder.path     = "/app";
+    builder.domain   = "example.com";
+    builder.maxAge   = "3600";
+    builder.secure   = true;
+    builder.httpOnly = true;
+    builder.sameSite = "Strict";
+    SC_TEST_EXPECT(builder.writeTo({storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "id=42; Path=/app; Domain=example.com; Max-Age=3600; Secure; HttpOnly; SameSite=Strict");
+
+    HttpSetCookieView roundTrip;
+    SC_TEST_EXPECT(roundTrip.parse(output));
+    SC_TEST_EXPECT(roundTrip.name == "id");
+    SC_TEST_EXPECT(roundTrip.value == "42");
+    SC_TEST_EXPECT(roundTrip.path == "/app");
+    SC_TEST_EXPECT(roundTrip.domain == "example.com");
+    SC_TEST_EXPECT(roundTrip.maxAge == "3600");
+    SC_TEST_EXPECT(roundTrip.secure);
+    SC_TEST_EXPECT(roundTrip.httpOnly);
+    SC_TEST_EXPECT(roundTrip.sameSite == "Strict");
+
+    SC_TEST_EXPECT(not builder.writeTo({storage, 4}, output));
+    SC_TEST_EXPECT(not cookie.parse("=missing-name"));
+    SC_TEST_EXPECT(not cookie.parse("missing-value"));
 }
 
 void runHttpHeadersTest(SC::TestReport& report) { HttpHeadersTest test(report); }

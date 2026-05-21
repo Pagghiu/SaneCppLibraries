@@ -31,6 +31,55 @@ struct SC_HTTP_EXPORT HttpCookieIterator
     size_t     cursor = 0;
 };
 
+/// @brief Iterates semicolon-delimited Set-Cookie attributes after the first name/value pair.
+struct SC_HTTP_EXPORT HttpSetCookieAttributeIterator
+{
+    explicit HttpSetCookieAttributeIterator(StringSpan attributes);
+
+    bool next(HttpHeaderKeyValue& attribute);
+
+  private:
+    StringSpan attributes;
+    size_t     cursor = 0;
+};
+
+/// @brief Zero-copy view of one Set-Cookie header value.
+struct SC_HTTP_EXPORT HttpSetCookieView
+{
+    StringSpan name;
+    StringSpan value;
+    StringSpan attributes;
+
+    StringSpan path;
+    StringSpan domain;
+    StringSpan expires;
+    StringSpan maxAge;
+    StringSpan sameSite;
+
+    bool hasMaxAge = false;
+    bool secure    = false;
+    bool httpOnly  = false;
+
+    Result parse(StringSpan setCookieHeader);
+};
+
+/// @brief Writes a Set-Cookie header value into caller-provided storage.
+struct SC_HTTP_EXPORT HttpSetCookieBuilder
+{
+    StringSpan name;
+    StringSpan value;
+    StringSpan path;
+    StringSpan domain;
+    StringSpan expires;
+    StringSpan maxAge;
+    StringSpan sameSite;
+
+    bool secure   = false;
+    bool httpOnly = false;
+
+    Result writeTo(Span<char> storage, StringSpan& output) const;
+};
+
 /// @brief Zero-copy view of an Authorization header split into scheme and credentials.
 struct SC_HTTP_EXPORT HttpAuthorizationView
 {

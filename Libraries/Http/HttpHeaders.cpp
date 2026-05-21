@@ -139,6 +139,20 @@ struct HttpHeaderInternal
 
         return Result(true);
     }
+
+    static bool appendTo(Span<char> storage, size_t& offset, StringSpan value)
+    {
+        if (offset + value.sizeInBytes() > storage.sizeInBytes())
+        {
+            return false;
+        }
+        for (size_t idx = 0; idx < value.sizeInBytes(); ++idx)
+        {
+            storage.data()[offset + idx] = value.bytesWithoutTerminator()[idx];
+        }
+        offset += value.sizeInBytes();
+        return true;
+    }
 };
 
 HttpCookieIterator::HttpCookieIterator(StringSpan cookieHeader) : header(cookieHeader) {}
@@ -196,6 +210,183 @@ bool HttpCookieIterator::next(HttpHeaderKeyValue& pair)
     }
 
     return false;
+}
+
+HttpSetCookieAttributeIterator::HttpSetCookieAttributeIterator(StringSpan attributes) : attributes(attributes) {}
+
+bool HttpSetCookieAttributeIterator::next(HttpHeaderKeyValue& attribute)
+{
+    const char*  data   = attributes.bytesWithoutTerminator();
+    const size_t length = attributes.sizeInBytes();
+    while (cursor < length)
+    {
+        while (cursor < length and data[cursor] == ';')
+        {
+            cursor++;
+        }
+        const size_t itemStart = cursor;
+        while (cursor < length and data[cursor] != ';')
+        {
+            cursor++;
+        }
+        const size_t itemEnd = cursor;
+
+        StringSpan item = {{data + itemStart, itemEnd - itemStart}, false, attributes.getEncoding()};
+        item            = HttpHeaderInternal::trimOptionalWhitespace(item);
+        if (item.isEmpty())
+        {
+            continue;
+        }
+
+        size_t equals = static_cast<size_t>(-1);
+        for (size_t idx = 0; idx < item.sizeInBytes(); ++idx)
+        {
+            if (item.bytesWithoutTerminator()[idx] == '=')
+            {
+                equals = idx;
+                break;
+            }
+        }
+        if (equals == static_cast<size_t>(-1))
+        {
+            attribute.name     = item;
+            attribute.value    = {};
+            attribute.hasValue = false;
+            return true;
+        }
+        attribute.name  = {{item.bytesWithoutTerminator(), equals}, false, item.getEncoding()};
+        attribute.value = {
+            {item.bytesWithoutTerminator() + equals + 1, item.sizeInBytes() - equals - 1}, false, item.getEncoding()};
+        attribute.name     = HttpHeaderInternal::trimOptionalWhitespace(attribute.name);
+        attribute.value    = HttpHeaderInternal::trimOptionalWhitespace(attribute.value);
+        attribute.hasValue = true;
+        return true;
+    }
+    return false;
+}
+
+Result HttpSetCookieView::parse(StringSpan setCookieHeader)
+{
+    *this = {};
+
+    StringSpan header = HttpHeaderInternal::trimOptionalWhitespace(setCookieHeader);
+    SC_TRY_MSG(not header.isEmpty(), "Set-Cookie header is empty");
+
+    const char*  data           = header.bytesWithoutTerminator();
+    const size_t length         = header.sizeInBytes();
+    size_t       firstSemicolon = length;
+    size_t       equals         = static_cast<size_t>(-1);
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        if (data[idx] == ';')
+        {
+            firstSemicolon = idx;
+            break;
+        }
+        if (data[idx] == '=' and equals == static_cast<size_t>(-1))
+        {
+            equals = idx;
+        }
+    }
+    SC_TRY_MSG(equals != static_cast<size_t>(-1) and equals < firstSemicolon, "Set-Cookie missing name/value");
+
+    name  = {{data, equals}, false, header.getEncoding()};
+    value = {{data + equals + 1, firstSemicolon - equals - 1}, false, header.getEncoding()};
+    name  = HttpHeaderInternal::trimOptionalWhitespace(name);
+    value = HttpHeaderInternal::trimOptionalWhitespace(value);
+    SC_TRY_MSG(not name.isEmpty(), "Set-Cookie cookie name is empty");
+
+    if (firstSemicolon < length)
+    {
+        attributes = {{data + firstSemicolon + 1, length - firstSemicolon - 1}, false, header.getEncoding()};
+    }
+
+    HttpSetCookieAttributeIterator it(attributes);
+    HttpHeaderKeyValue             attribute;
+    while (it.next(attribute))
+    {
+        if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "Path") and attribute.hasValue)
+        {
+            path = attribute.value;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "Domain") and attribute.hasValue)
+        {
+            domain = attribute.value;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "Expires") and attribute.hasValue)
+        {
+            expires = attribute.value;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "Max-Age") and attribute.hasValue)
+        {
+            maxAge    = attribute.value;
+            hasMaxAge = true;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "SameSite") and attribute.hasValue)
+        {
+            sameSite = attribute.value;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "Secure") and not attribute.hasValue)
+        {
+            secure = true;
+        }
+        else if (HttpHeaderInternal::equalsIgnoreCase(attribute.name, "HttpOnly") and not attribute.hasValue)
+        {
+            httpOnly = true;
+        }
+    }
+
+    return Result(true);
+}
+
+Result HttpSetCookieBuilder::writeTo(Span<char> storage, StringSpan& output) const
+{
+    output        = {};
+    size_t offset = 0;
+    SC_TRY_MSG(not name.isEmpty(), "Set-Cookie cookie name is empty");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, name), "Set-Cookie output buffer is too small");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "="), "Set-Cookie output buffer is too small");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, value), "Set-Cookie output buffer is too small");
+    if (not path.isEmpty())
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Path="), "Set-Cookie output buffer is too small");
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, path), "Set-Cookie output buffer is too small");
+    }
+    if (not domain.isEmpty())
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Domain="), "Set-Cookie output buffer is too small");
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, domain), "Set-Cookie output buffer is too small");
+    }
+    if (not expires.isEmpty())
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Expires="),
+                   "Set-Cookie output buffer is too small");
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, expires), "Set-Cookie output buffer is too small");
+    }
+    if (not maxAge.isEmpty())
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Max-Age="),
+                   "Set-Cookie output buffer is too small");
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, maxAge), "Set-Cookie output buffer is too small");
+    }
+    if (secure)
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; Secure"), "Set-Cookie output buffer is too small");
+    }
+    if (httpOnly)
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; HttpOnly"),
+                   "Set-Cookie output buffer is too small");
+    }
+    if (not sameSite.isEmpty())
+    {
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "; SameSite="),
+                   "Set-Cookie output buffer is too small");
+        SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, sameSite), "Set-Cookie output buffer is too small");
+    }
+
+    output = {{storage.data(), offset}, false, StringEncoding::Ascii};
+    return Result(true);
 }
 
 Result HttpAuthorizationView::parse(StringSpan authorizationHeader)
