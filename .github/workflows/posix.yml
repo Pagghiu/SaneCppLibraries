@@ -193,6 +193,7 @@ jobs:
         ./SC.sh package verify linux-sysroot-glibc-arm64
         ./SC.sh package verify linux-sysroot-musl-x86_64
         ./SC.sh package verify linux-sysroot-musl-arm64
+        ./SC.sh package lock
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py

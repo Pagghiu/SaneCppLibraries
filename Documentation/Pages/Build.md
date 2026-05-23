@@ -329,6 +329,70 @@ Current cross-compilation scope:
   ARM64 Windows loader
 - Cross-target plugin tests remain out of scope for now because the current plugin test flow assumes MSVC-oriented Windows behavior
 
+## Cross-Compilation Recipes
+
+The friendly `--target` profiles select the target platform, architecture, environment and default toolchain family.
+Use `--toolchain`, `--triple` or `--sysroot` only when you need to override that resolved profile. `build run
+--runner auto` first chooses direct execution for runnable native Linux outputs, then falls back to Wine for Windows
+targets or QEMU for foreign Linux targets when that row is supported by the host.
+
+Prepare package-managed inputs before relying on a cross row:
+
+```bash
+./SC.sh package install llvm
+./SC.sh package install llvm-mingw
+./SC.sh package install linux-sysroot-glibc-arm64
+./SC.sh package install linux-sysroot-musl-x86_64
+./SC.sh package verify
+./SC.sh package lock
+```
+
+Compile Linux targets from macOS with the packaged LLVM and sysroot receipts:
+
+```bash
+./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
+./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
+```
+
+Register QEMU when a host has a known `qemu-user` layout and you want foreign Linux `build run` smoke tests:
+
+```bash
+./SC.sh package install qemu --import-directory /opt/qemu-user
+./SC.sh package verify qemu
+./SC.sh build run SCTest --target linux-glibc-arm64 --runner auto -- --test "BaseTest" --test-section "new/delete"
+```
+
+Compile and smoke-run Windows GNU targets through the shared Wine runner model:
+
+```bash
+./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
+./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test "BaseTest" --test-section "new/delete"
+```
+
+Compile portable MSVC targets after acquiring the packaged toolchain:
+
+```bash
+./SC.sh package install msvc
+./SC.sh package verify msvc
+./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
+./SC.sh build compile SCTest --target windows-msvc-arm64 --output quiet
+```
+
+On Windows hosts, the Linux rows are compile-only today:
+
+```bat
+SC.bat package install llvm
+SC.bat package install linux-sysroot-glibc-arm64
+SC.bat package install linux-sysroot-musl-x86_64
+SC.bat build compile SCTest --target linux-glibc-arm64 --output quiet
+SC.bat build compile SCTest --target linux-musl-x86_64 --output quiet
+```
+
+Future preset hooks should compose the same public vocabulary instead of introducing parallel names:
+`target=<profile>`, `toolchain=<name>`, `runner=<auto|none|wine|qemu|custom>`, `runner-path=<path>`,
+`triple=<value>` and `sysroot=<path>`. A preset for a cross row should therefore expand to the same options shown
+above, plus package checks such as `SC-package verify` or `SC-package lock` when it depends on managed inputs.
+
 Typical native commands:
 
 ```bash

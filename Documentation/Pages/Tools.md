@@ -492,6 +492,16 @@ These are the packages that are currently downloaded and extracted / symlinked b
 - `LLVM 20.1.8`: Downloads `clang-format` from the official LLVM github repository using SHA256 pinned archives
 - `LLVM toolchain 20.1.8`: Downloads the full host LLVM toolchain (`clang`, `clang++`, `llvm-ar`, `lld`) for
   Linux-target native-backend flows on supported hosts
+- `llvm-mingw`: Downloads the Windows GNU cross toolchain used by `windows-gnu-*` native-backend target profiles
+- `linux-sysroot-glibc-x86_64` / `linux-sysroot-glibc-arm64`: Builds package-managed Ubuntu Jammy sysroots for
+  glibc Linux target profiles
+- `linux-sysroot-musl-x86_64` / `linux-sysroot-musl-arm64`: Builds package-managed Alpine sysroots for musl Linux
+  target profiles
+- `qemu`: Registers an imported QEMU user-mode runner layout and exports runner capabilities for foreign Linux
+  `build run` flows
+- `wine`: Downloads or prepares a Wine runner used by Windows target `build run` flows on supported non-Windows hosts
+- `msvc`: Downloads or imports the portable MSVC and Windows SDK layout used by `windows-msvc-*` native-backend target
+  profiles
 - `Fil-C 0.678` (experimental): Linux-only compiler package with a pinned upstream `pizfix` download path plus
   `--import-directory <path>` registration for compiler-first native-backend work through `--toolchain filc`
 - `doxygen`: Doxygen documentation generator

@@ -58,6 +58,8 @@ jobs:
       run: ./Support/Scripts/PruneLLVMPackageCache.sh .
     - name: Verify LLVM package receipt
       run: ./SC.sh package verify llvm
+    - name: Lock LLVM package receipt
+      run: ./SC.sh package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
@@ -144,6 +146,9 @@ jobs:
     - name: Verify Linux sysroot package receipt
       if: steps.linux_sysroot_ready.outputs.installed == 'true'
       run: ./SC.sh package verify ${{ matrix.sysroot.package }}
+    - name: Lock Linux sysroot package receipt
+      if: steps.linux_sysroot_ready.outputs.installed == 'true'
+      run: ./SC.sh package lock
     - name: Save Linux sysroot cache
       if: always() && steps.linux_sysroot_cache.outputs.cache-hit != 'true' && steps.linux_sysroot_ready.outputs.installed == 'true'
       uses: actions/cache/save@v4
@@ -178,6 +183,10 @@ jobs:
           sc-packages-posix-llvm-mingw-v2-${{ runner.os }}-${{ runner.arch }}-
     - name: Warm llvm-mingw package
       run: ./SC.sh package install llvm-mingw
+    - name: Verify llvm-mingw package receipt
+      run: ./SC.sh package verify llvm-mingw
+    - name: Lock llvm-mingw package receipt
+      run: ./SC.sh package lock
     - name: Save llvm-mingw cache
       if: always() && steps.llvm-mingw-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm-mingw/**') != ''
       uses: actions/cache/save@v4
@@ -216,6 +225,9 @@ jobs:
     - name: Verify LLVM package receipt
       shell: cmd
       run: call SC.bat package verify llvm
+    - name: Lock LLVM package receipt
+      shell: cmd
+      run: call SC.bat package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
@@ -285,6 +297,10 @@ jobs:
       if: steps.linux_sysroot_ready.outputs.installed == 'true'
       shell: cmd
       run: call SC.bat package verify ${{ matrix.sysroot.package }}
+    - name: Lock Linux sysroot package receipt
+      if: steps.linux_sysroot_ready.outputs.installed == 'true'
+      shell: cmd
+      run: call SC.bat package lock
     - name: Save Linux sysroot cache
       if: always() && steps.linux_sysroot_cache.outputs.cache-hit != 'true' && steps.linux_sysroot_ready.outputs.installed == 'true'
       uses: actions/cache/save@v4

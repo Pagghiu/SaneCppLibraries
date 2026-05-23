@@ -72,6 +72,7 @@ jobs:
         call SC.bat package verify llvm
         call SC.bat package verify linux-sysroot-glibc-arm64
         call SC.bat package verify linux-sysroot-musl-x86_64
+        call SC.bat package lock
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4

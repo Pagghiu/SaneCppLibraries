@@ -61,7 +61,49 @@ static Result installFakeRegistryPackage(StringView, StringView packagesInstallD
     info.phases                                 = phases;
     const Tools::PackageReceiptExport exports[] = {
         {Tools::PackageExportKind::Tool, "fake-tool", "bin/fake-tool"},
+        {Tools::PackageExportKind::Capability, "tool.fake", "bin/fake-tool"},
     };
+    return Tools::writePackageReceipt(package, info, exports);
+}
+
+static Result writePackageReceiptFixture(StringView packageRoot, StringView packageName,
+                                         Span<const Tools::PackageReceiptExport> exports)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (fs.existsAndIsDirectory(packageRoot))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(packageRoot));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(packageRoot));
+
+    for (const Tools::PackageReceiptExport& packageExport : exports)
+    {
+        if (packageExport.relativePath == "."_a8)
+        {
+            continue;
+        }
+
+        String exportedPath = StringEncoding::Utf8;
+        SC_TRY(Path::join(exportedPath, {packageRoot, packageExport.relativePath}));
+        SC_TRY(fs.makeDirectoryRecursive(Path::dirname(exportedPath.view(), Path::AsNative)));
+        SC_TRY(fs.writeString(exportedPath.view(), "fake"));
+    }
+
+    Tools::Package package;
+    package.installDirectoryLink = packageRoot;
+
+    Tools::PackageReceiptInfo info;
+    info.packageName          = packageName;
+    info.packageVersion       = "1";
+    info.recipeVersion        = "1";
+    info.hostPlatform         = "test";
+    info.packageVariant       = "host";
+    info.source               = "test";
+    info.sourceHash           = "";
+    info.validation           = "passed";
+    const StringView phases[] = {"writeReceipt"};
+    info.phases               = phases;
     return Tools::writePackageReceipt(package, info, exports);
 }
 
@@ -76,6 +118,7 @@ static Result writeFakeQEMURunner(FileSystem& fs, StringView path, StringView na
     SC_TRY(fs.writeString(path, script.view()));
     return fs.chmod(path, 0755u);
 }
+#endif
 
 static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot)
 {
@@ -99,12 +142,18 @@ static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot
         }
         break;
     case Platform::Windows:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: leaf = "windows_arm64"; break;
+        case InstructionSet::Intel64: leaf = "windows_intel64"; break;
+        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        }
+        break;
     case Platform::Emscripten: return Result::Error("Unsupported QEMU test host");
     }
     SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesRoot, leaf));
     return Result(true);
 }
-#endif
 
 struct SupportToolsTest : public TestCase
 {
@@ -954,6 +1003,25 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 3};
             SC_TEST_EXPECT(not runPackageTool(arguments));
         }
+        if (test_section("install qemu rejects missing import-directory value"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "qemu";
+            args[1]             = "--import-directory";
+            arguments.arguments = {args, 2};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("install qemu rejects unknown option"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "qemu";
+            args[1]             = "--unknown";
+            args[2]             = "value";
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
         if (test_section("package list is available"))
         {
             arguments.tool      = "package";
@@ -1004,6 +1072,7 @@ struct SupportToolsTest : public TestCase
         {
             static constexpr PackageRegistryExport fakeExports[] = {
                 {PackageExportKind::Tool, "fake-tool"},
+                {PackageExportKind::Capability, "tool.fake"},
             };
             static constexpr StringView fakePhases[] = {
                 "installFakeRegistryPackage",
@@ -1036,6 +1105,12 @@ struct SupportToolsTest : public TestCase
             args[0]             = "fake";
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments, registry, &package));
+
+            String resolved = StringEncoding::Utf8;
+            String expected = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(expected, {package.installDirectoryLink.view(), "bin", "fake-tool"}));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(package.installDirectoryLink.view(), "tool.fake", resolved));
+            SC_TEST_EXPECT(resolved.view() == expected.view());
 
             arguments.action    = "status";
             args[0]             = "fake";
@@ -1117,6 +1192,17 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64, resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
+
+            arguments.action    = "verify";
+            args[0]             = "qemu";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            arguments.action = "exports";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            arguments.action = "receipt";
+            SC_TEST_EXPECT(runPackageTool(arguments));
         }
 #endif
         if (test_section("package repair migrates llvm-mingw compiler exports"))
@@ -1319,6 +1405,105 @@ struct SupportToolsTest : public TestCase
             resolved = "";
             SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), "tool.fake", resolved));
             SC_TEST_EXPECT(resolved.view() == capabilityPath.view());
+        }
+        if (test_section("package verify covers builtin capability receipts"))
+        {
+            String packagesRoot = StringEncoding::Utf8;
+            String llvmRoot     = StringEncoding::Utf8;
+            String sysrootRoot  = StringEncoding::Utf8;
+            String qemuRoot     = StringEncoding::Utf8;
+            String wineRoot     = StringEncoding::Utf8;
+            String msvcRoot     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(Path::join(llvmRoot, {packagesRoot.view(), "llvm"}));
+            SC_TEST_EXPECT(Path::join(sysrootRoot, {packagesRoot.view(), "linux-sysroot_glibc_arm64"}));
+            SC_TEST_EXPECT(qemuRepairPackageRoot(packagesRoot.view(), qemuRoot));
+            SC_TEST_EXPECT(Path::join(wineRoot, {packagesRoot.view(), "wine-stable"}));
+            SC_TEST_EXPECT(Path::join(msvcRoot, {packagesRoot.view(), "msvc"}));
+
+            const PackageReceiptExport llvmExports[] = {
+                {PackageExportKind::Tool, PackageExport::Clang, "bin/clang"},
+                {PackageExportKind::Tool, PackageExport::ClangXX, "bin/clang++"},
+                {PackageExportKind::Tool, PackageExport::LLVMAr, "bin/llvm-ar"},
+                {PackageExportKind::Tool, PackageExport::LLVMLinker, "bin/ld.lld"},
+                {PackageExportKind::Capability, PackageCapability::ToolCCompiler, "bin/clang"},
+                {PackageExportKind::Capability, PackageCapability::ToolCXXCompiler, "bin/clang++"},
+                {PackageExportKind::Capability, PackageCapability::ToolArchiver, "bin/llvm-ar"},
+                {PackageExportKind::Capability, PackageCapability::ToolLinker, "bin/ld.lld"},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(llvmRoot.view(), "llvm", llvmExports));
+
+            const PackageReceiptExport sysrootExports[] = {
+                {PackageExportKind::Sysroot, PackageExport::Sysroot, "."},
+                {PackageExportKind::IncludeDir, "sysroot.include", "usr/include"},
+                {PackageExportKind::LibraryDir, "sysroot.lib", "usr/lib"},
+                {PackageExportKind::Capability, "sysroot.linux.glibc.arm64", "."},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(sysrootRoot.view(), "linux-sysroot-glibc-arm64", sysrootExports));
+
+            const PackageReceiptExport qemuExports[] = {
+                {PackageExportKind::Runner, PackageExport::RunnerQEMU, "."},
+                {PackageExportKind::Capability, PackageCapability::RunnerQEMUX86_64, "bin/qemu-x86_64"},
+                {PackageExportKind::Capability, PackageCapability::RunnerQEMUArm64, "bin/qemu-aarch64"},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(qemuRoot.view(), "qemu", qemuExports));
+
+            const PackageReceiptExport wineExports[] = {
+                {PackageExportKind::Runner, PackageExport::RunnerWine, "bin/wine"},
+                {PackageExportKind::Capability, PackageCapability::RunnerWine, "bin/wine"},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(wineRoot.view(), "wine-stable", wineExports));
+
+            const PackageReceiptExport msvcExports[] = {
+                {PackageExportKind::Tool, PackageExport::MSVCClX64, "bin/x64/cl"},
+                {PackageExportKind::Tool, PackageExport::MSVCLinkX64, "bin/x64/link"},
+                {PackageExportKind::Tool, PackageExport::MSVCLibX64, "bin/x64/lib"},
+                {PackageExportKind::Tool, PackageExport::MSVCClArm64, "bin/arm64/cl"},
+                {PackageExportKind::Tool, PackageExport::MSVCLinkArm64, "bin/arm64/link"},
+                {PackageExportKind::Tool, PackageExport::MSVCLibArm64, "bin/arm64/lib"},
+                {PackageExportKind::Capability, PackageCapability::ToolchainWindowsMSVCX64, "bin/x64/cl"},
+                {PackageExportKind::Capability, PackageCapability::ToolchainWindowsMSVCArm64, "bin/arm64/cl"},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(msvcRoot.view(), "msvc", msvcExports));
+
+            arguments.tool      = "package";
+            arguments.action    = "verify";
+            args[0]             = "llvm";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            args[0] = "linux-sysroot-glibc-arm64";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            args[0] = "qemu";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            args[0] = "wine";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            args[0] = "msvc";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            arguments.action = "exports";
+            args[0]          = "msvc";
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            arguments.action    = "lock";
+            arguments.arguments = {};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(llvmRoot.view(), PackageCapability::ToolCXXCompiler, resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("clang++"));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(sysrootRoot.view(), "sysroot.linux.glibc.arm64", resolved));
+            SC_TEST_EXPECT(resolved.view() == sysrootRoot.view());
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(qemuRoot.view(), PackageCapability::RunnerQEMUArm64, resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(wineRoot.view(), PackageCapability::RunnerWine, resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("wine"));
+            SC_TEST_EXPECT(
+                resolvePackageCapabilityPath(msvcRoot.view(), PackageCapability::ToolchainWindowsMSVCArm64, resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("cl"));
         }
         if (test_section("package receipt rejects invalid source hash"))
         {
@@ -1560,6 +1745,43 @@ struct SupportToolsTest : public TestCase
         }
         if (test_section("package lock writes package identities"))
         {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packagesRoot = StringEncoding::Utf8;
+            String packageRoot  = StringEncoding::Utf8;
+            String binRoot      = StringEncoding::Utf8;
+            String toolPath     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), "_LockCommandFake"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(toolPath, {binRoot.view(), "fake-tool"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
+
+            Package package;
+            package.installDirectoryLink = packageRoot.view();
+            PackageReceiptInfo info;
+            info.packageName                     = "lock-fixture";
+            info.packageVersion                  = "1";
+            info.recipeVersion                   = "1";
+            info.hostPlatform                    = "test";
+            info.packageVariant                  = "host";
+            info.source                          = "test";
+            info.sourceHash                      = "";
+            info.validation                      = "passed";
+            const StringView phases[]            = {"writeReceipt"};
+            info.phases                          = phases;
+            const PackageReceiptExport exports[] = {
+                {PackageExportKind::Tool, "fake-tool", "bin/fake-tool"},
+                {PackageExportKind::Capability, "tool.fake", "bin/fake-tool"},
+            };
+            SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
+
             arguments.tool      = "package";
             arguments.action    = "lock";
             arguments.arguments = {};
@@ -1575,6 +1797,13 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"packageCount\""));
             SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"packages\""));
             SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"exports\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"kind\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"name\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("\"path\""));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("lock-fixture"));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("capability"));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("tool.fake"));
+            SC_TEST_EXPECT(StringView(lockText.view()).containsString("bin/fake-tool"));
         }
         if (runHeavySections and test_section("clang-format execute"))
         {
