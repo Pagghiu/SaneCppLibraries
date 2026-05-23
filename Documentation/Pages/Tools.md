@@ -387,6 +387,8 @@ This happens during regular development, where new code is frequently tested in 
   each found receipt validates
 - `verify [package]`: Checks one package, or all installed receipts, and validates exported paths
 - `doctor [package]`: Explains receipt/export health and suggests install or repair actions without replacing `verify`
+- `repair <package>`: Rebuilds a structured receipt for a valid existing package layout, currently for QEMU and
+  llvm-mingw migrations
 - `receipt <package>`: Prints the installed package root, receipt path and raw `sc-package-receipt.json` contents
 - `exports <package>`: Prints the exports recorded by the installed receipt with resolved paths
 - `lock`: Writes a local `_Build/SC-package.lock` summary of installed package receipts and lock metadata
@@ -401,6 +403,7 @@ This happens during regular development, where new code is frequently tested in 
 ./SC.sh package status llvm
 ./SC.sh package verify llvm
 ./SC.sh package doctor llvm
+./SC.sh package repair llvm-mingw
 ./SC.sh package receipt llvm
 ./SC.sh package exports llvm
 ```
@@ -410,6 +413,8 @@ package identity, recipe version, host platform, variant, source provenance, opt
 validation result, named phases and exported tools / sysroots / runners / include directories / library directories.
 `SC-build` consumes these exports for packaged LLVM, Linux sysroots, QEMU, Wine, Fil-C, llvm-mingw and portable MSVC
 resolution, while preserving the older layout-based fallback during migration.
+For already-installed QEMU and llvm-mingw layouts, `./SC.sh package repair <package>` validates the existing files and
+rewrites `sc-package-receipt.json` with the current export/capability contract.
 
 Simple archive/git packages are routed through an internal C++ recipe lifecycle. The recipe holds package source,
 extraction/test hooks, named phases and exports. Complex packages such as MSVC, Wine, QEMU, Fil-C and Linux sysroots

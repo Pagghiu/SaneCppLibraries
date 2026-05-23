@@ -65,6 +65,47 @@ static Result installFakeRegistryPackage(StringView, StringView packagesInstallD
     return Tools::writePackageReceipt(package, info, exports);
 }
 
+#if !SC_PLATFORM_WINDOWS
+static Result writeFakeQEMURunner(FileSystem& fs, StringView path, StringView name)
+{
+    String script = StringEncoding::Utf8;
+    auto   builder = StringBuilder::create(script);
+    SC_TRY(builder.append("#!/bin/sh\n"));
+    SC_TRY(builder.append("echo \"{} version 10.0.0\"\n", name));
+    builder.finalize();
+    SC_TRY(fs.writeString(path, script.view()));
+    return fs.chmod(path, 0755u);
+}
+
+static Result qemuRepairPackageRoot(StringView packagesRoot, String& packageRoot)
+{
+    StringView leaf;
+    switch (HostPlatform)
+    {
+    case Platform::Apple:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: leaf = "macos_arm64"; break;
+        case InstructionSet::Intel64: leaf = "macos_intel64"; break;
+        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        }
+        break;
+    case Platform::Linux:
+        switch (HostInstructionSet)
+        {
+        case InstructionSet::ARM64: leaf = "linux_arm64"; break;
+        case InstructionSet::Intel64: leaf = "linux_intel64"; break;
+        case InstructionSet::Intel32: return Result::Error("Unsupported QEMU test host");
+        }
+        break;
+    case Platform::Windows:
+    case Platform::Emscripten: return Result::Error("Unsupported QEMU test host");
+    }
+    SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesRoot, leaf));
+    return Result(true);
+}
+#endif
+
 struct SupportToolsTest : public TestCase
 {
     SupportToolsTest(SC::TestReport& report) : TestCase(report, "SupportToolsTest")
@@ -1034,6 +1075,110 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments, registry));
             args[0] = "fake-missing";
             SC_TEST_EXPECT(runPackageTool(arguments, badRegistry));
+        }
+#if !SC_PLATFORM_WINDOWS
+        if (test_section("package repair writes qemu receipt for existing layout"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packagesRoot = StringEncoding::Utf8;
+            String packageRoot  = StringEncoding::Utf8;
+            String binRoot      = StringEncoding::Utf8;
+            String qemuX86_64   = StringEncoding::Utf8;
+            String qemuArm64    = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(qemuRepairPackageRoot(packagesRoot.view(), packageRoot));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(qemuX86_64, {binRoot.view(), "qemu-x86_64"}));
+            SC_TEST_EXPECT(Path::join(qemuArm64, {binRoot.view(), "qemu-aarch64"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuX86_64.view(), "qemu-x86_64"));
+            SC_TEST_EXPECT(writeFakeQEMURunner(fs, qemuArm64.view(), "qemu-aarch64"));
+
+            arguments.tool      = "package";
+            arguments.action    = "repair";
+            args[0]             = "qemu";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUX86_64,
+                                                        resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-x86_64"));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64,
+                                                        resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
+        }
+#endif
+        if (test_section("package repair migrates llvm-mingw compiler exports"))
+        {
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+
+            String packagesRoot = StringEncoding::Utf8;
+            String packageRoot  = StringEncoding::Utf8;
+            String binRoot      = StringEncoding::Utf8;
+            String x64C         = StringEncoding::Utf8;
+            String x64CXX       = StringEncoding::Utf8;
+            String arm64C       = StringEncoding::Utf8;
+            String arm64CXX     = StringEncoding::Utf8;
+            String ar           = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+            SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), "llvm-mingw"}));
+            SC_TEST_EXPECT(Path::join(binRoot, {packageRoot.view(), "bin"}));
+            SC_TEST_EXPECT(Path::join(x64C, {binRoot.view(), "x86_64-w64-mingw32-clang"}));
+            SC_TEST_EXPECT(Path::join(x64CXX, {binRoot.view(), "x86_64-w64-mingw32-clang++"}));
+            SC_TEST_EXPECT(Path::join(arm64C, {binRoot.view(), "aarch64-w64-mingw32-clang"}));
+            SC_TEST_EXPECT(Path::join(arm64CXX, {binRoot.view(), "aarch64-w64-mingw32-clang++"}));
+            SC_TEST_EXPECT(Path::join(ar, {binRoot.view(), "llvm-ar"}));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
+            SC_TEST_EXPECT(fs.writeString(x64C.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(x64CXX.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(arm64C.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(arm64CXX.view(), "fake"));
+            SC_TEST_EXPECT(fs.writeString(ar.view(), "fake"));
+
+            Package package;
+            package.installDirectoryLink = packageRoot.view();
+            PackageReceiptInfo info;
+            info.packageName                     = "llvm-mingw";
+            info.packageVersion                  = "old";
+            info.recipeVersion                   = "1";
+            info.hostPlatform                    = "test";
+            info.packageVariant                  = "host";
+            info.source                          = "test";
+            info.sourceHash                      = "";
+            info.validation                      = "passed";
+            const StringView phases[]            = {"writeReceipt"};
+            info.phases                          = phases;
+            const PackageReceiptExport exports[] = {
+                {"tool", PackageExport::LLVMMinGWClang_X86_64, "bin/x86_64-w64-mingw32-clang"},
+                {"tool", PackageExport::LLVMMinGWClangArm64, "bin/aarch64-w64-mingw32-clang"},
+            };
+            SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
+
+            arguments.tool      = "package";
+            arguments.action    = "repair";
+            args[0]             = "llvm-mingw";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            String resolved = StringEncoding::Utf8;
+            SC_TEST_EXPECT(resolvePackageExportPath(packageRoot.view(), PackageExport::LLVMMinGWClangXXArm64,
+                                                    resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("aarch64-w64-mingw32-clang++"));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(),
+                                                        PackageCapability::ToolchainWindowsGNUArm64, resolved));
+            SC_TEST_EXPECT(StringView(resolved.view()).endsWith("aarch64-w64-mingw32-clang"));
         }
         if (test_section("package commands accept external copy recipe"))
         {

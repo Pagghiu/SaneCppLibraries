@@ -4212,6 +4212,7 @@ static Result printPackageHelp(Console& console)
     console.printLine("  status [package]        Show installed receipt status");
     console.printLine("  verify [package]        Verify installed package receipts and exports");
     console.printLine("  doctor [package]        Explain package receipt and export health");
+    console.printLine("  repair <package>        Rebuild package receipts for valid existing layouts");
     console.printLine("  receipt <package>       Print the installed receipt JSON");
     console.printLine("  exports <package>       Print resolved receipt exports");
     console.printLine("  lock                    Write _Build/SC-package.lock");
@@ -4318,6 +4319,182 @@ static Result findInstalledPackageReceipt(StringView packagesInstallDirectory, S
     }
     SC_TRY(iterator.checkErrors());
     return Result(true);
+}
+
+static Result expectedPackageRepairRoot(StringView packagesInstallDirectory, const PackageRegistryEntry& entry,
+                                        String& packageRoot)
+{
+    if (entry.name == "qemu"_a8)
+    {
+        const StringView installLeaf = qemuRunnerInstallLeafName();
+        SC_TRY_MSG(not installLeaf.isEmpty(), "QEMU package repair is not supported on this host");
+        SC_TRY(StringBuilder::format(packageRoot, "{}/qemu_{}", packagesInstallDirectory, installLeaf));
+        return Result(true);
+    }
+    SC_TRY(Path::join(packageRoot, {packagesInstallDirectory, entry.installedName}));
+    return Result(true);
+}
+
+static Result findPackageRepairRoot(StringView packagesInstallDirectory, const PackageRegistryEntry& entry,
+                                    String& packageRoot)
+{
+    String receiptPath = StringEncoding::Utf8;
+    bool   found       = false;
+    SC_TRY(findInstalledPackageReceipt(packagesInstallDirectory, entry.installedName, receiptPath, packageRoot, found));
+    if (found)
+    {
+        return Result(true);
+    }
+
+    SC_TRY(expectedPackageRepairRoot(packagesInstallDirectory, entry, packageRoot));
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY_MSG(fs.existsAndIsDirectory(packageRoot.view()), "Package repair root not found");
+    return Result(true);
+}
+
+static Result readRepairReceiptIfPresent(StringView packageRoot, PackageReceiptJSON& receiptJSON, bool& found)
+{
+    found = false;
+    String receiptPath = StringEncoding::Utf8;
+    SC_TRY(packageReceiptPath(packageRoot, receiptPath));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsFile(receiptPath.view()))
+    {
+        return Result(true);
+    }
+
+    String receipt = StringEncoding::Utf8;
+    if (not readFileIntoString(receiptPath.view(), receipt))
+    {
+        return Result(true);
+    }
+    if (not readPackageReceiptJSON(receipt.view(), receiptJSON))
+    {
+        return Result(true);
+    }
+    found = true;
+    return Result(true);
+}
+
+static Result writeRepairedPackageReceipt(StringView packageRoot, StringView packageName,
+                                          Span<const PackageReceiptExport> exports,
+                                          Span<const StringView> phases)
+{
+    PackageReceiptJSON existingReceipt;
+    bool               hasExistingReceipt = false;
+    SC_TRY(readRepairReceiptIfPresent(packageRoot, existingReceipt, hasExistingReceipt));
+
+    String version    = StringEncoding::Utf8;
+    String variant    = StringEncoding::Utf8;
+    String source     = StringEncoding::Utf8;
+    String sourceHash = StringEncoding::Utf8;
+    SC_TRY(version.assign(hasExistingReceipt and not existingReceipt.version.isEmpty() ? existingReceipt.version.view()
+                                                                                       : "repaired"_a8));
+    SC_TRY(variant.assign(hasExistingReceipt and not existingReceipt.variant.isEmpty() ? existingReceipt.variant.view()
+                                                                                       : hostPackagePlatformName()));
+    SC_TRY(source.assign(hasExistingReceipt and not existingReceipt.source.isEmpty() ? existingReceipt.source.view()
+                                                                                    : "repair"_a8));
+    if (hasExistingReceipt and validatePackageReceiptSourceHash(existingReceipt.sourceHash.view()))
+    {
+        SC_TRY(sourceHash.assign(existingReceipt.sourceHash.view()));
+    }
+
+    Package package;
+    SC_TRY(package.installDirectoryLink.assign(packageRoot));
+    return writeManualPackageReceipt(package, packageName, version.view(), variant.view(), source.view(),
+                                     sourceHash.view(), exports, phases);
+}
+
+static Result validateLLVMMingwPackageRoot(StringView packageRoot, Span<const PackageReceiptExport> exports)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    for (const PackageReceiptExport& packageExport : exports)
+    {
+        if (packageExport.relativePath == "."_a8)
+        {
+            continue;
+        }
+        String path = StringEncoding::Utf8;
+        SC_TRY(Path::join(path, {packageRoot, packageExport.relativePath}));
+        SC_TRY_MSG(fs.exists(path.view()), "llvm-mingw package is incomplete");
+    }
+    return Result(true);
+}
+
+static Result repairQEMUPackageReceipt(Console& console, StringView packagesInstallDirectory,
+                                       const PackageRegistryEntry& entry)
+{
+    String packageRoot = StringEncoding::Utf8;
+    SC_TRY(findPackageRepairRoot(packagesInstallDirectory, entry, packageRoot));
+    SC_TRY(testQEMUPackageRoot(packageRoot.view()));
+
+    String qemuX86_64Export = StringEncoding::Utf8;
+    String qemuArm64Export  = StringEncoding::Utf8;
+    SC_TRY(resolveQEMURunnerExecutableExport(packageRoot.view(), InstructionSet::Intel64, qemuX86_64Export));
+    SC_TRY(resolveQEMURunnerExecutableExport(packageRoot.view(), InstructionSet::ARM64, qemuArm64Export));
+    const PackageReceiptExport exports[] = {
+        {"runner", PackageExport::RunnerQEMU, "."},
+        {"capability", PackageCapability::RunnerQEMUX86_64, qemuX86_64Export.view()},
+        {"capability", PackageCapability::RunnerQEMUArm64, qemuArm64Export.view()},
+    };
+    SC_TRY(writeRepairedPackageReceipt(packageRoot.view(), "qemu", exports, QEMUPhases));
+    console.print("repaired: ");
+    console.print(entry.name);
+    console.print(" at ");
+    console.printLine(packageRoot.view());
+    return Result(true);
+}
+
+static Result repairLLVMMingwPackageReceipt(Console& console, StringView packagesInstallDirectory,
+                                            const PackageRegistryEntry& entry)
+{
+    String packageRoot    = StringEncoding::Utf8;
+    String x64Compiler    = StringEncoding::Utf8;
+    String x64CompilerCpp = StringEncoding::Utf8;
+    String arm64Compiler  = StringEncoding::Utf8;
+    String arm64Cpp       = StringEncoding::Utf8;
+    String archiver       = StringEncoding::Utf8;
+    SC_TRY(findPackageRepairRoot(packagesInstallDirectory, entry, packageRoot));
+    SC_TRY(Path::join(x64Compiler, {"bin", "x86_64-w64-mingw32-clang"}));
+    SC_TRY(Path::join(x64CompilerCpp, {"bin", "x86_64-w64-mingw32-clang++"}));
+    SC_TRY(Path::join(arm64Compiler, {"bin", "aarch64-w64-mingw32-clang"}));
+    SC_TRY(Path::join(arm64Cpp, {"bin", "aarch64-w64-mingw32-clang++"}));
+    SC_TRY(Path::join(archiver, {"bin", "llvm-ar"}));
+
+    const PackageReceiptExport exports[] = {
+        {"tool", PackageExport::LLVMMinGWClang_X86_64, x64Compiler.view()},
+        {"tool", PackageExport::LLVMMinGWClangXX_X86_64, x64CompilerCpp.view()},
+        {"tool", PackageExport::LLVMMinGWClangArm64, arm64Compiler.view()},
+        {"tool", PackageExport::LLVMMinGWClangXXArm64, arm64Cpp.view()},
+        {"tool", PackageExport::LLVMAr, archiver.view()},
+        {"capability", PackageCapability::ToolchainWindowsGNUX86_64, x64Compiler.view()},
+        {"capability", PackageCapability::ToolchainWindowsGNUArm64, arm64Compiler.view()},
+    };
+    SC_TRY(validateLLVMMingwPackageRoot(packageRoot.view(), exports));
+    SC_TRY(writeRepairedPackageReceipt(packageRoot.view(), "llvm-mingw", exports, LLVMMingwPhases));
+    console.print("repaired: ");
+    console.print(entry.name);
+    console.print(" at ");
+    console.printLine(packageRoot.view());
+    return Result(true);
+}
+
+static Result repairPackageReceipt(Console& console, StringView packagesInstallDirectory,
+                                   const PackageRegistryEntry& entry)
+{
+    if (entry.name == "qemu"_a8)
+    {
+        return repairQEMUPackageReceipt(console, packagesInstallDirectory, entry);
+    }
+    if (entry.name == "llvm-mingw"_a8)
+    {
+        return repairLLVMMingwPackageReceipt(console, packagesInstallDirectory, entry);
+    }
+    return Result::Error("Package repair is not implemented for this package");
 }
 
 static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoot)
@@ -4872,6 +5049,17 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
             return printUnknownPackageError(console, registry, packageName);
         }
         SC_TRY(printPackageDoctor(console, registry, packagesInstallDirectory.view(), entry));
+    }
+    else if (arguments.action == "repair")
+    {
+        SC_TRY_MSG(not arguments.arguments.empty(), "Package repair requires a package name");
+        const StringView            packageName = packageNameFromArguments();
+        const PackageRegistryEntry* entry       = registry.find(packageName);
+        if (entry == nullptr)
+        {
+            return printUnknownPackageError(console, registry, packageName);
+        }
+        SC_TRY(repairPackageReceipt(console, packagesInstallDirectory.view(), *entry));
     }
     else if (arguments.action == "receipt")
     {
