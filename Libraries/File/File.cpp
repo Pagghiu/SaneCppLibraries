@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../File/File.h"
+#include "../Foundation/Deferred.h"
 #include "../Foundation/StringPath.h"
 
 #if SC_PLATFORM_WINDOWS
@@ -985,6 +986,35 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 }
 
 #else
+namespace
+{
+static SC::Result movePosixDescriptorAboveStandardRange(int& descriptor)
+{
+    if (descriptor >= 3)
+    {
+        return SC::Result(true);
+    }
+
+#if defined(F_DUPFD_CLOEXEC)
+    int movedDescriptor;
+    do
+    {
+        movedDescriptor = ::fcntl(descriptor, F_DUPFD_CLOEXEC, 3);
+    } while (movedDescriptor == -1 and errno == EINTR);
+#else
+    int movedDescriptor;
+    do
+    {
+        movedDescriptor = ::fcntl(descriptor, F_DUPFD, 3);
+    } while (movedDescriptor == -1 and errno == EINTR);
+#endif
+    SC_TRY_MSG(movedDescriptor != -1, "PipeDescriptor::createPipe - fcntl duplicate failed");
+    ::close(descriptor);
+    descriptor = movedDescriptor;
+    return SC::Result(true);
+}
+} // namespace
+
 SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
 {
     int  pipes[2];
@@ -1020,19 +1050,37 @@ SC::Result SC::PipeDescriptor::createPipe(PipeOptions options)
     }
 
     SC_TRY_MSG(res == 0, "PipeDescriptor::createPipe - pipe failed");
+    const auto closePipes = MakeDeferred(
+        [&]
+        {
+            if (pipes[0] >= 0)
+            {
+                ::close(pipes[0]);
+            }
+            if (pipes[1] >= 0)
+            {
+                ::close(pipes[1]);
+            }
+        });
+    SC_TRY(movePosixDescriptorAboveStandardRange(pipes[0]));
+    SC_TRY(movePosixDescriptorAboveStandardRange(pipes[1]));
+    const int readDescriptor  = pipes[0];
+    const int writeDescriptor = pipes[1];
     SC_TRY_MSG(readPipe.assign(pipes[0]), "Cannot assign read pipe");
+    pipes[0] = -1;
     SC_TRY_MSG(writePipe.assign(pipes[1]), "Cannot assign write pipe");
+    pipes[1] = -1;
     const Result setReadCloExec =
-        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[0], not options.readInheritable);
+        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(readDescriptor, not options.readInheritable);
     SC_TRY_MSG(setReadCloExec, "Cannot set close on exec on read pipe");
     const Result setWriteCloExec =
-        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(pipes[1], not options.writeInheritable);
+        FileDescriptor::Internal::setFileDescriptorFlags<FD_CLOEXEC>(writeDescriptor, not options.writeInheritable);
     SC_TRY_MSG(setWriteCloExec, "Cannot set close on exec on write pipe");
     if (options.blocking == false and not usedNonBlockingAtCreate)
     {
-        const Result pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(pipes[0], true);
+        const Result pipeRes1 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(readDescriptor, true);
         SC_TRY_MSG(pipeRes1, "Cannot set non-blocking flag on read");
-        const Result pipeRes2 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(pipes[1], true);
+        const Result pipeRes2 = FileDescriptor::Internal::setFileStatusFlags<O_NONBLOCK>(writeDescriptor, true);
         SC_TRY_MSG(pipeRes2, "Cannot set non-blocking flag on read");
     }
     return Result(true);

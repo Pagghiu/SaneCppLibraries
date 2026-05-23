@@ -11,8 +11,22 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #else
+#include <errno.h>
+#include <fcntl.h>
 #include <sys/stat.h>
+#include <unistd.h>
 #endif
+
+namespace
+{
+#if !SC_PLATFORM_WINDOWS
+static bool standardFileDescriptorIsOpen(int fileDescriptor)
+{
+    errno = 0;
+    return ::fcntl(fileDescriptor, F_GETFD) != -1 or errno != EBADF;
+}
+#endif
+} // namespace
 
 namespace SC
 {
@@ -109,9 +123,24 @@ void SC::FileTest::testOpen()
 void SC::FileTest::testOpenStdHandles()
 {
     FileDescriptor fd[3];
+#if SC_PLATFORM_WINDOWS
     SC_TEST_EXPECT(fd[0].openStdInDuplicate());
     SC_TEST_EXPECT(fd[1].openStdOutDuplicate());
     SC_TEST_EXPECT(fd[2].openStdErrDuplicate());
+#else
+    if (standardFileDescriptorIsOpen(STDIN_FILENO))
+    {
+        SC_TEST_EXPECT(fd[0].openStdInDuplicate());
+    }
+    if (standardFileDescriptorIsOpen(STDOUT_FILENO))
+    {
+        SC_TEST_EXPECT(fd[1].openStdOutDuplicate());
+    }
+    if (standardFileDescriptorIsOpen(STDERR_FILENO))
+    {
+        SC_TEST_EXPECT(fd[2].openStdErrDuplicate());
+    }
+#endif
 }
 
 void SC::FileTest::testNamedPipeCreateConnectAccept()
