@@ -200,6 +200,40 @@ struct SC::HttpMultipartParserTest : public SC::TestCase
                           "boundary", false);
         }
 
+        if (test_section("part header helpers"))
+        {
+            HttpMultipartContentDispositionView disposition;
+            SC_TEST_EXPECT(disposition.parse(" form-data; name=\"upload\"; filename=\"photo.webp\" "));
+            SC_TEST_EXPECT(disposition.isFormData());
+            SC_TEST_EXPECT(disposition.hasName);
+            SC_TEST_EXPECT(disposition.name == "upload");
+            SC_TEST_EXPECT(disposition.hasFileName);
+            SC_TEST_EXPECT(disposition.fileName == "photo.webp");
+            SC_TEST_EXPECT(HttpMultipartIsSafeFileName(disposition.fileName));
+
+            HttpMultipartPartHeadersView part;
+            SC_TEST_EXPECT(part.addHeader("Content-Disposition", "form-data; name=plain; filename=plain.txt"));
+            SC_TEST_EXPECT(part.addHeader("Content-Type", "text/plain"));
+            SC_TEST_EXPECT(part.fieldName() == "plain");
+            SC_TEST_EXPECT(part.fileName() == "plain.txt");
+            SC_TEST_EXPECT(part.contentType == "text/plain");
+            SC_TEST_EXPECT(part.hasSafeFileName());
+
+            part.reset();
+            SC_TEST_EXPECT(part.addHeader("Content-Disposition", "form-data; name=\"file\"; filename=\"../bad.txt\""));
+            SC_TEST_EXPECT(part.hasFileName());
+            SC_TEST_EXPECT(not part.hasSafeFileName());
+
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(""));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("."));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(".."));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("folder/file.txt"));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("folder\\file.txt"));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("drive:file.txt"));
+            SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(StringSpan({"\x01.txt", 5}, false, StringEncoding::Ascii)));
+            SC_TEST_EXPECT(HttpMultipartIsSafeFileName("raw-utf8-\xC3\xA8.txt"));
+        }
+
         if (test_section("large data streaming"))
         {
             // We want to verify that PartBody is emitted in chunks

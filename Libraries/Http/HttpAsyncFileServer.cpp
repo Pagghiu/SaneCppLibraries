@@ -41,7 +41,6 @@ struct HttpAsyncFileServer::Internal
     static bool   parseSingleByteRange(StringSpan header, size_t fileSize, ByteRange& range);
     static bool   etagMatchesIfNoneMatch(StringSpan ifNoneMatch, StringSpan etag);
     static bool   ifRangeMatches(StringSpan ifRange, StringSpan etag, StringSpan lastModified);
-    static bool   isSafeMultipartFileName(StringSpan fileName);
     static Result sendEmptyResponse(HttpResponse& response, int statusCode);
     static Result sendNotModified(HttpResponse& response, StringSpan lastModified, StringSpan etag);
     static Result sendRangeNotSatisfiable(HttpResponse& response, size_t fileSize);
@@ -87,6 +86,23 @@ Result HttpAsyncFileServer::handleRequest(HttpAsyncFileServer::Stream& stream, H
     if (not safePath)
     {
         return Internal::sendEmptyResponse(connection.response, 400);
+    }
+
+    const bool uploadRequest = connection.request.isMultipart() or
+                               connection.request.getParser().method == HttpParser::Method::HttpPOST or
+                               connection.request.getParser().method == HttpParser::Method::HttpPUT;
+    if (uploadRequest)
+    {
+        if (not options.enableUploads)
+        {
+            return Internal::sendEmptyResponse(connection.response, 403);
+        }
+        if (options.maxUploadBytes > 0 and
+            connection.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength and
+            connection.request.getBodyBytesRemaining() > options.maxUploadBytes)
+        {
+            return Internal::sendEmptyResponse(connection.response, 413);
+        }
     }
 
     if (connection.request.isMultipart())
@@ -736,24 +752,6 @@ bool HttpAsyncFileServer::Internal::ifRangeMatches(StringSpan ifRange, StringSpa
     return value == etag or value == lastModified;
 }
 
-bool HttpAsyncFileServer::Internal::isSafeMultipartFileName(StringSpan fileName)
-{
-    if (fileName.isEmpty() or fileName == "." or fileName == "..")
-    {
-        return false;
-    }
-
-    const char* data = fileName.bytesWithoutTerminator();
-    for (size_t idx = 0; idx < fileName.sizeInBytes(); ++idx)
-    {
-        if (data[idx] == '/' or data[idx] == '\\' or data[idx] == ':')
-        {
-            return false;
-        }
-    }
-    return true;
-}
-
 Result HttpAsyncFileServer::Internal::sendEmptyResponse(HttpResponse& response, int statusCode)
 {
     SC_TRY(response.startResponse(statusCode));
@@ -893,13 +891,12 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
 {
     SC_TRY(stream.multipartParser.initWithBoundary(connection.request.getBoundary()));
 
-    stream.multipartListener.server               = this;
-    stream.multipartListener.stream               = &stream;
-    stream.multipartListener.connection           = &connection;
-    stream.multipartListener.currentFileName      = {};
-    stream.multipartListener.currentHeaderName    = {};
-    stream.multipartListener.isContentDisposition = false;
-    stream.multipartListener.rejectedFileName     = false;
+    stream.multipartListener.server            = this;
+    stream.multipartListener.stream            = &stream;
+    stream.multipartListener.connection        = &connection;
+    stream.multipartListener.currentHeaderName = {};
+    stream.multipartListener.partHeaders.reset();
+    stream.multipartListener.rejectedFileName = false;
 
     SC_ASSERT_RELEASE((
         connection.request.getReadableStream()
@@ -942,49 +939,31 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
                 {
                     (void)currentFd.close();
                 }
-                currentFileName      = {};
-                currentHeaderName    = {};
-                isContentDisposition = false;
+                currentHeaderName = {};
+                partHeaders.reset();
             }
             break;
 
             case HttpMultipartParser::Token::HeaderName: {
-                currentHeaderName    = {parsedData, false, StringEncoding::Ascii};
-                isContentDisposition = HttpStringIterator::equalsIgnoreCase(currentHeaderName, "Content-Disposition");
+                currentHeaderName = {parsedData, false, StringEncoding::Ascii};
             }
             break;
 
             case HttpMultipartParser::Token::HeaderValue: {
-                if (isContentDisposition)
+                SC_ASSERT_RELEASE(partHeaders.addHeader(currentHeaderName, {parsedData, false, StringEncoding::Ascii}));
+                if (partHeaders.hasFileName() and not partHeaders.hasSafeFileName())
                 {
-                    HttpStringIterator it = {{parsedData, false, StringEncoding::Ascii}};
-                    if (it.advanceUntilMatchesIgnoreCase("filename="))
-                    {
-                        for (int i = 0; i < 9; ++i)
-                            (void)it.stepForward();
-                        if (it.advanceIfMatches('"'))
-                        {
-                            auto start = it;
-                            while (!it.isAtEnd() && !it.match('"'))
-                                (void)it.stepForward();
-                            currentFileName = HttpStringIterator::fromIterators(start, it, StringEncoding::Ascii);
-                            if (not Internal::isSafeMultipartFileName(currentFileName))
-                            {
-                                rejectedFileName = true;
-                                currentFileName  = {};
-                            }
-                        }
-                    }
+                    rejectedFileName = true;
                 }
             }
             break;
 
             case HttpMultipartParser::Token::PartHeaderEnd: {
-                if (!currentFileName.isEmpty())
+                if (partHeaders.hasSafeFileName())
                 {
                     (void)currentFilePath.assign(server->directory.view());
                     (void)currentFilePath.append("/");
-                    (void)currentFilePath.append(currentFileName);
+                    (void)currentFilePath.append(partHeaders.fileName());
                     (void)currentFd.open(currentFilePath.view(), FileOpen::Write);
                 }
             }

@@ -153,12 +153,47 @@ struct HttpHeaderInternal
         offset += value.sizeInBytes();
         return true;
     }
+
+    static bool appendUnsigned(Span<char> storage, size_t& offset, uint32_t value)
+    {
+        char   reversed[10];
+        size_t digits = 0;
+        do
+        {
+            reversed[digits++] = static_cast<char>('0' + (value % 10));
+            value /= 10;
+        } while (value > 0 and digits < sizeof(reversed));
+
+        if (value > 0 or offset + digits > storage.sizeInBytes())
+        {
+            return false;
+        }
+        for (size_t idx = 0; idx < digits; ++idx)
+        {
+            storage.data()[offset + idx] = reversed[digits - idx - 1];
+        }
+        offset += digits;
+        return true;
+    }
+
+    static Result appendCacheDirective(Span<char> storage, size_t& offset, bool& first, StringSpan directive)
+    {
+        if (not first)
+        {
+            SC_TRY_MSG(appendTo(storage, offset, ", "), "Cache-Control output buffer is too small");
+        }
+        SC_TRY_MSG(appendTo(storage, offset, directive), "Cache-Control output buffer is too small");
+        first = false;
+        return Result(true);
+    }
 };
 
 HttpCookieIterator::HttpCookieIterator(StringSpan cookieHeader) : header(cookieHeader) {}
 
 bool HttpCookieIterator::next(HttpHeaderKeyValue& pair)
 {
+    pair = {};
+
     const char*  data   = header.bytesWithoutTerminator();
     const size_t length = header.sizeInBytes();
 
@@ -216,6 +251,8 @@ HttpSetCookieAttributeIterator::HttpSetCookieAttributeIterator(StringSpan attrib
 
 bool HttpSetCookieAttributeIterator::next(HttpHeaderKeyValue& attribute)
 {
+    attribute = {};
+
     const char*  data   = attributes.bytesWithoutTerminator();
     const size_t length = attributes.sizeInBytes();
     while (cursor < length)
@@ -389,8 +426,61 @@ Result HttpSetCookieBuilder::writeTo(Span<char> storage, StringSpan& output) con
     return Result(true);
 }
 
+StringSpan HttpContentTypeTextPlainUtf8() { return "text/plain; charset=utf-8"; }
+
+StringSpan HttpContentTypeTextHtmlUtf8() { return "text/html; charset=utf-8"; }
+
+StringSpan HttpContentTypeApplicationJson() { return "application/json"; }
+
+StringSpan HttpContentTypeApplicationOctetStream() { return "application/octet-stream"; }
+
+Result HttpCacheControlBuilder::writeTo(Span<char> storage, StringSpan& output) const
+{
+    output = {};
+    SC_TRY_MSG(not(publicCache and privateCache), "Cache-Control cannot be both public and private");
+
+    size_t offset = 0;
+    bool   first  = true;
+    if (noStore)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "no-store"));
+    }
+    if (noCache)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "no-cache"));
+    }
+    if (publicCache)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "public"));
+    }
+    if (privateCache)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "private"));
+    }
+    if (hasMaxAge)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "max-age="));
+        SC_TRY_MSG(HttpHeaderInternal::appendUnsigned(storage, offset, maxAgeSeconds),
+                   "Cache-Control output buffer is too small");
+    }
+    if (mustRevalidate)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "must-revalidate"));
+    }
+    if (immutable)
+    {
+        SC_TRY(HttpHeaderInternal::appendCacheDirective(storage, offset, first, "immutable"));
+    }
+
+    SC_TRY_MSG(not first, "Cache-Control builder has no directives");
+    output = {{storage.data(), offset}, false, StringEncoding::Ascii};
+    return Result(true);
+}
+
 Result HttpAuthorizationView::parse(StringSpan authorizationHeader)
 {
+    *this = {};
+
     StringSpan  header = HttpHeaderInternal::trimOptionalWhitespace(authorizationHeader);
     const char* data   = header.bytesWithoutTerminator();
     size_t      split  = static_cast<size_t>(-1);
@@ -422,6 +512,8 @@ bool HttpAuthorizationView::isBasic() const { return HttpHeaderInternal::equalsI
 
 Result HttpParseBearerToken(StringSpan authorizationHeader, StringSpan& token)
 {
+    token = {};
+
     HttpAuthorizationView authorization;
     SC_TRY(authorization.parse(authorizationHeader));
     SC_TRY_MSG(authorization.isBearer(), "Authorization scheme is not Bearer");
@@ -432,6 +524,9 @@ Result HttpParseBearerToken(StringSpan authorizationHeader, StringSpan& token)
 Result HttpParseBasicCredentials(StringSpan authorizationHeader, Span<char> storage, StringSpan& username,
                                  StringSpan& password)
 {
+    username = {};
+    password = {};
+
     HttpAuthorizationView authorization;
     SC_TRY(authorization.parse(authorizationHeader));
     SC_TRY_MSG(authorization.isBasic(), "Authorization scheme is not Basic");
@@ -451,6 +546,29 @@ Result HttpParseBasicCredentials(StringSpan authorizationHeader, Span<char> stor
 
     username = {{storage.data(), colonIndex}, false, StringEncoding::Ascii};
     password = {{storage.data() + colonIndex + 1, decodedSize - colonIndex - 1}, false, StringEncoding::Ascii};
+    return Result(true);
+}
+
+Result HttpWriteBearerAuthorization(StringSpan token, Span<char> storage, StringSpan& output)
+{
+    output        = {};
+    size_t offset = 0;
+    SC_TRY_MSG(not token.isEmpty(), "Bearer authorization token is empty");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Bearer "), "Authorization output buffer is too small");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, token), "Authorization output buffer is too small");
+    output = {{storage.data(), offset}, false, StringEncoding::Ascii};
+    return Result(true);
+}
+
+Result HttpWriteBasicAuthorization(StringSpan base64Credentials, Span<char> storage, StringSpan& output)
+{
+    output        = {};
+    size_t offset = 0;
+    SC_TRY_MSG(not base64Credentials.isEmpty(), "Basic authorization credentials are empty");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Basic "), "Authorization output buffer is too small");
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, base64Credentials),
+               "Authorization output buffer is too small");
+    output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);
 }
 

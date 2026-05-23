@@ -21,11 +21,21 @@ struct HttpHeadersTest : public TestCase
         {
             setCookieHelpers();
         }
+        if (test_section("header builders"))
+        {
+            headerBuilders();
+        }
+        if (test_section("output reset"))
+        {
+            outputReset();
+        }
     }
 
     void cookieIterator();
     void authorizationHelpers();
     void setCookieHelpers();
+    void headerBuilders();
+    void outputReset();
 };
 
 void HttpHeadersTest::cookieIterator()
@@ -159,6 +169,93 @@ void HttpHeadersTest::setCookieHelpers()
     SC_TEST_EXPECT(not builder.writeTo({storage, 4}, output));
     SC_TEST_EXPECT(not cookie.parse("=missing-name"));
     SC_TEST_EXPECT(not cookie.parse("missing-value"));
+}
+
+void HttpHeadersTest::headerBuilders()
+{
+    SC_TEST_EXPECT(HttpContentTypeTextPlainUtf8() == "text/plain; charset=utf-8");
+    SC_TEST_EXPECT(HttpContentTypeTextHtmlUtf8() == "text/html; charset=utf-8");
+    SC_TEST_EXPECT(HttpContentTypeApplicationJson() == "application/json");
+    SC_TEST_EXPECT(HttpContentTypeApplicationOctetStream() == "application/octet-stream");
+
+    char       storage[128];
+    StringSpan output;
+
+    HttpCacheControlBuilder cache;
+    cache.publicCache    = true;
+    cache.hasMaxAge      = true;
+    cache.maxAgeSeconds  = 3600;
+    cache.mustRevalidate = true;
+    cache.immutable      = true;
+    SC_TEST_EXPECT(cache.writeTo({storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "public, max-age=3600, must-revalidate, immutable");
+
+    cache         = {};
+    cache.noStore = true;
+    SC_TEST_EXPECT(cache.writeTo({storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "no-store");
+
+    cache              = {};
+    cache.publicCache  = true;
+    cache.privateCache = true;
+    SC_TEST_EXPECT(not cache.writeTo({storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+
+    cache               = {};
+    cache.hasMaxAge     = true;
+    cache.maxAgeSeconds = 42;
+    SC_TEST_EXPECT(not cache.writeTo({storage, 8}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+
+    SC_TEST_EXPECT(HttpWriteBearerAuthorization("token", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "Bearer token");
+    SC_TEST_EXPECT(HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "Basic dXNlcjpwYXNz");
+
+    SC_TEST_EXPECT(not HttpWriteBearerAuthorization("", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+    SC_TEST_EXPECT(not HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, 8}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+}
+
+void HttpHeadersTest::outputReset()
+{
+    HttpHeaderKeyValue pair;
+    pair.name     = "stale-name";
+    pair.value    = "stale-value";
+    pair.hasValue = true;
+
+    HttpCookieIterator cookieIterator("");
+    SC_TEST_EXPECT(not cookieIterator.next(pair));
+    SC_TEST_EXPECT(pair.name.isEmpty());
+    SC_TEST_EXPECT(pair.value.isEmpty());
+    SC_TEST_EXPECT(not pair.hasValue);
+
+    pair.name     = "stale-name";
+    pair.value    = "stale-value";
+    pair.hasValue = true;
+    HttpSetCookieAttributeIterator attributeIterator("");
+    SC_TEST_EXPECT(not attributeIterator.next(pair));
+    SC_TEST_EXPECT(pair.name.isEmpty());
+    SC_TEST_EXPECT(pair.value.isEmpty());
+    SC_TEST_EXPECT(not pair.hasValue);
+
+    HttpAuthorizationView authorization;
+    SC_TEST_EXPECT(authorization.parse("Bearer token"));
+    SC_TEST_EXPECT(not authorization.parse("missing-credentials"));
+    SC_TEST_EXPECT(authorization.scheme.isEmpty());
+    SC_TEST_EXPECT(authorization.credentials.isEmpty());
+
+    StringSpan token = "stale";
+    SC_TEST_EXPECT(not HttpParseBearerToken("Basic dXNlcjpwYXNz", token));
+    SC_TEST_EXPECT(token.isEmpty());
+
+    char       storage[64];
+    StringSpan username = "stale-user";
+    StringSpan password = "stale-pass";
+    SC_TEST_EXPECT(not HttpParseBasicCredentials("Bearer token", {storage, sizeof(storage)}, username, password));
+    SC_TEST_EXPECT(username.isEmpty());
+    SC_TEST_EXPECT(password.isEmpty());
 }
 
 void runHttpHeadersTest(SC::TestReport& report) { HttpHeadersTest test(report); }

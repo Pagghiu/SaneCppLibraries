@@ -11,13 +11,12 @@
 #include "../../Libraries/Containers/VirtualArray.h"
 #include "../../Libraries/Http/HttpAsyncFileServer.h"
 #include "../../Libraries/Http/HttpAsyncServer.h"
+#include "../../Libraries/Http/HttpURLParser.h"
 #include "../../Libraries/Http/HttpWebSocket.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
-
-#include <string.h>
 
 SC::Console* globalConsole;
 
@@ -61,23 +60,9 @@ struct AsyncWebServerExample
 
     struct WebSocketRuntime
     {
-        AsyncWebServerExample* owner      = nullptr;
-        HttpConnection*        connection = nullptr;
-        size_t                 hubIndex   = size_t(-1);
-        HttpWebSocketEndpoint  endpoint;
-
-        Result writeFrame(Span<const char> frame)
-        {
-            SC_TRY_MSG(connection != nullptr, "WebSocketRuntime connection missing");
-            AsyncBufferView::ID bufferID;
-            Span<char>          writableData;
-            SC_TRY(connection->buffersPool.requestNewBuffer(frame.sizeInBytes(), bufferID, writableData));
-            ::memcpy(writableData.data(), frame.data(), frame.sizeInBytes());
-            connection->buffersPool.setNewBufferSize(bufferID, frame.sizeInBytes());
-            const Result writeResult = connection->writableSocketStream.write(bufferID);
-            connection->buffersPool.unrefBuffer(bufferID);
-            return writeResult;
-        }
+        AsyncWebServerExample*      owner    = nullptr;
+        size_t                      hubIndex = size_t(-1);
+        HttpWebSocketConnectionPump pump;
 
         Result onPayload(HttpWebSocketOpcode opcode, Span<char> payload, bool frameFinished)
         {
@@ -94,32 +79,6 @@ struct AsyncWebServerExample
             return owner->webSocketHub.broadcastText(payload, frameStorage);
         }
 
-        void onData(AsyncBufferView::ID bufferID)
-        {
-            Span<char> data;
-            if (connection == nullptr or not connection->buffersPool.getWritableData(bufferID, data))
-            {
-                return;
-            }
-
-            size_t consumed = 0;
-            Result received = endpoint.receive(data, consumed);
-            if (received and endpoint.hasPendingControlFrame())
-            {
-                Span<const char> controlFrame;
-                received = endpoint.getPendingControlFrame(controlFrame);
-                if (received)
-                {
-                    received = writeFrame(controlFrame);
-                }
-                endpoint.clearPendingControlFrame();
-            }
-            if (not received)
-            {
-                connection->readableSocketStream.destroy();
-            }
-        }
-
         void onEnd()
         {
             if (owner != nullptr and hubIndex != size_t(-1))
@@ -127,16 +86,6 @@ struct AsyncWebServerExample
                 (void)owner->webSocketHub.leave(hubIndex);
                 hubIndex = size_t(-1);
             }
-            if (connection != nullptr)
-            {
-                (void)connection->readableSocketStream.eventData
-                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onData>(*this);
-                (void)connection->readableSocketStream.eventEnd
-                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
-                (void)connection->readableSocketStream.eventClose
-                    .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
-            }
-            connection = nullptr;
         }
     };
 
@@ -195,7 +144,8 @@ struct AsyncWebServerExample
 #endif
         httpServer.onRequest = [&](HttpConnection& connection)
         {
-            if (connection.request.getRequestTarget() == "/ws")
+            HttpRequestTargetView target;
+            if (target.parse(connection.request.getRequestTarget()) and target.path == "/ws")
             {
                 SC_ASSERT_RELEASE(handleWebSocketRequest(connection));
                 return;
@@ -213,10 +163,10 @@ struct AsyncWebServerExample
 
         WebSocketRuntime& runtime = webSocketRuntimes.toSpan()[connectionIndex];
         runtime.owner             = this;
-        runtime.connection        = &connection;
         runtime.hubIndex          = size_t(-1);
-        runtime.endpoint.reset(HttpWebSocketEndpointRole::Server);
-        runtime.endpoint.onDataFramePayload.bind<WebSocketRuntime, &WebSocketRuntime::onPayload>(runtime);
+        runtime.pump.detach();
+        runtime.pump.onDataFramePayload.bind<WebSocketRuntime, &WebSocketRuntime::onPayload>(runtime);
+        runtime.pump.onEnd.bind<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime);
 
         HttpWebSocketTransportView transport;
         char                       acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
@@ -228,17 +178,7 @@ struct AsyncWebServerExample
 
         SC_TRY(HttpWebSocketHandshake::acceptServerConnection(connection, transport, acceptStorage));
         SC_TRY(webSocketHub.join(transport, runtime.hubIndex));
-
-        SC_TRY_MSG((connection.readableSocketStream.eventData.addListener<WebSocketRuntime, &WebSocketRuntime::onData>(
-                       runtime)),
-                   "WebSocket data listener limit reached");
-        SC_TRY_MSG(
-            (connection.readableSocketStream.eventEnd.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime)),
-            "WebSocket end listener limit reached");
-        SC_TRY_MSG((connection.readableSocketStream.eventClose.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(
-                       runtime)),
-                   "WebSocket close listener limit reached");
-        return Result(true);
+        return runtime.pump.attach(transport, HttpWebSocketEndpointRole::Server);
     }
 
     Result assignConnectionMemory(size_t numClients)

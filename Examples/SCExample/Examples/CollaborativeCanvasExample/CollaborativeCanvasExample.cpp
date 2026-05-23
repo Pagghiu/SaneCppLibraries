@@ -22,7 +22,6 @@
 #include "Libraries/Http/HttpWebSocket.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"
-#include "Libraries/Strings/StringBuilder.h"
 
 #include "../ISCExample.h"
 
@@ -468,11 +467,7 @@ struct SC::CollaborativeCanvasModel
 
     Result sendText(HttpConnection& connection, int code, StringSpan contentType, StringSpan body)
     {
-        String contentLength = StringEncoding::Ascii;
-        SC_TRY(StringBuilder::format(contentLength, "{}", body.sizeInBytes()));
-        SC_TRY(connection.response.startResponse(code));
-        SC_TRY(connection.response.addHeader("Content-Type", contentType));
-        SC_TRY(connection.response.addHeader("Content-Length", contentLength.view()));
+        SC_TRY(connection.response.startBody(code, body.sizeInBytes(), contentType));
         SC_TRY(connection.response.sendHeaders());
         if (body.sizeInBytes() > 0)
         {
@@ -490,9 +485,8 @@ struct SC::CollaborativeCanvasModel
 
     Result methodNotAllowed(HttpConnection& connection, StringSpan allow)
     {
-        SC_TRY(connection.response.startResponse(405));
+        SC_TRY(connection.response.startBody(405, 0));
         SC_TRY(connection.response.addHeader("Allow", allow));
-        SC_TRY(connection.response.addHeader("Content-Length", "0"));
         SC_TRY(connection.response.sendHeaders());
         return connection.response.end();
     }

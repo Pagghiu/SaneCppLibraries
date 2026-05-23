@@ -48,6 +48,21 @@ SC_HTTP_EXPORT Result HttpPercentDecode(StringSpan input, Span<char> storage, St
 /// @brief Decodes an application/x-www-form-urlencoded component into caller-provided storage.
 SC_HTTP_EXPORT Result HttpFormUrlDecode(StringSpan input, Span<char> storage, StringSpan& output);
 
+/// @brief Zero-copy view over an HTTP origin-form request target.
+struct SC_HTTP_EXPORT HttpRequestTargetView
+{
+    StringSpan raw;    ///< Original request target.
+    StringSpan path;   ///< Path component, excluding query / fragment.
+    StringSpan search; ///< Query component including leading `?`, if present.
+    StringSpan hash;   ///< Fragment component including leading `#`, if present.
+
+    /// @brief Parse an origin-form request target such as `/path?query`.
+    Result parse(StringSpan requestTarget);
+
+    /// @brief Finds first raw query value matching name in this request target.
+    bool getQueryValue(StringSpan name, StringSpan& value) const;
+};
+
 /// @brief Parse an URL splitting it into its base components
 struct SC_HTTP_EXPORT HttpURLParser
 {

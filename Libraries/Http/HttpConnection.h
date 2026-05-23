@@ -374,6 +374,21 @@ struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
     /// @brief Starts the response with an explicit status code and reason phrase.
     Result startResponse(int httpCode, StringSpan reasonPhrase);
 
+    /// @brief Starts a fixed-size body response and adds Content-Length plus optional Content-Type.
+    Result startBody(int httpCode, uint64_t contentLength, StringSpan contentType = {});
+
+    /// @brief Sends a caller-owned fixed-size byte response.
+    /// @warning The body span must remain valid until the writable stream finishes writing it.
+    Result sendBytes(int httpCode, Span<const char> body, StringSpan contentType = {});
+
+    /// @brief Sends a caller-owned fixed-size body response.
+    /// @warning The body span must remain valid until the writable stream finishes writing it.
+    Result sendBody(int httpCode, StringSpan body, StringSpan contentType = {});
+
+    /// @brief Sends a caller-owned text/plain; charset=utf-8 response body.
+    /// @warning The body span must remain valid until the writable stream finishes writing it.
+    Result sendText(int httpCode, StringSpan body);
+
     /// @brief Sends an empty response with `Content-Length: 0`.
     Result sendEmpty(int httpCode);
 

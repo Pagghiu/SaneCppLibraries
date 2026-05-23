@@ -49,8 +49,39 @@ Current client limitations:
 - `http` only, no `https`
 - one in-flight request at a time
 - no HTTP pipelining
-- no chunked transfer encoding support
-- response bodies must use `Content-Length`, unless HTTP semantics guarantee an empty body
+- no redirect policy helper
+
+# Error Categories
+HTTP APIs report failures through `SC::Result` and keep the error text stable enough to diagnose the failing layer.
+The library does not use exceptions or a large error hierarchy; instead, messages are grouped by prefix and by the
+operation that produced them.
+
+Typical categories:
+- Protocol errors: malformed HTTP syntax, invalid URL/request-target data, bad WebSocket frames, invalid masking,
+  invalid chunk framing, unsupported transfer encodings, or unexpected response bodies.
+- Unsupported feature errors: explicit limits such as unsupported content encodings, WebSocket extensions, pipelined
+  body data, non-empty chunk trailers, or TLS when using this library.
+- Storage errors: fixed header memory, caller-provided output buffers, stream queues, or `AsyncBuffersPool` capacity are
+  too small for the requested operation.
+- Stream/transport errors: socket disconnects, readable/writable stream failures, file stream failures, or backpressure
+  that could not be queued.
+- Lifecycle errors: calling request/response methods in the wrong order, starting a second client request while one is
+  active, using an uninitialized server/client, or writing after a stream has ended.
+
+Common prefixes point to the owner of the invariant:
+- `HttpIncomingMessage`: request/response body framing and chunked decoding.
+- `HttpOutgoingMessage` / `HttpResponse` / `HttpAsyncClientRequest`: outgoing header/body ordering and fixed header
+  storage.
+- `HttpAsyncServer` / `HttpAsyncClient`: async connection lifecycle and transport integration.
+- `HttpAsyncFileServer`: safe path extraction, upload policy, file/range/validator formatting.
+- `HttpURLParser` / `HttpRequestTargetView`: URL and origin-form request-target parsing.
+- `HttpWebSocketHandshake`, `HttpWebSocketFrameReader`, `HttpWebSocketFrameWriter`, `HttpWebSocketEndpoint`,
+  `HttpWebSocketConnectionPump`, and `HttpWebSocketSmallHub`: WebSocket handshake, frame protocol, control-frame
+  lifecycle, stream pumping, and hub capacity/backpressure.
+
+When adding new HTTP errors, prefer messages that name the component first, then the violated invariant, for example
+`HttpWebSocketFrameReader control frame payload too large`. This keeps errors readable without adding allocations or a
+new dependency.
 
 # Videos
 

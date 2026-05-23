@@ -61,6 +61,80 @@ struct FrameCollector
     }
 };
 
+struct PumpReadableStream : public SC::AsyncReadableStream
+{
+    Request queue[2];
+
+    PumpReadableStream() { setReadQueue(queue); }
+
+  private:
+    virtual SC::Result asyncRead() override { return SC::Result(true); }
+};
+
+struct PumpWritableStream : public SC::AsyncWritableStream
+{
+    Request queue[4];
+
+    char   output[256] = {0};
+    size_t outputSize  = 0;
+
+    PumpWritableStream() { setWriteQueue(queue); }
+
+  private:
+    virtual SC::Result asyncWrite(SC::AsyncBufferView::ID                     bufferID,
+                                  SC::Function<void(SC::AsyncBufferView::ID)> cb) override
+    {
+        SC::Span<const char> data;
+        SC_TRY(getBuffersPool().getReadableData(bufferID, data));
+        SC_TRY_MSG(outputSize + data.sizeInBytes() <= sizeof(output), "PumpWritableStream output too small");
+        ::memcpy(output + outputSize, data.data(), data.sizeInBytes());
+        outputSize += data.sizeInBytes();
+        finishedWriting(bufferID, SC::move(cb), SC::Result(true));
+        return SC::Result(true);
+    }
+};
+
+struct PumpPayloadCollector
+{
+    SC::HttpWebSocketOpcode opcode      = SC::HttpWebSocketOpcode::Text;
+    char                    payload[64] = {0};
+    size_t                  size        = 0;
+    size_t                  count       = 0;
+
+    SC::Result onPayload(SC::HttpWebSocketOpcode payloadOpcode, SC::Span<char> data, bool frameFinished)
+    {
+        if (not frameFinished)
+        {
+            return SC::Result(true);
+        }
+        SC_TRY_MSG(data.sizeInBytes() <= sizeof(payload), "PumpPayloadCollector payload too large");
+        opcode = payloadOpcode;
+        size   = data.sizeInBytes();
+        count++;
+        if (data.sizeInBytes() > 0)
+        {
+            ::memcpy(payload, data.data(), data.sizeInBytes());
+        }
+        return SC::Result(true);
+    }
+};
+
+struct PumpEventCollector
+{
+    size_t errors = 0;
+    size_t ends   = 0;
+
+    void onError(SC::Result result)
+    {
+        if (not result)
+        {
+            errors++;
+        }
+    }
+
+    void onEnd() { ends++; }
+};
+
 static bool bytesEqual(SC::Span<const char> lhs, SC::StringSpan rhs)
 {
     if (lhs.sizeInBytes() != rhs.sizeInBytes())
@@ -99,6 +173,10 @@ struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
         {
             sendDataHelper();
         }
+        if (test_section("connection pump"))
+        {
+            connectionPump();
+        }
     }
 
     void messageAssembler();
@@ -107,6 +185,7 @@ struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
     void closeEcho();
     void pendingControlBackpressure();
     void sendDataHelper();
+    void connectionPump();
 };
 
 void SC::HttpWebSocketLifecycleTest::messageAssembler()
@@ -287,6 +366,95 @@ void SC::HttpWebSocketLifecycleTest::sendDataHelper()
     SC_TEST_EXPECT(reader.parse({frameStorage, encodedFrame.sizeInBytes()}, consumed));
     SC_TEST_EXPECT(collector.header.opcode == HttpWebSocketOpcode::Text);
     SC_TEST_EXPECT(bytesEqual({collector.payload, collector.payloadSize}, "hello"));
+}
+
+void SC::HttpWebSocketLifecycleTest::connectionPump()
+{
+    AsyncBufferView buffers[8]            = {};
+    char            bufferStorage[8][256] = {};
+    for (size_t idx = 0; idx < 8; ++idx)
+    {
+        buffers[idx] = Span<char>(bufferStorage[idx], sizeof(bufferStorage[idx]));
+        buffers[idx].setReusable(true);
+    }
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    PumpReadableStream readable;
+    PumpWritableStream writable;
+    SC_TEST_EXPECT(readable.init(pool));
+    SC_TEST_EXPECT(writable.init(pool));
+
+    HttpWebSocketTransportView transport;
+    transport.readableStream = &readable;
+    transport.writableStream = &writable;
+    transport.buffersPool    = &pool;
+
+    HttpWebSocketConnectionPump pump;
+    PumpPayloadCollector        payloadCollector;
+    PumpEventCollector          eventCollector;
+    pump.onDataFramePayload.bind<PumpPayloadCollector, &PumpPayloadCollector::onPayload>(payloadCollector);
+    pump.onError.bind<PumpEventCollector, &PumpEventCollector::onError>(eventCollector);
+    pump.onEnd.bind<PumpEventCollector, &PumpEventCollector::onEnd>(eventCollector);
+    SC_TEST_EXPECT(pump.attach(transport, HttpWebSocketEndpointRole::Server));
+    SC_TEST_EXPECT(pump.isAttached());
+
+    const uint8_t         maskKey[4] = {1, 2, 3, 4};
+    HttpWebSocketEndpoint client;
+    client.reset(HttpWebSocketEndpointRole::Client);
+
+    char             textStorage[64] = {0};
+    Span<const char> textFrame;
+    SC_TEST_EXPECT(
+        client.sendData(HttpWebSocketOpcode::Text, "pump"_a8.toCharSpan(), true, maskKey, textStorage, textFrame));
+
+    AsyncBufferView::ID textBufferID;
+    Span<char>          textData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(textFrame.sizeInBytes(), textBufferID, textData));
+    ::memcpy(textData.data(), textFrame.data(), textFrame.sizeInBytes());
+    pool.setNewBufferSize(textBufferID, textFrame.sizeInBytes());
+    pump.onData(textBufferID);
+    pool.unrefBuffer(textBufferID);
+
+    SC_TEST_EXPECT(payloadCollector.count == 1);
+    SC_TEST_EXPECT(payloadCollector.opcode == HttpWebSocketOpcode::Text);
+    SC_TEST_EXPECT(bytesEqual({payloadCollector.payload, payloadCollector.size}, "pump"));
+
+    char             pingStorage[64] = {0};
+    Span<const char> pingFrame;
+    SC_TEST_EXPECT(client.sendPing("ok"_a8.toCharSpan(), maskKey, pingStorage, pingFrame));
+
+    AsyncBufferView::ID pingBufferID;
+    Span<char>          pingData;
+    SC_TEST_EXPECT(pool.requestNewBuffer(pingFrame.sizeInBytes(), pingBufferID, pingData));
+    ::memcpy(pingData.data(), pingFrame.data(), pingFrame.sizeInBytes());
+    pool.setNewBufferSize(pingBufferID, pingFrame.sizeInBytes());
+    pump.onData(pingBufferID);
+    pool.unrefBuffer(pingBufferID);
+
+    FrameCollector           collector;
+    HttpWebSocketFrameReader reader;
+    reader.reset(HttpWebSocketEndpointRole::Client);
+    reader.onFrameHeader.bind<FrameCollector, &FrameCollector::onHeader>(collector);
+    reader.onFramePayload.bind<FrameCollector, &FrameCollector::onPayload>(collector);
+
+    size_t consumed = 0;
+    SC_TEST_EXPECT(reader.parse({writable.output, writable.outputSize}, consumed));
+    SC_TEST_EXPECT(collector.header.opcode == HttpWebSocketOpcode::Pong);
+    SC_TEST_EXPECT(bytesEqual({collector.payload, collector.payloadSize}, "ok"));
+
+    pump.onStreamEnd();
+    SC_TEST_EXPECT(not pump.isAttached());
+    SC_TEST_EXPECT(eventCollector.ends == 1);
+
+    SC_TEST_EXPECT(pump.attach(transport, HttpWebSocketEndpointRole::Server));
+    writable.end();
+    SC_TEST_EXPECT(pool.requestNewBuffer(pingFrame.sizeInBytes(), pingBufferID, pingData));
+    ::memcpy(pingData.data(), pingFrame.data(), pingFrame.sizeInBytes());
+    pool.setNewBufferSize(pingBufferID, pingFrame.sizeInBytes());
+    pump.onData(pingBufferID);
+    pool.unrefBuffer(pingBufferID);
+    SC_TEST_EXPECT(eventCollector.errors == 1);
 }
 
 void SC::runHttpWebSocketLifecycleTest(SC::TestReport& report) { HttpWebSocketLifecycleTest test(report); }

@@ -145,6 +145,19 @@ static SC::Result scHttpDecodeComponent(SC::StringSpan input, SC::Span<char> sto
     return SC::Result(true);
 }
 
+static bool scHttpUrlContainsInvalidWhitespace(SC::StringSpan value)
+{
+    const char* data = value.bytesWithoutTerminator();
+    for (size_t idx = 0; idx < value.sizeInBytes(); ++idx)
+    {
+        if (static_cast<unsigned char>(data[idx]) <= static_cast<unsigned char>(' '))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 SC::Result SC::HttpPercentDecode(StringSpan input, Span<char> storage, StringSpan& output)
 {
     return scHttpDecodeComponent(input, storage, output, false);
@@ -155,8 +168,70 @@ SC::Result SC::HttpFormUrlDecode(StringSpan input, Span<char> storage, StringSpa
     return scHttpDecodeComponent(input, storage, output, true);
 }
 
+SC::Result SC::HttpRequestTargetView::parse(StringSpan requestTarget)
+{
+    *this = {};
+    SC_TRY_MSG(not requestTarget.isEmpty(), "HttpRequestTargetView empty request target");
+    SC_TRY_MSG(not scHttpUrlContainsInvalidWhitespace(requestTarget),
+               "HttpRequestTargetView request target contains invalid whitespace");
+
+    raw = requestTarget;
+
+    const char*  data   = requestTarget.bytesWithoutTerminator();
+    const size_t length = requestTarget.sizeInBytes();
+    if (length == 1 and data[0] == '*')
+    {
+        path = requestTarget;
+        return Result(true);
+    }
+
+    SC_TRY_MSG(data[0] == '/', "HttpRequestTargetView only supports origin-form request targets");
+
+    size_t queryStart = length;
+    size_t hashStart  = length;
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        if (data[idx] == '?' and queryStart == length and hashStart == length)
+        {
+            queryStart = idx;
+        }
+        else if (data[idx] == '#' and hashStart == length)
+        {
+            hashStart = idx;
+        }
+    }
+
+    const size_t pathEnd   = queryStart < hashStart ? queryStart : hashStart;
+    const size_t searchEnd = hashStart;
+    path                   = {{data, pathEnd}, false, requestTarget.getEncoding()};
+    if (queryStart < length)
+    {
+        search = {{data + queryStart, searchEnd - queryStart}, false, requestTarget.getEncoding()};
+    }
+    if (hashStart < length)
+    {
+        hash = {{data + hashStart, length - hashStart}, false, requestTarget.getEncoding()};
+    }
+    return Result(true);
+}
+
+bool SC::HttpRequestTargetView::getQueryValue(StringSpan name, StringSpan& value) const
+{
+    return HttpURLParser::getQueryValue(search, name, value);
+}
+
 SC::Result SC::HttpURLParser::parse(StringSpan url)
 {
+    protocol = {};
+    username = {};
+    password = {};
+    hostname = {};
+    host     = {};
+    pathname = {};
+    path     = {};
+    search   = {};
+    hash     = {};
+    port     = 0;
     encoding = url.getEncoding();
 
     HttpStringIterator it    = url;
@@ -203,6 +278,7 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
             {
                 // Query parameters found
                 pathname = "/";
+                path     = "/";
                 search   = HttpStringIterator::fromIteratorUntilEnd(hostIt, encoding);
                 // Check for fragment after query
                 auto queryIt = hostIt;
@@ -215,6 +291,7 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
             {
                 // Fragment found
                 pathname = "/";
+                path     = "/";
                 hash     = HttpStringIterator::fromIteratorUntilEnd(hostIt, encoding);
             }
         }
@@ -223,6 +300,7 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
             path     = "/";
             pathname = "/";
         }
+        SC_TRY(validatePath());
         return Result(true);
     }
     // path + hash
@@ -233,6 +311,7 @@ SC::Result SC::HttpURLParser::parse(StringSpan url)
     if (hasHref)
     {
         hash = HttpStringIterator::fromIteratorUntilEnd(it, encoding);
+        SC_TRY(validatePath());
     }
     return Result(true);
 }
@@ -311,16 +390,19 @@ SC::Result SC::HttpURLParser::parseHost()
         {
             (void)it2.stepForward();
             StringSpan portString = HttpStringIterator::fromIteratorUntilEnd(it2, encoding);
-            if (not portString.isEmpty())
-            {
-                int32_t value;
-                SC_TRY(HttpStringIterator::parseInt32(portString, value));
-                if (value < 0 || value > 65535)
-                    return Result(false);
-                port = static_cast<uint16_t>(value);
-            }
+            if (portString.isEmpty())
+                return Result(false);
+            int32_t value;
+            SC_TRY(HttpStringIterator::parseInt32(portString, value));
+            if (value < 0 || value > 65535)
+                return Result(false);
+            port = static_cast<uint16_t>(value);
             // Update host to include hostname and port
             host = HttpStringIterator::fromIterators(start, it2, encoding);
+        }
+        else if (not it2.isAtEnd())
+        {
+            return Result(false);
         }
         else
         {
@@ -338,14 +420,13 @@ SC::Result SC::HttpURLParser::parseHost()
             // stepForward moves past ':' so port iterator starts at first digit
             (void)it2.stepForward();
             StringSpan portString = HttpStringIterator::fromIteratorUntilEnd(it2, encoding);
-            if (not portString.isEmpty())
-            {
-                int32_t value;
-                SC_TRY(HttpStringIterator::parseInt32(portString, value));
-                if (value < 0 || value > 65535)
-                    return Result(false);
-                port = static_cast<uint16_t>(value);
-            }
+            if (portString.isEmpty())
+                return Result(false);
+            int32_t value;
+            SC_TRY(HttpStringIterator::parseInt32(portString, value));
+            if (value < 0 || value > 65535)
+                return Result(false);
+            port = static_cast<uint16_t>(value);
             // Advance it2 to end of port string for host calculation
             while (not it2.isAtEnd())
                 (void)it2.stepForward();
@@ -383,19 +464,22 @@ SC::Result SC::HttpURLParser::validateProtocol()
 SC::Result SC::HttpURLParser::validatePath()
 {
     // TODO: Improve validatePath
-    return Result(not HttpStringIterator::containsCodePoint(pathname, ' '));
+    return Result(not scHttpUrlContainsInvalidWhitespace(pathname) and
+                  not scHttpUrlContainsInvalidWhitespace(search) and not scHttpUrlContainsInvalidWhitespace(hash));
 }
 
 SC::Result SC::HttpURLParser::validateHost()
 {
     // TODO: Improve validateHost
-    return Result(not host.isEmpty() and
+    return Result(not host.isEmpty() and not scHttpUrlContainsInvalidWhitespace(host) and
                   ((HttpStringIterator::startsWith(hostname, "[") and HttpStringIterator::endsWith(hostname, "]")) or
                    HttpStringIterator::containsCodePoint(host, '.') or hostname == "localhost"));
 }
 
 SC::Result SC::HttpURLParser::parseUserPassword(StringSpan userPassword)
 {
+    SC_TRY_MSG(not scHttpUrlContainsInvalidWhitespace(userPassword), "HttpURLParser invalid userinfo");
+
     HttpStringIterator it    = userPassword;
     auto               start = it;
     if (it.advanceUntilMatches(':'))

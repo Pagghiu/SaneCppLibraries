@@ -80,6 +80,28 @@ struct SC_HTTP_EXPORT HttpSetCookieBuilder
     Result writeTo(Span<char> storage, StringSpan& output) const;
 };
 
+/// @brief Common Content-Type header values.
+SC_HTTP_EXPORT StringSpan HttpContentTypeTextPlainUtf8();
+SC_HTTP_EXPORT StringSpan HttpContentTypeTextHtmlUtf8();
+SC_HTTP_EXPORT StringSpan HttpContentTypeApplicationJson();
+SC_HTTP_EXPORT StringSpan HttpContentTypeApplicationOctetStream();
+
+/// @brief Writes a Cache-Control header value into caller-provided storage.
+struct SC_HTTP_EXPORT HttpCacheControlBuilder
+{
+    uint32_t maxAgeSeconds = 0;
+
+    bool hasMaxAge      = false;
+    bool noStore        = false;
+    bool noCache        = false;
+    bool publicCache    = false;
+    bool privateCache   = false;
+    bool mustRevalidate = false;
+    bool immutable      = false;
+
+    Result writeTo(Span<char> storage, StringSpan& output) const;
+};
+
 /// @brief Zero-copy view of an Authorization header split into scheme and credentials.
 struct SC_HTTP_EXPORT HttpAuthorizationView
 {
@@ -97,6 +119,12 @@ SC_HTTP_EXPORT Result HttpParseBearerToken(StringSpan authorizationHeader, Strin
 /// @brief Parses Basic Authorization credentials into caller-provided decoded storage.
 SC_HTTP_EXPORT Result HttpParseBasicCredentials(StringSpan authorizationHeader, Span<char> storage,
                                                 StringSpan& username, StringSpan& password);
+
+/// @brief Writes `Bearer <token>` into caller-provided storage.
+SC_HTTP_EXPORT Result HttpWriteBearerAuthorization(StringSpan token, Span<char> storage, StringSpan& output);
+
+/// @brief Writes `Basic <base64Credentials>` into caller-provided storage.
+SC_HTTP_EXPORT Result HttpWriteBasicAuthorization(StringSpan base64Credentials, Span<char> storage, StringSpan& output);
 
 //! @}
 } // namespace SC

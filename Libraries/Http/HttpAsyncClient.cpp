@@ -44,92 +44,116 @@ Result HttpAsyncClient::start(AsyncEventLoop& loop, HttpParser::Method method, S
     return startRequest(loop, preset);
 }
 
-Result HttpAsyncClient::get(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
+Result HttpAsyncClient::sendRequest(AsyncEventLoop& loop, const RequestOptions& options)
 {
     RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpGET;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
+    preset.method    = options.method;
+    preset.url       = options.url;
+    preset.keepAlive = options.keepAlive;
     preset.autoSend  = true;
+    preset.headers   = options.headers;
+
+    switch (options.bodyMode)
+    {
+    case RequestOptions::BodyMode::None: break;
+    case RequestOptions::BodyMode::Span:
+        preset.bodyMode = RequestPreset::BodyMode::Span;
+        preset.bodySpan = options.body;
+        break;
+    case RequestOptions::BodyMode::Stream:
+        SC_TRY_MSG(options.bodyStream != nullptr, "HttpAsyncClient RequestOptions body stream missing");
+        preset.bodyMode      = RequestPreset::BodyMode::Stream;
+        preset.bodyStream    = options.bodyStream;
+        preset.contentLength = options.bodyLength;
+        break;
+    case RequestOptions::BodyMode::Multipart:
+        SC_TRY_MSG(options.multipartWriter != nullptr, "HttpAsyncClient RequestOptions multipart writer missing");
+        preset.bodyMode        = RequestPreset::BodyMode::Multipart;
+        preset.multipartWriter = options.multipartWriter;
+        break;
+    }
+
     return startRequest(loop, preset);
+}
+
+Result HttpAsyncClient::get(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
+{
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpGET;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::head(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpHEAD;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpHEAD;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::options(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpOPTIONS;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpOPTIONS;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::deleteRequest(AsyncEventLoop& loop, StringSpan url, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpDELETE;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpDELETE;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::put(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpPUT;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    preset.bodyMode  = RequestPreset::BodyMode::Span;
-    preset.bodySpan  = body;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpPUT;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    options.bodyMode  = RequestOptions::BodyMode::Span;
+    options.body      = body;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::post(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpPOST;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    preset.bodyMode  = RequestPreset::BodyMode::Span;
-    preset.bodySpan  = body;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpPOST;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    options.bodyMode  = RequestOptions::BodyMode::Span;
+    options.body      = body;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::patch(AsyncEventLoop& loop, StringSpan url, Span<const char> body, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method    = HttpParser::Method::HttpPATCH;
-    preset.url       = url;
-    preset.keepAlive = keepAlive;
-    preset.autoSend  = true;
-    preset.bodyMode  = RequestPreset::BodyMode::Span;
-    preset.bodySpan  = body;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method    = HttpParser::Method::HttpPATCH;
+    options.url       = url;
+    options.keepAlive = keepAlive;
+    options.bodyMode  = RequestOptions::BodyMode::Span;
+    options.body      = body;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::postMultipart(AsyncEventLoop& loop, StringSpan url, HttpMultipartWriter& writer, bool keepAlive)
 {
-    RequestPreset preset;
-    preset.method          = HttpParser::Method::HttpPOST;
-    preset.url             = url;
-    preset.keepAlive       = keepAlive;
-    preset.autoSend        = true;
-    preset.bodyMode        = RequestPreset::BodyMode::Multipart;
-    preset.multipartWriter = &writer;
-    return startRequest(loop, preset);
+    RequestOptions options;
+    options.method          = HttpParser::Method::HttpPOST;
+    options.url             = url;
+    options.keepAlive       = keepAlive;
+    options.bodyMode        = RequestOptions::BodyMode::Multipart;
+    options.multipartWriter = &writer;
+    return sendRequest(loop, options);
 }
 
 Result HttpAsyncClient::startRequest(AsyncEventLoop& loop, const RequestPreset& preset)
@@ -337,6 +361,11 @@ Result HttpAsyncClient::beginRequestSend()
         SC_TRY_MSG(currentPreset.multipartWriter != nullptr, "HttpAsyncClient multipart writer missing");
         request.setMultipart(*currentPreset.multipartWriter);
         break;
+    }
+
+    for (const Header& header : currentPreset.headers)
+    {
+        SC_TRY(request.addHeader(header.name, header.value));
     }
 
     if (responseDecoder != nullptr and not request.hasAcceptEncodingHeader())

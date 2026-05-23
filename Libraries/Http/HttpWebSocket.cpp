@@ -1276,6 +1276,157 @@ Result HttpWebSocketEndpoint::queueAutomaticControl(HttpWebSocketOpcode opcode, 
     return Result(true);
 }
 
+Result HttpWebSocketConnectionPump::attach(const HttpWebSocketTransportView& newTransport,
+                                           HttpWebSocketEndpointRole         endpointRole)
+{
+    SC_TRY_MSG(newTransport.isValid(), "HttpWebSocketConnectionPump transport is invalid");
+    detach();
+
+    transport = newTransport;
+    endpoint.reset(endpointRole);
+    endpoint.onDataFramePayload.bind<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onEndpointDataFrame>(
+        *this);
+
+    dataListenerAdded = transport.readableStream->eventData
+                            .addListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onData>(*this);
+    if (not dataListenerAdded)
+    {
+        detach();
+        return Result::Error("HttpWebSocketConnectionPump data listener limit reached");
+    }
+
+    endListenerAdded = transport.readableStream->eventEnd
+                           .addListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onStreamEnd>(*this);
+    if (not endListenerAdded)
+    {
+        detach();
+        return Result::Error("HttpWebSocketConnectionPump end listener limit reached");
+    }
+
+    closeListenerAdded =
+        transport.readableStream->eventClose
+            .addListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onStreamEnd>(*this);
+    if (not closeListenerAdded)
+    {
+        detach();
+        return Result::Error("HttpWebSocketConnectionPump close listener limit reached");
+    }
+    return Result(true);
+}
+
+void HttpWebSocketConnectionPump::detach()
+{
+    if (transport.readableStream != nullptr)
+    {
+        if (dataListenerAdded)
+        {
+            (void)transport.readableStream->eventData
+                .removeListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onData>(*this);
+        }
+        if (endListenerAdded)
+        {
+            (void)transport.readableStream->eventEnd
+                .removeListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onStreamEnd>(*this);
+        }
+        if (closeListenerAdded)
+        {
+            (void)transport.readableStream->eventClose
+                .removeListener<HttpWebSocketConnectionPump, &HttpWebSocketConnectionPump::onStreamEnd>(*this);
+        }
+    }
+    dataListenerAdded  = false;
+    endListenerAdded   = false;
+    closeListenerAdded = false;
+    transport.reset();
+}
+
+Result HttpWebSocketConnectionPump::writeFrame(Span<const char> frame)
+{
+    SC_TRY_MSG(transport.isValid(), "HttpWebSocketConnectionPump is not attached");
+    SC_TRY_MSG(not frame.empty(), "HttpWebSocketConnectionPump cannot write empty frame");
+
+    AsyncBufferView::ID bufferID;
+    Span<char>          writableData;
+    SC_TRY(transport.buffersPool->requestNewBuffer(frame.sizeInBytes(), bufferID, writableData));
+    ::memcpy(writableData.data(), frame.data(), frame.sizeInBytes());
+    transport.buffersPool->setNewBufferSize(bufferID, frame.sizeInBytes());
+    const Result writeResult = transport.writableStream->write(bufferID);
+    transport.buffersPool->unrefBuffer(bufferID);
+    return writeResult;
+}
+
+Result HttpWebSocketConnectionPump::flushPendingControlFrame()
+{
+    if (not endpoint.hasPendingControlFrame())
+    {
+        return Result(true);
+    }
+
+    Span<const char> controlFrame;
+    SC_TRY(endpoint.getPendingControlFrame(controlFrame));
+    SC_TRY(writeFrame(controlFrame));
+    endpoint.clearPendingControlFrame();
+    return Result(true);
+}
+
+void HttpWebSocketConnectionPump::onData(AsyncBufferView::ID bufferID)
+{
+    if (not transport.isValid())
+    {
+        return;
+    }
+
+    Span<char> data;
+    Result     dataResult = transport.buffersPool->getWritableData(bufferID, data);
+    if (not dataResult)
+    {
+        fail(dataResult);
+        return;
+    }
+
+    size_t consumed = 0;
+    Result received = endpoint.receive(data, consumed);
+    if (received)
+    {
+        received = flushPendingControlFrame();
+    }
+    if (not received)
+    {
+        fail(received);
+    }
+}
+
+void HttpWebSocketConnectionPump::onStreamEnd()
+{
+    detach();
+    if (onEnd.isValid())
+    {
+        onEnd();
+    }
+}
+
+Result HttpWebSocketConnectionPump::onEndpointDataFrame(HttpWebSocketOpcode opcode, Span<char> payload,
+                                                        bool frameFinished)
+{
+    if (onDataFramePayload.isValid())
+    {
+        SC_TRY(onDataFramePayload(opcode, payload, frameFinished));
+    }
+    return Result(true);
+}
+
+void HttpWebSocketConnectionPump::fail(Result result)
+{
+    if (onError.isValid())
+    {
+        onError(result);
+    }
+    if (transport.readableStream != nullptr)
+    {
+        transport.readableStream->destroy();
+    }
+}
+
 void HttpWebSocketHubClient::reset()
 {
     transport.reset();

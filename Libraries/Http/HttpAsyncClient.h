@@ -47,6 +47,37 @@ struct SC_HTTP_EXPORT HttpAsyncClientConnection
 /// \snippet Tests/Libraries/Http/HttpAsyncClientTest.cpp HttpAsyncClientStreamSnippet
 struct SC_HTTP_EXPORT HttpAsyncClient
 {
+    struct Header
+    {
+        StringSpan name;
+        StringSpan value;
+    };
+
+    struct RequestOptions
+    {
+        enum class BodyMode : uint8_t
+        {
+            None,
+            Span,
+            Stream,
+            Multipart,
+        };
+
+        HttpParser::Method method = HttpParser::Method::HttpGET;
+        StringSpan         url;
+
+        Span<const Header> headers;
+
+        Span<const char>     body;
+        AsyncReadableStream* bodyStream      = nullptr;
+        HttpMultipartWriter* multipartWriter = nullptr;
+
+        uint64_t bodyLength = 0;
+
+        BodyMode bodyMode  = BodyMode::None;
+        bool     keepAlive = false;
+    };
+
     /// @brief Initializes the client with caller-provided connection storage
     /// The storage must outlive the client and provides buffers, queues and socket state.
     Result init(HttpConnectionBase& storage);
@@ -71,6 +102,10 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// `onPrepareRequest` must send the headers before returning, typically by calling
     /// `HttpAsyncClientRequest::sendHeaders()`.
     Result start(AsyncEventLoop& loop, HttpParser::Method method, StringSpan url, bool keepAlive = false);
+
+    /// @brief Starts an auto-sent request described by caller-owned request options.
+    /// @warning Header/body/multipart storage must remain valid until the request has been sent.
+    Result sendRequest(AsyncEventLoop& loop, const RequestOptions& options);
 
     /// @brief Convenience wrapper for a GET request without a request body
     Result get(AsyncEventLoop& loop, StringSpan url, bool keepAlive = false);
@@ -142,6 +177,8 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
         BodyMode bodyMode      = BodyMode::None;
         uint64_t contentLength = 0;
+
+        Span<const Header> headers;
 
         AsyncReadableStream* bodyStream      = nullptr;
         HttpMultipartWriter* multipartWriter = nullptr;

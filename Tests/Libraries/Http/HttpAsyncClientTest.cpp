@@ -218,6 +218,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             putSpanBody();
         }
+        if (test_section("request options"))
+        {
+            requestOptions();
+        }
         if (test_section("PUT with streamed body"))
         {
             putStreamBody();
@@ -280,6 +284,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void headResponse();
     void commonMethodWrappers();
     void putSpanBody();
+    void requestOptions();
     void putStreamBody();
     void putChunkedStreamBody();
     void putWritableBody();
@@ -675,6 +680,101 @@ void SC::HttpAsyncClientTest::putSpanBody()
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(client.put(loop, url.view(), StringSpan("InlineBody")));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::requestOptions()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+
+    ServerConnection    connections[1];
+    HttpAsyncServer     httpServer;
+    HttpAsyncFileServer fileServer;
+
+    const uint16_t port = report.mapPort(26118);
+
+    ThreadPool threadPool;
+    if (loop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+    SC_TEST_EXPECT(fileServer.init(threadPool, loop, webServerFolder));
+    struct ServerContext
+    {
+        HttpAsyncFileServer&                 fileServer;
+        HttpAsyncFileServer::StreamQueue<2>* streams;
+    } serverCtx          = {fileServer, streams};
+    httpServer.onRequest = [this, &serverCtx](HttpConnection& connection)
+    {
+        StringSpan header;
+        SC_TEST_EXPECT(connection.request.getHeader("X-Upload-Mode", header));
+        SC_TEST_EXPECT(header == "request-options");
+        SC_TEST_EXPECT(
+            serverCtx.fileServer.handleRequest(serverCtx.streams[connection.getConnectionID().getIndex()], connection));
+    };
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+    FileSystem        fs;
+
+    String url = StringEncoding::Ascii;
+    struct Context
+    {
+        ResponseCollector& collector;
+        HttpAsyncServer&   httpServer;
+        FileSystem&        fs;
+    } ctx = {collector, httpServer, fs};
+
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/client-request-options.txt", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector.attach(response,
+                             [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                             {
+                                 ctx.collector.detach();
+                                 SC_TEST_EXPECT(completedResponse.getParser().statusCode == 201);
+                                 String content;
+                                 SC_TEST_EXPECT(ctx.fs.read("client-request-options.txt", content));
+                                 SC_TEST_EXPECT(content == "OptionsBody");
+                                 SC_TEST_EXPECT(ctx.fs.removeFile("client-request-options.txt"));
+                                 SC_TEST_EXPECT(ctx.httpServer.stop());
+                             });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    HttpAsyncClient::RequestOptions invalidOptions;
+    invalidOptions.method     = HttpParser::Method::HttpPUT;
+    invalidOptions.url        = url.view();
+    invalidOptions.bodyMode   = HttpAsyncClient::RequestOptions::BodyMode::Stream;
+    invalidOptions.bodyLength = 11;
+    SC_TEST_EXPECT(not client.sendRequest(loop, invalidOptions));
+
+    HttpAsyncClient::Header headers[] = {{"X-Upload-Mode", "request-options"}};
+
+    HttpAsyncClient::RequestOptions options;
+    options.method    = HttpParser::Method::HttpPUT;
+    options.url       = url.view();
+    options.headers   = Span<const HttpAsyncClient::Header>(headers);
+    options.bodyMode  = HttpAsyncClient::RequestOptions::BodyMode::Span;
+    options.body      = StringSpan("OptionsBody").toCharSpan();
+    options.keepAlive = false;
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.sendRequest(loop, options));
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(fileServer.close());
     SC_TEST_EXPECT(httpServer.close());

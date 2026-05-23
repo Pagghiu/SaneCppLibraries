@@ -20,6 +20,12 @@ struct SC_HTTP_EXPORT HttpAsyncFileServerOptions
 
     /// @brief Enables byte range requests once supported (default: true).
     bool enableRangeRequests = true;
+
+    /// @brief Enables PUT/POST uploads (default: true).
+    bool enableUploads = true;
+
+    /// @brief Rejects Content-Length uploads larger than this value. Zero means unlimited.
+    size_t maxUploadBytes = 0;
 };
 
 /// @brief Http file server statically serves files from a directory
@@ -54,12 +60,11 @@ struct SC_HTTP_EXPORT HttpAsyncFileServer
             Stream*              stream     = nullptr;
             HttpConnection*      connection = nullptr;
 
-            FileDescriptor currentFd; // TODO: Reuse the above sourceFileDescriptor
-            StringPath     currentFilePath;
-            StringSpan     currentFileName;
-            StringSpan     currentHeaderName;
-            bool           isContentDisposition = false;
-            bool           rejectedFileName     = false;
+            FileDescriptor               currentFd; // TODO: Reuse the above sourceFileDescriptor
+            StringPath                   currentFilePath;
+            StringSpan                   currentHeaderName;
+            HttpMultipartPartHeadersView partHeaders;
+            bool                         rejectedFileName = false;
 
             void onData(AsyncBufferView::ID bufferID);
         } multipartListener;

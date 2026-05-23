@@ -47,6 +47,8 @@ void HttpRouterTest::routeMatching()
     StringSpan allow;
     SC_TEST_EXPECT(router.formatAllowHeader("/users/42?verbose=1", {allowStorage, sizeof(allowStorage)}, allow));
     SC_TEST_EXPECT(allow == "GET, PUT");
+    SC_TEST_EXPECT(router.formatAllowHeader("/users/42#fragment", {allowStorage, sizeof(allowStorage)}, allow));
+    SC_TEST_EXPECT(allow == "GET, PUT");
 
     SC_TEST_EXPECT(router.match(HttpParser::Method::HttpDELETE, "/users/42/books/abc", params, match));
     SC_TEST_EXPECT(match.status == HttpRouteMatchStatus::Matched);
@@ -64,6 +66,7 @@ void HttpRouterTest::routeMatching()
     SC_TEST_EXPECT(match.status == HttpRouteMatchStatus::NotFound);
 
     SC_TEST_EXPECT(not router.formatAllowHeader("/users/42", {allowStorage, 3}, allow));
+    SC_TEST_EXPECT(not router.match(HttpParser::Method::HttpGET, "http://example.com/users/42", params, match));
 }
 
 void runHttpRouterTest(SC::TestReport& report) { HttpRouterTest test(report); }

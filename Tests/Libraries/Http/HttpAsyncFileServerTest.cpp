@@ -28,9 +28,78 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
         {
             httpFileServerTest(false);
         }
+        if (test_section("upload policy"))
+        {
+            uploadPolicy();
+        }
     }
     void httpFileServerTest(bool useAsyncFileSend);
+    void uploadPolicy();
 };
+
+void SC::HttpAsyncFileServerTest::uploadPolicy()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType                  connections[1];
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+    HttpAsyncServer                     httpServer;
+    HttpAsyncFileServer                 fileServer;
+    ThreadPool                          threadPool;
+    const uint16_t                      serverPort = report.mapPort(26119);
+
+    if (eventLoop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+    SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, webServerFolder));
+
+    HttpAsyncFileServerOptions options;
+    options.maxUploadBytes = 4;
+    SC_TEST_EXPECT(fileServer.setOptions(options));
+
+    httpServer.onRequest = [&](HttpConnection& connection)
+    { SC_ASSERT_RELEASE(fileServer.handleRequest(streams[connection.getConnectionID().getIndex()], connection)); };
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+
+    HttpTestClient client;
+    String         url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/limited-upload.txt", serverPort));
+    struct UploadPolicyContext
+    {
+        HttpAsyncFileServerTest* test;
+        HttpAsyncServer*         httpServer;
+        FileSystem*              fs;
+    } context       = {this, &httpServer, &fs};
+    client.callback = [&context](HttpTestClient& result)
+    {
+        const StringView response(result.getResponse());
+        context.test->recordExpectation("413 response", response.containsString("413 Payload Too Large"));
+        context.test->recordExpectation("limited file missing", not context.fs->existsAndIsFile("limited-upload.txt"));
+        context.test->recordExpectation("stop server", context.httpServer->stop());
+    };
+
+    SC_TEST_EXPECT(client.put(eventLoop, url.view(), "too-large"));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
 
 void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
 {

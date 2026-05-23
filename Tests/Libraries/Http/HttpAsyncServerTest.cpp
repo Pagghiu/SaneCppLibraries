@@ -146,6 +146,65 @@ struct ChunkedBodyStream : public SC::AsyncReadableStream
     }
 };
 
+struct RecordedWritableStream : SC::AsyncWritableStream
+{
+    SC::AsyncWritableStream::Request queue[8];
+    SC::Buffer                       output;
+
+    SC::AsyncBufferView::ID                     pendingBufferID;
+    SC::Function<void(SC::AsyncBufferView::ID)> pendingCallback;
+
+    RecordedWritableStream() { setWriteQueue(queue); }
+
+    SC::Result append(SC::Span<const char> data)
+    {
+        SC::GrowableBuffer<SC::Buffer> gb(output);
+        SC::HttpStringAppend&          sb = static_cast<SC::HttpStringAppend&>(static_cast<SC::IGrowableBuffer&>(gb));
+        return SC::Result(sb.append(data, 0));
+    }
+
+    bool flushOne()
+    {
+        if (not pendingBufferID.isValid())
+        {
+            return false;
+        }
+
+        SC::Span<const char> data;
+        SC_ASSERT_RELEASE(getBuffersPool().getReadableData(pendingBufferID, data));
+        SC_ASSERT_RELEASE(append(data));
+
+        SC::AsyncBufferView::ID                     savedBufferID = pendingBufferID;
+        SC::Function<void(SC::AsyncBufferView::ID)> savedCallback = SC::move(pendingCallback);
+        pendingBufferID                                           = {};
+        pendingCallback                                           = {};
+        getBuffersPool().unrefBuffer(savedBufferID);
+        finishedWriting(savedBufferID, SC::move(savedCallback), SC::Result(true));
+        return true;
+    }
+
+  private:
+    virtual SC::Result asyncWrite(SC::AsyncBufferView::ID                     bufferID,
+                                  SC::Function<void(SC::AsyncBufferView::ID)> cb) override
+    {
+        SC_ASSERT_RELEASE(not pendingBufferID.isValid());
+        getBuffersPool().refBuffer(bufferID);
+        pendingBufferID = bufferID;
+        pendingCallback = SC::move(cb);
+        return SC::Result(true);
+    }
+};
+
+struct ProbeHttpResponse : SC::HttpResponse
+{
+    void setup(SC::Span<char> headers, SC::AsyncWritableStream& stream)
+    {
+        setHeaderMemory(headers);
+        setWritableStream(stream);
+        reset();
+    }
+};
+
 struct TimeoutGuard
 {
     SC::AsyncLoopTimeout timeout;
@@ -181,6 +240,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             emptyResponseHelper();
         }
+        if (test_section("response body helpers"))
+        {
+            responseBodyHelpers();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -206,6 +269,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void customResponseStatus();
     void standardResponseStatuses();
     void emptyResponseHelper();
+    void responseBodyHelpers();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void maxHeaderSizeError();
@@ -663,6 +727,77 @@ void SC::HttpAsyncServerTest::maxHeaderSizeError()
     SC_TEST_EXPECT(serverContext.sawError);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncServerTest::responseBodyHelpers()
+{
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
+        SC_TEST_EXPECT(response.sendText(200, "hello"));
+        while (writable.flushOne()) {}
+
+        constexpr StringView expected = "HTTP/1.1 200 OK\r\n"
+                                        "Content-Type: text/plain; charset=utf-8\r\n"
+                                        "Content-Length: 5\r\n"
+                                        "Connection: keep-alive\r\n"
+                                        "\r\n"
+                                        "hello";
+        SC_TEST_EXPECT(StringSpan(writable.output.toSpanConst(), false, StringEncoding::Ascii) == expected);
+    }
+
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
+        SC_TEST_EXPECT(response.startBody(201, 4, "application/json"));
+        SC_TEST_EXPECT(response.addHeader("X-Test", "yes"));
+        SC_TEST_EXPECT(response.sendHeaders());
+        SC_TEST_EXPECT(response.getWritableStream().write("true"));
+        SC_TEST_EXPECT(response.end());
+        while (writable.flushOne()) {}
+
+        constexpr StringView expected = "HTTP/1.1 201 Created\r\n"
+                                        "Content-Type: application/json\r\n"
+                                        "Content-Length: 4\r\n"
+                                        "X-Test: yes\r\n"
+                                        "Connection: keep-alive\r\n"
+                                        "\r\n"
+                                        "true";
+        SC_TEST_EXPECT(StringSpan(writable.output.toSpanConst(), false, StringEncoding::Ascii) == expected);
+    }
+
+    {
+        SC::AsyncBufferView  buffers[1] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
+        SC_TEST_EXPECT(not response.sendBody(200, "body", "text/plain"));
+    }
 }
 
 void SC::HttpAsyncServerTest::chunkedResponseWriting()

@@ -32,6 +32,185 @@
 
 namespace SC
 {
+struct HttpMultipartInternal
+{
+    static StringSpan trim(StringSpan value)
+    {
+        const char* data  = value.bytesWithoutTerminator();
+        size_t      start = 0;
+        size_t      end   = value.sizeInBytes();
+        while (start < end and (data[start] == ' ' or data[start] == '\t'))
+        {
+            start++;
+        }
+        while (end > start and (data[end - 1] == ' ' or data[end - 1] == '\t'))
+        {
+            end--;
+        }
+        return {{data + start, end - start}, false, value.getEncoding()};
+    }
+
+    static bool equalsIgnoreCase(StringSpan left, StringSpan right)
+    {
+        if (left.sizeInBytes() != right.sizeInBytes())
+        {
+            return false;
+        }
+        const char* leftData  = left.bytesWithoutTerminator();
+        const char* rightData = right.bytesWithoutTerminator();
+        for (size_t idx = 0; idx < left.sizeInBytes(); ++idx)
+        {
+            char a = leftData[idx];
+            char b = rightData[idx];
+            if (a >= 'A' and a <= 'Z')
+            {
+                a = static_cast<char>(a - 'A' + 'a');
+            }
+            if (b >= 'A' and b <= 'Z')
+            {
+                b = static_cast<char>(b - 'A' + 'a');
+            }
+            if (a != b)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static StringSpan unquote(StringSpan value)
+    {
+        if (value.sizeInBytes() >= 2)
+        {
+            const char* data = value.bytesWithoutTerminator();
+            if (data[0] == '"' and data[value.sizeInBytes() - 1] == '"')
+            {
+                return {{data + 1, value.sizeInBytes() - 2}, false, value.getEncoding()};
+            }
+        }
+        return value;
+    }
+};
+
+bool HttpMultipartIsSafeFileName(StringSpan fileName)
+{
+    if (fileName.isEmpty() or fileName == "." or fileName == "..")
+    {
+        return false;
+    }
+
+    const char* data = fileName.bytesWithoutTerminator();
+    for (size_t idx = 0; idx < fileName.sizeInBytes(); ++idx)
+    {
+        const char current = data[idx];
+        if (current == '/' or current == '\\' or current == ':' or static_cast<unsigned char>(current) < 0x20)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+Result HttpMultipartContentDispositionView::parse(StringSpan headerValue)
+{
+    *this = {};
+
+    StringSpan   header = HttpMultipartInternal::trim(headerValue);
+    const char*  data   = header.bytesWithoutTerminator();
+    const size_t length = header.sizeInBytes();
+    SC_TRY_MSG(not header.isEmpty(), "Multipart Content-Disposition is empty");
+
+    size_t cursor = 0;
+    while (cursor < length and data[cursor] != ';')
+    {
+        cursor++;
+    }
+    disposition = HttpMultipartInternal::trim({{data, cursor}, false, header.getEncoding()});
+    SC_TRY_MSG(not disposition.isEmpty(), "Multipart Content-Disposition disposition is empty");
+
+    while (cursor < length)
+    {
+        if (data[cursor] == ';')
+        {
+            cursor++;
+        }
+        const size_t itemStart = cursor;
+        while (cursor < length and data[cursor] != ';')
+        {
+            cursor++;
+        }
+        StringSpan item =
+            HttpMultipartInternal::trim({{data + itemStart, cursor - itemStart}, false, header.getEncoding()});
+        if (item.isEmpty())
+        {
+            continue;
+        }
+
+        const char* itemData = item.bytesWithoutTerminator();
+        size_t      equals   = static_cast<size_t>(-1);
+        for (size_t idx = 0; idx < item.sizeInBytes(); ++idx)
+        {
+            if (itemData[idx] == '=')
+            {
+                equals = idx;
+                break;
+            }
+        }
+        if (equals == static_cast<size_t>(-1))
+        {
+            continue;
+        }
+
+        StringSpan key   = HttpMultipartInternal::trim({{itemData, equals}, false, item.getEncoding()});
+        StringSpan value = HttpMultipartInternal::trim(
+            {{itemData + equals + 1, item.sizeInBytes() - equals - 1}, false, item.getEncoding()});
+        value = HttpMultipartInternal::unquote(value);
+        if (HttpMultipartInternal::equalsIgnoreCase(key, "name"))
+        {
+            name    = value;
+            hasName = true;
+        }
+        else if (HttpMultipartInternal::equalsIgnoreCase(key, "filename"))
+        {
+            fileName    = value;
+            hasFileName = true;
+        }
+    }
+
+    return Result(true);
+}
+
+bool HttpMultipartContentDispositionView::isFormData() const
+{
+    return HttpMultipartInternal::equalsIgnoreCase(disposition, "form-data");
+}
+
+void HttpMultipartPartHeadersView::reset()
+{
+    contentDisposition = {};
+    contentType        = {};
+    disposition        = {};
+}
+
+Result HttpMultipartPartHeadersView::addHeader(StringSpan name, StringSpan value)
+{
+    if (HttpMultipartInternal::equalsIgnoreCase(name, "Content-Disposition"))
+    {
+        contentDisposition = value;
+        SC_TRY(disposition.parse(value));
+    }
+    else if (HttpMultipartInternal::equalsIgnoreCase(name, "Content-Type"))
+    {
+        contentType = value;
+    }
+    return Result(true);
+}
+
+bool HttpMultipartPartHeadersView::hasSafeFileName() const
+{
+    return disposition.hasFileName and HttpMultipartIsSafeFileName(disposition.fileName);
+}
+
 Result HttpMultipartParser::initWithBoundary(StringSpan boundaryValue)
 {
     reset();

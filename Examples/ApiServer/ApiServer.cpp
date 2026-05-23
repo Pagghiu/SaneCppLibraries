@@ -11,6 +11,7 @@
 //   curl -X POST --data "hello" http://127.0.0.1:8091/echo
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Http/HttpAsyncServer.h"
+#include "../../Libraries/Http/HttpHeaders.h"
 #include "../../Libraries/Http/HttpRouter.h"
 #include "../../Libraries/Http/HttpURLParser.h"
 #include "../../Libraries/Memory/String.h"
@@ -45,7 +46,7 @@ struct ApiServerExample
             drainListening   = false;
             endAfterPending  = false;
             SC_TRY(connection->response.startResponse(200));
-            SC_TRY(connection->response.addHeader("Content-Type", "text/plain"));
+            SC_TRY(connection->response.addHeader("Content-Type", HttpContentTypeTextPlainUtf8()));
             if (connection->request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
             {
                 SC_TRY(connection->response.addContentLength(connection->request.getBodyBytesRemaining()));
@@ -205,31 +206,28 @@ struct ApiServerExample
         }
         if (match.status != HttpRouteMatchStatus::Matched)
         {
-            SC_ASSERT_RELEASE(sendText(connection, 500, "text/plain", "route error\n"));
+            SC_ASSERT_RELEASE(sendText(connection, 500, HttpContentTypeTextPlainUtf8(), "route error\n"));
             return;
         }
 
         if (match.route == &routes[0])
         {
-            SC_ASSERT_RELEASE(sendText(connection, 200, "application/json", "{\"status\":\"ok\"}"));
+            SC_ASSERT_RELEASE(sendText(connection, 200, HttpContentTypeApplicationJson(), "{\"status\":\"ok\"}"));
             return;
         }
         if (match.route == &routes[1])
         {
-            String        targetURL = StringEncoding::Ascii;
-            HttpURLParser url;
-            SC_ASSERT_RELEASE(
-                StringBuilder::format(targetURL, "http://localhost{}", connection.request.getRequestTarget()));
-            SC_ASSERT_RELEASE(url.parse(targetURL.view()));
+            HttpRequestTargetView target;
+            SC_ASSERT_RELEASE(target.parse(connection.request.getRequestTarget()));
 
             StringSpan name;
-            if (not url.getQueryValue("name", name) or name.isEmpty())
+            if (not target.getQueryValue("name", name) or name.isEmpty())
             {
                 name = "world";
             }
             String response = StringEncoding::Ascii;
             SC_ASSERT_RELEASE(StringBuilder::format(response, "{{\"hello\":\"{}\"}}", name));
-            SC_ASSERT_RELEASE(sendText(connection, 200, "application/json", response.view()));
+            SC_ASSERT_RELEASE(sendText(connection, 200, HttpContentTypeApplicationJson(), response.view()));
             return;
         }
         if (match.route == &routes[2])
@@ -238,7 +236,7 @@ struct ApiServerExample
             return;
         }
 
-        SC_ASSERT_RELEASE(sendText(connection, 500, "text/plain", "route error\n"));
+        SC_ASSERT_RELEASE(sendText(connection, 500, HttpContentTypeTextPlainUtf8(), "route error\n"));
     }
 
     void receiveEchoBody(HttpConnection& connection)
@@ -268,9 +266,7 @@ struct ApiServerExample
 
     Result sendText(HttpConnection& connection, int code, StringSpan contentType, StringSpan body)
     {
-        SC_TRY(connection.response.startResponse(code));
-        SC_TRY(connection.response.addHeader("Content-Type", contentType));
-        SC_TRY(connection.response.addContentLength(body.sizeInBytes()));
+        SC_TRY(connection.response.startBody(code, body.sizeInBytes(), contentType));
         SC_TRY(connection.response.sendHeaders());
         if (body.sizeInBytes() > 0)
         {
@@ -288,14 +284,16 @@ struct ApiServerExample
 
     Result methodNotAllowed(HttpConnection& connection, StringSpan allow)
     {
-        SC_TRY(connection.response.startResponse(405));
+        SC_TRY(connection.response.startBody(405, 0));
         SC_TRY(connection.response.addHeader("Allow", allow));
-        SC_TRY(connection.response.addContentLength(0));
         SC_TRY(connection.response.sendHeaders());
         return connection.response.end();
     }
 
-    Result notFound(HttpConnection& connection) { return sendText(connection, 404, "text/plain", "not found\n"); }
+    Result notFound(HttpConnection& connection)
+    {
+        return sendText(connection, 404, HttpContentTypeTextPlainUtf8(), "not found\n");
+    }
 };
 
 Result saneMain(Span<const StringSpan> args)

@@ -1,25 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpRouter.h"
+#include "HttpURLParser.h"
 
 namespace SC
 {
 struct HttpRouterInternal
 {
-    static StringSpan pathOnly(StringSpan requestTarget)
-    {
-        const char*  data   = requestTarget.bytesWithoutTerminator();
-        const size_t length = requestTarget.sizeInBytes();
-        for (size_t idx = 0; idx < length; ++idx)
-        {
-            if (data[idx] == '?' or data[idx] == '#')
-            {
-                return {{data, idx}, false, requestTarget.getEncoding()};
-            }
-        }
-        return requestTarget;
-    }
-
     static StringSpan trimLeadingSlash(StringSpan path)
     {
         if (path.sizeInBytes() > 0 and path.bytesWithoutTerminator()[0] == '/')
@@ -156,7 +143,9 @@ Result HttpRouter::match(HttpParser::Method method, StringSpan requestTarget, Sp
 {
     match = {};
 
-    const StringSpan requestPath = HttpRouterInternal::pathOnly(requestTarget);
+    HttpRequestTargetView target;
+    SC_TRY(target.parse(requestTarget));
+    const StringSpan requestPath = target.path;
     bool             pathMatched = false;
     for (const HttpRoute& route : routes)
     {
@@ -190,10 +179,12 @@ Result HttpRouter::formatAllowHeader(StringSpan requestTarget, Span<char> storag
 {
     allow = {};
 
-    HttpParser::Method methods[7];
-    size_t             numMethods = 0;
-    HttpRouteParam     params[8];
-    const StringSpan   requestPath = HttpRouterInternal::pathOnly(requestTarget);
+    HttpParser::Method    methods[7];
+    size_t                numMethods = 0;
+    HttpRouteParam        params[8];
+    HttpRequestTargetView target;
+    SC_TRY(target.parse(requestTarget));
+    const StringSpan requestPath = target.path;
     for (const HttpRoute& route : routes)
     {
         size_t                     numParams = 0;

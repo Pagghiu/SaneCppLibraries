@@ -56,6 +56,10 @@ struct SC::HttpURLParserTest : public SC::TestCase
         {
             testFormUrlEncoded();
         }
+        if (test_section("requestTargetView"))
+        {
+            testRequestTargetView();
+        }
         if (test_section("specialChars"))
         {
             testSpecialChars();
@@ -63,6 +67,10 @@ struct SC::HttpURLParserTest : public SC::TestCase
         if (test_section("ipAddresses"))
         {
             testIPAddresses();
+        }
+        if (test_section("reuseClearsPreviousResult"))
+        {
+            testReuseClearsPreviousResult();
         }
     }
 
@@ -77,8 +85,10 @@ struct SC::HttpURLParserTest : public SC::TestCase
     void testProtocols();
     void testQueryParams();
     void testFormUrlEncoded();
+    void testRequestTargetView();
     void testSpecialChars();
     void testIPAddresses();
+    void testReuseClearsPreviousResult();
 };
 
 void SC::HttpURLParserTest::testFull()
@@ -125,6 +135,10 @@ void SC::HttpURLParserTest::testInvalid()
     SC_TEST_EXPECT(not urlParser.parse("http://a"));                 // no dot
     SC_TEST_EXPECT(not urlParser.parse("http://site.com/asd dsa/")); // no space in paths
     SC_TEST_EXPECT(not urlParser.parse("hppt://site.com"));          // unknown protocol
+    SC_TEST_EXPECT(not urlParser.parse("http://exa mple.com/path"));
+    SC_TEST_EXPECT(not urlParser.parse("http://example.com/path\twith-tab"));
+    SC_TEST_EXPECT(not urlParser.parse("http://example.com/path?bad query"));
+    SC_TEST_EXPECT(not urlParser.parse("http://example.com/path#bad fragment"));
 }
 
 void SC::HttpURLParserTest::testCaseInsensitive()
@@ -153,6 +167,9 @@ void SC::HttpURLParserTest::testInvalidPort()
     HttpURLParser urlParser;
     SC_TEST_EXPECT(not urlParser.parse("http://site.com:99999"));
     SC_TEST_EXPECT(not urlParser.parse("http://site.com:-1"));
+    SC_TEST_EXPECT(not urlParser.parse("http://site.com:/path"));
+    SC_TEST_EXPECT(not urlParser.parse("http://[::1]:/path"));
+    SC_TEST_EXPECT(not urlParser.parse("http://[::1]extra/path"));
 }
 
 void SC::HttpURLParserTest::testUTF8()
@@ -365,6 +382,49 @@ void SC::HttpURLParserTest::testFormUrlEncoded()
     SC_TEST_EXPECT(not iterator.next(item));
 }
 
+void SC::HttpURLParserTest::testRequestTargetView()
+{
+    HttpRequestTargetView target;
+    StringSpan            value;
+
+    SC_TEST_EXPECT(target.parse("/api/users?name=first&empty=&flag&name=second#section"));
+    SC_TEST_EXPECT(target.raw == "/api/users?name=first&empty=&flag&name=second#section");
+    SC_TEST_EXPECT(target.path == "/api/users");
+    SC_TEST_EXPECT(target.search == "?name=first&empty=&flag&name=second");
+    SC_TEST_EXPECT(target.hash == "#section");
+    SC_TEST_EXPECT(target.getQueryValue("name", value));
+    SC_TEST_EXPECT(value == "first");
+    SC_TEST_EXPECT(target.getQueryValue("empty", value));
+    SC_TEST_EXPECT(value.isEmpty());
+    SC_TEST_EXPECT(target.getQueryValue("flag", value));
+    SC_TEST_EXPECT(value.isEmpty());
+
+    SC_TEST_EXPECT(target.parse("/only-path"));
+    SC_TEST_EXPECT(target.path == "/only-path");
+    SC_TEST_EXPECT(target.search.isEmpty());
+    SC_TEST_EXPECT(target.hash.isEmpty());
+
+    SC_TEST_EXPECT(target.parse("/empty-query?"));
+    SC_TEST_EXPECT(target.path == "/empty-query");
+    SC_TEST_EXPECT(target.search == "?");
+    SC_TEST_EXPECT(not target.getQueryValue("missing", value));
+
+    SC_TEST_EXPECT(target.parse("/fragment#only"));
+    SC_TEST_EXPECT(target.path == "/fragment");
+    SC_TEST_EXPECT(target.search.isEmpty());
+    SC_TEST_EXPECT(target.hash == "#only");
+
+    SC_TEST_EXPECT(target.parse("*"));
+    SC_TEST_EXPECT(target.path == "*");
+    SC_TEST_EXPECT(target.search.isEmpty());
+
+    SC_TEST_EXPECT(not target.parse(""));
+    SC_TEST_EXPECT(not target.parse("http://example.com/path"));
+    SC_TEST_EXPECT(not target.parse("relative/path"));
+    SC_TEST_EXPECT(not target.parse("/bad path"));
+    SC_TEST_EXPECT(not target.parse("/bad\tpath"));
+}
+
 void SC::HttpURLParserTest::testSpecialChars()
 {
     HttpURLParser urlParser;
@@ -419,6 +479,30 @@ void SC::HttpURLParserTest::testIPAddresses()
     // IPv6 compressed
     SC_TEST_EXPECT(urlParser.parse("http://[2001:db8::]/path"));
     SC_TEST_EXPECT(urlParser.hostname == "[2001:db8::]");
+}
+
+void SC::HttpURLParserTest::testReuseClearsPreviousResult()
+{
+    HttpURLParser urlParser;
+    SC_TEST_EXPECT(urlParser.parse("https://user:pass@example.com:8443/path?q=1#frag"));
+    SC_TEST_EXPECT(urlParser.parse("http://site.com"));
+
+    SC_TEST_EXPECT(urlParser.protocol == "http");
+    SC_TEST_EXPECT(urlParser.username.isEmpty());
+    SC_TEST_EXPECT(urlParser.password.isEmpty());
+    SC_TEST_EXPECT(urlParser.hostname == "site.com");
+    SC_TEST_EXPECT(urlParser.port == 80);
+    SC_TEST_EXPECT(urlParser.host == "site.com");
+    SC_TEST_EXPECT(urlParser.pathname == "/");
+    SC_TEST_EXPECT(urlParser.path == "/");
+    SC_TEST_EXPECT(urlParser.search.isEmpty());
+    SC_TEST_EXPECT(urlParser.hash.isEmpty());
+
+    SC_TEST_EXPECT(urlParser.parse("http://site.com?fresh=1"));
+    SC_TEST_EXPECT(urlParser.path == "/");
+    SC_TEST_EXPECT(urlParser.pathname == "/");
+    SC_TEST_EXPECT(urlParser.search == "?fresh=1");
+    SC_TEST_EXPECT(urlParser.hash.isEmpty());
 }
 
 namespace SC

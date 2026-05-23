@@ -294,6 +294,39 @@ struct SC_HTTP_EXPORT HttpWebSocketEndpoint
     bool closeReceived       = false;
 };
 
+/// @brief Optional stream pump that binds a WebSocket transport to an endpoint lifecycle.
+struct SC_HTTP_EXPORT HttpWebSocketConnectionPump
+{
+    Function<Result(HttpWebSocketOpcode, Span<char>, bool)> onDataFramePayload;
+    Function<void()>                                        onEnd;
+    Function<void(Result)>                                  onError;
+
+    Result attach(const HttpWebSocketTransportView& transport, HttpWebSocketEndpointRole endpointRole);
+    void   detach();
+
+    Result writeFrame(Span<const char> frame);
+    Result flushPendingControlFrame();
+
+    [[nodiscard]] bool isAttached() const { return transport.isValid(); }
+
+    HttpWebSocketEndpoint&       getEndpoint() { return endpoint; }
+    const HttpWebSocketEndpoint& getEndpoint() const { return endpoint; }
+
+    void onData(AsyncBufferView::ID bufferID);
+    void onStreamEnd();
+
+  private:
+    Result onEndpointDataFrame(HttpWebSocketOpcode opcode, Span<char> payload, bool frameFinished);
+    void   fail(Result result);
+
+    HttpWebSocketTransportView transport;
+    HttpWebSocketEndpoint      endpoint;
+
+    bool dataListenerAdded  = false;
+    bool endListenerAdded   = false;
+    bool closeListenerAdded = false;
+};
+
 /// @brief Fixed-slot WebSocket hub client entry
 struct SC_HTTP_EXPORT HttpWebSocketHubClient
 {

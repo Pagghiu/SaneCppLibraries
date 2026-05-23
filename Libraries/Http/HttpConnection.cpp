@@ -1017,6 +1017,7 @@ Result HttpResponse::startResponse(int code)
     case 403: reasonPhrase = "Forbidden"; break;
     case 404: reasonPhrase = "Not Found"; break;
     case 405: reasonPhrase = "Method Not Allowed"; break;
+    case 413: reasonPhrase = "Payload Too Large"; break;
     case 416: reasonPhrase = "Range Not Satisfiable"; break;
     case 426: reasonPhrase = "Upgrade Required"; break;
     case 500: reasonPhrase = "Internal Server Error"; break;
@@ -1050,6 +1051,35 @@ Result HttpResponse::startResponse(int code, StringSpan reasonPhrase)
     SC_TRY(responseHeaders.appendLiteral("\r\n", HeaderSpaceFinished));
     return Result(true);
 }
+
+Result HttpResponse::startBody(int code, uint64_t contentLength, StringSpan contentType)
+{
+    SC_TRY(startResponse(code));
+    if (not contentType.isEmpty())
+    {
+        SC_TRY(addHeader("Content-Type", contentType));
+    }
+    SC_TRY(addContentLength(contentLength));
+    return Result(true);
+}
+
+Result HttpResponse::sendBytes(int code, Span<const char> body, StringSpan contentType)
+{
+    SC_TRY(startBody(code, body.sizeInBytes(), contentType));
+    SC_TRY(sendHeaders());
+    if (body.sizeInBytes() > 0)
+    {
+        SC_TRY(getWritableStream().write(AsyncBufferView(body)));
+    }
+    return end();
+}
+
+Result HttpResponse::sendBody(int code, StringSpan body, StringSpan contentType)
+{
+    return sendBytes(code, body.toCharSpan(), contentType);
+}
+
+Result HttpResponse::sendText(int code, StringSpan body) { return sendBody(code, body, "text/plain; charset=utf-8"); }
 
 Result HttpResponse::sendEmpty(int code)
 {

@@ -11,6 +11,40 @@ namespace SC
 //! @addtogroup group_http
 //! @{
 
+/// @brief Conservative multipart filename safety check for upload sinks.
+SC_HTTP_EXPORT bool HttpMultipartIsSafeFileName(StringSpan fileName);
+
+/// @brief Zero-copy view of a Content-Disposition multipart header value.
+struct SC_HTTP_EXPORT HttpMultipartContentDispositionView
+{
+    StringSpan disposition;
+    StringSpan name;
+    StringSpan fileName;
+
+    bool hasName     = false;
+    bool hasFileName = false;
+
+    Result             parse(StringSpan headerValue);
+    [[nodiscard]] bool isFormData() const;
+};
+
+/// @brief Zero-copy view over common multipart part headers.
+struct SC_HTTP_EXPORT HttpMultipartPartHeadersView
+{
+    StringSpan contentDisposition;
+    StringSpan contentType;
+
+    HttpMultipartContentDispositionView disposition;
+
+    void   reset();
+    Result addHeader(StringSpan name, StringSpan value);
+
+    [[nodiscard]] StringSpan fieldName() const { return disposition.name; }
+    [[nodiscard]] StringSpan fileName() const { return disposition.fileName; }
+    [[nodiscard]] bool       hasFileName() const { return disposition.hasFileName; }
+    [[nodiscard]] bool       hasSafeFileName() const;
+};
+
 /// @brief Incremental HTTP multipart/form-data parser
 struct SC_HTTP_EXPORT HttpMultipartParser
 {
