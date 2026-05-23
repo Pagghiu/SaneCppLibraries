@@ -132,7 +132,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 
     Result createEventLoop(AsyncEventLoop::Options options = AsyncEventLoop::Options())
     {
-        if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIOURing)
+        if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIoUring)
         {
             return Result::Error("createEventLoop: Cannot use io_uring");
         }

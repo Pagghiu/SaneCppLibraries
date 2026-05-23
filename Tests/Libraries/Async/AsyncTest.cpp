@@ -46,16 +46,34 @@ static void printAsyncSerialSkip(SC::TestReport& report)
 
 SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
 {
+    if (test_section("process input output child", TestCase::Execute::OnlyExplicit))
+    {
+        processInputOutputChild();
+    }
+
     int numTestsToRun = 1;
-    if (AsyncEventLoop::tryLoadingLiburing())
+    if (AsyncEventLoop::tryProbingIOUring())
     {
         // Run all tests on epoll backend first, and then re-run them on io_uring
         options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
         numTestsToRun   = 2;
     }
-    if (test_section("process input output child", TestCase::Execute::OnlyExplicit))
+    if (test_section("loop io_uring probe"))
     {
-        processInputOutputChild();
+#if SC_PLATFORM_LINUX
+        if (AsyncEventLoop::tryProbingIOUring())
+        {
+            AsyncEventLoop          eventLoop;
+            AsyncEventLoop::Options probeOptions;
+            probeOptions.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
+            SC_TEST_EXPECT(eventLoop.create(probeOptions));
+            SC_TEST_EXPECT(eventLoop.close());
+        }
+        else if (not report.quietMode)
+        {
+            report.console.printLine("AsyncTest - Skipping direct io_uring probe: io_uring unavailable");
+        }
+#endif
     }
     for (int i = 0; i < numTestsToRun; ++i)
     {
@@ -219,8 +237,8 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         fileSystemOperations();
         if (numTestsToRun == 2)
         {
-            // If on Linux next run will test io_uring backend (if it's installed)
-            options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
+            // If on Linux next run will test io_uring backend (if available)
+            options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
         }
     }
 }

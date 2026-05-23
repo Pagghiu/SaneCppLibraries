@@ -1046,7 +1046,7 @@ void SC::AsyncEventLoop::setListeners(AsyncEventLoopListeners* listeners) { inte
 
 #if SC_PLATFORM_LINUX
 #else
-bool SC::AsyncEventLoop::tryLoadingLiburing() { return false; }
+bool SC::AsyncEventLoop::tryProbingIOUring() { return false; }
 #endif
 
 SC::Result SC::AsyncEventLoop::start(AsyncRequest& async)

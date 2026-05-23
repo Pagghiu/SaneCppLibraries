@@ -41,7 +41,7 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
         return;
 #else
         int numTestsToRun = 1;
-        if (AsyncEventLoop::tryLoadingLiburing())
+        if (AsyncEventLoop::tryProbingIOUring())
         {
             // Run all tests on epoll backend first, and then re-run them on io_uring
             options.apiType = AsyncEventLoop::Options::ApiType::ForceUseEpoll;
@@ -141,8 +141,8 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
             if (numTestsToRun == 2)
             {
-                // If on Linux next run will test io_uring backend (if it's installed)
-                options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIOURing;
+                // If on Linux next run will test io_uring backend (if available)
+                options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
             }
         }
 #endif

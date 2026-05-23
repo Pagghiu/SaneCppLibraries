@@ -15,13 +15,11 @@
 #include <sys/eventfd.h>  // eventfd
 #include <sys/sendfile.h> // sendfile
 #include <sys/signalfd.h> // signalfd
+#include <sys/stat.h>     // fstat
 #include <sys/syscall.h>  // SYS_pidfd_open
 #include <sys/wait.h>     // waitpid
 
-// TODO: Protect it with a mutex or force passing it during creation
-static AsyncLinuxLibURingLoader globalLibURing;
-
-bool SC::AsyncEventLoop::tryLoadingLiburing() { return globalLibURing.init(); }
+bool SC::AsyncEventLoop::tryProbingIOUring() { return AsyncLinuxIOUring::probe(); }
 
 struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 {
@@ -30,7 +28,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     bool ringInited = false;
     bool timerIsSet = false;
 
-    io_uring ring;
+    AsyncLinuxIOUring ring;
+    char              createErrorMessage[64] = {};
 
     AsyncFilePoll  wakeUpPoll;
     FileDescriptor wakeUpEventFd;
@@ -45,26 +44,27 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
         if (ringInited)
         {
             ringInited = false;
-            globalLibURing.io_uring_queue_exit(&ring);
+            ring.close();
         }
         return Result(true);
     }
 
     Result createEventLoop()
     {
-        if (not globalLibURing.init())
-        {
-            return Result::Error(
-                "Cannot load liburing.so. Run \"sudo apt install liburing-dev\" or equivalent for your distro.");
-        }
         if (ringInited)
         {
             return Result::Error("ring already inited");
         }
-        const auto uringFd = globalLibURing.io_uring_queue_init(QueueDepth, &ring, 0);
-        if (uringFd < 0)
+        const int uringResult = ring.create(QueueDepth);
+        if (uringResult < 0)
         {
-            return Result::Error("io_uring_setup failed");
+            const int written = ::snprintf(createErrorMessage, sizeof(createErrorMessage),
+                                           "io_uring setup failed (errno=%d)", -uringResult);
+            if (written <= 0 or static_cast<size_t>(written) >= sizeof(createErrorMessage))
+            {
+                return Result::Error("io_uring setup failed");
+            }
+            return Result::FromStableCharPointer(createErrorMessage);
         }
         ringInited = true;
         return Result(true);
@@ -146,7 +146,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     [[nodiscard]] AsyncRequest* getAsyncRequest(uint32_t idx)
     {
         io_uring_cqe& completion = events[idx];
-        return reinterpret_cast<AsyncRequest*>(globalLibURing.io_uring_cqe_get_data(&completion));
+        return reinterpret_cast<AsyncRequest*>(AsyncLinuxIOUring::getData(&completion));
     }
 
     Result makeIoUringCompletionError(int completionResult)
@@ -167,20 +167,40 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return eventLoop.internal.kernelQueue.get().getUring();
     }
 
+    static __u64 getOffsetForReadWrite(int fd, bool useOffset, uint64_t offset)
+    {
+        if (useOffset)
+        {
+            return offset;
+        }
+
+        if (not isRegularDescriptor(fd))
+        {
+            return 0;
+        }
+        return static_cast<__u64>(-1);
+    }
+
+    static bool isRegularDescriptor(int fd)
+    {
+        struct stat descriptorStatus;
+        return ::fstat(fd, &descriptorStatus) == 0 and S_ISREG(descriptorStatus.st_mode);
+    }
+
     Result getNewSubmission(AsyncEventLoop& eventLoop, io_uring_sqe*& newSubmission)
     {
-        io_uring& ring = getKernelQueue(eventLoop).ring;
+        AsyncLinuxIOUring& ring = getKernelQueue(eventLoop).ring;
         // Request a new submission slot
-        io_uring_sqe* kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
+        io_uring_sqe* kernelSubmission = ring.getSubmission();
         if (kernelSubmission == nullptr)
         {
             // No space in the submission kernelEvents, let's try to flush submissions and try again
             SC_TRY(flushSubmissions(eventLoop, Internal::SyncMode::NoWait, nullptr));
-            kernelSubmission = globalLibURing.io_uring_get_sqe(&ring);
+            kernelSubmission = ring.getSubmission();
             if (kernelSubmission == nullptr)
             {
                 // Not much we can do at this point, we can't really submit
-                return Result::Error("io_uring_get_sqe");
+                return Result::Error("io_uring get submission failed");
             }
         }
         newSubmission = kernelSubmission;
@@ -192,7 +212,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         KernelQueueIoURing& kq = getKernelQueue(eventLoop);
         // Read up to totalNumEvents completions, copy them into a local array and
         // advance the ring buffer pointers to free ring slots.
-        newEvents = globalLibURing.io_uring_peek_batch_cqe(&kq.ring, &eventPointers[0], totalNumEvents);
+        newEvents = kq.ring.peekBatchCompletions(&eventPointers[0], totalNumEvents);
 
         int writeIdx = 0;
         int readIdx  = 0;
@@ -213,7 +233,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             }
             readIdx++;
         }
-        globalLibURing.io_uring_cq_advance(&kq.ring, newEvents);
+        kq.ring.advanceCompletions(newEvents);
 
         if (nextTimer)
         {
@@ -251,18 +271,18 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             switch (syncMode)
             {
             case Internal::SyncMode::NoWait: {
-                res = globalLibURing.io_uring_submit(&kq.ring);
+                res = kq.ring.submit();
                 break;
             }
             case Internal::SyncMode::ForcedForwardProgress: {
                 __kernel_timespec kts; // Must stay here to be valid until submit
                 if (nextTimer)
                 {
-                    io_uring_sqe* sqe = globalLibURing.io_uring_get_sqe(&kq.ring);
+                    io_uring_sqe* sqe = kq.ring.getSubmission();
                     if (sqe == nullptr)
                     {
                         // TODO: is it correct returning if failing to get a new sqe?
-                        return Result::Error("io_uring_get_sqe timeout failed");
+                        return Result::Error("io_uring get timeout submission failed");
                     }
                     auto timespec = KernelEventsPosix::timerToRelativeTimespec(eventLoop.internal.loopTime, nextTimer);
                     kts.tv_sec    = timespec.tv_sec;
@@ -271,31 +291,31 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
                     {
                         // Timer was already added earlier let's just update it
                         const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
-                        globalLibURing.io_uring_prep_timeout_update(sqe, &kts, userData, 0);
+                        AsyncLinuxIOUring::prepTimeoutUpdate(sqe, &kts, userData, 0);
                     }
                     else
                     {
                         // We need to add a new timeout
-                        globalLibURing.io_uring_prep_timeout(sqe, &kts, 0, 0);
-                        globalLibURing.io_uring_sqe_set_data(sqe, &kq.timerIsSet);
+                        AsyncLinuxIOUring::prepTimeout(sqe, &kts, 0, 0);
+                        AsyncLinuxIOUring::setData(sqe, &kq.timerIsSet);
                         kq.timerIsSet = true;
                     }
                 }
                 else if (kq.timerIsSet)
                 {
                     // Timer was set earlier, but it's not anymore needed, and it must be removed
-                    io_uring_sqe* sqe = globalLibURing.io_uring_get_sqe(&kq.ring);
+                    io_uring_sqe* sqe = kq.ring.getSubmission();
                     if (sqe == nullptr)
                     {
                         // TODO: is it correct returning if failing to get a new sqe?
-                        return Result::Error("io_uring_get_sqe timeout failed");
+                        return Result::Error("io_uring get timeout submission failed");
                     }
                     const __u64 userData = reinterpret_cast<__u64>(&kq.timerIsSet);
-                    globalLibURing.io_uring_prep_timeout_remove(sqe, userData, 0);
+                    AsyncLinuxIOUring::prepTimeoutRemove(sqe, userData, 0);
                     kq.timerIsSet = false;
                 }
 
-                res = globalLibURing.io_uring_submit_and_wait(&kq.ring, 1);
+                res = kq.ring.submitAndWait(1);
                 break;
             }
             }
@@ -402,9 +422,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         SC_TRY(getNewSubmission(eventLoop, submission));
         struct sockaddr* sockAddr     = &async.acceptData->sockAddrHandle.reinterpret_as<struct sockaddr>();
         async.acceptData->sockAddrLen = sizeof(struct sockaddr);
-        globalLibURing.io_uring_prep_accept(submission, async.handle, sockAddr, &async.acceptData->sockAddrLen,
-                                            SOCK_CLOEXEC);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepAccept(submission, async.handle, sockAddr, &async.acceptData->sockAddrLen, SOCK_CLOEXEC);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -421,8 +440,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         struct sockaddr* sockAddr = &async.ipAddress.handle.reinterpret_as<struct sockaddr>();
-        globalLibURing.io_uring_prep_connect(submission, async.handle, sockAddr, async.ipAddress.sizeOfHandle());
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepConnect(submission, async.handle, sockAddr, async.ipAddress.sizeOfHandle());
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -441,8 +460,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         SC_TRY(getNewSubmission(eventLoop, submission));
         if (async.singleBuffer)
         {
-            globalLibURing.io_uring_prep_write(submission, async.handle, async.buffer.data(),
-                                               async.buffer.sizeInBytes(), 0);
+            AsyncLinuxIOUring::prepWrite(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
         }
         else
         {
@@ -450,9 +468,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
             const iovec*   vecs  = reinterpret_cast<const iovec*>(async.buffers.data());
             const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
-            globalLibURing.io_uring_prep_writev(submission, async.handle, vecs, nVecs, 0);
+            AsyncLinuxIOUring::prepWritev(submission, async.handle, vecs, nVecs, 0);
         }
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -483,8 +501,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_recv(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepRecv(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(), 0);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -506,14 +524,51 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_read(submission, async.handle, async.buffer.data(), async.buffer.sizeInBytes(),
-                                          async.useOffset ? async.offset : -1);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        if (not async.useOffset and not isRegularDescriptor(async.handle))
+        {
+            AsyncLinuxIOUring::prepPollAdd(submission, async.handle, POLLIN);
+        }
+        else
+        {
+            static_assert(sizeof(iovec) == sizeof(Span<char>), "assert");
+            const iovec* vec = reinterpret_cast<const iovec*>(&async.buffer);
+            AsyncLinuxIOUring::prepReadv(submission, async.handle, vec, 1,
+                                         getOffsetForReadWrite(async.handle, async.useOffset, async.offset));
+        }
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
     Result completeAsync(AsyncFileRead::Result& result)
     {
+        if (not result.getAsync().useOffset and not isRegularDescriptor(result.getAsync().handle))
+        {
+            ssize_t readBytes;
+            do
+            {
+                readBytes = ::read(result.getAsync().handle, result.getAsync().buffer.data(),
+                                   result.getAsync().buffer.sizeInBytes());
+            } while (readBytes < 0 and errno == EINTR);
+
+            if (readBytes < 0)
+            {
+                if (errno == EAGAIN or errno == EWOULDBLOCK)
+                {
+                    result.shouldCallCallback = false;
+                    result.reactivateRequest(true);
+                    return Result(true);
+                }
+                return Result::Error("io_uring file read readiness read failed");
+            }
+
+            result.completionData.numBytes = static_cast<size_t>(readBytes);
+            if (readBytes == 0)
+            {
+                result.completionData.endOfFile = true;
+            }
+            return Result(true);
+        }
+
         io_uring_cqe& completion = events[result.eventIndex];
         if (completion.res == -EINTR)
         {
@@ -536,11 +591,12 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        const __u64 off = async.useOffset ? async.offset : -1;
+        const __u64 off = getOffsetForReadWrite(async.handle, async.useOffset, async.offset);
         if (async.singleBuffer)
         {
-            globalLibURing.io_uring_prep_write(submission, async.handle, async.buffer.data(),
-                                               async.buffer.sizeInBytes(), off);
+            static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
+            const iovec* vec = reinterpret_cast<const iovec*>(&async.buffer);
+            AsyncLinuxIOUring::prepWritev(submission, async.handle, vec, 1, off);
         }
         else
         {
@@ -548,9 +604,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             static_assert(sizeof(iovec) == sizeof(Span<const char>), "assert");
             const iovec*   vecs  = reinterpret_cast<const iovec*>(async.buffers.data());
             const unsigned nVecs = static_cast<unsigned>(async.buffers.sizeInElements());
-            globalLibURing.io_uring_prep_writev(submission, async.handle, vecs, nVecs, off);
+            AsyncLinuxIOUring::prepWritev(submission, async.handle, vecs, nVecs, off);
         }
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -592,9 +648,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         const int fdIn = async.fileHandle;
         int       fdPipeW;
         SC_TRY(async.splicePipe.writePipe.get(fdPipeW, Result::Error("Invalid write pipe")));
-        globalLibURing.io_uring_prep_splice(submission1, fdIn, async.offset, fdPipeW, -1,
-                                            static_cast<unsigned int>(async.length - async.bytesSent), 0);
-        globalLibURing.io_uring_sqe_set_data(submission1, nullptr); // Ignore completion of the first part
+        AsyncLinuxIOUring::prepSplice(submission1, fdIn, async.offset, fdPipeW, -1,
+                                      static_cast<unsigned int>(async.length - async.bytesSent), 0);
+        AsyncLinuxIOUring::setData(submission1, nullptr); // Ignore completion of the first part
 
         submission1->flags |= IOSQE_IO_LINK;
 
@@ -602,9 +658,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         int fdPipeR;
         SC_TRY(async.splicePipe.readPipe.get(fdPipeR, Result::Error("Invalid read pipe")));
         const int fdOut = async.socketHandle;
-        globalLibURing.io_uring_prep_splice(submission2, fdPipeR, -1, fdOut, -1,
-                                            static_cast<unsigned int>(async.length - async.bytesSent), 0);
-        globalLibURing.io_uring_sqe_set_data(submission2, &async);
+        AsyncLinuxIOUring::prepSplice(submission2, fdPipeR, -1, fdOut, -1,
+                                      static_cast<unsigned int>(async.length - async.bytesSent), 0);
+        AsyncLinuxIOUring::setData(submission2, &async);
 
         return Result(true);
     }
@@ -645,8 +701,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         // poll operation is completed, it will have to be resubmitted."
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_poll_add(submission, async.handle, POLLIN);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepPollAdd(submission, async.handle, POLLIN);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -654,9 +710,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_poll_remove(submission, reinterpret_cast<__u64>(&async));
+        AsyncLinuxIOUring::prepPollRemove(submission, reinterpret_cast<__u64>(&async));
         eventLoop.internal.hasPendingKernelCancellations = true;
-        // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
+        // Intentionally not setting user data here, as we don't care being notified about the removal
         return Result(true);
     }
 
@@ -678,8 +734,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_poll_add(submission, pidFd, POLLIN);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepPollAdd(submission, pidFd, POLLIN);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
 #endif
     }
@@ -715,8 +771,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_poll_add(submission, sigFd, POLLIN);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepPollAdd(submission, sigFd, POLLIN);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -764,8 +820,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             msg.msg_iovlen = static_cast<int>(async.buffers.sizeInElements());
         }
 
-        globalLibURing.io_uring_prep_sendmsg(submission, async.handle, &msg, 0);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepSendMsg(submission, async.handle, &msg, 0);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -791,8 +847,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         msg.msg_iov    = reinterpret_cast<struct iovec*>(&async.buffer);
         msg.msg_iovlen = 1;
 
-        globalLibURing.io_uring_prep_recvmsg(submission, async.handle, &msg, 0);
-        globalLibURing.io_uring_sqe_set_data(submission, &async);
+        AsyncLinuxIOUring::prepRecvMsg(submission, async.handle, &msg, 0);
+        AsyncLinuxIOUring::setData(submission, &async);
         return Result(true);
     }
 
@@ -809,31 +865,31 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             const int   flags = async.openData.mode.toPosixFlags();
             const int   mode  = async.openData.mode.toPosixAccess();
             const char* path  = async.openData.path.getNullTerminatedNative();
-            globalLibURing.io_uring_prep_openat(submission, AT_FDCWD, path, flags, mode);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepOpenAt(submission, AT_FDCWD, path, flags, mode);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Close: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_close(submission, async.closeData.handle);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepClose(submission, async.closeData.handle);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Read: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_read(submission, async.readData.handle, async.readData.buffer.data(),
-                                              async.readData.buffer.sizeInBytes(), async.readData.offset);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepRead(submission, async.readData.handle, async.readData.buffer.data(),
+                                        async.readData.buffer.sizeInBytes(), async.readData.offset);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::Write: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_write(submission, async.writeData.handle, async.writeData.buffer.data(),
-                                               async.writeData.buffer.sizeInBytes(), async.writeData.offset);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepWrite(submission, async.writeData.handle, async.writeData.buffer.data(),
+                                         async.writeData.buffer.sizeInBytes(), async.writeData.offset);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::CopyFile: {
@@ -848,24 +904,23 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         case AsyncFileSystemOperation::Operation::Rename: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_rename(submission, async.renameData.path.getNullTerminatedNative(),
-                                                async.renameData.newPath.getNullTerminatedNative());
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepRename(submission, async.renameData.path.getNullTerminatedNative(),
+                                          async.renameData.newPath.getNullTerminatedNative());
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::RemoveDirectory: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_unlink(submission, async.removeData.path.getNullTerminatedNative(),
-                                                AT_REMOVEDIR);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepUnlink(submission, async.removeData.path.getNullTerminatedNative(), AT_REMOVEDIR);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::RemoveFile: {
             io_uring_sqe* submission;
             SC_TRY(getNewSubmission(eventLoop, submission));
-            globalLibURing.io_uring_prep_unlink(submission, async.removeData.path.getNullTerminatedNative(), 0);
-            globalLibURing.io_uring_sqe_set_data(submission, &async);
+            AsyncLinuxIOUring::prepUnlink(submission, async.removeData.path.getNullTerminatedNative(), 0);
+            AsyncLinuxIOUring::setData(submission, &async);
         }
         break;
         case AsyncFileSystemOperation::Operation::None: break;
@@ -909,9 +964,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
-        globalLibURing.io_uring_prep_cancel(submission, &async, 0);
+        AsyncLinuxIOUring::prepCancel(submission, &async, 0);
         eventLoop.internal.hasPendingKernelCancellations = true;
-        // Intentionally not calling io_uring_sqe_set_data here, as we don't care being notified about the removal
+        // Intentionally not setting user data here, as we don't care being notified about the removal
         return Result(true);
     }
 
@@ -929,8 +984,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 //----------------------------------------------------------------------------------------
 SC::AsyncEventLoop::Internal::KernelQueue::KernelQueue()
 {
-    (void)globalLibURing.init();
-    isEpoll = not globalLibURing.isValid();
+    isEpoll = not AsyncLinuxIOUring::probe();
     isEpoll ? placementNew(storage.reinterpret_as<KernelQueuePosix>())
             : placementNew(storage.reinterpret_as<KernelQueueIoURing>());
 }
@@ -964,7 +1018,7 @@ SC::Result SC::AsyncEventLoop::Internal::KernelQueue::createEventLoop(AsyncEvent
         isEpoll = true;
         placementNew(storage.reinterpret_as<KernelQueuePosix>());
     }
-    else if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseEpoll and isEpoll)
+    else if (options.apiType == AsyncEventLoop::Options::ApiType::ForceUseIoUring and isEpoll)
     {
         storage.reinterpret_as<KernelQueuePosix>().~KernelQueuePosix();
         isEpoll = false;
@@ -1083,10 +1137,11 @@ SC::Result SC::AsyncEventLoop::Internal::KernelEvents::teardownAsync(T* async, A
     switch (teardown.eventLoop->internal.createOptions.apiType)
     {
     case Options::ApiType::Automatic:
-        return not globalLibURing.isValid() ? KernelEventsPosix::teardownAsync(async, teardown)
-                                            : KernelEventsIoURing::teardownAsync(async, teardown);
+        return teardown.eventLoop->internal.kernelQueue.get().isEpoll
+                   ? KernelEventsPosix::teardownAsync(async, teardown)
+                   : KernelEventsIoURing::teardownAsync(async, teardown);
         break;
-    case Options::ApiType::ForceUseIOURing: return KernelEventsIoURing::teardownAsync(async, teardown); break;
+    case Options::ApiType::ForceUseIoUring: return KernelEventsIoURing::teardownAsync(async, teardown); break;
     case Options::ApiType::ForceUseEpoll: return KernelEventsPosix::teardownAsync(async, teardown); break;
     }
     Assert::unreachable();

@@ -126,6 +126,46 @@ struct io_uring_cqe
     __u64 big_cqe[];
 };
 
+struct io_sqring_offsets
+{
+    __u32 head;
+    __u32 tail;
+    __u32 ring_mask;
+    __u32 ring_entries;
+    __u32 flags;
+    __u32 dropped;
+    __u32 array;
+    __u32 resv1;
+    __u64 user_addr;
+};
+
+struct io_cqring_offsets
+{
+    __u32 head;
+    __u32 tail;
+    __u32 ring_mask;
+    __u32 ring_entries;
+    __u32 overflow;
+    __u32 cqes;
+    __u32 flags;
+    __u32 resv1;
+    __u64 user_addr;
+};
+
+struct io_uring_params
+{
+    __u32                    sq_entries;
+    __u32                    cq_entries;
+    __u32                    flags;
+    __u32                    sq_thread_cpu;
+    __u32                    sq_thread_idle;
+    __u32                    features;
+    __u32                    wq_fd;
+    __u32                    resv[3];
+    struct io_sqring_offsets sq_off;
+    struct io_cqring_offsets cq_off;
+};
+
 enum io_uring_op
 {
     IORING_OP_NOP,
@@ -169,4 +209,15 @@ enum io_uring_op
 
 #define IORING_TIMEOUT_UPDATE (1U << 1)
 #define IOSQE_IO_LINK         (1U << 2)
+
+#define IORING_OFF_SQ_RING 0ULL
+#define IORING_OFF_CQ_RING 0x8000000ULL
+#define IORING_OFF_SQES    0x10000000ULL
+
+#define IORING_SQ_CQ_OVERFLOW (1U << 1)
+#define IORING_SQ_TASKRUN     (1U << 2)
+
+#define IORING_ENTER_GETEVENTS (1U << 0)
+
+#define IORING_FEAT_SINGLE_MMAP (1U << 0)
 #endif

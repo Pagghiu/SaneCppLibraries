@@ -40,10 +40,10 @@ struct EventObject;
 /// The kernel Async API used on each operating systems are the following:
 /// - `IOCP` on Windows
 /// - `kqueue` on macOS
+/// - `io_uring` on Linux
 /// - `epoll` on Linux
-/// - `io_uring` on Linux (dynamically loading `liburing`)
 ///
-/// @note If `liburing` is not available on the system, the library will transparently fallback to epoll.
+/// @note If direct `io_uring` setup is not available on the system, the library will fallback to epoll.
 ///
 /// If an async operation is not supported by the OS, the caller can provide a SC::ThreadPool to run it on a thread.
 /// See SC::AsyncFileRead / SC::AsyncFileWrite for an example.
@@ -1401,7 +1401,7 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
         enum class ApiType : uint8_t
         {
             Automatic = 0,   ///< Platform specific backend chooses the best API.
-            ForceUseIOURing, ///< (Linux only) Tries to use `io_uring` (failing if it's not found on the system)
+            ForceUseIoUring, ///< (Linux only) Tries to use `io_uring` (failing if unavailable)
             ForceUseEpoll,   ///< (Linux only) Tries to use `epoll`
         };
         ApiType apiType; ///< Criteria to choose Async IO API
@@ -1562,9 +1562,9 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @brief Checks if excludeFromActiveCount() has been called on the given request
     [[nodiscard]] static bool isExcludedFromActiveCount(const AsyncRequest& async);
 
-    /// Check if liburing is loadable (only on Linux)
-    /// @return true if liburing has been loaded, false otherwise (and on any non-Linux os)
-    [[nodiscard]] static bool tryLoadingLiburing();
+    /// Check if io_uring can be created directly (only on Linux)
+    /// @return true if io_uring can be used, false otherwise (and on any non-Linux OS)
+    [[nodiscard]] static bool tryProbingIOUring();
 
     /// @brief Clears the sequence
     void clearSequence(AsyncSequence& sequence);
@@ -1595,7 +1595,7 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     {
         static constexpr int Windows = 552;
         static constexpr int Apple   = 520;
-        static constexpr int Linux   = 736;
+        static constexpr int Linux   = 784;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;
