@@ -184,11 +184,11 @@ struct SC::BuildTest : public SC::TestCase
                                                  Build::RunnerSpec::Wine));
             SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::LinuxGlibc,
                                                  Build::Architecture::Arm64, Build::SupportStatus::Supported,
-                                                 Build::SupportStatus::SmokeSupported, Build::SupportTier::Tier1,
+                                                 Build::SupportStatus::NotYet, Build::SupportTier::Tier1,
                                                  Build::RunnerSpec::QEMU));
             SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Apple, Build::TargetEnvironment::LinuxMusl,
                                                  Build::Architecture::Intel64, Build::SupportStatus::Supported,
-                                                 Build::SupportStatus::SmokeSupported, Build::SupportTier::Tier1,
+                                                 Build::SupportStatus::NotYet, Build::SupportTier::Tier1,
                                                  Build::RunnerSpec::QEMU));
             SC_TEST_EXPECT(supportMatrixContains(matrix, Build::Platform::Windows, Build::TargetEnvironment::LinuxGlibc,
                                                  Build::Architecture::Arm64, Build::SupportStatus::Supported,
@@ -282,10 +282,10 @@ struct SC::BuildTest : public SC::TestCase
             String help = StringEncoding::Utf8;
             SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, help));
             SC_TEST_EXPECT(StringView(help.view()).containsString("Current native-backend support matrix"));
-            SC_TEST_EXPECT(StringView(help.view())
-                               .containsString("macOS -> linux-glibc-arm64: build=supported, run=smoke-supported"));
-            SC_TEST_EXPECT(StringView(help.view())
-                               .containsString("macOS -> linux-musl-x86_64: build=supported, run=smoke-supported"));
+            SC_TEST_EXPECT(
+                StringView(help.view()).containsString("macOS -> linux-glibc-arm64: build=supported, run=not-yet"));
+            SC_TEST_EXPECT(
+                StringView(help.view()).containsString("macOS -> linux-musl-x86_64: build=supported, run=not-yet"));
             SC_TEST_EXPECT(
                 StringView(help.view()).containsString("Windows -> linux-musl-x86_64: build=supported, run=not-yet"));
             SC_TEST_EXPECT(

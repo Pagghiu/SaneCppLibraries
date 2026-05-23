@@ -19,26 +19,87 @@ jobs:
       id: llvm-cache
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
+        key: sc-packages-windows-llvm-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-windows-llvm-v4-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux glibc arm64 sysroot cache
+      id: linux_sysroot_glibc_arm64_cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-arm64
+          _Build/_Packages/linux-sysroot_glibc_arm64
+        key: sc-packages-windows-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux musl x86_64 sysroot cache
+      id: linux_sysroot_musl_x64_cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-x86_64
+          _Build/_Packages/linux-sysroot_musl_x86_64
+        key: sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Warm packaged LLVM toolchain
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: cmd
       run: |
         call SC.bat package install llvm
+    - name: Warm packaged Linux sysroots
+      if: steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true'
+      shell: cmd
+      run: |
+        call SC.bat package install linux-sysroot-glibc-arm64
+        call SC.bat package install linux-sysroot-musl-x86_64
     - name: Prune LLVM package cache
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: bash
       run: ./Support/Scripts/PruneLLVMPackageCache.sh .
+    - name: Verify warmed package receipts
+      shell: cmd
+      run: |
+        call SC.bat package verify llvm
+        call SC.bat package verify linux-sysroot-glibc-arm64
+        call SC.bat package verify linux-sysroot-musl-x86_64
     - name: Save LLVM package cache
       if: always() && steps.llvm-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/llvm/**') != ''
       uses: actions/cache/save@v4
       with:
-        path: _Build/_PackagesCache/llvm
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
         key: ${{ steps.llvm-cache.outputs.cache-primary-key }}
+    - name: Save Linux glibc arm64 sysroot cache
+      if: always() && steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_glibc_arm64/sc-package-receipt.json') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-arm64
+          _Build/_Packages/linux-sysroot_glibc_arm64
+        key: ${{ steps.linux_sysroot_glibc_arm64_cache.outputs.cache-primary-key }}
+    - name: Save Linux musl x86_64 sysroot cache
+      if: always() && steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true' && hashFiles('_Build/_Packages/linux-sysroot_musl_x86_64/sc-package-receipt.json') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-x86_64
+          _Build/_Packages/linux-sysroot_musl_x86_64
+        key: ${{ steps.linux_sysroot_musl_x64_cache.outputs.cache-primary-key }}
 
   build:
     needs: package-warmup
@@ -57,11 +118,40 @@ jobs:
       if: matrix.config == 'Release'
       uses: actions/cache/restore@v4
       with:
-        path: _Build/_PackagesCache/llvm
-        key: sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        path: |
+          _Build/_PackagesCache/llvm
+          _Build/_Packages/llvm_*
+        key: sc-packages-windows-llvm-v4-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
+          sc-packages-windows-llvm-v4-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v3-${{ runner.os }}-${{ runner.arch }}-
           sc-packages-windows-llvm-v2-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux glibc arm64 sysroot cache
+      id: linux_sysroot_glibc_arm64_cache
+      if: matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64
+          _Build/_PackagesCache/linux-sysroot/glibc-arm64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/glibc-arm64
+          _Build/_Packages/linux-sysroot_glibc_arm64
+        key: sc-packages-windows-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-glibc-arm64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Restore Linux musl x86_64 sysroot cache
+      id: linux_sysroot_musl_x64_cache
+      if: matrix.config == 'Release'
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64
+          _Build/_PackagesCache/linux-sysroot/musl-x86_64.txt
+          _Build/_PackagesCache/linux-sysroot/downloads/musl-x86_64
+          _Build/_Packages/linux-sysroot_musl_x86_64
+        key: sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
+        restore-keys: |
+          sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: Prune restored LLVM package cache
       if: matrix.config == 'Release'
       shell: bash

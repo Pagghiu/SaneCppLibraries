@@ -820,8 +820,8 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(StringView(text.view()).containsString("linux-glibc-x86_64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("linux-musl-arm64"));
             SC_TEST_EXPECT(StringView(text.view()).containsString("Current native-backend support matrix"));
-            SC_TEST_EXPECT(StringView(text.view())
-                               .containsString("macOS -> linux-glibc-arm64: build=supported, run=smoke-supported"));
+            SC_TEST_EXPECT(
+                StringView(text.view()).containsString("macOS -> linux-glibc-arm64: build=supported, run=not-yet"));
             SC_TEST_EXPECT(
                 StringView(text.view()).containsString("--abi is reserved for a future public ABI selector"));
             SC_TEST_EXPECT(

@@ -219,8 +219,10 @@ Current defaults:
 - Foreign Linux targets can now use `--runner qemu` or `--runner auto` to wrap `build run` through a managed
   `SC-package install qemu` registration or a host `qemu-user` executable from `PATH`; the runner passes
   `-L <sysroot>` so the Linux loader and runtime libraries resolve from the selected sysroot
-- macOS `linux-glibc-*` and `linux-musl-*` runs are smoke-supported when real host `qemu-x86_64` and `qemu-aarch64`
-  executables are available in CI
+- Native Linux outputs use direct execution under `--runner auto` before falling back to emulation, so VM or `binfmt`
+  setups that can launch the produced binary directly do not need a manual `_Build/_Outputs/...` invocation
+- macOS `linux-glibc-*` and `linux-musl-*` builds are supported; QEMU runs are validated opportunistically when real
+  host `qemu-x86_64` and `qemu-aarch64` executables are available, but are not yet a deterministic support-matrix claim
 - `build run` can auto-route `windows-gnu-x86_64` through Wine on macOS and Linux, and Linux arm64 now also
   smoke-runs `windows-gnu-arm64` through the packaged native ARM64 Wine runner
 - On Linux arm64, that same native runner path now auto-prefers generated `box64 + wine64` wrappers when those host
@@ -272,6 +274,7 @@ Build through the default native backend
 Prepare the packaged host LLVM toolchain for Linux targets
 ```
 ./SC.sh package install llvm
+./SC.sh package verify llvm
 ```
 
 Register an imported QEMU user-runner layout for foreign Linux `build run`
@@ -295,6 +298,11 @@ Cross-compile a Linux musl executable through the native backend with the packag
 ./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
 ```
 
+Run a native Linux output directly when the host or VM can execute that architecture
+```
+./SC.sh build run SCTest --arch intel64 --runner auto -- --test BaseTest
+```
+
 Cross-compile a Windows GNU executable through the native backend
 ```
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
@@ -315,6 +323,12 @@ Cross-compile a Windows MSVC arm64 executable on macOS
 Cross-compile a Windows GNU arm64 executable
 ```
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
+```
+
+Compile the representative Windows-host Linux rows
+```
+SC.bat build compile SCTest --target linux-glibc-arm64 --output quiet
+SC.bat build compile SCTest --target linux-musl-x86_64 --output quiet
 ```
 
 Cross-compile through a friendly profile and then override the raw toolchain details

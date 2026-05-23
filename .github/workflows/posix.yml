@@ -184,6 +184,14 @@ jobs:
         ./SC.sh package install linux-sysroot-musl-x86_64
         ./SC.sh package install linux-sysroot-musl-arm64
       if: matrix.params.os == 'macos-latest' && matrix.config == 'Release' && steps.macos-cross-packages.outputs.linux-sysroots-installed != 'true'
+    - name: Verify macOS cross package receipts
+      run: |
+        ./SC.sh package verify llvm
+        ./SC.sh package verify linux-sysroot-glibc-x86_64
+        ./SC.sh package verify linux-sysroot-glibc-arm64
+        ./SC.sh package verify linux-sysroot-musl-x86_64
+        ./SC.sh package verify linux-sysroot-musl-arm64
+      if: matrix.params.os == 'macos-latest' && matrix.config == 'Release'
     - name: Generate Single File Libs (Python)
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
@@ -303,6 +311,8 @@ jobs:
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: install Fil-C
       run: ./SC.sh package install filc
+    - name: verify Fil-C package receipt
+      run: ./SC.sh package verify filc
     - name: compile SaneHttpGet with Fil-C
       run: ./SC.sh build compile SaneHttpGet Debug native --toolchain filc
     - name: compile SCTest with Fil-C

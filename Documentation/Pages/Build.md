@@ -133,6 +133,7 @@ Current CLI behavior:
 - `--triple` and `--sysroot` are raw escape hatches for advanced toolchain overrides
 - Raw overrides are applied after `--target`, so they win over the friendly profile defaults
 - `build run` can use `--runner` / `--runner-path` to control how foreign executables are launched
+- `--runner auto` prefers direct execution for runnable native Linux outputs before falling back to Wine or QEMU
 - Contradictory explicit combinations such as mismatched `--generator`, `--arch`, `--runner`, or `--triple` values now fail early with concrete CLI errors
 - Legacy positional compatibility is still supported after `target` as `[configuration] [generator] [architecture] [output-mode]`
 
@@ -198,10 +199,10 @@ host / target rows, build support, run support, support tier, runner family, and
 | macOS | windows-gnu | arm64 | supported | not-yet | wine | tier1 |
 | macOS | windows-msvc | x86_64 | supported | smoke-supported | wine | tier2 |
 | macOS | windows-msvc | arm64 | supported | not-yet | wine | tier2 |
-| macOS | linux-glibc | x86_64 | supported | smoke-supported | qemu | tier1 |
-| macOS | linux-glibc | arm64 | supported | smoke-supported | qemu | tier1 |
-| macOS | linux-musl | x86_64 | supported | smoke-supported | qemu | tier1 |
-| macOS | linux-musl | arm64 | supported | smoke-supported | qemu | tier1 |
+| macOS | linux-glibc | x86_64 | supported | not-yet | qemu | tier1 |
+| macOS | linux-glibc | arm64 | supported | not-yet | qemu | tier1 |
+| macOS | linux-musl | x86_64 | supported | not-yet | qemu | tier1 |
+| macOS | linux-musl | arm64 | supported | not-yet | qemu | tier1 |
 | Windows | linux-glibc | arm64 | supported | not-yet | qemu | tier2 |
 | Windows | linux-musl | x86_64 | supported | not-yet | qemu | tier2 |
 | Linux | windows-gnu | x86_64 | supported | supported | wine | tier1 |
@@ -238,8 +239,8 @@ Current cross-compilation scope:
 - `build run` can now wrap foreign Linux targets through `qemu-user`; the native runner can reuse a managed
   `SC-package install qemu` registration or fall back to host `qemu-*` executables from `PATH`, and it passes
   `-L <sysroot>` so dynamically linked Linux targets can find their loader and libraries
-- macOS glibc and musl Linux target rows are promoted to smoke-supported when real host `qemu-x86_64` and
-  `qemu-aarch64` executables are available in CI
+- macOS glibc and musl Linux target runs are still `not-yet` in the support matrix; real host-QEMU validation remains
+  opportunistic until CI can acquire `qemu-x86_64` and `qemu-aarch64` deterministically
 - Windows hosts have packaged LLVM + Linux sysroot compile validation for representative `linux-glibc-arm64` and
   `linux-musl-x86_64` target profiles; Windows-host Linux runs remain pending
 - macOS hosts can acquire a portable MSVC + Windows SDK package with `./SC.sh package install msvc` and compile `windows-msvc-x86_64` and `windows-msvc-arm64` through the native backend
@@ -287,8 +288,10 @@ Typical native commands:
 ./SC.sh build compile SCBuildTest -c d -a arm64 --verbose
 ./SC.sh package install llvm
 ./SC.sh package install qemu --import-directory /opt/qemu-user
+./SC.sh package verify llvm
 ./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
 ./SC.sh build compile SCTest --target linux-musl-x86_64 --output quiet
+./SC.sh build run SCTest --arch intel64 --runner auto -- --test BaseTest
 ./SC.sh build compile SCTest --target windows-gnu-x86_64 --output quiet
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
 ./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
@@ -301,12 +304,15 @@ Typical native commands:
 ./SC.sh build run SCTest --target windows-gnu-x86_64 --runner auto -- --test BaseTest --test-section new/delete
 ./SC.sh build run SCBuildTest --config Debug -- --test "BuildTest"
 SC.bat build compile SCTest --config Debug
+SC.bat build compile SCTest --target linux-glibc-arm64 --output quiet
+SC.bat build compile SCTest --target linux-musl-x86_64 --output quiet
 ```
 
 Important current limits:
 
 - The QEMU runner path can reuse a managed imported `qemu-user` layout or host `qemu-*` executables; real host-QEMU
-  smoke validation is currently promoted for macOS `linux-glibc-*` and `linux-musl-*` rows
+  smoke validation remains opportunistic on macOS until QEMU-user acquisition is deterministic in CI, so macOS Linux
+  run support stays `not-yet`
 - Windows-host Linux-target support is compile-only today and validated for representative glibc arm64 and musl x86_64
   slices; Windows-host Linux run validation is still pending
 - Fil-C is still an experimental compiler-first Linux track: the public shape is `--toolchain filc`, no public `linux-filc-*` target profile exists, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation

@@ -1311,8 +1311,18 @@ struct SC::Build::NativeBuild
         SC_TRY(Path::normalize(normalizedTarget, StringView(executablePath).trimWhiteSpaces(), Path::AsNative));
         if (runner.mode == ResolvedRunner::Wrapped and StringView(runner.executable.view()).containsString("/wine"))
         {
-            SC_TRY_MSG(bundledWineHasWindowsLoader(runner.executable.view(), targetArchitecture(targetContext)),
-                       "Wine runner does not provide a Windows loader for the selected target architecture");
+            if (not bundledWineHasWindowsLoader(runner.executable.view(), targetArchitecture(targetContext)))
+            {
+                if (targetContext.hostMachine.platform == Platform::Apple and
+                    targetArchitecture(targetContext) == Architecture::Arm64)
+                {
+                    return Result::Error(
+                        "Wine runner does not provide an ARM64 Windows loader; macOS Windows ARM64 run support is "
+                        "not yet available with the packaged Wine runner");
+                }
+                return Result::Error("Wine runner does not provide a Windows loader for the selected target "
+                                     "architecture");
+            }
             String     prefixDirectory = StringEncoding::Utf8;
             StringView architectureName;
             switch (targetArchitecture(targetContext))
@@ -1391,6 +1401,10 @@ struct SC::Build::NativeBuild
                     numArguments++;
                 }
             }
+        }
+        else
+        {
+            globalConsole->print("RUNNER = direct\n");
         }
 
         if (not wineCommand.isEmpty())
