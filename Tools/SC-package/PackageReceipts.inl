@@ -356,5 +356,5 @@ Result resolvePackageExportPath(StringView packageRoot, StringView exportName, S
 
 Result resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output)
 {
-    return resolvePackageReceiptExportPath(packageRoot, "capability"_a8, capabilityName, output);
+    return resolvePackageReceiptExportPath(packageRoot, PackageExportKind::Capability, capabilityName, output);
 }
