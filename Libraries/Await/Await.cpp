@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../Foundation/Compiler.h"
 
-#if defined(SC_COMPILER_ENABLE_STD_CPP) && SC_LANGUAGE_CPP_AT_LEAST_20
+#if SC_INCLUDE_STD_CPP && SC_LANGUAGE_CPP_AT_LEAST_20
 
 #include "../Foundation/Assert.h"
 #include "../Foundation/LibC.h"

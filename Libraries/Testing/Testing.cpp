@@ -265,6 +265,7 @@ static bool resolveLibraryRootByWalkingParents(StringSpan startPath, const char*
 static bool resolveCompiledLibraryRoot(StringSpan executablePath, StringPath& libraryRoot, StartupAttempt* attempts,
                                        size_t maxAttempts, size_t& numAttempts)
 {
+#if defined(SC_LIBRARY_ROOT)
     const StringSpan compiledLibraryRoot =
         StringSpan::fromNullTerminated(SC_COMPILER_LIBRARY_PATH, StringEncoding::Utf8);
     if (compiledLibraryRoot.isEmpty())
@@ -295,6 +296,14 @@ static bool resolveCompiledLibraryRoot(StringSpan executablePath, StringPath& li
         return libraryRoot.assign(candidate.view()) ? true : false;
     }
     return false;
+#else
+    SC_COMPILER_UNUSED(executablePath);
+    SC_COMPILER_UNUSED(libraryRoot);
+    SC_COMPILER_UNUSED(attempts);
+    SC_COMPILER_UNUSED(maxAttempts);
+    SC_COMPILER_UNUSED(numAttempts);
+    return false;
+#endif
 }
 
 static void reportLibraryRootFailure(TestReport::IOutput& console, StringSpan applicationRoot, StartupAttempt* attempts,
@@ -326,10 +335,14 @@ static void reportLibraryRootFailure(TestReport::IOutput& console, StringSpan ap
 static bool resolveLibraryRoot(TestReport::IOutput& console, StringSpan explicitOverride, bool explicitOverrideProvided,
                                StringSpan executablePath, StringSpan applicationRoot, StringPath& libraryRoot)
 {
-    StartupAttempt   attempts[16];
-    size_t           numAttempts = 0;
+    StartupAttempt attempts[16];
+    size_t         numAttempts = 0;
+#if defined(SC_LIBRARY_ROOT)
     const StringSpan compiledLibraryRoot =
         StringSpan::fromNullTerminated(SC_COMPILER_LIBRARY_PATH, StringEncoding::Utf8);
+#else
+    const StringSpan compiledLibraryRoot;
+#endif
 
     if (explicitOverrideProvided)
     {

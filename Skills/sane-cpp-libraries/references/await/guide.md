@@ -88,9 +88,9 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
   allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
   completed slot without building a separate task-pointer array.
-- The no-stdlib coroutine story is not solved yet; do not present `Await` as ready for normal `-nostdinc++` use. A shim
-  would need coroutine traits/handles/suspend types plus compiler builtin mapping. This is stable-track work, not
-  required for MVP usage.
+- The strict no-stdlib coroutine story is not solved yet; do not present `Await` as ready for `SC_DISABLE_STD_CPP=1` or
+  normal `-nostdinc++` use. A shim would need coroutine traits/handles/suspend types plus compiler builtin mapping. This
+  is stable-track work, not required for MVP usage.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
 - `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
   useful on the POSIX backends for normal file/pipe handles.

@@ -531,8 +531,8 @@ struct CompileFlags
     Parameter<bool> enableASAN       = false; ///< Enable Address Sanitizer
     Parameter<bool> enableRTTI       = false; ///< Enable C++ Runtime Type Identification
     Parameter<bool> enableExceptions = false; ///< Enable C++ Exceptions
-    Parameter<bool> enableStdCpp     = false; ///< Enable and include C++ Standard Library
     Parameter<bool> enableCoverage   = false; ///< Enables code coverage instrumentation
+    Parameter<bool> includeStdCpp    = true;  ///< Include C++ standard library headers
 
     Parameter<CppStandard::Type> cppStandard = CppStandard::CPP14; ///< C++ language standard version
 
@@ -561,7 +561,25 @@ struct CompileFlags
 
   private:
     friend struct LinkFlags;
+    friend struct SaneCppFlags;
     struct Internal;
+};
+
+struct LinkFlags;
+
+/// @brief Sane C++ Libraries specific build policy flags
+struct SaneCppFlags
+{
+    Parameter<bool> enabled                = false; ///< Emit Sane C++ Libraries policy macros for this target
+    Parameter<bool> provideCppRuntimeShims = false; ///< Provide C++ runtime ABI shims from Sane C++ Libraries
+
+    /// @brief Merges opinions about Sane C++ policy into target flags
+    /// @param opinions Opinions about flags from strongest to weakest
+    /// @param flags Output flags
+    static void merge(Span<const SaneCppFlags*> opinions, SaneCppFlags& flags);
+
+    /// @brief Adds preprocessor defines implied by this Sane C++ policy
+    Result applyTo(CompileFlags& flags, const LinkFlags& linkFlags) const;
 };
 
 /// @brief Link flags (library paths, libraries to link, etc.)
@@ -578,6 +596,7 @@ struct LinkFlags
     Parameter<bool> preserveExportedSymbols = false; ///< Keep explicitly exported symbols alive while stripping
                                                      ///< (currently ignored by the XCode backend, which disables dead
                                                      ///< code stripping instead)
+    Parameter<bool> linkStdCpp = true;               ///< Link the C++ standard-library runtime
 
     /// @brief Merges opinions about flags into target flags
     /// @param opinions Opinions about flags from strongest to weakest
@@ -669,6 +688,7 @@ struct Configuration
 
     CompileFlags compile; ///< Configuration compile flags
     LinkFlags    link;    ///< Configuration link flags
+    SaneCppFlags saneCpp; ///< Sane C++ Libraries specific policy flags
 
     CoverageFlags coverage; ///< Configuration coverage flags
 
@@ -711,8 +731,9 @@ struct Project
     String targetName;    ///< Project target name (== Project::name if empty)
     String iconPath;      ///< Icon location
 
-    SourceFiles files; ///< Project source files with their associated compile flags
-    LinkFlags   link;  ///< Linker flags applied to all files in the project
+    SourceFiles  files;   ///< Project source files with their associated compile flags
+    LinkFlags    link;    ///< Linker flags applied to all files in the project
+    SaneCppFlags saneCpp; ///< Sane C++ Libraries specific policy flags
 
     Vector<String> exportLibraries;   ///< SC libraries that this executable explicitly exports for plugins
     Vector<String> exportDirectories; ///< Additional source roots whose symbols are exported for plugins

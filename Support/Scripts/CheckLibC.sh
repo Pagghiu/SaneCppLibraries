@@ -24,26 +24,28 @@ fi
 echo "Running LibC compatibility check..."
 
 for compiler in $COMPILERS; do
-    case "$compiler" in
-        clang++)
-            EXTRA_FLAGS="-nostdinc++ -fno-exceptions -fno-rtti"
-            ;;
-        g++)
-            EXTRA_FLAGS="-fno-exceptions -fno-rtti -DSC_COMPILER_ENABLE_STD_CPP=1"
-            ;;
-        *)
-            echo "Unsupported compiler: $compiler" >&2
-            exit 1
-            ;;
-    esac
-
     for standard in $STANDARDS; do
-        object_file="$TMP_DIR/$(basename "$compiler")-$standard.o"
-        echo "Testing $compiler with -std=$standard"
-        if ! "$compiler" -I "$REPO_ROOT" -std="$standard" $EXTRA_FLAGS -c "$TEST_FILE" -o "$object_file"; then
-            echo "LibC compatibility check failed for $compiler with -std=$standard" >&2
-            exit 1
-        fi
+        for mode in normal strict; do
+            case "$mode" in
+                normal)
+                    EXTRA_FLAGS="-fno-exceptions -fno-rtti"
+                    ;;
+                strict)
+                    EXTRA_FLAGS="-fno-exceptions -fno-rtti -DSC_INCLUDE_STD_CPP=0 -DSC_PROVIDE_CPP_RUNTIME_SHIMS=1 -nostdinc++"
+                    ;;
+                *)
+                    echo "Unsupported mode: $mode" >&2
+                    exit 1
+                    ;;
+            esac
+
+            object_file="$TMP_DIR/$(basename "$compiler")-$standard-$mode.o"
+            echo "Testing $compiler with -std=$standard ($mode)"
+            if ! "$compiler" -I "$REPO_ROOT" -std="$standard" $EXTRA_FLAGS -c "$TEST_FILE" -o "$object_file"; then
+                echo "LibC compatibility check failed for $compiler with -std=$standard ($mode)" >&2
+                exit 1
+            fi
+        done
     done
 done
 

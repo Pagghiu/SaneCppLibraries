@@ -37,8 +37,8 @@ SC::Result SC::Build::CompileFlags::merge(Span<const CompileFlags*> opinions, Co
     Internal::writeStrongest(&CompileFlags::optimizationLevel, opinions, flags);
     Internal::writeStrongest(&CompileFlags::enableASAN, opinions, flags);
     Internal::writeStrongest(&CompileFlags::enableExceptions, opinions, flags);
-    Internal::writeStrongest(&CompileFlags::enableStdCpp, opinions, flags);
     Internal::writeStrongest(&CompileFlags::enableCoverage, opinions, flags);
+    Internal::writeStrongest(&CompileFlags::includeStdCpp, opinions, flags);
     Internal::writeStrongest(&CompileFlags::cppStandard, opinions, flags);
 
     // TODO: Implement ability to "remove" paths from stronger opinions
@@ -49,6 +49,30 @@ SC::Result SC::Build::CompileFlags::merge(Span<const CompileFlags*> opinions, Co
         SC_TRY(flags.warnings.insert(0, opinion->warnings.toSpanConst()));
     }
 
+    return Result(true);
+}
+
+void SC::Build::SaneCppFlags::merge(Span<const SaneCppFlags*> opinions, SaneCppFlags& flags)
+{
+    CompileFlags::Internal::writeStrongest(&SaneCppFlags::enabled, opinions, flags);
+    CompileFlags::Internal::writeStrongest(&SaneCppFlags::provideCppRuntimeShims, opinions, flags);
+}
+
+SC::Result SC::Build::SaneCppFlags::applyTo(CompileFlags& flags, const LinkFlags& linkFlags) const
+{
+    if (not enabled)
+    {
+        return Result(true);
+    }
+    if (provideCppRuntimeShims and linkFlags.linkStdCpp)
+    {
+        return Result::Error("saneCpp.provideCppRuntimeShims=true conflicts with link.linkStdCpp=true");
+    }
+    const StringView includeStdCppDefine = flags.includeStdCpp ? "SC_INCLUDE_STD_CPP=1" : "SC_INCLUDE_STD_CPP=0";
+    const StringView runtimeShimsDefine =
+        provideCppRuntimeShims ? "SC_PROVIDE_CPP_RUNTIME_SHIMS=1" : "SC_PROVIDE_CPP_RUNTIME_SHIMS=0";
+    SC_TRY(flags.defines.append({includeStdCppDefine}));
+    SC_TRY(flags.defines.append({runtimeShimsDefine}));
     return Result(true);
 }
 
@@ -93,6 +117,7 @@ SC::Result SC::Build::LinkFlags::merge(Span<const LinkFlags*> opinions, LinkFlag
     CompileFlags::Internal::writeStrongest(&LinkFlags::enableASAN, opinions, flags);
     CompileFlags::Internal::writeStrongest(&LinkFlags::enableDeadCodeStripping, opinions, flags);
     CompileFlags::Internal::writeStrongest(&LinkFlags::preserveExportedSymbols, opinions, flags);
+    CompileFlags::Internal::writeStrongest(&LinkFlags::linkStdCpp, opinions, flags);
 
     // TODO: Implement ability to "remove" paths from stronger opinions
     for (const LinkFlags* opinion : opinions)
@@ -271,6 +296,8 @@ bool SC::Build::Project::addDefines(Span<const StringView> defines) { return fil
 
 SC::Result SC::Build::addSaneCppLibraries(Project& project, const Parameters& parameters, Libraries mode)
 {
+    project.saneCpp.enabled = true;
+
     StringView projectRoot =
         project.rootDirectory.isEmpty() ? parameters.directories.projectDirectory.view() : project.rootDirectory.view();
     SC_TRY_MSG(not projectRoot.isEmpty(), "Project root directory must be set before adding Sane C++ Libraries");

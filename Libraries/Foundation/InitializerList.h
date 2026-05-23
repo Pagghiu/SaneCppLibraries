@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/PrimitiveTypes.h"
-#if SC_COMPILER_ENABLE_STD_CPP
+#if SC_INCLUDE_STD_CPP
 #include <initializer_list>
 #else
 namespace std

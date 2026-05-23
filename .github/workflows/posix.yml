@@ -25,6 +25,8 @@ jobs:
     - uses: actions/checkout@v4
     - name: LibC Compatibility Check
       run: ./Support/Scripts/CheckLibC.sh
+    - name: Standard C++ Header No Runtime Link Check
+      run: ./Support/Scripts/CheckStdCppHeaderNoLink.sh
     - name: Restore llvm-mingw cache
       id: llvm-mingw-cache
       if: matrix.config == 'Release'
@@ -208,6 +210,8 @@ jobs:
       run: ./SC.sh build compile "SCSingleFileLibs:" ${{ matrix.config }}
     - name: compile InteropSTL
       run: ./SC.sh build compile InteropSTL ${{ matrix.config }}
+    - name: compile SCStdCppHeaderNoLinkTest
+      run: ./SC.sh build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }}
     - name: test SCTest
       run: ./SC.sh build run SCTest ${{ matrix.config }} -- --all-tests
       if: matrix.params.os != 'macos-latest' || matrix.config != 'Release'

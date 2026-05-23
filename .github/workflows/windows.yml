@@ -177,6 +177,9 @@ jobs:
     - name: compile InteropSTL
       shell: cmd
       run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
+    - name: compile SCStdCppHeaderNoLinkTest
+      shell: cmd
+      run: SC.bat build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }} ${{ matrix.params.generator }}
     - name: test SCTest
       shell: cmd
       run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} -- --all-tests

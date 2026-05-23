@@ -248,7 +248,14 @@ endif # $(CONFIG)
             const CompileFlags* compileSources[] = {&sourceFiles.compile, &configuration.compile,
                                                     &project.files.compile};
             SC_TRY(CompileFlags::merge(compileSources, compileFlags));
-            SC_TRY(writeCompileFlags(builder, perFileTarget.view(), relativeDirectories, compileFlags));
+            LinkFlags        linkFlags;
+            const LinkFlags* linkSources[] = {&configuration.link, &project.link};
+            SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+            SaneCppFlags        saneCppFlags;
+            const SaneCppFlags* saneCppSources[] = {&configuration.saneCpp, &project.saneCpp};
+            SaneCppFlags::merge(saneCppSources, saneCppFlags);
+            SC_TRY(saneCppFlags.applyTo(compileFlags, linkFlags));
+            SC_TRY(writeCompileFlags(builder, perFileTarget.view(), relativeDirectories, compileFlags, saneCppFlags));
             writeMergedCompileFlags(builder, perFileTarget.view());
         }
         return Result(true);
@@ -736,8 +743,10 @@ endif
         SC_COMPILER_WARNING_POP;
     }
 
-    Result appendCompilerFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags)
+    Result appendCompilerFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags,
+                               const SaneCppFlags& saneCppFlags)
     {
+        SC_COMPILER_UNUSED(saneCppFlags);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
@@ -761,7 +770,7 @@ endif
             builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
         }
         builder.append("\n{0}_COMPILER_CXXFLAGS :=", makeTarget);
-        if (not compileFlags.enableStdCpp)
+        if (not compileFlags.includeStdCpp)
         {
             builder.append(" -nostdinc++");
         }
@@ -771,7 +780,10 @@ endif
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_CPPFLAGS :=", makeTarget);
         builder.append("\n{0}_COMPILER_CXXFLAGS :=", makeTarget);
-        builder.append(" -DSC_COMPILER_ENABLE_STD_CPP=1"); // Only GCC 13+ supports nostdlib++
+        if (not compileFlags.includeStdCpp)
+        {
+            builder.append(" -nostdinc++");
+        }
         builder.append("\nendif");
 
         return Result(true);
@@ -779,8 +791,10 @@ endif
     }
 
     Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const Project& project,
-                                   const LinkFlags& linkFlags, const CompileFlags& compileFlags)
+                                   const LinkFlags& linkFlags, const CompileFlags& compileFlags,
+                                   const SaneCppFlags& saneCppFlags)
     {
+        SC_COMPILER_UNUSED(saneCppFlags);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n{0}_POST_LINK_STRIP = :", makeTarget);
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)");
@@ -792,12 +806,9 @@ endif
         }
         builder.append(" $({0}_NO_SANITIZE_CPPFLAGS)", makeTarget);
 
-        if (not compileFlags.enableStdCpp)
+        if (not linkFlags.linkStdCpp and not compileFlags.enableASAN and not linkFlags.enableASAN)
         {
-            // We still need to figure out how to make nostdlib++ work on Clang / Linux
-            builder.append("\nifneq ($(TARGET_OS),linux)");
             builder.append("\n{0}_COMPILER_LDFLAGS += -nostdlib++", makeTarget); // This is only Clang and GCC 13+
-            builder.append("\nendif");
         }
         if (linkFlags.enableDeadCodeStripping)
         {
@@ -1007,6 +1018,11 @@ $({0}_TARGET_DIR):
         const LinkFlags* linkSources[] = {&configuration.link, &project.link};
         SC_TRY(LinkFlags::merge(linkSources, linkFlags));
 
+        SaneCppFlags        saneCppFlags;
+        const SaneCppFlags* saneCppSources[] = {&configuration.saneCpp, &project.saneCpp};
+        SaneCppFlags::merge(saneCppSources, saneCppFlags);
+        SC_TRY(saneCppFlags.applyTo(compileFlags, linkFlags));
+
         if (compileFlags.enableCoverage)
         {
             builder.append(
@@ -1020,7 +1036,7 @@ endif
         appendIntermediateDir(builder, makeTarget, relativeDirectories, configName,
                               configuration.intermediatesPath.view());
         appendTargetDir(builder, makeTarget, relativeDirectories, configName, configuration.outputPath.view());
-        writeCompileFlags(builder, makeTarget, relativeDirectories, compileFlags);
+        writeCompileFlags(builder, makeTarget, relativeDirectories, compileFlags, saneCppFlags);
         if (project.targetType == TargetType::SharedLibrary)
         {
             builder.append("\n{0}_PIC_CPPFLAGS := -fPIC", makeTarget);
@@ -1029,7 +1045,7 @@ endif
         {
             builder.append("\n{0}_PIC_CPPFLAGS :=", makeTarget);
         }
-        appendCompilerLinkFlags(builder, makeTarget, project, linkFlags, compileFlags);
+        appendCompilerLinkFlags(builder, makeTarget, project, linkFlags, compileFlags, saneCppFlags);
         SC_TRY(appendExportedSymbolsRules(builder, makeTarget, project, renderer, linkFlags));
 
         SC_COMPILER_WARNING_POP;
@@ -1037,7 +1053,8 @@ endif
     }
 
     Result writeCompileFlags(StringBuilder& builder, StringView makeTarget,
-                             const RelativeDirectories& relativeDirectories, const CompileFlags& compileFlags)
+                             const RelativeDirectories& relativeDirectories, const CompileFlags& compileFlags,
+                             const SaneCppFlags& saneCppFlags)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         appendDefines(builder, makeTarget, relativeDirectories, compileFlags);
@@ -1045,7 +1062,7 @@ endif
         appendWarnings(builder, makeTarget, compileFlags);
         appendSanitizeFlags(builder, makeTarget, compileFlags);
         appendCommonFlags(builder, makeTarget, compileFlags);
-        appendCompilerFlags(builder, makeTarget, compileFlags);
+        appendCompilerFlags(builder, makeTarget, compileFlags, saneCppFlags);
         return Result(true);
         SC_COMPILER_WARNING_POP;
     }

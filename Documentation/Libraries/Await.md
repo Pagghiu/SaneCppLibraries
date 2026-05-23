@@ -197,7 +197,9 @@ Current support includes:
 - mandatory explicit coroutine frame allocation through `AwaitAllocator`.
 
 `Await` is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
-coroutine header.
+coroutine header. `Await` is available in the default standard-header-enabled mode and emits a clear diagnostic if
+compiled with `SC_INCLUDE_STD_CPP=0`. Coroutine frame storage is always explicit through `AwaitAllocator`, so enabling
+Await does not add a dependency on the Memory library.
 
 # Details
 
@@ -395,9 +397,9 @@ allocated/released bytes, bytes in use, peak bytes in use, failed allocation cou
 `AwaitTask::Promise::unhandled_exception()` remains present because the C++ coroutine promise interface requires it when
 compiling against the standard coroutine header.
 
-# No-stdlib coroutine status
+# Strict no-stdlib coroutine status
 
-The no-stdlib story is intentionally not part of the current MVP bar. Today
+The strict `SC_INCLUDE_STD_CPP=0` coroutine story is intentionally not part of the current MVP bar. Today
 `Libraries/Await/Internal/AwaitCoroutine.h` includes `<coroutine>` for `std::coroutine_traits`,
 `std::coroutine_handle`, and `std::suspend_always`. Coroutine frame storage is still provided by `AwaitAllocator`;
 there is no `std::nothrow` allocation fallback.

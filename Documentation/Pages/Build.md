@@ -158,6 +158,8 @@ The public API in `Tools/SC-build/Build.h` currently exposes:
 - `Directories::projectDirectory` for the root of the project being configured, distinct from the SaneCppLibraries checkout
 - `Project::addSpecificFileFlags` for per-file flag groups
 - `Project::addExportLibraries`, `addExportAllLibraries`, and `addExportDirectories` for plugin host exports
+- `Project::saneCpp` and `Configuration::saneCpp` for Sane C++ Libraries specific policy flags such as strict
+  no-standard-library mode
 
 # Consuming Sane C++ Libraries
 
@@ -177,6 +179,52 @@ SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
 
 Call the helper after setting the project root directory, typically with
 `project.setRootDirectory(parameters.directories.projectDirectory.view())`.
+
+SC-build is a general-purpose build system, so generic C++ standard-library policy lives in generic compile/link flags.
+Normal mode is the default: standard C/C++ headers are available and the C++ standard-library runtime may be linked.
+Sane C++ Libraries specific options are grouped under `saneCpp` and are enabled automatically by
+`addSaneCppLibraries()`.
+
+To request the stricter historical no-stdlib pressure mode for an entire Sane C++ target:
+
+```cpp
+project.files.compile.includeStdCpp = false;
+project.link.linkStdCpp = false;
+project.saneCpp.provideCppRuntimeShims = true;
+```
+
+For a single configuration:
+
+```cpp
+configuration.compile.includeStdCpp = false;
+configuration.link.linkStdCpp = false;
+configuration.saneCpp.provideCppRuntimeShims = true;
+```
+
+The generic `includeStdCpp` flag controls whether the backend passes best-effort no-standard-C++-include flags such as
+`-nostdinc++`. When `saneCpp.enabled` is true, SC-build also emits `SC_INCLUDE_STD_CPP` from that generic compile flag.
+
+Targets that intentionally use STL runtime features can opt into C++ standard-library linkage:
+
+```cpp
+project.link.linkStdCpp = true;
+```
+
+If a Sane C++ target avoids linking the C++ runtime, it must either provide the runtime ABI shims itself or obtain them
+from another object/library:
+
+```cpp
+project.link.linkStdCpp = false;
+project.saneCpp.provideCppRuntimeShims = true;
+```
+
+SC-build rejects `project.link.linkStdCpp = true` together with `project.saneCpp.provideCppRuntimeShims = true` because
+both sides would be trying to provide the same C++ runtime ABI symbols.
+
+The repository bootstrap keeps broad compiler compatibility for headers by default while still avoiding C++ runtime
+linkage. Set `SC_BOOTSTRAP_INCLUDE_STD_CPP=0` only when you intentionally want to test or benchmark strict-mode
+bootstrap compilation. Set `SC_BOOTSTRAP_LINK_STD_CPP=1` if you explicitly want the bootstrap tool to link the C++
+standard-library runtime.
 
 # Backend Matrix
 

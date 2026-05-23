@@ -28,7 +28,7 @@ Recommended steps:
 1. Obtain the amalgamated header from the GitHub release or assemble it from the repo.
 2. Include `SaneCpp<Library>.h` where needed.
 3. In exactly one `.cpp` file, define `SANE_CPP_IMPLEMENTATION` before including the same header.
-4. If the project uses the standard library, define `SC_COMPILER_ENABLE_STD_CPP=1`.
+4. If the project intentionally wants strict no-stdlib mode, define `SC_DISABLE_STD_CPP=1`.
 5. Add any required system libraries or frameworks for the target platform.
 
 Generation paths to mention when the user wants current-main artifacts:
@@ -71,8 +71,13 @@ Recommended steps:
 
 ## Standard Library Guidance
 
-- Default posture: Sane C++ Libraries assume no standard library.
-- If the user plans to keep `std::` usage in their app, tell them to define `SC_COMPILER_ENABLE_STD_CPP=1`.
+- Default posture: Sane C++ Libraries can be included from normal C++ projects without a stdlib opt-in macro.
+- SC library code still avoids STL containers, exceptions, hidden allocations, and C++ runtime dependencies where practical.
+- SC-build avoids C++ runtime linkage by default; use `project.saneCpp.linkStdCpp = true` only for targets that need STL
+  runtime features. Non-SC-build integrations can define `SC_AVOID_STD_CPP_LINK=1` when passing no-C++-runtime linker
+  flags manually.
+- If the user wants the strict historical no-header no-stdlib posture, tell them to define `SC_DISABLE_STD_CPP=1` and
+  use matching build flags or `project.saneCpp.disableStdCpp = true` in SC-build.
 - Do not imply that users must rewrite their whole application in Sane style on day one.
 
 ## Plugin Caveat

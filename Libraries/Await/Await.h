@@ -8,6 +8,15 @@
 #endif
 #define SC_AWAIT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_AWAIT)
 
+#if !SC_INCLUDE_STD_CPP
+#error                                                                                                                 \
+    "SC::Await requires the standard C++ coroutine header. Build with SC_INCLUDE_STD_CPP=1, or wait for the future no-stdlib coroutine shim."
+#endif
+
+#if !SC_LANGUAGE_CPP_AT_LEAST_20
+#error "SC::Await requires C++20 or newer."
+#endif
+
 #include "../Async/Async.h"
 #include "../Foundation/Result.h"
 #include "Internal/AwaitCoroutine.h"

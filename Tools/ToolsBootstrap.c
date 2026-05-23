@@ -47,6 +47,17 @@ extern int pclose(FILE *stream);
 #endif
 
 int printMessages = 0;
+
+int bootstrapIncludeStdCpp(void) {
+    const char* value = getenv("SC_BOOTSTRAP_INCLUDE_STD_CPP");
+    return value == NULL || strcmp(value, "0") != 0;
+}
+
+int bootstrapLinkStdCpp(void) {
+    const char* value = getenv("SC_BOOTSTRAP_LINK_STD_CPP");
+    return value != NULL && strcmp(value, "0") != 0 && value[0] != '\0';
+}
+
 // Platform abstractions
 typedef unsigned long long TimePoint;
 
@@ -1242,6 +1253,7 @@ int needsRebuildExe(CompilationInfo* ci) {
 // Helper functions for building compile commands
 void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char* includeDir, const char* output,
                               const char* input, int useClang, int defineSCBuild) {
+    (void)useClang;
     CommandLine_init(cmd, compiler);
     CommandLine_arg(cmd, "-I");
     CommandLine_argQuoted(cmd, includeDir);
@@ -1257,11 +1269,12 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     CommandLine_arg(cmd, "-g");
     CommandLine_arg(cmd, "-ggdb");
     CommandLine_arg(cmd, "-O0");
-    if (useClang) {
+    if (!bootstrapIncludeStdCpp()) {
+        CommandLine_arg(cmd, "-DSC_INCLUDE_STD_CPP=0");
         CommandLine_arg(cmd, "-nostdinc++");
     }
-    else {
-        CommandLine_arg(cmd, "-DSC_COMPILER_ENABLE_STD_CPP=1"); // Only GCC 13+ supports nostdinc++
+    if (!bootstrapLinkStdCpp()) {
+        CommandLine_arg(cmd, "-DSC_PROVIDE_CPP_RUNTIME_SHIMS=1");
     }
     if (defineSCBuild) {
         CommandLine_arg(cmd, "-DSC_BUILD=1");
@@ -1282,6 +1295,12 @@ void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, c
     CommandLine_argQuoted(cmd, includeDir);
     CommandLine_arg(cmd, "/std:c++17");
     CommandLine_arg(cmd, "/D_DEBUG");
+    if (!bootstrapIncludeStdCpp()) {
+        CommandLine_arg(cmd, "/DSC_INCLUDE_STD_CPP=0");
+    }
+    if (!bootstrapLinkStdCpp()) {
+        CommandLine_arg(cmd, "/DSC_PROVIDE_CPP_RUNTIME_SHIMS=1");
+    }
     if (defineSCBuild) {
         CommandLine_arg(cmd, "/DSC_BUILD=1");
     }
@@ -1422,7 +1441,7 @@ int compilePOSIX(CompilationInfo* ci) {
         }
         CommandLine_arg(&cmd, "-ldl");
         CommandLine_arg(&cmd, "-lpthread");
-        if (useClang) {
+        if (!bootstrapLinkStdCpp()) {
             CommandLine_arg(&cmd, "-nostdlib++");
         }
         if (strcmp(ci->targetOS, "Darwin") == 0) {
@@ -1471,6 +1490,14 @@ int linkWindows(CompilationInfo* ci) {
     StringBuilder_destroy(&sb);
     CommandLine_argQuoted(&cmd, toolsObj);
     CommandLine_argQuoted(&cmd, toolObj);
+    if (!bootstrapLinkStdCpp()) {
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:libcpmt");
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:libcpmtd");
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcprt");
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcprtd");
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcp140");
+        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcp140d");
+    }
     CommandLine_arg(&cmd, "Advapi32.lib");
     CommandLine_arg(&cmd, "Shell32.lib");
     int ret = CommandLine_run(&cmd);

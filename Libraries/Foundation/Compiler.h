@@ -4,6 +4,24 @@
 #if defined(SC_COMPILER_ENABLE_CONFIG)
 #include "SCConfig.h"
 #endif
+
+#if defined(SC_COMPILER_ENABLE_STD_CPP)
+#error                                                                                                                 \
+    "SC_COMPILER_ENABLE_STD_CPP has been replaced. Standard C/C++ headers and C++ runtime linkage are enabled by default; define SC_INCLUDE_STD_CPP=0 and SC_PROVIDE_CPP_RUNTIME_SHIMS=1 to request the old no-stdlib mode."
+#endif
+
+#if !defined(SC_INCLUDE_STD_CPP)
+#define SC_INCLUDE_STD_CPP 1
+#elif SC_INCLUDE_STD_CPP != 0 && SC_INCLUDE_STD_CPP != 1
+#error "SC_INCLUDE_STD_CPP must be 0 or 1."
+#endif
+
+#if !defined(SC_PROVIDE_CPP_RUNTIME_SHIMS)
+#define SC_PROVIDE_CPP_RUNTIME_SHIMS 0
+#elif SC_PROVIDE_CPP_RUNTIME_SHIMS != 0 && SC_PROVIDE_CPP_RUNTIME_SHIMS != 1
+#error "SC_PROVIDE_CPP_RUNTIME_SHIMS must be 0 or 1."
+#endif
+
 //! @defgroup group_foundation_compiler_macros Compiler Macros
 //! @ingroup group_foundation
 //! Compiler Macros

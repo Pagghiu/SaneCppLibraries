@@ -501,7 +501,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
                                            const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
                                            StringView objectFile, Span<char>& standardOutput) const
 {
-    static constexpr size_t MAX_PROCESS_ARGUMENTS = 24;
+    static constexpr size_t MAX_PROCESS_ARGUMENTS = 32;
 
     size_t argumentsLengths[MAX_PROCESS_ARGUMENTS];
     size_t numberOfArguments = 0;
@@ -530,6 +530,14 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     }
 
     SC_TRY(argumentsArena.appendAsSingleString({L"/Fo:", objectFile}));
+    if (not definition.build.contains("libc"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({L"/DSC_INCLUDE_STD_CPP=0"}));
+    }
+    if (not definition.build.contains("libc++"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({L"/DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}));
+    }
     SC_TRY(argumentsArena.appendMultipleStrings({L"/std:c++17", L"/GR-", L"/WX", L"/W4", L"/permissive-", L"/GS-",
                                                  L"/Zi", L"/DSC_PLUGIN_LIBRARY=1", L"/D_HAS_EXCEPTIONS=0", L"/nologo",
                                                  L"/c", sourceFile}));
@@ -542,10 +550,15 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
     if (not definition.build.contains("libc"))
     {
         SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc", "-nostdinc++", "-fno-stack-protector"}));
+        SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_INCLUDE_STD_CPP=0"}));
     }
     else if (not definition.build.contains("libc++"))
     {
         SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc++"}));
+    }
+    if (not definition.build.contains("libc++"))
+    {
+        SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}));
     }
     if (not definition.build.contains("exceptions"))
     {
@@ -683,7 +696,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_TRY(arena.appendMultipleStrings({"-bundle_loader", executablePath, "-bundle"}));
 #else
     SC_COMPILER_UNUSED(executablePath);
-    SC_TRY(arena.appendMultipleStrings({"-shared"}));
+    SC_TRY(arena.appendMultipleStrings({"-shared", "-Wl,-Bsymbolic-functions"}));
 #endif
 #if SC_COMPILER_ASAN
     SC_TRY(arena.appendMultipleStrings({"-fsanitize=address,undefined"}));

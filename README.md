@@ -68,17 +68,15 @@ Each library is color-coded to signal its status:
 1. Obtain a specific library: 
     - Downloading it from the above table or from the [Latest Release](https://github.com/Pagghiu/SaneCppLibraries/releases/latest) page 
     - Assembling it from current `main` branch using the [Single File Library](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) browser app
-2. `#define SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
-3. `#include SaneCppLIBRARY.h` in your headers
-4. `#define SANE_CPP_IMPLEMENTATION` + `#include "SaneCppLIBRARY.h"` in one of your `.cpp` files
+2. `#include SaneCppLIBRARY.h` in your headers
+3. `#define SANE_CPP_IMPLEMENTATION` + `#include "SaneCppLIBRARY.h"` in one of your `.cpp` files
 
 See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) for details on the (system) libraries to link.  
 
 ### Option 2: use all libraries together
 1. Clone the entire repo and add it as subfolder of your project
 2. Add [SC.cpp](SC.cpp) to your build system of choice
-3. `#define SC_COMPILER_ENABLE_STD_CPP=1` if you plan to use the Standard C++ library
-4. Include any public header (`Libraries/[Library]/*.h`)
+3. Include any public header (`Libraries/[Library]/*.h`)
 
 See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_user.html) for details on the (system) libraries to link.
 

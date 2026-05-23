@@ -20,7 +20,7 @@ Use this when the user wants a lightweight adoption path or to vendor only one l
 1. Tell them to obtain the amalgamated header from the latest release or assemble it from the repo.
 2. Tell them to include `SaneCpp<Library>.h` in headers.
 3. Tell them to put `#define SANE_CPP_IMPLEMENTATION` before including that header in exactly one `.cpp` file.
-4. Mention `SC_COMPILER_ENABLE_STD_CPP=1` only if they plan to keep using the standard library.
+4. Mention `SC_DISABLE_STD_CPP=1` only if they intentionally want strict no-header no-stdlib mode.
 5. Check platform link requirements in `references/integration-modes-and-linking.md`.
 
 ### Full-repo route
@@ -37,7 +37,7 @@ Use this when the user needs several libraries, wants to inspect tests/examples,
 
 - Prefer the smallest viable integration path first.
 - Be explicit about platform-specific link requirements.
-- Mention the project rules that matter externally: no STL by default, no exceptions, caller-owned memory.
+- Mention the project rules that matter externally: SC code avoids STL containers, exceptions, and hidden allocations.
 - Route deeper API usage to the relevant library guide for that API surface.
 - Route example hunting to `examples`.
 

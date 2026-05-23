@@ -2,27 +2,32 @@
 // SPDX-License-Identifier: MIT
 #include "../../Foundation/Compiler.h"
 #include <stdlib.h> // malloc / free
+
 #if SC_COMPILER_ASAN == 0
 void operator delete(void* p) noexcept
 {
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
+
 void operator delete[](void* p) noexcept
 {
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
+
 void operator delete(void* p, size_t) noexcept
 {
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
+
 void operator delete[](void* p, size_t) noexcept
 {
     if (p != 0)
         SC_LANGUAGE_LIKELY { ::free(p); }
 }
+
 #if SC_PLATFORM_WINDOWS && SC_CONFIGURATION_DEBUG && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
 #pragma warning(push)
 #pragma warning(disable : 4566) // malloc_dbg macro uses __FILE__ instead of a wide version
@@ -43,13 +48,14 @@ using guard_type = long long int;
 // so one can fix it with some sane code.
 extern "C" int __cxa_guard_acquire(guard_type* guard_object)
 {
-    if (*reinterpret_cast<const uint8_t*>(guard_object) != 0)
+    if (*reinterpret_cast<const unsigned char*>(guard_object) != 0)
         return 0;
     return 1;
 }
 
-extern "C" void __cxa_guard_release(guard_type* guard_object) { *reinterpret_cast<uint8_t*>(guard_object) = 1; }
+extern "C" void __cxa_guard_release(guard_type* guard_object) { *reinterpret_cast<unsigned char*>(guard_object) = 1; }
 extern "C" void __cxa_guard_abort(guard_type* guard_object) { SC_COMPILER_UNUSED(guard_object); }
+
 #if SC_PLATFORM_LINUX
 extern "C" int __cxa_atexit(void (*func)(void*), void* obj, void* dso_symbol);
 #if defined(__GLIBC__)

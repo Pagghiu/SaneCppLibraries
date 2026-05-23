@@ -288,6 +288,15 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         const CompileFlags* compileSources[] = {&configuration.compile, &project.files.compile};
         SC_TRY(CompileFlags::merge(compileSources, compileFlags));
 
+        LinkFlags        linkFlags;
+        const LinkFlags* linkSources[] = {&configuration.link, &project.link};
+        SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+
+        SaneCppFlags        saneCppFlags;
+        const SaneCppFlags* saneCppSources[] = {&configuration.saneCpp, &project.saneCpp};
+        SaneCppFlags::merge(saneCppSources, saneCppFlags);
+        SC_TRY(saneCppFlags.applyTo(compileFlags, linkFlags));
+
         builder.append("  <ItemDefinitionGroup Condition=\"'$(Configuration)|$(Platform)'=='{}|{}'\">\n",
                        configuration.name.view(), architecture);
         builder.append("    <ClCompile>\n");
@@ -361,6 +370,12 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 builder.append("      <OptimizeReferences>true</OptimizeReferences>\n");
                 builder.append("      <EnableCOMDATFolding>true</EnableCOMDATFolding>\n");
                 break;
+            }
+            if (not linkFlags.linkStdCpp)
+            {
+                builder.append("      <IgnoreSpecificDefaultLibraries>"
+                               "libcpmt;libcpmtd;msvcprt;msvcprtd;msvcp140;msvcp140d;"
+                               "%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>\n");
             }
             builder.append("    </Link>\n");
         }

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-// Remember to compile this with SC_COMPILER_ENABLE_STD_CPP=1, and possibly exceptions and RTTI enabled
+// Remember to compile this with SC_INCLUDE_STD_CPP=1, and possibly exceptions and RTTI enabled
 
 #include "SaneCppSTLAdapters.h"
 

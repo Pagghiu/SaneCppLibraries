@@ -802,6 +802,12 @@ struct SC::Build::ProjectWriter::WriterXCode
         LinkFlags        linkFlags;
         const LinkFlags* linkSources[] = {&configuration->link, &project.link};
         SC_TRY(LinkFlags::merge(linkSources, linkFlags));
+
+        SaneCppFlags        saneCppFlags;
+        const SaneCppFlags* saneCppSources[] = {&configuration->saneCpp, &project.saneCpp};
+        SaneCppFlags::merge(saneCppSources, saneCppFlags);
+        SC_TRY(saneCppFlags.applyTo(compileFlags, linkFlags));
+
         const bool preserveExportedSymbols = WriterInternal::shouldPreserveExportedSymbols(project, linkFlags);
         const bool enableDeadCodeStripping = linkFlags.enableDeadCodeStripping and not preserveExportedSymbols;
 
@@ -840,7 +846,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "\"$(SYMROOT)/CompilationDatabase\"",
                        );)delimiter");
 
-        if (not compileFlags.enableStdCpp)
+        if (not compileFlags.includeStdCpp)
         {
             builder.append(R"delimiter(
                        OTHER_CPLUSPLUSFLAGS = (
@@ -848,16 +854,12 @@ struct SC::Build::ProjectWriter::WriterXCode
                          "-nostdinc++",
                        );)delimiter");
         }
-        if (not compileFlags.enableStdCpp)
+        if (not linkFlags.linkStdCpp)
         {
             builder.append(R"delimiter(
                        OTHER_LDFLAGS = (
-                         "$(inherited)",)delimiter");
-            if (not compileFlags.enableStdCpp)
-            {
-                builder.append(R"delimiter(
+                         "$(inherited)",
                          "-nostdlib++",)delimiter");
-            }
             builder.append(R"delimiter(
                        );)delimiter");
         }

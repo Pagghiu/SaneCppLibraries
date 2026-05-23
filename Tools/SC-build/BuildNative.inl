@@ -45,6 +45,7 @@ struct SC::Build::NativeBuild
         {
             return family == Toolchain::Clang or family == Toolchain::FilC or family == Toolchain::LLVMMingw;
         }
+        [[nodiscard]] bool supportsNoStdCppFlags() const { return isClangLike() or family == Toolchain::GCC; }
         [[nodiscard]] bool isMSVCStyle() const { return family == Toolchain::MSVC or family == Toolchain::ClangCL; }
         [[nodiscard]] bool isClangCL() const { return family == Toolchain::ClangCL; }
     };
@@ -95,6 +96,7 @@ struct SC::Build::NativeBuild
         ResolvedTargetContext targetContext;
         CompilerAdapter       adapter;
         CompileFlags          compileFlags;
+        SaneCppFlags          saneCppFlags;
         LinkFlags             linkFlags;
 
         String targetDirectory;
@@ -1521,6 +1523,11 @@ struct SC::Build::NativeBuild
 
         const LinkFlags* linkOpinions[] = {&configuration.link, &project.link};
         SC_TRY(LinkFlags::merge(linkOpinions, resolvedProject.linkFlags));
+
+        const SaneCppFlags* saneCppOpinions[] = {&configuration.saneCpp, &project.saneCpp};
+        SaneCppFlags::merge(saneCppOpinions, resolvedProject.saneCppFlags);
+        SC_TRY(resolvedProject.saneCppFlags.applyTo(resolvedProject.compileFlags, resolvedProject.linkFlags));
+
         SC_TRY(resolveWorkspaceDependencies(parameters, workspace, project, configuration, resolvedProject));
 
         SC_TRY(expandConfiguredPath(parameters.directories.outputsDirectory.view(), configuration.outputPath.view(),
@@ -1568,6 +1575,7 @@ struct SC::Build::NativeBuild
                 &project.files.compile,
             };
             SC_TRY(CompileFlags::merge(opinions, source.compileFlags));
+            SC_TRY(resolvedProject.saneCppFlags.applyTo(source.compileFlags, resolvedProject.linkFlags));
 
             SC_TRY(Path::join(source.sourcePath, {project.rootDirectory.view(), renderItem.referencePath.view()}));
 
@@ -1766,10 +1774,17 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append("-B"));
             SC_TRY(commandLine.append(resolvedProject.adapter.linkerToolDirectory.view()));
         }
-        if (not resolvedProject.compileFlags.enableStdCpp and resolvedProject.adapter.isClangLike() and
-            targetPlatform(resolvedProject.targetContext) != Platform::Linux)
+        const bool sanitizerNeedsCppRuntime =
+            (resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers and
+            targetPlatform(resolvedProject.targetContext) == Platform::Linux;
+        if (not resolvedProject.linkFlags.linkStdCpp and not sanitizerNeedsCppRuntime and
+            resolvedProject.adapter.supportsNoStdCppFlags())
         {
             SC_TRY(commandLine.append("-nostdlib++"));
+        }
+        if (not resolvedProject.linkFlags.linkStdCpp and sanitizerNeedsCppRuntime)
+        {
+            SC_TRY(commandLine.append("-lstdc++"));
         }
         if (resolvedProject.project->targetType == TargetType::SharedLibrary)
         {
@@ -1923,7 +1938,7 @@ struct SC::Build::NativeBuild
                 SC_TRY(commandLine.append("-fno-exceptions"));
             }
             SC_TRY(commandLine.append("-fvisibility-inlines-hidden"));
-            if (not flags.enableStdCpp and resolvedProject.adapter.isClangLike())
+            if (not flags.includeStdCpp and resolvedProject.adapter.supportsNoStdCppFlags())
             {
                 SC_TRY(commandLine.append("-nostdinc++"));
             }
@@ -2088,6 +2103,16 @@ struct SC::Build::NativeBuild
                     SC_TRY(StringBuilder::format(option, "{}.lib", libraryView));
                     SC_TRY(commandLine.append(option.view()));
                 }
+            }
+
+            if (not resolvedProject.linkFlags.linkStdCpp)
+            {
+                SC_TRY(commandLine.append("/NODEFAULTLIB:libcpmt"));
+                SC_TRY(commandLine.append("/NODEFAULTLIB:libcpmtd"));
+                SC_TRY(commandLine.append("/NODEFAULTLIB:msvcprt"));
+                SC_TRY(commandLine.append("/NODEFAULTLIB:msvcprtd"));
+                SC_TRY(commandLine.append("/NODEFAULTLIB:msvcp140"));
+                SC_TRY(commandLine.append("/NODEFAULTLIB:msvcp140d"));
             }
 
             const Vector<String>& extraLinkerFlags = resolvedProject.parameters->toolchain.extraLinkerFlags;

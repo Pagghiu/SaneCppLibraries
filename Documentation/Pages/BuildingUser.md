@@ -18,10 +18,13 @@ If you want to contribute or run the test suite, check the [Building (Contributo
 - Headers in `Libraries/**SomeLibrary**/[Internal | Tests]` are **NOT** public.
 
 @note
-Libraries assume you're not using the C++ Standard Library to ensure peak C++ sanity in your project.  
-If you really need you can:
-    - `#define` `SC_COMPILER_ENABLE_STD_CPP=1` to use the C++ Standard Library
-    - But remember you can always [Disable the C++ standard library](@ref page_faq) with a few flags
+Libraries can be used from normal C++ projects by default. SC library code still avoids STL containers, exceptions,
+RTTI, and hidden allocations, but public integration no longer requires an opt-in macro for standard C/C++ headers.
+SC-build also defaults to normal C++ runtime linkage; set `project.link.linkStdCpp = false` only when you intentionally
+want to avoid linking the C++ standard-library runtime.
+If you want the stricter historical no-stdlib mode, define `SC_INCLUDE_STD_CPP=0` and
+`SC_PROVIDE_CPP_RUNTIME_SHIMS=1`, then check
+[Disable the C++ standard library](@ref page_faq).
 
 ## macOS
 - Add `SC.cpp` (located in project root) to your build

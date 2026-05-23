@@ -317,9 +317,30 @@ static Result addHotReloadIncludePathsDefine(Project& project, const Parameters&
     return Result(true);
 }
 
-static constexpr StringView TEST_PROJECT_NAME       = "SCTest";
-static constexpr StringView AWAIT_TEST_PROJECT_NAME = "SCAwaitTest";
-static constexpr StringView BUILD_TEST_PROJECT_NAME = "SCBuildTest";
+static constexpr StringView TEST_PROJECT_NAME                        = "SCTest";
+static constexpr StringView AWAIT_TEST_PROJECT_NAME                  = "SCAwaitTest";
+static constexpr StringView BUILD_TEST_PROJECT_NAME                  = "SCBuildTest";
+static constexpr StringView STD_CPP_HEADER_NO_LINK_TEST_PROJECT_NAME = "SCStdCppHeaderNoLinkTest";
+
+static void configureSaneStrictNoStdCpp(Project& project)
+{
+    // These targets intentionally preserve the old pressure-test mode: SC code cannot include standard C++ headers
+    // and SC provides the tiny runtime shims instead of linking the C++ standard-library runtime.
+    project.files.compile.includeStdCpp    = false;
+    project.link.linkStdCpp                = false;
+    project.saneCpp.enabled                = true;
+    project.saneCpp.provideCppRuntimeShims = true;
+}
+
+static void configureSaneStdHeadersNoRuntime(Project& project)
+{
+    // Used by coroutine/Await coverage: standard C++ headers are allowed, but linking libstdc++/libc++ is still
+    // forbidden so we keep proving the explicit-runtime-shim path.
+    project.files.compile.includeStdCpp    = true;
+    project.link.linkStdCpp                = false;
+    project.saneCpp.enabled                = true;
+    project.saneCpp.provideCppRuntimeShims = true;
+}
 
 Result configureTests(const Parameters& parameters, Workspace& workspace)
 {
@@ -349,6 +370,8 @@ Result configureTests(const Parameters& parameters, Workspace& workspace)
         project.configurations.back().compile.enableASAN = false;
         project.configurations.back().link.enableASAN    = false;
     }
+
+    configureSaneStrictNoStdCpp(project);
 
     project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
@@ -403,6 +426,8 @@ Result configureSCBuildTest(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
+    configureSaneStrictNoStdCpp(project);
+
     project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({
@@ -431,11 +456,10 @@ Result configureSCAwaitTest(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-    project.files.compile.enableStdCpp = true;
-    project.files.compile.cppStandard  = CppStandard::CPP20;
+    project.files.compile.cppStandard = CppStandard::CPP20;
+    configureSaneStdHeadersNoRuntime(project);
 
-    project.addDefines(
-        {"SC_COMPILER_ENABLE_CONFIG=1", "SC_COMPILER_ENABLE_STD_CPP=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
+    project.addDefines({"SC_COMPILER_ENABLE_CONFIG=1", "SC_TOOLS_COMPILED_SEPARATELY=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({
         ".",
@@ -453,6 +477,22 @@ Result configureSCAwaitTest(const Parameters& parameters, Workspace& workspace)
     return Result(true);
 }
 
+Result configureStdCppHeaderNoLinkTest(const Parameters& parameters, Workspace& workspace)
+{
+    Project project = {STD_CPP_HEADER_NO_LINK_TEST_PROJECT_NAME};
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    project.files.compile.cppStandard = CppStandard::CPP20;
+    project.link.linkStdCpp           = false; // This probe explicitly verifies standard headers without libstdc++.
+    project.addFile("Support/CompileTests/StdCppHeaderNoLinkProbe.cpp");
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
 Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspace)
 {
     Project project = {"SC", TargetType::SharedLibrary};
@@ -460,6 +500,8 @@ Result configureSCSharedLibrary(const Parameters& parameters, Workspace& workspa
     project.setRootDirectory(parameters.directories.projectDirectory.view());
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    configureSaneStrictNoStdCpp(project);
 
     project.addIncludePaths({"."});
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
@@ -479,12 +521,13 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-    project.files.compile.enableStdCpp     = true;
     project.files.compile.enableExceptions = true;
     project.files.compile.enableRTTI       = true;
     project.files.compile.cppStandard      = CppStandard::CPP17;
+    // InteropSTL is the explicit full-standard-C++ coverage target: headers and runtime link are both enabled.
+    project.files.compile.includeStdCpp = true;
+    project.link.linkStdCpp             = true;
 
-    project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
     SC_TRY(addCompiledLibraryRootDefine(project, parameters));
     project.addIncludePaths({"."});
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
@@ -518,6 +561,8 @@ Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
     project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
     project.addPresetConfiguration(Configuration::Preset::Release, parameters);
     project.addPresetConfiguration(Configuration::Preset::DebugCoverage, parameters);
+
+    configureSaneStrictNoStdCpp(project);
 
     SC_TRY(addSaneCppLibraries(project, parameters, Libraries::Multiple));
     SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
@@ -610,15 +655,15 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
 
         if (name.startsWith("Await"))
         {
-            project.files.compile.enableStdCpp = true;
-            project.files.compile.cppStandard  = CppStandard::CPP20;
-            project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
+            project.files.compile.cppStandard = CppStandard::CPP20;
+            configureSaneStdHeadersNoRuntime(project);
             SC_TRY(addSaneCppLibraries(project, parameters));
             project.addFiles("Libraries/Await", "**.cpp");
             project.addFiles("Libraries/Await", "**.h");
         }
         else
         {
+            configureSaneStrictNoStdCpp(project);
             SC_TRY(addSaneCppLibraries(project, parameters));
         }
         SC_TRY(project.addIncludePaths({parameters.directories.libraryDirectory.view()}));
@@ -655,12 +700,14 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        project.addDefines({"SC_COMPILER_ENABLE_STD_CPP=1"});
-        project.configurations[0].compile.enableStdCpp = true;
-        project.configurations[1].compile.enableStdCpp = true;
         if (name == "Test_SaneCppAwait")
         {
             project.files.compile.cppStandard = CppStandard::CPP20;
+            configureSaneStdHeadersNoRuntime(project);
+        }
+        else
+        {
+            configureSaneStrictNoStdCpp(project);
         }
 
         project.addIncludePaths({"_Build/_SingleFileLibraries"});
@@ -688,6 +735,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureTests(parameters, defaultWorkspace));
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
+    SC_TRY(configureStdCppHeaderNoLinkTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));

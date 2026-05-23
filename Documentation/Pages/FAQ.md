@@ -2,13 +2,48 @@
 
 [TOC]
 
-# Can I disable Standard C++ Library?
-Yes, if you're satisfied with the C++ standard library alternatives included in this SC and do not plan to use C++ Standard Library in your project:
-- *XCode / Clang / GCC 13+*: 
-    - Add **--nostdlib++**
+# What is the default Standard C++ Library mode?
+By default SC allows C and C++ standard headers, so normal C++ projects can include the libraries without an SC-specific
+stdlib opt-in macro. SC library code still avoids STL containers, exceptions, RTTI, hidden allocations, and C++ standard
+library features that force the C++ runtime when practical. SC-build defaults to the normal C++ integration model:
+standard headers are available and the C++ standard-library runtime may be linked.
+
+The old `SC_COMPILER_ENABLE_STD_CPP` macro has been removed. Defining it now stops compilation with a migration error.
+
+# Can I disable Standard C++ Library headers?
+Yes. Define `SC_INCLUDE_STD_CPP=0` and, if you are not using SC-build, add the matching compiler flags for your
+toolchain:
+- *XCode / Clang / GCC 13+*:
     - Add **--nostdinc++**
-- *GCC < 13*:
-    - Not supported (missing **--nostdlib++**)
+
+With SC-build, set `project.files.compile.includeStdCpp = false` on the target or
+`configuration.compile.includeStdCpp = false` on a specific configuration. For Sane C++ targets this also emits
+`SC_INCLUDE_STD_CPP=0`.
+
+To avoid C++ runtime linkage without disabling headers, set `project.link.linkStdCpp = false`; Sane C++ targets should
+also set `project.saneCpp.provideCppRuntimeShims = true` unless those runtime ABI symbols are provided elsewhere. If you
+are not using SC-build, define `SC_PROVIDE_CPP_RUNTIME_SHIMS=1` and pass **--nostdlib++** manually on Clang / GCC 13+.
+
+# Can standard C++ headers be used without linking the C++ runtime?
+For constrained SC-style code, yes on the toolchains currently measured by `Support/Scripts/CheckStdCppHeaderNoLink.*`.
+This is a toolchain-tested compatibility claim, not a blanket C++ language guarantee.
+
+| Platform / compiler | Header probe | C++ runtime dependency |
+|:--|:--|:--|
+| macOS Apple clang 17 | `<coroutine>` | Not linked in the constrained probe |
+| Ubuntu clang 18 | `<coroutine>` | Not linked in the constrained probe |
+| Ubuntu GCC 13.3 | `<coroutine>` | Not linked in the constrained probe |
+| Windows MSVC 14.44 | `<coroutine>` | Not linked in the constrained probe |
+| Windows clang-cl | `<coroutine>` | Not linked in the constrained probe |
+
+Run `Support/Scripts/CheckStdCppHeaderNoLink.sh` on macOS/Linux or
+`Support\Scripts\CheckStdCppHeaderNoLink.bat` from a Visual Studio developer prompt on Windows to refresh the local
+evidence.
+
+# Can I benchmark normal mode versus strict mode?
+Yes. `Support/Scripts/BenchmarkStdCppMode.sh` builds configurable normal and strict targets for multiple iterations and
+reports build timing, executable size, section sizes, and linked runtime dependencies. The benchmark is informational and
+is intentionally not a CI threshold.
 
 # Can I disable Exceptions and RTTI?
 Yes, if you disable the Standard C++ Library, you can also disable Exceptions and RTTI
@@ -56,4 +91,3 @@ There are no plans to provide ABI stability.
 
 Each library declares its own API stability, but as the project is very young, expect breaking changes for now.  
 At some point API will stabilize naturally and it will be made explicit for each library.
-

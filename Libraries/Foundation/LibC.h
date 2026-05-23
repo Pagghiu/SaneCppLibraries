@@ -17,7 +17,7 @@
 #define SC_LIBC_CDECL
 #endif
 
-#if SC_COMPILER_ENABLE_STD_CPP || SC_LANGUAGE_EXCEPTIONS ||                                                            \
+#if SC_INCLUDE_STD_CPP || SC_LANGUAGE_EXCEPTIONS ||                                                                    \
     (SC_PLATFORM_WINDOWS && not SC_COMPILER_MSVC and not SC_COMPILER_CLANG_CL)
 #include <memory.h>
 #endif
