@@ -64,12 +64,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             taskLifetimeEdgeCases();
         }
-#if !SC_PLATFORM_WINDOWS
         if (test_section("task cross loop guards"))
         {
             taskCrossLoopGuards();
         }
-#endif
         if (test_section("move active task frames"))
         {
             moveActiveTaskFrames();
@@ -1592,12 +1590,12 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(asyncA.create());
         SC_TEST_EXPECT(asyncB.create());
 
-        char           allocatorMemoryA[512 * 1024] = {};
+        char           allocatorMemoryA[64 * 1024] = {};
         AwaitAllocator allocatorA;
         SC_TEST_EXPECT(allocatorA.createFixed(allocatorMemoryA));
         AwaitEventLoop awaitA(asyncA, allocatorA);
 
-        char           allocatorMemoryB[512 * 1024] = {};
+        char           allocatorMemoryB[64 * 1024] = {};
         AwaitAllocator allocatorB;
         SC_TEST_EXPECT(allocatorB.createFixed(allocatorMemoryB));
         AwaitEventLoop awaitB(asyncB, allocatorB);
@@ -1619,6 +1617,11 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(awaitB.spawn(waitForParent));
         SC_TEST_EXPECT(waitForParent.isCompleted());
         SC_TEST_EXPECT(not waitForParent.result());
+
+        AwaitTask directAwaitParent = awaitExistingChild(awaitB, active);
+        SC_TEST_EXPECT(awaitB.spawn(directAwaitParent));
+        SC_TEST_EXPECT(directAwaitParent.isCompleted());
+        SC_TEST_EXPECT(not directAwaitParent.result());
 
         AwaitTask groupParent = waitTaskGroupExistingChild(awaitB, active);
         SC_TEST_EXPECT(awaitB.spawn(groupParent));

@@ -684,7 +684,14 @@ bool AwaitTask::await_suspend(Handle parent)
         return false;
     }
 
-    Promise& child = handle.promise();
+    Promise&        child           = handle.promise();
+    AwaitEventLoop* childEventLoop  = child.eventLoop;
+    AwaitEventLoop* parentEventLoop = parent.promise().eventLoop;
+    if (childEventLoop != nullptr and parentEventLoop != nullptr and childEventLoop != parentEventLoop)
+    {
+        return false;
+    }
+
     SC_ASSERT_RELEASE(child.continuation == nullptr);
     child.continuation = parent;
 
