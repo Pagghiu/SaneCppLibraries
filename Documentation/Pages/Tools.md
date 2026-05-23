@@ -443,7 +443,7 @@ static constexpr PackageRegistryExport recipeExports[] = {
 };
 static constexpr StringView recipePhases[]  = {"copyDirectory", "writeReceipt"};
 static constexpr PackageReceiptExport receiptExports[] = {
-    {"tool", "my-tool", "bin/my-tool"},
+    {PackageExportKind::Tool, "my-tool", "bin/my-tool"},
 };
 
 PackageRecipe recipe;

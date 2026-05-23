@@ -60,7 +60,7 @@ static Result installFakeRegistryPackage(StringView, StringView packagesInstallD
     const StringView phases[]                   = {"installFakeRegistryPackage", "writeReceipt"};
     info.phases                                 = phases;
     const Tools::PackageReceiptExport exports[] = {
-        {"tool", "fake-tool", "bin/fake-tool"},
+        {Tools::PackageExportKind::Tool, "fake-tool", "bin/fake-tool"},
     };
     return Tools::writePackageReceipt(package, info, exports);
 }
@@ -1161,8 +1161,8 @@ struct SupportToolsTest : public TestCase
             const StringView phases[]            = {"writeReceipt"};
             info.phases                          = phases;
             const PackageReceiptExport exports[] = {
-                {"tool", PackageExport::LLVMMinGWClang_X86_64, "bin/x86_64-w64-mingw32-clang"},
-                {"tool", PackageExport::LLVMMinGWClangArm64, "bin/aarch64-w64-mingw32-clang"},
+                {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64, "bin/x86_64-w64-mingw32-clang"},
+                {PackageExportKind::Tool, PackageExport::LLVMMinGWClangArm64, "bin/aarch64-w64-mingw32-clang"},
             };
             SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
 
@@ -1206,7 +1206,7 @@ struct SupportToolsTest : public TestCase
                 "writeReceipt",
             };
             static constexpr PackageReceiptExport receiptExports[] = {
-                {"tool", "fake-tool", "bin/fake-tool"},
+                {PackageExportKind::Tool, "fake-tool", "bin/fake-tool"},
             };
             PackageRecipe recipe;
             recipe.kind                    = PackageRecipeKind::CopyDirectory;
@@ -1292,9 +1292,9 @@ struct SupportToolsTest : public TestCase
             };
             info.phases                          = phases;
             const PackageReceiptExport exports[] = {
-                {"tool", "fake-tool", "bin/fake-tool"},
-                {"tool", "tool.fake", "bin/fake-tool"},
-                {"capability", "tool.fake", "bin/fake-capability"},
+                {PackageExportKind::Tool, "fake-tool", "bin/fake-tool"},
+                {PackageExportKind::Tool, "tool.fake", "bin/fake-tool"},
+                {PackageExportKind::Capability, "tool.fake", "bin/fake-capability"},
             };
             SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
 
@@ -1487,7 +1487,7 @@ struct SupportToolsTest : public TestCase
             const StringView phases[]            = {"writeReceipt"};
             info.phases                          = phases;
             const PackageReceiptExport exports[] = {
-                {"tool", "clang-format", "bin/clang-format"},
+                {PackageExportKind::Tool, "clang-format", "bin/clang-format"},
             };
             SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
 
@@ -1532,7 +1532,7 @@ struct SupportToolsTest : public TestCase
             const StringView phases[]            = {"writeReceipt"};
             info.phases                          = phases;
             const PackageReceiptExport exports[] = {
-                {"tool", "clang-format", "bin/clang-format"},
+                {PackageExportKind::Tool, "clang-format", "bin/clang-format"},
             };
             SC_TEST_EXPECT(writePackageReceipt(package, info, exports));
 

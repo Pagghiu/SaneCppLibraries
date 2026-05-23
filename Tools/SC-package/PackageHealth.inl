@@ -176,9 +176,9 @@ static Result repairQEMUPackageReceipt(Console& console, StringView packagesInst
     SC_TRY(resolveQEMURunnerExecutableExport(packageRoot.view(), InstructionSet::Intel64, qemuX86_64Export));
     SC_TRY(resolveQEMURunnerExecutableExport(packageRoot.view(), InstructionSet::ARM64, qemuArm64Export));
     const PackageReceiptExport exports[] = {
-        {"runner", PackageExport::RunnerQEMU, "."},
-        {"capability", PackageCapability::RunnerQEMUX86_64, qemuX86_64Export.view()},
-        {"capability", PackageCapability::RunnerQEMUArm64, qemuArm64Export.view()},
+        {PackageExportKind::Runner, PackageExport::RunnerQEMU, "."},
+        {PackageExportKind::Capability, PackageCapability::RunnerQEMUX86_64, qemuX86_64Export.view()},
+        {PackageExportKind::Capability, PackageCapability::RunnerQEMUArm64, qemuArm64Export.view()},
     };
     SC_TRY(writeRepairedPackageReceipt(packageRoot.view(), "qemu", exports, QEMUPhases));
     console.print("repaired: ");
@@ -205,13 +205,13 @@ static Result repairLLVMMingwPackageReceipt(Console& console, StringView package
     SC_TRY(Path::join(archiver, {"bin", "llvm-ar"}));
 
     const PackageReceiptExport exports[] = {
-        {"tool", PackageExport::LLVMMinGWClang_X86_64, x64Compiler.view()},
-        {"tool", PackageExport::LLVMMinGWClangXX_X86_64, x64CompilerCpp.view()},
-        {"tool", PackageExport::LLVMMinGWClangArm64, arm64Compiler.view()},
-        {"tool", PackageExport::LLVMMinGWClangXXArm64, arm64Cpp.view()},
-        {"tool", PackageExport::LLVMAr, archiver.view()},
-        {"capability", PackageCapability::ToolchainWindowsGNUX86_64, x64Compiler.view()},
-        {"capability", PackageCapability::ToolchainWindowsGNUArm64, arm64Compiler.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64, x64Compiler.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64, x64CompilerCpp.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangArm64, arm64Compiler.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXXArm64, arm64Cpp.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMAr, archiver.view()},
+        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUX86_64, x64Compiler.view()},
+        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUArm64, arm64Compiler.view()},
     };
     SC_TRY(validateLLVMMingwPackageRoot(packageRoot.view(), exports));
     SC_TRY(writeRepairedPackageReceipt(packageRoot.view(), "llvm-mingw", exports, LLVMMingwPhases));
