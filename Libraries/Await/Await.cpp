@@ -659,6 +659,10 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
     {
         return Result(true);
     }
+    if (promise.eventLoop != nullptr and promise.eventLoop != &await)
+    {
+        return Result::Error("AwaitTask belongs to another AwaitEventLoop");
+    }
     if (not promise.started)
     {
         return Result::Error("AwaitTask is not started");

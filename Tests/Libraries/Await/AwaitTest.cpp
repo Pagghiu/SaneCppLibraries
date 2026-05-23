@@ -1628,6 +1628,9 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(groupParent.isCompleted());
         SC_TEST_EXPECT(not groupParent.result());
 
+        SC_TEST_EXPECT(not active.cancel(awaitB));
+        SC_TEST_EXPECT(active.isActive());
+
         SC_TEST_EXPECT(active.cancel(awaitA));
         SC_TEST_EXPECT(awaitA.run());
         SC_TEST_EXPECT(not active.result());
