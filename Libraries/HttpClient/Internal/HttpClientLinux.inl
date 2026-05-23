@@ -51,12 +51,105 @@ static const char* getCustomMethod(SC::HttpClientRequest::Method method)
     }
     return "GET";
 }
+
+static SC::Result httpClientLinuxAppendHeader(HttpClientLinuxLibCurlLoader& curl, struct curl_slist*& headers,
+                                              const char* headerLine)
+{
+    struct curl_slist* newHeaders = curl.curl_slist_append(headers, headerLine);
+    SC_TRY_MSG(newHeaders != nullptr, "HttpClient: curl_slist_append failed");
+    headers = newHeaders;
+    return SC::Result(true);
+}
+
+static SC::Result httpClientLinuxAppendProxyAuthorization(HttpClientLinuxLibCurlLoader& curl,
+                                                          struct curl_slist*& headers, SC::StringSpan authorization,
+                                                          SC::Span<char> scratch)
+{
+    static const char   ProxyAuthorizationPrefix[]    = "Proxy-Authorization: ";
+    static const size_t ProxyAuthorizationPrefixBytes = sizeof(ProxyAuthorizationPrefix) - 1;
+
+    const SC::Span<const char> authorizationBytes = authorization.toCharSpan();
+    SC_TRY_MSG(scratch.sizeInBytes() > ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes(),
+               "HttpClient: backend scratch too small for proxy authorization");
+    memcpy(scratch.data(), ProxyAuthorizationPrefix, ProxyAuthorizationPrefixBytes);
+    memcpy(scratch.data() + ProxyAuthorizationPrefixBytes, authorizationBytes.data(), authorizationBytes.sizeInBytes());
+    scratch[ProxyAuthorizationPrefixBytes + authorizationBytes.sizeInBytes()] = '\0';
+    return httpClientLinuxAppendHeader(curl, headers, scratch.data());
+}
+
+static long getCurlHttpVersionOption(SC::HttpClientRequestProtocolOptions::Preference preference)
+{
+    switch (preference)
+    {
+    case SC::HttpClientRequestProtocolOptions::Default: return CURL_HTTP_VERSION_NONE;
+    case SC::HttpClientRequestProtocolOptions::Http11Only: return CURL_HTTP_VERSION_1_1;
+    case SC::HttpClientRequestProtocolOptions::Http2Preferred: return CURL_HTTP_VERSION_2TLS;
+    case SC::HttpClientRequestProtocolOptions::Http2Required: return CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE;
+    }
+    return CURL_HTTP_VERSION_NONE;
+}
+
+static SC::Result getCurlStringPointer(SC::StringSpan source, SC::Span<char> storage, const char*& destination)
+{
+    if (source.isNullTerminated())
+    {
+        destination = source.bytesIncludingTerminator();
+        return SC::Result(true);
+    }
+
+    const SC::Span<const char> sourceBytes = source.toCharSpan();
+    SC_TRY_MSG(storage.sizeInBytes() > sourceBytes.sizeInBytes(),
+               "HttpClient: response metadata buffer too small for proxy URL");
+    memcpy(storage.data(), sourceBytes.data(), sourceBytes.sizeInBytes());
+    storage[sourceBytes.sizeInBytes()] = '\0';
+    destination                        = storage.data();
+    return SC::Result(true);
+}
 } // namespace
 
 namespace SC
 {
 struct HttpClientLinuxCallbacks
 {
+    static HttpClientResponse::Protocol mapCurlHttpVersion(long version)
+    {
+        switch (version)
+        {
+        case CURL_HTTP_VERSION_1_0:
+        case CURL_HTTP_VERSION_1_1: return HttpClientResponse::Protocol::Http11;
+        case CURL_HTTP_VERSION_2_0:
+        case CURL_HTTP_VERSION_2TLS:
+        case CURL_HTTP_VERSION_2_PRIOR_KNOWLEDGE: return HttpClientResponse::Protocol::Http2;
+        default: return HttpClientResponse::Protocol::Unknown;
+        }
+    }
+
+    static bool isHttp2Required(HttpClientOperation& operation)
+    {
+        return operation.currentRequest.options.protocol.preference == HttpClientRequestProtocolOptions::Http2Required;
+    }
+
+    static void updateNegotiatedProtocol(HttpClientOperation& operation)
+    {
+        if (operation.currentResponse == nullptr)
+        {
+            return;
+        }
+
+        auto& session  = *reinterpret_cast<HttpClient::Internal*>(operation.client->storage);
+        auto& internal = *reinterpret_cast<HttpClientOperation::Internal*>(operation.storage);
+
+        long version = CURL_HTTP_VERSION_NONE;
+        if (session.curl.curl_easy_getinfo_long(internal.curlHandle, CURLINFO_HTTP_VERSION, &version) == CURLE_OK)
+        {
+            const HttpClientResponse::Protocol protocol = mapCurlHttpVersion(version);
+            if (protocol != HttpClientResponse::Protocol::Unknown)
+            {
+                operation.currentResponse->negotiatedProtocol = protocol;
+            }
+        }
+    }
+
     static size_t curlHeaderCallback(char* buffer, size_t size, size_t nitems, void* userdata)
     {
         HttpClientOperation* operation = reinterpret_cast<HttpClientOperation*>(userdata);
@@ -85,13 +178,26 @@ struct HttpClientLinuxCallbacks
                     break;
                 }
             }
+            if (totalSize >= 6 and buffer[5] == '2')
+            {
+                response.negotiatedProtocol = HttpClientResponse::Protocol::Http2;
+            }
+            else if (totalSize >= 6 and buffer[5] == '1')
+            {
+                response.negotiatedProtocol = HttpClientResponse::Protocol::Http11;
+            }
         }
 
         HttpClientOperation::Internal& internal = *reinterpret_cast<HttpClientOperation::Internal*>(operation->storage);
         if (totalSize == 2 and buffer[0] == '\r' and buffer[1] == '\n' and not internal.responseHeadSeen)
         {
-            internal.responseHeadSeen   = true;
-            response.negotiatedProtocol = HttpClientResponse::Protocol::Http11;
+            updateNegotiatedProtocol(*operation);
+            if (isHttp2Required(*operation) and response.negotiatedProtocol != HttpClientResponse::Protocol::Http2)
+            {
+                internal.callbackError = Result::Error("HttpClient: HTTP/2 required but not negotiated");
+                return 0;
+            }
+            internal.responseHeadSeen = true;
             operation->enqueueResponseHead();
         }
         return totalSize;
@@ -293,6 +399,33 @@ SC::Result SC::HttpClientOperation::platformStart()
                                            static_cast<long>(currentRequest.options.timeouts.requestTimeoutMs));
     }
 
+    const long httpVersion = getCurlHttpVersionOption(currentRequest.options.protocol.preference);
+    if (httpVersion != CURL_HTTP_VERSION_NONE)
+    {
+        SC_TRY_MSG(session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_HTTP_VERSION, httpVersion) == CURLE_OK,
+                   "HttpClient: libcurl protocol preference not supported");
+    }
+
+    if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::NoProxy)
+    {
+        SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, "") == CURLE_OK,
+                   "HttpClient: libcurl proxy configuration not supported");
+    }
+    else if (currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Http)
+    {
+        const char* proxyUrl = nullptr;
+        SC_TRY(getCurlStringPointer(currentRequest.options.proxy.url, backendScratch, proxyUrl));
+        SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_PROXY, proxyUrl) == CURLE_OK,
+                   "HttpClient: libcurl proxy configuration not supported");
+        if (currentRequest.options.proxy.bypassList.sizeInBytes() > 0)
+        {
+            const char* noProxy = nullptr;
+            SC_TRY(getCurlStringPointer(currentRequest.options.proxy.bypassList, backendScratch, noProxy));
+            SC_TRY_MSG(session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_NOPROXY, noProxy) == CURLE_OK,
+                       "HttpClient: libcurl proxy bypass list not supported");
+        }
+    }
+
     if (not currentRequest.options.tls.verifyPeer)
     {
         session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_SSL_VERIFYPEER, 0L);
@@ -334,10 +467,25 @@ SC::Result SC::HttpClientOperation::platformStart()
         session.curl.curl_slist_free_all(internal.requestHeaders);
         internal.requestHeaders = nullptr;
     }
+    if (currentRequest.options.proxy.authorization.sizeInBytes() > 0)
+    {
+        SC_TRY(httpClientLinuxAppendProxyAuthorization(session.curl, internal.requestHeaders,
+                                                       currentRequest.options.proxy.authorization, backendScratch));
+    }
     for (size_t idx = 0; idx < currentRequest.headers.sizeInElements(); ++idx)
     {
         const size_t nameLen = currentRequest.headers[idx].name.sizeInBytes();
         const size_t valLen  = currentRequest.headers[idx].value.sizeInBytes();
+        if (valLen == 0)
+        {
+            SC_TRY_MSG(nameLen + 2 <= backendScratch.sizeInBytes(),
+                       "HttpClient: backend scratch too small for headers");
+            memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
+            backendScratch[nameLen]     = ';';
+            backendScratch[nameLen + 1] = '\0';
+            SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
+            continue;
+        }
         SC_TRY_MSG(nameLen + valLen + 3 < backendScratch.sizeInBytes(),
                    "HttpClient: backend scratch too small for headers");
         memcpy(backendScratch.data(), currentRequest.headers[idx].name.toCharSpan().data(), nameLen);
@@ -345,7 +493,11 @@ SC::Result SC::HttpClientOperation::platformStart()
         backendScratch[nameLen + 1] = ' ';
         memcpy(backendScratch.data() + nameLen + 2, currentRequest.headers[idx].value.toCharSpan().data(), valLen);
         backendScratch[nameLen + 2 + valLen] = '\0';
-        internal.requestHeaders = session.curl.curl_slist_append(internal.requestHeaders, backendScratch.data());
+        SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, backendScratch.data()));
+    }
+    if (currentRequest.body.isChunkedStream())
+    {
+        SC_TRY(httpClientLinuxAppendHeader(session.curl, internal.requestHeaders, "Transfer-Encoding: chunked"));
     }
     if (internal.requestHeaders != nullptr)
     {
@@ -354,16 +506,30 @@ SC::Result SC::HttpClientOperation::platformStart()
 
     if (currentRequest.body.isStreamed())
     {
-        SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
-                   "HttpClient: streamed body too large for libcurl");
-        session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
-                                           static_cast<long>(currentRequest.body.sizeInBytes));
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READFUNCTION,
                                           reinterpret_cast<void*>(&HttpClientLinuxCallbacks::curlReadCallback));
         session.curl.curl_easy_setopt_ptr(curlHandle, CURLOPT_READDATA, this);
         if (currentRequest.method == HttpClientRequest::HttpPOST)
         {
             session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POST, 1L);
+            if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
+            {
+                SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
+                           "HttpClient: streamed body too large for libcurl");
+                session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_POSTFIELDSIZE,
+                                                   static_cast<long>(currentRequest.body.sizeInBytes));
+            }
+        }
+        else
+        {
+            session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_UPLOAD, 1L);
+            if (currentRequest.body.framing == HttpClientRequestBody::SizedStream)
+            {
+                SC_TRY_MSG(currentRequest.body.sizeInBytes <= static_cast<uint64_t>(LONG_MAX),
+                           "HttpClient: streamed body too large for libcurl");
+                session.curl.curl_easy_setopt_long(curlHandle, CURLOPT_INFILESIZE,
+                                                   static_cast<long>(currentRequest.body.sizeInBytes));
+            }
         }
     }
     else if (currentRequest.body.bytes.sizeInBytes() > 0)
@@ -393,9 +559,9 @@ SC::Result SC::HttpClientOperation::platformStart()
             {
                 long httpCode = 0;
                 sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_RESPONSE_CODE, &httpCode);
-                operation->currentResponse->statusCode         = static_cast<int>(httpCode);
-                operation->currentResponse->negotiatedProtocol = HttpClientResponse::Protocol::Http11;
-                long redirectCount                             = 0;
+                operation->currentResponse->statusCode = static_cast<int>(httpCode);
+                HttpClientLinuxCallbacks::updateNegotiatedProtocol(*operation);
+                long redirectCount = 0;
                 (void)sessionRef.curl.curl_easy_getinfo_long(internalRef.curlHandle, CURLINFO_REDIRECT_COUNT,
                                                              &redirectCount);
                 operation->currentResponse->redirectCount =
@@ -407,6 +573,13 @@ SC::Result SC::HttpClientOperation::platformStart()
                 {
                     (void)operation->copyResponseEffectiveUrl(
                         StringSpan::fromNullTerminated(effectiveUrl, operation->currentRequest.url.getEncoding()));
+                }
+                if (HttpClientLinuxCallbacks::isHttp2Required(*operation) and
+                    operation->currentResponse->negotiatedProtocol != HttpClientResponse::Protocol::Http2)
+                {
+                    operation->enqueueError(Result::Error("HttpClient: HTTP/2 required but not negotiated"));
+                    internalRef.workerRunning = false;
+                    return nullptr;
                 }
                 operation->enqueueResponseHead();
             }

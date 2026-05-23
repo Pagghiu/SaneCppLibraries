@@ -19,30 +19,174 @@ namespace SC
 //! @{
 
 struct SC_HTTP_CLIENT_EXPORT HttpClientRequestBodyProvider;
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestOptions;
 
-/// @brief One outgoing request header
+/// @brief HTTP header name/value view
 struct SC_HTTP_CLIENT_EXPORT HttpClientHeader
 {
     StringSpan name;
     StringSpan value;
 };
 
+/// @brief Caller-owned cursor for iterating response headers
+struct SC_HTTP_CLIENT_EXPORT HttpClientResponseHeaderIterator
+{
+    size_t offset = 0;
+};
+
+/// @brief Parsed response content-coding token view
+struct SC_HTTP_CLIENT_EXPORT HttpClientContentCoding
+{
+    enum Type : uint8_t
+    {
+        Unknown,
+        Identity,
+        GZip,
+        Deflate,
+        Compress,
+        Brotli,
+    };
+
+    Type       type = Unknown;
+    StringSpan name;
+
+    [[nodiscard]] bool               isIdentity() const { return type == Identity; }
+    [[nodiscard]] static Type        parseName(StringSpan name);
+    [[nodiscard]] static const char* getName(Type type);
+    [[nodiscard]] static Result writeAcceptEncoding(Span<const Type> types, Span<char> destination, StringSpan& value);
+};
+
+/// @brief Caller-owned cursor for iterating comma-separated Content-Encoding values.
+struct SC_HTTP_CLIENT_EXPORT HttpClientContentCodingIterator
+{
+    HttpClientResponseHeaderIterator headerIterator;
+    StringSpan                       headerValue;
+    size_t                           valueOffset    = 0;
+    bool                             hasHeaderValue = false;
+};
+
+/// @brief Parsed response transfer-coding token view.
+struct SC_HTTP_CLIENT_EXPORT HttpClientTransferCoding
+{
+    enum Type : uint8_t
+    {
+        Unknown,
+        Chunked,
+        Compress,
+        Deflate,
+        GZip,
+    };
+
+    Type       type = Unknown;
+    StringSpan name;
+
+    [[nodiscard]] bool               isChunked() const { return type == Chunked; }
+    [[nodiscard]] static Type        parseName(StringSpan name);
+    [[nodiscard]] static const char* getName(Type type);
+};
+
+/// @brief Caller-owned cursor for iterating comma-separated Transfer-Encoding values.
+struct SC_HTTP_CLIENT_EXPORT HttpClientTransferCodingIterator
+{
+    HttpClientResponseHeaderIterator headerIterator;
+    StringSpan                       headerValue;
+    size_t                           valueOffset    = 0;
+    bool                             hasHeaderValue = false;
+};
+
+/// @brief Compile-time backend capability report for the active HttpClient backend
+struct SC_HTTP_CLIENT_EXPORT HttpClientCapabilities
+{
+    enum Backend : uint8_t
+    {
+        Unsupported,
+        AppleURLSession,
+        LibCurl,
+        WinHttp,
+    };
+
+    enum Feature : uint8_t
+    {
+        MultipleOperationsPerClient,
+        FixedRequestBody,
+        SizedStreamRequestBody,
+        ChunkedStreamRequestBody,
+        RedirectPolicy,
+        ProtocolHttp11Only,
+        ProtocolHttp2Preferred,
+        ProtocolHttp2Required,
+        TlsDisablePeerVerification,
+        TlsCustomCaPath,
+        ProxyNoProxy,
+        ProxyHttp,
+        ProxyAuthorization,
+        ProxyBypassList,
+        ContentCodingPolicy,
+    };
+
+    Backend backend = Unsupported;
+
+    bool multipleOperationsPerClient = false;
+    bool fixedRequestBody            = false;
+    bool sizedStreamRequestBody      = false;
+    bool chunkedStreamRequestBody    = false;
+    bool redirectPolicy              = false;
+    bool protocolHttp11Only          = false;
+    bool protocolHttp2Preferred      = false;
+    bool protocolHttp2Required       = false;
+    bool tlsDisablePeerVerification  = false;
+    bool tlsCustomCaPath             = false;
+    bool proxyNoProxy                = false;
+    bool proxyHttp                   = false;
+    bool proxyAuthorization          = false;
+    bool proxyBypassList             = false;
+    bool contentCodingPolicy         = false;
+
+    [[nodiscard]] bool               hasBackend(Backend requiredBackend) const;
+    [[nodiscard]] bool               supports(Feature feature) const;
+    [[nodiscard]] bool               supportsRequestOptions(const HttpClientRequestOptions& options) const;
+    [[nodiscard]] bool               supportsAll(Span<const Feature> features) const;
+    [[nodiscard]] Result             requireBackend(Backend requiredBackend) const;
+    [[nodiscard]] Result             requireFeatures(Span<const Feature> features) const;
+    [[nodiscard]] Result             requireRequestOptions(const HttpClientRequestOptions& options) const;
+    [[nodiscard]] const char*        getBackendName() const;
+    [[nodiscard]] static const char* getBackendName(Backend backend);
+    [[nodiscard]] static const char* getFeatureName(Feature feature);
+};
+
 /// @brief Outgoing request body description
 struct SC_HTTP_CLIENT_EXPORT HttpClientRequestBody
 {
+    /// @brief Transfer framing requested for the outgoing body.
+    ///
+    /// `FixedSize` uses `bytes`, `SizedStream` uses `provider` plus `sizeInBytes`, and `ChunkedStream`
+    /// uses `provider` without a declared size.
+    enum Framing : uint8_t
+    {
+        FixedSize,
+        SizedStream,
+        ChunkedStream,
+    };
+
     Span<const char>               bytes;
     HttpClientRequestBodyProvider* provider = nullptr;
 
-    uint64_t sizeInBytes = 0; ///< Required for streamed bodies
+    uint64_t sizeInBytes = 0; ///< Required for SizedStream, must be zero for ChunkedStream
     bool     canReplay   = false;
 
-    [[nodiscard]] bool isStreamed() const
+    Framing framing = FixedSize;
+
+    [[nodiscard]] bool               isStreamed() const { return framing == SizedStream or framing == ChunkedStream; }
+    [[nodiscard]] bool               isChunkedStream() const { return framing == ChunkedStream; }
+    [[nodiscard]] const char*        getFramingName() const { return getFramingName(framing); }
+    [[nodiscard]] static const char* getFramingName(Framing framing);
+    [[nodiscard]] uint64_t           getDeclaredSizeInBytes() const
     {
-        return provider != nullptr or (bytes.sizeInBytes() == 0 and sizeInBytes > 0);
-    }
-    [[nodiscard]] uint64_t getDeclaredSizeInBytes() const
-    {
-        return isStreamed() ? sizeInBytes : static_cast<uint64_t>(bytes.sizeInBytes());
+        if (framing == FixedSize)
+        {
+            return static_cast<uint64_t>(bytes.sizeInBytes());
+        }
+        return framing == SizedStream ? sizeInBytes : 0;
     }
 };
 
@@ -58,6 +202,9 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientRequestRedirectOptions
 
     Mode    mode         = NoRedirects;
     uint8_t maxRedirects = 10;
+
+    [[nodiscard]] const char*        getModeName() const { return getModeName(mode); }
+    [[nodiscard]] static const char* getModeName(Mode mode);
 };
 
 /// @brief Timeout policy for one request
@@ -85,6 +232,28 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientRequestProtocolOptions
     };
 
     Preference preference = Default;
+
+    [[nodiscard]] const char*        getPreferenceName() const { return getPreferenceName(preference); }
+    [[nodiscard]] static const char* getPreferenceName(Preference preference);
+};
+
+/// @brief Proxy policy for one request
+struct SC_HTTP_CLIENT_EXPORT HttpClientRequestProxyOptions
+{
+    enum Mode : uint8_t
+    {
+        Default, ///< Use the backend default proxy configuration
+        NoProxy, ///< Bypass proxies for this request
+        Http,    ///< Use `url` as an explicit HTTP proxy URL
+    };
+
+    Mode       mode = Default;
+    StringSpan url;           ///< Required for `Http`, must use the `http://` scheme
+    StringSpan authorization; ///< Optional exact `Proxy-Authorization` header value for `Http`
+    StringSpan bypassList;    ///< Optional comma-separated proxy bypass list for `Http`
+
+    [[nodiscard]] const char*        getModeName() const { return getModeName(mode); }
+    [[nodiscard]] static const char* getModeName(Mode mode);
 };
 
 /// @brief Extended request options grouped by transport concern
@@ -94,9 +263,13 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientRequestOptions
     HttpClientRequestTimeoutOptions  timeouts;
     HttpClientRequestTlsOptions      tls;
     HttpClientRequestProtocolOptions protocol;
+    HttpClientRequestProxyOptions    proxy;
 };
 
-/// @brief Configuration for an outgoing HTTP request
+/// @brief Configuration for an outgoing HTTP request.
+///
+/// All views must remain valid until the operation completes or is cancelled. The request object is
+/// copied by value, but referenced header/body/provider storage remains caller-owned.
 struct SC_HTTP_CLIENT_EXPORT HttpClientRequest
 {
     enum Method : uint8_t
@@ -117,9 +290,15 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientRequest
     Span<const HttpClientHeader> headers;
     HttpClientRequestBody        body;
     HttpClientRequestOptions     options;
+
+    [[nodiscard]] const char*        getMethodName() const { return getMethodName(method); }
+    [[nodiscard]] static const char* getMethodName(Method method);
+    [[nodiscard]] Result             validate() const;
 };
 
-/// @brief Parsed response metadata filled when headers arrive
+/// @brief Parsed response metadata filled when headers arrive.
+///
+/// `headers` and `effectiveUrl` are views into caller-owned `HttpClientOperationMemory` buffers.
 struct SC_HTTP_CLIENT_EXPORT HttpClientResponse
 {
     enum class Protocol : uint8_t
@@ -138,7 +317,34 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientResponse
     StringSpan effectiveUrl;
     uint32_t   redirectCount = 0;
 
-    [[nodiscard]] bool getHeader(StringSpan name, StringSpan& value) const;
+    [[nodiscard]] bool        getHeader(StringSpan name, StringSpan& value) const;
+    [[nodiscard]] bool        hasHeader(StringSpan name) const;
+    [[nodiscard]] bool        findNextHeader(StringSpan name, HttpClientResponseHeaderIterator& iterator,
+                                             StringSpan& value) const;
+    [[nodiscard]] bool        getNextHeader(HttpClientResponseHeaderIterator& iterator, HttpClientHeader& header) const;
+    [[nodiscard]] bool        getContentLength(uint64_t& value) const;
+    [[nodiscard]] bool        getContentType(StringSpan& value) const;
+    [[nodiscard]] bool        getContentEncoding(StringSpan& value) const;
+    [[nodiscard]] bool        getTransferEncoding(StringSpan& value) const;
+    [[nodiscard]] bool        getLocation(StringSpan& value) const;
+    [[nodiscard]] bool        getWwwAuthenticate(StringSpan& value) const;
+    [[nodiscard]] bool        getProxyAuthenticate(StringSpan& value) const;
+    [[nodiscard]] bool        getNextContentCoding(HttpClientContentCodingIterator& iterator,
+                                                   HttpClientContentCoding&         contentCoding) const;
+    [[nodiscard]] bool        getNextTransferCoding(HttpClientTransferCodingIterator& iterator,
+                                                    HttpClientTransferCoding&         transferCoding) const;
+    [[nodiscard]] bool        hasContentCoding(HttpClientContentCoding::Type type) const;
+    [[nodiscard]] bool        hasTransferCoding(HttpClientTransferCoding::Type type) const;
+    [[nodiscard]] bool        isHttp11() const { return negotiatedProtocol == Protocol::Http11; }
+    [[nodiscard]] bool        isHttp2() const { return negotiatedProtocol == Protocol::Http2; }
+    [[nodiscard]] bool        isInformationalStatus() const { return statusCode >= 100 and statusCode < 200; }
+    [[nodiscard]] bool        isSuccessfulStatus() const { return statusCode >= 200 and statusCode < 300; }
+    [[nodiscard]] bool        isRedirectStatus() const { return statusCode >= 300 and statusCode < 400; }
+    [[nodiscard]] bool        isClientErrorStatus() const { return statusCode >= 400 and statusCode < 500; }
+    [[nodiscard]] bool        isServerErrorStatus() const { return statusCode >= 500 and statusCode < 600; }
+    [[nodiscard]] bool        isErrorStatus() const { return statusCode >= 400; }
+    [[nodiscard]] const char* getProtocolName() const { return getProtocolName(negotiatedProtocol); }
+    [[nodiscard]] static const char* getProtocolName(Protocol protocol);
 };
 
 /// @brief Pull-based provider for streamed request bodies
@@ -161,7 +367,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperationListener
 
     /// @brief Called once the response status code and headers are available
     /// @param response Parsed response metadata owned by the current operation
-    virtual void onResponseHead(HttpClientResponse& response) { SC_COMPILER_UNUSED(response); } // namespace SC
+    virtual void onResponseHead(HttpClientResponse& response) { SC_COMPILER_UNUSED(response); }
 
     /// @brief Called for each response body chunk delivered by poll()
     /// @param data Body bytes valid for the duration of the callback
@@ -214,7 +420,13 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperationEvent
     Result error       = Result(true);
 };
 
-/// @brief Caller-owned memory for one HttpClientOperation
+/// @brief Caller-owned memory for one HttpClientOperation.
+///
+/// `responseBuffers` and `eventQueue` are required. Either provide non-empty `data` for each
+/// response buffer, or provide `responseBufferMemory` to be split equally across them during
+/// `HttpClientOperation::init()`. `responseHeaders` stores raw response headers, `responseMetadata`
+/// stores transport metadata such as the effective URL, and `backendScratch` is temporary
+/// backend-specific conversion/header workspace.
 struct SC_HTTP_CLIENT_EXPORT HttpClientOperationMemory
 {
     Span<HttpClientResponseBuffer> responseBuffers;
@@ -242,9 +454,14 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
     HttpClient& operator=(HttpClient&&)      = delete;
 
     [[nodiscard]] Result init();
+    [[nodiscard]] Result init(HttpClientCapabilities::Backend requiredBackend);
+    [[nodiscard]] Result init(Span<const HttpClientCapabilities::Feature> requiredFeatures);
+    [[nodiscard]] Result init(HttpClientCapabilities::Backend             requiredBackend,
+                              Span<const HttpClientCapabilities::Feature> requiredFeatures);
     [[nodiscard]] Result close();
 
-    [[nodiscard]] bool isInitialized() const { return initialized; }
+    [[nodiscard]] static HttpClientCapabilities getCapabilities();
+    [[nodiscard]] bool                          isInitialized() const { return initialized; }
 
     /// @brief Convenience helper executing a request synchronously on top of HttpClientOperation::poll
     /// @param request Request metadata
@@ -261,6 +478,7 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
 
   private:
     friend struct Internal;
+    friend struct HttpClientLinuxCallbacks;
     struct Internal;
 
     Result platformInit();

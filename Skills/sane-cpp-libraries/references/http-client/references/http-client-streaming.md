@@ -16,6 +16,8 @@
 - `SC::HttpClientAsyncOperationMemoryT`
 - `SC::HttpClientRequestBody`
 - `SC::HttpClientRequestOptions`
+- `SC::HttpClientSession`
+- `SC::HttpClientOperationScheduler`
 
 ## Typical Flow
 
@@ -23,14 +25,17 @@
 2. Initialize `HttpClient`.
 3. Start a request with a request object that already contains headers, body, and transport options.
 4. Poll until completion or attach the async adapter and stream bodies.
+5. If stateful behavior is needed, prepare retries or headers with `HttpClientSession` before starting the next operation.
 
 ## Limits To Remember
 
 - One in-flight request per operation.
 - Multiple operations can share one client session/backend owner.
-- Redirects are limited.
-- Chunked request bodies are not fully supported on all backends.
+- Redirects, protocol preferences, proxy policy, and TLS customization are explicit request options.
+- Chunked request bodies are controlled by `HttpClientRequestBody::framing`; callers should not add `Transfer-Encoding` manually.
 - TLS and backend behavior are still experimental at the time of writing.
+- The core does not allocate for decompression, cookies, credentials, or retry state; use caller-owned helpers above it.
+- `getNextContentCoding()` parses response codings, but callers still own any `AsyncStreams` transform chain.
 
 ## Best Sources
 

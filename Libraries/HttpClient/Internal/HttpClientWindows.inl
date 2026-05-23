@@ -9,6 +9,16 @@
 #pragma comment(lib, "winhttp.lib")
 #endif
 
+#ifndef WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL
+#define WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL 133
+#endif
+#ifndef WINHTTP_OPTION_HTTP_PROTOCOL_USED
+#define WINHTTP_OPTION_HTTP_PROTOCOL_USED 134
+#endif
+#ifndef WINHTTP_PROTOCOL_FLAG_HTTP2
+#define WINHTTP_PROTOCOL_FLAG_HTTP2 0x1
+#endif
+
 struct SC::HttpClient::Internal
 {
     HINTERNET hSession = NULL;
@@ -52,6 +62,65 @@ static void setCancelRequested(SC::HttpClientOperation::Internal& internal, bool
 static bool isCancelRequested(const SC::HttpClientOperation::Internal& internal)
 {
     return InterlockedCompareExchange(const_cast<volatile LONG*>(&internal.cancelRequested), 0, 0) != 0;
+}
+
+static bool isHttp2Required(const SC::HttpClientRequest& request)
+{
+    return request.options.protocol.preference == SC::HttpClientRequestProtocolOptions::Http2Required;
+}
+
+static size_t writeChunkHeader(size_t value, char* destination, size_t destinationSize)
+{
+    char   reversed[sizeof(size_t) * 2];
+    size_t numDigits = 0;
+    do
+    {
+        const size_t digit    = value & 0x0F;
+        reversed[numDigits++] = static_cast<char>(digit < 10 ? ('0' + digit) : ('a' + static_cast<char>(digit - 10)));
+        value >>= 4;
+    } while (value != 0 and numDigits < sizeof(reversed));
+
+    if (numDigits + 2 > destinationSize)
+    {
+        return 0;
+    }
+    for (size_t idx = 0; idx < numDigits; ++idx)
+    {
+        destination[idx] = reversed[numDigits - 1 - idx];
+    }
+    destination[numDigits]     = '\r';
+    destination[numDigits + 1] = '\n';
+    return numDigits + 2;
+}
+
+static bool convertStringSpanToWide(SC::StringSpan source, wchar_t* destination, size_t destinationCapacity,
+                                    int& length)
+{
+    if (destinationCapacity == 0)
+    {
+        return false;
+    }
+
+    const SC::Span<const char> sourceBytes = source.toCharSpan();
+    length = MultiByteToWideChar(CP_UTF8, 0, sourceBytes.data(), static_cast<int>(sourceBytes.sizeInBytes()),
+                                 destination, static_cast<int>(destinationCapacity - 1));
+    if (length <= 0)
+    {
+        return false;
+    }
+    destination[length] = L'\0';
+    return true;
+}
+
+static void replaceWideCharacters(wchar_t* text, int length, wchar_t from, wchar_t to)
+{
+    for (int idx = 0; idx < length; ++idx)
+    {
+        if (text[idx] == from)
+        {
+            text[idx] = to;
+        }
+    }
 }
 } // namespace
 
@@ -316,6 +385,86 @@ SC::Result SC::HttpClientOperation::platformStart()
             (void)WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_MAX_HTTP_AUTOMATIC_REDIRECTS, &maxRedirects,
                                    sizeof(maxRedirects));
 
+            if (operation->currentRequest.options.proxy.mode != HttpClientRequestProxyOptions::Default)
+            {
+                WINHTTP_PROXY_INFO proxyInfo = {};
+                proxyInfo.dwAccessType       = WINHTTP_ACCESS_TYPE_NO_PROXY;
+                proxyInfo.lpszProxy          = WINHTTP_NO_PROXY_NAME;
+                proxyInfo.lpszProxyBypass    = WINHTTP_NO_PROXY_BYPASS;
+
+                if (operation->currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Http)
+                {
+                    static constexpr size_t HttpProxySchemeBytes = sizeof("http://") - 1;
+
+                    const Span<const char> proxyUrl = operation->currentRequest.options.proxy.url.toCharSpan();
+                    int                    proxyLen = 0;
+                    if (not convertStringSpanToWide(
+                            StringSpan(
+                                {proxyUrl.data() + HttpProxySchemeBytes, proxyUrl.sizeInBytes() - HttpProxySchemeBytes},
+                                false, operation->currentRequest.options.proxy.url.getEncoding()),
+                            wideScratch, wideCap, proxyLen))
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: proxy URL conversion failed"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
+
+                    wchar_t* bypassScratch = nullptr;
+                    if (operation->currentRequest.options.proxy.bypassList.sizeInBytes() > 0)
+                    {
+                        const size_t bypassOffset = static_cast<size_t>(proxyLen) + 1;
+                        if (bypassOffset >= wideCap)
+                        {
+                            operation->enqueueError(Result::Error("HttpClient: backend scratch too small for proxy "
+                                                                  "bypass list"));
+                            internalRef.workerRunning = false;
+                            return 0;
+                        }
+                        bypassScratch = wideScratch + bypassOffset;
+                        int bypassLen = 0;
+                        if (not convertStringSpanToWide(operation->currentRequest.options.proxy.bypassList,
+                                                        bypassScratch, wideCap - bypassOffset, bypassLen))
+                        {
+                            operation->enqueueError(Result::Error("HttpClient: proxy bypass list conversion failed"));
+                            internalRef.workerRunning = false;
+                            return 0;
+                        }
+                        replaceWideCharacters(bypassScratch, bypassLen, L',', L';');
+                    }
+
+                    proxyInfo.dwAccessType    = WINHTTP_ACCESS_TYPE_NAMED_PROXY;
+                    proxyInfo.lpszProxy       = wideScratch;
+                    proxyInfo.lpszProxyBypass = bypassScratch != nullptr ? bypassScratch : WINHTTP_NO_PROXY_BYPASS;
+                }
+
+                if (not WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_PROXY, &proxyInfo, sizeof(proxyInfo)))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: WinHTTP proxy configuration not supported"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+            }
+
+            if (operation->currentRequest.options.protocol.preference != HttpClientRequestProtocolOptions::Default)
+            {
+                DWORD enabledProtocols = 0;
+                if (operation->currentRequest.options.protocol.preference ==
+                        HttpClientRequestProtocolOptions::Http2Preferred or
+                    operation->currentRequest.options.protocol.preference ==
+                        HttpClientRequestProtocolOptions::Http2Required)
+                {
+                    enabledProtocols = WINHTTP_PROTOCOL_FLAG_HTTP2;
+                }
+
+                if (not WinHttpSetOption(internalRef.hRequest, WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, &enabledProtocols,
+                                         sizeof(enabledProtocols)))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: WinHTTP protocol preference not supported"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+            }
+
             if (operation->currentRequest.options.tls.caCertificatesPath.sizeInBytes() > 0)
             {
                 operation->enqueueError(Result::Error("HttpClient: WinHTTP custom CA path not supported"));
@@ -332,29 +481,98 @@ SC::Result SC::HttpClientOperation::platformStart()
 
             wchar_t*     headerLine = wideScratch;
             const size_t headerCap  = wideCap;
+            if (operation->currentRequest.options.proxy.authorization.sizeInBytes() > 0)
+            {
+                static const wchar_t ProxyAuthorizationPrefix[] = L"Proxy-Authorization: ";
+                static const size_t  ProxyAuthorizationPrefixLength =
+                    (sizeof(ProxyAuthorizationPrefix) / sizeof(ProxyAuthorizationPrefix[0])) - 1;
+
+                if (ProxyAuthorizationPrefixLength >= headerCap)
+                {
+                    operation->enqueueError(Result::Error("HttpClient: backend scratch too small for proxy "
+                                                          "authorization"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+                memcpy(headerLine, ProxyAuthorizationPrefix, sizeof(ProxyAuthorizationPrefix) - sizeof(wchar_t));
+                int authorizationLen = 0;
+                if (not convertStringSpanToWide(operation->currentRequest.options.proxy.authorization,
+                                                headerLine + ProxyAuthorizationPrefixLength,
+                                                headerCap - ProxyAuthorizationPrefixLength, authorizationLen))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: proxy authorization conversion failed"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+                if (not WinHttpAddRequestHeaders(internalRef.hRequest, headerLine, static_cast<DWORD>(-1L),
+                                                 WINHTTP_ADDREQ_FLAG_ADD))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: WinHttpAddRequestHeaders failed"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+            }
             for (size_t idx = 0; idx < operation->currentRequest.headers.sizeInElements(); ++idx)
             {
-                const int nameLen =
-                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headers[idx].name.toCharSpan().data(),
-                                        static_cast<int>(operation->currentRequest.headers[idx].name.sizeInBytes()),
+                const Span<const char> headerName = operation->currentRequest.headers[idx].name.toCharSpan();
+                const int              nameLen =
+                    MultiByteToWideChar(CP_UTF8, 0, headerName.data(), static_cast<int>(headerName.sizeInBytes()),
                                         headerLine, static_cast<int>(headerCap));
-                if (nameLen <= 0 or static_cast<size_t>(nameLen + 3) >= headerCap)
+                if (nameLen <= 0)
                 {
-                    continue;
+                    operation->enqueueError(Result::Error("HttpClient: request header name conversion failed"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+                if (static_cast<size_t>(nameLen + 3) >= headerCap)
+                {
+                    operation->enqueueError(Result::Error("HttpClient: backend scratch too small for request header"));
+                    internalRef.workerRunning = false;
+                    return 0;
                 }
                 headerLine[nameLen]     = L':';
                 headerLine[nameLen + 1] = L' ';
-                const int valueLen =
-                    MultiByteToWideChar(CP_UTF8, 0, operation->currentRequest.headers[idx].value.toCharSpan().data(),
-                                        static_cast<int>(operation->currentRequest.headers[idx].value.sizeInBytes()),
-                                        headerLine + nameLen + 2, static_cast<int>(headerCap - nameLen - 2));
-                if (valueLen <= 0)
+
+                int                    valueLen    = 0;
+                const Span<const char> headerValue = operation->currentRequest.headers[idx].value.toCharSpan();
+                if (headerValue.sizeInBytes() > 0)
                 {
-                    continue;
+                    const size_t valueCap = headerCap - static_cast<size_t>(nameLen) - 2;
+                    if (valueCap <= 1)
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: backend scratch too small for request "
+                                                              "header"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
+                    valueLen =
+                        MultiByteToWideChar(CP_UTF8, 0, headerValue.data(), static_cast<int>(headerValue.sizeInBytes()),
+                                            headerLine + nameLen + 2, static_cast<int>(valueCap - 1));
+                    if (valueLen <= 0)
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: request header value conversion failed"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
                 }
                 headerLine[nameLen + 2 + valueLen] = L'\0';
-                (void)WinHttpAddRequestHeaders(internalRef.hRequest, headerLine, static_cast<DWORD>(-1L),
-                                               WINHTTP_ADDREQ_FLAG_ADD);
+                if (not WinHttpAddRequestHeaders(internalRef.hRequest, headerLine, static_cast<DWORD>(-1L),
+                                                 WINHTTP_ADDREQ_FLAG_ADD))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: WinHttpAddRequestHeaders failed"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
+            }
+            if (operation->currentRequest.body.isChunkedStream())
+            {
+                if (not WinHttpAddRequestHeaders(internalRef.hRequest, L"Transfer-Encoding: chunked\r\n",
+                                                 static_cast<DWORD>(-1L), WINHTTP_ADDREQ_FLAG_ADD))
+                {
+                    operation->enqueueError(Result::Error("HttpClient: WinHttpAddRequestHeaders failed"));
+                    internalRef.workerRunning = false;
+                    return 0;
+                }
             }
 
             if (finishIfCancelled())
@@ -363,7 +581,11 @@ SC::Result SC::HttpClientOperation::platformStart()
             }
 
             DWORD requestBodyLength = static_cast<DWORD>(operation->currentRequest.body.bytes.sizeInBytes());
-            if (operation->currentRequest.body.isStreamed())
+            if (operation->currentRequest.body.isChunkedStream())
+            {
+                requestBodyLength = WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH;
+            }
+            else if (operation->currentRequest.body.isStreamed())
             {
                 if (operation->currentRequest.body.sizeInBytes > 0xFFFFFFFFu)
                 {
@@ -389,8 +611,22 @@ SC::Result SC::HttpClientOperation::platformStart()
 
             if (operation->currentRequest.body.isStreamed())
             {
-                char*  chunkData = reinterpret_cast<char*>(operation->backendScratch.data());
-                size_t chunkSize = operation->backendScratch.sizeInBytes();
+                static constexpr size_t ChunkHeaderBytes = 32;
+
+                char*  chunkHeader = reinterpret_cast<char*>(operation->backendScratch.data());
+                char*  chunkData   = chunkHeader;
+                size_t chunkSize   = operation->backendScratch.sizeInBytes();
+                if (operation->currentRequest.body.isChunkedStream())
+                {
+                    if (chunkSize <= ChunkHeaderBytes)
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: backend scratch too small for upload"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
+                    chunkData = chunkHeader + ChunkHeaderBytes;
+                    chunkSize -= ChunkHeaderBytes;
+                }
                 if (chunkSize == 0)
                 {
                     operation->enqueueError(Result::Error("HttpClient: backend scratch too small for upload"));
@@ -413,13 +649,45 @@ SC::Result SC::HttpClientOperation::platformStart()
                     if (bytesToWrite > 0)
                     {
                         DWORD written = 0;
+                        if (operation->currentRequest.body.isChunkedStream())
+                        {
+                            const size_t headerSize = writeChunkHeader(bytesToWrite, chunkHeader, ChunkHeaderBytes);
+                            if (headerSize == 0 or not WinHttpWriteData(internalRef.hRequest, chunkHeader,
+                                                                        static_cast<DWORD>(headerSize), &written))
+                            {
+                                operation->enqueueError(Result::Error("HttpClient: WinHttpWriteData chunk header "
+                                                                      "failed"));
+                                internalRef.workerRunning = false;
+                                return 0;
+                            }
+                        }
                         if (not WinHttpWriteData(internalRef.hRequest, chunkData, static_cast<DWORD>(bytesToWrite),
                                                  &written))
                         {
-                            operation->enqueueError(Result::Error("HttpClient: WinHttpWriteData failed"));
+                            operation->enqueueError(Result::Error("HttpClient: WinHttpWriteData payload failed"));
                             internalRef.workerRunning = false;
                             return 0;
                         }
+                        if (operation->currentRequest.body.isChunkedStream())
+                        {
+                            if (not WinHttpWriteData(internalRef.hRequest, "\r\n", 2, &written))
+                            {
+                                operation->enqueueError(Result::Error("HttpClient: WinHttpWriteData chunk terminator "
+                                                                      "failed"));
+                                internalRef.workerRunning = false;
+                                return 0;
+                            }
+                        }
+                    }
+                }
+                if (operation->currentRequest.body.isChunkedStream())
+                {
+                    DWORD written = 0;
+                    if (not WinHttpWriteData(internalRef.hRequest, "0\r\n\r\n", 5, &written))
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: WinHttpWriteData final chunk failed"));
+                        internalRef.workerRunning = false;
+                        return 0;
                     }
                 }
             }
@@ -437,9 +705,29 @@ SC::Result SC::HttpClientOperation::platformStart()
             DWORD statusSize = sizeof(statusCode);
             (void)WinHttpQueryHeaders(internalRef.hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
                                       WINHTTP_HEADER_NAME_BY_INDEX, &statusCode, &statusSize, WINHTTP_NO_HEADER_INDEX);
-            operation->currentResponse->statusCode         = static_cast<int>(statusCode);
-            operation->currentResponse->negotiatedProtocol = HttpClientResponse::Protocol::Http11;
-            operation->currentResponse->redirectCount      = 0;
+            operation->currentResponse->statusCode = static_cast<int>(statusCode);
+
+            DWORD usedProtocols     = 0;
+            DWORD usedProtocolsSize = sizeof(usedProtocols);
+            if (WinHttpQueryOption(internalRef.hRequest, WINHTTP_OPTION_HTTP_PROTOCOL_USED, &usedProtocols,
+                                   &usedProtocolsSize))
+            {
+                operation->currentResponse->negotiatedProtocol = (usedProtocols & WINHTTP_PROTOCOL_FLAG_HTTP2) != 0
+                                                                     ? HttpClientResponse::Protocol::Http2
+                                                                     : HttpClientResponse::Protocol::Http11;
+            }
+            else
+            {
+                operation->currentResponse->negotiatedProtocol = HttpClientResponse::Protocol::Http11;
+            }
+            if (isHttp2Required(operation->currentRequest) and
+                operation->currentResponse->negotiatedProtocol != HttpClientResponse::Protocol::Http2)
+            {
+                operation->enqueueError(Result::Error("HttpClient: HTTP/2 required but not negotiated"));
+                internalRef.workerRunning = false;
+                return 0;
+            }
+            operation->currentResponse->redirectCount = 0;
 
             DWORD rawHeaderBytes = 0;
             (void)WinHttpQueryHeaders(internalRef.hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF,

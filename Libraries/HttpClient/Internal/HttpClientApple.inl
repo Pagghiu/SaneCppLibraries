@@ -80,6 +80,23 @@ static size_t httpClientAppleWriteUnsigned(uint64_t value, SC::Span<char> dest)
     }
     return count;
 }
+
+static SC::HttpClientResponse::Protocol httpClientAppleMapProtocol(const char* protocolName)
+{
+    if (protocolName == nullptr)
+    {
+        return SC::HttpClientResponse::Protocol::Unknown;
+    }
+    if (strcmp(protocolName, "h2") == 0 or strcmp(protocolName, "h2c") == 0)
+    {
+        return SC::HttpClientResponse::Protocol::Http2;
+    }
+    if (strcmp(protocolName, "http/1.1") == 0 or strcmp(protocolName, "http/1.0") == 0)
+    {
+        return SC::HttpClientResponse::Protocol::Http11;
+    }
+    return SC::HttpClientResponse::Protocol::Unknown;
+}
 } // namespace
 
 struct SC::HttpClient::Internal
@@ -95,6 +112,8 @@ struct SC::HttpClientOperation::Internal
     id       bodyStream      = nullptr;
     bool     cancelRequested = false;
     uint32_t redirectCount   = 0;
+
+    SC::HttpClientResponse::Protocol negotiatedProtocol = SC::HttpClientResponse::Protocol::Unknown;
 };
 
 struct SC::HttpClientAppleCallbacks
@@ -114,6 +133,8 @@ struct SC::HttpClientAppleCallbacks
                             reinterpret_cast<IMP>(&didReceiveData), "v@:@@@");
             class_addMethod(delegateClass, sel_getUid("URLSession:task:didCompleteWithError:"),
                             reinterpret_cast<IMP>(&didCompleteWithError), "v@:@@@");
+            class_addMethod(delegateClass, sel_getUid("URLSession:task:didFinishCollectingMetrics:"),
+                            reinterpret_cast<IMP>(&didFinishCollectingMetrics), "v@:@@@");
             class_addMethod(delegateClass,
                             sel_getUid("URLSession:task:willPerformHTTPRedirection:newRequest:completionHandler:"),
                             reinterpret_cast<IMP>(&willPerformHTTPRedirection), "v@:@@@@@");
@@ -280,9 +301,9 @@ struct SC::HttpClientAppleCallbacks
 
         SC::HttpClientResponse& response = *operation->currentResponse;
         response.statusCode         = static_cast<int>(sc_objc_msgSend<long>(urlResponse, sel_getUid("statusCode")));
-        response.negotiatedProtocol = SC::HttpClientResponse::Protocol::Http11;
-        response.redirectCount =
-            reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage)->redirectCount;
+        auto& internal              = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
+        response.negotiatedProtocol = internal.negotiatedProtocol;
+        response.redirectCount      = internal.redirectCount;
 
         id          url            = sc_objc_msgSend<id>(urlResponse, sel_getUid("URL"));
         id          absoluteString = sc_objc_msgSend<id>(url, sel_getUid("absoluteString"));
@@ -426,6 +447,40 @@ struct SC::HttpClientAppleCallbacks
             operation->enqueueResponseComplete();
         }
     }
+
+    static void didFinishCollectingMetrics(id self, SEL, id, id, id metrics)
+    {
+        SC::HttpClientOperation* operation = getOperation(self);
+        if (operation == nullptr)
+        {
+            return;
+        }
+
+        id transactions = sc_objc_msgSend<id>(metrics, sel_getUid("transactionMetrics"));
+        if (transactions == nullptr)
+        {
+            return;
+        }
+        const unsigned long count = sc_objc_msgSend<unsigned long>(transactions, sel_getUid("count"));
+        for (unsigned long reverseIdx = count; reverseIdx > 0; --reverseIdx)
+        {
+            id          transaction = sc_objc_msgSend<id>(transactions, sel_getUid("objectAtIndex:"), reverseIdx - 1);
+            id          protocol    = sc_objc_msgSend<id>(transaction, sel_getUid("networkProtocolName"));
+            const char* protocolName =
+                protocol != nullptr ? sc_objc_msgSend<const char*>(protocol, sel_getUid("UTF8String")) : nullptr;
+            const SC::HttpClientResponse::Protocol mapped = httpClientAppleMapProtocol(protocolName);
+            if (mapped != SC::HttpClientResponse::Protocol::Unknown)
+            {
+                auto& internal              = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
+                internal.negotiatedProtocol = mapped;
+                if (operation->currentResponse != nullptr)
+                {
+                    operation->currentResponse->negotiatedProtocol = mapped;
+                }
+                return;
+            }
+        }
+    }
 };
 
 SC::HttpClient::HttpClient()
@@ -529,13 +584,20 @@ SC::Result SC::HttpClientOperation::platformCancel()
 
 SC::Result SC::HttpClientOperation::platformStart()
 {
-    auto& internal           = *reinterpret_cast<Internal*>(storage);
-    internal.cancelRequested = false;
-    internal.redirectCount   = 0;
+    auto& internal              = *reinterpret_cast<Internal*>(storage);
+    internal.cancelRequested    = false;
+    internal.redirectCount      = 0;
+    internal.negotiatedProtocol = HttpClientResponse::Protocol::Unknown;
 
     SC_TRY_MSG(currentRequest.options.tls.verifyPeer, "HttpClient: Apple custom TLS settings not supported");
     SC_TRY_MSG(currentRequest.options.tls.caCertificatesPath.sizeInBytes() == 0,
                "HttpClient: Apple custom TLS settings not supported");
+    SC_TRY_MSG(currentRequest.options.protocol.preference != HttpClientRequestProtocolOptions::Http11Only,
+               "HttpClient: Apple backend does not support forcing HTTP/1.1");
+    SC_TRY_MSG(currentRequest.options.protocol.preference != HttpClientRequestProtocolOptions::Http2Required,
+               "HttpClient: Apple backend does not support requiring HTTP/2");
+    SC_TRY_MSG(currentRequest.options.proxy.mode == HttpClientRequestProxyOptions::Default,
+               "HttpClient: Apple backend does not support custom proxy policy");
 
     id configurationClass = reinterpret_cast<id>(objc_getClass("NSURLSessionConfiguration"));
     id configuration      = sc_objc_msgSend<id>(configurationClass, sel_getUid("ephemeralSessionConfiguration"));
@@ -616,8 +678,7 @@ SC::Result SC::HttpClientOperation::platformStart()
         sc_objc_msgSend<void>(requestObj, sel_getUid("setValue:forHTTPHeaderField:"), headerValue, headerName);
     }
 
-    const uint64_t declaredBodySize =
-        currentRequest.body.isStreamed() ? currentRequest.body.sizeInBytes : currentRequest.body.bytes.sizeInBytes();
+    const uint64_t declaredBodySize = currentRequest.body.getDeclaredSizeInBytes();
     if (declaredBodySize > 0 and not httpClientAppleHasHeader(currentRequest, SC::StringSpan("Content-Length")))
     {
         const size_t encodedLength = httpClientAppleWriteUnsigned(declaredBodySize, backendScratch);
