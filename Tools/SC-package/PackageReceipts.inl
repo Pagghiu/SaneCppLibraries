@@ -108,14 +108,19 @@ namespace Tools
 
 static Result assignJSONField(String& output, StringView value)
 {
-    SC_TRY(output.assign(value));
+    // Keep receipt objects UTF-8 so JSON escaping never slices native UTF-16 paths.
+    String utf8    = StringEncoding::Utf8;
+    auto   builder = StringBuilder::create(utf8);
+    SC_TRY(builder.append(value));
+    const StringView utf8View = builder.finalize();
+    SC_TRY(output.assign(utf8View.isEmpty() ? StringView(StringEncoding::Utf8) : utf8View));
     return Result(true);
 }
 
 static Result appendJSONString(Vector<String>& output, StringView value)
 {
     String item = StringEncoding::Utf8;
-    SC_TRY(item.assign(value));
+    SC_TRY(assignJSONField(item, value));
     SC_TRY(output.push_back(move(item)));
     return Result(true);
 }
@@ -234,6 +239,8 @@ Result writePackageReceipt(const Package& package, const PackageReceiptInfo& inf
     SC_TRY(assignJSONField(receiptJSON.sourceHash, sourceHash.view()));
     SC_TRY(assignJSONField(receiptJSON.installRoot, package.installDirectoryLink.view()));
     SC_TRY(assignJSONField(receiptJSON.validation, info.validation));
+    SC_TRY(receiptJSON.phases.reserve(info.phases.sizeInElements()));
+    SC_TRY(receiptJSON.exports.reserve(exports.sizeInElements()));
     for (size_t idx = 0; idx < info.phases.sizeInElements(); ++idx)
     {
         SC_TRY(appendJSONString(receiptJSON.phases, info.phases[idx]));

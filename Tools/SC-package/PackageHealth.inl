@@ -574,6 +574,7 @@ static Result lockInstalledPackages(StringView packagesInstallDirectory, StringV
         SC_TRY(assignJSONField(entry.sourceHash, receiptJSON.sourceHash.view()));
         SC_TRY(assignJSONField(entry.installRoot, receiptJSON.installRoot.view()));
         SC_TRY(assignJSONField(entry.receipt, receiptPath));
+        SC_TRY(entry.exports.reserve(receiptJSON.exports.size()));
         for (PackageReceiptExportJSON& exportView : receiptJSON.exports)
         {
             SC_TRY(appendJSONExport(entry.exports, exportView.kind.view(), exportView.name.view(),
