@@ -68,7 +68,7 @@ static Result installFakeRegistryPackage(StringView, StringView packagesInstallD
 #if !SC_PLATFORM_WINDOWS
 static Result writeFakeQEMURunner(FileSystem& fs, StringView path, StringView name)
 {
-    String script = StringEncoding::Utf8;
+    String script  = StringEncoding::Utf8;
     auto   builder = StringBuilder::create(script);
     SC_TRY(builder.append("#!/bin/sh\n"));
     SC_TRY(builder.append("echo \"{} version 10.0.0\"\n", name));
@@ -1011,7 +1011,7 @@ struct SupportToolsTest : public TestCase
             };
             const PackageRegistryEntry fakeEntry = {
                 "fake", "external-fake", PackageKind::Tool, "External package registry fixture", "host", "test fixture",
-                false,  fakeExports,     fakePhases, installFakeRegistryPackage};
+                false,  fakeExports,     fakePhases,        installFakeRegistryPackage};
             PackageRegistryEntry   registryStorage[16];
             PackageRegistryBuilder registryBuilder = {{registryStorage, 16}};
             SC_TEST_EXPECT(addBuiltinPackages(registryBuilder));
@@ -1060,14 +1060,18 @@ struct SupportToolsTest : public TestCase
             static constexpr PackageRegistryExport missingExports[] = {
                 {PackageExportKind::Tool, "missing-tool"},
             };
-            const PackageRegistryEntry badEntry = {
-                "fake-missing", "external-fake",
-                PackageKind::Tool, "External package registry fixture with a mismatched contract",
-                "host",         "test fixture",
-                false,          missingExports,
-                fakePhases,     installFakeRegistryPackage};
-            const PackageRegistry badRegistry = {{&badEntry, 1}};
-            args[0]                           = "fake-missing";
+            const PackageRegistryEntry badEntry    = {"fake-missing",
+                                                      "external-fake",
+                                                      PackageKind::Tool,
+                                                      "External package registry fixture with a mismatched contract",
+                                                      "host",
+                                                      "test fixture",
+                                                      false,
+                                                      missingExports,
+                                                      fakePhases,
+                                                      installFakeRegistryPackage};
+            const PackageRegistry      badRegistry = {{&badEntry, 1}};
+            args[0]                                = "fake-missing";
             SC_TEST_EXPECT(not runPackageTool(arguments, badRegistry));
 
             arguments.action = "doctor";
@@ -1107,11 +1111,11 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments));
 
             String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUX86_64,
-                                                        resolved));
+            SC_TEST_EXPECT(
+                resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUX86_64, resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-x86_64"));
-            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64,
-                                                        resolved));
+            SC_TEST_EXPECT(
+                resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::RunnerQEMUArm64, resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("qemu-aarch64"));
         }
 #endif
@@ -1173,11 +1177,11 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(runPackageTool(arguments));
 
             String resolved = StringEncoding::Utf8;
-            SC_TEST_EXPECT(resolvePackageExportPath(packageRoot.view(), PackageExport::LLVMMinGWClangXXArm64,
-                                                    resolved));
+            SC_TEST_EXPECT(
+                resolvePackageExportPath(packageRoot.view(), PackageExport::LLVMMinGWClangXXArm64, resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("aarch64-w64-mingw32-clang++"));
-            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(),
-                                                        PackageCapability::ToolchainWindowsGNUArm64, resolved));
+            SC_TEST_EXPECT(resolvePackageCapabilityPath(packageRoot.view(), PackageCapability::ToolchainWindowsGNUArm64,
+                                                        resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("aarch64-w64-mingw32-clang"));
         }
         if (test_section("package commands accept external copy recipe"))
@@ -1217,11 +1221,18 @@ struct SupportToolsTest : public TestCase
             recipe.phases                  = phases;
             recipe.phaseRegistry           = builtinPackagePhaseRegistry();
 
-            const PackageRegistryEntry recipeEntry = {
-                "copy-fake", "external-copy", PackageKind::Tool, "External copy recipe fixture",
-                "host",      "test fixture",  false,  registryExports,
-                phases,      nullptr,         &recipe};
-            const PackageRegistry recipeRegistry = {{&recipeEntry, 1}};
+            const PackageRegistryEntry recipeEntry    = {"copy-fake",
+                                                         "external-copy",
+                                                         PackageKind::Tool,
+                                                         "External copy recipe fixture",
+                                                         "host",
+                                                         "test fixture",
+                                                         false,
+                                                         registryExports,
+                                                         phases,
+                                                         nullptr,
+                                                         &recipe};
+            const PackageRegistry      recipeRegistry = {{&recipeEntry, 1}};
 
             Package package;
             arguments.tool      = "package";
@@ -1239,18 +1250,22 @@ struct SupportToolsTest : public TestCase
             static constexpr StringView badPhases[] = {
                 "missingPhase",
             };
-            PackageRecipe badRecipe                   = recipe;
-            badRecipe.phases                          = badPhases;
-            const PackageRegistryEntry badRecipeEntry = {
-                "copy-fake-bad", "external-copy-bad",
-                PackageKind::Tool, "External copy recipe fixture with an unknown phase",
-                "host",          "test fixture",
-                false,           registryExports,
-                badPhases,       nullptr,
-                &badRecipe};
-            const PackageRegistry badRecipeRegistry = {{&badRecipeEntry, 1}};
-            args[0]                                 = "copy-fake-bad";
-            arguments.action                        = "install";
+            PackageRecipe badRecipe                      = recipe;
+            badRecipe.phases                             = badPhases;
+            const PackageRegistryEntry badRecipeEntry    = {"copy-fake-bad",
+                                                            "external-copy-bad",
+                                                            PackageKind::Tool,
+                                                            "External copy recipe fixture with an unknown phase",
+                                                            "host",
+                                                            "test fixture",
+                                                            false,
+                                                            registryExports,
+                                                            badPhases,
+                                                            nullptr,
+                                                            &badRecipe};
+            const PackageRegistry      badRecipeRegistry = {{&badRecipeEntry, 1}};
+            args[0]                                      = "copy-fake-bad";
+            arguments.action                             = "install";
             SC_TEST_EXPECT(not runPackageTool(arguments, badRecipeRegistry, &package));
         }
         if (test_section("package receipt resolves exports and capabilities"))

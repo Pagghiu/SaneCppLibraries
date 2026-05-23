@@ -94,7 +94,7 @@ static Result findPackageRepairRoot(StringView packagesInstallDirectory, const P
 
 static Result readRepairReceiptIfPresent(StringView packageRoot, PackageReceiptJSON& receiptJSON, bool& found)
 {
-    found = false;
+    found              = false;
     String receiptPath = StringEncoding::Utf8;
     SC_TRY(packageReceiptPath(packageRoot, receiptPath));
 
@@ -119,8 +119,7 @@ static Result readRepairReceiptIfPresent(StringView packageRoot, PackageReceiptJ
 }
 
 static Result writeRepairedPackageReceipt(StringView packageRoot, StringView packageName,
-                                          Span<const PackageReceiptExport> exports,
-                                          Span<const StringView> phases)
+                                          Span<const PackageReceiptExport> exports, Span<const StringView> phases)
 {
     PackageReceiptJSON existingReceipt;
     bool               hasExistingReceipt = false;
@@ -135,7 +134,7 @@ static Result writeRepairedPackageReceipt(StringView packageRoot, StringView pac
     SC_TRY(variant.assign(hasExistingReceipt and not existingReceipt.variant.isEmpty() ? existingReceipt.variant.view()
                                                                                        : hostPackagePlatformName()));
     SC_TRY(source.assign(hasExistingReceipt and not existingReceipt.source.isEmpty() ? existingReceipt.source.view()
-                                                                                    : "repair"_a8));
+                                                                                     : "repair"_a8));
     if (hasExistingReceipt and validatePackageReceiptSourceHash(existingReceipt.sourceHash.view()))
     {
         SC_TRY(sourceHash.assign(existingReceipt.sourceHash.view()));
@@ -191,27 +190,17 @@ static Result repairQEMUPackageReceipt(Console& console, StringView packagesInst
 static Result repairLLVMMingwPackageReceipt(Console& console, StringView packagesInstallDirectory,
                                             const PackageRegistryEntry& entry)
 {
-    String packageRoot    = StringEncoding::Utf8;
-    String x64Compiler    = StringEncoding::Utf8;
-    String x64CompilerCpp = StringEncoding::Utf8;
-    String arm64Compiler  = StringEncoding::Utf8;
-    String arm64Cpp       = StringEncoding::Utf8;
-    String archiver       = StringEncoding::Utf8;
+    String packageRoot = StringEncoding::Utf8;
     SC_TRY(findPackageRepairRoot(packagesInstallDirectory, entry, packageRoot));
-    SC_TRY(Path::join(x64Compiler, {"bin", "x86_64-w64-mingw32-clang"}));
-    SC_TRY(Path::join(x64CompilerCpp, {"bin", "x86_64-w64-mingw32-clang++"}));
-    SC_TRY(Path::join(arm64Compiler, {"bin", "aarch64-w64-mingw32-clang"}));
-    SC_TRY(Path::join(arm64Cpp, {"bin", "aarch64-w64-mingw32-clang++"}));
-    SC_TRY(Path::join(archiver, {"bin", "llvm-ar"}));
 
     const PackageReceiptExport exports[] = {
-        {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64, x64Compiler.view()},
-        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64, x64CompilerCpp.view()},
-        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangArm64, arm64Compiler.view()},
-        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXXArm64, arm64Cpp.view()},
-        {PackageExportKind::Tool, PackageExport::LLVMAr, archiver.view()},
-        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUX86_64, x64Compiler.view()},
-        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUArm64, arm64Compiler.view()},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64, "bin/x86_64-w64-mingw32-clang"},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64, "bin/x86_64-w64-mingw32-clang++"},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangArm64, "bin/aarch64-w64-mingw32-clang"},
+        {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXXArm64, "bin/aarch64-w64-mingw32-clang++"},
+        {PackageExportKind::Tool, PackageExport::LLVMAr, "bin/llvm-ar"},
+        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUX86_64, "bin/x86_64-w64-mingw32-clang"},
+        {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUArm64, "bin/aarch64-w64-mingw32-clang"},
     };
     SC_TRY(validateLLVMMingwPackageRoot(packageRoot.view(), exports));
     SC_TRY(writeRepairedPackageReceipt(packageRoot.view(), "llvm-mingw", exports, LLVMMingwPhases));

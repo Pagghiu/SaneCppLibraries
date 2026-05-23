@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "Tools.h"
 #include "SC-package/BuiltinCatalog.h"
 #include "SC-package/PackageManager.h"
+#include "Tools.h"
 
 #include "../Libraries/File/File.h"
 #include "../Libraries/FileSystem/FileSystem.h"

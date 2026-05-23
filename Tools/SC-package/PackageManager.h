@@ -181,17 +181,17 @@ struct PackagePhaseRegistry
 
 struct PackageRegistryEntry
 {
-    StringView             name;
-    StringView             installedName;
-    StringView             kind;
-    StringView             description;
-    StringView             variants;
-    StringView             source;
-    bool                   supportsImport = false;
+    StringView                        name;
+    StringView                        installedName;
+    StringView                        kind;
+    StringView                        description;
+    StringView                        variants;
+    StringView                        source;
+    bool                              supportsImport = false;
     Span<const PackageRegistryExport> exports;
-    Span<const StringView> phases;
-    PackageInstallHandler  install = nullptr;
-    const PackageRecipe*   recipe  = nullptr;
+    Span<const StringView>            phases;
+    PackageInstallHandler             install = nullptr;
+    const PackageRecipe*              recipe  = nullptr;
 };
 
 struct PackageRegistry
@@ -268,9 +268,9 @@ constexpr StringView PackagesCacheDirectory   = "_PackagesCache";
 constexpr StringView PackagesInstallDirectory = "_Packages";
 constexpr StringView PackageReceiptFileName   = "sc-package-receipt.json";
 
-Result writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
-                           Span<const PackageReceiptExport> exports = {});
-Result installPackageRecipe(const PackageRecipe& recipe, Package& package);
+Result               writePackageReceipt(const Package& package, const PackageReceiptInfo& info,
+                                         Span<const PackageReceiptExport> exports = {});
+Result               installPackageRecipe(const PackageRecipe& recipe, Package& package);
 PackagePhaseRegistry builtinPackagePhaseRegistry();
 Result               resolvePackageExportPath(StringView packageRoot, StringView exportName, String& output);
 Result               resolvePackageCapabilityPath(StringView packageRoot, StringView capabilityName, String& output);

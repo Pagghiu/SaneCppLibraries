@@ -2145,10 +2145,17 @@ static Result writeFilCCompilerWrapperScript(FileSystem& fs, StringView scriptPa
     SC_TRY(builder.append("COMPILER_PATH=\"{}\"\n", compilerPath));
     SC_TRY(builder.append("COMPILER_DIR=$(dirname \"$COMPILER_PATH\")\n"));
     SC_TRY(builder.append("cd \"$COMPILER_DIR\" || exit 1\n"));
-    SC_TRY(builder.append("exec \"{}\" \"$COMPILER_PATH\" \"$@\"\n", launcherPath));
+    if (launcherPath.isEmpty())
+    {
+        SC_TRY(builder.append("exec \"$COMPILER_PATH\" \"$@\"\n"));
+    }
+    else
+    {
+        SC_TRY(builder.append("exec \"{}\" \"$COMPILER_PATH\" \"$@\"\n", launcherPath));
+    }
     builder.finalize();
     SC_TRY(fs.writeString(scriptPath, script.view()));
-    SC_TRY(fs.chmod(scriptPath, 0755));
+    SC_TRY(fs.chmod(scriptPath, 0755u));
     return Result(true);
 }
 
@@ -2157,15 +2164,16 @@ static Result prepareFilCCompilerLaunchers(StringView packageRoot)
     FileSystem fs;
     SC_TRY(fs.init("."));
 
-    if (HostPlatform != Platform::Linux or HostInstructionSet != InstructionSet::ARM64)
+    if (HostPlatform != Platform::Linux)
     {
         return Result(true);
     }
 
     static constexpr StringView rosettaPath = "/media/psf/RosettaLinux/rosetta";
-    if (not fs.existsAndIsFile(rosettaPath))
+    StringView                  launcherPath;
+    if (HostInstructionSet == InstructionSet::ARM64 and fs.existsAndIsFile(rosettaPath))
     {
-        return Result(true);
+        launcherPath = rosettaPath;
     }
 
     String rawCompilerC   = StringEncoding::Utf8;
@@ -2179,8 +2187,8 @@ static Result prepareFilCCompilerLaunchers(StringView packageRoot)
     SC_TRY(Path::join(wrapperC, {wrapperRoot.view(), "clang"}));
     SC_TRY(Path::join(wrapperCpp, {wrapperRoot.view(), "clang++"}));
     SC_TRY(fs.makeDirectoryRecursive(wrapperRoot.view()));
-    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperC.view(), rosettaPath, rawCompilerC.view()));
-    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperCpp.view(), rosettaPath, rawCompilerCpp.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperC.view(), launcherPath, rawCompilerC.view()));
+    SC_TRY(writeFilCCompilerWrapperScript(fs, wrapperCpp.view(), launcherPath, rawCompilerCpp.view()));
     return Result(true);
 }
 
@@ -2295,6 +2303,16 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
                 break;
             }
         }
+    }
+
+    if (not importDirectory.isEmpty() and not fs.existsAndIsDirectory(resolvedImportDirectory.view()))
+    {
+        return Result::Error("Imported Fil-C toolchain directory does not exist");
+    }
+    if (importDirectory.isEmpty() and not resolvedImportDirectory.isEmpty() and
+        not fs.existsAndIsDirectory(resolvedImportDirectory.view()))
+    {
+        SC_TRY(resolvedImportDirectory.assign({}));
     }
 
     const bool importing        = not resolvedImportDirectory.isEmpty();
@@ -3284,7 +3302,8 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
     SC_TRY(packageInstall(download, package, functions));
     const PackageReceiptExport exports[] = {
         {PackageExportKind::Runner, PackageExport::RunnerWine, "Wine Stable.app/Contents/Resources/wine/bin/wine"},
-        {PackageExportKind::Capability, PackageCapability::RunnerWine, "Wine Stable.app/Contents/Resources/wine/bin/wine"},
+        {PackageExportKind::Capability, PackageCapability::RunnerWine,
+         "Wine Stable.app/Contents/Resources/wine/bin/wine"},
     };
     static constexpr StringView phases[] = {
         "extractWineStableRunner",

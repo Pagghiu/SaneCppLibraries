@@ -58,7 +58,8 @@ static Result printStringViewList(Console& console, StringView label, Span<const
     return Result(true);
 }
 
-static Result printPackageRegistryExportList(Console& console, StringView label, Span<const PackageRegistryExport> values)
+static Result printPackageRegistryExportList(Console& console, StringView label,
+                                             Span<const PackageRegistryExport> values)
 {
     console.print(label);
     console.print(" = ");
