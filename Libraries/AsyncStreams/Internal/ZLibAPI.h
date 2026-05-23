@@ -34,8 +34,7 @@ struct SC::ZLibAPI
         unsigned long adler;     // Adler-32 checksum of the uncompressed data
         unsigned long reserved;  // Reserved for future use
     };
-    static constexpr int         MaxBits = 15;
-    static constexpr const char* Version = "1.2.12";
+    static constexpr int MaxBits = 15;
 
     enum Flush : int
     {
@@ -94,13 +93,13 @@ struct SC::ZLibAPI
 
     Error deflateInit2(Stream& strm, Compression level, Method method, int windowBits, int memLevel, Strategy strategy)
     {
-        return pDeflateInit2(&strm, level, method, windowBits, memLevel, strategy, Version,
+        return pDeflateInit2(&strm, level, method, windowBits, memLevel, strategy, pZlibVersion(),
                              static_cast<int>(sizeof(Stream)));
     }
 
     Error inflateInit2(Stream& strm, int windowBits)
     {
-        return pInflateInit2(&strm, windowBits, Version, static_cast<int>(sizeof(Stream)));
+        return pInflateInit2(&strm, windowBits, pZlibVersion(), static_cast<int>(sizeof(Stream)));
     }
 
   private:
@@ -114,6 +113,7 @@ struct SC::ZLibAPI
     Error(SC_ZLIB_API_CC* pDeflateEnd)(void* strm)                                                         = nullptr;
     Error(SC_ZLIB_API_CC* pInflate)(void* strm, Flush flush)                                               = nullptr;
     Error(SC_ZLIB_API_CC* pInflateEnd)(void* strm)                                                         = nullptr;
+    const char*(SC_ZLIB_API_CC* pZlibVersion)()                                                            = nullptr;
     Error(SC_ZLIB_API_CC* pDeflateInit2)(void* strm, Compression level, Method method, int windowBits, int memLevel,
                                          Strategy strategy, const char* version, int stream_size)          = nullptr;
     Error(SC_ZLIB_API_CC* pInflateInit2)(void* strm, int windowBits, const char* version, int stream_size) = nullptr;

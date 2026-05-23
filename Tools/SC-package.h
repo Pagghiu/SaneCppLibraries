@@ -434,6 +434,8 @@ Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesI
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installFilCToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                             StringView importDirectory = {});
+Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                       StringView importDirectory = {});
 Result installLLVMMingwToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                  Package& package);
 Result installLinuxSysroot(StringView packagesCacheDirectory, StringView packagesInstallDirectory,

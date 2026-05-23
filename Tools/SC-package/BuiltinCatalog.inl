@@ -36,6 +36,14 @@ static Result installFilCEntry(StringView cache, StringView install, Package& pa
     return installFilCToolchain(cache, install, package, options.importDirectory);
 }
 
+static Result installZLibFilCEntry(StringView cache, StringView install, Package& package,
+                                   Span<const StringView> arguments)
+{
+    ZLibFilCPackageInstallOptions options;
+    SC_TRY(parseZLibFilCPackageInstallOptions(arguments, options));
+    return installZLibFilC(cache, install, package, options.importDirectory);
+}
+
 static Result installLLVMMingwEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
 {
     return installLLVMMingwToolchain(cache, install, package);
@@ -152,6 +160,19 @@ static constexpr StringView FilCPhases[] = {
     "validateFilCToolchain",
     "writeReceipt",
 };
+static constexpr PackageRegistryExport ZLibFilCExports[] = {
+    {PackageExportKind::Library, PackageExport::ZLibShared},
+    {PackageExportKind::Library, PackageExport::ZLibSharedLink},
+    {PackageExportKind::LibraryDir, PackageExport::ZLibLibraryDir},
+    {PackageExportKind::IncludeDir, PackageExport::ZLibIncludeDir},
+    {PackageExportKind::Capability, PackageCapability::LibraryZLibFilCX86_64},
+};
+static constexpr StringView ZLibFilCPhases[] = {
+    "resolveZLibSource",
+    "buildZLibWithSCBuildFilC",
+    "validateZLibRuntime",
+    "writeReceipt",
+};
 static constexpr PackageRegistryExport LLVMMingwExports[] = {
     {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64},
     {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64},
@@ -217,6 +238,8 @@ static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
      "Imported directory or PATH", true, QEMUExports, QEMUPhases, installQEMUEntry},
     {"filc", "filc", PackageKind::Toolchain, "Experimental Fil-C compiler toolchain", "linux-x86_64",
      "Pinned archive or import", true, FilCExports, FilCPhases, installFilCEntry},
+    {"zlib-filc", "zlib_filc", PackageKind::Library, "Fil-C native zlib shared library", "linux-x86_64",
+     "Pinned zlib archive or import", true, ZLibFilCExports, ZLibFilCPhases, installZLibFilCEntry},
     {"llvm-mingw", "llvm-mingw", PackageKind::Toolchain, "LLVM MinGW Windows GNU toolchain", "host",
      "llvm-mingw release archive", false, LLVMMingwExports, LLVMMingwPhases, installLLVMMingwEntry},
     {"linux-sysroot-glibc-x86_64", "linux-sysroot-glibc-x86_64", PackageKind::Sysroot, "Linux glibc x86_64 sysroot",

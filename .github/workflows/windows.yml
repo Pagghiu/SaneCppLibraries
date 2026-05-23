@@ -51,16 +51,35 @@ jobs:
         key: sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt') }}
         restore-keys: |
           sc-packages-windows-linux-sysroot-musl-x86_64-v1-${{ runner.os }}-${{ runner.arch }}-
+    - name: Check restored Linux sysroots
+      id: linux_sysroots
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [[ -f "_Build/_Packages/linux-sysroot_glibc_arm64/sc-package-receipt.json" ]]; then
+          echo "glibc-arm64-installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "glibc-arm64-installed=false" >> "$GITHUB_OUTPUT"
+        fi
+        if [[ -f "_Build/_Packages/linux-sysroot_musl_x86_64/sc-package-receipt.json" ]]; then
+          echo "musl-x86_64-installed=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "musl-x86_64-installed=false" >> "$GITHUB_OUTPUT"
+        fi
     - name: Warm packaged LLVM toolchain
       if: steps.llvm-cache.outputs.cache-hit != 'true'
       shell: cmd
       run: |
         call SC.bat package install llvm
-    - name: Warm packaged Linux sysroots
-      if: steps.linux_sysroot_glibc_arm64_cache.outputs.cache-hit != 'true' || steps.linux_sysroot_musl_x64_cache.outputs.cache-hit != 'true'
+    - name: Warm packaged Linux glibc arm64 sysroot
+      if: steps.linux_sysroots.outputs.glibc-arm64-installed != 'true'
       shell: cmd
       run: |
         call SC.bat package install linux-sysroot-glibc-arm64
+    - name: Warm packaged Linux musl x86_64 sysroot
+      if: steps.linux_sysroots.outputs.musl-x86_64-installed != 'true'
+      shell: cmd
+      run: |
         call SC.bat package install linux-sysroot-musl-x86_64
     - name: Prune LLVM package cache
       if: steps.llvm-cache.outputs.cache-hit != 'true'

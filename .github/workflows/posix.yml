@@ -322,8 +322,24 @@ jobs:
       run: ./SC.sh build compile SaneHttpGet Debug native --toolchain filc
     - name: compile SCTest with Fil-C
       run: ./SC.sh build compile SCTest Debug native --toolchain filc
+    - name: Restore zlib-filc source cache
+      id: zlib-filc-cache
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          _Build/_PackagesCache/zlib-filc
+        key: sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('Tools/SC-package-versions.txt', 'Tools/SC-package.cpp', 'Tools/SC-package.h') }}
+        restore-keys: |
+          sc-packages-posix-zlib-filc-v1-${{ runner.os }}-${{ runner.arch }}-
     - name: test SCTest with Fil-C
       run: ./SC.sh build run SCTest Debug native --toolchain filc -- --all-tests
+    - name: Save zlib-filc source cache
+      if: always() && steps.zlib-filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/zlib-filc/**') != ''
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          _Build/_PackagesCache/zlib-filc
+        key: ${{ steps.zlib-filc-cache.outputs.cache-primary-key }}
     - name: Save Fil-C cache
       if: always() && steps.filc-cache.outputs.cache-hit != 'true' && hashFiles('_Build/_PackagesCache/filc/**') != ''
       uses: actions/cache/save@v4

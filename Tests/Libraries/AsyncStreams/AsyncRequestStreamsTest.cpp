@@ -32,14 +32,6 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
     AsyncEventLoop::Options options;
     AsyncRequestStreamsTest(SC::TestReport& report) : TestCase(report, "AsyncRequestStreamsTest")
     {
-#if SC_COMPILER_FILC
-        if (not report.quietMode)
-        {
-            report.console.printLine("AsyncRequestStreamsTest - Skipping under Fil-C: compression paths depend on "
-                                     "host zlib ABI loading");
-        }
-        return;
-#else
         int numTestsToRun = 1;
         if (AsyncEventLoop::tryProbingIOUring())
         {
@@ -145,7 +137,6 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
                 options.apiType = AsyncEventLoop::Options::ApiType::ForceUseIoUring;
             }
         }
-#endif
     }
 
     void createAsyncConnectedSockets(AsyncEventLoop& eventLoop, SocketDescriptor& writeSide,

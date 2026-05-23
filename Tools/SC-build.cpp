@@ -321,6 +321,7 @@ static constexpr StringView TEST_PROJECT_NAME                        = "SCTest";
 static constexpr StringView AWAIT_TEST_PROJECT_NAME                  = "SCAwaitTest";
 static constexpr StringView BUILD_TEST_PROJECT_NAME                  = "SCBuildTest";
 static constexpr StringView STD_CPP_HEADER_NO_LINK_TEST_PROJECT_NAME = "SCStdCppHeaderNoLinkTest";
+static constexpr StringView ZLIB_FILC_PROJECT_NAME                   = "ZLibFilC";
 
 static void configureSaneStrictNoStdCpp(Project& project)
 {
@@ -340,6 +341,53 @@ static void configureSaneStdHeadersNoRuntime(Project& project)
     project.link.linkStdCpp                = false;
     project.saneCpp.enabled                = true;
     project.saneCpp.provideCppRuntimeShims = true;
+}
+
+static Result configureZLibFilC(const Parameters& parameters, Workspace& workspace)
+{
+    ProcessEnvironment environment;
+    StringSpan         sourceDirectory;
+    StringSpan         outputDirectory;
+    StringSpan         intermediateDirectory;
+    if (not environment.get("SC_ZLIB_FILC_SOURCE_DIR", sourceDirectory) or sourceDirectory.isEmpty())
+    {
+        return Result(true);
+    }
+    SC_TRY_MSG(environment.get("SC_ZLIB_FILC_OUTPUT_DIR", outputDirectory) and not outputDirectory.isEmpty(),
+               "SC_ZLIB_FILC_OUTPUT_DIR is required when SC_ZLIB_FILC_SOURCE_DIR is set");
+    SC_TRY_MSG(environment.get("SC_ZLIB_FILC_INTERMEDIATE_DIR", intermediateDirectory) and
+                   not intermediateDirectory.isEmpty(),
+               "SC_ZLIB_FILC_INTERMEDIATE_DIR is required when SC_ZLIB_FILC_SOURCE_DIR is set");
+
+    Project project = {ZLIB_FILC_PROJECT_NAME, TargetType::SharedLibrary};
+    project.setRootDirectory(sourceDirectory);
+    SC_TRY(project.targetName.assign("libz"));
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+    for (Configuration& configuration : project.configurations)
+    {
+        SC_TRY(configuration.outputPath.assign(outputDirectory));
+        SC_TRY(configuration.intermediatesPath.assign(intermediateDirectory));
+        SC_TRY(configuration.compile.defines.push_back("ZEXPORT=__attribute__((visibility(\"default\")))"));
+        SC_TRY(configuration.compile.defines.push_back("ZEXPORTVA=__attribute__((visibility(\"default\")))"));
+        SC_TRY(configuration.compile.defines.push_back("HAVE_UNISTD_H"));
+        SC_TRY(configuration.compile.defines.push_back("HAVE_HIDDEN"));
+        SC_TRY(configuration.compile.disableWarnings({"implicit-fallthrough"}));
+        configuration.link.enableDeadCodeStripping = false;
+    }
+
+    static constexpr StringView sources[] = {
+        "adler32.c", "compress.c", "crc32.c",   "deflate.c",  "gzclose.c", "gzlib.c",   "gzread.c", "gzwrite.c",
+        "infback.c", "inffast.c",  "inflate.c", "inftrees.c", "trees.c",   "uncompr.c", "zutil.c",
+    };
+    for (const StringView source : sources)
+    {
+        SC_TRY(project.addFile(source));
+    }
+    SC_TRY(project.addIncludePaths({"."}));
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
 }
 
 Result configureTests(const Parameters& parameters, Workspace& workspace)
@@ -740,6 +788,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
     SC_TRY(configureExamplesGUI(parameters, defaultWorkspace));
+    SC_TRY(configureZLibFilC(parameters, defaultWorkspace));
     definition.workspaces.push_back(move(defaultWorkspace));
 
     (void)configureSingleFileLibs(definition, parameters);

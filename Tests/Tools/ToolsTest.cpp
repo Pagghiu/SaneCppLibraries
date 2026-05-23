@@ -984,6 +984,25 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 3};
             SC_TEST_EXPECT(not runPackageTool(arguments));
         }
+        if (test_section("install zlib-filc rejects missing import-directory value"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "zlib-filc";
+            args[1]             = "--import-directory";
+            arguments.arguments = {args, 2};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
+        if (test_section("install zlib-filc rejects unknown option"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "install";
+            args[0]             = "zlib-filc";
+            args[1]             = "--unknown";
+            args[2]             = "value";
+            arguments.arguments = {args, 3};
+            SC_TEST_EXPECT(not runPackageTool(arguments));
+        }
         if (test_section("install msvc rejects missing wine option value"))
         {
             arguments.tool      = "package";

@@ -36,3 +36,6 @@ qemu:
 msvc:
 - Visual Studio 2022 Build Tools 14.44.35211
 - Windows SDK 10.0.26100.0
+
+zlib-filc:
+- zlib 1.3.1

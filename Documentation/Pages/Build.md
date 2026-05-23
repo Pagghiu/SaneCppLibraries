@@ -408,6 +408,8 @@ Typical native commands:
 ./SC.sh build compile SCTest --target windows-gnu-arm64 --output quiet
 ./SC.sh package install filc --import-directory /home/user/filc-0.678-linux-x86_64
 ./SC.sh build compile SaneHttpGet --toolchain filc --output quiet
+./SC.sh package install zlib-filc
+./SC.sh build run SCTest Debug native --toolchain filc -- --test ZLibStreamTest
 ./SC.sh package install msvc
 ./SC.sh package install msvc --import-directory /opt/msvc-portable --wine /opt/bin/wine-wrapper
 ./SC.sh build compile SCTest --target windows-msvc-x86_64 --output quiet
@@ -428,6 +430,8 @@ Important current limits:
 - Windows-host Linux-target support is compile-only today and validated for representative glibc arm64 and musl x86_64
   slices; Windows-host Linux run validation is still pending
 - Fil-C is still an experimental compiler-first Linux track: the public shape is `--toolchain filc`, no public `linux-filc-*` target profile exists, Linux `x86_64` is the only intended output slice for the first milestone, and Linux arm64 hosts may still require imported local installs plus host-specific translation/linker helpers during validation
+- Fil-C `build run` installs/rebuilds `zlib-filc` on demand and prepends that package's `lib` directory to
+  `LD_LIBRARY_PATH` so zlib-backed tests load a Fil-C-built `libz.so.1`
 - Windows native sysroot selection is not implemented yet
 - `run` is valid only for executable targets and only when a single project is selected
 - The repository `build configure` command remains available for generated-project workflows; native builds do not need

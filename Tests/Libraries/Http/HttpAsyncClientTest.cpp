@@ -169,13 +169,6 @@ struct TimeoutGuard
 
 static bool compressionTestsAvailable(SC::TestReport& report)
 {
-#if SC_COMPILER_FILC
-    if (not report.quietMode)
-    {
-        report.console.printLine("HttpAsyncClientTest compression sections skipped under Fil-C");
-    }
-    return false;
-#else
     SC_COMPILER_UNUSED(report);
     auto host           = SC::HostPlatform;
     auto instructionSet = SC::HostInstructionSet;
@@ -184,7 +177,6 @@ static bool compressionTestsAvailable(SC::TestReport& report)
         return false;
     }
     return true;
-#endif
 }
 
 static SC::Result decompressForTest(SC::ZLibStream::Algorithm algorithm, SC::Span<const char> input,

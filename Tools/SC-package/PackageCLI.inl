@@ -33,6 +33,7 @@ static Result printPackageHelp(Console& console)
     console.printLine("Import-capable packages:");
     console.printLine("  qemu --import-directory <path>");
     console.printLine("  filc --import-directory <path>");
+    console.printLine("  zlib-filc --import-directory <path>");
     console.printLine("  msvc --import-directory <path> --wine <path>");
     return Result(true);
 }

@@ -1097,6 +1097,11 @@ struct FilCPackageInstallOptions
     StringView importDirectory;
 };
 
+struct ZLibFilCPackageInstallOptions
+{
+    StringView importDirectory;
+};
+
 static Result parseQEMUPackageInstallOptions(Span<const StringView> arguments, QEMUPackageInstallOptions& options)
 {
     options = {};
@@ -1156,6 +1161,39 @@ static Result parseFilCPackageInstallOptions(Span<const StringView> arguments, F
         else
         {
             return Result::Error("Unexpected extra argument for SC-package install filc");
+        }
+    }
+    return Result(true);
+}
+
+static Result parseZLibFilCPackageInstallOptions(Span<const StringView>         arguments,
+                                                 ZLibFilCPackageInstallOptions& options)
+{
+    options = {};
+    if (arguments.sizeInElements() <= 1)
+    {
+        return Result(true);
+    }
+
+    for (size_t idx = 1; idx < arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments[idx];
+        if (argument == "--import-directory")
+        {
+            SC_TRY_MSG(idx + 1 < arguments.sizeInElements(), "Missing value for --import-directory");
+            options.importDirectory = arguments[++idx];
+        }
+        else if (argument.startsWith("--"))
+        {
+            return Result::Error("Unknown option for SC-package install zlib-filc");
+        }
+        else if (options.importDirectory.isEmpty())
+        {
+            options.importDirectory = argument;
+        }
+        else
+        {
+            return Result::Error("Unexpected extra argument for SC-package install zlib-filc");
         }
     }
     return Result(true);
@@ -2454,6 +2492,299 @@ Result installFilCToolchain(StringView packagesCacheDirectory, StringView packag
 Result installFilCToolchain(StringView, StringView, Package&, StringView)
 {
     return Result::Error("Fil-C package install is only supported on Linux hosts");
+}
+#endif
+
+#if SC_PLATFORM_LINUX
+static Result validateZLibSourceDirectory(StringView sourceDirectory)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    static constexpr StringView requiredFiles[] = {
+        "zlib.h", "zconf.h", "deflate.c", "inflate.c", "zutil.c", "adler32.c", "crc32.c", "trees.c", "inftrees.c",
+    };
+    for (const StringView requiredFile : requiredFiles)
+    {
+        String path = StringEncoding::Utf8;
+        SC_TRY(Path::join(path, {sourceDirectory, requiredFile}));
+        SC_TRY_MSG(fs.existsAndIsFile(path.view()), "zlib source directory is missing required files");
+    }
+    return Result(true);
+}
+
+static Result resolveRepositoryRoot(String& output)
+{
+    String sourcePath = StringEncoding::Utf8;
+    SC_TRY(sourcePath.assign(__FILE__));
+    String toolsPackageDirectory = StringEncoding::Utf8;
+    SC_TRY(toolsPackageDirectory.assign(Path::dirname(sourcePath.view(), Path::AsNative)));
+    String toolsDirectory = StringEncoding::Utf8;
+    SC_TRY(toolsDirectory.assign(Path::dirname(toolsPackageDirectory.view(), Path::AsNative)));
+    SC_TRY(output.assign(Path::dirname(toolsDirectory.view(), Path::AsNative)));
+    return Result(true);
+}
+
+static Result runZLibFilCBuild(StringView repositoryRoot, StringView sourceDirectory, StringView outputDirectory,
+                               StringView intermediateDirectory)
+{
+    String scriptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(scriptPath, {repositoryRoot, "SC.sh"}));
+
+    Process process;
+    SC_TRY(process.setWorkingDirectory(repositoryRoot));
+    SC_TRY(process.setEnvironment("SC_ZLIB_FILC_SOURCE_DIR", sourceDirectory));
+    SC_TRY(process.setEnvironment("SC_ZLIB_FILC_OUTPUT_DIR", outputDirectory));
+    SC_TRY(process.setEnvironment("SC_ZLIB_FILC_INTERMEDIATE_DIR", intermediateDirectory));
+    SC_TRY(process.exec(
+        {scriptPath.view(), "build", "compile", "ZLibFilC", "Release", "--toolchain", "filc", "--output", "quiet"}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "SC::Build zlib-filc build failed");
+    return Result(true);
+}
+
+static Result runZLibFilCSmoke(StringView compiler, StringView includeDirectory, StringView libraryDirectory,
+                               StringView buildDirectory)
+{
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(buildDirectory));
+
+    String smokeSource = StringEncoding::Utf8;
+    String smokeBinary = StringEncoding::Utf8;
+    SC_TRY(Path::join(smokeSource, {buildDirectory, "zlib-filc-smoke.c"}));
+    SC_TRY(Path::join(smokeBinary, {buildDirectory, "zlib-filc-smoke"}));
+
+    static constexpr StringView smokeCode = R"sczlib(
+#include <dlfcn.h>
+#include <stdio.h>
+#include <string.h>
+#include "zlib.h"
+
+typedef const char* (*zlibVersionFn)(void);
+typedef int (*deflateFn)(z_streamp, int);
+typedef int (*deflateEndFn)(z_streamp);
+typedef int (*inflateFn)(z_streamp, int);
+typedef int (*inflateEndFn)(z_streamp);
+typedef int (*deflateInit2Fn)(z_streamp, int, int, int, int, int, const char*, int);
+typedef int (*inflateInit2Fn)(z_streamp, int, const char*, int);
+
+int main(void)
+{
+    void* library = dlopen("libz.so.1", RTLD_NOW);
+    if (!library)
+    {
+        return 2;
+    }
+
+    zlibVersionFn pZlibVersion = (zlibVersionFn)dlsym(library, "zlibVersion");
+    deflateFn pDeflate = (deflateFn)dlsym(library, "deflate");
+    deflateEndFn pDeflateEnd = (deflateEndFn)dlsym(library, "deflateEnd");
+    inflateFn pInflate = (inflateFn)dlsym(library, "inflate");
+    inflateEndFn pInflateEnd = (inflateEndFn)dlsym(library, "inflateEnd");
+    deflateInit2Fn pDeflateInit2 = (deflateInit2Fn)dlsym(library, "deflateInit2_");
+    inflateInit2Fn pInflateInit2 = (inflateInit2Fn)dlsym(library, "inflateInit2_");
+    if (!pZlibVersion || !pDeflate || !pDeflateEnd || !pInflate || !pInflateEnd || !pDeflateInit2 || !pInflateInit2)
+    {
+        return 3;
+    }
+
+    const char* version = pZlibVersion();
+    const unsigned char input[] = "filc-zlib-smoke";
+    unsigned char compressed[128];
+    unsigned char output[128];
+    z_stream compressor;
+    memset(&compressor, 0, sizeof(compressor));
+    compressor.next_in = (Bytef*)input;
+    compressor.avail_in = sizeof(input);
+    compressor.next_out = compressed;
+    compressor.avail_out = sizeof(compressed);
+    if (pDeflateInit2(&compressor, Z_DEFAULT_COMPRESSION, Z_DEFLATED, MAX_WBITS, 8, Z_DEFAULT_STRATEGY, version,
+                      sizeof(z_stream)) != Z_OK)
+    {
+        return 4;
+    }
+    if (pDeflate(&compressor, Z_FINISH) != Z_STREAM_END)
+    {
+        return 5;
+    }
+    unsigned long compressedSize = compressor.total_out;
+    if (pDeflateEnd(&compressor) != Z_OK)
+    {
+        return 6;
+    }
+
+    z_stream decompressor;
+    memset(&decompressor, 0, sizeof(decompressor));
+    decompressor.next_in = compressed;
+    decompressor.avail_in = (uInt)compressedSize;
+    decompressor.next_out = output;
+    decompressor.avail_out = sizeof(output);
+    if (pInflateInit2(&decompressor, MAX_WBITS, version, sizeof(z_stream)) != Z_OK)
+    {
+        return 7;
+    }
+    if (pInflate(&decompressor, Z_FINISH) != Z_STREAM_END)
+    {
+        return 8;
+    }
+    if (pInflateEnd(&decompressor) != Z_OK)
+    {
+        return 9;
+    }
+    if (decompressor.total_out != sizeof(input) || memcmp(output, input, sizeof(input)) != 0)
+    {
+        return 10;
+    }
+    dlclose(library);
+    return 0;
+}
+)sczlib";
+
+    SC_TRY(fs.writeString(smokeSource.view(), smokeCode));
+
+    String includeFlag = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(includeFlag, "-I{}", includeDirectory));
+
+    Process compile;
+    SC_TRY(compile.exec({compiler, smokeSource.view(), includeFlag.view(), "-ldl", "-o", smokeBinary.view()}));
+    SC_TRY_MSG(compile.getExitStatus() == 0, "zlib-filc smoke compile failed");
+
+    Process run;
+    SC_TRY(run.setEnvironment("LD_LIBRARY_PATH", libraryDirectory));
+    SC_TRY(run.exec({smokeBinary.view()}));
+    SC_TRY_MSG(run.getExitStatus() == 0, "zlib-filc smoke run failed");
+    return Result(true);
+}
+
+Result installZLibFilC(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
+                       StringView importDirectory)
+{
+    static constexpr StringView packageVersion = "1.3.1";
+    static constexpr StringView packageURL     = "https://zlib.net/fossils/zlib-1.3.1.tar.gz";
+    static constexpr StringView packageHash    = "9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23";
+
+    package.packageFullName       = "zlib-filc-1.3.1";
+    package.packageBaseName       = "zlib-1.3.1.tar.gz";
+    package.packageLocalFile      = format("{}/zlib-filc/{}", packagesCacheDirectory, package.packageBaseName.view());
+    package.packageLocalDirectory = format("{}/zlib-filc/source-{}", packagesCacheDirectory, packageVersion);
+    package.packageLocalTxt       = format("{}/zlib-filc/zlib-filc-{}.txt", packagesCacheDirectory, packageVersion);
+    package.installDirectoryLink  = format("{}/zlib_filc", packagesInstallDirectory);
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    SC_TRY(fs.makeDirectoryRecursive(packagesCacheDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(packagesInstallDirectory));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(package.packageLocalFile.view(), Path::AsNative)));
+
+    Package filCPackage;
+    SC_TRY(installFilCToolchain(packagesCacheDirectory, packagesInstallDirectory, filCPackage));
+
+    String compiler = StringEncoding::Utf8;
+    SC_TRY(resolveFilCCompilerPath(filCPackage.installDirectoryLink.view(), "clang", compiler));
+
+    String buildRoot = StringEncoding::Utf8;
+    String sourceDir = StringEncoding::Utf8;
+    String outputDir = StringEncoding::Utf8;
+    String intermDir = StringEncoding::Utf8;
+    String libDir    = StringEncoding::Utf8;
+    String incDir    = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(buildRoot, "{}-build", package.installDirectoryLink.view()));
+    SC_TRY(Path::join(sourceDir, {buildRoot.view(), "source"}));
+    SC_TRY(Path::join(outputDir, {buildRoot.view(), "out"}));
+    SC_TRY(Path::join(intermDir, {buildRoot.view(), "intermediate"}));
+    SC_TRY(Path::join(libDir, {package.installDirectoryLink.view(), "lib"}));
+    SC_TRY(Path::join(incDir, {package.installDirectoryLink.view(), "include"}));
+
+    if (fs.existsAndIsDirectory(buildRoot.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(buildRoot.view()));
+    }
+    SC_TRY(removePackageInstallLink(fs, package));
+    SC_TRY(fs.makeDirectoryRecursive(buildRoot.view()));
+    SC_TRY(fs.makeDirectoryRecursive(libDir.view()));
+    SC_TRY(fs.makeDirectoryRecursive(incDir.view()));
+
+    String sourceIdentifier = StringEncoding::Utf8;
+    String sourceHash       = StringEncoding::Utf8;
+    if (not importDirectory.isEmpty())
+    {
+        SC_TRY(validateZLibSourceDirectory(importDirectory));
+        SC_TRY(sourceDir.assign(importDirectory));
+        SC_TRY(StringBuilder::format(sourceIdentifier, "import:{}", importDirectory));
+    }
+    else
+    {
+        SC_TRY(downloadFileHash(packageURL, package.packageLocalFile.view(), Hashing::TypeSHA256, packageHash));
+        SC_TRY(extractTarArchiveFlatteningRoot(package.packageLocalFile.view(), sourceDir.view()));
+        SC_TRY(validateZLibSourceDirectory(sourceDir.view()));
+        SC_TRY(sourceIdentifier.assign(packageURL));
+        SC_TRY(StringBuilder::format(sourceHash, "sha256:{}", packageHash));
+    }
+
+    String repositoryRoot = StringEncoding::Utf8;
+    SC_TRY(resolveRepositoryRoot(repositoryRoot));
+    SC_TRY(runZLibFilCBuild(repositoryRoot.view(), sourceDir.view(), outputDir.view(), intermDir.view()));
+
+    String builtLibrary = StringEncoding::Utf8;
+    String libzSo1      = StringEncoding::Utf8;
+    String libzSo       = StringEncoding::Utf8;
+    SC_TRY(Path::join(builtLibrary, {outputDir.view(), "libz.so"}));
+    SC_TRY(Path::join(libzSo1, {libDir.view(), "libz.so.1"}));
+    SC_TRY(Path::join(libzSo, {libDir.view(), "libz.so"}));
+    SC_TRY_MSG(fs.existsAndIsFile(builtLibrary.view()), "zlib-filc build did not produce libz.so");
+    SC_TRY(fs.copyFile(builtLibrary.view(), libzSo1.view(), FileSystem::CopyFlags().setOverwrite(true)));
+    SC_TRY(fs.removeLinkIfExists(libzSo.view()));
+    SC_TRY(fs.createSymbolicLink("libz.so.1", libzSo.view()));
+
+    String zlibHeader  = StringEncoding::Utf8;
+    String zconfHeader = StringEncoding::Utf8;
+    String zlibOut     = StringEncoding::Utf8;
+    String zconfOut    = StringEncoding::Utf8;
+    SC_TRY(Path::join(zlibHeader, {sourceDir.view(), "zlib.h"}));
+    SC_TRY(Path::join(zconfHeader, {sourceDir.view(), "zconf.h"}));
+    SC_TRY(Path::join(zlibOut, {incDir.view(), "zlib.h"}));
+    SC_TRY(Path::join(zconfOut, {incDir.view(), "zconf.h"}));
+    SC_TRY(fs.copyFile(zlibHeader.view(), zlibOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
+    SC_TRY(fs.copyFile(zconfHeader.view(), zconfOut.view(), FileSystem::CopyFlags().setOverwrite(true)));
+
+    SC_TRY(runZLibFilCSmoke(compiler.view(), incDir.view(), libDir.view(), buildRoot.view()));
+
+    String metadata = StringEncoding::Utf8;
+    auto   builder  = StringBuilder::create(metadata);
+    SC_TRY(builder.append("SC_PACKAGE_URL={}\n", sourceIdentifier.view()));
+    if (not sourceHash.isEmpty())
+    {
+        SC_TRY(builder.append("SC_PACKAGE_HASH={}\n", sourceHash.view()));
+    }
+    SC_TRY(builder.append("SC_PACKAGE_VERSION={}\n", packageVersion));
+    builder.finalize();
+    SC_TRY(fs.writeString(package.packageLocalTxt.view(), metadata.view()));
+
+    const PackageReceiptExport exports[] = {
+        {PackageExportKind::Library, PackageExport::ZLibShared, "lib/libz.so.1"},
+        {PackageExportKind::Library, PackageExport::ZLibSharedLink, "lib/libz.so"},
+        {PackageExportKind::LibraryDir, PackageExport::ZLibLibraryDir, "lib"},
+        {PackageExportKind::IncludeDir, PackageExport::ZLibIncludeDir, "include"},
+        {PackageExportKind::Capability, PackageCapability::LibraryZLibFilCX86_64, "lib/libz.so.1"},
+    };
+    static constexpr StringView phases[] = {
+        "resolveZLibSource",
+        "buildZLibWithSCBuildFilC",
+        "validateZLibRuntime",
+        "writeReceipt",
+    };
+    SC_TRY(writeManualPackageReceipt(package, "zlib_filc", packageVersion, "linux-x86_64", sourceIdentifier.view(),
+                                     sourceHash.view(), exports, phases));
+
+    if (fs.existsAndIsDirectory(buildRoot.view()))
+    {
+        SC_TRY(fs.removeDirectoriesRecursive(buildRoot.view()));
+    }
+    return Result(true);
+}
+#else
+Result installZLibFilC(StringView, StringView, Package&, StringView)
+{
+    return Result::Error("zlib-filc package install is only supported on Linux hosts");
 }
 #endif
 

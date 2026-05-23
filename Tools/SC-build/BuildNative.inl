@@ -1441,6 +1441,30 @@ struct SC::Build::NativeBuild
             globalConsole->print("ARGS[{}] = {}\n", idx, arguments[numArguments]);
             numArguments++;
         }
+        String zlibFilCLibraryPathStorage = StringEncoding::Utf8;
+        String zlibFilCLibraryPath        = StringEncoding::Utf8;
+        if (action.parameters.toolchain.family == Toolchain::FilC)
+        {
+            Tools::Package zlibPackage;
+            SC_TRY(Tools::installZLibFilC(action.parameters.directories.packagesCacheDirectory.view(),
+                                          action.parameters.directories.packagesInstallDirectory.view(), zlibPackage));
+            SC_TRY(Tools::resolvePackageExportPath(zlibPackage.installDirectoryLink.view(),
+                                                   Tools::PackageExport::ZLibLibraryDir, zlibFilCLibraryPath));
+
+            ProcessEnvironment environment;
+            StringSpan         existingPath;
+            if (environment.get("LD_LIBRARY_PATH", existingPath) and not existingPath.isEmpty())
+            {
+                SC_TRY(StringBuilder::format(zlibFilCLibraryPathStorage, "{}:{}", zlibFilCLibraryPath.view(),
+                                             existingPath));
+            }
+            else
+            {
+                SC_TRY(zlibFilCLibraryPathStorage.assign(zlibFilCLibraryPath.view()));
+            }
+            SC_TRY(process.setEnvironment("LD_LIBRARY_PATH", zlibFilCLibraryPathStorage.view()));
+            globalConsole->print("LD_LIBRARY_PATH = {}\n", zlibFilCLibraryPathStorage.view());
+        }
         globalConsole->flush();
         SC_TRY(process.exec({arguments, numArguments}));
         SC_TRY_MSG(process.getExitStatus() == 0, "Run exited with non zero status");

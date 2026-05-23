@@ -66,6 +66,10 @@ namespace PackageExport
 {
 constexpr StringView Clang                   = "clang";
 constexpr StringView ClangXX                 = "clang++";
+constexpr StringView ZLibShared              = "libz.so.1";
+constexpr StringView ZLibSharedLink          = "libz.so";
+constexpr StringView ZLibLibraryDir          = "zlib.lib";
+constexpr StringView ZLibIncludeDir          = "zlib.include";
 constexpr StringView LLVMAr                  = "llvm-ar";
 constexpr StringView LLVMLinker              = "ld.lld";
 constexpr StringView Sysroot                 = "sysroot";
@@ -88,6 +92,7 @@ namespace PackageExportKind
 constexpr StringView Asset      = "asset";
 constexpr StringView Capability = "capability";
 constexpr StringView IncludeDir = "include-dir";
+constexpr StringView Library    = "library";
 constexpr StringView LibraryDir = "library-dir";
 constexpr StringView Runner     = "runner";
 constexpr StringView Sysroot    = "sysroot";
@@ -97,6 +102,7 @@ constexpr StringView Tool       = "tool";
 namespace PackageKind
 {
 constexpr StringView Asset     = "asset";
+constexpr StringView Library   = "library";
 constexpr StringView Runner    = "runner";
 constexpr StringView Sysroot   = "sysroot";
 constexpr StringView Tool      = "tool";
@@ -112,6 +118,7 @@ constexpr StringView ToolLinker                = "tool.linker";
 constexpr StringView RunnerWine                = "runner.wine";
 constexpr StringView RunnerQEMUX86_64          = "runner.qemu.x86_64";
 constexpr StringView RunnerQEMUArm64           = "runner.qemu.arm64";
+constexpr StringView LibraryZLibFilCX86_64     = "library.zlib.filc.x86_64";
 constexpr StringView ToolchainFilCX86_64       = "toolchain.filc.x86_64";
 constexpr StringView ToolchainWindowsGNUX86_64 = "toolchain.windows-gnu.x86_64";
 constexpr StringView ToolchainWindowsGNUArm64  = "toolchain.windows-gnu.arm64";

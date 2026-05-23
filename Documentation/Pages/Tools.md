@@ -288,6 +288,12 @@ Register an imported Fil-C installation and compile a native Linux target throug
 ./SC.sh build compile SaneHttpGet --toolchain filc --output quiet
 ```
 
+Build and run Fil-C tests with the Fil-C zlib runtime package
+```
+./SC.sh package install zlib-filc
+./SC.sh build run SCTest Debug native --toolchain filc -- --test ZLibStreamTest
+```
+
 Cross-compile a Linux glibc executable through the native backend with the packaged macOS sysroot path
 ```
 ./SC.sh build compile SCTest --target linux-glibc-arm64 --output quiet
@@ -504,6 +510,8 @@ These are the packages that are currently downloaded and extracted / symlinked b
   profiles
 - `Fil-C 0.678` (experimental): Linux-only compiler package with a pinned upstream `pizfix` download path plus
   `--import-directory <path>` registration for compiler-first native-backend work through `--toolchain filc`
+- `zlib-filc 1.3.1` (experimental): Linux-only zlib shared-library package built from upstream C sources with
+  SC::Build and the Fil-C toolchain; Fil-C `build run` prepends its `lib` directory to `LD_LIBRARY_PATH`
 - `doxygen`: Doxygen documentation generator
 - `doxygen-awesome-css`: Doxygen awesome css (Doxygen theme)
 
