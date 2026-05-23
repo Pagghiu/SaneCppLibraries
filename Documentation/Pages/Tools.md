@@ -438,7 +438,9 @@ The builder uses caller-owned storage so registry entry lifetimes are explicit. 
 `PackageInstallHandler`, or can point at a `PackageRecipe` descriptor for data-only copy/download recipes:
 
 ```cpp
-static constexpr StringView recipeExports[] = {"tool:my-tool"};
+static constexpr PackageRegistryExport recipeExports[] = {
+    {PackageExportKind::Tool, "my-tool"},
+};
 static constexpr StringView recipePhases[]  = {"copyDirectory", "writeReceipt"};
 static constexpr PackageReceiptExport receiptExports[] = {
     {"tool", "my-tool", "bin/my-tool"},

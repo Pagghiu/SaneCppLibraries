@@ -272,22 +272,17 @@ static Result verifyPackageReceipt(StringView receiptPath, StringView packageRoo
 static Result verifyPackageReceiptMatchesRegistryExports(const PackageRegistryEntry& entry,
                                                          const PackageReceiptJSON&   receiptJSON)
 {
-    for (StringView expectedExport : entry.exports)
+    for (const PackageRegistryExport& expectedExport : entry.exports)
     {
-        if (expectedExport.containsString("<"))
+        if (expectedExport.name.containsString("<"))
         {
             continue;
         }
 
-        StringView expectedKind;
-        StringView expectedName;
-        SC_TRY_MSG(expectedExport.splitBefore(":", expectedKind) and expectedExport.splitAfter(":", expectedName),
-                   "Malformed package registry export contract");
-
         bool found = false;
         for (const PackageReceiptExportJSON& exportView : receiptJSON.exports)
         {
-            if (exportView.kind.view() == expectedKind and exportView.name.view() == expectedName)
+            if (exportView.kind.view() == expectedExport.kind and exportView.name.view() == expectedExport.name)
             {
                 found = true;
                 break;

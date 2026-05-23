@@ -62,26 +62,6 @@ struct Package
     SmallString<255> installDirectoryLink;
 };
 
-struct PackageReceiptExport
-{
-    StringView kind;
-    StringView name;
-    StringView relativePath;
-};
-
-struct PackageReceiptInfo
-{
-    StringView             packageName;
-    StringView             packageVersion;
-    StringView             recipeVersion;
-    StringView             hostPlatform;
-    StringView             packageVariant;
-    StringView             source;
-    StringView             sourceHash;
-    StringView             validation;
-    Span<const StringView> phases;
-};
-
 namespace PackageExport
 {
 constexpr StringView Clang                   = "clang";
@@ -103,6 +83,17 @@ constexpr StringView LLVMMinGWClangXX_X86_64 = "x86_64-w64-mingw32-clang++";
 constexpr StringView LLVMMinGWClangXXArm64   = "aarch64-w64-mingw32-clang++";
 } // namespace PackageExport
 
+namespace PackageExportKind
+{
+constexpr StringView Asset      = "asset";
+constexpr StringView Capability = "capability";
+constexpr StringView IncludeDir = "include-dir";
+constexpr StringView LibraryDir = "library-dir";
+constexpr StringView Runner     = "runner";
+constexpr StringView Sysroot    = "sysroot";
+constexpr StringView Tool       = "tool";
+} // namespace PackageExportKind
+
 namespace PackageCapability
 {
 constexpr StringView ToolCCompiler             = "tool.c-compiler";
@@ -123,6 +114,32 @@ constexpr StringView ToolchainWindowsMSVCArm64 = "toolchain.windows-msvc.arm64";
     return architecture == InstructionSet::Intel64 ? RunnerQEMUX86_64 : RunnerQEMUArm64;
 }
 } // namespace PackageCapability
+
+struct PackageReceiptExport
+{
+    StringView kind;
+    StringView name;
+    StringView relativePath;
+};
+
+struct PackageRegistryExport
+{
+    StringView kind;
+    StringView name;
+};
+
+struct PackageReceiptInfo
+{
+    StringView             packageName;
+    StringView             packageVersion;
+    StringView             recipeVersion;
+    StringView             hostPlatform;
+    StringView             packageVariant;
+    StringView             source;
+    StringView             sourceHash;
+    StringView             validation;
+    Span<const StringView> phases;
+};
 
 using PackageInstallHandler = Result (*)(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package, Span<const StringView> packageArguments);
@@ -162,7 +179,7 @@ struct PackageRegistryEntry
     StringView             variants;
     StringView             source;
     bool                   supportsImport = false;
-    Span<const StringView> exports;
+    Span<const PackageRegistryExport> exports;
     Span<const StringView> phases;
     PackageInstallHandler  install = nullptr;
     const PackageRecipe*   recipe  = nullptr;

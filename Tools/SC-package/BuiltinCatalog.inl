@@ -89,8 +89,8 @@ static Result installMSVCEntry(StringView cache, StringView install, Package& pa
     return installMSVCToolchain(cache, install, package, options.importDirectory, options.wineExecutable);
 }
 
-static constexpr StringView DoxygenExports[] = {
-    "tool:doxygen",
+static constexpr PackageRegistryExport DoxygenExports[] = {
+    {PackageExportKind::Tool, "doxygen"},
 };
 static constexpr StringView DoxygenPhases[] = {
     "resolveDoxygenRelease",
@@ -98,16 +98,16 @@ static constexpr StringView DoxygenPhases[] = {
     "validateDoxygenVersion",
     "writeReceipt",
 };
-static constexpr StringView DoxygenAwesomeExports[] = {
-    "asset:doxygen-awesome-css",
+static constexpr PackageRegistryExport DoxygenAwesomeExports[] = {
+    {PackageExportKind::Asset, "doxygen-awesome-css"},
 };
 static constexpr StringView DoxygenAwesomePhases[] = {
     "fetchGitRevision",
     "validateGitCommit",
     "writeReceipt",
 };
-static constexpr StringView ClangExports[] = {
-    "tool:clang-format",
+static constexpr PackageRegistryExport ClangExports[] = {
+    {PackageExportKind::Tool, "clang-format"},
 };
 static constexpr StringView ClangPhases[] = {
     "resolveHostLLVMArchive",
@@ -115,15 +115,15 @@ static constexpr StringView ClangPhases[] = {
     "validateClangFormatVersion",
     "writeReceipt",
 };
-static constexpr StringView LLVMExports[] = {
-    "tool:clang",
-    "tool:clang++",
-    "tool:llvm-ar",
-    "tool:ld.lld",
-    "capability:tool.c-compiler",
-    "capability:tool.cxx-compiler",
-    "capability:tool.archiver",
-    "capability:tool.linker",
+static constexpr PackageRegistryExport LLVMExports[] = {
+    {PackageExportKind::Tool, PackageExport::Clang},
+    {PackageExportKind::Tool, PackageExport::ClangXX},
+    {PackageExportKind::Tool, PackageExport::LLVMAr},
+    {PackageExportKind::Tool, PackageExport::LLVMLinker},
+    {PackageExportKind::Capability, PackageCapability::ToolCCompiler},
+    {PackageExportKind::Capability, PackageCapability::ToolCXXCompiler},
+    {PackageExportKind::Capability, PackageCapability::ToolArchiver},
+    {PackageExportKind::Capability, PackageCapability::ToolLinker},
 };
 static constexpr StringView LLVMPhases[] = {
     "resolveHostLLVMArchive",
@@ -131,20 +131,20 @@ static constexpr StringView LLVMPhases[] = {
     "validateLLVMToolchain",
     "writeReceipt",
 };
-static constexpr StringView QEMUExports[] = {
-    "runner:qemu",
-    "capability:runner.qemu.x86_64",
-    "capability:runner.qemu.arm64",
+static constexpr PackageRegistryExport QEMUExports[] = {
+    {PackageExportKind::Runner, PackageExport::RunnerQEMU},
+    {PackageExportKind::Capability, PackageCapability::RunnerQEMUX86_64},
+    {PackageExportKind::Capability, PackageCapability::RunnerQEMUArm64},
 };
 static constexpr StringView QEMUPhases[] = {
     "resolveImportedQEMU",
     "validateQEMUTargets",
     "writeReceipt",
 };
-static constexpr StringView FilCExports[] = {
-    "tool:clang",
-    "tool:clang++",
-    "capability:toolchain.filc.x86_64",
+static constexpr PackageRegistryExport FilCExports[] = {
+    {PackageExportKind::Tool, PackageExport::Clang},
+    {PackageExportKind::Tool, PackageExport::ClangXX},
+    {PackageExportKind::Capability, PackageCapability::ToolchainFilCX86_64},
 };
 static constexpr StringView FilCPhases[] = {
     "resolveFilCSource",
@@ -152,14 +152,14 @@ static constexpr StringView FilCPhases[] = {
     "validateFilCToolchain",
     "writeReceipt",
 };
-static constexpr StringView LLVMMingwExports[] = {
-    "tool:x86_64-w64-mingw32-clang",
-    "tool:x86_64-w64-mingw32-clang++",
-    "tool:aarch64-w64-mingw32-clang",
-    "tool:aarch64-w64-mingw32-clang++",
-    "tool:llvm-ar",
-    "capability:toolchain.windows-gnu.x86_64",
-    "capability:toolchain.windows-gnu.arm64",
+static constexpr PackageRegistryExport LLVMMingwExports[] = {
+    {PackageExportKind::Tool, PackageExport::LLVMMinGWClang_X86_64},
+    {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXX_X86_64},
+    {PackageExportKind::Tool, PackageExport::LLVMMinGWClangArm64},
+    {PackageExportKind::Tool, PackageExport::LLVMMinGWClangXXArm64},
+    {PackageExportKind::Tool, PackageExport::LLVMAr},
+    {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUX86_64},
+    {PackageExportKind::Capability, PackageCapability::ToolchainWindowsGNUArm64},
 };
 static constexpr StringView LLVMMingwPhases[] = {
     "resolveLLVMMingwArchive",
@@ -167,11 +167,11 @@ static constexpr StringView LLVMMingwPhases[] = {
     "validateLLVMMingwToolchain",
     "writeReceipt",
 };
-static constexpr StringView LinuxSysrootExports[] = {
-    "sysroot:sysroot",
-    "include-dir:sysroot.include",
-    "library-dir:sysroot.lib",
-    "capability:sysroot.linux.<environment>.<architecture>",
+static constexpr PackageRegistryExport LinuxSysrootExports[] = {
+    {PackageExportKind::Sysroot, PackageExport::Sysroot},
+    {PackageExportKind::IncludeDir, "sysroot.include"},
+    {PackageExportKind::LibraryDir, "sysroot.lib"},
+    {PackageExportKind::Capability, "sysroot.linux.<environment>.<architecture>"},
 };
 static constexpr StringView LinuxSysrootPhases[] = {
     "resolveLinuxSysrootPackages",
@@ -180,9 +180,9 @@ static constexpr StringView LinuxSysrootPhases[] = {
     "validateLinuxSysroot",
     "writeReceipt",
 };
-static constexpr StringView WineExports[] = {
-    "runner:wine",
-    "capability:runner.wine",
+static constexpr PackageRegistryExport WineExports[] = {
+    {PackageExportKind::Runner, PackageExport::RunnerWine},
+    {PackageExportKind::Capability, PackageCapability::RunnerWine},
 };
 static constexpr StringView WinePhases[] = {
     "resolveWinePackages",
@@ -190,15 +190,15 @@ static constexpr StringView WinePhases[] = {
     "validateWineRunner",
     "writeReceipt",
 };
-static constexpr StringView MSVCExports[] = {
-    "tool:cl.x64",
-    "tool:link.x64",
-    "tool:lib.x64",
-    "tool:cl.arm64",
-    "tool:link.arm64",
-    "tool:lib.arm64",
-    "capability:toolchain.windows-msvc.x64",
-    "capability:toolchain.windows-msvc.arm64",
+static constexpr PackageRegistryExport MSVCExports[] = {
+    {PackageExportKind::Tool, PackageExport::MSVCClX64},
+    {PackageExportKind::Tool, PackageExport::MSVCLinkX64},
+    {PackageExportKind::Tool, PackageExport::MSVCLibX64},
+    {PackageExportKind::Tool, PackageExport::MSVCClArm64},
+    {PackageExportKind::Tool, PackageExport::MSVCLinkArm64},
+    {PackageExportKind::Tool, PackageExport::MSVCLibArm64},
+    {PackageExportKind::Capability, PackageCapability::ToolchainWindowsMSVCX64},
+    {PackageExportKind::Capability, PackageCapability::ToolchainWindowsMSVCArm64},
 };
 static constexpr StringView MSVCPhases[] = {
     "fetchPortableMSVC", "repairMSVCLayout", "prepareMSVCWinePrefix", "validateMSVCLayout", "writeReceipt",

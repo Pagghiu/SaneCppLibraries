@@ -1002,8 +1002,8 @@ struct SupportToolsTest : public TestCase
         }
         if (test_section("package commands accept external registry"))
         {
-            static constexpr StringView fakeExports[] = {
-                "tool:fake-tool",
+            static constexpr PackageRegistryExport fakeExports[] = {
+                {PackageExportKind::Tool, "fake-tool"},
             };
             static constexpr StringView fakePhases[] = {
                 "installFakeRegistryPackage",
@@ -1057,8 +1057,8 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments, registry));
 
-            static constexpr StringView missingExports[] = {
-                "tool:missing-tool",
+            static constexpr PackageRegistryExport missingExports[] = {
+                {PackageExportKind::Tool, "missing-tool"},
             };
             const PackageRegistryEntry badEntry = {
                 "fake-missing", "external-fake",
@@ -1198,8 +1198,8 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(fs.makeDirectoryRecursive(binRoot.view()));
             SC_TEST_EXPECT(fs.writeString(toolPath.view(), "fake"));
 
-            static constexpr StringView registryExports[] = {
-                "tool:fake-tool",
+            static constexpr PackageRegistryExport registryExports[] = {
+                {PackageExportKind::Tool, "fake-tool"},
             };
             static constexpr StringView phases[] = {
                 "copyDirectory",

@@ -58,6 +58,29 @@ static Result printStringViewList(Console& console, StringView label, Span<const
     return Result(true);
 }
 
+static Result printPackageRegistryExportList(Console& console, StringView label, Span<const PackageRegistryExport> values)
+{
+    console.print(label);
+    console.print(" = ");
+    if (values.empty())
+    {
+        console.printLine("-");
+        return Result(true);
+    }
+    for (size_t idx = 0; idx < values.sizeInElements(); ++idx)
+    {
+        if (idx > 0)
+        {
+            console.print(", ");
+        }
+        console.print(values[idx].kind);
+        console.print(":");
+        console.print(values[idx].name);
+    }
+    console.printLine(""_a8);
+    return Result(true);
+}
+
 static Result printUnknownPackageError(Console& console, PackageRegistry registry, StringView packageName)
 {
     console.print("Unknown package: ");
@@ -175,7 +198,7 @@ Result runPackageTool(Tool::Arguments& arguments, PackageRegistry registry, Tool
         console.printLine(entry->supportsImport ? "true"_a8 : "false"_a8);
         console.print("description     = ");
         console.printLine(entry->description);
-        SC_TRY(printStringViewList(console, "exports        "_a8, entry->exports));
+        SC_TRY(printPackageRegistryExportList(console, "exports        "_a8, entry->exports));
         SC_TRY(printStringViewList(console, "phases         "_a8, entry->phases));
     }
     else if (arguments.action == "status" or arguments.action == "verify")
