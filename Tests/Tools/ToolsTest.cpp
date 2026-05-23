@@ -1010,7 +1010,7 @@ struct SupportToolsTest : public TestCase
                 "writeReceipt",
             };
             const PackageRegistryEntry fakeEntry = {
-                "fake", "external-fake", "tool",     "External package registry fixture", "host", "test fixture",
+                "fake", "external-fake", PackageKind::Tool, "External package registry fixture", "host", "test fixture",
                 false,  fakeExports,     fakePhases, installFakeRegistryPackage};
             PackageRegistryEntry   registryStorage[16];
             PackageRegistryBuilder registryBuilder = {{registryStorage, 16}};
@@ -1062,7 +1062,7 @@ struct SupportToolsTest : public TestCase
             };
             const PackageRegistryEntry badEntry = {
                 "fake-missing", "external-fake",
-                "tool",         "External package registry fixture with a mismatched contract",
+                PackageKind::Tool, "External package registry fixture with a mismatched contract",
                 "host",         "test fixture",
                 false,          missingExports,
                 fakePhases,     installFakeRegistryPackage};
@@ -1218,7 +1218,7 @@ struct SupportToolsTest : public TestCase
             recipe.phaseRegistry           = builtinPackagePhaseRegistry();
 
             const PackageRegistryEntry recipeEntry = {
-                "copy-fake", "external-copy", "tool", "External copy recipe fixture",
+                "copy-fake", "external-copy", PackageKind::Tool, "External copy recipe fixture",
                 "host",      "test fixture",  false,  registryExports,
                 phases,      nullptr,         &recipe};
             const PackageRegistry recipeRegistry = {{&recipeEntry, 1}};
@@ -1243,7 +1243,7 @@ struct SupportToolsTest : public TestCase
             badRecipe.phases                          = badPhases;
             const PackageRegistryEntry badRecipeEntry = {
                 "copy-fake-bad", "external-copy-bad",
-                "tool",          "External copy recipe fixture with an unknown phase",
+                PackageKind::Tool, "External copy recipe fixture with an unknown phase",
                 "host",          "test fixture",
                 false,           registryExports,
                 badPhases,       nullptr,

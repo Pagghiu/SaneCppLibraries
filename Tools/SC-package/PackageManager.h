@@ -94,6 +94,15 @@ constexpr StringView Sysroot    = "sysroot";
 constexpr StringView Tool       = "tool";
 } // namespace PackageExportKind
 
+namespace PackageKind
+{
+constexpr StringView Asset     = "asset";
+constexpr StringView Runner    = "runner";
+constexpr StringView Sysroot   = "sysroot";
+constexpr StringView Tool      = "tool";
+constexpr StringView Toolchain = "toolchain";
+} // namespace PackageKind
+
 namespace PackageCapability
 {
 constexpr StringView ToolCCompiler             = "tool.c-compiler";

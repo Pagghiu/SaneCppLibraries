@@ -456,7 +456,7 @@ recipe.phases                  = recipePhases;
 recipe.phaseRegistry           = builtinPackagePhaseRegistry();
 
 PackageRegistryEntry myPackageEntry = {
-    "my-tool", "my-tool", "tool", "My external tool", "host", "local directory", false,
+    "my-tool", "my-tool", PackageKind::Tool, "My external tool", "host", "local directory", false,
     recipeExports, recipePhases, nullptr, &recipe,
 };
 ```
