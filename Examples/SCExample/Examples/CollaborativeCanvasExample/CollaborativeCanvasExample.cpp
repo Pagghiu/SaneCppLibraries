@@ -19,6 +19,8 @@
 #include "Libraries/ContainersReflection/ContainersReflection.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
 #include "Libraries/Http/HttpAsyncServer.h"
+#include "Libraries/Http/HttpHeaders.h"
+#include "Libraries/Http/HttpURLParser.h"
 #include "Libraries/Http/HttpWebSocket.h"
 #include "Libraries/Plugin/PluginMacros.h"
 #include "Libraries/SerializationBinary/SerializationBinary.h"
@@ -374,8 +376,13 @@ struct SC::CollaborativeCanvasModel
 
     Result handleRequest(HttpConnection& connection)
     {
-        const StringSpan target = connection.request.getURL();
-        const StringSpan path   = requestPath(target);
+        const StringSpan      target = connection.request.getURL();
+        HttpRequestTargetView requestTarget;
+        if (not requestTarget.parse(target))
+        {
+            return connection.sendTextCopy(400, "bad request\n");
+        }
+        const StringSpan path = requestTarget.path;
 
         ::printf("[CanvasWS] request conn=%zu method=%d target=%.*s path=%.*s\n",
                  connection.getConnectionID().getIndex(), static_cast<int>(connection.request.getParser().method),
@@ -389,15 +396,15 @@ struct SC::CollaborativeCanvasModel
         }
         if (connection.request.getParser().method != HttpParser::Method::HttpGET)
         {
-            return methodNotAllowed(connection, "GET");
+            return connection.response.sendMethodNotAllowed("GET");
         }
         if (path == "/" or path == "/index.html" or path == "/canvas")
         {
-            return sendText(connection, 200, "text/html; charset=utf-8", canvasHtmlSpan());
+            return connection.sendBodyCopy(200, canvasHtmlSpan(), HttpContentTypeTextHtmlUtf8());
         }
         if (path == "/health")
         {
-            return sendText(connection, 200, "application/json", "{\"status\":\"ok\"}");
+            return connection.sendJsonCopy(200, "{\"status\":\"ok\"}");
         }
         return notFound(connection);
     }
@@ -465,33 +472,7 @@ struct SC::CollaborativeCanvasModel
         return broadcast;
     }
 
-    Result sendText(HttpConnection& connection, int code, StringSpan contentType, StringSpan body)
-    {
-        SC_TRY(connection.response.startBody(code, body.sizeInBytes(), contentType));
-        SC_TRY(connection.response.sendHeaders());
-        if (body.sizeInBytes() > 0)
-        {
-            AsyncBufferView::ID bufferID;
-            Span<char>          writableData;
-            SC_TRY(connection.buffersPool.requestNewBuffer(body.sizeInBytes(), bufferID, writableData));
-            ::memcpy(writableData.data(), body.bytesWithoutTerminator(), body.sizeInBytes());
-            connection.buffersPool.setNewBufferSize(bufferID, body.sizeInBytes());
-            const Result writeResult = connection.response.getWritableStream().write(bufferID);
-            connection.buffersPool.unrefBuffer(bufferID);
-            SC_TRY(writeResult);
-        }
-        return connection.response.end();
-    }
-
-    Result methodNotAllowed(HttpConnection& connection, StringSpan allow)
-    {
-        SC_TRY(connection.response.startBody(405, 0));
-        SC_TRY(connection.response.addHeader("Allow", allow));
-        SC_TRY(connection.response.sendHeaders());
-        return connection.response.end();
-    }
-
-    Result notFound(HttpConnection& connection) { return sendText(connection, 404, "text/plain", "not found\n"); }
+    Result notFound(HttpConnection& connection) { return connection.sendTextCopy(404, "not found\n"); }
 
     Result saveToBinary(Buffer& modelStateBuffer)
     {
@@ -501,19 +482,6 @@ struct SC::CollaborativeCanvasModel
     Result loadFromBinary(Span<const char> modelStateSpan)
     {
         return Result(SC::SerializationBinary::loadVersionedWithSchema(modelState, modelStateSpan));
-    }
-
-    static StringSpan requestPath(StringSpan target)
-    {
-        const char* data = target.bytesWithoutTerminator();
-        for (size_t idx = 0; idx < target.sizeInBytes(); ++idx)
-        {
-            if (data[idx] == '?')
-            {
-                return {{data, idx}, false, target.getEncoding()};
-            }
-        }
-        return target;
     }
 
     static StringSpan canvasHtmlSpan()

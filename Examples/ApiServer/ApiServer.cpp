@@ -20,8 +20,6 @@
 #include "../../Libraries/Strings/StringBuilder.h"
 #include "../../Libraries/Strings/StringView.h"
 
-#include <string.h>
-
 namespace SC
 {
 struct ApiServerExample
@@ -201,18 +199,18 @@ struct ApiServerExample
             char       allowStorage[64];
             StringSpan allow;
             SC_ASSERT_RELEASE(router.formatAllowHeader(connection.request.getRequestTarget(), allowStorage, allow));
-            SC_ASSERT_RELEASE(methodNotAllowed(connection, allow));
+            SC_ASSERT_RELEASE(connection.response.sendMethodNotAllowed(allow));
             return;
         }
         if (match.status != HttpRouteMatchStatus::Matched)
         {
-            SC_ASSERT_RELEASE(sendText(connection, 500, HttpContentTypeTextPlainUtf8(), "route error\n"));
+            SC_ASSERT_RELEASE(connection.sendTextCopy(500, "route error\n"));
             return;
         }
 
         if (match.route == &routes[0])
         {
-            SC_ASSERT_RELEASE(sendText(connection, 200, HttpContentTypeApplicationJson(), "{\"status\":\"ok\"}"));
+            SC_ASSERT_RELEASE(connection.sendJsonCopy(200, "{\"status\":\"ok\"}"));
             return;
         }
         if (match.route == &routes[1])
@@ -227,7 +225,7 @@ struct ApiServerExample
             }
             String response = StringEncoding::Ascii;
             SC_ASSERT_RELEASE(StringBuilder::format(response, "{{\"hello\":\"{}\"}}", name));
-            SC_ASSERT_RELEASE(sendText(connection, 200, HttpContentTypeApplicationJson(), response.view()));
+            SC_ASSERT_RELEASE(connection.sendJsonCopy(200, response.view()));
             return;
         }
         if (match.route == &routes[2])
@@ -236,7 +234,7 @@ struct ApiServerExample
             return;
         }
 
-        SC_ASSERT_RELEASE(sendText(connection, 500, HttpContentTypeTextPlainUtf8(), "route error\n"));
+        SC_ASSERT_RELEASE(connection.sendTextCopy(500, "route error\n"));
     }
 
     void receiveEchoBody(HttpConnection& connection)
@@ -264,36 +262,7 @@ struct ApiServerExample
         }
     }
 
-    Result sendText(HttpConnection& connection, int code, StringSpan contentType, StringSpan body)
-    {
-        SC_TRY(connection.response.startBody(code, body.sizeInBytes(), contentType));
-        SC_TRY(connection.response.sendHeaders());
-        if (body.sizeInBytes() > 0)
-        {
-            AsyncBufferView::ID bufferID;
-            Span<char>          writableData;
-            SC_TRY(connection.buffersPool.requestNewBuffer(body.sizeInBytes(), bufferID, writableData));
-            ::memcpy(writableData.data(), body.bytesWithoutTerminator(), body.sizeInBytes());
-            connection.buffersPool.setNewBufferSize(bufferID, body.sizeInBytes());
-            const Result writeResult = connection.response.getWritableStream().write(bufferID);
-            connection.buffersPool.unrefBuffer(bufferID);
-            SC_TRY(writeResult);
-        }
-        return connection.response.end();
-    }
-
-    Result methodNotAllowed(HttpConnection& connection, StringSpan allow)
-    {
-        SC_TRY(connection.response.startBody(405, 0));
-        SC_TRY(connection.response.addHeader("Allow", allow));
-        SC_TRY(connection.response.sendHeaders());
-        return connection.response.end();
-    }
-
-    Result notFound(HttpConnection& connection)
-    {
-        return sendText(connection, 404, HttpContentTypeTextPlainUtf8(), "not found\n");
-    }
+    Result notFound(HttpConnection& connection) { return connection.sendTextCopy(404, "not found\n"); }
 };
 
 Result saneMain(Span<const StringSpan> args)

@@ -389,8 +389,15 @@ struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
     /// @warning The body span must remain valid until the writable stream finishes writing it.
     Result sendText(int httpCode, StringSpan body);
 
+    /// @brief Sends a caller-owned application/json response body.
+    /// @warning The body span must remain valid until the writable stream finishes writing it.
+    Result sendJson(int httpCode, StringSpan body);
+
     /// @brief Sends an empty response with `Content-Length: 0`.
     Result sendEmpty(int httpCode);
+
+    /// @brief Sends a 405 Method Not Allowed response with an Allow header and `Content-Length: 0`.
+    Result sendMethodNotAllowed(StringSpan allow);
 
   private:
     friend struct HttpConnectionsPool;
@@ -487,6 +494,15 @@ struct SC_HTTP_EXPORT HttpConnection : public HttpConnectionBase
 
     /// @brief Returns true after the HTTP layer handed this connection to WebSocket code.
     [[nodiscard]] bool isWebSocketUpgraded() const { return webSocketUpgraded; }
+
+    /// @brief Sends a fixed-size response body by copying it into this connection's async buffer pool.
+    Result sendBodyCopy(int httpCode, StringSpan body, StringSpan contentType = {});
+
+    /// @brief Sends a text/plain; charset=utf-8 response body by copying it into this connection's async buffer pool.
+    Result sendTextCopy(int httpCode, StringSpan body);
+
+    /// @brief Sends an application/json response body by copying it into this connection's async buffer pool.
+    Result sendJsonCopy(int httpCode, StringSpan body);
 
     HttpRequest  request;
     HttpResponse response;

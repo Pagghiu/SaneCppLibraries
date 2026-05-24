@@ -16,6 +16,22 @@ namespace SC
 struct HttpAsyncFileServerTest;
 } // namespace SC
 
+namespace
+{
+SC::StringSpan httpAsyncFileServerTestMimeLookup(SC::StringSpan extension, void* userData)
+{
+    if (userData != nullptr)
+    {
+        *static_cast<int*>(userData) += 1;
+    }
+    if (extension == "sane")
+    {
+        return "application/x-sane";
+    }
+    return {};
+}
+} // namespace
+
 struct SC::HttpAsyncFileServerTest : public SC::TestCase
 {
     HttpAsyncFileServerTest(SC::TestReport& report) : TestCase(report, "HttpAsyncFileServerTest")
@@ -32,10 +48,88 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
         {
             uploadPolicy();
         }
+        if (test_section("custom MIME lookup"))
+        {
+            customMimeLookup();
+        }
     }
     void httpFileServerTest(bool useAsyncFileSend);
     void uploadPolicy();
+    void customMimeLookup();
 };
+
+void SC::HttpAsyncFileServerTest::customMimeLookup()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType                  connections[1];
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+    HttpAsyncServer                     httpServer;
+    HttpAsyncFileServer                 fileServer;
+    ThreadPool                          threadPool;
+    const uint16_t                      serverPort = report.mapPort(26120);
+
+    if (eventLoop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+    SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, webServerFolder));
+
+    int                        lookupCount = 0;
+    HttpAsyncFileServerOptions options;
+    options.mimeTypeLookup   = httpAsyncFileServerTestMimeLookup;
+    options.mimeTypeUserData = &lookupCount;
+    SC_TEST_EXPECT(fileServer.setOptions(options));
+
+    httpServer.onRequest = [&](HttpConnection& connection)
+    { SC_ASSERT_RELEASE(fileServer.handleRequest(streams[connection.getConnectionID().getIndex()], connection)); };
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+    SC_TEST_EXPECT(fs.writeString("custom.sane", "custom mime"));
+
+    HttpTestClient client;
+    String         url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/custom.sane", serverPort));
+
+    struct CustomMimeContext
+    {
+        HttpAsyncFileServerTest* test;
+        HttpAsyncServer*         httpServer;
+        FileSystem*              fs;
+        int*                     lookupCount;
+    } context       = {this, &httpServer, &fs, &lookupCount};
+    client.callback = [&context](HttpTestClient& result)
+    {
+        const StringView response(result.getResponse());
+        context.test->recordExpectation("custom MIME response", response.containsString("200 OK"));
+        context.test->recordExpectation("custom MIME type",
+                                        response.containsString("Content-Type: application/x-sane"));
+        context.test->recordExpectation("custom MIME body", response.containsString("custom mime"));
+        context.test->recordExpectation("custom MIME lookup called", *context.lookupCount == 1);
+        context.test->recordExpectation("remove custom MIME fixture", context.fs->removeFile("custom.sane"));
+        context.test->recordExpectation("stop server", context.httpServer->stop());
+    };
+
+    SC_TEST_EXPECT(client.get(eventLoop, url.view()));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
 
 void SC::HttpAsyncFileServerTest::uploadPolicy()
 {

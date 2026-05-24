@@ -76,6 +76,49 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
         BodyMode bodyMode  = BodyMode::None;
         bool     keepAlive = false;
+
+        RequestOptions& clearBody()
+        {
+            body            = {};
+            bodyStream      = nullptr;
+            multipartWriter = nullptr;
+            bodyLength      = 0;
+            bodyMode        = BodyMode::None;
+            return *this;
+        }
+
+        RequestOptions& setBody(Span<const char> newBody)
+        {
+            clearBody();
+            body       = newBody;
+            bodyLength = newBody.sizeInBytes();
+            bodyMode   = BodyMode::Span;
+            return *this;
+        }
+
+        RequestOptions& setBody(StringSpan newBody) { return setBody(newBody.toCharSpan()); }
+
+        RequestOptions& setBody(const char* newBody)
+        {
+            return setBody(StringSpan::fromNullTerminated(newBody, StringEncoding::Ascii));
+        }
+
+        RequestOptions& setBody(AsyncReadableStream& newBodyStream, uint64_t newBodyLength)
+        {
+            clearBody();
+            bodyStream = &newBodyStream;
+            bodyLength = newBodyLength;
+            bodyMode   = BodyMode::Stream;
+            return *this;
+        }
+
+        RequestOptions& setMultipart(HttpMultipartWriter& newMultipartWriter)
+        {
+            clearBody();
+            multipartWriter = &newMultipartWriter;
+            bodyMode        = BodyMode::Multipart;
+            return *this;
+        }
     };
 
     /// @brief Initializes the client with caller-provided connection storage

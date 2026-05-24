@@ -12,8 +12,14 @@ namespace SC
 /// @brief Options controlling optional HttpAsyncFileServer semantics.
 struct SC_HTTP_EXPORT HttpAsyncFileServerOptions
 {
+    using MimeTypeLookup = StringSpan (*)(StringSpan extension, void* userData);
+
     /// @brief Optional SPA fallback path. The StringSpan must outlive the file server.
     StringSpan spaFallbackPath = {};
+
+    /// @brief Optional MIME lookup. Return an empty StringSpan to use the built-in fallback table.
+    MimeTypeLookup mimeTypeLookup   = nullptr;
+    void*          mimeTypeUserData = nullptr;
 
     /// @brief Enables Last-Modified / ETag validators (default: true).
     bool enableValidators = true;

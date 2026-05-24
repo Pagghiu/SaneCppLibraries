@@ -64,6 +64,7 @@ void runHttpWebSocketFrameTest(TestReport& report);
 void runHttpWebSocketHandshakeTest(TestReport& report);
 void runHttpWebSocketHubTest(TestReport& report);
 void runHttpWebSocketLifecycleTest(TestReport& report);
+void runHttpStressTest(TestReport& report);
 
 // HttpClient
 void runHttpClientTest(TestReport& report);
@@ -205,6 +206,7 @@ int main(int argc, const char* argv[])
     runHttpWebSocketHandshakeTest(report);
     runHttpWebSocketHubTest(report);
     runHttpWebSocketLifecycleTest(report);
+    runHttpStressTest(report);
 
     // HttpClient tests
     runHttpClientTest(report);

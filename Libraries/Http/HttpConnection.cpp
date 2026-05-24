@@ -5,6 +5,7 @@
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
 #include "../Foundation/Assert.h"
+#include "../Foundation/Deferred.h"
 #include "Internal/HttpFixedBufferWriter.inl"
 #include "Internal/HttpParsedHeaders.inl"
 
@@ -233,6 +234,41 @@ void HttpConnection::reset()
     state             = State::Inactive;
     webSocketUpgraded = false;
 }
+
+Result HttpConnection::sendBodyCopy(int code, StringSpan body, StringSpan contentType)
+{
+    AsyncBufferView::ID bufferID;
+    if (body.sizeInBytes() > 0)
+    {
+        Span<char> writableData;
+        SC_TRY(buffersPool.requestNewBuffer(body.sizeInBytes(), bufferID, writableData));
+        ::memcpy(writableData.data(), body.bytesWithoutTerminator(), body.sizeInBytes());
+        buffersPool.setNewBufferSize(bufferID, body.sizeInBytes());
+    }
+    auto releaseBuffer = MakeDeferred(
+        [&]
+        {
+            if (bufferID.isValid())
+            {
+                buffersPool.unrefBuffer(bufferID);
+            }
+        });
+
+    SC_TRY(response.startBody(code, body.sizeInBytes(), contentType));
+    SC_TRY(response.sendHeaders());
+    if (bufferID.isValid())
+    {
+        SC_TRY(response.getWritableStream().write(bufferID));
+    }
+    return response.end();
+}
+
+Result HttpConnection::sendTextCopy(int code, StringSpan body)
+{
+    return sendBodyCopy(code, body, "text/plain; charset=utf-8");
+}
+
+Result HttpConnection::sendJsonCopy(int code, StringSpan body) { return sendBodyCopy(code, body, "application/json"); }
 
 void HttpConnectionBase::reset()
 {
@@ -1081,10 +1117,20 @@ Result HttpResponse::sendBody(int code, StringSpan body, StringSpan contentType)
 
 Result HttpResponse::sendText(int code, StringSpan body) { return sendBody(code, body, "text/plain; charset=utf-8"); }
 
+Result HttpResponse::sendJson(int code, StringSpan body) { return sendBody(code, body, "application/json"); }
+
 Result HttpResponse::sendEmpty(int code)
 {
     SC_TRY(startResponse(code));
     SC_TRY(addContentLength(0));
+    SC_TRY(sendHeaders());
+    return end();
+}
+
+Result HttpResponse::sendMethodNotAllowed(StringSpan allow)
+{
+    SC_TRY(startBody(405, 0));
+    SC_TRY(addHeader("Allow", allow));
     SC_TRY(sendHeaders());
     return end();
 }

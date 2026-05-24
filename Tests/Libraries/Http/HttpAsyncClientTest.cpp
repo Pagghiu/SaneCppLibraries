@@ -214,6 +214,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             requestOptions();
         }
+        if (test_section("request option body helpers"))
+        {
+            requestOptionBodyHelpers();
+        }
         if (test_section("PUT with streamed body"))
         {
             putStreamBody();
@@ -277,6 +281,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void commonMethodWrappers();
     void putSpanBody();
     void requestOptions();
+    void requestOptionBodyHelpers();
     void putStreamBody();
     void putChunkedStreamBody();
     void putWritableBody();
@@ -290,6 +295,43 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void gzipRequestCompression();
     void multipartUpload();
 };
+
+void SC::HttpAsyncClientTest::requestOptionBodyHelpers()
+{
+    HttpAsyncClient::RequestOptions options;
+    SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::None);
+
+    HttpAsyncClient::RequestOptions* returned = &options.setBody(StringSpan("abc"));
+    SC_TEST_EXPECT(returned == &options);
+    SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::Span);
+    SC_TEST_EXPECT(options.body.sizeInBytes() == 3);
+    SC_TEST_EXPECT(options.bodyLength == 3);
+    SC_TEST_EXPECT(options.bodyStream == nullptr);
+    SC_TEST_EXPECT(options.multipartWriter == nullptr);
+
+    ChunkedBodyStream bodyStream;
+    SC_TEST_EXPECT(&options.setBody(bodyStream, 42) == &options);
+    SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::Stream);
+    SC_TEST_EXPECT(options.body.empty());
+    SC_TEST_EXPECT(options.bodyLength == 42);
+    SC_TEST_EXPECT(options.bodyStream == &bodyStream);
+    SC_TEST_EXPECT(options.multipartWriter == nullptr);
+
+    HttpMultipartWriter writer;
+    SC_TEST_EXPECT(&options.setMultipart(writer) == &options);
+    SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::Multipart);
+    SC_TEST_EXPECT(options.body.empty());
+    SC_TEST_EXPECT(options.bodyLength == 0);
+    SC_TEST_EXPECT(options.bodyStream == nullptr);
+    SC_TEST_EXPECT(options.multipartWriter == &writer);
+
+    SC_TEST_EXPECT(&options.clearBody() == &options);
+    SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::None);
+    SC_TEST_EXPECT(options.body.empty());
+    SC_TEST_EXPECT(options.bodyLength == 0);
+    SC_TEST_EXPECT(options.bodyStream == nullptr);
+    SC_TEST_EXPECT(options.multipartWriter == nullptr);
+}
 
 void SC::HttpAsyncClientTest::basicGet()
 {
@@ -761,9 +803,8 @@ void SC::HttpAsyncClientTest::requestOptions()
     options.method    = HttpParser::Method::HttpPUT;
     options.url       = url.view();
     options.headers   = Span<const HttpAsyncClient::Header>(headers);
-    options.bodyMode  = HttpAsyncClient::RequestOptions::BodyMode::Span;
-    options.body      = StringSpan("OptionsBody").toCharSpan();
     options.keepAlive = false;
+    options.setBody("OptionsBody");
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(client.sendRequest(loop, options));

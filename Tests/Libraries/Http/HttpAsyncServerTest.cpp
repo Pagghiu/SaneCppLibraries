@@ -244,6 +244,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             responseBodyHelpers();
         }
+        if (test_section("connection body copy helper"))
+        {
+            connectionBodyCopyHelper();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -270,6 +274,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void standardResponseStatuses();
     void emptyResponseHelper();
     void responseBodyHelpers();
+    void connectionBodyCopyHelper();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void maxHeaderSizeError();
@@ -767,6 +772,53 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
         char              headers[256] = {0};
         response.setup(headers, writable);
 
+        SC_TEST_EXPECT(response.sendMethodNotAllowed("GET, POST"));
+        while (writable.flushOne()) {}
+
+        constexpr StringView expected = "HTTP/1.1 405 Method Not Allowed\r\n"
+                                        "Content-Length: 0\r\n"
+                                        "Allow: GET, POST\r\n"
+                                        "Connection: keep-alive\r\n"
+                                        "\r\n";
+        SC_TEST_EXPECT(StringSpan(writable.output.toSpanConst(), false, StringEncoding::Ascii) == expected);
+    }
+
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
+        SC_TEST_EXPECT(response.sendJson(200, "{\"ok\":true}"));
+        while (writable.flushOne()) {}
+
+        constexpr StringView expected = "HTTP/1.1 200 OK\r\n"
+                                        "Content-Type: application/json\r\n"
+                                        "Content-Length: 11\r\n"
+                                        "Connection: keep-alive\r\n"
+                                        "\r\n"
+                                        "{\"ok\":true}";
+        SC_TEST_EXPECT(StringSpan(writable.output.toSpanConst(), false, StringEncoding::Ascii) == expected);
+    }
+
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
         SC_TEST_EXPECT(response.startBody(201, 4, "application/json"));
         SC_TEST_EXPECT(response.addHeader("X-Test", "yes"));
         SC_TEST_EXPECT(response.sendHeaders());
@@ -798,6 +850,53 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
 
         SC_TEST_EXPECT(not response.sendBody(200, "body", "text/plain"));
     }
+}
+
+void SC::HttpAsyncServerTest::connectionBodyCopyHelper()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType connections[1];
+    HttpAsyncServer    httpServer;
+    const uint16_t     serverPort = report.mapPort(6158);
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        char body[] = {'c', 'o', 'p', 'y'};
+        SC_TEST_EXPECT(connection.sendJsonCopy(201, {{body, sizeof(body)}, false, StringEncoding::Ascii}));
+        body[0] = 'x';
+    };
+
+    HttpTestClient client;
+    client.callback = [this, &httpServer](HttpTestClient& result)
+    {
+        StringView response(result.getResponse());
+        SC_TEST_EXPECT(response.containsString("201 Created"));
+        SC_TEST_EXPECT(response.containsString("Content-Type: application/json"));
+        SC_TEST_EXPECT(response.containsString("Content-Length: 4"));
+        SC_TEST_EXPECT(response.containsString("\r\n\r\ncopy"));
+        SC_TEST_EXPECT(not response.containsString("\r\n\r\nxopy"));
+        SC_TEST_EXPECT(httpServer.stop());
+    };
+
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/copy", serverPort));
+    SC_TEST_EXPECT(client.get(eventLoop, endpoint.view()));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::HttpAsyncServerTest::chunkedResponseWriting()

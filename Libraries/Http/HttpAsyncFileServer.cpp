@@ -3,6 +3,7 @@
 #include "HttpAsyncFileServer.h"
 #include "../FileSystem/FileSystem.h"
 #include "../Foundation/Assert.h"
+#include "HttpURLParser.h"
 #include "Internal/HttpStringIterator.h"
 
 #include <stdio.h>
@@ -46,7 +47,7 @@ struct HttpAsyncFileServer::Internal
     static Result sendRangeNotSatisfiable(HttpResponse& response, size_t fileSize);
 
     static int64_t    getCurrentTimeMilliseconds();
-    static StringSpan getContentType(const StringSpan extension);
+    static StringSpan getContentType(const HttpAsyncFileServerOptions& options, const StringSpan extension);
 };
 
 Result HttpAsyncFileServer::init(ThreadPool& pool, AsyncEventLoop& loop, StringSpan directoryToServe)
@@ -227,7 +228,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
         // Send HTTP headers first
         SC_TRY(connection.response.startResponse(byteRange.partial ? 206 : 200));
         SC_TRY(connection.response.addContentLength(byteRange.length));
-        SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(extension)));
+        SC_TRY(connection.response.addHeader("Content-Type", Internal::getContentType(options, extension)));
         SC_TRY(Internal::writeGMTHeaderTime("Date", connection.response, Internal::getCurrentTimeMilliseconds()));
         if (options.enableValidators)
         {
@@ -382,8 +383,18 @@ void HttpAsyncFileServer::Stream::PutFileListener::onFinish()
     SC_ASSERT_RELEASE(connection->response.sendEmpty(201));
 }
 
-StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extension)
+StringSpan HttpAsyncFileServer::Internal::getContentType(const HttpAsyncFileServerOptions& options,
+                                                         const StringSpan                  extension)
 {
+    if (options.mimeTypeLookup != nullptr)
+    {
+        const StringSpan custom = options.mimeTypeLookup(extension, options.mimeTypeUserData);
+        if (not custom.isEmpty())
+        {
+            return custom;
+        }
+    }
+
     if (extension == "htm" or extension == "html")
     {
         return "text/html";
@@ -473,21 +484,11 @@ StringSpan HttpAsyncFileServer::Internal::getContentType(const StringSpan extens
 
 Result HttpAsyncFileServer::Internal::extractSafeFilePath(StringSpan requestTarget, StringSpan& filePath)
 {
-    SC_TRY_MSG(HttpStringIterator::startsWith(requestTarget, "/"), "HttpAsyncFileServer request target must be path");
+    HttpRequestTargetView target;
+    SC_TRY(target.parse(requestTarget));
+    SC_TRY_MSG(HttpStringIterator::startsWith(target.path, "/"), "HttpAsyncFileServer request target must be path");
 
-    const char* data       = requestTarget.bytesWithoutTerminator();
-    size_t      pathLength = requestTarget.sizeInBytes();
-    for (size_t idx = 0; idx < requestTarget.sizeInBytes(); ++idx)
-    {
-        if (data[idx] == '?' or data[idx] == '#')
-        {
-            pathLength = idx;
-            break;
-        }
-    }
-
-    StringSpan path = {{data, pathLength}, false, requestTarget.getEncoding()};
-    filePath        = HttpStringIterator::sliceStart(path, 1);
+    filePath = HttpStringIterator::sliceStart(target.path, 1);
     if (filePath.isEmpty())
     {
         filePath = "index.html";

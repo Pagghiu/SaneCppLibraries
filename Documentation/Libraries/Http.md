@@ -114,6 +114,79 @@ both styles of usage.
 
 @copydoc SC::HttpAsyncClient
 
+# Validation
+For HTTP changes, start with the focused test, then run the broader stress and portability checks before merging.
+
+Local macOS / Linux:
+
+```sh
+./SC.sh build compile SCTest Debug
+./SC.sh build run SCTest Debug -- --test "HttpStressTest"
+./SC.sh build run SCTest Debug -- --test "HttpAsyncFileServerTest"
+./SC.sh build compile SCTest Release
+./SC.sh build compile "SCSingleFileLibs:" Release
+./SC.sh build documentation
+```
+
+Linux VM:
+
+```sh
+./SC.sh build compile SCTest Debug
+./SC.sh build run SCTest Debug -- --test "HttpStressTest" --port-offset 200
+./SC.sh build run SCTest Debug -- --test "HttpAsyncFileServerTest" --port-offset 200
+./SC.sh build compile SCTest Release
+./SC.sh build compile "SCSingleFileLibs:" Release
+```
+
+Windows VM:
+
+```bat
+SC.bat build compile SCTest Debug
+SC.bat build run SCTest Debug -- --test "HttpStressTest" --port-offset 400
+SC.bat build run SCTest Debug -- --test "HttpAsyncFileServerTest" --port-offset 400
+SC.bat build compile SCTest Release
+```
+
+`HttpStressTest` is intentionally bounded and fast. It is a smoke signal for repeated keep-alive requests and WebSocket
+fan-out writes through caller-owned buffer pools. `HttpAsyncFileServerTest` covers the heavier HTTP paths, including
+file requests, range and conditional requests, large PUT uploads, and multipart uploads.
+
+# Error Taxonomy
+HTTP APIs return `Result` for protocol, storage, stream, and lifecycle failures. Prefer messages that make the failure
+class obvious:
+
+- Protocol errors: syntactically valid HTTP/WebSocket input that violates the protocol state machine, for example
+  unexpected continuations, invalid control-frame fragmentation, or invalid request target usage.
+- Malformed input: invalid bytes or incomplete syntax, for example bad request lines, invalid header fields, malformed
+  multipart boundaries, or invalid extended WebSocket lengths.
+- Unsupported feature: valid input intentionally not implemented by this library layer, for example HTTP trailers in
+  request chunked decoding.
+- Storage too small: caller-provided fixed storage cannot hold output, headers, copied response bodies, parsed fields, or
+  queued async buffers. These errors should never silently truncate.
+- Stream or transport failure: async read/write, file, socket, or buffer-pool operations failed below the HTTP parser.
+- Lifecycle misuse: APIs were called in the wrong order or after ownership changed, for example writing after upgrade or
+  attaching a WebSocket pump twice without detach.
+
+# API Friction Audit
+Recent example and test call sites point to these remaining improvement seams:
+
+- Response bodies: use `HttpResponse::sendBody` / `sendJson` when the body span stays alive until the async write
+  finishes, and `HttpConnection::sendBodyCopy` / `sendTextCopy` / `sendJsonCopy` when stack-owned response text should
+  be copied into the connection's fixed async buffer pool before returning.
+- Method routing: `HttpRouter::formatAllowHeader` can feed `HttpResponse::sendMethodNotAllowed` directly for the common
+  405 + `Allow` + empty-body response path.
+- Streaming echo responses: `Examples/ApiServer/ApiServer.cpp` still needs custom pause/drain plumbing to mirror request
+  body buffers back to the response. That is correct stream code, but a small documented pipe helper could reduce
+  listener-order mistakes for users.
+- WebSocket examples: `Examples/AsyncWebServer/AsyncWebServer.cpp` now uses `HttpWebSocketConnectionPump`, while the
+  collaborative canvas keeps lower-level endpoint/message-assembler plumbing because it needs full-message assembly,
+  source-client suppression, and best-effort dropped-broadcast accounting. A later helper could combine pump plus
+  assembler without forcing policy into the core frame layer.
+- File uploads: `HttpAsyncFileServerTest` covers PUT and multipart uploads well, but application-level examples still
+  expose mostly raw file-server behavior. `HttpAsyncFileServerOptions` now covers SPA fallback, validators, ranges,
+  upload enable/size policy, and a zero-allocation MIME lookup hook. A future doc snippet should show those options and
+  safe filename handling as a small recipe.
+
 # Examples
 
 - [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpAsyncServer

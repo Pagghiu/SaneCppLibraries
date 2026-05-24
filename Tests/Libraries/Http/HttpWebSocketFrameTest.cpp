@@ -125,6 +125,16 @@ static bool spansEqual(SC::Span<const char> lhs, SC::Span<const char> rhs)
     }
     return true;
 }
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpWebSocketFrameTest : public SC::TestCase
@@ -486,7 +496,8 @@ void SC::HttpWebSocketFrameTest::maskingRoleValidation()
     HttpWebSocketFrameReader clientReader;
     clientReader.reset(HttpWebSocketEndpointRole::Client);
     size_t consumed = 0;
-    SC_TEST_EXPECT(not clientReader.parse({maskedOutput, maskedSize}, consumed));
+    Result result   = clientReader.parse({maskedOutput, maskedSize}, consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid frame masking for endpoint role"));
 
     HttpWebSocketFrameWriter serverWriter;
     serverWriter.reset(HttpWebSocketEndpointRole::Server);
@@ -506,7 +517,8 @@ void SC::HttpWebSocketFrameTest::maskingRoleValidation()
     HttpWebSocketFrameReader serverReader;
     serverReader.reset(HttpWebSocketEndpointRole::Server);
     consumed = 0;
-    SC_TEST_EXPECT(not serverReader.parse({unmaskedOutput, unmaskedSize}, consumed));
+    result   = serverReader.parse({unmaskedOutput, unmaskedSize}, consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid frame masking for endpoint role"));
 }
 
 void SC::HttpWebSocketFrameTest::invalidFrameRejection()
@@ -516,15 +528,18 @@ void SC::HttpWebSocketFrameTest::invalidFrameRejection()
 
     SC::uint8_t rsvFrame[] = {0xC1, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(rsvFrame, sizeof(rsvFrame)), consumed));
+    Result result = reader.parse(byteSpan(rsvFrame, sizeof(rsvFrame)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader RSV bits are not supported"));
 
     SC::uint8_t invalidOpcodeFrame[] = {0x83, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(invalidOpcodeFrame, sizeof(invalidOpcodeFrame)), consumed));
+    result = reader.parse(byteSpan(invalidOpcodeFrame, sizeof(invalidOpcodeFrame)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader unsupported opcode"));
 
     char fragmentedControl[] = {char(0x09), char(0x00)};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse({fragmentedControl, sizeof(fragmentedControl)}, consumed));
+    result = reader.parse({fragmentedControl, sizeof(fragmentedControl)}, consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader control frames must not be fragmented"));
 
     SC::uint8_t oversizedControl[] = {0x89, 0x7E, 0x00, 0x7E};
     reader.reset(HttpWebSocketEndpointRole::Client);
@@ -551,7 +566,8 @@ void SC::HttpWebSocketFrameTest::invalidFrameRejection()
     invalidControl.payloadLength = 0;
     Span<const char> encodedHeader;
     char             storage[16] = {0};
-    SC_TEST_EXPECT(not writer.beginFrame(invalidControl, {storage, sizeof(storage)}, encodedHeader));
+    result                       = writer.beginFrame(invalidControl, {storage, sizeof(storage)}, encodedHeader);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameWriter control frames must not be fragmented"));
 }
 
 void SC::HttpWebSocketFrameTest::writerRoundtrip()
