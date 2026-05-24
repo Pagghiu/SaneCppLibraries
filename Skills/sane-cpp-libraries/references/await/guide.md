@@ -88,6 +88,12 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
   allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
   completed slot without building a separate task-pointer array.
+- For registry shutdown, use an explicit cancel/drain/clear sequence: `registry.cancelAll()`, run the owning
+  `AwaitEventLoop`, then `registry.clearCompleted(&summary)`. Repeated `cancelAll()` and `clearCompleted()` calls are
+  valid and covered by tests.
+- For fixed allocator sizing, inspect `AwaitAllocator::peakUsed()` or `statistics().peakBytesInUse` after realistic
+  runs and keep enough headroom for concurrently active coroutine frames. Completed tasks may keep frames allocated
+  until their `AwaitTask` object is destroyed or cleared from a registry.
 - The strict no-stdlib coroutine story is not solved yet; do not present `Await` as ready for `SC_DISABLE_STD_CPP=1` or
   normal `-nostdinc++` use. A shim would need coroutine traits/handles/suspend types plus compiler builtin mapping. This
   is stable-track work, not required for MVP usage.

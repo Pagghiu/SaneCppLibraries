@@ -371,6 +371,20 @@ background lifetime owner and shutdown will later call `cancelAll()` or drain th
 management. Coroutine frames come from the `AwaitAllocator` bound to the task's `AwaitEventLoop`, and active registry
 tasks must be cancelled or drained before the registry storage is destroyed.
 
+Recommended shutdown for a registry is explicit and repeatable:
+
+```cpp
+SC_TRY(registry.cancelAll());
+SC_TRY(await.run());
+
+AwaitTaskGroupResultSummary summary;
+registry.clearCompleted(&summary);
+```
+
+Calling `cancelAll()` on an empty or already-cancelled registry is valid. Calling `clearCompleted()` repeatedly is also
+valid; it only releases completed slots. If a registry uses `waitAny(LeaveRemainingRunning)`, the owner must still call
+`cancelAll()` or otherwise drain the remaining active tasks before destroying the registry storage.
+
 # Memory allocation
 
 `AwaitAllocator` is mandatory: every `AwaitEventLoop` receives an already opened allocator, and coroutine frame
@@ -389,6 +403,30 @@ Explicit opt-in modes exist for integration and experiments:
 
 All modes expose the same diagnostics through `AwaitAllocatorStatistics`: allocation/release counts, requested
 allocated/released bytes, bytes in use, peak bytes in use, failed allocation count, and failed allocation sizes.
+
+When sizing fixed storage, start from the smallest realistic workflow, run it once, inspect `peakUsed()` or
+`statistics().peakBytesInUse`, then add headroom for the maximum number of concurrently active coroutine frames. A task
+that has completed but whose `AwaitTask` object is still alive may keep its frame allocated until that task object is
+destroyed or cleared from a registry.
+
+```cpp
+char           allocatorStorage[16 * 1024] = {};
+AwaitAllocator allocator;
+SC_TRY(allocator.createFixed(allocatorStorage));
+
+AwaitEventLoop await(async, allocator);
+
+// Run the workflow...
+
+const AwaitAllocatorStatistics stats = allocator.statistics();
+if (stats.numAllocationFailures != 0)
+{
+    return Result::Error("Await allocator storage is too small");
+}
+```
+
+Fixed storage should be sized intentionally per workflow. Prefer using diagnostics to tune the storage over switching to
+`createMalloc()` or `createVirtual()` just to hide a missing sizing decision.
 
 # Exceptions
 

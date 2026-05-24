@@ -22,7 +22,8 @@ namespace SC
 {
 namespace
 {
-static const char AwaitCancellationMessageStorage[] = "AwaitTask cancelled";
+static const char AwaitCancellationMessageStorage[]   = "AwaitTask cancelled";
+static const char AwaitWrongEventLoopMessageStorage[] = "AwaitTask belongs to another AwaitEventLoop";
 
 static constexpr size_t AwaitFrameAlignment =
 #if defined(__STDCPP_DEFAULT_NEW_ALIGNMENT__)
@@ -116,6 +117,12 @@ const char* AwaitCancellationMessage() { return AwaitCancellationMessageStorage;
 Result AwaitCancelledResult() { return Result::FromStableCharPointer(AwaitCancellationMessageStorage); }
 
 bool AwaitIsCancelled(Result result) { return result.message == AwaitCancellationMessageStorage; }
+
+const char* AwaitWrongEventLoopMessage() { return AwaitWrongEventLoopMessageStorage; }
+
+Result AwaitWrongEventLoopResult() { return Result::FromStableCharPointer(AwaitWrongEventLoopMessageStorage); }
+
+bool AwaitIsWrongEventLoop(Result result) { return result.message == AwaitWrongEventLoopMessageStorage; }
 
 struct AwaitAllocator::BlockHeader
 {
@@ -661,7 +668,7 @@ Result AwaitTask::cancel(AwaitEventLoop& await)
     }
     if (promise.eventLoop != nullptr and promise.eventLoop != &await)
     {
-        return Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        return AwaitWrongEventLoopResult();
     }
     if (not promise.started)
     {
@@ -844,7 +851,7 @@ Result AwaitEventLoop::spawn(AwaitTask& task)
     AwaitEventLoop* taskEventLoop = task.handle.promise().eventLoop;
     if (taskEventLoop != nullptr and taskEventLoop != this)
     {
-        return Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        return AwaitWrongEventLoopResult();
     }
     if (taskEventLoop == nullptr)
     {
@@ -3403,7 +3410,7 @@ bool AwaitTaskSpawnAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     AwaitEventLoop* taskEventLoop = task.handle.promise().eventLoop;
     if (taskEventLoop != nullptr and taskEventLoop != &await)
     {
-        operationResult = Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        operationResult = AwaitWrongEventLoopResult();
         return false;
     }
 
@@ -3475,7 +3482,7 @@ bool AwaitTaskTimeoutAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     AwaitTask::Promise& promise = task.handle.promise();
     if (promise.eventLoop != nullptr and promise.eventLoop != &await)
     {
-        operationResult = Result::Error("AwaitTask belongs to another AwaitEventLoop");
+        operationResult = AwaitWrongEventLoopResult();
         return false;
     }
     if (promise.completionCallback != nullptr or promise.continuation != nullptr)

@@ -72,6 +72,10 @@ SC_AWAIT_EXPORT const char* AwaitCancellationMessage();
 SC_AWAIT_EXPORT Result      AwaitCancelledResult();
 SC_AWAIT_EXPORT bool        AwaitIsCancelled(Result result);
 
+SC_AWAIT_EXPORT const char* AwaitWrongEventLoopMessage();
+SC_AWAIT_EXPORT Result      AwaitWrongEventLoopResult();
+SC_AWAIT_EXPORT bool        AwaitIsWrongEventLoop(Result result);
+
 /// @brief Checks the Result of a coroutine await expression and co_return-s the error to the caller.
 #define SC_CO_TRY(expression)                                                                                          \
     {                                                                                                                  \
