@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Http/HttpAsyncClient.h"
 #include "HttpStringAppend.h"
+#include "Libraries/AsyncStreams/Internal/ZLibAPI.h"
 #include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Foundation/Assert.h"
@@ -170,12 +171,12 @@ struct TimeoutGuard
 static bool compressionTestsAvailable(SC::TestReport& report)
 {
     SC_COMPILER_UNUSED(report);
-    auto host           = SC::HostPlatform;
-    auto instructionSet = SC::HostInstructionSet;
-    if (host == SC::Platform::Windows and instructionSet == SC::InstructionSet::ARM64)
+    SC::ZLibAPI zlib;
+    if (not zlib.load())
     {
         return false;
     }
+    zlib.unload();
     return true;
 }
 

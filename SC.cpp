@@ -19,6 +19,8 @@
 #include "Libraries/Http/HttpURLParser.cpp"
 #include "Libraries/Http/HttpWebSocket.cpp"
 #include "Libraries/HttpClient/HttpClient.cpp"
+#include "Libraries/HttpClient/HttpClientScheduler.cpp"
+#include "Libraries/HttpClient/HttpClientSession.cpp"
 #include "Libraries/Memory/Memory.cpp"
 #include "Libraries/Plugin/Plugin.cpp"
 #include "Libraries/Process/Process.cpp"

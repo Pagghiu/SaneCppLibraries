@@ -27,8 +27,10 @@ Choose `http-client` when the task needs the separate native-backend client and 
 - Use `HttpClientCapabilities::supports()`, `supportsAll()`, `supportsRequestOptions()`, `requireRequestOptions()`, `requireFeatures()`, `requireBackend()`, `getBackendName()`, and `getFeatureName()` for no-allocation backend diagnostics.
 - Use `HttpClient::init(requiredBackend/features)` when startup should fail unless a specific backend capability set is active.
 - Use the blocking helper only for simple synchronous workflows.
+- Treat the blocking helper response body span as a hard capacity; overflow returns an error and reports copied bytes.
 - Recommended flow: validate/preflight request shape, start one request per operation, poll until completion, then reuse the operation only after it is no longer in flight.
 - For many poll-driven operations, use `HttpClientOperationScheduler` rather than adding batching policy to `HttpClientOperation`.
+- Point users to `Examples/SaneHttpGet` for blocking usage, `Examples/HttpClientAsyncGet` for async-stream usage, and `Examples/HttpClientPollSession` for poll-driven session/scheduler usage.
 
 ## When Not To Use
 

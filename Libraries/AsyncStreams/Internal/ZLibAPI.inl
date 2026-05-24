@@ -31,6 +31,34 @@ struct SC::ZLibAPI::Internal
         return Result(true);
     }
 
+    static void unloadLibrary(ZLibAPI& zlib)
+    {
+        if (zlib.library == nullptr)
+        {
+            return;
+        }
+#ifdef _WIN32
+        HMODULE hmodule;
+        memcpy(&hmodule, &zlib.library, sizeof(HMODULE));
+        ::FreeLibrary(hmodule);
+#else
+        ::dlclose(zlib.library);
+#endif
+        zlib.library  = nullptr;
+        zlib.refCount = 0;
+    }
+
+    template <typename Func>
+    static Result requireSymbol(ZLibAPI& zlib, Func& sym, const char* name)
+    {
+        const Result result = loadSymbol(zlib, sym, name);
+        if (not result)
+        {
+            unloadLibrary(zlib);
+        }
+        return result;
+    }
+
 #if _WIN32
     static Result GetClrCompressionPath(char* pathBuffer, size_t bufferSize)
     {
@@ -109,13 +137,13 @@ SC::Result SC::ZLibAPI::load(const char* libPath)
         return Result::Error("Failed to load zlib library");
     }
     // Load functions
-    SC_TRY(Internal::loadSymbol(*this, pDeflate, "deflate"));
-    SC_TRY(Internal::loadSymbol(*this, pDeflateEnd, "deflateEnd"));
-    SC_TRY(Internal::loadSymbol(*this, pInflate, "inflate"));
-    SC_TRY(Internal::loadSymbol(*this, pInflateEnd, "inflateEnd"));
-    SC_TRY(Internal::loadSymbol(*this, pZlibVersion, "zlibVersion"));
-    SC_TRY(Internal::loadSymbol(*this, pDeflateInit2, "deflateInit2_"));
-    SC_TRY(Internal::loadSymbol(*this, pInflateInit2, "inflateInit2_"));
+    SC_TRY(Internal::requireSymbol(*this, pDeflate, "deflate"));
+    SC_TRY(Internal::requireSymbol(*this, pDeflateEnd, "deflateEnd"));
+    SC_TRY(Internal::requireSymbol(*this, pInflate, "inflate"));
+    SC_TRY(Internal::requireSymbol(*this, pInflateEnd, "inflateEnd"));
+    SC_TRY(Internal::requireSymbol(*this, pZlibVersion, "zlibVersion"));
+    SC_TRY(Internal::requireSymbol(*this, pDeflateInit2, "deflateInit2_"));
+    SC_TRY(Internal::requireSymbol(*this, pInflateInit2, "inflateInit2_"));
     refCount = 1;
     return Result(true);
 }
@@ -127,15 +155,5 @@ void SC::ZLibAPI::unload()
     {
         return;
     }
-    if (library)
-    {
-#ifdef _WIN32
-        HMODULE hmodule;
-        memcpy(&hmodule, &library, sizeof(HMODULE));
-        ::FreeLibrary(hmodule);
-#else
-        ::dlclose(library);
-#endif
-        library = nullptr;
-    }
+    Internal::unloadLibrary(*this);
 }

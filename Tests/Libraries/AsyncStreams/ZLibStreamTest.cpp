@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/AsyncStreams/Internal/ZLibStream.h"
+#include "Libraries/AsyncStreams/Internal/ZLibAPI.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
@@ -33,14 +34,12 @@ struct SC::ZLibStreamTest : public SC::TestCase
 {
     ZLibStreamTest(SC::TestReport& report) : TestCase(report, "ZLibStreamTest")
     {
-        // Avoid "expression is constant" warning
-        auto host           = HostPlatform;
-        auto instructionSet = HostInstructionSet;
-        if (host == Platform::Windows and instructionSet == InstructionSet::ARM64)
+        ZLibAPI zlib;
+        if (not zlib.load())
         {
-            // Can't load the system installed x86_64 zlib dll from ARM64 executable
             return;
         }
+        zlib.unload();
 
         if (test_section("gzip"))
         {

@@ -1641,10 +1641,11 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
 
     struct BlockingListener final : public HttpClientOperationListener
     {
-        Span<char> bodyBuffer;
-        size_t*    bodyLength = nullptr;
-        bool*      completed  = nullptr;
-        Result*    finalRes   = nullptr;
+        Span<char>           bodyBuffer;
+        size_t*              bodyLength = nullptr;
+        bool*                completed  = nullptr;
+        Result*              finalRes   = nullptr;
+        HttpClientOperation* operation  = nullptr;
 
         virtual void onResponseBody(Span<const char> data) override
         {
@@ -1655,6 +1656,12 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
                 memcpy(bodyBuffer.data() + *bodyLength, data.data(), toCopy);
                 *bodyLength += toCopy;
             }
+            if (toCopy != data.sizeInBytes())
+            {
+                *finalRes  = Result::Error("HttpClient: blocking response body buffer too small");
+                *completed = true;
+                (void)operation->cancel();
+            }
         }
 
         virtual void onResponseComplete() override { *completed = true; }
@@ -1662,7 +1669,10 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
         virtual void onError(Result error) override
         {
             *completed = true;
-            *finalRes  = error;
+            if (*finalRes)
+            {
+                *finalRes = error;
+            }
         }
     };
 
@@ -1677,6 +1687,7 @@ SC::Result SC::HttpClient::executeBlocking(const HttpClientRequest& request, Htt
     listener.bodyLength = &bodyLength;
     listener.completed  = &completed;
     listener.finalRes   = &finalRes;
+    listener.operation  = &operation;
 
     SC_TRY(operation.start(request, response, &listener));
 

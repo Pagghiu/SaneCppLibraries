@@ -466,8 +466,8 @@ struct SC_HTTP_CLIENT_EXPORT HttpClient
     /// @brief Convenience helper executing a request synchronously on top of HttpClientOperation::poll
     /// @param request Request metadata
     /// @param response Parsed response metadata
-    /// @param bodyBuffer Destination for the response body
-    /// @param bodyLength Number of body bytes copied into bodyBuffer
+    /// @param bodyBuffer Destination for the response body; exhaustion fails the request instead of truncating silently
+    /// @param bodyLength Number of body bytes copied into bodyBuffer, including bytes copied before an overflow error
     /// @param memory Caller-owned operation memory used for the blocking request
     /// @return `Result(true)` on success, otherwise the request error
     [[nodiscard]] static Result executeBlocking(const HttpClientRequest& request, HttpClientResponse& response,

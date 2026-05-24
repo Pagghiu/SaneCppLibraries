@@ -64,6 +64,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             blockingGet();
         }
+        if (test_section("blocking response buffer overflow"))
+        {
+            blockingResponseBufferOverflow();
+        }
         if (test_section("blocking POST local"))
         {
             blockingPost();
@@ -777,6 +781,51 @@ struct SC::HttpClientTest : public SC::TestCase
                     HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory.memory));
                 SC_TEST_EXPECT(response.statusCode == 200);
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hello GET");
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(server.scheduleStop());
+            }));
+
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void blockingResponseBufferOverflow()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+
+        TestServer server(loop);
+        SC_TEST_EXPECT(server.start(report));
+        server.server.onRequest = [this](HttpConnection& client)
+        {
+            SC_TEST_EXPECT(client.response.startResponse(200));
+            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "9"_a8));
+            SC_TEST_EXPECT(client.response.sendHeaders());
+            SC_TEST_EXPECT(client.response.getWritableStream().write("Hello GET"));
+            SC_TEST_EXPECT(client.response.end());
+        };
+
+        Thread clientThread;
+        SC_TEST_EXPECT(clientThread.start(
+            [&](Thread&)
+            {
+                HttpClient client;
+                SC_TEST_EXPECT(client.init());
+
+                CoreOperationMemory<64 * 1024, 8, 16, 4096, 16 * 1024> memory;
+
+                HttpClientRequest  request;
+                HttpClientResponse response;
+                char               body[4]    = {};
+                size_t             bodyLength = 0;
+
+                request.url = server.endpoint.view();
+                SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
+                                                               memory.memory));
+                SC_TEST_EXPECT(bodyLength == sizeof(body));
+                SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hell");
                 SC_TEST_EXPECT(client.close());
                 SC_TEST_EXPECT(server.scheduleStop());
             }));

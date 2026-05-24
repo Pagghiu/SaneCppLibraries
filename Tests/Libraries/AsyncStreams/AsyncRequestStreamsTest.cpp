@@ -4,6 +4,7 @@
 #include "Libraries/AsyncStreams/AsyncRequestStreams.h"
 #include "Libraries/Async/Async.h"
 #include "Libraries/AsyncStreams/AsyncStreams.h"
+#include "Libraries/AsyncStreams/Internal/ZLibAPI.h"
 #include "Libraries/AsyncStreams/ZLibTransformStreams.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/File/File.h"
@@ -42,14 +43,13 @@ struct SC::AsyncRequestStreamsTest : public SC::TestCase
 
         for (int i = 0; i < numTestsToRun; ++i)
         {
-            // Avoid "expression is constant" warning
-            auto host           = HostPlatform;
-            auto instructionSet = HostInstructionSet;
-            if (host == Platform::Windows and instructionSet == InstructionSet::ARM64)
+            ZLibAPI zlib;
+            if (not zlib.load())
             {
-                // Can't load the system installed x86_64 zlib dll from ARM64 executable
                 continue;
             }
+            zlib.unload();
+
             if (test_section("file to file"))
             {
                 fileToFile();

@@ -120,6 +120,10 @@ size_t bodyLength = 0;
 SC_TRY(SC::HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory));
 ```
 
+`executeBlocking()` treats `body` as a hard caller-owned capacity. If the response body does not fit,
+the helper returns an error instead of silently truncating; `bodyLength` still reports the bytes copied
+before the overflow was detected.
+
 Poll-driven:
 ```cpp
 SC::HttpClient client;
@@ -131,6 +135,20 @@ SC_TRY(operation.start(request, response, &listener));
 while (operation.isRequestInFlight())
 {
     SC_TRY(operation.poll(16));
+}
+```
+
+Async stream adapter:
+```cpp
+SC::AsyncEventLoop loop;
+SC_TRY(loop.create());
+
+SC::HttpClientAsyncT<SC::AsyncEventLoop, SC::AsyncStreams> operation;
+SC_TRY(operation.init(client, loop, operationMemory, asyncMemory));
+SC_TRY(operation.start(request, response));
+while (operation.isRequestInFlight())
+{
+    SC_TRY(loop.runOnce());
 }
 ```
 
@@ -240,7 +258,10 @@ Some relevant blog posts are:
 
 # Examples
 
-- Unit tests in `Tests/Libraries/HttpClient` show blocking and async usage patterns
+- `Examples/SaneHttpGet` shows the blocking helper with caller-owned buffers
+- `Examples/HttpClientAsyncGet` shows the optional async-stream adapter with caller-owned queues
+- `Examples/HttpClientPollSession` shows poll-driven operation memory, the optional session layer, and the operation scheduler
+- Unit tests in `Tests/Libraries/HttpClient` show blocking, poll-driven, session, scheduler, and upload usage patterns
 - AsyncStreams examples show how to integrate streaming pipelines with `AsyncReadableStream`
 
 # Roadmap
