@@ -24,6 +24,7 @@
 
   Exported API
   - buildSingleLibraryHeaderUsingContext(libraryName, ctx): Promise<string>
+  - buildSingleLibraryHeadersUsingContext(libraryName, ctx): Promise<{ regular, standalone }>
 */
 
 function getLineEnding(ctx) {
@@ -53,6 +54,31 @@ export function countLoc(content) {
   }
   comments--; // end of file newline
   return { code, comments };
+}
+
+function normalizeContentForHash(content) {
+  return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+async function calculateContentHash(headers, sources) {
+  const content = normalizeContentForHash(headers + sources);
+  const bytes = new TextEncoder().encode(content);
+  let digest;
+  if (globalThis.crypto && globalThis.crypto.subtle) {
+    digest = await globalThis.crypto.subtle.digest('SHA-256', bytes);
+  } else {
+    const { createHash } = await import('node:crypto');
+    return createHash('sha256').update(content, 'utf8').digest('hex').slice(0, 16).toUpperCase();
+  }
+  return Array.from(new Uint8Array(digest))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 16)
+    .toUpperCase();
+}
+
+function macroLibraryName(libraryName) {
+  return libraryName.replace(/[^A-Za-z0-9]/g, '_').toUpperCase();
 }
 
 function joinPath(dir, rel) {
@@ -156,16 +182,60 @@ async function amalgamateFilesRecursively({ orderList, ctx, targetLibrary, treeP
   return result;
 }
 
-export async function buildSingleLibraryHeaderUsingContext(libraryName, ctx) {
+function validateDependencyOrder(libraryName, dependencies) {
+  const visiting = [];
+  const visited = new Set();
+  const order = [];
+
+  function visit(name) {
+    if (!dependencies || !dependencies[name]) {
+      const chain = [...visiting, name].join(' -> ');
+      throw new Error(`Unknown library dependency '${name}' while resolving ${chain}`);
+    }
+    if (visiting.includes(name)) {
+      const cycleStart = visiting.indexOf(name);
+      const cycle = [...visiting.slice(cycleStart), name].join(' -> ');
+      throw new Error(`Dependency cycle detected: ${cycle}`);
+    }
+    if (visited.has(name)) return;
+
+    visiting.push(name);
+    for (const dependency of dependencies[name].direct_dependencies || []) {
+      visit(dependency);
+    }
+    visiting.pop();
+
+    visited.add(name);
+    order.push(name);
+  }
+
+  visit(libraryName);
+
+  const dependencyOrder = order.slice(0, -1);
+  const expectedDependencies = new Set((dependencies[libraryName] && dependencies[libraryName].all_dependencies) || []);
+  const actualDependencies = new Set(dependencyOrder);
+  const missing = [...actualDependencies].filter(dep => !expectedDependencies.has(dep)).sort();
+  const extra = [...expectedDependencies].filter(dep => !actualDependencies.has(dep)).sort();
+  if (missing.length || extra.length) {
+    const details = [];
+    if (missing.length) details.push(`missing from all_dependencies: ${missing.join(', ')}`);
+    if (extra.length) details.push(`extra in all_dependencies: ${extra.join(', ')}`);
+    throw new Error(`Dependency metadata mismatch for ${libraryName}: ${details.join('; ')}`);
+  }
+
+  return dependencyOrder;
+}
+
+async function buildLibraryRecord({ libraryName, ctx, treePathsSet }) {
   const treeEntries = await ctx.listTree(ctx.ref);
   const treePaths = treeEntries.filter(e => e.type === 'blob').map(e => e.path);
-  const treePathsSet = new Set(treePaths);
+  const localTreePathsSet = treePathsSet || new Set(treePaths);
 
   // Order file (optional)
   const orderPath = `${ctx.orderDir || 'Support/SingleFileLibs'}/SaneCpp${libraryName}.json`;
   let includeOrder = null;
   let implementationOrder = null;
-  if (treePathsSet.has(orderPath)) {
+  if (localTreePathsSet.has(orderPath)) {
     try {
       const orderText = await ctx.readFile(ctx.ref, orderPath);
       const order = JSON.parse(orderText);
@@ -182,51 +252,197 @@ export async function buildSingleLibraryHeaderUsingContext(libraryName, ctx) {
   const authorsInfo = new Map();
   const spdxSet = new Set();
   const processed = new Set();
-  const headers = await amalgamateFilesRecursively({ orderList: headerFiles, ctx, targetLibrary: libraryName, treePathsSet, authorsInfo, spdxSet, processedSet: processed });
-  const sources = await amalgamateFilesRecursively({ orderList: sourceFiles, ctx, targetLibrary: libraryName, treePathsSet, authorsInfo, spdxSet, processedSet: processed });
+  const headers = await amalgamateFilesRecursively({ orderList: headerFiles, ctx, targetLibrary: libraryName, treePathsSet: localTreePathsSet, authorsInfo, spdxSet, processedSet: processed });
+  const sources = await amalgamateFilesRecursively({ orderList: sourceFiles, ctx, targetLibrary: libraryName, treePathsSet: localTreePathsSet, authorsInfo, spdxSet, processedSet: processed });
 
   const headerLoc = countLoc(headers);
   const sourcesLoc = countLoc(sources);
 
-  const versionString = (await ctx.getVersionString(ctx.ref)) || 'unknown';
-  const DIV = divider();
-  const deps = (ctx.dependencies && ctx.dependencies[libraryName] && ctx.dependencies[libraryName].all_dependencies) || [];
+  return {
+    name: libraryName,
+    data: ctx.dependencies && ctx.dependencies[libraryName] ? ctx.dependencies[libraryName] : {},
+    headers,
+    sources,
+    authorsInfo,
+    spdxSet,
+    headerCodeLoc: headerLoc.code,
+    headerCommentLoc: headerLoc.comments,
+    sourcesCodeLoc: sourcesLoc.code,
+    sourcesCommentLoc: sourcesLoc.comments,
+    contentHash: await calculateContentHash(headers, sources),
+  };
+}
 
-  const eol = getLineEnding(ctx);
+function aggregateRecords(records) {
+  const authorsInfo = new Map();
+  const spdxSet = new Set();
+  let headerCodeLoc = 0;
+  let headerCommentLoc = 0;
+  let sourcesCodeLoc = 0;
+  let sourcesCommentLoc = 0;
+
+  for (const record of records) {
+    for (const [author, count] of record.authorsInfo.entries()) {
+      authorsInfo.set(author, (authorsInfo.get(author) || 0) + count);
+    }
+    for (const spdx of record.spdxSet) spdxSet.add(spdx);
+    headerCodeLoc += record.headerCodeLoc;
+    headerCommentLoc += record.headerCommentLoc;
+    sourcesCodeLoc += record.sourcesCodeLoc;
+    sourcesCommentLoc += record.sourcesCommentLoc;
+  }
+
+  return { authorsInfo, spdxSet, headerCodeLoc, headerCommentLoc, sourcesCodeLoc, sourcesCommentLoc };
+}
+
+function writeGeneratedBanner({ outputFilename, libraryName, dependencyText, versionString, statistics, authorsInfo, spdxSet, standalone, eol }) {
+  const buildKind = standalone ? 'standalone single file build' : 'single file build';
   const lines = [];
-  lines.push(DIV.replace(/\n$/, eol));
-  lines.push(`// SaneCpp${libraryName}.h - Sane C++ ${libraryName} Library (single file build)${eol}`);
-  lines.push(DIV.replace(/\n$/, eol));
-  if (deps.length) lines.push(`// Dependencies:       ${deps.map(d => `SaneCpp${d}.h`).join(', ')}${eol}`); else lines.push(`// Dependencies:       None${eol}`);
+  lines.push(divider().replace(/\n$/, eol));
+  lines.push(`// ${outputFilename} - Sane C++ ${libraryName} Library (${buildKind})${eol}`);
+  lines.push(divider().replace(/\n$/, eol));
+  lines.push(`// Dependencies:       ${dependencyText}${eol}`);
   lines.push(`// Version:            ${versionString}${eol}`);
-  lines.push(`// LOC header:         ${headerLoc.code} (code) + ${headerLoc.comments} (comments)${eol}`);
-  lines.push(`// LOC implementation: ${sourcesLoc.code} (code) + ${sourcesLoc.comments} (comments)${eol}`);
+  lines.push(`// LOC header:         ${statistics.headerCodeLoc} (code) + ${statistics.headerCommentLoc} (comments)${eol}`);
+  lines.push(`// LOC implementation: ${statistics.sourcesCodeLoc} (code) + ${statistics.sourcesCommentLoc} (comments)${eol}`);
   lines.push(`// Documentation:      https://pagghiu.github.io/SaneCppLibraries${eol}`);
   lines.push(`// Source Code:        https://github.com/pagghiu/SaneCppLibraries${eol}`);
-  lines.push(DIV.replace(/\n$/, eol));
+  lines.push(divider().replace(/\n$/, eol));
   lines.push(`// All copyrights and SPDX information for this library (each amalgamated section has its own copyright attributions):${eol}`);
   const sortedAuthors = Array.from(authorsInfo.entries()).sort((a, b) => b[1] - a[1]);
   for (const [author] of sortedAuthors) lines.push(`// Copyright (c) ${author}${eol}`);
   if (spdxSet.size > 0) lines.push(`// SPDX-License-Identifier: ${Array.from(spdxSet).sort().join(', ')}${eol}`);
-  lines.push(DIV.replace(/\n$/, eol));
-  for (const dep of deps) lines.push(`#include "SaneCpp${dep}.h"${eol}`);
-  if (deps.length) lines.push(eol);
+  lines.push(divider().replace(/\n$/, eol));
+  return lines.join('');
+}
 
-  const defineGuard = `SANE_CPP_${libraryName.toUpperCase()}_HEADER`;
+function writeLibraryBlock({ record, embedded, eol }) {
+  const libraryName = record.name;
+  const macroName = macroLibraryName(libraryName);
+  const includedGuard = `SANE_CPP_${macroName}_INCLUDED`;
+  const contentGuard = `SANE_CPP_${macroName}_CONTENT_${record.contentHash}`;
+  const defineGuard = `SANE_CPP_${macroName}_HEADER`;
+  const implementationGuard = `SANE_CPP_${macroName}_IMPLEMENTATION`;
+  const lines = [];
+
+  if (embedded) {
+    lines.push(divider().replace(/\n$/, eol));
+    lines.push(`// Embedded SaneCpp${libraryName}.h${eol}`);
+    lines.push(divider().replace(/\n$/, eol));
+  }
+
+  lines.push(`#if defined(${includedGuard}) && !defined(${contentGuard})${eol}`);
+  lines.push(`#error "SaneCpp${libraryName} was already included from a different single-file version"${eol}`);
+  lines.push(`#endif${eol}${eol}`);
+  lines.push(`#if (defined(${defineGuard}) || defined(${implementationGuard})) && !defined(${includedGuard})${eol}`);
+  lines.push(`#error "SaneCpp${libraryName} was already included without single-file content markers"${eol}`);
+  lines.push(`#endif${eol}${eol}`);
+  lines.push(`#if !defined(${includedGuard})${eol}`);
+  lines.push(`#define ${includedGuard} 1${eol}`);
+  lines.push(`#define ${contentGuard} 1${eol}`);
+  lines.push(`#endif${eol}${eol}`);
+
   lines.push(`#if !defined(${defineGuard})${eol}`);
   lines.push(`#define ${defineGuard} 1${eol}`);
-  lines.push(headers);
+  lines.push(record.headers);
   lines.push(`${eol}#endif // ${defineGuard}${eol}`);
 
-  if (sources.trim().length > 0) {
-    const implGuard = `SANE_CPP_${libraryName.toUpperCase()}_IMPLEMENTATION`;
-    lines.push(`#if defined(SANE_CPP_IMPLEMENTATION) && !defined(${implGuard})${eol}`);
-    lines.push(`#define ${implGuard} 1${eol}`);
-    lines.push(sources);
-    lines.push(`${eol}#endif // ${implGuard}${eol}`);
+  if (record.sources) {
+    lines.push(`#if defined(SANE_CPP_IMPLEMENTATION) && !defined(${implementationGuard})${eol}`);
+    lines.push(`#define ${implementationGuard} 1${eol}`);
+    lines.push(record.sources);
+    lines.push(`${eol}#endif // ${implementationGuard}${eol}`);
   }
 
   return lines.join('');
 }
 
+function renderRegularHeader({ record, versionString, eol }) {
+  const deps = record.data.all_dependencies || [];
+  const outputFilename = `SaneCpp${record.name}.h`;
+  const dependencyText = deps.length ? deps.map(dep => `SaneCpp${dep}.h`).join(', ') : 'None';
+  const statistics = {
+    headerCodeLoc: record.headerCodeLoc,
+    headerCommentLoc: record.headerCommentLoc,
+    sourcesCodeLoc: record.sourcesCodeLoc,
+    sourcesCommentLoc: record.sourcesCommentLoc,
+  };
+  const lines = [];
+  lines.push(writeGeneratedBanner({
+    outputFilename,
+    libraryName: record.name,
+    dependencyText,
+    versionString,
+    statistics,
+    authorsInfo: record.authorsInfo,
+    spdxSet: record.spdxSet,
+    standalone: false,
+    eol,
+  }));
+  for (const dep of deps) lines.push(`#include "SaneCpp${dep}.h"${eol}`);
+  if (deps.length) lines.push(eol);
+  lines.push(writeLibraryBlock({ record, embedded: false, eol }));
+  return lines.join('');
+}
 
+function renderStandaloneHeader({ record, dependencyOrder, recordsByName, versionString, eol }) {
+  const orderedRecords = [...dependencyOrder, record.name].map(name => recordsByName.get(name));
+  const aggregate = aggregateRecords(orderedRecords);
+  const outputFilename = `SaneCpp${record.name}Standalone.h`;
+  const dependencyText = dependencyOrder.length ? `Embedded: ${dependencyOrder.map(dep => `SaneCpp${dep}.h`).join(', ')}` : 'None';
+  const statistics = {
+    headerCodeLoc: aggregate.headerCodeLoc,
+    headerCommentLoc: aggregate.headerCommentLoc,
+    sourcesCodeLoc: aggregate.sourcesCodeLoc,
+    sourcesCommentLoc: aggregate.sourcesCommentLoc,
+  };
+  const lines = [];
+  lines.push(writeGeneratedBanner({
+    outputFilename,
+    libraryName: record.name,
+    dependencyText,
+    versionString,
+    statistics,
+    authorsInfo: aggregate.authorsInfo,
+    spdxSet: aggregate.spdxSet,
+    standalone: true,
+    eol,
+  }));
+  for (const embeddedRecord of orderedRecords) {
+    lines.push(writeLibraryBlock({ record: embeddedRecord, embedded: embeddedRecord.name !== record.name, eol }));
+  }
+  return lines.join('');
+}
+
+async function prepareBuildContext(libraryName, ctx) {
+  const treeEntries = await ctx.listTree(ctx.ref);
+  const treePaths = treeEntries.filter(e => e.type === 'blob').map(e => e.path);
+  const treePathsSet = new Set(treePaths);
+  const dependencyOrder = validateDependencyOrder(libraryName, ctx.dependencies || {});
+  const recordsByName = new Map();
+  for (const name of [...dependencyOrder, libraryName]) {
+    recordsByName.set(name, await buildLibraryRecord({ libraryName: name, ctx, treePathsSet }));
+  }
+  return { dependencyOrder, recordsByName };
+}
+
+export async function buildSingleLibraryHeadersUsingContext(libraryName, ctx) {
+  const { dependencyOrder, recordsByName } = await prepareBuildContext(libraryName, ctx);
+  const versionString = (await ctx.getVersionString(ctx.ref)) || 'unknown';
+  const eol = getLineEnding(ctx);
+  const record = recordsByName.get(libraryName);
+  return {
+    regular: renderRegularHeader({ record, versionString, eol }),
+    standalone: renderStandaloneHeader({ record, dependencyOrder, recordsByName, versionString, eol }),
+  };
+}
+
+export async function buildSingleLibraryHeaderUsingContext(libraryName, ctx) {
+  const treeEntries = await ctx.listTree(ctx.ref);
+  const treePaths = treeEntries.filter(e => e.type === 'blob').map(e => e.path);
+  const treePathsSet = new Set(treePaths);
+  const record = await buildLibraryRecord({ libraryName, ctx, treePathsSet });
+  const versionString = (await ctx.getVersionString(ctx.ref)) || 'unknown';
+  const eol = getLineEnding(ctx);
+  return renderRegularHeader({ record, versionString, eol });
+}

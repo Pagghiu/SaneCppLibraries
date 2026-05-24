@@ -748,7 +748,7 @@ Result configureSingleFileLibs(Definition& definition, const Parameters& paramet
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        if (name == "Test_SaneCppAwait")
+        if (name == "Test_SaneCppAwait" or name == "Test_SaneCppAwaitStandalone")
         {
             project.files.compile.cppStandard = CppStandard::CPP20;
             configureSaneStdHeadersNoRuntime(project);

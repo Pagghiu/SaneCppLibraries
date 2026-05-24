@@ -13,7 +13,7 @@
   Notes:
   - Node: CommonJS wrapper dynamically imports the ESM core module (Node >=16)
   - Bun: works out of the box
-  - Outputs single-file headers only (no test cpp)
+  - Outputs regular and standalone single-file headers only (no test cpp)
   - Scans only Libraries/, LibrariesExtra/ and Support/SingleFileLibs (for order files)
 */
 
@@ -74,7 +74,7 @@ async function main() {
 
   // Dynamic import of ESM core
   const coreUrl = pathToFileURL(join(__dirname, 'amalgamationCore.js')).href;
-  const { buildSingleLibraryHeaderUsingContext } = await import(coreUrl);
+  const { buildSingleLibraryHeadersUsingContext } = await import(coreUrl);
 
   // Filesystem backend context
   const ctx = {
@@ -115,9 +115,11 @@ async function main() {
   const libraries = args.all ? Object.keys(dependencies) : [args.library];
   for (const lib of libraries) {
     process.stdout.write(`Amalgamating ${lib}... `);
-    const content = await buildSingleLibraryHeaderUsingContext(lib, ctx);
+    const content = await buildSingleLibraryHeadersUsingContext(lib, ctx);
     const outPath = join(outDir, `SaneCpp${lib}.h`);
-    await writeText(outPath, content);
+    const standaloneOutPath = join(outDir, `SaneCpp${lib}Standalone.h`);
+    await writeText(outPath, content.regular);
+    await writeText(standaloneOutPath, content.standalone);
     console.log('done');
   }
 }
@@ -126,5 +128,4 @@ main().catch(err => {
   console.error(err);
   process.exit(1);
 });
-
 

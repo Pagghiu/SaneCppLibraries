@@ -29,6 +29,7 @@ import re
 import sys
 import subprocess
 import argparse
+import hashlib
 from collections import defaultdict
 DIVIDER = "//" + ''.join(['-' for _ in range(120-2)]) + '\n'
 
@@ -204,6 +205,252 @@ def amalgamate_files_recursively(library_files, order_list, root_dir, library_na
         full_path = os.path.realpath(full_path) # Redundant but safe
         content += _process_file_recursively(full_path, processed_files, root_dir, library_name, authors_info, spdx_set)
     return content
+
+def normalize_content_for_hash(content):
+    return content.replace('\r\n', '\n').replace('\r', '\n')
+
+def calculate_content_hash(headers, sources):
+    content = normalize_content_for_hash(headers + sources)
+    return hashlib.sha256(content.encode('utf-8')).hexdigest()[:16].upper()
+
+def macro_library_name(library_name):
+    return re.sub(r'[^A-Za-z0-9]', '_', library_name).upper()
+
+def validate_dependency_order(library_name, dependencies):
+    visiting = []
+    visited = set()
+    order = []
+
+    def visit(name):
+        if name not in dependencies:
+            chain = ' -> '.join(visiting + [name])
+            raise RuntimeError(f"Unknown library dependency '{name}' while resolving {chain}")
+        if name in visiting:
+            cycle_start = visiting.index(name)
+            cycle = ' -> '.join(visiting[cycle_start:] + [name])
+            raise RuntimeError(f"Dependency cycle detected: {cycle}")
+        if name in visited:
+            return
+
+        visiting.append(name)
+        for dependency in dependencies[name].get('direct_dependencies', []):
+            visit(dependency)
+        visiting.pop()
+
+        visited.add(name)
+        order.append(name)
+
+    visit(library_name)
+
+    dependency_order = order[:-1]
+    expected_dependencies = set(dependencies[library_name].get('all_dependencies', []))
+    actual_dependencies = set(dependency_order)
+    if expected_dependencies != actual_dependencies:
+        missing = sorted(actual_dependencies - expected_dependencies)
+        extra = sorted(expected_dependencies - actual_dependencies)
+        details = []
+        if missing:
+            details.append(f"missing from all_dependencies: {', '.join(missing)}")
+        if extra:
+            details.append(f"extra in all_dependencies: {', '.join(extra)}")
+        raise RuntimeError(f"Dependency metadata mismatch for {library_name}: {'; '.join(details)}")
+
+    return dependency_order
+
+def build_library_record(root_dir, library_name, data):
+    print(f'Processing library: {library_name}')
+
+    library_files = get_library_files(root_dir, library_name)
+
+    order_file_path = os.path.join(root_dir, 'Support', 'SingleFileLibs', f'SaneCpp{library_name}.json')
+
+    processed_files_for_lib = set()
+    authors_info_for_lib = defaultdict(int)
+    spdx_set_for_lib = set()
+
+    if os.path.exists(order_file_path):
+        print(f"  (Using order file: {os.path.basename(order_file_path)})")
+        with open(order_file_path, 'r', encoding='utf-8') as f:
+            order_data = json.load(f)
+        include_order = order_data.get('includeOrder', [])
+        implementation_order = order_data.get('implementationOrder', [])
+        headers = amalgamate_files_recursively(library_files, include_order, root_dir, library_name,
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+        sources = amalgamate_files_recursively(library_files, implementation_order, root_dir, library_name,
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+    else:
+        public_headers = [f for f in library_files if f.endswith('.h') and 'Internal' not in f.split(os.sep)]
+        # Make deterministic across platforms/runs
+        public_headers.sort(key=lambda p: os.path.basename(p))
+        public_header_basenames_for_lib = [os.path.basename(f) for f in public_headers]
+        headers = amalgamate_files_recursively(library_files, public_header_basenames_for_lib, root_dir, library_name,
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+
+        source_files = [f for f in library_files if f.endswith('.cpp')]
+        # Make deterministic across platforms/runs
+        source_files.sort(key=lambda p: os.path.basename(p))
+        source_basenames = [os.path.basename(f) for f in source_files]
+        sources = amalgamate_files_recursively(library_files, source_basenames, root_dir, library_name,
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+
+    header_code_loc, header_comment_loc = count_loc(headers)
+    sources_code_loc, sources_comment_loc = count_loc(sources)
+
+    return {
+        'name': library_name,
+        'data': data,
+        'headers': headers,
+        'sources': sources,
+        'authors_info': authors_info_for_lib,
+        'spdx_set': spdx_set_for_lib,
+        'header_code_loc': header_code_loc,
+        'header_comment_loc': header_comment_loc,
+        'sources_code_loc': sources_code_loc,
+        'sources_comment_loc': sources_comment_loc,
+        'content_hash': calculate_content_hash(headers, sources),
+    }
+
+def aggregate_records(records):
+    authors_info = defaultdict(int)
+    spdx_set = set()
+    header_code_loc = 0
+    header_comment_loc = 0
+    sources_code_loc = 0
+    sources_comment_loc = 0
+
+    for record in records:
+        for author, count in record['authors_info'].items():
+            authors_info[author] += count
+        spdx_set.update(record['spdx_set'])
+        header_code_loc += record['header_code_loc']
+        header_comment_loc += record['header_comment_loc']
+        sources_code_loc += record['sources_code_loc']
+        sources_comment_loc += record['sources_comment_loc']
+
+    return {
+        'authors_info': authors_info,
+        'spdx_set': spdx_set,
+        'header_code_loc': header_code_loc,
+        'header_comment_loc': header_comment_loc,
+        'sources_code_loc': sources_code_loc,
+        'sources_comment_loc': sources_comment_loc,
+    }
+
+def write_generated_banner(f, output_filename, library_name, dependency_text, git_version, statistics, authors_info, spdx_set,
+                           standalone):
+    build_kind = 'standalone single file build' if standalone else 'single file build'
+    f.write(f'{DIVIDER}')
+    f.write(f'// {output_filename} - Sane C++ {library_name} Library ({build_kind})\n')
+    f.write(f'{DIVIDER}')
+    f.write(f'// Dependencies:       {dependency_text}\n')
+    f.write(f'// Version:            {git_version}\n')
+    f.write(f'// LOC header:         {statistics["header_code_loc"]} (code) + {statistics["header_comment_loc"]} (comments)\n')
+    f.write(f'// LOC implementation: {statistics["sources_code_loc"]} (code) + {statistics["sources_comment_loc"]} (comments)\n')
+    f.write(f'// Documentation:      https://pagghiu.github.io/SaneCppLibraries\n')
+    f.write(f'// Source Code:        https://github.com/pagghiu/SaneCppLibraries\n')
+    f.write(f'{DIVIDER}')
+    f.write(f'// All copyrights and SPDX information for this library (each amalgamated section has its own copyright attributions):\n')
+    sorted_authors = sorted(authors_info.items(), key=lambda item: item[1], reverse=True)
+    for author, _ in sorted_authors:
+        f.write(f'// Copyright (c) {author}\n')
+
+    if spdx_set:
+        f.write(f'// SPDX-License-Identifier: {", ".join(sorted(list(spdx_set)))}\n')
+    f.write(f'{DIVIDER}')
+
+def write_library_block(f, record, embedded=False):
+    library_name = record['name']
+    macro_name = macro_library_name(library_name)
+    included_guard = f'SANE_CPP_{macro_name}_INCLUDED'
+    content_guard = f'SANE_CPP_{macro_name}_CONTENT_{record["content_hash"]}'
+    define_guard = f'SANE_CPP_{macro_name}_HEADER'
+
+    if embedded:
+        f.write(f'{DIVIDER}')
+        f.write(f'// Embedded SaneCpp{library_name}.h\n')
+        f.write(f'{DIVIDER}')
+
+    f.write(f'#if defined({included_guard}) && !defined({content_guard})\n')
+    f.write(f'#error "SaneCpp{library_name} was already included from a different single-file version"\n')
+    f.write(f'#endif\n\n')
+    f.write(f'#if (defined({define_guard}) || defined(SANE_CPP_{macro_name}_IMPLEMENTATION)) && !defined({included_guard})\n')
+    f.write(f'#error "SaneCpp{library_name} was already included without single-file content markers"\n')
+    f.write(f'#endif\n\n')
+    f.write(f'#if !defined({included_guard})\n')
+    f.write(f'#define {included_guard} 1\n')
+    f.write(f'#define {content_guard} 1\n')
+    f.write(f'#endif\n\n')
+
+    f.write(f'#if !defined({define_guard})\n')
+    f.write(f'#define {define_guard} 1\n')
+    f.write(record['headers'])
+    f.write(f'\n#endif // {define_guard}\n')
+
+    if record['sources']:
+        implementation_guard = f'SANE_CPP_{macro_name}_IMPLEMENTATION'
+        f.write(f'#if defined(SANE_CPP_IMPLEMENTATION) && !defined({implementation_guard})\n')
+        f.write(f'#define {implementation_guard} 1\n')
+        f.write(record['sources'])
+        f.write(f'\n#endif // {implementation_guard}\n')
+
+def write_regular_header(output_filepath, output_filename, record, git_version):
+    dependencies = record['data'].get('all_dependencies', [])
+    dependency_text = ", ".join([f"SaneCpp{dep}.h" for dep in dependencies]) if dependencies else "None"
+    statistics = {
+        'header_code_loc': record['header_code_loc'],
+        'header_comment_loc': record['header_comment_loc'],
+        'sources_code_loc': record['sources_code_loc'],
+        'sources_comment_loc': record['sources_comment_loc'],
+    }
+
+    with open(output_filepath, 'w', encoding='utf-8') as f:
+        write_generated_banner(f, output_filename, record['name'], dependency_text, git_version, statistics,
+                               record['authors_info'], record['spdx_set'], standalone=False)
+
+        for dep in dependencies:
+            f.write(f'#include "SaneCpp{dep}.h"\n')
+        if dependencies:
+            f.write('\n')
+
+        write_library_block(f, record)
+
+def write_standalone_header(output_filepath, output_filename, record, dependency_order, records_by_name, git_version):
+    ordered_records = [records_by_name[name] for name in dependency_order + [record['name']]]
+    aggregate = aggregate_records(ordered_records)
+    dependency_text = "Embedded: " + ", ".join([f"SaneCpp{dep}.h" for dep in dependency_order]) if dependency_order else "None"
+
+    statistics = {
+        'header_code_loc': aggregate['header_code_loc'],
+        'header_comment_loc': aggregate['header_comment_loc'],
+        'sources_code_loc': aggregate['sources_code_loc'],
+        'sources_comment_loc': aggregate['sources_comment_loc'],
+    }
+
+    with open(output_filepath, 'w', encoding='utf-8') as f:
+        write_generated_banner(f, output_filename, record['name'], dependency_text, git_version, statistics,
+                               aggregate['authors_info'], aggregate['spdx_set'], standalone=True)
+
+        for embedded_record in ordered_records:
+            write_library_block(f, embedded_record, embedded=embedded_record['name'] != record['name'])
+
+def write_regular_test(test_filepath, output_filename):
+    with open(test_filepath, 'w', encoding='utf-8') as f:
+        f.write(f'#define SANE_CPP_IMPLEMENTATION\n')
+        f.write(f'#include "{output_filename}"\n\n')
+        f.write(f'int main()\n')
+        f.write(f'{{\n')
+        f.write(f'    return 0;\n')
+        f.write(f'}}\n')
+
+def write_standalone_test(test_filepath, output_filename):
+    with open(test_filepath, 'w', encoding='utf-8') as f:
+        f.write(f'#include "{output_filename}"\n\n')
+        f.write(f'#define SANE_CPP_IMPLEMENTATION\n')
+        f.write(f'#include "{output_filename}"\n\n')
+        f.write(f'int main()\n')
+        f.write(f'{{\n')
+        f.write(f'    return 0;\n')
+        f.write(f'}}\n')
 
 def update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc, sources_code_loc, sources_comment_loc):
     """Updates the statistics section in the library's documentation markdown file."""
@@ -387,109 +634,50 @@ def main():
 
     git_version = get_git_version()
 
+    records_by_name = {}
+    dependency_orders = {}
+
+    for library_name, data in dependencies.items():
+        records_by_name[library_name] = build_library_record(root_dir, library_name, data)
+
+    for library_name in dependencies:
+        dependency_orders[library_name] = validate_dependency_order(library_name, dependencies)
+
     lib_line_counts = {}
     total_header_loc = 0
     total_sources_loc = 0
     total_comment_loc = 0
 
-    for library_name, data in dependencies.items():
+    for library_name, record in records_by_name.items():
+        header_code_loc = record['header_code_loc']
+        header_comment_loc = record['header_comment_loc']
+        sources_code_loc = record['sources_code_loc']
+        sources_comment_loc = record['sources_comment_loc']
 
-        print(f'Processing library: {library_name}')
-
-        library_files = get_library_files(root_dir, library_name)
-        
-        order_file_path = os.path.join(root_dir, 'Support', 'SingleFileLibs', f'SaneCpp{library_name}.json')
-        
-        processed_files_for_lib = set()
-        authors_info_for_lib = defaultdict(int)
-        spdx_set_for_lib = set()
-
-        if os.path.exists(order_file_path):
-            print(f"  (Using order file: {os.path.basename(order_file_path)})")
-            with open(order_file_path, 'r', encoding='utf-8') as f:
-                order_data = json.load(f)
-            include_order = order_data.get('includeOrder', [])
-            implementation_order = order_data.get('implementationOrder', [])
-            headers = amalgamate_files_recursively(library_files, include_order, root_dir, library_name, processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
-            sources = amalgamate_files_recursively(library_files, implementation_order, root_dir, library_name, processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
-        else:
-            public_headers = [f for f in library_files if f.endswith('.h') and 'Internal' not in f.split(os.sep)]
-            # Make deterministic across platforms/runs
-            public_headers.sort(key=lambda p: os.path.basename(p))
-            public_header_basenames_for_lib = [os.path.basename(f) for f in public_headers]
-            headers = amalgamate_files_recursively(library_files, public_header_basenames_for_lib, root_dir, library_name, processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
-
-            source_files = [f for f in library_files if f.endswith('.cpp')]
-            # Make deterministic across platforms/runs
-            source_files.sort(key=lambda p: os.path.basename(p))
-            source_basenames = [os.path.basename(f) for f in source_files]
-            sources = amalgamate_files_recursively(library_files, source_basenames, root_dir, library_name, processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
-
-        output_filename = f'SaneCpp{library_name}.h'
-        output_filepath = os.path.join(single_file_lib_dir, output_filename)
-
-        header_code_loc, header_comment_loc = count_loc(headers)
-        sources_code_loc, sources_comment_loc = count_loc(sources)
         total_header_loc += header_code_loc
         total_sources_loc += sources_code_loc
         total_comment_loc += header_comment_loc + sources_comment_loc
         lib_line_counts[library_name] = (header_code_loc + sources_code_loc, header_code_loc + sources_code_loc)
         if args.update_loc:
-            update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc, sources_code_loc, sources_comment_loc)
+            update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc,
+                                          sources_code_loc, sources_comment_loc)
 
+        output_filename = f'SaneCpp{library_name}.h'
+        output_filepath = os.path.join(single_file_lib_dir, output_filename)
+        write_regular_header(output_filepath, output_filename, record, git_version)
 
-        with open(output_filepath, 'w', encoding='utf-8') as f:
-            f.write(f'{DIVIDER}')
-            f.write(f'// SaneCpp{library_name}.h - Sane C++ {library_name} Library (single file build)\n')
-            f.write(f'{DIVIDER}')
-            if data.get('all_dependencies'):
-                f.write(f'// Dependencies:       {", ".join([f"SaneCpp{dep}.h" for dep in data["all_dependencies"]] )}\n')
-            else:
-                f.write(f'// Dependencies:       None\n')
-            f.write(f'// Version:            {git_version}\n')
-            f.write(f'// LOC header:         {header_code_loc} (code) + {header_comment_loc} (comments)\n')
-            f.write(f'// LOC implementation: {sources_code_loc} (code) + {sources_comment_loc} (comments)\n')
-            f.write(f'// Documentation:      https://pagghiu.github.io/SaneCppLibraries\n')
-            f.write(f'// Source Code:        https://github.com/pagghiu/SaneCppLibraries\n')
-            f.write(f'{DIVIDER}')
-            # Write Copyrights and SPDX
-            f.write(f'// All copyrights and SPDX information for this library (each amalgamated section has its own copyright attributions):\n')
-            sorted_authors = sorted(authors_info_for_lib.items(), key=lambda item: item[1], reverse=True)
-            for author, _ in sorted_authors:
-                f.write(f'// Copyright (c) {author}\n')
-            
-            if spdx_set_for_lib:
-                f.write(f'// SPDX-License-Identifier: {", ".join(sorted(list(spdx_set_for_lib)))}\n')
-            f.write(f'{DIVIDER}')
+        standalone_output_filename = f'SaneCpp{library_name}Standalone.h'
+        standalone_output_filepath = os.path.join(single_file_lib_dir, standalone_output_filename)
+        write_standalone_header(standalone_output_filepath, standalone_output_filename, record,
+                                dependency_orders[library_name], records_by_name, git_version)
 
-            for dep in data.get('all_dependencies', []):
-                f.write(f'#include "SaneCpp{dep}.h"\n')
-            if data.get('all_dependencies'):
-                f.write('\n')
-
-            define_guard = f'SANE_CPP_{library_name.upper()}_HEADER'
-            f.write(f'#if !defined({define_guard})\n')
-            f.write(f'#define {define_guard} 1\n')
-            f.write(headers)
-            f.write(f'\n#endif // {define_guard}\n')
-
-            if sources:
-                implementation_guard = f'SANE_CPP_{library_name.upper()}_IMPLEMENTATION'
-                f.write(f'#if defined(SANE_CPP_IMPLEMENTATION) && !defined({implementation_guard})\n')
-                f.write(f'#define {implementation_guard} 1\n')
-                f.write(sources)
-                f.write(f'\n#endif // {implementation_guard}\n')
-
-        # Create test file
         test_filename = f'Test_SaneCpp{library_name}.cpp'
         test_filepath = os.path.join(single_file_lib_test_dir, test_filename)
-        with open(test_filepath, 'w', encoding='utf-8') as f:
-            f.write(f'#define SANE_CPP_IMPLEMENTATION\n')
-            f.write(f'#include "{output_filename}"\n\n')
-            f.write(f'int main()\n')
-            f.write(f'{{\n')
-            f.write(f'    return 0;\n')
-            f.write(f'}}\n')
+        write_regular_test(test_filepath, output_filename)
+
+        standalone_test_filename = f'Test_SaneCpp{library_name}Standalone.cpp'
+        standalone_test_filepath = os.path.join(single_file_lib_test_dir, standalone_test_filename)
+        write_standalone_test(standalone_test_filepath, standalone_output_filename)
     if args.update_loc:
         update_libraries_md_table(lib_line_counts, root_dir)
         total_loc_str_sum = f"{total_header_loc + total_sources_loc + total_comment_loc}"
