@@ -33,6 +33,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.
 - Use `Examples/AwaitManifestPreview` for bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage.
 - Use `Examples/AwaitProcessExitCodes` for child process exit waits with `processExit()`.
+- Use `Examples/AwaitServiceProbe` for a compact application-shaped flow combining sockets, task groups, timeout
+  cancellation, and fixed allocator diagnostics.
 - Use `Examples/AwaitThreadWakeUp` for external thread notifications through `AwaitLoopWakeUp`.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
   `Span<const char>` storage when header/body fragments should be sent as one logical stream message.

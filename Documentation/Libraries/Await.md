@@ -137,6 +137,8 @@ Complete console examples live in:
 - `Examples/AwaitLineProtocol`, showing a tiny CRLF text protocol built with `receiveLine()` and `sendAll()`.
 - `Examples/AwaitManifestPreview`, showing bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage.
 - `Examples/AwaitProcessExitCodes`, showing concurrent child-process exit waits with fixed job storage.
+- `Examples/AwaitServiceProbe`, showing a small service probe with sockets, task groups, timeout cancellation, and
+  allocator diagnostics.
 - `Examples/AwaitThreadWakeUp`, showing another thread waking an Await coroutine through `AwaitLoopWakeUp`.
 
 # Socket send helpers

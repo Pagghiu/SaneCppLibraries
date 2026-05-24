@@ -72,6 +72,7 @@ Some relevant blog posts are:
 | AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned allocator storage                    |
 | AwaitManifestPreview | Shows bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage                                           |
 | AwaitProcessExitCodes | Shows concurrent child-process exit waits with `processExit()` and fixed job storage                                  |
+| AwaitServiceProbe | Shows a TCP service probe with task groups, timeout cancellation, and fixed allocator diagnostics                    |
 | AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |
 | AwaitThreadWakeUp | Shows another thread waking an Await coroutine through `AwaitLoopWakeUp`                                                   |
 | Serialization | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
