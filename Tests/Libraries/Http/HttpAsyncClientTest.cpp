@@ -235,6 +235,14 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             keepAliveAndReconnect();
         }
+        if (test_section("HTTPS rejected until TLS transport exists"))
+        {
+            httpsRejectedUntilTlsTransportExists();
+        }
+        if (test_section("TLS options are client scoped"))
+        {
+            tlsOptionsAreClientScoped();
+        }
         if (test_section("zero-length response"))
         {
             zeroLengthResponse();
@@ -287,6 +295,8 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putChunkedStreamBody();
     void putWritableBody();
     void keepAliveAndReconnect();
+    void httpsRejectedUntilTlsTransportExists();
+    void tlsOptionsAreClientScoped();
     void zeroLengthResponse();
     void chunkedResponse();
     void chunkedResponseRejectsTrailers();
@@ -390,6 +400,54 @@ void SC::HttpAsyncClientTest::basicGet()
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::httpsRejectedUntilTlsTransportExists()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+
+    bool errorCallbackCalled = false;
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.onError = [&errorCallbackCalled](Result) { errorCallbackCalled = true; };
+
+    const Result result = client.get(loop, "https://example.com/");
+    SC_TEST_EXPECT(not result);
+    SC_TEST_EXPECT(not errorCallbackCalled);
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::tlsOptionsAreClientScoped()
+{
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+
+    const char customCA[] = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n";
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    SC_TEST_EXPECT(client.getTlsOptions().verifyPeer);
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.empty());
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath.isEmpty());
+
+    HttpAsyncClientTlsOptions options;
+    options.verifyPeer         = false;
+    options.caCertificates     = {customCA, sizeof(customCA) - 1};
+    options.caCertificatesPath = "/tmp/sane-cpp-ca.pem";
+    client.setTlsOptions(options);
+
+    SC_TEST_EXPECT(not client.getTlsOptions().verifyPeer);
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.sizeInBytes() == sizeof(customCA) - 1);
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath == "/tmp/sane-cpp-ca.pem");
+
+    client.clearTlsOptions();
+    SC_TEST_EXPECT(client.getTlsOptions().verifyPeer);
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.empty());
+    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath.isEmpty());
+    SC_TEST_EXPECT(client.close());
 }
 
 void SC::HttpAsyncClientTest::headResponse()

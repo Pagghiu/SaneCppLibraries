@@ -207,6 +207,7 @@ Result HttpAsyncClient::detachWebSocketTransport(HttpWebSocketTransportView& tra
     (void)connection->pipeline.unpipe();
 
     hasOpenConnection = false;
+    currentProtocol   = {};
     currentHost       = {};
     currentPort       = 0;
     webSocketUpgraded = true;
@@ -220,20 +221,24 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
         response.initBodyStream(connection->buffersPool, {[this]() -> Result { return onResponseBodyStreamRead(); }}));
 
     SC_TRY(currentURL.parse(preset.url));
-    SC_TRY_MSG(currentURL.protocol == "http", "HttpAsyncClient only supports http URLs");
+    if (currentURL.protocol == "https")
+    {
+        return Result::Error("HttpAsyncClient https URLs require TLS transport support");
+    }
+    SC_TRY_MSG(currentURL.protocol == "http", "HttpAsyncClient only supports http and https URLs");
     SC_TRY_MSG(currentURL.username.isEmpty() and currentURL.password.isEmpty(),
                "HttpAsyncClient userinfo not supported");
     return Result(true);
 }
 
-bool HttpAsyncClient::canReuseConnectionFor(StringSpan host, uint16_t port) const
+bool HttpAsyncClient::canReuseConnectionFor(StringSpan protocol, StringSpan host, uint16_t port) const
 {
-    return hasOpenConnection and currentPort == port and currentHost == host;
+    return hasOpenConnection and currentPort == port and currentProtocol == protocol and currentHost == host;
 }
 
 Result HttpAsyncClient::ensureConnected()
 {
-    if (canReuseConnectionFor(currentURL.host, currentURL.port))
+    if (canReuseConnectionFor(currentURL.protocol, currentURL.host, currentURL.port))
     {
         SC_TRY(connection->writableSocketStream.init(connection->buffersPool, *eventLoop, connection->socket));
         SC_TRY(beginResponseRead());
@@ -294,12 +299,23 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
     SC_ASSERT_RELEASE(addedReadableEnd);
     SC_ASSERT_RELEASE(addedPipelineError);
 
+    const size_t protocolLen = currentURL.protocol.sizeInBytes();
+    if (protocolLen >= sizeof(currentProtocolStorage))
+    {
+        fail(Result::Error("HttpAsyncClient protocol too long"));
+        return;
+    }
+
     const size_t hostLen = currentURL.host.sizeInBytes();
     if (hostLen >= sizeof(currentHostStorage))
     {
         fail(Result::Error("HttpAsyncClient host too long"));
         return;
     }
+    ::memset(currentProtocolStorage, 0, sizeof(currentProtocolStorage));
+    ::memcpy(currentProtocolStorage, currentURL.protocol.bytesWithoutTerminator(), protocolLen);
+    currentProtocol = StringSpan::fromNullTerminated(currentProtocolStorage, StringEncoding::Ascii);
+
     ::memset(currentHostStorage, 0, sizeof(currentHostStorage));
     ::memcpy(currentHostStorage, currentURL.host.bytesWithoutTerminator(), hostLen);
     currentHost = StringSpan::fromNullTerminated(currentHostStorage, StringEncoding::Ascii);
@@ -824,6 +840,7 @@ void HttpAsyncClient::finalizeResponse(bool shouldFinishBodyStream)
     else
     {
         hasOpenConnection = false;
+        currentProtocol   = {};
         currentHost       = {};
         currentPort       = 0;
     }
@@ -867,6 +884,7 @@ void HttpAsyncClient::closeConnection()
         (void)connection->socket.close();
     }
     hasOpenConnection = false;
+    currentProtocol   = {};
     currentHost       = {};
     currentPort       = 0;
     webSocketUpgraded = false;

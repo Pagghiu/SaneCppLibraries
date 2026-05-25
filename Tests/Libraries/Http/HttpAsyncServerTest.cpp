@@ -248,6 +248,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             connectionBodyCopyHelper();
         }
+        if (test_section("TLS options are server scoped"))
+        {
+            tlsOptionsAreServerScoped();
+        }
         if (test_section("chunked request decoding"))
         {
             chunkedRequestDecoding();
@@ -275,6 +279,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void emptyResponseHelper();
     void responseBodyHelpers();
     void connectionBodyCopyHelper();
+    void tlsOptionsAreServerScoped();
     void chunkedRequestDecoding();
     void chunkedRequestRejectsTrailers();
     void maxHeaderSizeError();
@@ -521,6 +526,40 @@ void SC::HttpAsyncServerTest::emptyResponseHelper()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncServerTest::tlsOptionsAreServerScoped()
+{
+    HttpAsyncServer server;
+
+    const char certificate[] = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n";
+    const char privateKey[]  = "-----BEGIN PRIVATE KEY-----\n-----END PRIVATE KEY-----\n";
+    StringSpan protocols[]   = {"h2", "http/1.1"};
+
+    SC_TEST_EXPECT(not server.getTlsOptions().enabled);
+    SC_TEST_EXPECT(server.getTlsOptions().pemCertificateChain.empty());
+    SC_TEST_EXPECT(server.getTlsOptions().pemPrivateKey.empty());
+    SC_TEST_EXPECT(server.getTlsOptions().alpnProtocols.empty());
+
+    HttpAsyncServerTlsOptions options;
+    options.enabled             = true;
+    options.pemCertificateChain = {certificate, sizeof(certificate) - 1};
+    options.pemPrivateKey       = {privateKey, sizeof(privateKey) - 1};
+    options.alpnProtocols       = protocols;
+    server.setTlsOptions(options);
+
+    SC_TEST_EXPECT(server.getTlsOptions().enabled);
+    SC_TEST_EXPECT(server.getTlsOptions().pemCertificateChain.sizeInBytes() == sizeof(certificate) - 1);
+    SC_TEST_EXPECT(server.getTlsOptions().pemPrivateKey.sizeInBytes() == sizeof(privateKey) - 1);
+    SC_TEST_EXPECT(server.getTlsOptions().alpnProtocols.sizeInElements() == 2);
+    SC_TEST_EXPECT(server.getTlsOptions().alpnProtocols[0] == "h2");
+    SC_TEST_EXPECT(server.getTlsOptions().alpnProtocols[1] == "http/1.1");
+
+    server.clearTlsOptions();
+    SC_TEST_EXPECT(not server.getTlsOptions().enabled);
+    SC_TEST_EXPECT(server.getTlsOptions().pemCertificateChain.empty());
+    SC_TEST_EXPECT(server.getTlsOptions().pemPrivateKey.empty());
+    SC_TEST_EXPECT(server.getTlsOptions().alpnProtocols.empty());
 }
 
 void SC::HttpAsyncServerTest::chunkedRequestDecoding()

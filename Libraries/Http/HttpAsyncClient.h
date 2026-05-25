@@ -25,6 +25,18 @@ struct SC_HTTP_EXPORT HttpAsyncClientConnection
     }
 };
 
+/// @brief TLS policy for `HttpAsyncClient` HTTPS requests.
+///
+/// The pointed-to CA buffers and paths must outlive requests using these options. `https://` transport wiring is still
+/// in progress, but the policy lives on the client so request and response message types stay HTTP-only.
+struct SC_HTTP_EXPORT HttpAsyncClientTlsOptions
+{
+    bool verifyPeer = true;
+
+    Span<const char> caCertificates;
+    StringSpan       caCertificatesPath;
+};
+
 /// @brief Asynchronous HTTP/1.1 client using caller-provided fixed storage
 ///
 /// `HttpAsyncClient` processes a single request at a time and can sequentially reuse the same connection when
@@ -137,6 +149,14 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     /// @brief Disables response decompression for future requests.
     void clearResponseDecompression() { responseDecoder = nullptr; }
+
+    /// @brief Sets TLS verification options used by future HTTPS transport integration.
+    void setTlsOptions(const HttpAsyncClientTlsOptions& options) { tlsOptions = options; }
+
+    /// @brief Restores default TLS verification options.
+    void clearTlsOptions() { tlsOptions = {}; }
+
+    [[nodiscard]] const HttpAsyncClientTlsOptions& getTlsOptions() const { return tlsOptions; }
 
     /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
     Result detachWebSocketTransport(HttpWebSocketTransportView& transport);
@@ -264,7 +284,7 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     void onCompressedResponseBodyEnd();
     void onCompressedResponseError(Result result);
 
-    [[nodiscard]] bool   canReuseConnectionFor(StringSpan host, uint16_t port) const;
+    [[nodiscard]] bool   canReuseConnectionFor(StringSpan protocol, StringSpan host, uint16_t port) const;
     [[nodiscard]] bool   responseMustNotHaveBody() const;
     [[nodiscard]] bool   responseHasKnownLength() const;
     [[nodiscard]] Result prepareResponseDecompression();
@@ -273,16 +293,20 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     HttpConnectionBase* connection = nullptr;
 
-    AsyncEventLoop*          eventLoop      = nullptr;
-    HttpAsyncClientRequest*  currentRequest = nullptr;
-    HttpAsyncClientRequest   request;
-    HttpAsyncClientResponse  response;
-    AsyncSocketConnect       connectAsync;
-    RequestPreset            currentPreset;
-    SyncZLibTransformStream* responseDecoder       = nullptr;
-    bool                     responseDecoderActive = false;
+    AsyncEventLoop*           eventLoop      = nullptr;
+    HttpAsyncClientRequest*   currentRequest = nullptr;
+    HttpAsyncClientRequest    request;
+    HttpAsyncClientResponse   response;
+    AsyncSocketConnect        connectAsync;
+    RequestPreset             currentPreset;
+    SyncZLibTransformStream*  responseDecoder       = nullptr;
+    bool                      responseDecoderActive = false;
+    HttpAsyncClientTlsOptions tlsOptions;
 
     State state = State::Idle;
+
+    StringSpan currentProtocol;
+    char       currentProtocolStorage[16] = {0};
 
     StringSpan currentHost;
     char       currentHostStorage[256] = {0};

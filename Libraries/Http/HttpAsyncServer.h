@@ -24,6 +24,18 @@ struct SC_HTTP_EXPORT HttpAsyncConnection
 {
 };
 
+/// @brief TLS policy for future `HttpAsyncServer` HTTPS listeners.
+///
+/// The pointed-to certificate, key, and ALPN buffers must outlive the server listener using these options.
+struct SC_HTTP_EXPORT HttpAsyncServerTlsOptions
+{
+    bool enabled = false;
+
+    Span<const char> pemCertificateChain;
+    Span<const char> pemPrivateKey;
+    Span<StringSpan> alpnProtocols;
+};
+
 /// @brief Async Http Server
 ///
 /// This class handles a fully asynchronous http server staying inside 5 fixed memory regions passed during init.
@@ -75,6 +87,14 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @brief Gets the maximum accepted request-header size in bytes.
     [[nodiscard]] uint32_t getMaxHeaderSize() const { return maxHeaderSize; }
 
+    /// @brief Sets TLS options used by future HTTPS listener integration.
+    void setTlsOptions(const HttpAsyncServerTlsOptions& options) { tlsOptions = options; }
+
+    /// @brief Restores default plain HTTP listener options.
+    void clearTlsOptions() { tlsOptions = {}; }
+
+    [[nodiscard]] const HttpAsyncServerTlsOptions& getTlsOptions() const { return tlsOptions; }
+
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return state == State::Started; }
 
@@ -105,6 +125,8 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     HttpConnectionsPool connections;
 
     uint32_t maxHeaderSize = 8 * 1024;
+
+    HttpAsyncServerTlsOptions tlsOptions;
 
     enum class State
     {
