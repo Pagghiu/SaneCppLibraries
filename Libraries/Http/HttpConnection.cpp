@@ -270,11 +270,24 @@ Result HttpConnection::sendTextCopy(int code, StringSpan body)
 
 Result HttpConnection::sendJsonCopy(int code, StringSpan body) { return sendBodyCopy(code, body, "application/json"); }
 
+void HttpConnectionBase::setTransportStreams(AsyncReadableStream& readable, AsyncWritableStream& writable)
+{
+    readableTransportStream = &readable;
+    writableTransportStream = &writable;
+}
+
+void HttpConnectionBase::resetTransportStreams()
+{
+    readableTransportStream = &readableSocketStream;
+    writableTransportStream = &writableSocketStream;
+}
+
 void HttpConnectionBase::reset()
 {
     (void)pipeline.unpipe();
     readableSocketStream.destroy();
     writableSocketStream.destroy();
+    resetTransportStreams();
     if (socket.isValid())
     {
         (void)socket.close();

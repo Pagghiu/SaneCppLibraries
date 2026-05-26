@@ -84,10 +84,23 @@ struct SC_HTTP_EXPORT HttpConnectionBase
 
     [[nodiscard]] Span<char> getHeaderMemory() const { return headerMemory; }
 
+    void setTransportStreams(AsyncReadableStream& readable, AsyncWritableStream& writable);
+    void resetTransportStreams();
+
+    [[nodiscard]] AsyncReadableStream& getReadableTransportStream() { return *readableTransportStream; }
+    [[nodiscard]] AsyncWritableStream& getWritableTransportStream() { return *writableTransportStream; }
+
+    [[nodiscard]] const AsyncReadableStream& getReadableTransportStream() const { return *readableTransportStream; }
+    [[nodiscard]] const AsyncWritableStream& getWritableTransportStream() const { return *writableTransportStream; }
+
     void reset();
 
   protected:
     Span<char> headerMemory;
+
+  private:
+    AsyncReadableStream* readableTransportStream = &readableSocketStream;
+    AsyncWritableStream* writableTransportStream = &writableSocketStream;
 };
 
 /// @brief Incoming message from the perspective of the participants of an HTTP transaction

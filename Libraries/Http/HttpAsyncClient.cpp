@@ -189,20 +189,20 @@ Result HttpAsyncClient::detachWebSocketTransport(HttpWebSocketTransportView& tra
     SC_TRY_MSG(response.hasReceivedHeaders(), "HttpAsyncClient::detachWebSocketTransport response headers missing");
     SC_TRY_MSG(response.getParser().statusCode == 101, "HttpAsyncClient::detachWebSocketTransport expected 101");
 
-    transport.readableStream = &connection->readableSocketStream;
-    transport.writableStream = &connection->writableSocketStream;
+    transport.readableStream = &connection->getReadableTransportStream();
+    transport.writableStream = &connection->getWritableTransportStream();
     transport.buffersPool    = &connection->buffersPool;
 
-    (void)connection->readableSocketStream.eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(
-        *this);
-    (void)connection->readableSocketStream.eventData
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
-    (void)connection->readableSocketStream.eventError
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
-    (void)connection->writableSocketStream.eventError
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
-    (void)connection->readableSocketStream.eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(
-        *this);
+    (void)connection->getReadableTransportStream()
+        .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
+    (void)connection->getWritableTransportStream()
+        .eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(*this);
     (void)connection->pipeline.eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
     (void)connection->pipeline.unpipe();
 
@@ -283,15 +283,17 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
         fail(writeInit);
         return;
     }
+    connection->resetTransportStreams();
 
     const bool addedReadableError =
-        connection->readableSocketStream.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(
-            *this);
+        connection->getReadableTransportStream()
+            .eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
     const bool addedWritableError =
-        connection->writableSocketStream.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(
-            *this);
+        connection->getWritableTransportStream()
+            .eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
     const bool addedReadableEnd =
-        connection->readableSocketStream.eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(*this);
+        connection->getReadableTransportStream().eventEnd.addListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(
+            *this);
     const bool addedPipelineError =
         connection->pipeline.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
     SC_ASSERT_RELEASE(addedReadableError);
@@ -338,17 +340,16 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
 
 Result HttpAsyncClient::beginResponseRead()
 {
-    const bool addedResponseData =
-        connection->readableSocketStream.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(
-            *this);
+    const bool addedResponseData = connection->getReadableTransportStream()
+                                       .eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
     SC_TRY_MSG(addedResponseData, "HttpAsyncClient failed to register response listener");
     if (requestCount == 0)
     {
-        SC_TRY(connection->readableSocketStream.start());
+        SC_TRY(connection->getReadableTransportStream().start());
     }
     else
     {
-        connection->readableSocketStream.resumeReading();
+        connection->getReadableTransportStream().resumeReading();
     }
     state = State::Sending;
     return Result(true);
@@ -356,7 +357,7 @@ Result HttpAsyncClient::beginResponseRead()
 
 Result HttpAsyncClient::beginRequestSend()
 {
-    request.setWritableStream(connection->writableSocketStream);
+    request.setWritableStream(connection->getWritableTransportStream());
     request.setHeaderMemory(connection->getHeaderMemory());
     request.reset();
     request.setKeepAlive(currentPreset.keepAlive);
@@ -449,7 +450,7 @@ Result HttpAsyncClient::onResponseBodyStreamRead()
 {
     if (state == State::StreamingResponse and not response.isBodyComplete())
     {
-        connection->readableSocketStream.resumeReading();
+        connection->getReadableTransportStream().resumeReading();
     }
     return Result(true);
 }
@@ -582,9 +583,9 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
     }
     else if (currentRequest->getBodyType() == HttpAsyncClientRequest::BodyType::Span)
     {
-        Result writeResult = connection->writableSocketStream.write(
+        Result writeResult = connection->getWritableTransportStream().write(
             AsyncBufferView(currentRequest->getBodySpan()),
-            {[this](AsyncBufferView::ID) { connection->writableSocketStream.end(); }});
+            {[this](AsyncBufferView::ID) { connection->getWritableTransportStream().end(); }});
         if (not writeResult)
         {
             fail(writeResult);
@@ -637,9 +638,9 @@ void HttpAsyncClient::onHeadersBufferWritten(AsyncBufferView::ID)
             return;
         }
 
-        Result writeResult = connection->writableSocketStream.write(
+        Result writeResult = connection->getWritableTransportStream().write(
             AsyncBufferView(bodyWriter.written()),
-            {[this](AsyncBufferView::ID) { connection->writableSocketStream.end(); }});
+            {[this](AsyncBufferView::ID) { connection->getWritableTransportStream().end(); }});
         if (not writeResult)
         {
             fail(writeResult);
@@ -677,7 +678,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
     }
 
     Result parseRes = response.writeHeaders(static_cast<uint32_t>(connection->getHeaderMemory().sizeInBytes()),
-                                            readData, connection->readableSocketStream, bufferID);
+                                            readData, connection->getReadableTransportStream(), bufferID);
     if (not parseRes)
     {
         fail(parseRes);
@@ -688,9 +689,8 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
         return;
     }
 
-    const bool removed =
-        connection->readableSocketStream.eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(
-            *this);
+    const bool removed = connection->getReadableTransportStream()
+                             .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
     SC_COMPILER_UNUSED(removed);
 
     if (response.getParser().statusCode < 200 and not responseMustNotHaveBody())
@@ -759,7 +759,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
             return;
         }
         Result processBuffered =
-            response.processBodyData(connection->readableSocketStream, bufferedBodyID,
+            response.processBodyData(connection->getReadableTransportStream(), bufferedBodyID,
                                      {readData.data() + response.getHeadersLength(), bufferedBodyBytes}, false);
         connection->buffersPool.unrefBuffer(bufferedBodyID);
         if (not processBuffered)
@@ -775,9 +775,8 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
         return;
     }
 
-    const bool addedBodyData =
-        connection->readableSocketStream.eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(
-            *this);
+    const bool addedBodyData = connection->getReadableTransportStream()
+                                   .eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
     SC_ASSERT_RELEASE(addedBodyData);
     state = State::StreamingResponse;
 }
@@ -792,7 +791,7 @@ void HttpAsyncClient::onResponseBodyData(AsyncBufferView::ID bufferID)
         return;
     }
 
-    Result process = response.processBodyData(connection->readableSocketStream, bufferID, readData, false);
+    Result process = response.processBodyData(connection->getReadableTransportStream(), bufferID, readData, false);
     if (not process)
     {
         fail(process);
@@ -800,8 +799,9 @@ void HttpAsyncClient::onResponseBodyData(AsyncBufferView::ID bufferID)
     }
     if (response.isBodyComplete())
     {
-        const bool removed = connection->readableSocketStream.eventData
-                                 .removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
+        const bool removed =
+            connection->getReadableTransportStream()
+                .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
         SC_COMPILER_UNUSED(removed);
         finishResponse();
     }
@@ -835,7 +835,7 @@ void HttpAsyncClient::finalizeResponse(bool shouldFinishBodyStream)
 
     if (keepAlive)
     {
-        connection->readableSocketStream.pause();
+        connection->getReadableTransportStream().pause();
     }
     else
     {
@@ -865,20 +865,21 @@ void HttpAsyncClient::closeConnection()
     {
         return;
     }
-    (void)connection->readableSocketStream.eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(
-        *this);
-    (void)connection->readableSocketStream.eventData
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
-    (void)connection->readableSocketStream.eventError
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
-    (void)connection->writableSocketStream.eventError
-        .removeListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
-    (void)connection->readableSocketStream.eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(
-        *this);
+    (void)connection->getReadableTransportStream()
+        .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
+    (void)connection->getWritableTransportStream()
+        .eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onWritableError>(*this);
+    (void)connection->getReadableTransportStream()
+        .eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(*this);
     (void)connection->pipeline.eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
     (void)connection->pipeline.unpipe();
     connection->readableSocketStream.destroy();
     connection->writableSocketStream.destroy();
+    connection->resetTransportStreams();
     if (connection->socket.isValid())
     {
         (void)connection->socket.close();

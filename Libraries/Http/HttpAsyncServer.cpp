@@ -182,13 +182,14 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     client.socket = move(acceptedClient);
     SC_TRUST_RESULT(client.readableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
     SC_TRUST_RESULT(client.writableSocketStream.init(client.buffersPool, *eventLoop, client.socket));
+    client.resetTransportStreams();
     client.readableSocketStream.setAutoDestroy(true);
     client.writableSocketStream.setAutoDestroy(false); // needed for keep-alive logic
-    client.response.setWritableStream(client.writableSocketStream);
+    client.response.setWritableStream(client.getWritableTransportStream());
 
     EventDataListener dataListener{*this, client};
-    SC_TRUST_RESULT(client.readableSocketStream.eventData.addListener(dataListener));
-    SC_TRUST_RESULT(client.readableSocketStream.start());
+    SC_TRUST_RESULT(client.getReadableTransportStream().eventData.addListener(dataListener));
+    SC_TRUST_RESULT(client.getReadableTransportStream().start());
 
     // Only reactivate asyncAccept if there are available clients (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(connections.getNumActiveConnections() < connections.getNumTotalConnections());
@@ -199,7 +200,8 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
     Span<char> readData;
     SC_ASSERT_RELEASE(client.buffersPool.getWritableData(bufferID, readData));
 
-    Result headerWrite = client.request.writeHeaders(maxHeaderSize, readData, client.readableSocketStream, bufferID);
+    Result headerWrite =
+        client.request.writeHeaders(maxHeaderSize, readData, client.getReadableTransportStream(), bufferID);
     if (not headerWrite)
     {
         if (onError.isValid())
@@ -215,21 +217,24 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         client.response.reset();
 
         // Both with and without body we should stop listening to data events
-        SC_ASSERT_RELEASE(client.readableSocketStream.eventData.removeListener(EventDataListener{*this, client}));
+        SC_ASSERT_RELEASE(
+            client.getReadableTransportStream().eventData.removeListener(EventDataListener{*this, client}));
         if (client.requestCount > 0)
         {
-            SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.removeListener(EventEndListener{*this, client}));
+            SC_ASSERT_RELEASE(
+                client.getReadableTransportStream().eventEnd.removeListener(EventEndListener{*this, client}));
         }
-        Result prepareBody = client.request.prepareBodyStream(client.buffersPool,
-                                                              {[&client]() -> Result
-                                                               {
-                                                                   if (not client.request.isBodyComplete())
-                                                                   {
-                                                                       client.readableSocketStream.resumeReading();
-                                                                   }
-                                                                   return Result(true);
-                                                               }},
-                                                              false);
+        Result prepareBody =
+            client.request.prepareBodyStream(client.buffersPool,
+                                             {[&client]() -> Result
+                                              {
+                                                  if (not client.request.isBodyComplete())
+                                                  {
+                                                      client.getReadableTransportStream().resumeReading();
+                                                  }
+                                                  return Result(true);
+                                              }},
+                                             false);
         if (not prepareBody)
         {
             if (onError.isValid())
@@ -244,7 +249,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
             client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
         {
             const bool addedBodyData =
-                client.readableSocketStream.eventData.addListener(EventBodyDataListener{*this, client});
+                client.getReadableTransportStream().eventData.addListener(EventBodyDataListener{*this, client});
             SC_ASSERT_RELEASE(addedBodyData);
         }
 
@@ -253,7 +258,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
         if (client.isWebSocketUpgraded())
         {
             EventCloseListener closeListener{*this, client};
-            if (not client.readableSocketStream.eventClose.addListener(closeListener))
+            if (not client.getReadableTransportStream().eventClose.addListener(closeListener))
             {
                 closeAsync(client);
             }
@@ -273,8 +278,8 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                 // Determine if we should keep the connection alive
                 const bool underMaxRequests =
                     (pself.maxRequestsPerConnection == 0) or (client.requestCount + 1 < pself.maxRequestsPerConnection);
-                const bool shouldKeepAlive =
-                    client.response.getKeepAlive() and underMaxRequests and not client.readableSocketStream.isEnded();
+                const bool shouldKeepAlive = client.response.getKeepAlive() and underMaxRequests and
+                                             not client.getReadableTransportStream().isEnded();
 
                 if (shouldKeepAlive and pself.state == State::Started) // We may get some after-writes after server stop
                 {
@@ -291,13 +296,13 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                     SC_TRUST_RESULT(writableRes);
 
                     // Resume reading in any case to avoid deadlocking
-                    client.readableSocketStream.resumeReading();
+                    client.getReadableTransportStream().resumeReading();
 
                     // Re-register for next request headers
                     EventDataListener dataListener{pself, client};
-                    SC_ASSERT_RELEASE(client.readableSocketStream.eventData.addListener(dataListener));
+                    SC_ASSERT_RELEASE(client.getReadableTransportStream().eventData.addListener(dataListener));
                     EventEndListener endListener{pself, client};
-                    SC_ASSERT_RELEASE(client.readableSocketStream.eventEnd.addListener(endListener));
+                    SC_ASSERT_RELEASE(client.getReadableTransportStream().eventEnd.addListener(endListener));
                 }
                 else
                 {
@@ -309,7 +314,7 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
 
         if (client.request.getBodyFramingKind() == HttpBodyFramingKind::None)
         {
-            client.readableSocketStream.pause();
+            client.getReadableTransportStream().pause();
         }
         else if (client.request.getBodyFramingKind() == HttpBodyFramingKind::Chunked or
                  client.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
@@ -333,7 +338,7 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
         return;
     }
 
-    Result process = client.request.processBodyData(client.readableSocketStream, bufferID, readData, true);
+    Result process = client.request.processBodyData(client.getReadableTransportStream(), bufferID, readData, true);
     if (not process)
     {
         if (onError.isValid())
@@ -346,9 +351,10 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
 
     if (client.request.isBodyComplete())
     {
-        const bool removed = client.readableSocketStream.eventData.removeListener(EventBodyDataListener{*this, client});
+        const bool removed =
+            client.getReadableTransportStream().eventData.removeListener(EventBodyDataListener{*this, client});
         SC_COMPILER_UNUSED(removed);
-        client.readableSocketStream.pause();
+        client.getReadableTransportStream().pause();
     }
 }
 
@@ -362,13 +368,13 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
 
     // These events may or may not be registered depending on when the close request arrives
     EventDataListener dataListener{*this, client};
-    (void)client.readableSocketStream.eventData.removeListener(dataListener);
+    (void)client.getReadableTransportStream().eventData.removeListener(dataListener);
     EventBodyDataListener bodyDataListener{*this, client};
-    (void)client.readableSocketStream.eventData.removeListener(bodyDataListener);
+    (void)client.getReadableTransportStream().eventData.removeListener(bodyDataListener);
     EventEndListener endListener{*this, client};
-    (void)client.readableSocketStream.eventEnd.removeListener(endListener);
+    (void)client.getReadableTransportStream().eventEnd.removeListener(endListener);
     EventCloseListener closeListener{*this, client};
-    (void)client.readableSocketStream.eventClose.removeListener(closeListener);
+    (void)client.getReadableTransportStream().eventClose.removeListener(closeListener);
 
     const bool readWasDestroyed  = client.readableSocketStream.hasBeenDestroyed();
     const bool writeWasDestroyed = client.writableSocketStream.hasBeenDestroyed();
@@ -427,6 +433,7 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
 void HttpAsyncServer::deactivateConnection(HttpConnection& client)
 {
     SC_TRUST_RESULT(client.socket.close());
+    client.resetTransportStreams();
     const bool wasFull = connections.getNumActiveConnections() == connections.getNumTotalConnections();
     SC_TRUST_RESULT(connections.deactivate(client.getConnectionID()));
     if (wasFull and state == State::Started)

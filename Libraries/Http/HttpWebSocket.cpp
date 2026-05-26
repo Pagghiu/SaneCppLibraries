@@ -551,12 +551,12 @@ Result HttpWebSocketHandshake::acceptServerConnection(HttpConnection& connection
     SC_TRY(connection.response.addHeader("Sec-WebSocket-Accept", accept));
 
     connection.markWebSocketUpgraded();
-    transport.readableStream = &connection.readableSocketStream;
-    transport.writableStream = &connection.writableSocketStream;
+    transport.readableStream = &connection.getReadableTransportStream();
+    transport.writableStream = &connection.getWritableTransportStream();
     transport.buffersPool    = &connection.buffersPool;
 
     return connection.response.sendHeaders(
-        {[&connection](AsyncBufferView::ID) { connection.readableSocketStream.resumeReading(); }});
+        {[&connection](AsyncBufferView::ID) { connection.getReadableTransportStream().resumeReading(); }});
 }
 
 Result HttpWebSocketHandshake::rejectServerConnection(HttpResponse&                       response,
