@@ -181,6 +181,87 @@ struct SC::PluginTest : public SC::TestCase
             SC_TEST_EXPECT(registry.removeAllBuildProducts(identifierParent));
 #endif
         }
+        if (test_section("PluginCompiler can include C++ headers without linking the C++ runtime"))
+        {
+#if SC_COMPILER_FILC
+            if (not report.quietMode)
+            {
+                report.console.printLine("PluginTest - Skipping plugin compile under Fil-C: plugin "
+                                         "toolchain/runtime ABI integration is not implemented");
+            }
+#else
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+            StringPath pluginSandboxRoot;
+            SC_TEST_EXPECT(Path::join(pluginSandboxRoot, {report.applicationRootDirectory.view(), "PluginTest"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(pluginSandboxRoot.view()));
+
+            StringPath pluginSandboxName;
+            SC_TEST_EXPECT(StringBuilder::format(pluginSandboxName, "PluginStdHeaderNoRuntime-{}-{}",
+                                                 Time::Realtime::now().milliseconds, reinterpret_cast<size_t>(this)));
+            StringPath pluginSandboxPath;
+            SC_TEST_EXPECT(Path::join(pluginSandboxPath, {pluginSandboxRoot.view(), pluginSandboxName.view()}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(pluginSandboxPath.view()));
+            auto removeSandbox = MakeDeferred([&]() { (void)fs.removeDirectoryRecursive(pluginSandboxPath.view()); });
+
+            StringPath pluginDirectory;
+            SC_TEST_EXPECT(Path::join(pluginDirectory, {pluginSandboxPath.view(), "StdHeaderNoRuntime"}));
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(pluginDirectory.view()));
+
+            StringPath pluginSourcePath;
+            SC_TEST_EXPECT(Path::join(pluginSourcePath, {pluginDirectory.view(), "StdHeaderNoRuntime.cpp"}));
+            SC_TEST_EXPECT(fs.writeString(pluginSourcePath.view(),
+                                          R"(// Copyright (c) Stefano Cristiano
+// SPDX-License-Identifier: MIT
+#include <initializer_list>
+#include <Libraries/Plugin/PluginMacros.h>
+
+struct StdHeaderNoRuntime
+{
+    [[nodiscard]] bool init()
+    {
+        std::initializer_list<int> values = {1, 2, 3};
+        return values.size() == 3;
+    }
+
+    [[nodiscard]] bool close() { return true; }
+};
+
+// SC_BEGIN_PLUGIN
+//
+// Name:          StdHeaderNoRuntime
+// Version:       1
+// Description:   Includes C++ standard headers but does not request the C++ runtime
+// Category:      Generic
+// Build:         libc
+// Dependencies:
+//
+// SC_END_PLUGIN
+SC_PLUGIN_DEFINE(StdHeaderNoRuntime)
+)"));
+
+            PluginDefinition       definitions[1];
+            Span<PluginDefinition> definitionsSpan;
+            Buffer                 fileStorage;
+            SC_TEST_EXPECT(
+                PluginScanner::scanDirectory(pluginSandboxPath.view(), definitions, fileStorage, definitionsSpan));
+            SC_TEST_EXPECT(definitionsSpan.sizeInElements() == 1);
+            SC_TEST_EXPECT(definitions[0].build[0] == "libc");
+            SC_TEST_EXPECT(definitions[0].build.size() == 1);
+
+            PluginCompiler compiler;
+            SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
+            PluginSysroot sysroot;
+            SC_TEST_EXPECT(PluginSysroot::findBestSysroot(compiler.type, sysroot));
+            SC_TEST_EXPECT(compiler.includePaths.push_back(report.libraryRootDirectory));
+
+            PluginCompilerEnvironment environment;
+            char                      compilerLogStorage[4096];
+            Span<char>                compilerLog = {compilerLogStorage};
+            SC_TEST_EXPECT(compiler.compile(definitions[0], sysroot, environment, compilerLog));
+#endif
+        }
     }
 };
 

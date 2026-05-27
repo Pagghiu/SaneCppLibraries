@@ -552,10 +552,6 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
         SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc", "-nostdinc++", "-fno-stack-protector"}));
         SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_INCLUDE_STD_CPP=0"}));
     }
-    else if (not definition.build.contains("libc++"))
-    {
-        SC_TRY(argumentsArena.appendMultipleStrings({"-nostdinc++"}));
-    }
     if (not definition.build.contains("libc++"))
     {
         SC_TRY(argumentsArena.appendMultipleStrings({"-DSC_PROVIDE_CPP_RUNTIME_SHIMS=1"}));
