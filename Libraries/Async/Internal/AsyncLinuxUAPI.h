@@ -20,6 +20,10 @@
 #define SC_ASYNC_HAS_LINUX_IO_URING_UAPI 0
 #endif
 
+#if SC_ASYNC_HAS_LINUX_TIME_TYPES_UAPI
+#include <linux/time_types.h>
+#endif
+
 #if SC_ASYNC_HAS_LINUX_IO_URING_UAPI
 #if !SC_ASYNC_HAS_LINUX_TIME_TYPES_UAPI
 #define UAPI_LINUX_IO_URING_H_SKIP_LINUX_TIME_TYPES_H 1
@@ -220,4 +224,8 @@ enum io_uring_op
 #define IORING_ENTER_GETEVENTS (1U << 0)
 
 #define IORING_FEAT_SINGLE_MMAP (1U << 0)
+#endif
+
+#if !defined(IORING_SQ_TASKRUN)
+#define IORING_SQ_TASKRUN (1U << 2)
 #endif
