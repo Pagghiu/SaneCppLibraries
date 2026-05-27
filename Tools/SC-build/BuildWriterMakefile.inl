@@ -94,6 +94,7 @@ CLANG_MAJOR_VERSION := $(word 2, $(CLANG_VERSION))
 # Detecting GCC Compiler Type and Version
 GCC_VERSION := $(shell $(CXX) -dumpversion)
 GCC_MAJOR_VERSION := $(firstword $(GCC_VERSION))
+GCC_MATCHING_CC := $(shell command -v gcc-$(GCC_MAJOR_VERSION) >/dev/null 2>&1 && echo gcc-$(GCC_MAJOR_VERSION) || echo $(CC))
 
 # Setting Compiler Type and Version based on detection
 ifeq ($(CLANG_MAJOR_VERSION),)
@@ -388,7 +389,7 @@ endif
             builder.append(R"delimiter(
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) $({0}_LINK_DEPENDENCIES) | $({0}_TARGET_DIR)
 	@echo Linking "{0}"
-	$(VRBS)$(CXX) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+	$(VRBS)$({0}_LINKER) -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 	$(VRBS)$({0}_POST_LINK_STRIP)
 )delimiter",
                            makeTarget);
@@ -398,11 +399,11 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) $({0}_LINK_DEPENDENCIE
 $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) $({0}_LINK_DEPENDENCIES) | $({0}_TARGET_DIR)
 	@echo Linking shared library "{0}"
 ifeq ($(TARGET_OS),macOS)
-	$(VRBS)$(CXX) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+	$(VRBS)$({0}_LINKER) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 else ifeq ($(TARGET_OS),iOS)
-	$(VRBS)$(CXX) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+	$(VRBS)$({0}_LINKER) -dynamiclib -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 else
-	$(VRBS)$(CXX) -shared -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
+	$(VRBS)$({0}_LINKER) -shared -o $({0}_TARGET_DIR)/$({0}_TARGET_NAME) $({0}_OBJECT_FILES) $({0}_LDFLAGS)
 endif
 	$(VRBS)$({0}_POST_LINK_STRIP)
 )delimiter",
@@ -692,9 +693,13 @@ endif
         {
             // TODO: Split the UBSAN flag
             builder.append("\n{0}_SANITIZE_CPPFLAGS := -fsanitize=address,undefined", makeTarget);
+            builder.append("\nifeq ($(CLANG_DETECTED),yes)");
             builder.append("\n{0}_NO_SANITIZE_CPPFLAGS := -fno-sanitize=enum,return,float-divide-by-zero,function,vptr "
                            "# Needed on macOS x64",
                            makeTarget);
+            builder.append("\nelse");
+            builder.append("\n{0}_NO_SANITIZE_CPPFLAGS :=", makeTarget);
+            builder.append("\nendif");
         }
         else
         {
@@ -797,6 +802,7 @@ endif
         SC_COMPILER_UNUSED(saneCppFlags);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n{0}_POST_LINK_STRIP = :", makeTarget);
+        builder.append("\n{0}_LINKER := $(CXX)", makeTarget);
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)");
         // Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
@@ -837,6 +843,11 @@ endif
         builder.append("\nelse");
         // Non Clang specific flags
         builder.append("\n{0}_COMPILER_LDFLAGS :=", makeTarget);
+        if (not linkFlags.linkStdCpp)
+        {
+            builder.append("\n{0}_LINKER := $(GCC_MATCHING_CC)", makeTarget);
+            builder.append("\n{0}_COMPILER_LDFLAGS += -lm", makeTarget);
+        }
         if (linkFlags.enableDeadCodeStripping)
         {
             builder.append(" -Wl,--gc-sections");

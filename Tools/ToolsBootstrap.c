@@ -1337,14 +1337,17 @@ int compilePOSIX(CompilationInfo* ci) {
     FileSystem_createDirectoryRecursive(ci->toolOutputDir); // Wait, already there
 
     char* compiler = "";
+    char* cCompiler = "";
     char* includeDir = Path_join(ci->args->libraryDir, "Includes");
     int useClang = 0;
     int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
     if (runCommand("clang++ --version > /dev/null 2>&1") == 0) {
         compiler = "clang++";
+        cCompiler = "clang";
         useClang = 1;
     } else if (runCommand("g++ --version > /dev/null 2>&1") == 0) {
         compiler = "g++";
+        cCompiler = "gcc";
     } else {
         free(includeDir);
         return 1;
@@ -1431,7 +1434,7 @@ int compilePOSIX(CompilationInfo* ci) {
         toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
         sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
         CommandLine cmd;
-        CommandLine_init(&cmd, compiler);
+        CommandLine_init(&cmd, (!useClang && !bootstrapLinkStdCpp()) ? cCompiler : compiler);
         CommandLine_arg(&cmd, "-o");
         CommandLine_argQuoted(&cmd, ci->toolExe);
         CommandLine_argQuoted(&cmd, toolsObj);
@@ -1441,7 +1444,10 @@ int compilePOSIX(CompilationInfo* ci) {
         }
         CommandLine_arg(&cmd, "-ldl");
         CommandLine_arg(&cmd, "-lpthread");
-        if (!bootstrapLinkStdCpp()) {
+        if (strcmp(ci->targetOS, "Linux") == 0 && !useClang && !bootstrapLinkStdCpp()) {
+            CommandLine_arg(&cmd, "-lm");
+        }
+        if (useClang && !bootstrapLinkStdCpp()) {
             CommandLine_arg(&cmd, "-nostdlib++");
         }
         if (strcmp(ci->targetOS, "Darwin") == 0) {

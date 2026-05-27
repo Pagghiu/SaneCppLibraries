@@ -45,7 +45,8 @@ struct SC::Build::NativeBuild
         {
             return family == Toolchain::Clang or family == Toolchain::FilC or family == Toolchain::LLVMMingw;
         }
-        [[nodiscard]] bool supportsNoStdCppFlags() const { return isClangLike() or family == Toolchain::GCC; }
+        [[nodiscard]] bool supportsNoStdCppIncludeFlags() const { return isClangLike() or family == Toolchain::GCC; }
+        [[nodiscard]] bool supportsNoStdCppLinkFlag() const { return isClangLike(); }
         [[nodiscard]] bool isMSVCStyle() const { return family == Toolchain::MSVC or family == Toolchain::ClangCL; }
         [[nodiscard]] bool isClangCL() const { return family == Toolchain::ClangCL; }
     };
@@ -1768,7 +1769,11 @@ struct SC::Build::NativeBuild
             return Result(true);
         }
 
-        SC_TRY(commandLine.append(resolvedProject.adapter.executableLink.view()));
+        const bool useCDriverToAvoidGccStdCppRuntime =
+            resolvedProject.adapter.family == Toolchain::GCC and not resolvedProject.linkFlags.linkStdCpp and
+            resolvedProject.adapter.executableLink == resolvedProject.adapter.executableCpp;
+        SC_TRY(commandLine.append(useCDriverToAvoidGccStdCppRuntime ? resolvedProject.adapter.executableC.view()
+                                                                    : resolvedProject.adapter.executableLink.view()));
         if (not resolvedProject.adapter.subcommandLink.isEmpty())
         {
             SC_TRY(commandLine.append(resolvedProject.adapter.subcommandLink));
@@ -1802,11 +1807,12 @@ struct SC::Build::NativeBuild
             (resolvedProject.compileFlags.enableASAN or resolvedProject.linkFlags.enableASAN) and supportsSanitizers and
             targetPlatform(resolvedProject.targetContext) == Platform::Linux;
         if (not resolvedProject.linkFlags.linkStdCpp and not sanitizerNeedsCppRuntime and
-            resolvedProject.adapter.supportsNoStdCppFlags())
+            resolvedProject.adapter.supportsNoStdCppLinkFlag())
         {
             SC_TRY(commandLine.append("-nostdlib++"));
         }
-        if (not resolvedProject.linkFlags.linkStdCpp and sanitizerNeedsCppRuntime)
+        if (not resolvedProject.linkFlags.linkStdCpp and sanitizerNeedsCppRuntime and
+            resolvedProject.adapter.family != Toolchain::GCC)
         {
             SC_TRY(commandLine.append("-lstdc++"));
         }
@@ -1826,6 +1832,10 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(source.objectPath.view()));
         }
         SC_TRY(appendLinkFlags(commandLine, resolvedProject));
+        if (useCDriverToAvoidGccStdCppRuntime and targetPlatform(resolvedProject.targetContext) == Platform::Linux)
+        {
+            SC_TRY(commandLine.append("-lm"));
+        }
         SC_TRY(commandLine.append("-o"));
         SC_TRY(commandLine.append(resolvedProject.executablePath.view()));
         return Result(true);
@@ -1962,7 +1972,7 @@ struct SC::Build::NativeBuild
                 SC_TRY(commandLine.append("-fno-exceptions"));
             }
             SC_TRY(commandLine.append("-fvisibility-inlines-hidden"));
-            if (not flags.includeStdCpp and resolvedProject.adapter.supportsNoStdCppFlags())
+            if (not flags.includeStdCpp and resolvedProject.adapter.supportsNoStdCppIncludeFlags())
             {
                 SC_TRY(commandLine.append("-nostdinc++"));
             }
@@ -1997,7 +2007,10 @@ struct SC::Build::NativeBuild
         if (flags.enableASAN and supportsSanitizers)
         {
             SC_TRY(commandLine.append("-fsanitize=address,undefined"));
-            SC_TRY(commandLine.append("-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"));
+            if (resolvedProject.adapter.isClangLike())
+            {
+                SC_TRY(commandLine.append("-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"));
+            }
         }
         if (flags.enableCoverage)
         {
@@ -3877,6 +3890,7 @@ struct SC::Build::NativeBuild
         case Toolchain::GCC:
             SC_TRY(resolveExecutable(toolchain.compilerC.view(), "gcc", adapter.executableC));
             SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), "g++", adapter.executableCpp));
+            SC_TRY(resolveMatchingGccCDriver(toolchain, adapter));
             SC_TRY(resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
             SC_TRY(resolveExecutable(toolchain.archiver.view(), "ar", adapter.executableArchive));
             SC_TRY(adapter.displayName.assign("gcc"));
@@ -4271,6 +4285,30 @@ struct SC::Build::NativeBuild
         }
         SC_TRY_MSG(not fallback.isEmpty(), "Missing compiler executable");
         SC_TRY(output.assign(fallback));
+        return Result(true);
+    }
+
+    static Result resolveMatchingGccCDriver(const Toolchain& toolchain, CompilerAdapter& adapter)
+    {
+        if (not toolchain.compilerC.isEmpty())
+            return Result(true);
+
+        Process process;
+        String  version = StringEncoding::Utf8;
+        if (not process.exec({adapter.executableCpp.view(), "-dumpfullversion"}, version) or
+            process.getExitStatus() != 0)
+            return Result(true);
+
+        StringViewTokenizer tokenizer(version.view());
+        if (not tokenizer.tokenizeNext({'.'}))
+            return Result(true);
+
+        SmallString<32> candidate;
+        SC_TRY(StringBuilder::format(candidate, "gcc-{}", tokenizer.component));
+        if (probeExecutable(candidate.view()))
+        {
+            SC_TRY(adapter.executableC.assign(candidate.view()));
+        }
         return Result(true);
     }
 
