@@ -285,6 +285,56 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
     }
     connection->resetTransportStreams();
 
+    if (transportSetup.isValid())
+    {
+        HttpAsyncClientTransportSetup setup;
+        setup.connection = connection;
+        setup.eventLoop  = eventLoop;
+        setup.url        = &currentURL;
+        setup.complete   = {[this](Result setupResult) { completeTransportSetup(setupResult); }};
+
+        Result setupResult = transportSetup(setup);
+        if (not setupResult)
+        {
+            fail(setupResult);
+        }
+        return;
+    }
+
+    completeTransportSetup(Result(true));
+}
+
+Result HttpAsyncClient::rememberConnectedOrigin()
+{
+    const size_t protocolLen = currentURL.protocol.sizeInBytes();
+    SC_TRY_MSG(protocolLen < sizeof(currentProtocolStorage), "HttpAsyncClient protocol too long");
+
+    const size_t hostLen = currentURL.host.sizeInBytes();
+    SC_TRY_MSG(hostLen < sizeof(currentHostStorage), "HttpAsyncClient host too long");
+
+    ::memset(currentProtocolStorage, 0, sizeof(currentProtocolStorage));
+    ::memcpy(currentProtocolStorage, currentURL.protocol.bytesWithoutTerminator(), protocolLen);
+    currentProtocol = StringSpan::fromNullTerminated(currentProtocolStorage, StringEncoding::Ascii);
+
+    ::memset(currentHostStorage, 0, sizeof(currentHostStorage));
+    ::memcpy(currentHostStorage, currentURL.host.bytesWithoutTerminator(), hostLen);
+    currentHost = StringSpan::fromNullTerminated(currentHostStorage, StringEncoding::Ascii);
+    currentPort = currentURL.port;
+    return Result(true);
+}
+
+void HttpAsyncClient::completeTransportSetup(Result result)
+{
+    if (state != State::Connecting or connection == nullptr)
+    {
+        return;
+    }
+    if (not result)
+    {
+        fail(result);
+        return;
+    }
+
     const bool addedReadableError =
         connection->getReadableTransportStream()
             .eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onReadableError>(*this);
@@ -301,27 +351,12 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
     SC_ASSERT_RELEASE(addedReadableEnd);
     SC_ASSERT_RELEASE(addedPipelineError);
 
-    const size_t protocolLen = currentURL.protocol.sizeInBytes();
-    if (protocolLen >= sizeof(currentProtocolStorage))
+    Result origin = rememberConnectedOrigin();
+    if (not origin)
     {
-        fail(Result::Error("HttpAsyncClient protocol too long"));
+        fail(origin);
         return;
     }
-
-    const size_t hostLen = currentURL.host.sizeInBytes();
-    if (hostLen >= sizeof(currentHostStorage))
-    {
-        fail(Result::Error("HttpAsyncClient host too long"));
-        return;
-    }
-    ::memset(currentProtocolStorage, 0, sizeof(currentProtocolStorage));
-    ::memcpy(currentProtocolStorage, currentURL.protocol.bytesWithoutTerminator(), protocolLen);
-    currentProtocol = StringSpan::fromNullTerminated(currentProtocolStorage, StringEncoding::Ascii);
-
-    ::memset(currentHostStorage, 0, sizeof(currentHostStorage));
-    ::memcpy(currentHostStorage, currentURL.host.bytesWithoutTerminator(), hostLen);
-    currentHost = StringSpan::fromNullTerminated(currentHostStorage, StringEncoding::Ascii);
-    currentPort = currentURL.port;
 
     hasOpenConnection = true;
 

@@ -235,6 +235,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             keepAliveAndReconnect();
         }
+        if (test_section("transport setup hook defers request"))
+        {
+            transportSetupHookDefersRequest();
+        }
         if (test_section("HTTPS rejected until TLS transport exists"))
         {
             httpsRejectedUntilTlsTransportExists();
@@ -295,6 +299,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putChunkedStreamBody();
     void putWritableBody();
     void keepAliveAndReconnect();
+    void transportSetupHookDefersRequest();
     void httpsRejectedUntilTlsTransportExists();
     void tlsOptionsAreClientScoped();
     void zeroLengthResponse();
@@ -1310,6 +1315,102 @@ void SC::HttpAsyncClientTest::keepAliveAndReconnect()
     SC_TEST_EXPECT(loop.run());
     SC_TEST_EXPECT(server1.close());
     SC_TEST_EXPECT(server2.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26124);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+
+    String url = StringEncoding::Ascii;
+
+    struct Context
+    {
+        HttpAsyncClientTest* test = nullptr;
+
+        ResponseCollector* collector = nullptr;
+        HttpAsyncServer*   server    = nullptr;
+
+        AsyncLoopTimeout completeDelay;
+
+        Function<void(Result)> completeTransport;
+
+        bool setupCalled       = false;
+        bool setupCompleted    = false;
+        bool requestAfterSetup = false;
+
+        Result onSetup(HttpAsyncClientTransportSetup& setup)
+        {
+            test->recordExpectation("transport setup connection", setup.connection != nullptr);
+            test->recordExpectation("transport setup loop", setup.eventLoop != nullptr);
+            test->recordExpectation("transport setup url", setup.url != nullptr and setup.url->protocol == "http");
+            test->recordExpectation("transport setup complete", setup.complete.isValid());
+
+            setupCalled       = true;
+            completeTransport = setup.complete;
+
+            completeDelay.callback.bind<Context, &Context::onCompleteDelay>(*this);
+            return completeDelay.start(*setup.eventLoop, TimeMs{1});
+        }
+
+        void onCompleteDelay(AsyncLoopTimeout::Result&)
+        {
+            setupCompleted = true;
+            completeTransport(Result(true));
+        }
+    } ctx;
+
+    ctx.test      = this;
+    ctx.collector = &collector;
+    ctx.server    = &httpServer;
+
+    httpServer.onRequest = [this, &ctx](HttpConnection& connection)
+    {
+        ctx.requestAfterSetup = ctx.setupCompleted;
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "5"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("ready"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/deferred", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector->attach(response,
+                              [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                              {
+                                  ctx.collector->detach();
+                                  SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                  SC_TEST_EXPECT(StringView(ctx.collector->view()) == "ready");
+                                  SC_TEST_EXPECT(ctx.setupCalled);
+                                  SC_TEST_EXPECT(ctx.setupCompleted);
+                                  SC_TEST_EXPECT(ctx.requestAfterSetup);
+                                  SC_TEST_EXPECT(ctx.server->stop());
+                              });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(loop.close());
 }
 

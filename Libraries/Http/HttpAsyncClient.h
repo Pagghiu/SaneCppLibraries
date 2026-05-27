@@ -12,6 +12,20 @@ namespace SC
 
 struct HttpWebSocketTransportView;
 
+/// @brief Mutable transport setup view used by `HttpAsyncClient` after the TCP socket connects.
+///
+/// The default setup keeps `connection` using its socket streams. A custom setup can install alternate active streams
+/// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP.
+struct SC_HTTP_EXPORT HttpAsyncClientTransportSetup
+{
+    HttpConnectionBase* connection = nullptr;
+    AsyncEventLoop*     eventLoop  = nullptr;
+
+    const HttpURLParser* url = nullptr;
+
+    Function<void(Result)> complete;
+};
+
 template <int ReadQueue, int WriteQueue, int HeaderBytes, int StreamBytes>
 struct SC_HTTP_EXPORT HttpAsyncClientConnection
     : public HttpStaticConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes, 8, HttpConnectionBase>
@@ -158,6 +172,15 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     [[nodiscard]] const HttpAsyncClientTlsOptions& getTlsOptions() const { return tlsOptions; }
 
+    /// @brief Sets an optional transport setup hook invoked after TCP connect and before HTTP request bytes are sent.
+    ///
+    /// The hook can leave the socket streams active for plain HTTP, or install alternate active streams and complete
+    /// later. This keeps TLS and other transport adapters outside the core Http library.
+    void setTransportSetup(Function<Result(HttpAsyncClientTransportSetup&)>&& setup) { transportSetup = move(setup); }
+
+    /// @brief Clears the optional transport setup hook and restores default socket transport setup.
+    void clearTransportSetup() { transportSetup = {}; }
+
     /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
     Result detachWebSocketTransport(HttpWebSocketTransportView& transport);
 
@@ -266,6 +289,9 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     Result onResponseBodyStreamRead();
     Result validateActiveRequest() const;
 
+    void                 completeTransportSetup(Result result);
+    [[nodiscard]] Result rememberConnectedOrigin();
+
     void finalizeResponse(bool finishBodyStream);
     void closeConnection();
     void finishResponse();
@@ -293,15 +319,16 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     HttpConnectionBase* connection = nullptr;
 
-    AsyncEventLoop*           eventLoop      = nullptr;
-    HttpAsyncClientRequest*   currentRequest = nullptr;
-    HttpAsyncClientRequest    request;
-    HttpAsyncClientResponse   response;
-    AsyncSocketConnect        connectAsync;
-    RequestPreset             currentPreset;
-    SyncZLibTransformStream*  responseDecoder       = nullptr;
-    bool                      responseDecoderActive = false;
-    HttpAsyncClientTlsOptions tlsOptions;
+    AsyncEventLoop*                                  eventLoop      = nullptr;
+    HttpAsyncClientRequest*                          currentRequest = nullptr;
+    HttpAsyncClientRequest                           request;
+    HttpAsyncClientResponse                          response;
+    AsyncSocketConnect                               connectAsync;
+    RequestPreset                                    currentPreset;
+    SyncZLibTransformStream*                         responseDecoder       = nullptr;
+    bool                                             responseDecoderActive = false;
+    HttpAsyncClientTlsOptions                        tlsOptions;
+    Function<Result(HttpAsyncClientTransportSetup&)> transportSetup;
 
     State state = State::Idle;
 
