@@ -99,6 +99,7 @@ struct SC::FileSystemWatcher::Internal
             if (threadingRunner->thread.wasStarted())
             {
                 threadingRunner->shouldStop.exchange(true);
+
                 // Write to shutdownPipe to unblock the ::select() in the dedicated thread
                 char dummy = 1;
                 while (::write(threadingRunner->shutdownPipe[1], &dummy, sizeof(dummy)) == -1)
@@ -108,6 +109,7 @@ struct SC::FileSystemWatcher::Internal
                         return Result::Error("write to shutdown pipe failed");
                     }
                 }
+                SC_TRY(threadingRunner->thread.join());
                 if (threadingRunner->shutdownPipe[0] != -1)
                 {
                     ::close(threadingRunner->shutdownPipe[0]);
@@ -118,7 +120,6 @@ struct SC::FileSystemWatcher::Internal
                     ::close(threadingRunner->shutdownPipe[1]);
                     threadingRunner->shutdownPipe[1] = -1;
                 }
-                SC_TRY(threadingRunner->thread.join());
             }
         }
         if (notifyFd != -1)
@@ -331,12 +332,19 @@ struct SC::FileSystemWatcher::Internal
         ThreadRunnerInternal& runner = *threadingRunner;
         while (not runner.shouldStop.load())
         {
+            const int shutdownFd      = runner.shutdownPipe[0];
+            const int currentNotifyFd = notifyFd;
+            if (shutdownFd == -1 or currentNotifyFd == -1)
+            {
+                return;
+            }
+
             // Setup a select fd_set to listen on both notifyFd and shutdownPipe simultaneously
             fd_set fds;
             FD_ZERO(&fds);
-            FD_SET(notifyFd, &fds);
-            FD_SET(runner.shutdownPipe[0], &fds);
-            const int maxFd = notifyFd > runner.shutdownPipe[0] ? notifyFd : runner.shutdownPipe[0];
+            FD_SET(currentNotifyFd, &fds);
+            FD_SET(shutdownFd, &fds);
+            const int maxFd = currentNotifyFd > shutdownFd ? currentNotifyFd : shutdownFd;
 
             int selectRes;
             do
@@ -345,12 +353,12 @@ struct SC::FileSystemWatcher::Internal
                 selectRes = ::select(maxFd + 1, &fds, nullptr, nullptr, nullptr);
             } while (selectRes == -1 and errno == EINTR);
 
-            if (threadingRunner->shutdownPipe[0] == -1 or FD_ISSET(runner.shutdownPipe[0], &fds))
+            if (FD_ISSET(shutdownFd, &fds))
             {
                 return; // Interrupted by write to shutdown pipe (from close())
             }
             // Here select has received data on notifyHandle
-            readAndNotify(notifyFd, self->watchers);
+            readAndNotify(currentNotifyFd, self->watchers);
         }
         threadingRunner->shouldStop.exchange(false);
     }
