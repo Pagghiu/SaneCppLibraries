@@ -7,8 +7,7 @@
 #elif defined(_WIN32)
 #define SOKOL_D3D11
 #elif defined(__linux__)
-// Desktop Linux builds link OpenGL directly, so use Sokol's GL core backend here.
-#define SOKOL_GLCORE
+#define SOKOL_GLES3
 #else
 #error "Unsupported platform"
 #endif
