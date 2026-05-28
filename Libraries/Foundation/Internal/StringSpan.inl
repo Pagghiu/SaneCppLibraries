@@ -7,6 +7,17 @@
 #include <Windows.h> // MultiByteToWideChar
 #endif
 
+SC::StringSpan SC::StringSpan::fromNullTerminated(const char* text, StringEncoding encoding)
+{
+    return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::strlen(text)}, true, encoding);
+}
+
+#if SC_PLATFORM_WINDOWS
+SC::StringSpan SC::StringSpan::fromNullTerminated(const wchar_t* text, StringEncoding encoding)
+{
+    return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::wcslen(text)}, true);
+}
+#endif
 SC::size_t SC::StringSpan::sizeInBytesIncludingTerminator() const
 {
     SC_ASSERT_RELEASE(hasNullTerm);

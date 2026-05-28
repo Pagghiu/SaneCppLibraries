@@ -51,14 +51,14 @@ struct SC_FOUNDATION_EXPORT StringSpan
     constexpr StringSpan(const char (&str)[N]) : text(str), textSizeInBytes(N - 1), encoding(static_cast<uint8_t>(StringEncoding::Ascii)), hasNullTerm(true) {}
 
     /// @brief Constructs a StringView from a null terminated string
-    static constexpr StringSpan fromNullTerminated(const char* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::strlen(text)}, true, encoding); }
+    static StringSpan fromNullTerminated(const char* text, StringEncoding encoding);
 
 #if SC_PLATFORM_WINDOWS
     constexpr StringSpan(Span<const wchar_t> textSpan, bool nullTerm, StringEncoding encoding = StringEncoding::Native) : textWide(textSpan.data()), textSizeInBytes(textSpan.sizeInBytes()), encoding(static_cast<uint8_t>(encoding)), hasNullTerm(nullTerm ? 1 : 0) {}
 
     template <size_t N>
     constexpr StringSpan(const wchar_t (&str)[N]) : textWide(str), textSizeInBytes((N - 1)* sizeof(wchar_t)), encoding(static_cast<uint8_t>(StringEncoding::Native)), hasNullTerm(true) {}
-    static constexpr StringSpan fromNullTerminated(const wchar_t* text, StringEncoding encoding) { return text == nullptr ? StringSpan(encoding) : StringSpan({text, ::wcslen(text)}, true); }
+    static StringSpan fromNullTerminated(const wchar_t* text, StringEncoding encoding);
 #endif
 
     // clang-format on
@@ -139,7 +139,6 @@ struct SC_FOUNDATION_EXPORT StringSpan
     static uint32_t advanceUTF16(const char*& it, const char* end);
 
   protected:
-    friend struct StringView;
     union
     {
         const char* text;

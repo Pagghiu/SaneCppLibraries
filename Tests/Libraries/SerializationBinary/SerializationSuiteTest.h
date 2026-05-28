@@ -9,6 +9,7 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+#include <memory.h> // memset
 
 namespace SC
 {

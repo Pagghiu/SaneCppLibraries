@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Testing/Testing.h"
+#include <memory.h> // memcmp
+
 namespace SC
 {
 struct BufferTest;

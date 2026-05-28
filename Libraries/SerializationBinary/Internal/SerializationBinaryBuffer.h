@@ -3,6 +3,13 @@
 #pragma once
 #include "../../Foundation/Span.h"
 
+#if SC_PLATFORM_WINDOWS
+extern "C"
+{
+    void* __cdecl memcpy(void* dst, const void* src, SC::size_t len);
+}
+#endif
+
 namespace SC
 {
 //! @addtogroup group_serialization_binary
@@ -66,7 +73,11 @@ struct SerializationBinaryReader
         numberOfOperations++;
         if (not object.empty())
         {
+#if SC_COMPILER_MSVC
             ::memcpy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
+#else
+            __builtin_memcpy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
+#endif
         }
         readPosition += object.sizeInBytes();
         return true;

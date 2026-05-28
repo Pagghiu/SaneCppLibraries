@@ -188,7 +188,11 @@ struct SerializationBinary
         // Read number of type info
         Span<const char> numInfosSlice;
         SC_TRY(buffer.sliceStartLength(0, sizeof(numInfos), numInfosSlice));
-        memcpy(&numInfos, numInfosSlice.data(), sizeof(numInfos));
+#if SC_COMPILER_MSVC
+        ::memcpy(&numInfos, numInfosSlice.data(), sizeof(numInfos));
+#else
+        __builtin_memcpy(&numInfos, numInfosSlice.data(), sizeof(numInfos));
+#endif
 
         // Cast first part of the buffer to a Span of TypeInfo.
         // It's possible as we've been serializing it with correct alignment (currently 32 bits).

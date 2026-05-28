@@ -43,8 +43,8 @@ inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<co
     if (value.sizeInBytes() == 1)
     {
         int intValue = 0;
-        ::memcpy(&intValue, value.data(), 1);
-        ::memset(destData, intValue, data.sizeInBytes());
+        Memory::copy(&intValue, value.data(), 1);
+        Memory::set(destData, intValue, data.sizeInBytes());
     }
     else
     {
@@ -52,7 +52,7 @@ inline void SC::detail::SegmentTrivial<T>::copyConstructAs(Span<T> data, Span<co
         const auto*  sourceValue = value.data();
         for (size_t idx = 0; idx < numElements; idx++)
         {
-            ::memcpy(destData + idx, sourceValue, valueSize);
+            Memory::copy(destData + idx, sourceValue, valueSize);
         }
     }
 }
@@ -61,41 +61,41 @@ template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyConstruct(Span<T> data, const U* src) noexcept
 {
-    ::memmove(prepare_byte_storage_destination(data), src, data.sizeInBytes());
+    Memory::move(prepare_byte_storage_destination(data), src, data.sizeInBytes());
 }
 
 template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyAssign(Span<T> data, const U* src) noexcept
 {
-    ::memcpy(data.data(), src, data.sizeInBytes());
+    Memory::copy(data.data(), src, data.sizeInBytes());
 }
 
 template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::copyInsert(Span<T> data, Span<const U> values) noexcept
 {
-    ::memmove(data.template reinterpret_as_span_of<char>().data() + values.sizeInBytes(), data.data(),
-              data.sizeInBytes());
-    ::memmove(data.data(), values.data(), values.sizeInBytes());
+    Memory::move(data.template reinterpret_as_span_of<char>().data() + values.sizeInBytes(), data.data(),
+                 data.sizeInBytes());
+    Memory::move(data.data(), values.data(), values.sizeInBytes());
 }
 
 template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveConstruct(Span<T> data, U* src) noexcept
 {
-    ::memcpy(prepare_byte_storage_destination(data), src, data.sizeInBytes());
+    Memory::copy(prepare_byte_storage_destination(data), src, data.sizeInBytes());
 }
 
 template <typename T>
 template <typename U>
 inline void SC::detail::SegmentTrivial<T>::moveAssign(Span<T> data, U* src) noexcept
 {
-    ::memcpy(start_lifetime_as_array(data), src, data.sizeInBytes());
+    Memory::copy(start_lifetime_as_array(data), src, data.sizeInBytes());
 }
 
 template <typename T>
 inline void SC::detail::SegmentTrivial<T>::remove(Span<T> data, size_t numElements) noexcept
 {
-    ::memmove(data.data(), data.template reinterpret_as_span_of<char>().data() + numElements, numElements);
+    Memory::move(data.data(), data.template reinterpret_as_span_of<char>().data() + numElements, numElements);
 }

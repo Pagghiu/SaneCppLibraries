@@ -69,7 +69,7 @@ struct ArrayWithSize
 
     bool equals(Span<const T> other) const
     {
-        return size == other.sizeInElements() and ::memcmp(values, other.data(), other.sizeInBytes()) == 0;
+        return size == other.sizeInElements() and __builtin_memcmp(values, other.data(), other.sizeInBytes()) == 0;
     }
 };
 

@@ -4,7 +4,6 @@
 #include "../Libraries/Foundation/Deferred.h"
 #include "../Libraries/Foundation/Function.h"
 #include "../Libraries/Foundation/InitializerList.h"
-#include "../Libraries/Foundation/LibC.h"
 #include "../Libraries/Foundation/OpaqueObject.h"
 #include "../Libraries/Foundation/Platform.h"
 #include "../Libraries/Foundation/PrimitiveTypes.h"

@@ -3,6 +3,7 @@
 #include "../../Libraries/SerializationBinary/Internal/SerializationBinaryBuffer.h"
 #include "Internal/SerializationBinaryTypeErasedReadVersioned.h"
 #include "Internal/SerializationBinaryTypeErasedReadWriteExact.h"
+#include <memory.h> // memcpy
 
 namespace SC
 {

@@ -11,6 +11,8 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Time/Time.h"
+#include <memory.h> // memcmp
+#include <string.h> // strlen
 
 namespace SC
 {

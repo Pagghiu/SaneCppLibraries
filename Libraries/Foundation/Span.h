@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Foundation/InitializerList.h" // IWYU pragma: keep
-#include "../Foundation/LibC.h"            // IWYU pragma: keep
+#include "../Foundation/PrimitiveTypes.h"  // IWYU pragma: keep
 #include "../Foundation/TypeTraits.h"      // SameConstnessAs
 
 namespace SC

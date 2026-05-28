@@ -4,6 +4,7 @@
 #include "Libraries/Foundation/Deferred.h"
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Testing.h"
+#include <memory.h> // memcmp
 
 namespace SC
 {

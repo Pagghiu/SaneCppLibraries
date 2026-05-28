@@ -6,6 +6,7 @@
 #include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"
 #include "Libraries/Strings/Path.h"
+#include <memory.h> // memcmp
 
 struct SC::AsyncTest::FileSendContext
 {

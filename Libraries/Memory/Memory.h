@@ -38,6 +38,15 @@ struct SC::Memory
     /// @brief Free memory allocated by Memory::allocate and / or reallocated by Memory::reallocate
     /// @param memory Memory to release / deallocate
     static void release(void* memory);
+
+    /// @brief Move numBytes bytes of memory from src to dst. The memory areas may overlap.
+    static void move(void* dst, const void* src, size_t numBytes);
+
+    /// @brief Set numBytes bytes of memory at dst to the value c
+    static void set(void* dst, int c, size_t numBytes);
+
+    /// @brief Copy numBytes bytes of memory from src to dst. The memory areas must not overlap.
+    static void copy(void* dst, const void* src, size_t numBytes);
 };
 
 /// @brief Customizable functions to allocate, reallocate and deallocate memory

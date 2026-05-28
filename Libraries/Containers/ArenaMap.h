@@ -48,7 +48,7 @@ struct SC::ArenaMap
         Gen*  newGens   = reinterpret_cast<Gen*>(allocator.allocate(this, other.itemsSize * sizeof(Gen), alignof(Gen)));
         SC_ASSERT_RELEASE(newItems);
         SC_ASSERT_RELEASE(newGens);
-        ::memset(newGens, 0, other.itemsSize * sizeof(Gen));
+        Memory::set(newGens, 0, other.itemsSize * sizeof(Gen));
         items       = newItems;
         generations = newGens;
         itemsSize   = other.itemsSize;
@@ -196,7 +196,7 @@ struct SC::ArenaMap
         Gen* newGens = reinterpret_cast<Gen*>(allocator.allocate(this, newSize * sizeof(Gen), alignof(Gen)));
         if (newGens == nullptr)
             return false;
-        ::memset(newGens, 0, newSize * sizeof(Gen));
+        Memory::set(newGens, 0, newSize * sizeof(Gen));
         generations = newGens;
         itemsSize   = newSize;
         numUsed     = 0;

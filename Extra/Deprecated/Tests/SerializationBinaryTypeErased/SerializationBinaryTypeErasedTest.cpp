@@ -5,6 +5,7 @@
 #include "Libraries/ContainersReflection/MemoryReflection.h"
 #include "Libraries/Testing/Testing.h"
 #include "Tests/Libraries/SerializationBinary/SerializationSuiteTest.h"
+#include <memory.h> // memset
 
 namespace SC
 {

@@ -4,6 +4,7 @@
 #include "../../Foundation/Deferred.h"
 #include "../../Foundation/Result.h"
 #include "../../Strings/StringConverter.h"
+#include <memory.h> // memcpy
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN

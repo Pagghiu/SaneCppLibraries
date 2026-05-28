@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../../Memory/Globals.h"
 #include "../../Memory/Memory.h"
+#include <memory.h> // memmove
 #include <stdint.h> // uintptr_t
 
 //------------------------------------------------------------------------------------------------------------------
@@ -11,6 +12,9 @@
 void* SC::Memory::reallocate(void* memory, size_t numBytes) { return Globals::get(Globals::Global).allocator.reallocate(memory, numBytes); }
 void* SC::Memory::allocate(size_t numBytes, size_t alignment) { return Globals::get(Globals::Global).allocator.allocate(nullptr, numBytes,alignment); }
 void  SC::Memory::release(void* allocatedMemory) { return Globals::get(Globals::Global).allocator.release(allocatedMemory); }
+void  SC::Memory::move(void* dst, const void* src, size_t numBytes) { ::memmove(dst, src, numBytes);}
+void  SC::Memory::set(void* dst, int c, size_t numBytes) { ::memset(dst, c, numBytes); }
+void  SC::Memory::copy(void* dst, const void* src, size_t numBytes) { ::memcpy(dst, src, numBytes); }
 // clang-format on
 
 //------------------------------------------------------------------------------------------------------------------

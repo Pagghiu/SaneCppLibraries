@@ -8,6 +8,7 @@
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"
+#include <memory.h> // memcpy
 
 namespace SC
 {

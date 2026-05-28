@@ -3,6 +3,7 @@
 #include "HttpParser.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
+#include <string.h> // memchr
 
 namespace
 {

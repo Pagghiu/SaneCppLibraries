@@ -5,7 +5,6 @@
         "Platform.h",
         "PrimitiveTypes.h",
         "Assert.h",
-        "LibC.h",
         "InitializerList.h",
         "TypeTraits.h",
         "AlignedStorage.h",

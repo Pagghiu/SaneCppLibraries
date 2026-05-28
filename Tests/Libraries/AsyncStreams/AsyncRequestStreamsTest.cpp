@@ -16,6 +16,7 @@
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/Threading.h"
+#include <memory.h> // memcmp
 
 namespace SC
 {

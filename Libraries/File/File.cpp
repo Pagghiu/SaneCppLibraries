@@ -3,6 +3,7 @@
 #include "../File/File.h"
 #include "../Foundation/Deferred.h"
 #include "../Foundation/StringPath.h"
+#include <memory.h> // memset
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN

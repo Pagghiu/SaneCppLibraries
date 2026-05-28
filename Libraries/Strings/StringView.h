@@ -51,13 +51,13 @@ struct SC::StringView : public StringSpan
 
     constexpr StringView(StringSpan ssv) : StringSpan(ssv) {}
 
-    static constexpr StringView fromNullTerminated(const char* text, StringEncoding encoding)
+    static StringView fromNullTerminated(const char* text, StringEncoding encoding)
     {
         return StringSpan::fromNullTerminated(text, encoding);
     }
 
 #if SC_PLATFORM_WINDOWS
-    static constexpr StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding)
+    static StringView fromNullTerminated(const wchar_t* text, StringEncoding encoding)
     {
         return StringSpan::fromNullTerminated(text, encoding);
     }

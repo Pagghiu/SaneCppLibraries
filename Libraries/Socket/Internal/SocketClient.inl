@@ -4,7 +4,8 @@
 #include "../../Socket/Socket.h"
 #include "SocketInternal.h"
 
-#include <errno.h> // errno
+#include <errno.h>  // errno
+#include <memory.h> // memcpy
 #if !SC_PLATFORM_WINDOWS
 #include <netinet/in.h> // sockaddr_in
 #include <sys/select.h> // select

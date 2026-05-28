@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Foundation/LibC.h"
+#include "../../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {

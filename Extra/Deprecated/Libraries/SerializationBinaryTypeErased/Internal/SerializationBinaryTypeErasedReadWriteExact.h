@@ -63,7 +63,7 @@ struct SerializationBinaryTypeErasedReader
         numberOfOperations++;
         if (not object.empty())
         {
-            ::memcpy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
+            Memory::copy(object.data(), &memory.data()[readPosition], object.sizeInBytes());
         }
         readPosition += object.sizeInBytes();
         return true;

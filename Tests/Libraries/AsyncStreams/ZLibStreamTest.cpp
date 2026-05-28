@@ -4,6 +4,7 @@
 #include "Libraries/AsyncStreams/Internal/ZLibAPI.h"
 #include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
+#include <memory.h> // memcmp
 
 namespace SC
 {

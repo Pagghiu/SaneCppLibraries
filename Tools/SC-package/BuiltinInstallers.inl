@@ -60,14 +60,14 @@ static Result resolveMSVCVersions(StringView packageRoot, String& msvcVersion, S
     return Result(true);
 }
 
-static constexpr StringView portableMSVCCacheLeafName()
+static StringView portableMSVCCacheLeafName()
 {
     return HostPlatform == Platform::Apple   ? StringView::fromNullTerminated("portable-macos", StringEncoding::Ascii)
            : HostPlatform == Platform::Linux ? StringView::fromNullTerminated("portable-linux", StringEncoding::Ascii)
                                              : StringView::fromNullTerminated("portable-host", StringEncoding::Ascii);
 }
 
-static constexpr StringView hostPlatformName()
+static StringView hostPlatformName()
 {
     return HostPlatform == Platform::Apple        ? StringView::fromNullTerminated("apple", StringEncoding::Ascii)
            : HostPlatform == Platform::Linux      ? StringView::fromNullTerminated("linux", StringEncoding::Ascii)
@@ -76,7 +76,7 @@ static constexpr StringView hostPlatformName()
                                                   : StringView::fromNullTerminated("unknown", StringEncoding::Ascii);
 }
 
-static constexpr StringView hostInstructionSetName()
+static StringView hostInstructionSetName()
 {
     return HostInstructionSet == InstructionSet::ARM64 ? StringView::fromNullTerminated("arm64", StringEncoding::Ascii)
            : HostInstructionSet == InstructionSet::Intel64
