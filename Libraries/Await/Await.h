@@ -241,8 +241,9 @@ struct AwaitAllocatorStatistics
     size_t requestedBytesAllocated = 0;
     size_t requestedBytesReleased  = 0;
 
-    size_t bytesInUse     = 0;
-    size_t peakBytesInUse = 0;
+    size_t bytesInUse                     = 0;
+    size_t peakBytesInUse                 = 0;
+    size_t largestRequestedAllocationSize = 0;
 
     size_t numAllocationFailures       = 0;
     size_t lastFailedAllocationSize    = 0;
@@ -310,6 +311,7 @@ struct SC_AWAIT_EXPORT AwaitAllocator
     [[nodiscard]] size_t used() const;
     [[nodiscard]] size_t capacity() const;
     [[nodiscard]] size_t peakUsed() const;
+    [[nodiscard]] size_t largestAllocationSize() const;
     [[nodiscard]] size_t failedAllocationSize() const;
     [[nodiscard]] size_t reservedBytes() const;
     [[nodiscard]] size_t committedBytes() const;
@@ -1098,9 +1100,13 @@ struct SC_AWAIT_EXPORT AwaitTaskGroup
         AwaitTaskGroupWaitAnyResult& outResult,
         AwaitTaskGroupWaitAnyPolicy  waitAnyPolicy = AwaitTaskGroupWaitAnyPolicy::CancelRemaining);
     Result collectResults(Span<Result> outResults, AwaitTaskGroupResultSummary* outSummary = nullptr) const;
+    Result summarizeResults(AwaitTaskGroupResultSummary& outSummary) const;
 
     [[nodiscard]] size_t size() const;
     [[nodiscard]] size_t capacity() const;
+    [[nodiscard]] size_t remainingCapacity() const;
+    [[nodiscard]] bool   isEmpty() const;
+    [[nodiscard]] bool   isFull() const;
 
   private:
     friend struct AwaitTaskGroupWaitAllAwaiter;
@@ -1132,6 +1138,11 @@ struct SC_AWAIT_EXPORT AwaitTaskRegistry
     [[nodiscard]] size_t           activeCount() const;
     [[nodiscard]] size_t           completedCount() const;
     [[nodiscard]] size_t           capacity() const;
+    [[nodiscard]] size_t           remainingCapacity() const;
+    [[nodiscard]] bool             isEmpty() const;
+    [[nodiscard]] bool             isFull() const;
+    [[nodiscard]] bool             hasActiveTasks() const;
+    [[nodiscard]] bool             hasCompletedTasks() const;
 
   private:
     friend struct AwaitTaskRegistryWaitAllAwaiter;

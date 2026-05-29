@@ -18,9 +18,10 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   `AwaitTaskGroup::waitAll()`, `AwaitTaskGroup::waitAny()`, child task timeouts with `waitFor()`, and cancellation of
   the currently suspended operation. `AwaitTaskRegistry` covers explicit fixed-slot detached/background task ownership.
 - Prefer fixed `AwaitAllocator` examples when discussing no-hidden-allocation coroutine frame storage.
-- Use `AwaitAllocator::capacity()`, `used()`, `peakUsed()`, `failedAllocationSize()`, and `statistics()` when sizing
-  caller-provided coroutine frame storage.
+- Use `AwaitAllocator::capacity()`, `used()`, `peakUsed()`, `largestAllocationSize()`, `failedAllocationSize()`, and
+  `statistics()` when sizing caller-provided coroutine frame storage.
 - Mention `createVirtual()`, `createMalloc()`, and `createPolymorphic()` only as explicit opt-in allocation modes.
+  `createVirtual()` is for deliberate reservation/commit experiments, not the normal no-hidden-allocation story.
 - Use `Examples/AwaitEcho` for socket connect/accept/receive/sendAll/task groups.
 - Use `Examples/AwaitBackgroundDigest` for ThreadPool-backed CPU work through `loopWork()`.
 - Use `Examples/AwaitBackgroundJobs` for detached/background jobs through fixed caller-owned `AwaitTaskRegistry` slots.
@@ -33,7 +34,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `Examples/AwaitLineProtocol` for CRLF text protocols using `receiveLine()` plus `sendAll()`.
 - Use `Examples/AwaitManifestPreview` for bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage.
 - Use `Examples/AwaitProcessExitCodes` for child process exit waits with `processExit()`.
-- Use `Examples/AwaitServiceProbe` for a compact application-shaped flow combining sockets, task groups, timeout
+- Use `Examples/AwaitServiceProbe` for a compact application-shaped flow combining sockets, nested task groups, timeout
   cancellation, and fixed allocator diagnostics.
 - Use `Examples/AwaitThreadWakeUp` for external thread notifications through `AwaitLoopWakeUp`.
 - Use single-buffer `sendAll()` for contiguous payloads and scatter/gather `sendAll()` with caller-owned
@@ -47,17 +48,26 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - `SCAwaitTest` owns allocator coverage; Await stays separate from `SCTest` because it needs C++20 and standard-library
   coroutine support.
 - `AwaitTask` is caller-owned, movable, non-copyable, and must not be destroyed while active.
+- Use task state helpers to keep shutdown code explicit: `AwaitTask::isActive()`, `isCompleted()`,
+  `AwaitTaskRegistry::hasActiveTasks()`, `hasCompletedTasks()`, and the group/registry `remainingCapacity()` helpers
+  are query-only and never allocate, cancel, or drain.
 - Completed child task frames can be destroyed while an `Async` callback is unwinding; `AwaitEventLoop` defers that
   destruction until `run()`, `runOnce()`, or `runNoWait()` returns so embedded `AsyncRequest` storage stays alive.
 - Result spans such as `AwaitSocketReceiveResult::data` and `AwaitFileReadResult::data` point into caller-provided
   buffers; those buffers must outlive result inspection.
 - Child tasks can still be explicitly `spawn()`-ed before `co_await child`; use `spawnAndWait()` when a parent should
   start and await a child in one expression.
-- Keep `spawnAndWait()` for the one-child convenience case; use `AwaitTaskGroup` for multiple children, aggregation,
-  `waitAny()`, or custom child cancellation policy.
+- Keep `spawnAndWait()` for the one-child convenience case; its name intentionally exposes "starts then awaits" behavior.
+  Use `AwaitTaskGroup` for multiple children, aggregation, `waitAny()`, or custom child cancellation policy.
+- Do not add destructor-based cancel/drain helpers unless the design has an explicit way to surface failures. Prefer
+  explicit `Result`-returning shutdown (`cancelAll()`, run the loop, then `clearCompleted()`).
+- Destroying an active `AwaitTask` is still an assert-release programming error. Use `isActive()` and
+  `AwaitTaskRegistry::hasActiveTasks()` when shutdown code needs a pre-destroy diagnostic.
 - Use `AwaitTaskGroup` with caller-provided `Span<AwaitTask*>` storage when a parent needs to own several children and
   cancel/wait them as a group. `waitAny()` defaults to cancelling remaining children before returning so stack-owned
   child tasks are not left active.
+- Use `AwaitTaskGroup::summarizeResults()` when only aggregate counts and first-failure metadata are needed; use
+  `collectResults()` when each child `Result` must be copied into caller-provided storage.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
 - Use `AwaitIsCancelled(result)` to distinguish cooperative cancellation from ordinary failure without introducing
   `Result<T>` or exception-style control flow.
@@ -90,12 +100,16 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
   allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
   completed slot without building a separate task-pointer array.
+- It is fair to describe `AwaitTaskGroup` as asyncio-like control flow, but always call out the Sane C++ difference:
+  task objects, pointer arrays, result arrays, buffers, and allocator storage remain caller-owned and explicit.
 - For registry shutdown, use an explicit cancel/drain/clear sequence: `registry.cancelAll()`, run the owning
   `AwaitEventLoop`, then `registry.clearCompleted(&summary)`. Repeated `cancelAll()` and `clearCompleted()` calls are
   valid and covered by tests.
-- For fixed allocator sizing, inspect `AwaitAllocator::peakUsed()` or `statistics().peakBytesInUse` after realistic
-  runs and keep enough headroom for concurrently active coroutine frames. Completed tasks may keep frames allocated
-  until their `AwaitTask` object is destroyed or cleared from a registry.
+- For fixed allocator sizing, inspect `AwaitAllocator::peakUsed()`, `largestAllocationSize()`, or
+  `statistics().peakBytesInUse` after realistic runs and keep enough headroom for concurrently active coroutine frames.
+  Completed tasks may keep frames allocated until their `AwaitTask` object is destroyed or cleared from a registry.
+- Keep example allocator storage modest and intentional; socket examples should expose peak/largest/capacity diagnostics
+  instead of hiding behind an oversized fixed buffer.
 - The strict no-stdlib coroutine story is not solved yet; do not present `Await` as ready for `SC_DISABLE_STD_CPP=1` or
   normal `-nostdinc++` use. A shim would need coroutine traits/handles/suspend types plus compiler builtin mapping. This
   is stable-track work, not required for MVP usage.

@@ -165,7 +165,8 @@ static Result runAwaitLineProtocol()
 
     StringView value({valueLine.line.data(), valueLine.line.sizeInBytes()}, false, StringEncoding::Ascii);
     console.print("AwaitLineProtocol read: {}\n", value);
-    console.print("AwaitLineProtocol allocator capacity: {} bytes\n", allocator.capacity());
+    console.print("AwaitLineProtocol allocator peak/largest/capacity: {}/{}/{} bytes\n", allocator.peakUsed(),
+                  allocator.largestAllocationSize(), allocator.capacity());
 
     SC_TRY(client.close());
     SC_TRY(accepted.close());

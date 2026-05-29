@@ -1158,9 +1158,17 @@ struct SC::AwaitTest : public SC::TestCase
 
         AwaitTask*     groupStorage[2] = {};
         AwaitTaskGroup group(await, groupStorage);
+        if (not group.isEmpty() or group.isFull() or group.remainingCapacity() != 2)
+        {
+            co_return Result::Error("Await task group initial capacity mismatch");
+        }
         SC_CO_TRY(group.spawn(childA));
+        if (group.isEmpty() or group.isFull() or group.remainingCapacity() != 1)
+        {
+            co_return Result::Error("Await task group partial capacity mismatch");
+        }
         SC_CO_TRY(group.spawn(childB));
-        if (group.size() != 2)
+        if (group.size() != 2 or group.remainingCapacity() != 0 or not group.isFull())
         {
             co_return Result::Error("Await task group size mismatch");
         }
@@ -1201,6 +1209,15 @@ struct SC::AwaitTest : public SC::TestCase
             summary.firstFailureTask != &childB or summary.firstFailure)
         {
             co_return Result::Error("Await task group collected result mismatch");
+        }
+
+        AwaitTaskGroupResultSummary summaryOnly;
+        Result                      summaryAggregate = group.summarizeResults(summaryOnly);
+        if (summaryAggregate or summaryOnly.numTasks != 2 or summaryOnly.numCompleted != 2 or
+            summaryOnly.numSucceeded != 1 or summaryOnly.numFailed != 1 or summaryOnly.firstFailureIndex != 1 or
+            summaryOnly.firstFailureTask != &childB or summaryOnly.firstFailure)
+        {
+            co_return Result::Error("Await task group summary result mismatch");
         }
 
         co_return Result(true);
@@ -3011,6 +3028,11 @@ struct SC::AwaitTest : public SC::TestCase
 
             AwaitTask         storage[2];
             AwaitTaskRegistry registry(await, storage);
+            SC_TEST_EXPECT(registry.isEmpty());
+            SC_TEST_EXPECT(not registry.isFull());
+            SC_TEST_EXPECT(not registry.hasActiveTasks());
+            SC_TEST_EXPECT(not registry.hasCompletedTasks());
+            SC_TEST_EXPECT(registry.remainingCapacity() == 2);
 
             AwaitTaskRegistrySpawnResult first;
             SC_TEST_EXPECT(registry.spawn(waitTwice(await), &first));
@@ -3020,16 +3042,25 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(registry.activeCount() == 1);
             SC_TEST_EXPECT(registry.completedCount() == 0);
             SC_TEST_EXPECT(registry.capacity() == 2);
+            SC_TEST_EXPECT(not registry.isEmpty());
+            SC_TEST_EXPECT(not registry.isFull());
+            SC_TEST_EXPECT(registry.hasActiveTasks());
+            SC_TEST_EXPECT(not registry.hasCompletedTasks());
+            SC_TEST_EXPECT(registry.remainingCapacity() == 1);
 
             AwaitTaskRegistrySpawnResult second;
             SC_TEST_EXPECT(registry.spawn(failSoon(await), &second));
             SC_TEST_EXPECT(second.index == 1);
             SC_TEST_EXPECT(second.task == &storage[1]);
+            SC_TEST_EXPECT(registry.isFull());
+            SC_TEST_EXPECT(registry.remainingCapacity() == 0);
 
             SC_TEST_EXPECT(await.run());
             SC_TEST_EXPECT(registry.size() == 2);
             SC_TEST_EXPECT(registry.activeCount() == 0);
             SC_TEST_EXPECT(registry.completedCount() == 2);
+            SC_TEST_EXPECT(not registry.hasActiveTasks());
+            SC_TEST_EXPECT(registry.hasCompletedTasks());
 
             AwaitTaskGroupResultSummary summary;
             SC_TEST_EXPECT(registry.clearCompleted(&summary) == 2);
@@ -3040,6 +3071,8 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(summary.firstFailureIndex == 1);
             SC_TEST_EXPECT(not summary.firstFailure);
             SC_TEST_EXPECT(registry.size() == 0);
+            SC_TEST_EXPECT(registry.isEmpty());
+            SC_TEST_EXPECT(not registry.hasCompletedTasks());
             SC_TEST_EXPECT(async.close());
         }
         {
@@ -3567,6 +3600,8 @@ struct SC::AwaitTest : public SC::TestCase
         AwaitTask task = allocatorWait(await);
         SC_TEST_EXPECT(allocator.used() > 0);
         SC_TEST_EXPECT(allocator.peakUsed() >= allocator.used());
+        SC_TEST_EXPECT(allocator.largestAllocationSize() > 0);
+        SC_TEST_EXPECT(allocator.statistics().largestRequestedAllocationSize == allocator.largestAllocationSize());
         SC_TEST_EXPECT(allocator.failedAllocationSize() == 0);
 
         SC_TEST_EXPECT(await.spawn(task));
@@ -3580,6 +3615,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.capacity() == sizeof(diagnosticsMemory));
         SC_TEST_EXPECT(diagnostics.used() == 0);
         SC_TEST_EXPECT(diagnostics.peakUsed() == 0);
+        SC_TEST_EXPECT(diagnostics.largestAllocationSize() == 0);
         SC_TEST_EXPECT(diagnostics.failedAllocationSize() == 0);
         SC_TEST_EXPECT(diagnostics.allocate(nullptr, 4, 1) == nullptr);
         SC_TEST_EXPECT(diagnostics.used() == 0);
@@ -3624,6 +3660,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(fixedA != nullptr);
         SC_TEST_EXPECT(fixedB != nullptr);
         SC_TEST_EXPECT(fixed.used() > 0);
+        SC_TEST_EXPECT(fixed.largestAllocationSize() == 64);
         fixed.release(fixedA);
         fixed.release(fixedB);
         SC_TEST_EXPECT(fixed.used() == 0);
@@ -3636,6 +3673,7 @@ struct SC::AwaitTest : public SC::TestCase
         void* mallocMemory = mallocAllocator.allocate(nullptr, 128, alignof(void*));
         SC_TEST_EXPECT(mallocMemory != nullptr);
         SC_TEST_EXPECT(mallocAllocator.statistics().requestedBytesAllocated == 128);
+        SC_TEST_EXPECT(mallocAllocator.largestAllocationSize() == 128);
         mallocAllocator.release(mallocMemory);
         SC_TEST_EXPECT(mallocAllocator.statistics().requestedBytesReleased == 128);
         SC_TEST_EXPECT(mallocAllocator.used() == 0);
@@ -3649,6 +3687,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(polymorphicMemory != nullptr);
         SC_TEST_EXPECT(tracking.lastOwner == &owner);
         SC_TEST_EXPECT(tracking.lastNumBytes >= 24);
+        SC_TEST_EXPECT(polymorphic.largestAllocationSize() == 24);
         polymorphic.release(polymorphicMemory);
         SC_TEST_EXPECT(tracking.numAllocations == 1);
         SC_TEST_EXPECT(tracking.numReleases == 1);
@@ -3662,6 +3701,7 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(virtualAllocator.committedBytes() == 0);
         void* virtualMemory = virtualAllocator.allocate(nullptr, 1024, alignof(void*));
         SC_TEST_EXPECT(virtualMemory != nullptr);
+        SC_TEST_EXPECT(virtualAllocator.largestAllocationSize() == 1024);
         SC_TEST_EXPECT(virtualAllocator.committedBytes() > 0);
         virtualAllocator.release(virtualMemory);
         SC_TEST_EXPECT(virtualAllocator.used() == 0);

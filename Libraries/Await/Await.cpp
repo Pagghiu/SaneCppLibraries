@@ -282,6 +282,10 @@ void* AwaitAllocator::allocate(const void* owner, size_t numBytes, size_t alignm
 
     currentStatistics.numAllocations++;
     currentStatistics.requestedBytesAllocated += numBytes;
+    if (numBytes > currentStatistics.largestRequestedAllocationSize)
+    {
+        currentStatistics.largestRequestedAllocationSize = numBytes;
+    }
     currentStatistics.bytesInUse += rawBytes;
     if (currentStatistics.bytesInUse > currentStatistics.peakBytesInUse)
     {
@@ -359,6 +363,8 @@ size_t AwaitAllocator::capacity() const
 }
 
 size_t AwaitAllocator::peakUsed() const { return currentStatistics.peakBytesInUse; }
+
+size_t AwaitAllocator::largestAllocationSize() const { return currentStatistics.largestRequestedAllocationSize; }
 
 size_t AwaitAllocator::failedAllocationSize() const { return currentStatistics.lastFailedAllocationSize; }
 
@@ -450,6 +456,10 @@ void* AwaitAllocator::allocateFromBlocks(const void*, size_t numBytes, size_t al
 
             currentStatistics.numAllocations++;
             currentStatistics.requestedBytesAllocated += numBytes;
+            if (numBytes > currentStatistics.largestRequestedAllocationSize)
+            {
+                currentStatistics.largestRequestedAllocationSize = numBytes;
+            }
             currentStatistics.bytesInUse += block->blockBytes;
             if (currentStatistics.bytesInUse > currentStatistics.peakBytesInUse)
             {
@@ -2425,9 +2435,55 @@ Result AwaitTaskGroup::collectResults(Span<Result> outResults, AwaitTaskGroupRes
     return aggregate;
 }
 
+Result AwaitTaskGroup::summarizeResults(AwaitTaskGroupResultSummary& outSummary) const
+{
+    AwaitTaskGroupResultSummary summary;
+    summary.numTasks = numTasks;
+
+    Result aggregate(true);
+    for (size_t idx = 0; idx < numTasks; ++idx)
+    {
+        AwaitTask* task = tasks[idx];
+        if (task == nullptr)
+        {
+            return Result::Error("AwaitTaskGroup contains invalid task");
+        }
+
+        Result taskResult = task->result();
+        if (task->isCompleted())
+        {
+            summary.numCompleted++;
+        }
+        if (taskResult)
+        {
+            summary.numSucceeded++;
+        }
+        else
+        {
+            summary.numFailed++;
+            if (summary.firstFailureTask == nullptr)
+            {
+                summary.firstFailureIndex = idx;
+                summary.firstFailureTask  = task;
+                summary.firstFailure      = taskResult;
+                aggregate                 = taskResult;
+            }
+        }
+    }
+
+    outSummary = summary;
+    return aggregate;
+}
+
 size_t AwaitTaskGroup::size() const { return numTasks; }
 
 size_t AwaitTaskGroup::capacity() const { return tasks.sizeInElements(); }
+
+size_t AwaitTaskGroup::remainingCapacity() const { return capacity() - size(); }
+
+bool AwaitTaskGroup::isEmpty() const { return size() == 0; }
+
+bool AwaitTaskGroup::isFull() const { return size() == capacity(); }
 
 AwaitTaskRegistry::AwaitTaskRegistry(AwaitEventLoop& await, Span<AwaitTask> taskStorage)
     : await(await), tasks(taskStorage)
@@ -2590,6 +2646,16 @@ size_t AwaitTaskRegistry::completedCount() const
 }
 
 size_t AwaitTaskRegistry::capacity() const { return tasks.sizeInElements(); }
+
+size_t AwaitTaskRegistry::remainingCapacity() const { return capacity() - size(); }
+
+bool AwaitTaskRegistry::isEmpty() const { return size() == 0; }
+
+bool AwaitTaskRegistry::isFull() const { return size() == capacity(); }
+
+bool AwaitTaskRegistry::hasActiveTasks() const { return activeCount() != 0; }
+
+bool AwaitTaskRegistry::hasCompletedTasks() const { return completedCount() != 0; }
 
 AwaitTaskRegistryWaitAllAwaiter::AwaitTaskRegistryWaitAllAwaiter(AwaitTaskRegistry& registry) : registry(registry) {}
 

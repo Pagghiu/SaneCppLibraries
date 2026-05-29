@@ -136,7 +136,8 @@ static Result runAwaitDatagramPing()
 
     StringView replyText({reply.data.data(), reply.data.sizeInBytes()}, false, StringEncoding::Ascii);
     console.print("Await UDP reply: {}\n", replyText);
-    console.print("Await allocator capacity: {} bytes\n", allocator.capacity());
+    console.print("Await allocator peak/largest/capacity: {}/{}/{} bytes\n", allocator.peakUsed(),
+                  allocator.largestAllocationSize(), allocator.capacity());
 
     SC_TRY(client.close());
     SC_TRY(server.close());

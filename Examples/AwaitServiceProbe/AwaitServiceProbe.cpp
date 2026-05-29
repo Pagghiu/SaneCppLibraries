@@ -76,10 +76,9 @@ static AwaitTask slowMaintenance(AwaitEventLoop& await)
     co_return Result(true);
 }
 
-static AwaitTask serviceProbe(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
-                              const SocketDescriptor& client, SocketIPAddress address, SocketDescriptor& accepted,
-                              Span<char> replyBuffer, AwaitSocketReceiveResult& reply,
-                              AwaitTimeoutResult& maintenanceTimeout)
+static AwaitTask networkExchange(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                                 const SocketDescriptor& client, SocketIPAddress address, SocketDescriptor& accepted,
+                                 Span<char> replyBuffer, AwaitSocketReceiveResult& reply)
 {
     AwaitTask server     = probeServer(await, serverSocket, accepted);
     AwaitTask clientTask = probeClient(await, client, address, replyBuffer, reply);
@@ -90,6 +89,11 @@ static AwaitTask serviceProbe(AwaitEventLoop& await, const SocketDescriptor& ser
     SC_CO_TRY(group.spawn(clientTask));
     SC_CO_TRY(co_await group.waitAll());
 
+    co_return Result(true);
+}
+
+static AwaitTask boundedMaintenance(AwaitEventLoop& await, AwaitTimeoutResult& maintenanceTimeout)
+{
     AwaitTask maintenance = slowMaintenance(await);
     SC_CO_TRY(await.spawn(maintenance));
 
@@ -98,6 +102,23 @@ static AwaitTask serviceProbe(AwaitEventLoop& await, const SocketDescriptor& ser
     {
         co_return Result::Error("AwaitServiceProbe expected maintenance timeout cancellation");
     }
+
+    co_return Result(true);
+}
+
+static AwaitTask serviceProbe(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
+                              const SocketDescriptor& client, SocketIPAddress address, SocketDescriptor& accepted,
+                              Span<char> replyBuffer, AwaitSocketReceiveResult& reply,
+                              AwaitTimeoutResult& maintenanceTimeout)
+{
+    AwaitTask networkTask     = networkExchange(await, serverSocket, client, address, accepted, replyBuffer, reply);
+    AwaitTask maintenanceTask = boundedMaintenance(await, maintenanceTimeout);
+
+    AwaitTask*     children[2] = {};
+    AwaitTaskGroup group(await, children);
+    SC_CO_TRY(group.spawn(networkTask));
+    SC_CO_TRY(group.spawn(maintenanceTask));
+    SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);
 }
@@ -144,8 +165,8 @@ static Result runAwaitServiceProbe()
     const AwaitAllocatorStatistics stats = allocator.statistics();
     console.print("AwaitServiceProbe response: {}\n", text);
     console.print("AwaitServiceProbe maintenance timed out: {}\n", maintenanceTimeout.timedOut ? 1 : 0);
-    console.print("AwaitServiceProbe allocator peak/capacity: {}/{} bytes\n", stats.peakBytesInUse,
-                  allocator.capacity());
+    console.print("AwaitServiceProbe allocator peak/largest/capacity: {}/{}/{} bytes\n", stats.peakBytesInUse,
+                  stats.largestRequestedAllocationSize, allocator.capacity());
 
     SC_TRY(client.close());
     SC_TRY(accepted.close());

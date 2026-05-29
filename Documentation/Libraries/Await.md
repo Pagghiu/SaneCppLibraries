@@ -137,8 +137,8 @@ Complete console examples live in:
 - `Examples/AwaitLineProtocol`, showing a tiny CRLF text protocol built with `receiveLine()` and `sendAll()`.
 - `Examples/AwaitManifestPreview`, showing bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage.
 - `Examples/AwaitProcessExitCodes`, showing concurrent child-process exit waits with fixed job storage.
-- `Examples/AwaitServiceProbe`, showing a small service probe with sockets, task groups, timeout cancellation, and
-  allocator diagnostics.
+- `Examples/AwaitServiceProbe`, showing a small service probe with nested task groups, sockets, timeout cancellation,
+  and allocator diagnostics.
 - `Examples/AwaitThreadWakeUp`, showing another thread waking an Await coroutine through `AwaitLoopWakeUp`.
 
 # Socket send helpers
@@ -272,8 +272,22 @@ If future helpers start carrying protocol state, buffering policy, parsing rules
 move into explicit `Await*` helper structs instead of making `AwaitEventLoop` a grab bag.
 
 `spawnAndWait()` intentionally remains a convenience awaiter for the common "start one child and wait for it" case.
-`AwaitTaskGroup` is the structured API for multiple children, result aggregation, `waitAny()`, or custom child
-cancellation policy.
+The name is a little longer than plain `spawn()`, but it makes the "starts then awaits" behavior visible and avoids
+teaching `co_await child` to secretly start unowned tasks. `AwaitTaskGroup` is the structured API for multiple children,
+result aggregation, `waitAny()`, or custom child cancellation policy.
+
+# Task state helpers
+
+`AwaitTask` exposes explicit state queries (`isValid()`, `isStarted()`, `isActive()`, `isCompleted()`, and
+`isCancellationRequested()`) so shutdown code can stay readable without hiding lifetime rules.
+
+`AwaitTaskGroup` and `AwaitTaskRegistry` also expose small storage/state helpers such as `isEmpty()`, `isFull()`, and
+`remainingCapacity()`. The registry adds `hasActiveTasks()` and `hasCompletedTasks()` for shutdown loops. These helpers
+are only query sugar over caller-owned storage; they do not allocate, drain, cancel, or change task ownership.
+
+Await does not currently provide an RAII scope guard that cancels and drains tasks in a destructor. Draining can fail,
+and hiding that behind destructor control flow would be surprising in exceptions-off Sane C++. Prefer explicit shutdown
+code that returns `Result`, such as `cancelAll()`, `await.run()`, and `clearCompleted()`.
 
 # Platform notes
 
@@ -329,6 +343,10 @@ behavior instead.
 Awaiters keep the same stable-object rules as `Async`: sockets, file descriptors, buffers, result objects, wake-up
 objects, and child tasks must stay alive while the operation is active.
 
+Destroying an active `AwaitTask` remains an assert-release programming error rather than a recoverable runtime result.
+Use `AwaitTask::isActive()` or registry helpers such as `hasActiveTasks()` in shutdown code when a diagnostic check is
+needed before storage goes out of scope.
+
 When a completed child task is destroyed while an `Async` callback is still unwinding, `AwaitEventLoop` defers the
 actual coroutine frame destruction until `run()`, `runOnce()`, or `runNoWait()` returns. This keeps any embedded
 `AsyncRequest` alive until the lower-level event loop has finished its teardown work, without adding dynamic allocation.
@@ -356,6 +374,15 @@ lifetime.
 After `waitAll()` returns, `collectResults()` can copy each child `Result` into caller-provided storage and optionally
 fill `AwaitTaskGroupResultSummary` with counts plus the first failed task. This keeps aggregation no-allocation and
 still follows Sane C++'s plain-`Result` style.
+
+If the caller only needs counts and first-failure metadata, `summarizeResults()` fills an
+`AwaitTaskGroupResultSummary&` without requiring a result span.
+
+This is intentionally close to Python `asyncio.TaskGroup` at the control-flow level: spawn related children, wait for
+the group, and cancel siblings on structured failure paths. `Examples/AwaitServiceProbe` shows this with an outer group
+that runs a network exchange and a bounded maintenance check, while the network exchange owns an inner server/client
+group. The Sane C++ difference is visible storage: the task objects, task-pointer arrays, result arrays, buffers, and
+allocator backing store are all caller-owned so lifetime and memory use remain auditable.
 
 # Detached tasks
 
@@ -396,20 +423,28 @@ standard allocation fallback.
 The default and recommended mode is fixed caller-owned storage through `createFixed(Span<char>)`. This preserves the
 Sane C++ no-hidden-allocation rule while still allowing coroutine frames to be allocated and released individually.
 
-Explicit opt-in modes exist for integration and experiments:
+Explicit opt-in modes exist for integration and experiments. They are not the default Sane path and should be visible at
+the call site:
 
-- `createVirtual()` reserves virtual address space and commits pages lazily until `close()`;
+- `createVirtual()` reserves virtual address space and commits pages lazily until `close()`; use it only when a workflow
+  has a deliberately large or platform-tuned reservation budget;
 - `createMalloc()` uses one `malloc()` / `free()` pair per allocation;
 - `createPolymorphic()` delegates to a caller-provided `AwaitAllocatorInterface` without depending on the Memory
   library.
 
 All modes expose the same diagnostics through `AwaitAllocatorStatistics`: allocation/release counts, requested
-allocated/released bytes, bytes in use, peak bytes in use, failed allocation count, and failed allocation sizes.
+allocated/released bytes, bytes in use, peak bytes in use, largest successful allocation requested, failed allocation
+count, and failed allocation sizes.
 
 When sizing fixed storage, start from the smallest realistic workflow, run it once, inspect `peakUsed()` or
-`statistics().peakBytesInUse`, then add headroom for the maximum number of concurrently active coroutine frames. A task
-that has completed but whose `AwaitTask` object is still alive may keep its frame allocated until that task object is
-destroyed or cleared from a registry.
+`statistics().peakBytesInUse`, and compare it with `largestAllocationSize()` to understand the biggest single coroutine
+frame or allocator request observed. Then add headroom for the maximum number of concurrently active coroutine frames. A
+task that has completed but whose `AwaitTask` object is still alive may keep its frame allocated until that task object
+is destroyed or cleared from a registry.
+
+The current examples intentionally use fixed storage in the 8-20 KiB range rather than a large catch-all arena. The
+socket-oriented examples print peak/largest/capacity diagnostics so those sizes can be revisited as coroutine frame
+layout changes across compilers.
 
 ```cpp
 char           allocatorStorage[16 * 1024] = {};
@@ -425,6 +460,7 @@ if (stats.numAllocationFailures != 0)
 {
     return Result::Error("Await allocator storage is too small");
 }
+// stats.largestRequestedAllocationSize shows the largest successful frame/allocation request.
 ```
 
 Fixed storage should be sized intentionally per workflow. Prefer using diagnostics to tune the storage over switching to
