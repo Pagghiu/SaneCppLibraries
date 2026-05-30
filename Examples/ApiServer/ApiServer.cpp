@@ -28,142 +28,7 @@ struct ApiServerExample
 
     using Connection = HttpAsyncConnection<16, 16, 16 * 1024, 512 * 1024>;
 
-    struct EchoStream
-    {
-        HttpConnection*     connection       = nullptr;
-        AsyncBufferView::ID pendingBufferID  = {};
-        bool                hasPendingBuffer = false;
-        bool                drainListening   = false;
-        bool                endAfterPending  = false;
-
-        Result start(HttpConnection& newConnection)
-        {
-            connection       = &newConnection;
-            pendingBufferID  = {};
-            hasPendingBuffer = false;
-            drainListening   = false;
-            endAfterPending  = false;
-            SC_TRY(connection->response.startResponse(200));
-            SC_TRY(connection->response.addHeader("Content-Type", HttpContentTypeTextPlainUtf8()));
-            if (connection->request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
-            {
-                SC_TRY(connection->response.addContentLength(connection->request.getBodyBytesRemaining()));
-            }
-            else
-            {
-                connection->response.setKeepAlive(false);
-            }
-            SC_TRY(connection->response.sendHeaders());
-            return Result(true);
-        }
-
-        void onData(AsyncBufferView::ID bufferID)
-        {
-            if (connection == nullptr)
-            {
-                return;
-            }
-            if (not writeOrDefer(bufferID))
-            {
-                SC_ASSERT_RELEASE(false);
-            }
-        }
-
-        void onDrain()
-        {
-            if (connection == nullptr or not hasPendingBuffer)
-            {
-                return;
-            }
-
-            const AsyncBufferView::ID bufferID    = pendingBufferID;
-            const Result              writeResult = connection->response.getWritableStream().write(bufferID);
-            if (not writeResult)
-            {
-                return;
-            }
-
-            connection->buffersPool.unrefBuffer(bufferID);
-            pendingBufferID  = {};
-            hasPendingBuffer = false;
-            removeDrainListener();
-
-            if (endAfterPending)
-            {
-                SC_ASSERT_RELEASE(connection->response.end());
-                connection = nullptr;
-                return;
-            }
-            connection->request.getReadableStream().resumeReading();
-        }
-
-        void onEnd()
-        {
-            if (connection != nullptr)
-            {
-                removeBodyListeners();
-                if (hasPendingBuffer)
-                {
-                    endAfterPending = true;
-                    return;
-                }
-                SC_ASSERT_RELEASE(connection->response.end());
-                connection = nullptr;
-            }
-        }
-
-        bool writeOrDefer(AsyncBufferView::ID bufferID)
-        {
-            const Result writeResult = connection->response.getWritableStream().write(bufferID);
-            if (writeResult)
-            {
-                return true;
-            }
-            if (hasPendingBuffer)
-            {
-                return false;
-            }
-
-            connection->buffersPool.refBuffer(bufferID);
-            pendingBufferID  = bufferID;
-            hasPendingBuffer = true;
-            connection->request.getReadableStream().pause();
-            if (not drainListening)
-            {
-                drainListening =
-                    connection->response.getWritableStream().eventDrain.addListener<EchoStream, &EchoStream::onDrain>(
-                        *this);
-            }
-            if (not drainListening)
-            {
-                connection->buffersPool.unrefBuffer(bufferID);
-                pendingBufferID  = {};
-                hasPendingBuffer = false;
-            }
-            return drainListening;
-        }
-
-        void removeBodyListeners()
-        {
-            (void)connection->request.getReadableStream().eventData.removeListener<EchoStream, &EchoStream::onData>(
-                *this);
-            (void)connection->request.getReadableStream().eventEnd.removeListener<EchoStream, &EchoStream::onEnd>(
-                *this);
-        }
-
-        void removeDrainListener()
-        {
-            if (drainListening)
-            {
-                (void)connection->response.getWritableStream()
-                    .eventDrain.removeListener<EchoStream, &EchoStream::onDrain>(*this);
-                drainListening = false;
-            }
-        }
-    };
-
     Connection      connections[MaxConnections];
-    EchoStream      echoStreams[MaxConnections];
     HttpAsyncServer server;
     HttpRouter      router;
     HttpRoute       routes[3] = {
@@ -239,27 +104,30 @@ struct ApiServerExample
 
     void receiveEchoBody(HttpConnection& connection)
     {
-        const size_t index = connection.getConnectionID().getIndex();
-        SC_ASSERT_RELEASE(index < MaxConnections);
-        EchoStream& echo = echoStreams[index];
-        SC_ASSERT_RELEASE(echo.start(connection));
+        SC_ASSERT_RELEASE(connection.response.startResponse(200));
+        SC_ASSERT_RELEASE(connection.response.addHeader("Content-Type", HttpContentTypeTextPlainUtf8()));
+        if (connection.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength)
+        {
+            SC_ASSERT_RELEASE(connection.response.addContentLength(connection.request.getBodyBytesRemaining()));
+        }
+        else
+        {
+            connection.response.setKeepAlive(false);
+        }
+        SC_ASSERT_RELEASE(connection.response.sendHeaders());
 
-        const bool addedData =
-            connection.request.getReadableStream().eventData.addListener<EchoStream, &EchoStream::onData>(echo);
-        const bool addedEnd =
-            connection.request.getReadableStream().eventEnd.addListener<EchoStream, &EchoStream::onEnd>(echo);
-        SC_ASSERT_RELEASE(addedData);
-        SC_ASSERT_RELEASE(addedEnd);
         if (connection.request.getBodyFramingKind() == HttpBodyFramingKind::None or
             (connection.request.getBodyFramingKind() == HttpBodyFramingKind::ContentLength and
              connection.request.getBodyBytesRemaining() == 0))
         {
-            (void)connection.request.getReadableStream().eventData.removeListener<EchoStream, &EchoStream::onData>(
-                echo);
-            (void)connection.request.getReadableStream().eventEnd.removeListener<EchoStream, &EchoStream::onEnd>(echo);
             SC_ASSERT_RELEASE(connection.response.end());
-            echo.connection = nullptr;
+            return;
         }
+
+        connection.pipeline.source   = &connection.request.getReadableStream();
+        connection.pipeline.sinks[0] = &connection.response.getWritableStream();
+        SC_ASSERT_RELEASE(connection.pipeline.pipe());
+        SC_ASSERT_RELEASE(connection.pipeline.start());
     }
 
     Result notFound(HttpConnection& connection) { return connection.sendTextCopy(404, "not found\n"); }

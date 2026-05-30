@@ -219,6 +219,10 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             requestOptionBodyHelpers();
         }
+        if (test_section("multipart writer validation"))
+        {
+            multipartWriterValidation();
+        }
         if (test_section("PUT with streamed body"))
         {
             putStreamBody();
@@ -295,6 +299,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putSpanBody();
     void requestOptions();
     void requestOptionBodyHelpers();
+    void multipartWriterValidation();
     void putStreamBody();
     void putChunkedStreamBody();
     void putWritableBody();
@@ -347,6 +352,27 @@ void SC::HttpAsyncClientTest::requestOptionBodyHelpers()
     SC_TEST_EXPECT(options.bodyLength == 0);
     SC_TEST_EXPECT(options.bodyStream == nullptr);
     SC_TEST_EXPECT(options.multipartWriter == nullptr);
+}
+
+void SC::HttpAsyncClientTest::multipartWriterValidation()
+{
+    HttpMultipartWriter writer;
+
+    SC_TEST_EXPECT(not writer.addField("field", "value"));
+    SC_TEST_EXPECT(not writer.setBoundary("bad boundary"));
+    SC_TEST_EXPECT(not writer.setBoundary(StringSpan({"\r\n", 2}, false, StringEncoding::Ascii)));
+
+    SC_TEST_EXPECT(writer.setBoundary("----SCMultipartBoundary"));
+    SC_TEST_EXPECT(not writer.addField("", "value"));
+    SC_TEST_EXPECT(not writer.addField("bad\"name", "value"));
+    SC_TEST_EXPECT(not writer.addFile("file", "bad\"name.txt", StringSpan("body").toCharSpan()));
+    SC_TEST_EXPECT(not writer.addFile("file", "bad\\name.txt", StringSpan("body").toCharSpan()));
+    SC_TEST_EXPECT(not writer.addFile("file", "ok.txt", StringSpan("body").toCharSpan(), "text/plain\r\nX-Bad: 1"));
+    SC_TEST_EXPECT(writer.getNumParts() == 0);
+
+    SC_TEST_EXPECT(writer.addField("field", "value"));
+    SC_TEST_EXPECT(writer.addFile("file", "safe-name.txt", StringSpan("body").toCharSpan(), "text/plain"));
+    SC_TEST_EXPECT(writer.getNumParts() == 2);
 }
 
 void SC::HttpAsyncClientTest::basicGet()

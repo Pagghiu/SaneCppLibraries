@@ -90,6 +90,45 @@ static SC::Result scHttpFormatChunkHeader(uint64_t size, SC::Span<char> storage,
     header                 = SC::StringSpan({storage.data(), numDigits + 2}, false, SC::StringEncoding::Ascii);
     return SC::Result(true);
 }
+
+static bool scHttpMultipartBoundaryIsSafe(SC::StringSpan value)
+{
+    for (char current : value.toCharSpan())
+    {
+        const unsigned char byte = static_cast<unsigned char>(current);
+        if (byte <= 0x20 or byte >= 0x7F)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool scHttpMultipartQuotedParameterIsSafe(SC::StringSpan value)
+{
+    for (char current : value.toCharSpan())
+    {
+        const unsigned char byte = static_cast<unsigned char>(current);
+        if (byte < 0x20 or current == '"' or current == '\\')
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool scHttpHeaderValueIsSafe(SC::StringSpan value)
+{
+    for (char current : value.toCharSpan())
+    {
+        const unsigned char byte = static_cast<unsigned char>(current);
+        if ((byte < 0x20 and current != '\t') or current == 0x7F)
+        {
+            return false;
+        }
+    }
+    return true;
+}
 } // namespace
 
 namespace SC
@@ -157,6 +196,7 @@ Result HttpMultipartWriter::setBoundary(StringSpan boundaryValue)
     reset();
     SC_TRY_MSG(boundaryValue.sizeInBytes() > 0, "HttpMultipartWriter::setBoundary empty boundary");
     SC_TRY_MSG(boundaryValue.sizeInBytes() < sizeof(boundaryStorage), "HttpMultipartWriter::setBoundary too long");
+    SC_TRY_MSG(scHttpMultipartBoundaryIsSafe(boundaryValue), "HttpMultipartWriter::setBoundary unsafe boundary");
     ::memcpy(boundaryStorage, boundaryValue.bytesWithoutTerminator(), boundaryValue.sizeInBytes());
     boundary = StringSpan::fromNullTerminated(boundaryStorage, StringEncoding::Ascii);
     return Result(true);
@@ -165,6 +205,8 @@ Result HttpMultipartWriter::setBoundary(StringSpan boundaryValue)
 Result HttpMultipartWriter::addField(StringSpan fieldName, StringSpan value)
 {
     SC_TRY_MSG(boundary.sizeInBytes() > 0, "HttpMultipartWriter::addField boundary not set");
+    SC_TRY_MSG(not fieldName.isEmpty(), "HttpMultipartWriter::addField empty field name");
+    SC_TRY_MSG(scHttpMultipartQuotedParameterIsSafe(fieldName), "HttpMultipartWriter::addField unsafe field name");
     SC_TRY_MSG(numParts < MaxParts, "HttpMultipartWriter::addField too many parts");
     Part& part       = parts[numParts++];
     part.partName    = fieldName;
@@ -178,6 +220,12 @@ Result HttpMultipartWriter::addFile(StringSpan fieldName, StringSpan fileName, S
                                     StringSpan contentType)
 {
     SC_TRY_MSG(boundary.sizeInBytes() > 0, "HttpMultipartWriter::addFile boundary not set");
+    SC_TRY_MSG(not fieldName.isEmpty(), "HttpMultipartWriter::addFile empty field name");
+    SC_TRY_MSG(scHttpMultipartQuotedParameterIsSafe(fieldName), "HttpMultipartWriter::addFile unsafe field name");
+    SC_TRY_MSG(fileName.isEmpty() or scHttpMultipartQuotedParameterIsSafe(fileName),
+               "HttpMultipartWriter::addFile unsafe file name");
+    SC_TRY_MSG(contentType.isEmpty() or scHttpHeaderValueIsSafe(contentType),
+               "HttpMultipartWriter::addFile unsafe content type");
     SC_TRY_MSG(numParts < MaxParts, "HttpMultipartWriter::addFile too many parts");
     Part& part       = parts[numParts++];
     part.partName    = fieldName;
@@ -1144,6 +1192,16 @@ Result HttpResponse::sendMethodNotAllowed(StringSpan allow)
 {
     SC_TRY(startBody(405, 0));
     SC_TRY(addHeader("Allow", allow));
+    SC_TRY(sendHeaders());
+    return end();
+}
+
+Result HttpResponse::sendRedirect(int code, StringSpan location)
+{
+    SC_TRY_MSG(code >= 300 and code <= 399, "HttpResponse redirect status must be 3xx");
+    SC_TRY_MSG(not location.isEmpty(), "HttpResponse redirect location must not be empty");
+    SC_TRY(startBody(code, 0));
+    SC_TRY(addHeader("Location", location));
     SC_TRY(sendHeaders());
     return end();
 }

@@ -126,5 +126,9 @@ SC_HTTP_EXPORT Result HttpWriteBearerAuthorization(StringSpan token, Span<char> 
 /// @brief Writes `Basic <base64Credentials>` into caller-provided storage.
 SC_HTTP_EXPORT Result HttpWriteBasicAuthorization(StringSpan base64Credentials, Span<char> storage, StringSpan& output);
 
+/// @brief Writes `Basic <base64(username:password)>` into caller-provided storage.
+SC_HTTP_EXPORT Result HttpWriteBasicAuthorizationCredentials(StringSpan username, StringSpan password,
+                                                             Span<char> storage, StringSpan& output);
+
 //! @}
 } // namespace SC

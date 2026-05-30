@@ -811,6 +811,47 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
         char              headers[256] = {0};
         response.setup(headers, writable);
 
+        SC_TEST_EXPECT(response.sendRedirect(302, "/new-place"));
+        while (writable.flushOne()) {}
+
+        constexpr StringView expected = "HTTP/1.1 302 Found\r\n"
+                                        "Content-Length: 0\r\n"
+                                        "Location: /new-place\r\n"
+                                        "Connection: keep-alive\r\n"
+                                        "\r\n";
+        SC_TEST_EXPECT(StringSpan(writable.output.toSpanConst(), false, StringEncoding::Ascii) == expected);
+    }
+
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(not response.sendRedirect(200, "/not-a-redirect"));
+
+        ProbeHttpResponse emptyLocationResponse;
+        emptyLocationResponse.setup(headers, writable);
+        SC_TEST_EXPECT(not emptyLocationResponse.sendRedirect(302, ""));
+    }
+
+    {
+        SC::AsyncBufferView  buffers[4] = {};
+        SC::AsyncBuffersPool pool;
+        pool.setBuffers(buffers);
+
+        RecordedWritableStream writable;
+        SC_TEST_EXPECT(writable.init(pool));
+
+        ProbeHttpResponse response;
+        char              headers[256] = {0};
+        response.setup(headers, writable);
+
         SC_TEST_EXPECT(response.sendMethodNotAllowed("GET, POST"));
         while (writable.flushOne()) {}
 

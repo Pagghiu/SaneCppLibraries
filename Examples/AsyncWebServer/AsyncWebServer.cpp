@@ -25,12 +25,14 @@ namespace SC
 struct AsyncWebServerExample
 {
     String  directory;
-    String  interface   = "127.0.0.1";
-    int32_t port        = 8090;
-    int32_t maxClients  = 400; // Max number of concurrent connections
-    int32_t numThreads  = 4;   // Number of threads for async file stream operations
-    bool    useSendFile = true;
-    bool    useEpoll    = false;
+    String  interface     = "127.0.0.1";
+    int32_t port          = 8090;
+    int32_t maxClients    = 400; // Max number of concurrent connections
+    int32_t numThreads    = 4;   // Number of threads for async file stream operations
+    int32_t maxUploadMiB  = 0;   // Zero means unlimited
+    bool    useSendFile   = true;
+    bool    useEpoll      = false;
+    bool    enableUploads = true;
 
     HttpConnectionsPool::Configuration asyncConfiguration;
 
@@ -135,9 +137,29 @@ struct AsyncWebServerExample
             return result;
         }
         fileServer.setUseAsyncFileSend(useSendFile);
+
+        HttpAsyncFileServerOptions fileOptions;
+        fileOptions.enableUploads = enableUploads;
+        if (maxUploadMiB > 0)
+        {
+            fileOptions.maxUploadBytes = static_cast<size_t>(maxUploadMiB) * 1024 * 1024;
+        }
+        result = fileServer.setOptions(fileOptions);
+        if (not result)
+        {
+            globalConsole->printError("AsyncWebServer fileServer.setOptions failed: {}\n", result.message);
+            return result;
+        }
+
         globalConsole->print("Serving files from folder: {}\n", directory);
         globalConsole->print("Routes: GET /path, PUT /path, POST /path, multipart POST /upload, WebSocket /ws\n");
         globalConsole->print("AsyncFileSend optimization: {}\n", useSendFile);
+        globalConsole->print("Uploads: {}{}\n", enableUploads ? "enabled" : "disabled",
+                             maxUploadMiB > 0 ? " with size limit" : "");
+        if (maxUploadMiB > 0)
+        {
+            globalConsole->print("Max upload size: {} MiB\n", maxUploadMiB);
+        }
         globalConsole->print("Max clients: {}\n", maxClients);
 #if SC_PLATFORM_LINUX
         globalConsole->print("Using {}\n", useEpoll ? "epoll" : "io_uring");
@@ -221,10 +243,11 @@ Result saneMain(Span<const StringSpan> args)
     Console    console;
     StringPath currentDirPath;
     StringView directory;
+    StringView interface;
     uint16_t   port = static_cast<uint16_t>(sample.port);
 
     globalConsole = &console;
-    CommandLineOption cmdOptions[6];
+    CommandLineOption cmdOptions[9];
     cmdOptions[0].longName  = "directory";
     cmdOptions[0].help      = "Directory to serve (defaults to current working directory)";
     cmdOptions[0].valueName = "PATH";
@@ -259,6 +282,22 @@ Result saneMain(Span<const StringSpan> args)
     cmdOptions[5].shortName = 'p';
     cmdOptions[5].value     = CommandLineValue::uint16(port);
 
+    cmdOptions[6].longName  = "interface";
+    cmdOptions[6].help      = "Interface to listen on (for LAN use 0.0.0.0)";
+    cmdOptions[6].valueName = "ADDRESS";
+    cmdOptions[6].shortName = 'i';
+    cmdOptions[6].value     = CommandLineValue::stringView(interface);
+
+    cmdOptions[7].longName         = "uploads";
+    cmdOptions[7].negativeLongName = "no-uploads";
+    cmdOptions[7].help             = "Enable or disable PUT and multipart uploads";
+    cmdOptions[7].value            = CommandLineValue::boolean(sample.enableUploads);
+
+    cmdOptions[8].longName  = "max-upload-mb";
+    cmdOptions[8].help      = "Maximum upload size in MiB (0 means unlimited)";
+    cmdOptions[8].valueName = "MIB";
+    cmdOptions[8].value     = CommandLineValue::int32(sample.maxUploadMiB);
+
     CommandLineSpec spec;
     spec.programName = "AsyncWebServer";
     spec.summary     = "A simple async web server example using Sane C++ Libraries.";
@@ -285,7 +324,16 @@ Result saneMain(Span<const StringSpan> args)
         console.printError("Invalid port value: 0\n");
         return Result(false);
     }
+    if (sample.maxUploadMiB < 0)
+    {
+        console.printError("Invalid max upload size: {}\n", sample.maxUploadMiB);
+        return Result(false);
+    }
     sample.port = static_cast<int32_t>(port);
+    if (not interface.isEmpty())
+    {
+        sample.interface = interface;
+    }
     if (sample.directory.isEmpty())
     {
         if (directory.isEmpty())
@@ -317,7 +365,7 @@ template <typename CharType>
 static int asyncWebServerMain(int argc, CharType** argv)
 {
     using namespace SC;
-    static constexpr size_t MAX_COMMAND_LINE_ARGUMENTS = 10; // 4 valued options + 2 boolean flags
+    static constexpr size_t MAX_COMMAND_LINE_ARGUMENTS = 13; // 6 valued options + 3 boolean flags
     StringSpan              argsStorage[MAX_COMMAND_LINE_ARGUMENTS];
     CommandLineArguments    args;
     if (not args.setFromMainArguments(argc, argv, argsStorage))

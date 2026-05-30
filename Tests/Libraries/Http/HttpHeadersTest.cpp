@@ -211,10 +211,20 @@ void HttpHeadersTest::headerBuilders()
     SC_TEST_EXPECT(output == "Bearer token");
     SC_TEST_EXPECT(HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, sizeof(storage)}, output));
     SC_TEST_EXPECT(output == "Basic dXNlcjpwYXNz");
+    SC_TEST_EXPECT(HttpWriteBasicAuthorizationCredentials("user", "pass", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "Basic dXNlcjpwYXNz");
+    SC_TEST_EXPECT(HttpWriteBasicAuthorizationCredentials("user", "", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "Basic dXNlcjo=");
+    SC_TEST_EXPECT(HttpWriteBasicAuthorizationCredentials("", "pass", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output == "Basic OnBhc3M=");
 
     SC_TEST_EXPECT(not HttpWriteBearerAuthorization("", {storage, sizeof(storage)}, output));
     SC_TEST_EXPECT(output.isEmpty());
     SC_TEST_EXPECT(not HttpWriteBasicAuthorization("dXNlcjpwYXNz", {storage, 8}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+    SC_TEST_EXPECT(not HttpWriteBasicAuthorizationCredentials("bad:name", "pass", {storage, sizeof(storage)}, output));
+    SC_TEST_EXPECT(output.isEmpty());
+    SC_TEST_EXPECT(not HttpWriteBasicAuthorizationCredentials("user", "pass", {storage, 10}, output));
     SC_TEST_EXPECT(output.isEmpty());
 }
 

@@ -175,17 +175,21 @@ Recent example and test call sites point to these remaining improvement seams:
   be copied into the connection's fixed async buffer pool before returning.
 - Method routing: `HttpRouter::formatAllowHeader` can feed `HttpResponse::sendMethodNotAllowed` directly for the common
   405 + `Allow` + empty-body response path.
-- Streaming echo responses: `Examples/ApiServer/ApiServer.cpp` still needs custom pause/drain plumbing to mirror request
-  body buffers back to the response. That is correct stream code, but a small documented pipe helper could reduce
-  listener-order mistakes for users.
+- Redirects: `HttpResponse::sendRedirect` emits the 3xx status, `Location`, and empty-body framing as one checked
+  operation.
+- Header writing: `HttpWriteBasicAuthorizationCredentials` writes Basic authorization from raw username/password into
+  caller-provided storage, avoiding caller-side temporary allocation or ad-hoc base64 helpers.
+- Multipart writing: `HttpMultipartWriter` rejects unsafe boundaries, field names, filenames, and content-type values
+  before they can be written into request headers.
+- Streaming echo responses: `Examples/ApiServer/ApiServer.cpp` now uses `AsyncPipeline` to mirror the request body into
+  the response body without collecting it in memory or hand-rolling pause/drain listeners.
 - WebSocket examples: `Examples/AsyncWebServer/AsyncWebServer.cpp` now uses `HttpWebSocketConnectionPump`, while the
   collaborative canvas keeps lower-level endpoint/message-assembler plumbing because it needs full-message assembly,
   source-client suppression, and best-effort dropped-broadcast accounting. A later helper could combine pump plus
   assembler without forcing policy into the core frame layer.
-- File uploads: `HttpAsyncFileServerTest` covers PUT and multipart uploads well, but application-level examples still
-  expose mostly raw file-server behavior. `HttpAsyncFileServerOptions` now covers SPA fallback, validators, ranges,
-  upload enable/size policy, and a zero-allocation MIME lookup hook. A future doc snippet should show those options and
-  safe filename handling as a small recipe.
+- File uploads: `HttpAsyncFileServerTest` covers PUT and multipart uploads well, and `Examples/AsyncWebServer` now
+  exposes upload enable/disable and max-size policy from the command line. `HttpAsyncFileServerOptions` also supports
+  SPA fallback, validators, ranges, and a zero-allocation MIME lookup hook.
 
 # Examples
 

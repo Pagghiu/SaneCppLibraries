@@ -412,6 +412,9 @@ struct SC_HTTP_EXPORT HttpResponse : public HttpOutgoingMessage
     /// @brief Sends a 405 Method Not Allowed response with an Allow header and `Content-Length: 0`.
     Result sendMethodNotAllowed(StringSpan allow);
 
+    /// @brief Sends a 3xx redirect response with a Location header and `Content-Length: 0`.
+    Result sendRedirect(int httpCode, StringSpan location);
+
   private:
     friend struct HttpConnectionsPool;
     friend struct HttpAsyncServer;

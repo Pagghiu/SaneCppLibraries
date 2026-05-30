@@ -75,6 +75,12 @@ struct HttpHeaderInternal
         return -1;
     }
 
+    static char base64Char(uint8_t value)
+    {
+        static constexpr char Table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        return Table[value & 0x3F];
+    }
+
     static Result decodeBase64(StringSpan input, Span<char> output, size_t& outputSize)
     {
         outputSize         = 0;
@@ -152,6 +158,52 @@ struct HttpHeaderInternal
         }
         offset += value.sizeInBytes();
         return true;
+    }
+
+    static char basicCredentialByte(StringSpan username, StringSpan password, size_t index)
+    {
+        if (index < username.sizeInBytes())
+        {
+            return username.bytesWithoutTerminator()[index];
+        }
+        if (index == username.sizeInBytes())
+        {
+            return ':';
+        }
+        return password.bytesWithoutTerminator()[index - username.sizeInBytes() - 1];
+    }
+
+    static Result appendBasicCredentialsBase64(StringSpan username, StringSpan password, Span<char> storage,
+                                               size_t& offset)
+    {
+        for (char current : username.toCharSpan())
+        {
+            SC_TRY_MSG(current != ':', "Basic authorization username must not contain colon");
+        }
+
+        const size_t credentialLength = username.sizeInBytes() + 1 + password.sizeInBytes();
+        const size_t encodedLength    = ((credentialLength + 2) / 3) * 4;
+        SC_TRY_MSG(offset + encodedLength <= storage.sizeInBytes(), "Authorization output buffer is too small");
+
+        size_t credentialOffset = 0;
+        while (credentialOffset < credentialLength)
+        {
+            const size_t  remaining = credentialLength - credentialOffset;
+            const uint8_t first     = static_cast<uint8_t>(basicCredentialByte(username, password, credentialOffset));
+            const uint8_t second =
+                remaining > 1 ? static_cast<uint8_t>(basicCredentialByte(username, password, credentialOffset + 1)) : 0;
+            const uint8_t third =
+                remaining > 2 ? static_cast<uint8_t>(basicCredentialByte(username, password, credentialOffset + 2)) : 0;
+
+            storage.data()[offset++] = base64Char(static_cast<uint8_t>(first >> 2));
+            storage.data()[offset++] = base64Char(static_cast<uint8_t>(((first & 0x03) << 4) | (second >> 4)));
+            storage.data()[offset++] =
+                remaining > 1 ? base64Char(static_cast<uint8_t>(((second & 0x0F) << 2) | (third >> 6))) : '=';
+            storage.data()[offset++] = remaining > 2 ? base64Char(static_cast<uint8_t>(third & 0x3F)) : '=';
+
+            credentialOffset += 3;
+        }
+        return Result(true);
     }
 
     static bool appendUnsigned(Span<char> storage, size_t& offset, uint32_t value)
@@ -568,6 +620,17 @@ Result HttpWriteBasicAuthorization(StringSpan base64Credentials, Span<char> stor
     SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Basic "), "Authorization output buffer is too small");
     SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, base64Credentials),
                "Authorization output buffer is too small");
+    output = {{storage.data(), offset}, false, StringEncoding::Ascii};
+    return Result(true);
+}
+
+Result HttpWriteBasicAuthorizationCredentials(StringSpan username, StringSpan password, Span<char> storage,
+                                              StringSpan& output)
+{
+    output        = {};
+    size_t offset = 0;
+    SC_TRY_MSG(HttpHeaderInternal::appendTo(storage, offset, "Basic "), "Authorization output buffer is too small");
+    SC_TRY(HttpHeaderInternal::appendBasicCredentialsBase64(username, password, storage, offset));
     output = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);
 }
