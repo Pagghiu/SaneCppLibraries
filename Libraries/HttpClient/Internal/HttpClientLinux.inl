@@ -25,16 +25,13 @@ struct SC::HttpClientOperation::Internal
 
 namespace
 {
-static void appendResponseHeaderLine(SC::HttpClientResponse& response, const char* data, size_t size)
+static SC::Result appendResponseHeaderLine(SC::HttpClientResponse& response, const char* data, size_t size)
 {
-    if (response.headersLength >= response.headers.sizeInBytes())
-    {
-        return;
-    }
     const size_t remaining = response.headers.sizeInBytes() - response.headersLength;
-    const size_t toCopy    = size < remaining ? size : remaining;
-    memcpy(const_cast<char*>(response.headers.data()) + response.headersLength, data, toCopy);
-    response.headersLength += toCopy;
+    SC_TRY_MSG(remaining >= size, "HttpClient: response headers buffer too small");
+    memcpy(const_cast<char*>(response.headers.data()) + response.headersLength, data, size);
+    response.headersLength += size;
+    return SC::Result(true);
 }
 
 static const char* getCustomMethod(SC::HttpClientRequest::Method method)
@@ -160,8 +157,15 @@ struct HttpClientLinuxCallbacks
             return 0;
         }
 
-        HttpClientResponse& response = *operation->currentResponse;
-        appendResponseHeaderLine(response, buffer, totalSize);
+        HttpClientResponse& response    = *operation->currentResponse;
+        const Result        appendError = appendResponseHeaderLine(response, buffer, totalSize);
+        if (not appendError)
+        {
+            HttpClientOperation::Internal& internal =
+                *reinterpret_cast<HttpClientOperation::Internal*>(operation->storage);
+            internal.callbackError = appendError;
+            return 0;
+        }
 
         if (totalSize >= 5 and memcmp(buffer, "HTTP/", 5) == 0)
         {
@@ -571,8 +575,14 @@ SC::Result SC::HttpClientOperation::platformStart()
                                                           &effectiveUrl) == CURLE_OK and
                     effectiveUrl != nullptr)
                 {
-                    (void)operation->copyResponseEffectiveUrl(
+                    const Result effectiveUrlError = operation->copyResponseEffectiveUrl(
                         StringSpan::fromNullTerminated(effectiveUrl, operation->currentRequest.url.getEncoding()));
+                    if (not effectiveUrlError)
+                    {
+                        operation->enqueueError(effectiveUrlError);
+                        internalRef.workerRunning = false;
+                        return nullptr;
+                    }
                 }
                 if (HttpClientLinuxCallbacks::isHttp2Required(*operation) and
                     operation->currentResponse->negotiatedProtocol != HttpClientResponse::Protocol::Http2)

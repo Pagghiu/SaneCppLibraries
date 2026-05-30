@@ -68,6 +68,10 @@ struct SC::HttpClientTest : public SC::TestCase
         {
             blockingResponseBufferOverflow();
         }
+        if (test_section("blocking response header buffer overflow"))
+        {
+            blockingResponseHeaderBufferOverflow();
+        }
         if (test_section("blocking POST local"))
         {
             blockingPost();
@@ -697,6 +701,7 @@ struct SC::HttpClientTest : public SC::TestCase
         HttpClientOperationEvent eventQueue[2]      = {};
         char                     responseHeaders[64];
         char                     responseMetadata[64];
+        char                     tinyResponseMetadata[4];
         char                     responseMemory[2];
         char                     singleResponseBuffer[1];
 
@@ -740,6 +745,24 @@ struct SC::HttpClientTest : public SC::TestCase
             HttpClientOperation operation;
             SC_TEST_EXPECT(operation.init(client, memory));
             SC_TEST_EXPECT(operation.isInitialized());
+            SC_TEST_EXPECT(operation.close());
+        }
+        {
+            HttpClientOperationMemory memory;
+            memory.responseBuffers      = {responseBuffers, 2};
+            memory.responseBufferMemory = {responseMemory, sizeof(responseMemory)};
+            memory.eventQueue           = {eventQueue, 2};
+            memory.responseHeaders      = {responseHeaders, sizeof(responseHeaders)};
+            memory.responseMetadata     = {tinyResponseMetadata, sizeof(tinyResponseMetadata)};
+
+            HttpClientRequest  request;
+            HttpClientResponse response;
+            request.url = "http://127.0.0.1/metadata-overflow"_a8;
+
+            HttpClientOperation operation;
+            SC_TEST_EXPECT(operation.init(client, memory));
+            SC_TEST_EXPECT(not operation.start(request, response, nullptr));
+            SC_TEST_EXPECT(not operation.isRequestInFlight());
             SC_TEST_EXPECT(operation.close());
         }
 
@@ -826,6 +849,52 @@ struct SC::HttpClientTest : public SC::TestCase
                                                                memory.memory));
                 SC_TEST_EXPECT(bodyLength == sizeof(body));
                 SC_TEST_EXPECT(StringView({body, bodyLength}, false, StringEncoding::Ascii) == "Hell");
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(server.scheduleStop());
+            }));
+
+        SC_TEST_EXPECT(loop.run());
+        (void)clientThread.join();
+        SC_TEST_EXPECT(server.server.close());
+        SC_TEST_EXPECT(loop.close());
+    }
+
+    void blockingResponseHeaderBufferOverflow()
+    {
+        AsyncEventLoop loop;
+        SC_TEST_EXPECT(loop.create());
+
+        TestServer server(loop);
+        SC_TEST_EXPECT(server.start(report));
+        server.server.onRequest = [this](HttpConnection& client)
+        {
+            SC_TEST_EXPECT(client.response.startResponse(200));
+            SC_TEST_EXPECT(client.response.addHeader("X-Large-Header"_a8,
+                                                     "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"_a8));
+            SC_TEST_EXPECT(client.response.addHeader("Content-Length"_a8, "2"_a8));
+            SC_TEST_EXPECT(client.response.sendHeaders());
+            SC_TEST_EXPECT(client.response.getWritableStream().write("OK"));
+            SC_TEST_EXPECT(client.response.end());
+        };
+
+        Thread clientThread;
+        SC_TEST_EXPECT(clientThread.start(
+            [&](Thread&)
+            {
+                HttpClient client;
+                SC_TEST_EXPECT(client.init());
+
+                CoreOperationMemory<64 * 1024, 8, 16, 24, 16 * 1024> memory;
+
+                HttpClientRequest  request;
+                HttpClientResponse response;
+                char               body[16]   = {};
+                size_t             bodyLength = 0;
+
+                request.url = server.endpoint.view();
+                SC_TEST_EXPECT(not HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength,
+                                                               memory.memory));
+                SC_TEST_EXPECT(response.headersLength <= response.headers.sizeInBytes());
                 SC_TEST_EXPECT(client.close());
                 SC_TEST_EXPECT(server.scheduleStop());
             }));

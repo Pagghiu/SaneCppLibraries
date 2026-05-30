@@ -113,6 +113,8 @@ struct SC::HttpClientOperation::Internal
     bool     cancelRequested = false;
     uint32_t redirectCount   = 0;
 
+    SC::Result callbackError = SC::Result(true);
+
     SC::HttpClientResponse::Protocol negotiatedProtocol = SC::HttpClientResponse::Protocol::Unknown;
 };
 
@@ -305,6 +307,15 @@ struct SC::HttpClientAppleCallbacks
         response.negotiatedProtocol = internal.negotiatedProtocol;
         response.redirectCount      = internal.redirectCount;
 
+        struct BlockLiteral
+        {
+            void* isa;
+            int   flags;
+            int   reserved;
+            void (*invoke)(void*, long);
+        };
+        auto block = reinterpret_cast<BlockLiteral*>(completionHandler);
+
         id          url            = sc_objc_msgSend<id>(urlResponse, sel_getUid("URL"));
         id          absoluteString = sc_objc_msgSend<id>(url, sel_getUid("absoluteString"));
         const char* urlCStr        = absoluteString != nullptr
@@ -312,8 +323,15 @@ struct SC::HttpClientAppleCallbacks
                                          : nullptr;
         if (urlCStr != nullptr)
         {
-            (void)operation->copyResponseEffectiveUrl(
+            internal.callbackError = operation->copyResponseEffectiveUrl(
                 SC::StringSpan::fromNullTerminated(urlCStr, operation->currentRequest.url.getEncoding()));
+            if (not internal.callbackError)
+            {
+                operation->enqueueError(internal.callbackError);
+                internal.cancelRequested = true;
+                block->invoke(block, 0);
+                return;
+            }
         }
 
         id            headers = sc_objc_msgSend<id>(urlResponse, sel_getUid("allHeaderFields"));
@@ -338,7 +356,11 @@ struct SC::HttpClientAppleCallbacks
             const size_t valLen = strlen(valCStr);
             if (appended + keyLen + valLen + 4 > capacity)
             {
-                continue;
+                internal.callbackError = SC::Result::Error("HttpClient: response headers buffer too small");
+                operation->enqueueError(internal.callbackError);
+                internal.cancelRequested = true;
+                block->invoke(block, 0);
+                return;
             }
             memcpy(dest + appended, keyCStr, keyLen);
             appended += keyLen;
@@ -351,15 +373,6 @@ struct SC::HttpClientAppleCallbacks
         }
         response.headersLength = appended;
         operation->enqueueResponseHead();
-
-        struct BlockLiteral
-        {
-            void* isa;
-            int   flags;
-            int   reserved;
-            void (*invoke)(void*, long);
-        };
-        auto block = reinterpret_cast<BlockLiteral*>(completionHandler);
         block->invoke(block, 1);
     }
 
@@ -382,8 +395,10 @@ struct SC::HttpClientAppleCallbacks
             operation->enqueueResponseDataCopy({reinterpret_cast<const char*>(bytes), length});
         if (not enqueueRes)
         {
+            auto& internal           = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
+            internal.callbackError   = enqueueRes;
+            internal.cancelRequested = true;
             operation->enqueueError(enqueueRes);
-            auto& internal = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
             if (internal.task != nullptr)
             {
                 sc_objc_msgSend<void>(internal.task, sel_getUid("cancel"));
@@ -433,7 +448,11 @@ struct SC::HttpClientAppleCallbacks
         if (error != nullptr)
         {
             auto& internal = *reinterpret_cast<SC::HttpClientOperation::Internal*>(operation->storage);
-            if (internal.cancelRequested)
+            if (not internal.callbackError)
+            {
+                operation->enqueueError(internal.callbackError);
+            }
+            else if (internal.cancelRequested)
             {
                 operation->enqueueError(Result::Error("HttpClient: request cancelled"));
             }
@@ -568,6 +587,7 @@ SC::Result SC::HttpClientOperation::platformClose()
 #endif
     internal.delegate        = nullptr;
     internal.cancelRequested = false;
+    internal.callbackError   = Result(true);
     return Result(true);
 }
 
@@ -587,6 +607,7 @@ SC::Result SC::HttpClientOperation::platformStart()
     auto& internal              = *reinterpret_cast<Internal*>(storage);
     internal.cancelRequested    = false;
     internal.redirectCount      = 0;
+    internal.callbackError      = Result(true);
     internal.negotiatedProtocol = HttpClientResponse::Protocol::Unknown;
 
     SC_TRY_MSG(currentRequest.options.tls.verifyPeer, "HttpClient: Apple custom TLS settings not supported");

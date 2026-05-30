@@ -1282,7 +1282,13 @@ SC::Result SC::HttpClientOperation::start(const HttpClientRequest& request, Http
     currentResponse = &response;
     currentListener = listener;
     requestInFlight = true;
-    SC_TRY(copyResponseEffectiveUrl(currentRequest.url));
+
+    const Result effectiveUrlResult = copyResponseEffectiveUrl(currentRequest.url);
+    if (not effectiveUrlResult)
+    {
+        requestInFlight = false;
+        return effectiveUrlResult;
+    }
 
     const Result startResult = platformStart();
     if (not startResult)

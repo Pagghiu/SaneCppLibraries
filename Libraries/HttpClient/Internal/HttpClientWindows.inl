@@ -732,17 +732,31 @@ SC::Result SC::HttpClientOperation::platformStart()
             DWORD rawHeaderBytes = 0;
             (void)WinHttpQueryHeaders(internalRef.hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF,
                                       WINHTTP_HEADER_NAME_BY_INDEX, NULL, &rawHeaderBytes, WINHTTP_NO_HEADER_INDEX);
-            if (rawHeaderBytes > 0 and rawHeaderBytes <= operation->backendScratch.sizeInBytes())
+            if (rawHeaderBytes > operation->backendScratch.sizeInBytes())
+            {
+                operation->enqueueError(Result::Error("HttpClient: backend scratch too small for response headers"));
+                internalRef.workerRunning = false;
+                return 0;
+            }
+            if (rawHeaderBytes > 0)
             {
                 if (WinHttpQueryHeaders(internalRef.hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF,
                                         WINHTTP_HEADER_NAME_BY_INDEX, operation->backendScratch.data(), &rawHeaderBytes,
                                         WINHTTP_NO_HEADER_INDEX))
                 {
-                    const int utf8Len = WideCharToMultiByte(
-                        CP_UTF8, 0, reinterpret_cast<wchar_t*>(operation->backendScratch.data()),
-                        static_cast<int>(rawHeaderBytes / sizeof(wchar_t)),
-                        const_cast<char*>(operation->currentResponse->headers.data()),
-                        static_cast<int>(operation->currentResponse->headers.sizeInBytes()), NULL, NULL);
+                    const int utf8Len =
+                        WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<wchar_t*>(operation->backendScratch.data()),
+                                            static_cast<int>(rawHeaderBytes / sizeof(wchar_t)), NULL, 0, NULL, NULL);
+                    if (utf8Len < 0 or static_cast<size_t>(utf8Len) > operation->currentResponse->headers.sizeInBytes())
+                    {
+                        operation->enqueueError(Result::Error("HttpClient: response headers buffer too small"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
+                    (void)WideCharToMultiByte(CP_UTF8, 0, reinterpret_cast<wchar_t*>(operation->backendScratch.data()),
+                                              static_cast<int>(rawHeaderBytes / sizeof(wchar_t)),
+                                              const_cast<char*>(operation->currentResponse->headers.data()), utf8Len,
+                                              NULL, NULL);
                     operation->currentResponse->headersLength = static_cast<size_t>(utf8Len > 0 ? utf8Len : 0);
                 }
             }
@@ -753,13 +767,27 @@ SC::Result SC::HttpClientOperation::platformStart()
                 effectiveUrl != nullptr)
             {
                 const int utf8Len = WideCharToMultiByte(CP_UTF8, 0, effectiveUrl, -1, NULL, 0, NULL, NULL);
-                if (utf8Len > 1 and static_cast<size_t>(utf8Len - 1) <= operation->responseMetadata.sizeInBytes())
+                if (utf8Len > 1)
                 {
+                    if (static_cast<size_t>(utf8Len - 1) > operation->responseMetadata.sizeInBytes())
+                    {
+                        GlobalFree(effectiveUrl);
+                        operation->enqueueError(Result::Error("HttpClient: response metadata buffer too small"));
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
                     (void)WideCharToMultiByte(CP_UTF8, 0, effectiveUrl, -1, operation->responseMetadata.data(),
                                               static_cast<int>(operation->responseMetadata.sizeInBytes()), NULL, NULL);
-                    (void)operation->copyResponseEffectiveUrl(
+                    const Result effectiveUrlError = operation->copyResponseEffectiveUrl(
                         StringSpan({operation->responseMetadata.data(), static_cast<size_t>(utf8Len - 1)}, false,
                                    operation->currentRequest.url.getEncoding()));
+                    if (not effectiveUrlError)
+                    {
+                        GlobalFree(effectiveUrl);
+                        operation->enqueueError(effectiveUrlError);
+                        internalRef.workerRunning = false;
+                        return 0;
+                    }
                 }
                 GlobalFree(effectiveUrl);
             }
