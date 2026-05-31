@@ -77,6 +77,6 @@ Some relevant blog posts are:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 1216			| 703		| 1919	|
-| Sources   | 292			| 51		| 343	|
-| Sum       | 1508			| 754		| 2262	|
+| Headers   | 1103			| 684		| 1787	|
+| Sources   | 362			| 72		| 434	|
+| Sum       | 1465			| 756		| 2221	|

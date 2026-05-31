@@ -110,6 +110,6 @@ This can be solved implementing streaming binary serializer or experimenting wit
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 556			| 279		| 835	|
+| Headers   | 570			| 280		| 850	|
 | Sources   | 0			| 0		| 0	|
-| Sum       | 556			| 279		| 835	|
+| Sum       | 570			| 280		| 850	|

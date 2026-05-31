@@ -525,6 +525,6 @@ against real `AwaitTask` usage and single-file-library generation before the mai
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 730			| 253		| 983	|
-| Sources   | 1643			| 333		| 1976	|
-| Sum       | 2373			| 586		| 2959	|
+| Headers   | 1186			| 361		| 1547	|
+| Sources   | 3225			| 545		| 3770	|
+| Sum       | 4411			| 906		| 5317	|

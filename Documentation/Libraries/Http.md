@@ -217,6 +217,6 @@ Recent example and test call sites point to these remaining improvement seams:
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
-| Headers   | 886			| 518		| 1404	|
-| Sources   | 4198			| 655		| 4853	|
-| Sum       | 5084			| 1173		| 6257	|
+| Headers   | 1517			| 871		| 2388	|
+| Sources   | 7781			| 1050		| 8831	|
+| Sum       | 9298			| 1921		| 11219	|

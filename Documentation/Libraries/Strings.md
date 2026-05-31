@@ -171,5 +171,5 @@ we will investigate if there OS functions allowing to achieve that functionality
 | Type      | Lines Of Code | Comments  | Sum   |
 |-----------|---------------|-----------|-------|
 | Headers   | 1012			| 1081		| 2093	|
-| Sources   | 3114			| 398		| 3512	|
-| Sum       | 4126			| 1479		| 5605	|
+| Sources   | 3115			| 398		| 3513	|
+| Sum       | 4127			| 1479		| 5606	|
