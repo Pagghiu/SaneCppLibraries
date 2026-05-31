@@ -243,6 +243,14 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             transportSetupHookDefersRequest();
         }
+        if (test_section("HTTPS transport setup hook dispatch"))
+        {
+            httpsTransportSetupHookDispatch();
+        }
+        if (test_section("HTTPS transport setup reports TLS backend errors"))
+        {
+            httpsTransportSetupReportsTlsBackendError();
+        }
         if (test_section("HTTPS rejected until TLS transport exists"))
         {
             httpsRejectedUntilTlsTransportExists();
@@ -305,6 +313,8 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void putWritableBody();
     void keepAliveAndReconnect();
     void transportSetupHookDefersRequest();
+    void httpsTransportSetupHookDispatch();
+    void httpsTransportSetupReportsTlsBackendError();
     void httpsRejectedUntilTlsTransportExists();
     void tlsOptionsAreClientScoped();
     void zeroLengthResponse();
@@ -1435,6 +1445,155 @@ void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
     SC_TEST_EXPECT(client.get(loop, url.view()));
     SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::httpsTransportSetupHookDispatch()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26125);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    ClientConnection  clientStorage;
+    HttpAsyncClient   client;
+    ResponseCollector collector;
+    TimeoutGuard      timeout;
+
+    String url = StringEncoding::Ascii;
+
+    struct Context
+    {
+        HttpAsyncClientTest* test = nullptr;
+
+        ResponseCollector* collector = nullptr;
+        HttpAsyncServer*   server    = nullptr;
+
+        bool setupCalled = false;
+
+        Result onSetup(HttpAsyncClientTransportSetup& setup)
+        {
+            test->recordExpectation("https transport setup connection", setup.connection != nullptr);
+            test->recordExpectation("https transport setup loop", setup.eventLoop != nullptr);
+            test->recordExpectation("https transport setup url",
+                                    setup.url != nullptr and setup.url->protocol == "https");
+            test->recordExpectation("https transport setup complete", setup.complete.isValid());
+
+            setupCalled = true;
+            setup.complete(Result(true));
+            return Result(true);
+        }
+    } ctx;
+
+    ctx.test      = this;
+    ctx.collector = &collector;
+    ctx.server    = &httpServer;
+
+    httpServer.onRequest = [this](HttpConnection& connection)
+    {
+        SC_TEST_EXPECT(connection.response.startResponse(200));
+        SC_TEST_EXPECT(connection.response.addHeader("Content-Length", "5"));
+        SC_TEST_EXPECT(connection.response.sendHeaders());
+        SC_TEST_EXPECT(connection.response.getWritableStream().write("https"));
+        SC_TEST_EXPECT(connection.response.end());
+    };
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/hook", port));
+
+    client.onResponse = [this, &ctx](HttpAsyncClientResponse& response)
+    {
+        ctx.collector->attach(response,
+                              [this, &ctx](HttpAsyncClientResponse& completedResponse)
+                              {
+                                  ctx.collector->detach();
+                                  SC_TEST_EXPECT(completedResponse.getParser().statusCode == 200);
+                                  SC_TEST_EXPECT(StringView(ctx.collector->view()) == "https");
+                                  SC_TEST_EXPECT(ctx.setupCalled);
+                                  SC_TEST_EXPECT(ctx.server->stop());
+                              });
+    };
+    client.onError = [this](Result result) { SC_TEST_EXPECT(result); };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(loop.close());
+}
+
+void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
+{
+    AsyncEventLoop loop;
+    SC_TEST_EXPECT(loop.create());
+
+    ServerConnection connections[1];
+    HttpAsyncServer  httpServer;
+    const uint16_t   port = report.mapPort(26126);
+    SC_TEST_EXPECT(httpServer.init(Span<ServerConnection>(connections)));
+    SC_TEST_EXPECT(httpServer.start(loop, "127.0.0.1", port));
+
+    ClientConnection clientStorage;
+    HttpAsyncClient  client;
+    TimeoutGuard     timeout;
+
+    String url = StringEncoding::Ascii;
+
+    struct Context
+    {
+        HttpAsyncClientTest* test   = nullptr;
+        HttpAsyncServer*     server = nullptr;
+
+        bool setupCalled         = false;
+        bool errorCalled         = false;
+        bool errorMessageMatched = false;
+
+        Result onSetup(HttpAsyncClientTransportSetup& setup)
+        {
+            test->recordExpectation("https tls error setup connection", setup.connection != nullptr);
+            test->recordExpectation("https tls error setup loop", setup.eventLoop != nullptr);
+            test->recordExpectation("https tls error setup url",
+                                    setup.url != nullptr and setup.url->protocol == "https");
+            test->recordExpectation("https tls error setup complete", setup.complete.isValid());
+
+            setupCalled = true;
+            return Result::Error("HttpAsyncClient TLS backend unavailable");
+        }
+    } ctx;
+
+    ctx.test   = this;
+    ctx.server = &httpServer;
+
+    httpServer.onRequest = [this](HttpConnection&) { SC_TEST_EXPECT(false); };
+
+    SC_TEST_EXPECT(client.init(clientStorage));
+    client.setTransportSetup({[&ctx](HttpAsyncClientTransportSetup& setup) -> Result { return ctx.onSetup(setup); }});
+    SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/tls-error", port));
+
+    client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
+    client.onError    = [this, &ctx](Result result)
+    {
+        ctx.errorCalled = true;
+        ctx.errorMessageMatched =
+            not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) ==
+                               "HttpAsyncClient TLS backend unavailable";
+        SC_TEST_EXPECT(ctx.server->stop());
+    };
+
+    SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(ctx.setupCalled);
+    SC_TEST_EXPECT(ctx.errorCalled);
+    SC_TEST_EXPECT(ctx.errorMessageMatched);
     SC_TEST_EXPECT(httpServer.close());
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(loop.close());

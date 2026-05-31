@@ -221,11 +221,15 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
         response.initBodyStream(connection->buffersPool, {[this]() -> Result { return onResponseBodyStreamRead(); }}));
 
     SC_TRY(currentURL.parse(preset.url));
-    if (currentURL.protocol == "https")
+    if (HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https"))
     {
-        return Result::Error("HttpAsyncClient https URLs require TLS transport support");
+        SC_TRY_MSG(transportSetup.isValid(), "HttpAsyncClient https URLs require TLS transport support");
     }
-    SC_TRY_MSG(currentURL.protocol == "http", "HttpAsyncClient only supports http and https URLs");
+    else
+    {
+        SC_TRY_MSG(HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "http"),
+                   "HttpAsyncClient only supports http and https URLs");
+    }
     SC_TRY_MSG(currentURL.username.isEmpty() and currentURL.password.isEmpty(),
                "HttpAsyncClient userinfo not supported");
     return Result(true);
