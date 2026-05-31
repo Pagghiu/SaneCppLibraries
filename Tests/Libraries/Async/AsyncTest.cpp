@@ -105,6 +105,10 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
         {
             loopWakeUp();
         }
+        if (test_section("loop dispatchCompletions clears events"))
+        {
+            loopDispatchCompletionsClearsEvents();
+        }
         if (test_section("loop wakeUp coalescing"))
         {
             loopWakeUpCoalescing();

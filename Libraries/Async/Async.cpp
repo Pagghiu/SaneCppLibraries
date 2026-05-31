@@ -1528,6 +1528,7 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eve
 {
     if (interrupted)
     {
+        asyncKernelEvents.numberOfEvents = 0;
         return SC::Result(true);
     }
     KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
@@ -1557,6 +1558,7 @@ SC::Result SC::AsyncEventLoop::Internal::dispatchCompletions(AsyncEventLoop& eve
 
     SC_LOG_MESSAGE("Active Requests After Completion = {} ( + {} manual)\n", getTotalNumberOfActiveHandle(),
                    numberOfManualCompletions);
+    asyncKernelEvents.numberOfEvents = 0;
     return SC::Result(true);
 }
 

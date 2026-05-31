@@ -97,6 +97,38 @@ void SC::AsyncTest::loopWakeUp()
     SC_TEST_EXPECT(context.wakeUp1ThreadID == Thread::CurrentThreadID());
 }
 
+void SC::AsyncTest::loopDispatchCompletionsClearsEvents()
+{
+    struct Context
+    {
+        int callbacks = 0;
+    } context;
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    AsyncLoopWakeUp wakeUp;
+    wakeUp.setDebugName("dispatchCompletionsClearsEvents");
+    wakeUp.callback = [&context](AsyncLoopWakeUp::Result&) { context.callbacks++; };
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+
+    alignas(uint64_t) uint8_t eventsMemory[8 * 1024];
+    AsyncKernelEvents         kernelEvents;
+    kernelEvents.eventsMemory = eventsMemory;
+
+    SC_TEST_EXPECT(eventLoop.submitRequests(kernelEvents));
+    SC_TEST_EXPECT(eventLoop.blockingPoll(kernelEvents));
+    SC_TEST_EXPECT(eventLoop.dispatchCompletions(kernelEvents));
+    SC_TEST_EXPECT(context.callbacks == 1);
+
+    // Dispatching the same completion buffer again must be a no-op. Otherwise already-freed asyncs
+    // would be processed a second time when callers reuse AsyncKernelEvents across loop integrations.
+    SC_TEST_EXPECT(eventLoop.dispatchCompletions(kernelEvents));
+    SC_TEST_EXPECT(context.callbacks == 1);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
 void SC::AsyncTest::loopWakeUpCoalescing()
 {
     struct Context
