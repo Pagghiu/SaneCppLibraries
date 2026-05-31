@@ -1022,6 +1022,39 @@ struct SC::HttpClientTest : public SC::TestCase
             request.url = "http://127.0.0.1:1/valid-request"_a8;
             SC_TEST_EXPECT(request.validate());
         }
+        {
+            HttpClientRequest request;
+            request.url = "HTTPS://example.test/valid-request"_a8;
+            SC_TEST_EXPECT(request.validate());
+        }
+
+        auto expectUrlRejected = [&](StringSpan url)
+        {
+            HttpClientRequest  request;
+            HttpClientResponse response;
+
+            request.url = url;
+            SC_TEST_EXPECT(not request.validate());
+            SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(not operation.isRequestInFlight());
+        };
+
+        {
+            expectUrlRejected("ftp://127.0.0.1:1/invalid-url"_a8);
+        }
+        {
+            expectUrlRejected("http://"_a8);
+        }
+        {
+            expectUrlRejected("https:///missing-host"_a8);
+        }
+        {
+            expectUrlRejected("http://127.0.0.1:1/bad url"_a8);
+        }
+        {
+            static const char BadUrl[] = {'h', 't', 't', 'p', ':', '/', '/', 'b', 'a', 'd', '\0', 'h', 'o', 's', 't'};
+            expectUrlRejected({{BadUrl, sizeof(BadUrl)}, false, StringEncoding::Ascii});
+        }
 
         auto expectRejected = [&](HttpClientHeader& header)
         {

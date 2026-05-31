@@ -30,7 +30,8 @@ The API is stabilizing and the streaming core is in place, but consider everythi
 HttpClient is designed to stay allocation-free by relying on caller-provided buffers and queues. The core library is poll-driven and independent from `Async`, `AsyncStreams`, `Threading`, and `Time`. Response headers and transport metadata are written into user-provided buffers, while response body chunks are delivered during `poll()` through a small listener interface.
 
 `HttpClientRequest` groups caller-owned headers, body, and transport options into one request object. Request bodies are explicitly framed as fixed-size inline bytes, a fixed-size stream, or a chunked stream by setting `HttpClientRequestBody::framing`. Redirect, timeout, TLS, and protocol concerns are grouped under `HttpClientRequestOptions`.
-Request method, redirect mode, header names, and header values are validated before any backend-specific request setup starts.
+Request URL, method, redirect mode, header names, and header values are validated before any backend-specific request setup starts.
+URLs must use the `http://` or `https://` scheme, include a non-empty host, and avoid whitespace or control bytes.
 Header names must be HTTP token names, and header values reject CR, LF, and NUL bytes.
 Request methods, body framing modes, redirect modes, protocol preferences, and proxy modes expose static name helpers for allocation-free diagnostics.
 `HttpClientRequest::validate()` exposes the same request-shape checks used by `HttpClientOperation::start()`.

@@ -315,6 +315,37 @@ static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& 
     return SC::Result(true);
 }
 
+static SC::Result validateRequestUrl(SC::StringSpan url)
+{
+    SC_TRY_MSG(url.sizeInBytes() > 0, "HttpClientRequest: URL is empty");
+
+    const SC::Span<const char> bytes = url.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        const unsigned char c = static_cast<unsigned char>(bytes[idx]);
+        SC_TRY_MSG(c > ' ' and c != 0x7f, "HttpClientRequest: URL contains whitespace or control bytes");
+    }
+
+    size_t schemeBytes = 0;
+    if (asciiStartsWithIgnoreCase(url, SC::StringSpan("http://")))
+    {
+        schemeBytes = sizeof("http://") - 1;
+    }
+    else if (asciiStartsWithIgnoreCase(url, SC::StringSpan("https://")))
+    {
+        schemeBytes = sizeof("https://") - 1;
+    }
+    else
+    {
+        return SC::Result::Error("HttpClientRequest: only http:// and https:// URLs are supported");
+    }
+
+    SC_TRY_MSG(bytes.sizeInBytes() > schemeBytes, "HttpClientRequest: URL host is empty");
+    SC_TRY_MSG(bytes[schemeBytes] != '/' and bytes[schemeBytes] != '?' and bytes[schemeBytes] != '#',
+               "HttpClientRequest: URL host is empty");
+    return SC::Result(true);
+}
+
 static SC::Result validateRequestOptionsShape(const SC::HttpClientRequestOptions& options)
 {
     SC_TRY_MSG(isValidRedirectMode(options.redirect.mode), "HttpClientRequestOptions: invalid redirect mode");
@@ -326,7 +357,7 @@ static SC::Result validateRequestOptionsShape(const SC::HttpClientRequestOptions
 
 static SC::Result validateRequestShape(const SC::HttpClientRequest& request)
 {
-    SC_TRY_MSG(request.url.sizeInBytes() > 0, "HttpClientRequest: URL is empty");
+    SC_TRY(validateRequestUrl(request.url));
     SC_TRY_MSG(isValidRequestMethod(request.method), "HttpClientRequest: invalid request method");
     SC_TRY(validateRequestHeaders(request.headers));
     SC_TRY(validateRequestBodyFramingHeaders(request));
