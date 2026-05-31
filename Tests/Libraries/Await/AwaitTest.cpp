@@ -88,6 +88,10 @@ struct SC::AwaitTest : public SC::TestCase
         {
             cancelSuspendedAwaiters();
         }
+        if (test_section("cancel and destroy awaiters"))
+        {
+            cancelAndDestroyAwaiters();
+        }
         if (test_section("cancel before loop dispatch"))
         {
             cancelBeforeLoopDispatch();
@@ -2039,6 +2043,175 @@ struct SC::AwaitTest : public SC::TestCase
 
             SC_TEST_EXPECT(threadPool.destroy());
             (void)fs.removeFile("await-cancel-fs-open.txt");
+            SC_TEST_EXPECT(async.close());
+        }
+    }
+
+    void cancelAndDestroyAwaiters()
+    {
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            for (size_t idx = 0; idx < 8; ++idx)
+            {
+                SocketDescriptor client;
+                SocketDescriptor serverSideClient;
+                createTCPSocketPair(async, client, serverSideClient);
+
+                AwaitTask task = receiveForever(await, serverSideClient);
+                SC_TEST_EXPECT(await.spawn(task));
+                SC_TEST_EXPECT(task.isActive());
+                SC_TEST_EXPECT(task.cancel(await));
+                SC_TEST_EXPECT(await.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+                task = AwaitTask();
+                SC_TEST_EXPECT(await.runNoWait());
+                SC_TEST_EXPECT(client.close());
+                SC_TEST_EXPECT(serverSideClient.close());
+            }
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+            for (size_t idx = 0; idx < 8; ++idx)
+            {
+                const StringView fileName = "await-cancel-destroy-file.txt";
+
+                SmallStringNative<255> filePath = StringEncoding::Native;
+                SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), fileName}));
+
+                FileDescriptor file;
+                FileOpen       writeOpen(FileOpen::Write);
+                writeOpen.blocking = false;
+                SC_TEST_EXPECT(file.open(filePath.view(), writeOpen));
+                SC_TEST_EXPECT(async.associateExternallyCreatedFileDescriptor(file));
+
+                AwaitTask task = writeFileScatterGatherCancellable(await, file);
+                SC_TEST_EXPECT(await.spawn(task));
+                SC_TEST_EXPECT(task.isActive());
+                SC_TEST_EXPECT(task.cancel(await));
+                SC_TEST_EXPECT(await.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+                task = AwaitTask();
+                SC_TEST_EXPECT(await.runNoWait());
+                SC_TEST_EXPECT(file.close());
+                (void)fs.removeFile(fileName);
+            }
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+            for (size_t idx = 0; idx < 8; ++idx)
+            {
+                ThreadPool threadPool;
+                SC_TEST_EXPECT(threadPool.create(1));
+
+                ThreadPoolTask blocker;
+                Atomic<bool>   blockerEntered = false;
+                Atomic<bool>   releaseBlocker = false;
+                startThreadPoolBlocker(threadPool, blocker, blockerEntered, releaseBlocker);
+
+                const StringView fileName = "await-cancel-destroy-fs.txt";
+
+                SmallStringNative<255> filePath = StringEncoding::Native;
+                SC_TEST_EXPECT(Path::join(filePath, {report.applicationRootDirectory.view(), fileName}));
+                SC_TEST_EXPECT(fs.writeString(fileName, "cancel"));
+
+                FileDescriptor file;
+                AwaitTask      task = fsOpenCancellable(await, threadPool, filePath.view(), file);
+                SC_TEST_EXPECT(await.spawn(task));
+                SC_TEST_EXPECT(task.isActive());
+
+                Thread releaser;
+                releaseThreadPoolBlockerSoon(releaser, releaseBlocker);
+                SC_TEST_EXPECT(task.cancel(await));
+                SC_TEST_EXPECT(releaser.join());
+                SC_TEST_EXPECT(await.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+                SC_TEST_EXPECT(not file.isValid());
+                task = AwaitTask();
+                SC_TEST_EXPECT(await.runNoWait());
+                (void)fs.removeFile(fileName);
+                SC_TEST_EXPECT(threadPool.destroy());
+            }
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            for (size_t idx = 0; idx < 4; ++idx)
+            {
+                Process process;
+#if SC_PLATFORM_WINDOWS
+                SC_TEST_EXPECT(process.launch({"cmd", "/C", "ping -n 2 127.0.0.1 >NUL"}));
+#else
+                SC_TEST_EXPECT(process.launch({"sleep", "0.1"}));
+#endif
+
+                AwaitProcessExitResult result;
+                AwaitTask              task = processExitOnce(await, process, result);
+                SC_TEST_EXPECT(await.spawn(task));
+                SC_TEST_EXPECT(task.isActive());
+                SC_TEST_EXPECT(task.cancel(await));
+                SC_TEST_EXPECT(await.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+                task = AwaitTask();
+                SC_TEST_EXPECT(await.runNoWait());
+                SC_TEST_EXPECT(process.waitForExitSync());
+            }
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            for (size_t idx = 0; idx < 8; ++idx)
+            {
+                ThreadPool threadPool;
+                SC_TEST_EXPECT(threadPool.create(1));
+
+                ThreadPoolTask blocker;
+                Atomic<bool>   blockerEntered = false;
+                Atomic<bool>   releaseBlocker = false;
+                startThreadPoolBlocker(threadPool, blocker, blockerEntered, releaseBlocker);
+
+                Atomic<int> workCount = 0;
+                AwaitTask   task      = loopWorkCancellable(await, threadPool, workCount);
+                SC_TEST_EXPECT(await.spawn(task));
+                SC_TEST_EXPECT(task.isActive());
+
+                Thread releaser;
+                releaseThreadPoolBlockerSoon(releaser, releaseBlocker);
+                SC_TEST_EXPECT(task.cancel(await));
+                SC_TEST_EXPECT(releaser.join());
+                SC_TEST_EXPECT(await.run());
+                SC_TEST_EXPECT(task.isCompleted());
+                SC_TEST_EXPECT(AwaitIsCancelled(task.result()));
+                task = AwaitTask();
+                SC_TEST_EXPECT(await.runNoWait());
+                SC_TEST_EXPECT(threadPool.destroy());
+            }
             SC_TEST_EXPECT(async.close());
         }
     }
