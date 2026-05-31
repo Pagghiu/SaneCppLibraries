@@ -3768,10 +3768,15 @@ struct SC::AwaitTest : public SC::TestCase
         SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
         SC_TEST_EXPECT(fs.writeString(fileName, "callback teardown"));
 
-        AwaitTask parent = spawnAndWaitFsChild(await, threadPool, filePath.view());
-        SC_TEST_EXPECT(await.spawn(parent));
-        SC_TEST_EXPECT(await.run());
-        SC_TEST_EXPECT(parent.result());
+        for (size_t idx = 0; idx < 8; ++idx)
+        {
+            AwaitTask parent = spawnAndWaitFsChild(await, threadPool, filePath.view());
+            SC_TEST_EXPECT(await.spawn(parent));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(parent.result());
+            parent = AwaitTask();
+            SC_TEST_EXPECT(await.runNoWait());
+        }
 
         SC_TEST_EXPECT(threadPool.destroy());
         SC_TEST_EXPECT(async.close());
