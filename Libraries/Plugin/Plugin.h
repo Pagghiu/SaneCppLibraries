@@ -287,7 +287,7 @@ struct PluginDynamicLibrary
 
     friend struct PluginRegistry;
     Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
-    Result unload();
+    Result unload(bool releaseDebuggerFiles);
 };
 
 /// @brief Holds a registry of plugins, loading and compiling them on the fly
@@ -356,6 +356,8 @@ struct PluginRegistry
                                      Function<void(const PluginIdentifier&)> onPlugin);
 
   private:
+    Result unloadPlugin(const StringView identifier, bool releaseDebuggerFiles);
+
     Span<PluginDynamicLibrary> storage;
     Span<PluginDynamicLibrary> libraries;
 };

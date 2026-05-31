@@ -740,11 +740,11 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 }
 
 SC::PluginDynamicLibrary::PluginDynamicLibrary() : lastLoadTime(PluginNow()) { numReloads = 0; }
-SC::Result SC::PluginDynamicLibrary::unload()
+SC::Result SC::PluginDynamicLibrary::unload(bool releaseDebuggerFiles)
 {
     SC_TRY(dynamicLibrary.close());
 #if SC_PLATFORM_WINDOWS
-    if (Debugger::isDebuggerConnected())
+    if (releaseDebuggerFiles and Debugger::isDebuggerConnected())
     {
         StringPath pdbFile;
         SC_TRY(definition.getDynamicLibraryPDBAbsolutePath(pdbFile));
@@ -754,6 +754,8 @@ SC::Result SC::PluginDynamicLibrary::unload()
             SC_TRY(Debugger::deleteForcefullyUnlockedFile(pdbFile.view()));
         }
     }
+#else
+    (void)releaseDebuggerFiles;
 #endif
     pluginInit  = nullptr;
     pluginClose = nullptr;
@@ -885,7 +887,10 @@ SC::Result SC::PluginRegistry::close()
     Result result(true);
     for (size_t idx = 0; idx < getNumberOfEntries(); ++idx)
     {
-        Result res = unloadPlugin(getIdentifierAt(idx).view());
+        // TODO: Investigate why releasing debugger PDB handles through Restart Manager can take
+        // several seconds when exiting SCExample under VSCode on a Parallels shared folder.
+        // Final process shutdown does not need it, but explicit unload/reload still does.
+        Result res = unloadPlugin(getIdentifierAt(idx).view(), false);
         if (not res)
         {
             // We still want to continue unload all plugins
@@ -1014,7 +1019,9 @@ SC::Result SC::PluginRegistry::loadPlugin(const StringView identifier, const Plu
     return Result(true);
 }
 
-SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier)
+SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier) { return unloadPlugin(identifier, true); }
+
+SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier, bool releaseDebuggerFiles)
 {
     PluginDynamicLibrary* res = findPlugin(identifier);
     SC_TRY(res != nullptr);
@@ -1026,14 +1033,14 @@ SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier)
             // TODO: Shield against circular dependencies
             if (dynamicLibrary.definition.dependencies.contains(identifier))
             {
-                SC_TRY(unloadPlugin(dynamicLibrary.definition.identity.identifier.view()));
+                SC_TRY(unloadPlugin(dynamicLibrary.definition.identity.identifier.view(), releaseDebuggerFiles));
             }
         }
         auto closeResult = lib.pluginClose(lib.instance);
         lib.instance     = nullptr;
         SC_COMPILER_UNUSED(closeResult); // TODO: Print / Return some warning
     }
-    return lib.unload();
+    return lib.unload(releaseDebuggerFiles);
 }
 
 SC::Result SC::PluginRegistry::removeAllBuildProducts(const StringView identifier)
