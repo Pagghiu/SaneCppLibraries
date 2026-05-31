@@ -20,6 +20,11 @@ task groups, cancellation, and timeouts.
 for normal file or pipe handles currently fails fast at the Await layer instead of pretending to be portable. File and
 filesystem operations that need blocking work use caller-provided `ThreadPool` storage.
 
+@note
+Long-lived callback streams such as `FileSystemWatcher` should stay callback-style or use an explicit caller-owned
+adapter with bounded event storage. `Await` intentionally does not model watcher streams as direct `AwaitEventLoop`
+methods.
+
 # Dependencies
 - Dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
 - All dependencies: [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)

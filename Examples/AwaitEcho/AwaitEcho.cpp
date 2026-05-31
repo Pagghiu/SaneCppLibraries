@@ -94,10 +94,9 @@ static AwaitTask echoConversation(AwaitEventLoop& await, const SocketDescriptor&
     AwaitTask server     = echoServer(await, serverSocket, accepted);
     AwaitTask clientTask = echoClient(await, client, address, replyBuffer, reply);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&server, &clientTask};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(server));
-    SC_CO_TRY(group.spawn(clientTask));
+    SC_CO_TRY(group.spawnAll(children));
     Result waitResult = co_await group.waitAll();
     if (not waitResult)
     {

@@ -83,10 +83,9 @@ static AwaitTask networkExchange(AwaitEventLoop& await, const SocketDescriptor& 
     AwaitTask server     = probeServer(await, serverSocket, accepted);
     AwaitTask clientTask = probeClient(await, client, address, replyBuffer, reply);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&server, &clientTask};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(server));
-    SC_CO_TRY(group.spawn(clientTask));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);
@@ -114,10 +113,9 @@ static AwaitTask serviceProbe(AwaitEventLoop& await, const SocketDescriptor& ser
     AwaitTask networkTask     = networkExchange(await, serverSocket, client, address, accepted, replyBuffer, reply);
     AwaitTask maintenanceTask = boundedMaintenance(await, maintenanceTimeout);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&networkTask, &maintenanceTask};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(networkTask));
-    SC_CO_TRY(group.spawn(maintenanceTask));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);

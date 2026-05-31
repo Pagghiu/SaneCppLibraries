@@ -1095,6 +1095,7 @@ struct SC_AWAIT_EXPORT AwaitTaskGroup
                    AwaitTaskGroupCancelPolicy cancelPolicy = AwaitTaskGroupCancelPolicy::CancelChildren);
 
     Result                       spawn(AwaitTask& task);
+    Result                       spawnAll(Span<AwaitTask*> taskList);
     AwaitTaskGroupWaitAllAwaiter waitAll();
     AwaitTaskGroupWaitAnyAwaiter waitAny(
         AwaitTaskGroupWaitAnyResult& outResult,

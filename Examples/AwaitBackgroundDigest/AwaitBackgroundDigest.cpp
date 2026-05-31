@@ -48,10 +48,9 @@ static AwaitTask digestBoth(AwaitEventLoop& await, ThreadPool& threadPool, Diges
     left.task  = digestOne(await, threadPool, left);
     right.task = digestOne(await, threadPool, right);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&left.task, &right.task};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(left.task));
-    SC_CO_TRY(group.spawn(right.task));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);

@@ -262,6 +262,16 @@ For now, coroutine examples should keep using callback-style `FileSystemWatcher`
 workflow needs it. If a future helper is added, it should be an explicit `Await*` object carrying the watcher state and
 caller-provided notification storage, not another thin method on `AwaitEventLoop`.
 
+A future watcher adapter should look more like a bounded event queue than a one-shot awaiter:
+
+- the caller owns `FileSystemWatcher`, each `FolderWatcher`, the event storage, and any wake-up object;
+- producer callbacks push compact events into caller-provided slots and wake the awaiting coroutine;
+- the coroutine awaits "next event" or "queue not empty" on the adapter object, not on `AwaitEventLoop`;
+- when the queue fills, the adapter must return an explicit overflow result or set a sticky overflow flag that the
+  consumer observes, rather than allocating or silently dropping events;
+- the same shape may be reused for process output or accept loops only after a concrete example proves the bounded
+  queue semantics are pleasant.
+
 # Helper placement
 
 Thin convenience helpers currently live on `AwaitEventLoop` when they preserve the shape of one underlying `Async`
@@ -362,6 +372,15 @@ structured: cancelling the parent task while it is suspended in `waitAll()` or `
 the parent completes. `AwaitTaskGroupCancelPolicy::LeaveChildrenRunning` exists for advanced cases where child tasks
 outlive the waiting parent.
 
+When children are already available as caller-owned task objects, `spawnAll()` can reduce repeated `spawn()` calls
+without hiding storage:
+
+```cpp
+AwaitTask*     children[2] = {&reader, &writer};
+AwaitTaskGroup group(await, children);
+SC_CO_TRY(group.spawnAll(children));
+```
+
 For request-backed children, keep the child `AwaitTask` objects in caller-owned storage that outlives the parent
 coroutine suspension. This mirrors `Async`'s stable request-object rule: the coroutine frame owns the active awaiter,
 so the task object should not be a short-lived temporary when the event loop may still be unwinding an async
@@ -370,6 +389,12 @@ completion. `Examples/AwaitTaskGroupFiles` keeps each child task inside a caller
 `waitAny()` defaults to `AwaitTaskGroupWaitAnyPolicy::CancelRemaining`, so stack-owned child tasks are not left active
 after the first child completes. Use `LeaveRemainingRunning` only when pending children have an explicitly managed
 lifetime.
+
+Cancellation policy names deliberately describe the observable effect rather than the call site. `CancelRemaining` is
+the structured default for `waitAny()` because it cancels every still-active sibling after a winner is known.
+`LeaveRemainingRunning` should read as an explicit escape hatch. `AwaitTaskGroupCancelPolicy::CancelChildren` applies
+when the parent task itself is cancelled while suspended in a group wait; the alternative,
+`LeaveChildrenRunning`, is only for owners that can prove child storage outlives the parent.
 
 After `waitAll()` returns, `collectResults()` can copy each child `Result` into caller-provided storage and optionally
 fill `AwaitTaskGroupResultSummary` with counts plus the first failed task. This keeps aggregation no-allocation and

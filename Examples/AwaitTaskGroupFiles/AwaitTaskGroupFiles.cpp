@@ -41,10 +41,9 @@ static AwaitTask readBothFiles(AwaitEventLoop& await, ThreadPool& threadPool, Fi
     left.task  = readOneFile(await, threadPool, left);
     right.task = readOneFile(await, threadPool, right);
 
-    AwaitTask*     taskStorage[2] = {};
+    AwaitTask*     taskStorage[2] = {&left.task, &right.task};
     AwaitTaskGroup group(await, taskStorage);
-    SC_CO_TRY(group.spawn(left.task));
-    SC_CO_TRY(group.spawn(right.task));
+    SC_CO_TRY(group.spawnAll(taskStorage));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);

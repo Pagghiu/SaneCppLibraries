@@ -66,6 +66,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Use `AwaitTaskGroup` with caller-provided `Span<AwaitTask*>` storage when a parent needs to own several children and
   cancel/wait them as a group. `waitAny()` defaults to cancelling remaining children before returning so stack-owned
   child tasks are not left active.
+- Use `AwaitTaskGroup::spawnAll()` when children are already listed in a caller-owned `AwaitTask*` array; it reduces
+  repeated `spawn()` calls without hiding task storage.
 - Use `AwaitTaskGroup::summarizeResults()` when only aggregate counts and first-failure metadata are needed; use
   `collectResults()` when each child `Result` must be copied into caller-provided storage.
 - Cancellation is cooperative and routed through the currently suspended awaiter.
@@ -88,6 +90,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
 - Do not add direct filesystem watcher awaiters on `AwaitEventLoop` yet. `FileSystemWatcher` is a long-lived callback
   stream; use `FileSystemWatcherAsyncT<AsyncEventLoop>` on the same loop, or design a caller-owned `Await*` adapter when
   a concrete stream/channel workflow is needed.
+- If designing such an adapter, keep it bounded and caller-owned: watcher/folder state, event queue storage, wake-up
+  object, overflow reporting, and backpressure policy must all be explicit.
 - `waitFor()` cancels the child task when the timeout expires and reports timeout state through `AwaitTimeoutResult`.
 - `fsRead()` and `fsWrite()` wrap `AsyncFileSystemOperation::read()` and `write()`; those operations borrow file handles
   and preserve caller ownership.
@@ -100,6 +104,8 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   `AwaitTaskRegistry` with caller-owned `Span<AwaitTask>` storage, explicit shutdown cancellation, and no hidden
   allocation. `AwaitTaskRegistry::waitAll()` drains currently registered tasks and `waitAny()` waits for the first
   completed slot without building a separate task-pointer array.
+- Treat `CancelRemaining` as the structured `waitAny()` default and `LeaveRemainingRunning` as the explicit escape
+  hatch. `AwaitTaskGroupCancelPolicy::CancelChildren` is about parent cancellation while waiting in a group.
 - It is fair to describe `AwaitTaskGroup` as asyncio-like control flow, but always call out the Sane C++ difference:
   task objects, pointer arrays, result arrays, buffers, and allocator storage remain caller-owned and explicit.
 - For registry shutdown, use an explicit cancel/drain/clear sequence: `registry.cancelAll()`, run the owning

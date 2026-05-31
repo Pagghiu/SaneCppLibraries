@@ -1184,10 +1184,9 @@ struct SC::AwaitTest : public SC::TestCase
         childA = waitTwice(await);
         childB = failSoon(await);
 
-        AwaitTask*     groupStorage[2] = {};
+        AwaitTask*     groupStorage[2] = {&childA, &childB};
         AwaitTaskGroup group(await, groupStorage);
-        SC_CO_TRY(group.spawn(childA));
-        SC_CO_TRY(group.spawn(childB));
+        SC_CO_TRY(group.spawnAll(groupStorage));
 
         Result waitResult = co_await group.waitAll();
         if (waitResult)
@@ -1218,6 +1217,36 @@ struct SC::AwaitTest : public SC::TestCase
             summaryOnly.firstFailureTask != &childB or summaryOnly.firstFailure)
         {
             co_return Result::Error("Await task group summary result mismatch");
+        }
+
+        co_return Result(true);
+    }
+
+    static AwaitTask waitTaskGroupSpawnAllInvalid(AwaitEventLoop& await, AwaitTask& child)
+    {
+        child = waitTwice(await);
+
+        AwaitTask*     groupStorage[2] = {};
+        AwaitTaskGroup group(await, groupStorage);
+
+        AwaitTask* tooManyChildren[3] = {&child, &child, &child};
+        if (group.spawnAll(tooManyChildren))
+        {
+            co_return Result::Error("Await task group spawnAll unexpectedly ignored capacity");
+        }
+        if (group.size() != 0)
+        {
+            co_return Result::Error("Await task group spawnAll capacity failure mutated group");
+        }
+
+        AwaitTask* invalidChildren[1] = {};
+        if (group.spawnAll(invalidChildren))
+        {
+            co_return Result::Error("Await task group spawnAll unexpectedly ignored invalid task");
+        }
+        if (group.size() != 0)
+        {
+            co_return Result::Error("Await task group spawnAll invalid failure mutated group");
         }
 
         co_return Result(true);
@@ -3305,6 +3334,20 @@ struct SC::AwaitTest : public SC::TestCase
             SC_TEST_EXPECT(task.result());
             SC_TEST_EXPECT(childA.result());
             SC_TEST_EXPECT(not childB.result());
+            SC_TEST_EXPECT(async.close());
+        }
+        {
+            AsyncEventLoop async;
+            SC_TEST_EXPECT(async.create());
+            SC_AWAIT_TEST_EVENT_LOOP(await, async);
+
+            AwaitTask child;
+            AwaitTask task = waitTaskGroupSpawnAllInvalid(await, child);
+            SC_TEST_EXPECT(await.spawn(task));
+            SC_TEST_EXPECT(await.run());
+            SC_TEST_EXPECT(task.result());
+            SC_TEST_EXPECT(child.isValid());
+            SC_TEST_EXPECT(not child.isStarted());
             SC_TEST_EXPECT(async.close());
         }
         {

@@ -116,10 +116,9 @@ static AwaitTask lineProtocolConversation(AwaitEventLoop& await, const SocketDes
     AwaitTask server     = lineServer(await, serverSocket, accepted);
     AwaitTask clientTask = lineClient(await, client, address, valueBuffer, valueLine, doneBuffer, doneLine);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&server, &clientTask};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(server));
-    SC_CO_TRY(group.spawn(clientTask));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);

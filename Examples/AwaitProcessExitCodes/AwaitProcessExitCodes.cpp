@@ -32,10 +32,9 @@ static AwaitTask waitBothProcesses(AwaitEventLoop& await, ProcessWaitJob& succes
     success.task = waitOneProcess(await, success);
     failure.task = waitOneProcess(await, failure);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&success.task, &failure.task};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(success.task));
-    SC_CO_TRY(group.spawn(failure.task));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);

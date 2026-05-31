@@ -2378,6 +2378,28 @@ Result AwaitTaskGroup::spawn(AwaitTask& task)
     return Result(true);
 }
 
+Result AwaitTaskGroup::spawnAll(Span<AwaitTask*> taskList)
+{
+    if (taskList.sizeInElements() > remainingCapacity())
+    {
+        return Result::Error("AwaitTaskGroup storage is full");
+    }
+
+    for (size_t idx = 0; idx < taskList.sizeInElements(); ++idx)
+    {
+        if (taskList[idx] == nullptr)
+        {
+            return Result::Error("AwaitTaskGroup contains invalid task");
+        }
+    }
+
+    for (size_t idx = 0; idx < taskList.sizeInElements(); ++idx)
+    {
+        SC_TRY(spawn(*taskList[idx]));
+    }
+    return Result(true);
+}
+
 AwaitTaskGroupWaitAllAwaiter AwaitTaskGroup::waitAll() { return AwaitTaskGroupWaitAllAwaiter(*this); }
 
 AwaitTaskGroupWaitAnyAwaiter AwaitTaskGroup::waitAny(AwaitTaskGroupWaitAnyResult& outResult,

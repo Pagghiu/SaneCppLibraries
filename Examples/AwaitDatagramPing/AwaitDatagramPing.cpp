@@ -90,10 +90,9 @@ static AwaitTask datagramConversation(AwaitEventLoop& await, const SocketDescrip
     AwaitTask serverTask = datagramServer(await, server);
     AwaitTask clientTask = datagramClient(await, client, serverAddress, replyBuffer, reply);
 
-    AwaitTask*     children[2] = {};
+    AwaitTask*     children[2] = {&serverTask, &clientTask};
     AwaitTaskGroup group(await, children);
-    SC_CO_TRY(group.spawn(serverTask));
-    SC_CO_TRY(group.spawn(clientTask));
+    SC_CO_TRY(group.spawnAll(children));
     SC_CO_TRY(co_await group.waitAll());
 
     co_return Result(true);
