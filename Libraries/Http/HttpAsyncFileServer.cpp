@@ -952,7 +952,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
 
             case HttpMultipartParser::Token::HeaderValue: {
                 SC_ASSERT_RELEASE(partHeaders.addHeader(currentHeaderName, {parsedData, false, StringEncoding::Ascii}));
-                if (partHeaders.hasFileName() and not partHeaders.hasSafeFileName())
+                if (partHeaders.isFile() and not partHeaders.hasSafeFileName())
                 {
                     rejectedFileName = true;
                 }
@@ -960,7 +960,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
             break;
 
             case HttpMultipartParser::Token::PartHeaderEnd: {
-                if (partHeaders.hasSafeFileName())
+                if (partHeaders.isSafeFile())
                 {
                     (void)currentFilePath.assign(server->directory.view());
                     (void)currentFilePath.append("/");

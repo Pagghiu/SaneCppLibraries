@@ -41,8 +41,13 @@ struct SC_HTTP_EXPORT HttpMultipartPartHeadersView
 
     [[nodiscard]] StringSpan fieldName() const { return disposition.name; }
     [[nodiscard]] StringSpan fileName() const { return disposition.fileName; }
+    [[nodiscard]] bool       isFormData() const { return disposition.isFormData(); }
+    [[nodiscard]] bool       hasFieldName() const { return disposition.hasName; }
     [[nodiscard]] bool       hasFileName() const { return disposition.hasFileName; }
+    [[nodiscard]] bool       isField() const { return isFormData() and hasFieldName() and not hasFileName(); }
+    [[nodiscard]] bool       isFile() const { return isFormData() and hasFieldName() and hasFileName(); }
     [[nodiscard]] bool       hasSafeFileName() const;
+    [[nodiscard]] bool       isSafeFile() const { return isFile() and hasSafeFileName(); }
 };
 
 /// @brief Incremental HTTP multipart/form-data parser

@@ -214,15 +214,31 @@ struct SC::HttpMultipartParserTest : public SC::TestCase
             HttpMultipartPartHeadersView part;
             SC_TEST_EXPECT(part.addHeader("Content-Disposition", "form-data; name=plain; filename=plain.txt"));
             SC_TEST_EXPECT(part.addHeader("Content-Type", "text/plain"));
+            SC_TEST_EXPECT(part.isFormData());
+            SC_TEST_EXPECT(part.hasFieldName());
+            SC_TEST_EXPECT(part.hasFileName());
+            SC_TEST_EXPECT(not part.isField());
+            SC_TEST_EXPECT(part.isFile());
             SC_TEST_EXPECT(part.fieldName() == "plain");
             SC_TEST_EXPECT(part.fileName() == "plain.txt");
             SC_TEST_EXPECT(part.contentType == "text/plain");
             SC_TEST_EXPECT(part.hasSafeFileName());
+            SC_TEST_EXPECT(part.isSafeFile());
 
             part.reset();
             SC_TEST_EXPECT(part.addHeader("Content-Disposition", "form-data; name=\"file\"; filename=\"../bad.txt\""));
             SC_TEST_EXPECT(part.hasFileName());
+            SC_TEST_EXPECT(part.isFile());
             SC_TEST_EXPECT(not part.hasSafeFileName());
+            SC_TEST_EXPECT(not part.isSafeFile());
+
+            part.reset();
+            SC_TEST_EXPECT(part.addHeader("Content-Disposition", "form-data; name=\"comment\""));
+            SC_TEST_EXPECT(part.isFormData());
+            SC_TEST_EXPECT(part.hasFieldName());
+            SC_TEST_EXPECT(part.isField());
+            SC_TEST_EXPECT(not part.isFile());
+            SC_TEST_EXPECT(not part.isSafeFile());
 
             SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(""));
             SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("."));
