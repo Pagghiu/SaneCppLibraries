@@ -106,9 +106,31 @@ struct HotReloadSystem
 
     Result close()
     {
-        SC_TRY(fileSystemWatcher.close());
+        Result result(true);
+        auto   preserveFirstError = [&result](Result closeResult)
+        {
+            if (not closeResult and result)
+            {
+                result = closeResult;
+            }
+        };
+
+        preserveFirstError(fileSystemWatcher.close());
+        if (eventLoop)
+        {
+            for (size_t idx = 0; idx < registry.getNumberOfEntries(); ++idx)
+            {
+                const PluginDynamicLibrary& library = registry.getPluginDynamicLibraryAt(idx);
+                ISCExample*                 example = nullptr;
+                if (library.queryInterface(example) and example->closeAsync.isValid())
+                {
+                    preserveFirstError(example->closeAsync(*eventLoop));
+                }
+            }
+        }
         eventLoop = nullptr;
-        return registry.close();
+        preserveFirstError(registry.close());
+        return result;
     }
 
     Result syncRegistry()

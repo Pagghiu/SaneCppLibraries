@@ -164,14 +164,29 @@ struct ApplicationSystem
 
     Result close()
     {
+        Result result(true);
+        auto   preserveFirstError = [&result](Result closeResult)
+        {
+            if (not closeResult and result)
+            {
+                result = closeResult;
+            }
+        };
+
+        {
+            preserveFirstError(eventLoopMonitor.close());
+        }
         if (timeout.isActive())
         {
-            SC_TRY(timeout.stop(eventLoop));
+            preserveFirstError(timeout.stop(eventLoop));
         }
-        SC_TRY(hotReloadSystem.close());
-        SC_TRY(eventLoopMonitor.close())
-        SC_TRY(eventLoop.close());
-        return Result(true);
+        {
+            preserveFirstError(hotReloadSystem.close());
+        }
+        {
+            preserveFirstError(eventLoop.close());
+        }
+        return result;
     }
 
   private:

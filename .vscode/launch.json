@@ -148,7 +148,7 @@
             "name": "SCExample intel64 [windows]",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/_Build/_Outputs/windows-x64-Native-msvc-Debug/SCExample.exe",
+            "program": "${workspaceFolder}/_Build/_Outputs/windows-x86_64-Native-msvc-Debug/SCExample.exe",
             "preLaunchTask": "Build SCExample Debug intel64",
             "args": [],
             "cwd": "${workspaceRoot}",
