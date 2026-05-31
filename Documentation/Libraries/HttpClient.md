@@ -256,6 +256,7 @@ orchestration diagnostics.
 Some relevant blog posts are:
 
 - [March 2026 Update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
+- [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
 
 # Examples
 

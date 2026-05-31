@@ -285,6 +285,12 @@ The name is a little longer than plain `spawn()`, but it makes the "starts then 
 teaching `co_await child` to secretly start unowned tasks. `AwaitTaskGroup` is the structured API for multiple children,
 result aggregation, `waitAny()`, or custom child cancellation policy.
 
+# Blog
+
+Some relevant blog posts are:
+
+- [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
+
 # Task state helpers
 
 `AwaitTask` exposes explicit state queries (`isValid()`, `isStarted()`, `isActive()`, `isCompleted()`, and
