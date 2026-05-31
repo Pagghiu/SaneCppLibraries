@@ -184,10 +184,10 @@ Recent example and test call sites point to these remaining improvement seams:
   before they can be written into request headers.
 - Streaming echo responses: `Examples/ApiServer/ApiServer.cpp` now uses `AsyncPipeline` to mirror the request body into
   the response body without collecting it in memory or hand-rolling pause/drain listeners.
-- WebSocket examples: `Examples/AsyncWebServer/AsyncWebServer.cpp` now uses `HttpWebSocketConnectionPump`, while the
-  collaborative canvas keeps lower-level endpoint/message-assembler plumbing because it needs full-message assembly,
-  source-client suppression, and best-effort dropped-broadcast accounting. A later helper could combine pump plus
-  assembler without forcing policy into the core frame layer.
+- WebSocket examples: `Examples/AsyncWebServer/AsyncWebServer.cpp` and the collaborative canvas now use
+  `HttpWebSocketConnectionPump` for listener lifecycle and automatic control-frame flushing. The canvas keeps its
+  caller-owned message assembler, source-client suppression, and best-effort dropped-broadcast accounting as application
+  policy.
 - File uploads: `HttpAsyncFileServerTest` covers PUT and multipart uploads well, and `Examples/AsyncWebServer` now
   exposes upload enable/disable and max-size policy from the command line. `HttpAsyncFileServerOptions` also supports
   SPA fallback, validators, ranges, and a zero-allocation MIME lookup hook.

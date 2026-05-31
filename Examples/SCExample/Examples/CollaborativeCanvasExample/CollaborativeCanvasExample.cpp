@@ -99,25 +99,9 @@ struct SC::CollaborativeCanvasModel
         CollaborativeCanvasModel*     owner      = nullptr;
         HttpConnection*               connection = nullptr;
         size_t                        hubIndex   = size_t(-1);
-        HttpWebSocketEndpoint         endpoint;
+        HttpWebSocketConnectionPump   pump;
         HttpWebSocketMessageAssembler messageAssembler;
         char                          messageStorage[16 * 1024] = {0};
-        bool                          dataListenerAdded         = false;
-        bool                          endListenerAdded          = false;
-        bool                          closeListenerAdded        = false;
-
-        Result writeFrame(Span<const char> frame)
-        {
-            SC_TRY_MSG(connection != nullptr, "CollaborativeCanvas connection missing");
-            AsyncBufferView::ID bufferID;
-            Span<char>          writableData;
-            SC_TRY(connection->buffersPool.requestNewBuffer(frame.sizeInBytes(), bufferID, writableData));
-            ::memcpy(writableData.data(), frame.data(), frame.sizeInBytes());
-            connection->buffersPool.setNewBufferSize(bufferID, frame.sizeInBytes());
-            const Result writeResult = connection->writableSocketStream.write(bufferID);
-            connection->buffersPool.unrefBuffer(bufferID);
-            return writeResult;
-        }
 
         Result onFrameHeader(const HttpWebSocketFrameHeaderView& header)
         {
@@ -145,33 +129,31 @@ struct SC::CollaborativeCanvasModel
             return messageAssembler.onFramePayload(payload, frameFinished);
         }
 
-        void onData(AsyncBufferView::ID bufferID)
+        Result onPing(Span<char>)
         {
-            Span<char> data;
-            if (connection == nullptr or not connection->buffersPool.getWritableData(bufferID, data))
+            if (owner != nullptr)
             {
-                return;
+                owner->controlFrames++;
             }
+            return Result(true);
+        }
 
-            size_t consumed = 0;
-            Result received = endpoint.receive(data, consumed);
-            if (received and endpoint.hasPendingControlFrame())
+        Result onClose(uint16_t, Span<char>)
+        {
+            if (owner != nullptr)
             {
-                Span<const char> controlFrame;
-                received = endpoint.getPendingControlFrame(controlFrame);
-                if (received)
-                {
-                    owner->controlFrames++;
-                    received = writeFrame(controlFrame);
-                }
-                endpoint.clearPendingControlFrame();
+                owner->controlFrames++;
             }
-            if (not received)
+            return Result(true);
+        }
+
+        void onError(Result result)
+        {
+            if (connection != nullptr)
             {
                 ::printf("[CanvasWS] destroying readable conn=%zu reason=%s\n",
-                         connection->getConnectionID().getIndex(), received.message);
+                         connection->getConnectionID().getIndex(), result.message);
                 ::fflush(stdout);
-                connection->readableSocketStream.destroy();
             }
         }
 
@@ -181,39 +163,18 @@ struct SC::CollaborativeCanvasModel
                 connection != nullptr ? connection->getConnectionID().getIndex() : size_t(-1);
             if (connection != nullptr or hubIndex != size_t(-1))
             {
-                ::printf("[CanvasWS] detach conn=%zu hub=%zu listeners data/end/close=%d/%d/%d activeBefore=%zu\n",
-                         connectionIndex, hubIndex, dataListenerAdded ? 1 : 0, endListenerAdded ? 1 : 0,
-                         closeListenerAdded ? 1 : 0, owner != nullptr ? owner->webSocketHub.getNumClients() : 0);
+                ::printf("[CanvasWS] detach conn=%zu hub=%zu attached=%d activeBefore=%zu\n", connectionIndex, hubIndex,
+                         pump.isAttached() ? 1 : 0, owner != nullptr ? owner->webSocketHub.getNumClients() : 0);
                 ::fflush(stdout);
             }
+            pump.detach();
             if (owner != nullptr and hubIndex != size_t(-1))
             {
                 (void)owner->webSocketHub.leave(hubIndex);
                 hubIndex = size_t(-1);
             }
-            if (connection != nullptr)
-            {
-                if (dataListenerAdded)
-                {
-                    (void)connection->readableSocketStream.eventData
-                        .removeListener<WebSocketRuntime, &WebSocketRuntime::onData>(*this);
-                }
-                if (endListenerAdded)
-                {
-                    (void)connection->readableSocketStream.eventEnd
-                        .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
-                }
-                if (closeListenerAdded)
-                {
-                    (void)connection->readableSocketStream.eventClose
-                        .removeListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(*this);
-                }
-            }
-            owner              = nullptr;
-            connection         = nullptr;
-            dataListenerAdded  = false;
-            endListenerAdded   = false;
-            closeListenerAdded = false;
+            owner      = nullptr;
+            connection = nullptr;
             if (connectionIndex != size_t(-1))
             {
                 ::printf("[CanvasWS] detached conn=%zu\n", connectionIndex);
@@ -423,11 +384,11 @@ struct SC::CollaborativeCanvasModel
         runtime.owner      = this;
         runtime.connection = &connection;
         runtime.hubIndex   = size_t(-1);
-        runtime.endpoint.reset(HttpWebSocketEndpointRole::Server);
         runtime.messageAssembler.reset(runtime.messageStorage);
         runtime.messageAssembler.onMessage.bind<WebSocketRuntime, &WebSocketRuntime::onMessage>(runtime);
-        runtime.endpoint.onFrameHeader.bind<WebSocketRuntime, &WebSocketRuntime::onFrameHeader>(runtime);
-        runtime.endpoint.onDataFramePayload.bind<WebSocketRuntime, &WebSocketRuntime::onPayload>(runtime);
+        runtime.pump.onDataFramePayload.bind<WebSocketRuntime, &WebSocketRuntime::onPayload>(runtime);
+        runtime.pump.onEnd.bind<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime);
+        runtime.pump.onError.bind<WebSocketRuntime, &WebSocketRuntime::onError>(runtime);
 
         HttpWebSocketTransportView transport;
         char                       acceptStorage[HttpWebSocketHandshake::AcceptKeyLength] = {0};
@@ -445,18 +406,16 @@ struct SC::CollaborativeCanvasModel
                  webSocketHub.getNumClients());
         ::fflush(stdout);
 
-        SC_TRY_MSG((connection.readableSocketStream.eventData.addListener<WebSocketRuntime, &WebSocketRuntime::onData>(
-                       runtime)),
-                   "CollaborativeCanvas WebSocket data listener limit reached");
-        runtime.dataListenerAdded = true;
-        SC_TRY_MSG(
-            (connection.readableSocketStream.eventEnd.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(runtime)),
-            "CollaborativeCanvas WebSocket end listener limit reached");
-        runtime.endListenerAdded = true;
-        SC_TRY_MSG((connection.readableSocketStream.eventClose.addListener<WebSocketRuntime, &WebSocketRuntime::onEnd>(
-                       runtime)),
-                   "CollaborativeCanvas WebSocket close listener limit reached");
-        runtime.closeListenerAdded = true;
+        Result attachResult = runtime.pump.attach(transport, HttpWebSocketEndpointRole::Server);
+        if (not attachResult)
+        {
+            (void)webSocketHub.leave(runtime.hubIndex);
+            runtime.hubIndex = size_t(-1);
+            return attachResult;
+        }
+        runtime.pump.getEndpoint().onFrameHeader.bind<WebSocketRuntime, &WebSocketRuntime::onFrameHeader>(runtime);
+        runtime.pump.getEndpoint().onPing.bind<WebSocketRuntime, &WebSocketRuntime::onPing>(runtime);
+        runtime.pump.getEndpoint().onClose.bind<WebSocketRuntime, &WebSocketRuntime::onClose>(runtime);
         return Result(true);
     }
 
