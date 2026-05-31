@@ -5,8 +5,7 @@
 SC::GrowableBuffer<SC::StringPath>::GrowableBuffer(StringPath& string) noexcept
     : IGrowableBuffer(&GrowableBuffer::tryGrowTo), sp(string)
 {
-    directAccess = {sp.view().sizeInBytes(), (StringPath::MaxPath - 1) * sizeof(native_char_t),
-                    sp.writableSpan().data()};
+    directAccess = {sp.view().sizeInBytes(), StringPath::MaxPath * sizeof(native_char_t), sp.writableSpan().data()};
 }
 
 SC::GrowableBuffer<SC::StringPath>::~GrowableBuffer() noexcept { finalize(); }
@@ -26,10 +25,10 @@ bool SC::GrowableBuffer<SC::StringPath>::tryGrowTo(IGrowableBuffer& gb, size_t n
 
 bool SC::StringPath::resize(size_t newSize)
 {
-    if (newSize + 1 < MaxPath)
+    if (newSize <= MaxPath)
     {
         path.length              = newSize;
         path.buffer[path.length] = 0;
     }
-    return newSize + 1 < MaxPath;
+    return newSize <= MaxPath;
 }

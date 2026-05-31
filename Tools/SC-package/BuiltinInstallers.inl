@@ -169,10 +169,16 @@ static Result extractDebArchive(StringView sourceFile, StringView destinationDir
     }
     SC_TRY(fs.makeDirectoryRecursive(extractDirectory.view()));
 
+#if SC_PLATFORM_WINDOWS
+    Process process;
+    SC_TRY(process.exec({"tar", "-xf", sourceFile, "-C", extractDirectory.view()}));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb ar archive");
+#else
     Process process;
     SC_TRY(process.setWorkingDirectory(extractDirectory.view()));
     SC_TRY(process.exec({"ar", "-x", sourceFile}));
     SC_TRY_MSG(process.getExitStatus() == 0, "Failed extracting .deb ar archive");
+#endif
 
     String archivePath   = StringEncoding::Utf8;
     auto   expandArchive = [&](StringView archiveName, bool& expanded) -> Result
@@ -227,20 +233,46 @@ static Result downloadTextFile(StringView url, StringView destinationFile)
     return Result(true);
 }
 
-static Result downloadGzipTextFile(StringView url, StringView destinationFile)
+static Result decompressGzipTextFile(StringView compressedPath, StringView destinationFile)
 {
-    String compressedPath = format("{}.gz", destinationFile);
-    SC_TRY(downloadTextFile(url, compressedPath.view()));
-
+#if SC_PLATFORM_WINDOWS
+    Process process;
+    String  stdErr = StringEncoding::Utf8;
+    SC_TRY(process.setEnvironment("SC_GZIP_SOURCE", compressedPath));
+    SC_TRY(process.setEnvironment("SC_GZIP_DEST", destinationFile));
+    static constexpr StringView script =
+        "$src=$env:SC_GZIP_SOURCE; "
+        "$dst=$env:SC_GZIP_DEST; "
+        "$input=[System.IO.File]::OpenRead($src); "
+        "try { "
+        "  $gzip=[System.IO.Compression.GzipStream]::new($input,[System.IO.Compression.CompressionMode]::Decompress); "
+        "  try { "
+        "    $output=[System.IO.File]::Create($dst); "
+        "    try { $gzip.CopyTo($output) } finally { $output.Dispose() } "
+        "  } finally { $gzip.Dispose() } "
+        "} finally { $input.Dispose() }";
+    SC_TRY(process.exec({"powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script}, {}, {},
+                        stdErr));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Failed decompressing gzip metadata");
+    return Result(true);
+#else
     Process process;
     String  output = StringEncoding::Utf8;
-    SC_TRY(process.exec({"gzip", "-dc", compressedPath.view()}, output));
+    SC_TRY(process.exec({"gzip", "-dc", compressedPath}, output));
     SC_TRY_MSG(process.getExitStatus() == 0, "Failed decompressing gzip metadata");
 
     FileSystem fs;
     SC_TRY(fs.init("."));
     SC_TRY(fs.writeString(destinationFile, output.view()));
     return Result(true);
+#endif
+}
+
+static Result downloadGzipTextFile(StringView url, StringView destinationFile)
+{
+    String compressedPath = format("{}.gz", destinationFile);
+    SC_TRY(downloadTextFile(url, compressedPath.view()));
+    return decompressGzipTextFile(compressedPath.view(), destinationFile);
 }
 
 #if SC_PLATFORM_LINUX

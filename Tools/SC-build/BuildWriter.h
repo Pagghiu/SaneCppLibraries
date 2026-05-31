@@ -269,7 +269,9 @@ struct SC::Build::WriterInternal
                 // skipEmpty == true
                 SC_TRY(Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true));
             }
-            const Vector<String>* res = filePathsResolver.resolvedPaths.get(renderedFile.view());
+            String normalizedRenderedFile = StringEncoding::Utf8;
+            SC_TRY(Path::normalize(normalizedRenderedFile, renderedFile.view(), Path::AsPosix));
+            const Vector<String>* res = filePathsResolver.resolvedPaths.get(normalizedRenderedFile.view());
             if (res == nullptr)
             {
                 return Result::Error("BuildWriter::getPathsRelativeTo - Cannot find path");

@@ -8,6 +8,17 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <string.h>
+#include <wchar.h>
+#include <wctype.h>
+
+namespace SC
+{
+namespace FileWindowsDetail
+{
+#include "../Common/WindowsPath.inl"
+}
+} // namespace SC
 
 namespace
 {
@@ -335,15 +346,24 @@ SC::Result SC::FileDescriptor::read(Span<char> data, Span<char>& actuallyRead)
 
 SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
 {
-    StringPath nullTerminated;
-    SC_TRY_MSG(nullTerminated.assign(filePath), "FileDescriptor::open - Path too long or invalid encoding");
-    const wchar_t* nullTerminatedPath = nullTerminated.view().getNullTerminatedNative();
-
-    const bool isThreeChars = filePath.sizeInBytes() >= 3 * sizeof(wchar_t);
-    if (not isThreeChars or
-        (nullTerminatedPath[0] != L'\\' and nullTerminatedPath[1] != L':' and wcscmp(nullTerminatedPath, L"NUL") != 0))
+    StringPath logicalPath;
+    SC_TRY(FileWindowsDetail::WindowsPath::makeLogicalPath(filePath, logicalPath));
+    if (logicalPath.view() != L"NUL" and not FileWindowsDetail::WindowsPath::isAbsolute(logicalPath.view()))
     {
         return Result::Error("FileDescriptor::open - Path must be absolute");
+    }
+    const wchar_t* logicalData = logicalPath.view().getNullTerminatedNative();
+
+    FileWindowsDetail::WindowsPath::TransportString transportPath;
+    const wchar_t*                                  nullTerminatedPath;
+    if (wcscmp(logicalData, L"NUL") == 0)
+    {
+        nullTerminatedPath = logicalData;
+    }
+    else
+    {
+        SC_TRY(FileWindowsDetail::WindowsPath::appendTransportPrefix(logicalPath.view(), transportPath));
+        nullTerminatedPath = transportPath.view().getNullTerminatedNative();
     }
 
     DWORD accessMode        = 0;

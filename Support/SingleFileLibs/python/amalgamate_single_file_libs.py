@@ -146,7 +146,9 @@ def _process_file_recursively(file_path, processed_files, root_dir, current_libr
                     
                     if path_parts[0] in ['Libraries', 'LibrariesExtra'] and len(path_parts) > 1: # Ensure there's a library name
                         included_library_name = path_parts[1]
-                        if included_library_name == current_library_name:
+                        if path_parts[0] == 'Libraries' and included_library_name == 'Common':
+                            file_content += _process_file_recursively(normalized_abs_included_path, processed_files, root_dir, current_library_name, authors_info, spdx_set)
+                        elif included_library_name == current_library_name:
                             file_content += _process_file_recursively(normalized_abs_included_path, processed_files, root_dir, current_library_name, authors_info, spdx_set)
                         else:
                             # This is an include from another library, so we strip it.

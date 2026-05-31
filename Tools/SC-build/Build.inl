@@ -15,6 +15,21 @@
 #include "BuildWriterVisualStudio.inl"
 #include "BuildWriterXCode.inl"
 
+namespace
+{
+static bool buildTargetsWindowsRuntime(const SC::Build::Parameters& parameters)
+{
+    return parameters.targetMachine.platform == SC::Build::Platform::Windows or
+           parameters.platform == SC::Build::Platform::Windows;
+}
+
+static bool buildSupportsWindowsLongPathAwareTargets(const SC::Build::TargetType::Type targetType)
+{
+    return targetType == SC::Build::TargetType::ConsoleExecutable or
+           targetType == SC::Build::TargetType::GUIApplication or targetType == SC::Build::TargetType::SharedLibrary;
+}
+} // namespace
+
 struct SC::Build::CompileFlags::Internal
 {
     template <typename FieldType, typename FlagsClass>
@@ -505,11 +520,17 @@ SC::Result SC::Build::Project::validate() const
     SC_TRY_MSG(not targetName.isEmpty(), "Project needs targetName");
     SC_TRY_MSG(not rootDirectory.isEmpty(), "Project needs targetName");
     SC_TRY_MSG(configurations.size() > 0, "Project needs at least one configuration");
+    SC_TRY_MSG(not((windows.longPathAware.hasBeenSet() and windows.longPathAware) and
+                   not buildSupportsWindowsLongPathAwareTargets(targetType)),
+               "Windows long-path awareness is only valid for runtime targets");
     for (const Configuration& config : configurations)
     {
         SC_TRY_MSG(not config.name.isEmpty(), "Configuration needs a name");
         SC_TRY_MSG(not config.outputPath.isEmpty(), "Configuration needs an output path");
         SC_TRY_MSG(not config.intermediatesPath.isEmpty(), "Configuration needs an intermediates path");
+        SC_TRY_MSG(not((config.windows.longPathAware.hasBeenSet() and config.windows.longPathAware) and
+                       not buildSupportsWindowsLongPathAwareTargets(targetType)),
+                   "Windows long-path awareness is only valid for runtime targets");
     }
     return Result(true);
 }
@@ -595,6 +616,12 @@ SC::Result SC::Build::Definition::enforceDefaults(const Parameters& parameters)
             {
                 SC_TRY(project.addPresetConfiguration(Configuration::Preset::Debug, parameters));
                 SC_TRY(project.addPresetConfiguration(Configuration::Preset::Release, parameters));
+            }
+            if (buildTargetsWindowsRuntime(parameters) and
+                buildSupportsWindowsLongPathAwareTargets(project.targetType) and
+                not project.windows.longPathAware.hasBeenSet())
+            {
+                project.windows.longPathAware = true;
             }
         }
     }
@@ -734,6 +761,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
                                                        String&                                       buffer,
                                                        VectorMap<String, VectorSet<FilesSelection>>& paths)
 {
+    String normalizedPath = StringEncoding::Utf8;
     SC_TRY(buffer.assign(rootDirectory));
     if (Path::isAbsolute(file.base.view(), Path::Type::AsNative))
     {
@@ -753,12 +781,14 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
                 return Result::Error("Absolute path detected");
             }
             SC_TRY(Path::append(buffer, {file.mask.view()}, Path::AsPosix));
-            auto* value = paths.getOrCreate(buffer);
+            SC_TRY(Path::normalize(normalizedPath, buffer.view(), Path::AsPosix));
+            auto* value = paths.getOrCreate(normalizedPath.view());
             SC_TRY(value != nullptr and value->insert(file));
         }
         return Result(true);
     }
     SC_TRY(Path::append(buffer, {file.base.view()}, Path::AsPosix));
+    SC_TRY(Path::normalize(normalizedPath, buffer.view(), Path::AsPosix));
     // Some example cases:
     // 1. /SC/Tests/SCTest
     // 2. /SC/Libraries
@@ -772,7 +802,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
         size_t commonOverlap = 0;
 
         StringView key = it.key.view();
-        StringView buf = buffer.view();
+        StringView buf = normalizedPath.view();
         if (key.fullyOverlaps(buffer.view(), commonOverlap))
         {
             // they are the same (Case 4. after 2. has been inserted)
@@ -804,7 +834,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     }
     if (shouldInsert)
     {
-        auto* value = paths.getOrCreate(buffer);
+        auto* value = paths.getOrCreate(normalizedPath.view());
         SC_TRY(value != nullptr and value->insert(file));
     }
     return Result(true);
@@ -930,6 +960,14 @@ SC::Result SC::Build::ProjectWriter::write(StringView workspaceName)
                 String prjFilterName;
                 SC_TRY(StringBuilder::format(prjFilterName, "{}.vcxproj.filters", project.name));
                 SC_TRY(writeGeneratedFileIfChanged(fs, prjFilterName.view(), builder.finalize()));
+            }
+            if (WriterVisualStudio::shouldWriteLongPathManifest(project))
+            {
+                auto builder = StringBuilder::create(buffer);
+                SC_TRY(WriterVisualStudio::writeLongPathManifest(builder));
+                String manifestName;
+                SC_TRY(StringBuilder::format(manifestName, "{}.long-path.manifest", project.name));
+                SC_TRY(writeGeneratedFileIfChanged(fs, manifestName.view(), builder.finalize()));
             }
             SC_TRY(projectsGuids.push_back(writer.projectGuid));
         }

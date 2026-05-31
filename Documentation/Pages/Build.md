@@ -506,6 +506,10 @@ Typical examples:
 - Visual Studio: open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
 - Make: use `_Build/_Projects/Make/SCWorkspace/apple` or `_Build/_Projects/Make/SCWorkspace/linux`
 
+Windows runtime targets are long-path-aware by default. Override this with `project.windows.longPathAware` or
+`config.windows.longPathAware` when generating Windows targets. The option is valid for console executables, GUI
+applications, and shared libraries; static libraries reject it during validation.
+
 With any debugger or IDE other than VSCode, debug `_Build/_Tools/<Platform>/SC-build` (or
 `_Build/_Tools/Windows/SC-build.exe`) and pass arguments similar to:
 

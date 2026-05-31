@@ -11,6 +11,16 @@
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <wchar.h>
+#include <wctype.h>
+
+namespace SC
+{
+namespace TestingWindowsDetail
+{
+#include "../Common/WindowsPath.inl"
+}
+} // namespace SC
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -217,6 +227,18 @@ static bool repoHasMarkers(StringSpan path)
     return pathExistsFile(marker.view());
 }
 
+static bool normalizeNativePath(StringSpan path, StringPath& normalizedPath)
+{
+#if SC_PLATFORM_WINDOWS
+    const DWORD length =
+        ::GetFullPathNameW(path.getNullTerminatedNative(), static_cast<DWORD>(StringPath::StorageCapacity),
+                           normalizedPath.writableSpan().data(), nullptr);
+    return length > 0 and length < StringPath::StorageCapacity and normalizedPath.resize(length);
+#else
+    return normalizedPath.assign(path);
+#endif
+}
+
 static void recordAttempt(StartupAttempt* attempts, size_t maxAttempts, size_t& numAttempts, const char* source,
                           StringSpan candidate)
 {
@@ -290,6 +312,12 @@ static bool resolveCompiledLibraryRoot(StringSpan executablePath, StringPath& li
             return false;
     }
 
+    StringPath normalizedCandidate;
+    if (normalizeNativePath(candidate.view(), normalizedCandidate))
+    {
+        candidate = move(normalizedCandidate);
+    }
+
     recordAttempt(attempts, maxAttempts, numAttempts, "compiled relative root", candidate.view());
     if (validateLibraryRoot(candidate.view()))
     {
@@ -349,6 +377,11 @@ static bool resolveLibraryRoot(TestReport::IOutput& console, StringSpan explicit
         StringPath candidate;
         if (candidate.assign(explicitOverride))
         {
+            StringPath normalizedCandidate;
+            if (normalizeNativePath(candidate.view(), normalizedCandidate))
+            {
+                candidate = move(normalizedCandidate);
+            }
             recordAttempt(attempts, 16, numAttempts, "explicit override", candidate.view());
             if (validateLibraryRoot(candidate.view()))
             {
@@ -393,14 +426,11 @@ static bool resolveLibraryRoot(TestReport::IOutput& console, StringSpan explicit
 static StringSpan getExecutablePath(StringPath& executablePath)
 {
 #if SC_PLATFORM_WINDOWS
-    DWORD length =
-        ::GetModuleFileNameW(nullptr, executablePath.writableSpan().data(), static_cast<DWORD>(StringPath::MaxPath));
-    if (length == 0 || length >= StringPath::MaxPath)
+    if (not TestingWindowsDetail::WindowsPath::getExecutablePath(executablePath))
     {
         (void)executablePath.resize(0);
         return {};
     }
-    (void)executablePath.resize(length);
     return executablePath.view();
 #elif SC_PLATFORM_APPLE
     uint32_t size = static_cast<uint32_t>(StringPath::MaxPath);
@@ -425,14 +455,11 @@ static StringSpan getExecutablePath(StringPath& executablePath)
 static StringSpan getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
 {
 #if SC_PLATFORM_WINDOWS
-    DWORD length =
-        ::GetCurrentDirectoryW(static_cast<DWORD>(StringPath::MaxPath), currentWorkingDirectory.writableSpan().data());
-    if (length == 0 || length >= StringPath::MaxPath)
+    if (not TestingWindowsDetail::WindowsPath::getCurrentDirectory(currentWorkingDirectory))
     {
         (void)currentWorkingDirectory.resize(0);
         return {};
     }
-    (void)currentWorkingDirectory.resize(length);
     return currentWorkingDirectory.view();
 #else
     if (::getcwd(currentWorkingDirectory.writableSpan().data(), StringPath::MaxPath) != nullptr)

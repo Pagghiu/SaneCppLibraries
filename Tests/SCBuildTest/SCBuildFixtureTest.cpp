@@ -176,6 +176,21 @@ static Result createFixtureDirectories(TestReport& report, String& buildRoot, Bu
     return Result(true);
 }
 
+#if SC_PLATFORM_WINDOWS
+static Result appendDeepWindowsFixtureRoot(StringView buildRoot, StringView fixtureDirectoryName, String& projectRoot)
+{
+    SC_TRY(projectRoot.assign(buildRoot));
+    for (size_t idx = 0; idx < 6; ++idx)
+    {
+        SmallString<64> segment;
+        SC_TRY(StringBuilder::format(segment, "windows-long-path-segment-{:02}", idx));
+        SC_TRY(Path::append(projectRoot, {segment.view()}, Path::AsNative));
+    }
+    SC_TRY(Path::append(projectRoot, {fixtureDirectoryName}, Path::AsNative));
+    return Result(true);
+}
+#endif
+
 static Result setDynamicFixtureProjectRoot(StringView sourceRoot)
 {
     StringSpan::NativeWritable writable = {{DynamicFixtureProjectRootStorage, sizeof(DynamicFixtureProjectRootStorage)},
@@ -1243,7 +1258,8 @@ static Result captureRepositoryBuildCommand(TestReport& report, Span<const Strin
 #endif
 
 static Result captureExternalBuildCommand(TestReport& report, StringView workingDirectory,
-                                          Span<const StringSpan> arguments, CapturedProcessOutput& capturedOutput)
+                                          Span<const StringSpan> arguments, CapturedProcessOutput& capturedOutput,
+                                          StringView projectDirectoryOverride = {})
 {
     String scriptPath = StringEncoding::Utf8;
 #if SC_PLATFORM_WINDOWS
@@ -1255,7 +1271,13 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
     processArguments[numArguments++] = "/d";
     processArguments[numArguments++] = "/c";
     processArguments[numArguments++] = scriptPath.view();
+    if (not projectDirectoryOverride.isEmpty())
+    {
+        processArguments[numArguments++] = "--project-dir";
+        processArguments[numArguments++] = projectDirectoryOverride;
+    }
 #else
+    SC_COMPILER_UNUSED(projectDirectoryOverride);
     SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.sh"}));
 
     StringSpan processArguments[48];
@@ -1269,7 +1291,14 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
     }
 
     Process process;
+#if SC_PLATFORM_WINDOWS
+    // cmd.exe cannot start from an extended-length current directory, so deep Windows fixtures pass the project
+    // root explicitly and launch from the shorter library checkout.
+    SC_TRY(process.setWorkingDirectory(projectDirectoryOverride.isEmpty() ? workingDirectory
+                                                                          : report.libraryRootDirectory.view()));
+#else
     SC_TRY(process.setWorkingDirectory(workingDirectory));
+#endif
     SC_TRY(process.exec({processArguments, numArguments}, capturedOutput.stdOut, {}, capturedOutput.stdErr));
     capturedOutput.exitStatus = process.getExitStatus();
     SC_TRY(normalizeConsoleOutput(capturedOutput.stdOut));
@@ -1765,10 +1794,54 @@ static Build::Action makeGeneratedCompileAction(const Build::Directories& direct
 
 static Result runBuiltProgram(StringView executablePath, String& stdoutOutput)
 {
-    StringSpan processArguments[] = {executablePath};
-    Process    process;
-    String     rawStdout = StringEncoding::Utf8;
+    Process process;
+    String  rawStdout = StringEncoding::Utf8;
+#if SC_PLATFORM_WINDOWS
+    String normalizedExecutable = StringEncoding::Utf8;
+    SC_TRY(Path::normalize(normalizedExecutable, executablePath, Path::AsNative));
+    String workingDirectory = StringEncoding::Utf8;
+    SC_TRY(workingDirectory.assign(Path::dirname(normalizedExecutable.view(), Path::AsNative)));
+    String launchDirectory = StringEncoding::Utf8;
+    SC_TRY(launchDirectory.assign(workingDirectory.view()));
+    if (not workingDirectory.isEmpty())
+    {
+        wchar_t tempPathStorage[MAX_PATH + 1] = {};
+        DWORD   tempPathLength                = ::GetTempPathW(MAX_PATH + 1, tempPathStorage);
+        SC_TRY_MSG(tempPathLength != 0 and tempPathLength <= MAX_PATH, "Failed resolving Windows temp directory");
+
+        String tempDirectory = StringEncoding::Utf8;
+        SC_TRY(tempDirectory.assign(StringView::fromNullTerminated(tempPathStorage, StringEncoding::Utf16)));
+        SC_TRY(Path::normalize(tempDirectory, tempDirectory.view(), Path::AsNative));
+
+        SmallString<128> aliasName;
+        SC_TRY(StringBuilder::format(aliasName, "SCBuildRun-{}", Time::Realtime::now().milliseconds));
+
+        String aliasWorkingDirectory = StringEncoding::Utf8;
+        SC_TRY(Path::join(aliasWorkingDirectory, {tempDirectory.view(), aliasName.view()}));
+
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+        if (fs.existsAndIsLink(aliasWorkingDirectory.view()))
+        {
+            SC_TRY(fs.removeEmptyDirectory(aliasWorkingDirectory.view()));
+        }
+        else if (fs.existsAndIsDirectory(aliasWorkingDirectory.view()))
+        {
+            SC_TRY(fs.removeDirectoryRecursive(aliasWorkingDirectory.view()));
+        }
+        SC_TRY(fs.createSymbolicLink(workingDirectory.view(), aliasWorkingDirectory.view()));
+        SC_TRY(launchDirectory.assign(aliasWorkingDirectory.view()));
+        SC_TRY(process.setWorkingDirectory(aliasWorkingDirectory.view()));
+    }
+    String launchExecutable = StringEncoding::Utf8;
+    SC_TRY(Path::join(launchExecutable,
+                      {launchDirectory.view(), Path::basename(normalizedExecutable.view(), Path::AsNative)}));
+    StringSpan processArguments[] = {launchExecutable.view()};
     SC_TRY(process.exec({processArguments, 1}, rawStdout));
+#else
+    StringSpan processArguments[] = {executablePath};
+    SC_TRY(process.exec({processArguments, 1}, rawStdout));
+#endif
     SC_TRY_MSG(process.getExitStatus() == 0, "Fixture program exited with non-zero status");
 #if SC_PLATFORM_WINDOWS
     SC_TRY(stdoutOutput.assign({}));
@@ -1973,6 +2046,75 @@ struct SCBuildFixtureTest : public SC::TestCase
         {
             runExternalBuildFixture(Build::Libraries::Multiple, "ebm"_a8, "external-build-multiple\n"_a8);
         }
+
+#if SC_PLATFORM_WINDOWS
+        if (test_section("SC-build launcher builds external project from deep Windows path"))
+        {
+            SC_TRUST_RESULT(verifyNativeBackendHostSupport());
+
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+
+            String projectRoot = StringEncoding::Utf8;
+            String nestedRoot  = StringEncoding::Utf8;
+            SC_TRUST_RESULT(appendDeepWindowsFixtureRoot(buildRoot.view(), "ebwlp"_a8, projectRoot));
+            SC_TRUST_RESULT(Path::join(nestedRoot, {projectRoot.view(), "Nested", "Child"}));
+            SC_TRUST_RESULT(writeExternalBuildFixture(fs, projectRoot.view(), Build::Libraries::SingleFile));
+            SC_TRUST_RESULT(fs.makeDirectoryRecursive(nestedRoot.view()));
+
+            StringSpan commandArguments[] = {
+                "--libraries-root", report.libraryRootDirectory.view(),
+                "compile",          ExternalFixtureProjectName,
+                "--config",         "Debug",
+                "--generator",      "native",
+            };
+
+            CapturedProcessOutput capturedOutput;
+            SC_TRUST_RESULT(captureExternalBuildCommand(report, nestedRoot.view(), commandArguments, capturedOutput,
+                                                        projectRoot.view()));
+            if (not recordExpectation("capturedOutput.exitStatus == 0", capturedOutput.exitStatus == 0))
+            {
+                if (not capturedOutput.stdOut.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdOut", false, capturedOutput.stdOut.view());
+                }
+                if (not capturedOutput.stdErr.isEmpty())
+                {
+                    recordExpectation("capturedOutput.stdErr", false, capturedOutput.stdErr.view());
+                }
+            }
+
+            Build::Directories externalDirectories;
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.projectsDirectory, {projectRoot.view(), "_Build", "_Projects"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.outputsDirectory, {projectRoot.view(), "_Build", "_Outputs"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.intermediatesDirectory,
+                                       {projectRoot.view(), "_Build", "_Intermediates"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.buildCacheDirectory, {projectRoot.view(), "_Build", "_BuildCache"}));
+            SC_TRUST_RESULT(Path::join(externalDirectories.packagesCacheDirectory,
+                                       {projectRoot.view(), "_Build", "_PackagesCache"}));
+            SC_TRUST_RESULT(
+                Path::join(externalDirectories.packagesInstallDirectory, {projectRoot.view(), "_Build", "_Packages"}));
+            externalDirectories.libraryDirectory = report.libraryRootDirectory.view();
+            externalDirectories.projectDirectory = projectRoot.view();
+
+            Build::Action action = makeNativeCompileAction(externalDirectories, ExternalFixtureProjectName);
+
+            String executablePath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(computeExecutablePath(action, ExternalFixtureProjectName, executablePath));
+            SC_TEST_EXPECT(fs.existsAndIsFile(executablePath.view()));
+
+            String stdoutOutput = StringEncoding::Utf8;
+            SC_TEST_EXPECT(runBuiltProgram(executablePath.view(), stdoutOutput));
+            SC_TEST_EXPECT(stdoutOutput == "external-build-single-file\n"_a8);
+        }
+#endif
 
         if (test_section("SC-build launcher defaults to compile for external projects"))
         {
@@ -3919,8 +4061,11 @@ struct SCBuildFixtureTest : public SC::TestCase
 
             String compilerLog = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read(compilerLogPath.view(), compilerLog));
-            SC_TEST_EXPECT(StringView(compilerLog.view()).containsString("ProgramOne/./main.cpp"));
-            SC_TEST_EXPECT(not StringView(compilerLog.view()).containsString("ProgramTwo/./main.cpp"));
+            const StringView compilerLogView = compilerLog.view();
+            SC_TEST_EXPECT(compilerLogView.containsString("ProgramOne/./main.cpp") or
+                           compilerLogView.containsString("ProgramOne/main.cpp"));
+            SC_TEST_EXPECT(not compilerLogView.containsString("ProgramTwo/./main.cpp"));
+            SC_TEST_EXPECT(not compilerLogView.containsString("ProgramTwo/main.cpp"));
         }
 #endif
 

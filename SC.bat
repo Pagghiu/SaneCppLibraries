@@ -55,7 +55,7 @@ if !build_bootstrap! equ 1 (
         echo Failed to build ToolsBootstrap
         exit /b 1
     )
-    link /nologo /DEBUG /OUT:"!BOOTSTRAP_EXE!" "!OBJ_FILE!" Shell32.lib 2>&1
+    link /nologo /DEBUG /MANIFEST:EMBED /MANIFESTINPUT:"!SCRIPT_DIR!\Tools\LongPathAware.manifest" /OUT:"!BOOTSTRAP_EXE!" "!OBJ_FILE!" Shell32.lib 2>&1
     if !errorlevel! neq 0 (
         echo Failed to link ToolsBootstrap
         exit /b 1

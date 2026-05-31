@@ -114,6 +114,15 @@ void SC::FileTest::testOpen()
     StringView sv(spanOut, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(sv.compare("test") == StringView::Comparison::Equals);
 
+#if SC_PLATFORM_WINDOWS
+    StringPath prefixedFilePath;
+    SC_TEST_EXPECT(prefixedFilePath.assign("\\\\?\\"_a8));
+    SC_TEST_EXPECT(prefixedFilePath.append(filePath.view()));
+
+    SC_TEST_EXPECT(fd.open(prefixedFilePath.view(), FileOpen::Read));
+    SC_TEST_EXPECT(fd.close());
+#endif
+
     // Shutdown test
     SC_TEST_EXPECT(fs.removeFile(fileName));
     SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));

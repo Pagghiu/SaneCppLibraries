@@ -643,6 +643,11 @@ struct CoverageFlags
     String excludeRegex; ///< Regex of files to exclude from coverage
 };
 
+struct WindowsTargetOptions
+{
+    Parameter<bool> longPathAware = false; ///< Embed a long-path-aware Windows manifest on supported runtime targets
+};
+
 /// @brief Groups SC::Build::CompileFlags and SC::Build::LinkFlags for a given SC::Build::Architecture
 struct Configuration
 {
@@ -660,7 +665,8 @@ struct Configuration
         StringView platformToolset;
     };
 
-    VisualStudio visualStudio; ///< Customize VisualStudio platformToolset
+    VisualStudio         visualStudio; ///< Customize VisualStudio platformToolset
+    WindowsTargetOptions windows;
 
     /// @brief Convert Preset to StringView
     [[nodiscard]] static constexpr StringView PresetToString(Preset preset)
@@ -724,8 +730,9 @@ struct Project
         : name(name), targetType(targetType)
     {}
 
-    String           name;                                       ///< Project name
-    TargetType::Type targetType = TargetType::ConsoleExecutable; ///< Type of build artifact
+    String               name;                                       ///< Project name
+    TargetType::Type     targetType = TargetType::ConsoleExecutable; ///< Type of build artifact
+    WindowsTargetOptions windows;
 
     String rootDirectory; ///< Project root directory (== Parameters::projectDirectory if empty)
     String targetName;    ///< Project target name (== Project::name if empty)

@@ -114,6 +114,7 @@ Span<StringSpan>* parsedValues     = nullptr;
 | Path | Description |
 |------|-------------|
 | `Libraries/*` | Core libraries |
+| `Libraries/Common/` | Source fragments to privately inline into multiple libraries, not a library dependency; see its local `AGENTS.md`. |
 | `Tests/Libraries/*` | Tests per library |
 | `Examples/SCExample` | GUI example with async integration |
 | `Tools/SC-Build.cpp` | Build configuration |

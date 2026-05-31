@@ -83,9 +83,10 @@ Result openSerialHandle(StringSpan path, const SerialOpenOptions& options, FileD
         ::CreateFileW(nativePath, desiredAccess, shareMode, &securityAttributes, creationMode, flagsAndAttrs, nullptr);
     if (serialHandle == INVALID_HANDLE_VALUE and isUnprefixedComPath(nativePath))
     {
-        wchar_t      prefixedPath[StringPath::MaxPath] = {};
-        const size_t pathLen                           = ::wcslen(nativePath);
-        SC_TRY_MSG(pathLen + 4 < StringPath::MaxPath, "SerialDescriptor::open - Path too long");
+        wchar_t prefixedPath[StringPath::StorageCapacity] = {};
+
+        const size_t pathLen = ::wcslen(nativePath);
+        SC_TRY_MSG(pathLen + 4 <= StringPath::MaxPath, "SerialDescriptor::open - Path too long");
         prefixedPath[0] = L'\\';
         prefixedPath[1] = L'\\';
         prefixedPath[2] = L'.';

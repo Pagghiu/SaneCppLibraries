@@ -22,5 +22,5 @@ OUTPUT_HTML = os.path.join('_Build', '_Dependencies', 'Dependencies.html')
 LIBRARIES_DIR = 'Libraries'
 DOC_LIBRARIES_DIR = os.path.join('Documentation', 'Libraries')
 
-# Libraries to ignore (e.g., LibrariesExtra)
-IGNORED_LIBRARIES = {'LibrariesExtra'}
+# Directories under Libraries/ that are source material, not standalone libraries.
+IGNORED_LIBRARIES = {'Common', 'LibrariesExtra'}

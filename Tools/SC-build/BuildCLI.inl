@@ -1316,7 +1316,7 @@ static Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& d
     directories.libraryDirectory = arguments.libraryDirectory.view();
     directories.projectDirectory = arguments.projectDirectory.view();
 
-    SmallStringNative<256> buffer;
+    SmallStringNative<4096> buffer;
 
     Console& console = arguments.console;
     auto     builder = StringBuilder::create(buffer);

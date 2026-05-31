@@ -277,6 +277,10 @@ struct SC_PROCESS_EXPORT Process
     Result formatArguments(Span<const StringSpan> cmd);
 
     StringPath currentDirectory;
+#if SC_PLATFORM_WINDOWS
+    StringPath executablePathForLaunch;
+    bool       executablePathLooksLikeFile = false;
+#endif
 
     // On Windows command holds the concatenation of executable and arguments.
     // On Posix command holds the concatenation of executable and arguments SEPARATED BY null-terminators (\0).

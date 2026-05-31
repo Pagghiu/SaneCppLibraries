@@ -48,6 +48,41 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return true;
     }
 
+    [[nodiscard]] static bool isLongPathAware(const Project& project, const Configuration& configuration)
+    {
+        if (configuration.windows.longPathAware.hasBeenSet())
+        {
+            return configuration.windows.longPathAware;
+        }
+        return project.windows.longPathAware;
+    }
+
+    [[nodiscard]] static bool shouldWriteLongPathManifest(const Project& project)
+    {
+        for (const Configuration& configuration : project.configurations)
+        {
+            if (isLongPathAware(project, configuration))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    [[nodiscard]] static Result writeLongPathManifest(StringBuilder& builder)
+    {
+        SC_TRY(
+            builder.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+                           "<assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"
+                           "  <application xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"
+                           "    <windowsSettings xmlns:ws2=\"http://schemas.microsoft.com/SMI/2016/WindowsSettings\">\n"
+                           "      <ws2:longPathAware>true</ws2:longPathAware>\n"
+                           "    </windowsSettings>\n"
+                           "  </application>\n"
+                           "</assembly>\n"));
+        return Result(true);
+    }
+
     [[nodiscard]] bool writeConfiguration(StringBuilder& builder, const Configuration& configuration,
                                           StringView platform)
     {
@@ -378,6 +413,14 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                "%(IgnoreSpecificDefaultLibraries)</IgnoreSpecificDefaultLibraries>\n");
             }
             builder.append("    </Link>\n");
+            if (isLongPathAware(project, configuration))
+            {
+                builder.append("    <Manifest>\n");
+                builder.append("      <AdditionalManifestFiles>$(ProjectDir){}.long-path.manifest;"
+                               "%(AdditionalManifestFiles)</AdditionalManifestFiles>\n",
+                               project.name);
+                builder.append("    </Manifest>\n");
+            }
         }
         builder.append("  </ItemDefinitionGroup>\n");
 

@@ -26,10 +26,19 @@ struct SC::FileSystemIteratorTest : public SC::TestCase
         {
             walkNotEnough();
         }
+#if SC_PLATFORM_WINDOWS
+        if (test_section("prefixed input logical output"))
+        {
+            prefixedInputLogicalOutput();
+        }
+#endif
     };
     inline void walkRecursiveManual();
     inline void walkRecursive();
     inline void walkNotEnough();
+#if SC_PLATFORM_WINDOWS
+    inline void prefixedInputLogicalOutput();
+#endif
 };
 
 void SC::FileSystemIteratorTest::walkRecursive()
@@ -92,6 +101,23 @@ void SC::FileSystemIteratorTest::walkRecursiveManual()
     SC_TEST_EXPECT(fsIterator.checkErrors());
     //! [walkRecursiveManualSnippet]
 }
+
+#if SC_PLATFORM_WINDOWS
+void SC::FileSystemIteratorTest::prefixedInputLogicalOutput()
+{
+    FileSystemIterator::FolderState entries[16];
+
+    StringPath prefixedRoot;
+    SC_TEST_EXPECT(prefixedRoot.assign("\\\\?\\"_a8));
+    SC_TEST_EXPECT(prefixedRoot.append(report.applicationRootDirectory.view()));
+
+    FileSystemIterator fsIterator;
+    SC_TEST_EXPECT(fsIterator.init(prefixedRoot.view(), entries));
+    SC_TEST_EXPECT(fsIterator.enumerateNext());
+    SC_TEST_EXPECT(not StringView(fsIterator.get().path).startsWith("\\\\?\\"_a8));
+    SC_TEST_EXPECT(fsIterator.checkErrors());
+}
+#endif
 
 namespace SC
 {

@@ -17,7 +17,7 @@
 #include <Windows.h>
 #endif
 
-static SC::SmallString<512> gFormatString;
+static SC::SmallString<4096> gFormatString;
 
 SC::Console* globalConsole;
 

@@ -150,7 +150,9 @@ async function processFileRecursively({ path, processedSet, ctx, targetLibrary, 
       const includedPath = joinPath(currentDir, incToken);
       if (treePathsSet.has(includedPath) && (includedPath.startsWith('Libraries/') || includedPath.startsWith('LibrariesExtra/'))) {
         const includedLib = libraryNameFromPath(includedPath);
-        if (includedLib === targetLibrary) {
+        if (includedPath.startsWith('Libraries/Common/')) {
+          content += await processFileRecursively({ path: includedPath, processedSet, ctx, targetLibrary, treePathsSet, authorsInfo, spdxSet });
+        } else if (includedLib === targetLibrary) {
           content += await processFileRecursively({ path: includedPath, processedSet, ctx, targetLibrary, treePathsSet, authorsInfo, spdxSet });
         }
         continue;

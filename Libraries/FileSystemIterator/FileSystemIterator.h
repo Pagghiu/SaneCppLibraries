@@ -142,6 +142,7 @@ struct FileSystemIterator
 #if SC_PLATFORM_WINDOWS
     bool       expectDotDirectories = true;
     StringPath currentPath;
+    StringPath outputPath;
     uint64_t   dirEnumeratorBuffer[592 / sizeof(uint64_t)];
 #else
     StringPath currentPath;

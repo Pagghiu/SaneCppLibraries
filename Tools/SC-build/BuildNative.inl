@@ -2,17 +2,22 @@
 // SPDX-License-Identifier: MIT
 #include "../../Libraries/Async/Async.h"
 #include "../../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl"
+#include "../../Libraries/Foundation/Deferred.h"
 #include "BuildWriter.h"
 
 #include "../../Libraries/FileSystem/FileSystem.h"
 #include "../../Libraries/Strings/Path.h"
 #include "../../Libraries/Strings/StringBuilder.h"
 #include "../../Libraries/Time/Time.h"
+#include <stdlib.h>
 
 #include "BuildNativeOutput.inl"
+#include "BuildNativeWindowsLongPath.inl"
 
 struct SC::Build::NativeBuild
 {
+    struct ResolvedProject;
+
     struct Variables
     {
         String projectName;
@@ -32,6 +37,7 @@ struct SC::Build::NativeBuild
         String executableCpp;
         String executableLink;
         String executableArchive;
+        String executableResourceCompiler;
         String linkerToolDirectory;
 
         StringView subcommandC;
@@ -110,6 +116,14 @@ struct SC::Build::NativeBuild
         String exportedSymbolsPath;
         String exportedSymbolsLinkerPath;
         String resolvedSysroot;
+        String windowsLongPathManifestPath;
+        String windowsLongPathResourceScriptPath;
+        String windowsLongPathResourcePath;
+        String commandProjectRoot;
+        String commandLibraryRoot;
+        String commandWorkingDirectory;
+
+        bool windowsLongPathAware = false;
 
         Vector<const Project*> workspaceDependencies;
         Vector<String>         workspaceDependencyArtifacts;
@@ -343,13 +357,18 @@ struct SC::Build::NativeBuild
             SC_TRY(makeParentDirectory(*fileSystem, source.objectPath.view()));
             SC_TRY(reporter->printStepStarted(slot.job));
 
-            SC_TRY(maybeWriteResponseFile(*fileSystem, commandLine, source.responsePath.view(), project.adapter));
+            SC_TRY(maybeWriteResponseFile(*fileSystem, commandLine, source.responsePath.view(), project.adapter,
+                                          project.commandWorkingDirectory.view()));
 
             StringSpan             views[128];
             Span<const StringSpan> args;
             SC_TRY(commandLine.toViews(views, args));
 
             Process process;
+            if (not project.commandWorkingDirectory.view().isEmpty())
+            {
+                SC_TRY(process.setWorkingDirectory(project.commandWorkingDirectory.view()));
+            }
             if (project.adapter.isMSVCStyle())
             {
                 SC_TRY(buildCapturedOutputPath(source, ".stdout.tmp", slot.stdOutPath));
@@ -660,7 +679,7 @@ struct SC::Build::NativeBuild
             NativeJobRecord nmJob;
             SC_TRY(initializeJobRecord(0, 0, NativeJobKind::Link, "NM"_a8, source.displayPath.view(), StringView(),
                                        StringView(), nmJob));
-            SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, nmJob));
+            SC_TRY(runCapturedCommand(fs, nmCommand, StringView(), resolvedProject.adapter, StringView(), nmJob));
             SC_TRY_MSG(nmJob.status == NativeJobStatus::Succeeded, "Native backend command failed");
             SC_TRY(appendUniqueSymbolLines(nmJob.stdOut.view(), symbols));
         }
@@ -740,16 +759,22 @@ struct SC::Build::NativeBuild
     }
 
     static Result runCapturedCommand(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
-                                     const CompilerAdapter& adapter, NativeJobRecord& job)
+                                     const CompilerAdapter& adapter, StringView commandWorkingDirectory,
+                                     NativeJobRecord& job)
     {
-        SC_TRY(maybeWriteResponseFile(fs, commandLine, responsePath, adapter));
+        SC_TRY(maybeWriteResponseFile(fs, commandLine, responsePath, adapter, commandWorkingDirectory));
 
         StringSpan             views[128];
         Span<const StringSpan> args;
         SC_TRY(commandLine.toViews(views, args));
 
         Process process;
-        SC_TRY(process.exec(args, job.stdOut, Process::StdIn(), job.stdErr));
+        if (not commandWorkingDirectory.isEmpty())
+        {
+            SC_TRY_MSG(process.setWorkingDirectory(commandWorkingDirectory),
+                       "Failed setting native command working directory");
+        }
+        SC_TRY_MSG(process.exec(args, job.stdOut, Process::StdIn(), job.stdErr), "Failed executing native command");
         job.exitStatus = process.getExitStatus();
         job.status     = job.exitStatus == 0 ? NativeJobStatus::Succeeded : NativeJobStatus::Failed;
         return Result(true);
@@ -801,11 +826,26 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(writeExportedSymbolsFiles(fs, resolvedProject, exportedSymbolsSignature));
         }
+        SC_TRY(NativeBuildWindowsLongPath::writeWindowsLongPathManifest(fs, resolvedProject));
 
         CommandLine finalCommand;
         String      finalCommandString = StringEncoding::Utf8;
         SC_TRY(buildFinalCommand(resolvedProject, finalCommand));
         SC_TRY(formatCommandLine(finalCommand, finalCommandString));
+        CommandLine resourceCommand;
+        String      resourceCommandString = StringEncoding::Utf8;
+        SC_TRY(NativeBuildWindowsLongPath::buildWindowsLongPathResourceCommand(resolvedProject, resourceCommand));
+        if (resourceCommand.size() > 0)
+        {
+            SC_TRY(formatCommandLine(resourceCommand, resourceCommandString));
+            String combinedCommandString = StringEncoding::Utf8;
+            auto   builder               = StringBuilder::create(combinedCommandString);
+            SC_TRY(builder.append(resourceCommandString.view()));
+            SC_TRY(builder.append("\n"));
+            SC_TRY(builder.append(finalCommandString.view()));
+            builder.finalize();
+            finalCommandString = move(combinedCommandString);
+        }
         if (not exportedSymbolsSignature.isEmpty())
         {
             auto builder = StringBuilder::createForAppendingTo(finalCommandString);
@@ -839,10 +879,23 @@ struct SC::Build::NativeBuild
             SC_TRY(reporter.printRebuildTrace(finalJob.stepName.view(), finalJob.label.view(),
                                               finalJob.rebuildReason.view()));
             SC_TRY(reporter.printStepStarted(finalJob));
-            SC_TRY(makeParentDirectory(fs, resolvedProject.executablePath.view()));
+            SC_TRY_MSG(makeParentDirectory(fs, resolvedProject.executablePath.view()),
+                       "Failed creating parent directory for native final artifact");
+            if (resourceCommand.size() > 0)
+            {
+                SC_TRY_MSG(makeParentDirectory(fs, resolvedProject.windowsLongPathResourcePath.view()),
+                           "Failed creating parent directory for native manifest resource");
+                SC_TRY(runCapturedCommand(fs, resourceCommand, StringView(), resolvedProject.adapter,
+                                          resolvedProject.commandWorkingDirectory.view(), finalJob));
+                if (finalJob.status != NativeJobStatus::Succeeded)
+                {
+                    SC_TRY_MSG(reporter.recordCompleted(finalJob), "Failed recording final job completion");
+                    return Result(true);
+                }
+            }
             SC_TRY(runCapturedCommand(fs, finalCommand, finalResponsePath(resolvedProject), resolvedProject.adapter,
-                                      finalJob));
-            SC_TRY(reporter.recordCompleted(finalJob));
+                                      resolvedProject.commandWorkingDirectory.view(), finalJob));
+            SC_TRY_MSG(reporter.recordCompleted(finalJob), "Failed recording final job completion");
             if (reporter.shouldStopScheduling())
             {
                 return Result(true);
@@ -854,14 +907,16 @@ struct SC::Build::NativeBuild
                                            resolvedProject.project->targetName.view(), stripCommandString.view(),
                                            "post-link strip"_a8, stripJob));
                 SC_TRY(reporter.printStepStarted(stripJob));
-                SC_TRY(runCapturedCommand(fs, stripCommand, StringView(), resolvedProject.adapter, stripJob));
+                SC_TRY(runCapturedCommand(fs, stripCommand, StringView(), resolvedProject.adapter,
+                                          resolvedProject.commandWorkingDirectory.view(), stripJob));
                 SC_TRY(reporter.recordCompleted(stripJob));
                 if (reporter.shouldStopScheduling())
                 {
                     return Result(true);
                 }
             }
-            SC_TRY(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()));
+            SC_TRY_MSG(fs.writeString(resolvedProject.linkCommandPath.view(), finalCommandString.view()),
+                       "Failed writing final link command file");
         }
         else
         {
@@ -1120,6 +1175,7 @@ struct SC::Build::NativeBuild
         SC_TRY(fs.makeDirectoryRecursive(action.parameters.directories.outputsDirectory.view()));
         SC_TRY(fs.makeDirectoryRecursive(action.parameters.directories.intermediatesDirectory.view()));
         SC_TRY(fs.makeDirectoryRecursive(action.parameters.directories.buildCacheDirectory.view()));
+        SC_TRY(NativeBuildWindowsLongPath::prepareWindowsCommandWorkingDirectories(fs, resolvedProjects));
 
         Vector<String> workspaceCompileCommands;
         for (ResolvedProject& resolvedProject : resolvedProjects)
@@ -1130,8 +1186,9 @@ struct SC::Build::NativeBuild
 
         if (not workspaceCompileCommands.isEmpty())
         {
-            SC_TRY(writeCompileCommandsArray(fs, resolvedProjects[0].workspaceCompileCommandsPath.view(),
-                                             workspaceCompileCommands.toSpanConst()));
+            SC_TRY_MSG(writeCompileCommandsArray(fs, resolvedProjects[0].workspaceCompileCommandsPath.view(),
+                                                 workspaceCompileCommands.toSpanConst()),
+                       "Failed writing workspace compile_commands.json");
         }
 
         if (action.action == Action::Run)
@@ -1220,7 +1277,8 @@ struct SC::Build::NativeBuild
                                        source.displayPath.view(), commandString.view(),
                                        describeRebuildDecision(compileDecision), job));
             SC_TRY(reporter.printStepStarted(job));
-            SC_TRY(runCapturedCommand(fs, commandLine, source.responsePath.view(), resolvedProject.adapter, job));
+            SC_TRY(runCapturedCommand(fs, commandLine, source.responsePath.view(), resolvedProject.adapter,
+                                      resolvedProject.commandWorkingDirectory.view(), job));
             SC_TRY(
                 finalizeCompileJob(fs, resolvedProject, source, commandString.view(), anyObjectBuilt, job, reporter));
             if (reporter.shouldStopScheduling())
@@ -1473,7 +1531,7 @@ struct SC::Build::NativeBuild
     }
 
     static Result maybeWriteResponseFile(FileSystem& fs, CommandLine& commandLine, StringView responsePath,
-                                         const CompilerAdapter& adapter)
+                                         const CompilerAdapter& adapter, StringView commandWorkingDirectory)
     {
         if (responsePath.isEmpty())
             return Result(true);
@@ -1512,8 +1570,24 @@ struct SC::Build::NativeBuild
                 SC_TRY(reduced.append(secondArgument));
             }
         }
-        String responseArgument = StringEncoding::Utf8;
-        SC_TRY(StringBuilder::format(responseArgument, "@{}", responsePath));
+        String responseArgument       = StringEncoding::Utf8;
+        String normalizedResponsePath = StringEncoding::Utf8;
+        if (not commandWorkingDirectory.isEmpty())
+        {
+            if (not Path::relativeFromTo(normalizedResponsePath, commandWorkingDirectory, responsePath, Path::AsNative,
+                                         Path::AsNative))
+            {
+                // Alias working directories on Windows can live on a different drive from the
+                // response file (for example LOCALAPPDATA vs a mapped/shared workspace). In that
+                // case a relative path does not exist, so keep the absolute response path.
+                SC_TRY(normalizedResponsePath.assign(responsePath));
+            }
+        }
+        else
+        {
+            SC_TRY(normalizedResponsePath.assign(responsePath));
+        }
+        SC_TRY(StringBuilder::format(responseArgument, "@{}", normalizedResponsePath.view()));
         SC_TRY(reduced.append(responseArgument.view()));
         commandLine = move(reduced);
         return Result(true);
@@ -1528,14 +1602,32 @@ struct SC::Build::NativeBuild
         resolvedProject.project         = &project;
         resolvedProject.configuration   = &configuration;
         resolvedProject.resolvedSysroot = String(StringEncoding::Utf8);
-        if (not parameters.toolchain.sysroot.isEmpty())
+        resolvedProject.windowsLongPathAware =
+            NativeBuildWindowsLongPath::isWindowsLongPathAware(project, configuration);
+        if (not parameters.toolchain.sysroot.view().isEmpty())
         {
             SC_TRY(resolvedProject.resolvedSysroot.assign(parameters.toolchain.sysroot.view()));
         }
 
         SC_TRY(resolveTargetContext(parameters, resolvedProject.targetContext));
         SC_TRY(resolveCompilerAdapter(parameters, resolvedProject.targetContext, resolvedProject.adapter));
-        if (resolvedProject.resolvedSysroot.isEmpty() and shouldUsePackagedLinuxSysroot(resolvedProject.targetContext))
+        if (resolvedProject.windowsLongPathAware and
+            targetPlatform(resolvedProject.targetContext) == Platform::Windows and
+            (not project.rootDirectory.isEmpty() or not parameters.directories.libraryDirectory.isEmpty()))
+        {
+            const StringView commandRoot = not project.rootDirectory.isEmpty()
+                                               ? project.rootDirectory.view()
+                                               : parameters.directories.libraryDirectory.view();
+            SC_TRY(Path::normalize(resolvedProject.commandProjectRoot, commandRoot, Path::AsNative));
+            SC_TRY(resolvedProject.commandWorkingDirectory.assign(resolvedProject.commandProjectRoot.view()));
+            if (not parameters.directories.libraryDirectory.isEmpty())
+            {
+                SC_TRY(Path::normalize(resolvedProject.commandLibraryRoot,
+                                       parameters.directories.libraryDirectory.view(), Path::AsNative));
+            }
+        }
+        if (resolvedProject.resolvedSysroot.view().isEmpty() and
+            shouldUsePackagedLinuxSysroot(resolvedProject.targetContext))
         {
             SC_TRY(resolvePackagedLinuxSysroot(parameters, resolvedProject.targetContext,
                                                resolvedProject.resolvedSysroot));
@@ -1577,6 +1669,21 @@ struct SC::Build::NativeBuild
                           {resolvedProject.intermediateDirectory.view(), "exported_symbols.list"}));
         SC_TRY(Path::join(resolvedProject.exportedSymbolsLinkerPath,
                           {resolvedProject.intermediateDirectory.view(), "exported_symbols.ld"}));
+        if (resolvedProject.windowsLongPathAware and
+            targetPlatform(resolvedProject.targetContext) == Platform::Windows and
+            (project.targetType == TargetType::ConsoleExecutable or project.targetType == TargetType::GUIApplication or
+             project.targetType == TargetType::SharedLibrary))
+        {
+            SC_TRY(Path::join(resolvedProject.windowsLongPathManifestPath,
+                              {resolvedProject.intermediateDirectory.view(), "long_path.manifest"}));
+            if (resolvedProject.adapter.family == Toolchain::LLVMMingw)
+            {
+                SC_TRY(Path::join(resolvedProject.windowsLongPathResourceScriptPath,
+                                  {resolvedProject.intermediateDirectory.view(), "long_path.rc"}));
+                SC_TRY(Path::join(resolvedProject.windowsLongPathResourcePath,
+                                  {resolvedProject.intermediateDirectory.view(), "long_path.res"}));
+            }
+        }
 
         Vector<WriterInternal::RenderItem> renderItems;
         SC_TRY(WriterInternal::renderProject(project.rootDirectory.view(), project, filePathsResolver, renderItems));
@@ -1602,7 +1709,9 @@ struct SC::Build::NativeBuild
             SC_TRY(CompileFlags::merge(opinions, source.compileFlags));
             SC_TRY(resolvedProject.saneCppFlags.applyTo(source.compileFlags, resolvedProject.linkFlags));
 
-            SC_TRY(Path::join(source.sourcePath, {project.rootDirectory.view(), renderItem.referencePath.view()}));
+            String joinedSourcePath = StringEncoding::Utf8;
+            SC_TRY(Path::join(joinedSourcePath, {project.rootDirectory.view(), renderItem.referencePath.view()}));
+            SC_TRY(Path::normalize(source.sourcePath, joinedSourcePath.view(), Path::AsNative));
 
             String     objectRelative  = StringEncoding::Utf8;
             StringView objectReference = renderItem.referencePath.view();
@@ -1671,17 +1780,16 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(usesCppDriver ? "/TP"_a8 : "/TC"_a8));
             SC_TRY(commandLine.append("/c"));
 
-            String objectFlag = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(objectFlag, "/Fo{}", source.objectPath.view()));
-            SC_TRY(commandLine.append(objectFlag.view()));
+            SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/Fo"_a8,
+                                                                     source.objectPath.view()));
 
             String pdbPath = StringEncoding::Utf8;
             SC_TRY(Path::join(pdbPath, {resolvedProject.intermediateDirectory.view(), "native.pdb"}));
-            String pdbFlag = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(pdbFlag, "/Fd{}", pdbPath.view()));
             SC_TRY(commandLine.append("/FS"));
-            SC_TRY(commandLine.append(pdbFlag.view()));
-            SC_TRY(commandLine.append(source.sourcePath.view()));
+            SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/Fd"_a8,
+                                                                     pdbPath.view()));
+            SC_TRY(
+                NativeBuildWindowsLongPath::appendCommandPath(commandLine, resolvedProject, source.sourcePath.view()));
             return Result(true);
         }
         SC_TRY(appendTargeting(commandLine, resolvedProject, true));
@@ -1712,7 +1820,8 @@ struct SC::Build::NativeBuild
             SC_TRY(appendTargeting(commandLine, resolvedProject, false));
             for (const ResolvedSource& source : resolvedProject.sources)
             {
-                SC_TRY(commandLine.append(source.objectPath.view()));
+                SC_TRY(NativeBuildWindowsLongPath::appendCommandPath(commandLine, resolvedProject,
+                                                                     source.objectPath.view()));
             }
             SC_TRY(commandLine.append("/link"));
             SC_TRY(commandLine.append("/NOLOGO"));
@@ -1732,9 +1841,9 @@ struct SC::Build::NativeBuild
                 break;
             }
             SC_TRY(appendLinkFlags(commandLine, resolvedProject));
-            String outFlag = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(outFlag, "/OUT:{}", resolvedProject.executablePath.view()));
-            SC_TRY(commandLine.append(outFlag.view()));
+            SC_TRY(NativeBuildWindowsLongPath::appendMSVCWindowsLongPathManifest(commandLine, resolvedProject));
+            SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/OUT:"_a8,
+                                                                     resolvedProject.executablePath.view()));
             return Result(true);
         }
 
@@ -1760,12 +1869,13 @@ struct SC::Build::NativeBuild
             }
             for (const ResolvedSource& source : resolvedProject.sources)
             {
-                SC_TRY(commandLine.append(source.objectPath.view()));
+                SC_TRY(NativeBuildWindowsLongPath::appendCommandPath(commandLine, resolvedProject,
+                                                                     source.objectPath.view()));
             }
             SC_TRY(appendLinkFlags(commandLine, resolvedProject));
-            String outFlag = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(outFlag, "/OUT:{}", resolvedProject.executablePath.view()));
-            SC_TRY(commandLine.append(outFlag.view()));
+            SC_TRY(NativeBuildWindowsLongPath::appendMSVCWindowsLongPathManifest(commandLine, resolvedProject));
+            SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/OUT:"_a8,
+                                                                     resolvedProject.executablePath.view()));
             return Result(true);
         }
 
@@ -1836,6 +1946,7 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append("-lm"));
         }
+        SC_TRY(NativeBuildWindowsLongPath::appendGenericWindowsLongPathManifest(commandLine, resolvedProject));
         SC_TRY(commandLine.append("-o"));
         SC_TRY(commandLine.append(resolvedProject.executablePath.view()));
         return Result(true);
@@ -1851,12 +1962,12 @@ struct SC::Build::NativeBuild
         if (resolvedProject.adapter.isMSVCStyle())
         {
             SC_TRY(commandLine.append("/NOLOGO"));
-            String outFlag = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(outFlag, "/OUT:{}", resolvedProject.executablePath.view()));
-            SC_TRY(commandLine.append(outFlag.view()));
+            SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/OUT:"_a8,
+                                                                     resolvedProject.executablePath.view()));
             for (const ResolvedSource& source : resolvedProject.sources)
             {
-                SC_TRY(commandLine.append(source.objectPath.view()));
+                SC_TRY(NativeBuildWindowsLongPath::appendCommandPath(commandLine, resolvedProject,
+                                                                     source.objectPath.view()));
             }
             return Result(true);
         }
@@ -1946,9 +2057,8 @@ struct SC::Build::NativeBuild
                 String absolutePath = StringEncoding::Utf8;
                 SC_TRY(resolveBuildPath(resolvedProject.project->rootDirectory.view(), includePath.view(),
                                         resolvedProject.variables, absolutePath));
-                String option = StringEncoding::Utf8;
-                SC_TRY(StringBuilder::format(option, "/I{}", absolutePath.view()));
-                SC_TRY(commandLine.append(option.view()));
+                SC_TRY(NativeBuildWindowsLongPath::appendCommandPathFlag(commandLine, resolvedProject, "/I"_a8,
+                                                                         absolutePath.view()));
             }
             const Vector<String>& extraCompilerFlags = resolvedProject.parameters->toolchain.extraCompilerFlags;
             for (const String& extraCompilerFlag : extraCompilerFlags)
@@ -3081,7 +3191,7 @@ struct SC::Build::NativeBuild
     static Result resolveLinuxRunnerSysroot(const Parameters& parameters, const ResolvedTargetContext& targetContext,
                                             String& sysroot)
     {
-        if (not parameters.toolchain.sysroot.isEmpty())
+        if (not parameters.toolchain.sysroot.view().isEmpty())
         {
             SC_TRY(sysroot.assign(parameters.toolchain.sysroot.view()));
             return Result(true);
@@ -3416,7 +3526,7 @@ struct SC::Build::NativeBuild
                 case Architecture::Wasm: break;
                 }
             }
-            if (not resolvedProject.resolvedSysroot.isEmpty())
+            if (not resolvedProject.resolvedSysroot.view().isEmpty())
             {
                 return Result::Error("Windows native sysroot selection is not implemented yet");
             }
@@ -3461,7 +3571,7 @@ struct SC::Build::NativeBuild
             SC_TRY(commandLine.append(targetTriple));
         }
 
-        if (not resolvedProject.resolvedSysroot.isEmpty())
+        if (not resolvedProject.resolvedSysroot.view().isEmpty())
         {
             if (targetPlatform(resolvedProject.targetContext) == Platform::Apple)
             {
@@ -3517,8 +3627,7 @@ struct SC::Build::NativeBuild
         Vector<String> dependencies;
         if (resolvedProject.parameters->execution.useCompilerDependencies)
         {
-            if (not parseDependencyFile(fs, source.dependencyPath.view(), resolvedProject.project->rootDirectory.view(),
-                                        resolvedProject.adapter, dependencies))
+            if (not parseDependencyFile(fs, source.dependencyPath.view(), resolvedProject, dependencies))
             {
                 return DependencyScanFailed;
             }
@@ -3579,12 +3688,12 @@ struct SC::Build::NativeBuild
         return UpToDate;
     }
 
-    static Result parseDependencyFile(FileSystem& fs, StringView dependencyPath, StringView projectRoot,
-                                      const CompilerAdapter& adapter, Vector<String>& dependencies)
+    static Result parseDependencyFile(FileSystem& fs, StringView dependencyPath, const ResolvedProject& resolvedProject,
+                                      Vector<String>& dependencies)
     {
-        if (adapter.isMSVCStyle())
+        if (resolvedProject.adapter.isMSVCStyle())
         {
-            return parseWindowsDependencyFile(fs, dependencyPath, projectRoot, dependencies);
+            return parseWindowsDependencyFile(fs, dependencyPath, resolvedProject, dependencies);
         }
 
         String contents = StringEncoding::Utf8;
@@ -3620,7 +3729,7 @@ struct SC::Build::NativeBuild
             {
                 if (not current.isEmpty())
                 {
-                    SC_TRY(normalizeDependencyPath(projectRoot, current));
+                    SC_TRY(NativeBuildWindowsLongPath::normalizeDependencyPath(resolvedProject, current));
                     SC_TRY(dependencies.push_back(move(current)));
                     current = "";
                 }
@@ -3632,14 +3741,14 @@ struct SC::Build::NativeBuild
         }
         if (not current.isEmpty())
         {
-            SC_TRY(normalizeDependencyPath(projectRoot, current));
+            SC_TRY(NativeBuildWindowsLongPath::normalizeDependencyPath(resolvedProject, current));
             SC_TRY(dependencies.push_back(move(current)));
         }
         return Result(true);
     }
 
-    static Result parseWindowsDependencyFile(FileSystem& fs, StringView dependencyPath, StringView projectRoot,
-                                             Vector<String>& dependencies)
+    static Result parseWindowsDependencyFile(FileSystem& fs, StringView dependencyPath,
+                                             const ResolvedProject& resolvedProject, Vector<String>& dependencies)
     {
         String contents = StringEncoding::Utf8;
         SC_TRY(fs.read(dependencyPath, contents));
@@ -3664,7 +3773,7 @@ struct SC::Build::NativeBuild
 
             String dependency = StringEncoding::Utf8;
             SC_TRY(dependency.assign(line));
-            SC_TRY(normalizeDependencyPath(projectRoot, dependency));
+            SC_TRY(NativeBuildWindowsLongPath::normalizeDependencyPath(resolvedProject, dependency));
             SC_TRY(dependencies.push_back(move(dependency)));
         }
         return Result(true);
@@ -3694,7 +3803,7 @@ struct SC::Build::NativeBuild
                 {
                     String dependency = StringEncoding::Utf8;
                     SC_TRY(dependency.assign(includePath));
-                    SC_TRY(normalizeDependencyPath(resolvedProject.project->rootDirectory.view(), dependency));
+                    SC_TRY(NativeBuildWindowsLongPath::normalizeDependencyPath(resolvedProject, dependency));
                     SC_TRY(dependencies.push_back(move(dependency)));
                 }
                 continue;
@@ -3741,16 +3850,6 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
-    static Result normalizeDependencyPath(StringView projectRoot, String& dependencyPath)
-    {
-        if (Path::isAbsolute(dependencyPath.view(), Path::AsNative))
-            return Result(true);
-        String normalized = StringEncoding::Utf8;
-        SC_TRY(Path::join(normalized, {projectRoot, dependencyPath.view()}));
-        dependencyPath = move(normalized);
-        return Result(true);
-    }
-
     static Result writeCompileCommands(FileSystem& fs, const ResolvedProject& resolvedProject,
                                        Vector<String>& workspaceEntries)
     {
@@ -3772,9 +3871,11 @@ struct SC::Build::NativeBuild
             SC_TRY(appendJsonEscaped(escapedOutput, source.objectPath.view()));
 
             String entry = StringEncoding::Utf8;
-            SC_TRY(StringBuilder::format(
-                entry, "{{\"directory\":\"{}\",\"command\":\"{}\",\"file\":\"{}\",\"output\":\"{}\"}}",
-                escapedDirectory.view(), escapedCommand.view(), escapedFile.view(), escapedOutput.view()));
+            SC_TRY(StringBuilder::format(entry,
+                                         "{{\"directory\":\"{}\",\"command\":\"{}\",\"file\":\"{}\",\"output\":"
+                                         "\"{}\"}}",
+                                         escapedDirectory.view(), escapedCommand.view(), escapedFile.view(),
+                                         escapedOutput.view()));
             SC_TRY(projectEntries.push_back(entry));
             SC_TRY(workspaceEntries.push_back(move(entry)));
         }
@@ -3921,6 +4022,7 @@ struct SC::Build::NativeBuild
             String     defaultCompilerC   = StringEncoding::Utf8;
             String     defaultCompilerCpp = StringEncoding::Utf8;
             String     defaultArchiver    = StringEncoding::Utf8;
+            String     defaultWindres     = StringEncoding::Utf8;
             StringView compilerCapability = targetIntel64 ? Tools::PackageCapability::ToolchainWindowsGNUX86_64
                                                           : Tools::PackageCapability::ToolchainWindowsGNUArm64;
             if (not Tools::resolvePackageCapabilityPath(llvmMingwPackage.installDirectoryLink.view(),
@@ -3942,10 +4044,13 @@ struct SC::Build::NativeBuild
             {
                 SC_TRY(StringBuilder::format(defaultArchiver, "{}/bin/llvm-ar", llvmMingwPackage.installDirectoryLink));
             }
+            SC_TRY(StringBuilder::format(defaultWindres, "{}/bin/{}-windres", llvmMingwPackage.installDirectoryLink,
+                                         compilerPrefix));
             SC_TRY(resolveExecutable(toolchain.compilerC.view(), defaultCompilerC.view(), adapter.executableC));
             SC_TRY(resolveExecutable(toolchain.compilerCpp.view(), defaultCompilerCpp.view(), adapter.executableCpp));
             SC_TRY(resolveExecutable(toolchain.linker.view(), adapter.executableCpp.view(), adapter.executableLink));
             SC_TRY(resolveExecutable(toolchain.archiver.view(), defaultArchiver.view(), adapter.executableArchive));
+            SC_TRY(resolveExecutable(StringView(), defaultWindres.view(), adapter.executableResourceCompiler));
             SC_TRY(adapter.displayName.assign("llvm-mingw"));
             break;
         }
@@ -4039,13 +4144,17 @@ struct SC::Build::NativeBuild
                                        String& output)
     {
         String expanded = StringEncoding::Utf8;
+        String resolved = StringEncoding::Utf8;
         SC_TRY(expandVariables(configuredPath, variables, expanded));
         if (Path::isAbsolute(expanded.view(), Path::AsNative))
         {
-            SC_TRY(output.assign(expanded.view()));
-            return Result(true);
+            SC_TRY(resolved.assign(expanded.view()));
         }
-        SC_TRY(Path::join(output, {baseDirectory, expanded.view()}));
+        else
+        {
+            SC_TRY(Path::join(resolved, {baseDirectory, expanded.view()}));
+        }
+        SC_TRY(Path::normalize(output, resolved.view(), Path::AsNative));
         return Result(true);
     }
 
@@ -4053,13 +4162,17 @@ struct SC::Build::NativeBuild
                                    String& output)
     {
         String expanded = StringEncoding::Utf8;
+        String resolved = StringEncoding::Utf8;
         SC_TRY(expandVariables(configuredPath, variables, expanded));
         if (Path::isAbsolute(expanded.view(), Path::AsNative))
         {
-            SC_TRY(output.assign(expanded.view()));
-            return Result(true);
+            SC_TRY(resolved.assign(expanded.view()));
         }
-        SC_TRY(Path::join(output, {projectRoot, expanded.view()}));
+        else
+        {
+            SC_TRY(Path::join(resolved, {projectRoot, expanded.view()}));
+        }
+        SC_TRY(Path::normalize(output, resolved.view(), Path::AsNative));
         return Result(true);
     }
 
@@ -4176,7 +4289,7 @@ struct SC::Build::NativeBuild
                              platformName(targetPlatform(resolvedProject.targetContext)),
                              TargetEnvironment::toString(resolvedProject.targetContext.targetMachine.environment));
         if (not resolvedProject.parameters->toolchain.targetTriple.isEmpty() or
-            not resolvedProject.resolvedSysroot.isEmpty())
+            not resolvedProject.resolvedSysroot.view().isEmpty())
         {
             globalConsole->print("[trace] target triple={} sysroot={}\n",
                                  resolvedProject.parameters->toolchain.targetTriple.view(),

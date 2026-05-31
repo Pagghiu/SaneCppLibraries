@@ -453,11 +453,18 @@ struct SC_FILE_SYSTEM_EXPORT FileSystem
     };
 
   private:
-    [[nodiscard]] bool convert(const StringSpan file, StringPath& destination, StringSpan* encodedPath = nullptr);
+    static constexpr size_t WindowsPathTransportCapacity = StringPath::MaxPath + 6;
+
+    [[nodiscard]] Result convert(const StringSpan file, StringPath& destination,
+                                 StringNativeBuffer<WindowsPathTransportCapacity + 1>& transportPath,
+                                 StringSpan*                                           encodedPath = nullptr);
 
     StringPath fileFormatBuffer1;
     StringPath fileFormatBuffer2;
     StringPath currentDirectory;
+
+    StringNativeBuffer<WindowsPathTransportCapacity + 1> fileTransportBuffer1;
+    StringNativeBuffer<WindowsPathTransportCapacity + 1> fileTransportBuffer2;
 
     char errorMessageBuffer[256] = {0};
 

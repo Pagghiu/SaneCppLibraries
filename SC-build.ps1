@@ -14,6 +14,21 @@ function Fail([string]$Message) {
     exit 1
 }
 
+function Convert-ToLongPath([string]$Path) {
+    $FullPath = [System.IO.Path]::GetFullPath($Path)
+    if ($FullPath.StartsWith("\\?\")) {
+        return $FullPath
+    }
+    if ($FullPath.StartsWith("\\")) {
+        return "\\?\UNC\" + $FullPath.Substring(2)
+    }
+    return "\\?\" + $FullPath
+}
+
+function Ensure-Directory([string]$Path) {
+    [System.IO.Directory]::CreateDirectory((Convert-ToLongPath $Path)) | Out-Null
+}
+
 function Test-LocalLibrariesRoot([string]$Root) {
     (Test-Path (Join-Path $Root "SC.cpp") -PathType Leaf) -and
     (Test-Path (Join-Path $Root "SC.bat") -PathType Leaf) -and
@@ -21,15 +36,20 @@ function Test-LocalLibrariesRoot([string]$Root) {
 }
 
 function Resolve-CanonicalDirectory([string]$Path) {
-    if (-not (Test-Path $Path -PathType Container)) {
+    $FullPath = [System.IO.Path]::GetFullPath($Path)
+    if (-not [System.IO.Directory]::Exists((Convert-ToLongPath $FullPath))) {
         Fail "Directory `"$Path`" does not exist"
     }
-    return (Resolve-Path $Path).Path
+    return $FullPath
 }
 
 function Resolve-CanonicalFile([string]$Path) {
     $Parent = Resolve-CanonicalDirectory ([System.IO.Path]::GetDirectoryName($Path))
-    return (Join-Path $Parent ([System.IO.Path]::GetFileName($Path)))
+    $FullPath = Join-Path $Parent ([System.IO.Path]::GetFileName($Path))
+    if (-not [System.IO.File]::Exists((Convert-ToLongPath $FullPath))) {
+        Fail "File `"$Path`" does not exist"
+    }
+    return $FullPath
 }
 
 function Resolve-ProjectRoot([string]$StartDirectory) {
@@ -48,7 +68,7 @@ function Resolve-ProjectRoot([string]$StartDirectory) {
 }
 
 function Get-RequestedGitRef([string]$ProjectFile) {
-    foreach ($Line in [System.IO.File]::ReadLines($ProjectFile)) {
+    foreach ($Line in [System.IO.File]::ReadLines((Convert-ToLongPath $ProjectFile))) {
         if ($Line -match '^\s*//\s*sc-build-version:\s*(.+?)\s*$') {
             return $Matches[1]
         }
@@ -92,7 +112,7 @@ function Resolve-VcVarsAllPath() {
 function Ensure-SharedRepositoryCheckout([string]$CacheBase) {
     Ensure-GitAvailable
     $RepositoryRoot = Join-Path $CacheBase "repository"
-    [System.IO.Directory]::CreateDirectory($CacheBase) | Out-Null
+    Ensure-Directory $CacheBase
     if (-not (Test-Path (Join-Path $RepositoryRoot ".git") -PathType Container)) {
         Write-Host "Cloning SaneCppLibraries into $RepositoryRoot"
         & git clone $RepositoryUrl $RepositoryRoot | Out-Null
@@ -131,7 +151,7 @@ function Resolve-RequestedCommit([string]$RepositoryRoot, [string]$RequestedRef)
 function Resolve-SharedLibrariesRoot([string]$ProjectRoot) {
     $CacheBase = Get-DefaultCacheBase
     $CacheBase = [System.IO.Path]::GetFullPath($CacheBase)
-    [System.IO.Directory]::CreateDirectory($CacheBase) | Out-Null
+    Ensure-Directory $CacheBase
 
     $RepositoryRoot = Ensure-SharedRepositoryCheckout $CacheBase
     $ProjectFile = Join-Path $ProjectRoot "SC-build.cpp"
@@ -154,7 +174,7 @@ function Resolve-SharedLibrariesRoot([string]$ProjectRoot) {
         Remove-Item -Recurse -Force $WorktreeRoot
     }
     if (-not (Test-Path $WorktreeRoot -PathType Container)) {
-        [System.IO.Directory]::CreateDirectory((Split-Path -Parent $WorktreeRoot)) | Out-Null
+        Ensure-Directory (Split-Path -Parent $WorktreeRoot)
         & git -C $RepositoryRoot worktree add --detach $WorktreeRoot $Commit | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Fail "Failed creating SaneCppLibraries worktree for $Commit"
@@ -169,7 +189,7 @@ function Ensure-BootstrapExecutable([string]$LibrariesRoot) {
     }
 
     $BootstrapExe = Join-Path $LibrariesRoot "_Build\_Tools\Windows\ToolsBootstrap.exe"
-    [System.IO.Directory]::CreateDirectory((Split-Path -Parent $BootstrapExe)) | Out-Null
+    Ensure-Directory (Split-Path -Parent $BootstrapExe)
     $SourceFile = Join-Path $LibrariesRoot "Tools\ToolsBootstrap.c"
     $NeedsBuild = -not (Test-Path $BootstrapExe -PathType Leaf) -or ((Get-Item $SourceFile).LastWriteTimeUtc -gt (Get-Item $BootstrapExe).LastWriteTimeUtc)
     if ($NeedsBuild) {
@@ -177,9 +197,15 @@ function Ensure-BootstrapExecutable([string]$LibrariesRoot) {
         $VcVarsAll = Resolve-VcVarsAllPath
         $ObjectFile = Join-Path $LibrariesRoot "_Build\_Tools\Windows\ToolsBootstrap.obj"
         $Command = 'call "{0}" x86_amd64 >nul && cl.exe /nologo /MTd /Zi /Od /D_DEBUG=1 /Fo"{1}" /c "{2}" && link /nologo /DEBUG /OUT:"{3}" "{1}" Shell32.lib' -f $VcVarsAll, $ObjectFile, $SourceFile, $BootstrapExe
-        cmd.exe /d /c $Command | Out-Null
-        if ($LASTEXITCODE -ne 0) {
-            Fail "Failed building ToolsBootstrap"
+        Push-Location $LibrariesRoot
+        try {
+            cmd.exe /d /c $Command | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Fail "Failed building ToolsBootstrap"
+            }
+        }
+        finally {
+            Pop-Location
         }
     }
     return $BootstrapExe
@@ -233,7 +259,7 @@ $LibrariesRoot =
 
 $BootstrapExe = Ensure-BootstrapExecutable $LibrariesRoot
 $BuildRoot = Join-Path $ProjectRoot "_Build"
-[System.IO.Directory]::CreateDirectory($BuildRoot) | Out-Null
+Ensure-Directory $BuildRoot
 
 $VcVarsAll = Resolve-VcVarsAllPath
 $EscapedArguments = New-Object System.Collections.Generic.List[string]
@@ -241,5 +267,13 @@ foreach ($Argument in @($LibrariesRoot, (Join-Path $LibrariesRoot "Tools"), $Bui
     $EscapedArguments.Add(('"{0}"' -f $Argument.Replace('"', '""'))) | Out-Null
 }
 $BootstrapCommand = 'call "{0}" x86_amd64 >nul && "{1}" {2}' -f $VcVarsAll, $BootstrapExe, ($EscapedArguments -join ' ')
-cmd.exe /d /c $BootstrapCommand
-exit $LASTEXITCODE
+$BootstrapExitCode = 1
+Push-Location $LibrariesRoot
+try {
+    cmd.exe /d /c $BootstrapCommand
+    $BootstrapExitCode = $LASTEXITCODE
+}
+finally {
+    Pop-Location
+}
+exit $BootstrapExitCode

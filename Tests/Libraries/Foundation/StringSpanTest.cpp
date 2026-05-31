@@ -251,8 +251,8 @@ struct SC::StringSpanTest : public SC::TestCase
         SC_TEST_EXPECT(test.assign(report.libraryRootDirectory.view()));
         GrowableBuffer<StringPath> bufTest = {test};
         SC_TEST_EXPECT(not bufTest.tryGrowTo(bufTest, StringPath::MaxPath * 3));
-        char excessivePath[StringPath::MaxPath + 1] = {'a'};
-        SC_TEST_EXPECT(not test.assign({{excessivePath, StringPath::MaxPath + 1}, false, StringEncoding::Ascii}));
+        char excessivePath[StringPath::MaxPath + 2] = {'a'};
+        SC_TEST_EXPECT(not test.assign({{excessivePath, StringPath::MaxPath + 2}, false, StringEncoding::Ascii}));
     }
 };
 

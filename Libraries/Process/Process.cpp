@@ -261,7 +261,12 @@ SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, c
 
 SC::Result SC::Process::setWorkingDirectory(StringSpan processWorkingDirectory)
 {
+#if SC_PLATFORM_WINDOWS
+    return ProcessWindowsDetail::makeWorkingDirectoryAbsolute(processWorkingDirectory, currentDirectory.view(),
+                                                              currentDirectory);
+#else
     return Result(currentDirectory.assign(processWorkingDirectory));
+#endif
 }
 
 SC::Result SC::Process::setEnvironment(StringSpan name, StringSpan value)

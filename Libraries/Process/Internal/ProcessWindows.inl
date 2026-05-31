@@ -8,12 +8,36 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <stdlib.h> // _exit
-#include <wchar.h>  // wcschr
+#include <string.h>
+#include <wchar.h> // wcschr
+#include <wctype.h>
+
+namespace SC
+{
+namespace ProcessWindowsDetail
+{
+#include "../../Common/WindowsPath.inl"
+
+static Result makeWorkingDirectoryAbsolute(StringSpan processWorkingDirectory, StringSpan currentDirectory,
+                                           StringPath& absoluteWorkingDirectory)
+{
+    return WindowsPath::makeAbsoluteLogicalPath(processWorkingDirectory, currentDirectory, absoluteWorkingDirectory);
+}
+} // namespace ProcessWindowsDetail
+} // namespace SC
 #endif
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Process
 //-----------------------------------------------------------------------------------------------------------------------
+
+namespace
+{
+static bool processNeedsWindowsLongPathTransport(SC::StringSpan path)
+{
+    return path.sizeInBytes() / sizeof(wchar_t) >= MAX_PATH;
+}
+} // namespace
 
 bool SC::Process::isWindowsConsoleSubsystem() { return ::GetStdHandle(STD_OUTPUT_HANDLE) == NULL; }
 
@@ -125,10 +149,47 @@ SC::Result SC::Process::launchImplementation()
         startupInfo.dwFlags |= STARTF_USESTDHANDLES;
     }
 
+    ProcessWindowsDetail::WindowsPath::TransportString executableTransportPath;
+    ProcessWindowsDetail::WindowsPath::TransportString workingDirectoryPath;
+
+    LPCWSTR wideApplication = nullptr;
+    if (executablePathLooksLikeFile)
+    {
+        if (processNeedsWindowsLongPathTransport(executablePathForLaunch.view()))
+        {
+            SC_TRY(ProcessWindowsDetail::WindowsPath::makeTransportPath(
+                executablePathForLaunch.view(), currentDirectory.view(), executablePathForLaunch,
+                executableTransportPath));
+            wideApplication = executableTransportPath.view().getNullTerminatedNative();
+        }
+        else
+        {
+            wideApplication = executablePathForLaunch.view().getNullTerminatedNative();
+        }
+    }
+
     // In documentation it's explicitly stated that this buffer will be modified (!?)
-    LPWSTR  wideCmd = const_cast<LPWSTR>(command.view().getNullTerminatedNative());
-    LPCWSTR wideDir = currentDirectory.view().isEmpty() ? nullptr : currentDirectory.view().getNullTerminatedNative();
-    LPWSTR  wideEnv = nullptr; // by default inherit parent environment
+    LPWSTR wideCmd = const_cast<LPWSTR>(command.view().getNullTerminatedNative());
+    if (wideApplication != nullptr and processNeedsWindowsLongPathTransport(executablePathForLaunch.view()) and
+        command.view() == executablePathForLaunch.view())
+    {
+        wideCmd = nullptr;
+    }
+    LPCWSTR wideDir = nullptr;
+    if (not currentDirectory.view().isEmpty())
+    {
+        if (processNeedsWindowsLongPathTransport(currentDirectory.view()))
+        {
+            SC_TRY(ProcessWindowsDetail::WindowsPath::makeTransportPath(currentDirectory.view(), {}, currentDirectory,
+                                                                        workingDirectoryPath));
+            wideDir = workingDirectoryPath.view().getNullTerminatedNative();
+        }
+        else
+        {
+            wideDir = currentDirectory.view().getNullTerminatedNative();
+        }
+    }
+    LPWSTR wideEnv = nullptr; // by default inherit parent environment
 
     EnvironmentTable<MAX_NUM_ENVIRONMENT> environmentTable;
 
@@ -157,16 +218,16 @@ SC::Result SC::Process::launchImplementation()
     PROCESS_INFORMATION processInfo;
     ZeroMemory(&processInfo, sizeof(PROCESS_INFORMATION));
     BOOL success;
-    success = ::CreateProcessW(nullptr,        // [in, optional]      LPCWSTR               lpApplicationName,
-                               wideCmd,        // [in, out, optional] LPWSTR                lpCommandLine,
-                               nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpProcessAttributes,
-                               nullptr,        // [in, optional]      LPSECURITY_ATTRIBUTES lpThreadAttributes,
-                               inheritHandles, // [in]                BOOL                  bInheritHandles,
-                               creationFlags,  // [in]                DWORD                 dwCreationFlags,
-                               wideEnv,        // [in, optional]      LPVOID                lpEnvironment,
-                               wideDir,        // [in, optional]      LPCWSTR               lpCurrentDirectory,
-                               &startupInfo,   // [in]                LPSTARTUPINFOW        lpStartupInfo,
-                               &processInfo);  // [out]               PROCESSINFORMATION    lpProcessInformation
+    success = ::CreateProcessW(wideApplication, // [in, optional]      LPCWSTR               lpApplicationName,
+                               wideCmd,         // [in, out, optional] LPWSTR                lpCommandLine,
+                               nullptr,         // [in, optional]      LPSECURITY_ATTRIBUTES lpProcessAttributes,
+                               nullptr,         // [in, optional]      LPSECURITY_ATTRIBUTES lpThreadAttributes,
+                               inheritHandles,  // [in]                BOOL                  bInheritHandles,
+                               creationFlags,   // [in]                DWORD                 dwCreationFlags,
+                               wideEnv,         // [in, optional]      LPVOID                lpEnvironment,
+                               wideDir,         // [in, optional]      LPCWSTR               lpCurrentDirectory,
+                               &startupInfo,    // [in]                LPSTARTUPINFOW        lpStartupInfo,
+                               &processInfo);   // [out]               PROCESSINFORMATION    lpProcessInformation
 
     if (not success)
     {
@@ -185,9 +246,23 @@ SC::Result SC::Process::launchImplementation()
 SC::Result SC::Process::formatArguments(Span<const StringSpan> params)
 {
     bool first = true;
+#if SC_PLATFORM_WINDOWS
+    executablePathLooksLikeFile = false;
+    (void)executablePathForLaunch.resize(0);
+#endif
 
     for (const StringSpan param : params)
     {
+#if SC_PLATFORM_WINDOWS
+        if (first)
+        {
+            executablePathLooksLikeFile = ProcessWindowsDetail::WindowsPath::looksLikeFilesystemPath(param);
+            if (executablePathLooksLikeFile)
+            {
+                SC_TRY(ProcessWindowsDetail::WindowsPath::makeLogicalPath(param, executablePathForLaunch));
+            }
+        }
+#endif
         if (not first)
         {
             SC_TRY(StringSpan(" ").appendNullTerminatedTo(command));

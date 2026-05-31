@@ -5,6 +5,25 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <string.h>
+#include <wchar.h>
+#include <wctype.h>
+
+namespace SC
+{
+namespace FileSystemIteratorWindowsDetail
+{
+#include "../../Common/WindowsPath.inl"
+}
+} // namespace SC
+
+namespace
+{
+static bool fileSystemIteratorNeedsWindowsLongPathTransport(SC::StringSpan path)
+{
+    return path.sizeInBytes() / sizeof(wchar_t) >= MAX_PATH;
+}
+} // namespace
 
 struct SC::FileSystemIterator::Internal
 {
@@ -42,9 +61,18 @@ SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> 
     recurseStack.recursiveEntries = recursiveEntries;
     recurseStack.currentEntry     = -1;
 
-    SC_TRY_MSG(currentPath.assign(directory), "Directory path is too long");
+    SC_TRY(FileSystemIteratorWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(directory, {}, currentPath));
     const size_t dirLen = currentPath.view().sizeInBytes() / sizeof(wchar_t);
-    SC_TRY_MSG(currentPath.append(L"\\*.*"), "Directory path is too long");
+
+    StringPath searchPath = currentPath;
+    SC_TRY_MSG(searchPath.append(L"\\*.*"), "Directory path is too long");
+    FileSystemIteratorWindowsDetail::WindowsPath::TransportString transportPath;
+    const wchar_t* searchPattern = searchPath.view().getNullTerminatedNative();
+    if (fileSystemIteratorNeedsWindowsLongPathTransport(searchPath.view()))
+    {
+        SC_TRY(FileSystemIteratorWindowsDetail::WindowsPath::appendTransportPrefix(searchPath.view(), transportPath));
+        searchPattern = transportPath.view().getNullTerminatedNative();
+    }
     {
         FolderState entry;
         entry.textLengthInBytes = dirLen * sizeof(wchar_t);
@@ -53,9 +81,7 @@ SC::Result SC::FileSystemIterator::init(StringSpan directory, Span<FolderState> 
 
     FolderState&      currentFolder = recurseStack.back();
     WIN32_FIND_DATAW& dirEnumerator = reinterpret_cast<WIN32_FIND_DATAW&>(dirEnumeratorBuffer);
-    currentFolder.fileDescriptor    = ::FindFirstFileW(currentPath.view().getNullTerminatedNative(), &dirEnumerator);
-    // Set currentPathString back to just the directory (no pattern)
-    currentPath.writableSpan().data()[dirLen] = L'\0';
+    currentFolder.fileDescriptor    = ::FindFirstFileW(searchPattern, &dirEnumerator);
 
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
@@ -104,25 +130,11 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
         break;
     }
 
-    entry.name = StringSpan({dirEnumerator.cFileName, ::wcsnlen(dirEnumerator.cFileName, MAX_PATH)}, true);
+    entry.name = StringSpan::fromNullTerminated(dirEnumerator.cFileName, StringEncoding::Utf16);
 
     (void)currentPath.resize(dirLen);
     SC_TRY_MSG(currentPath.append(L"\\"), "Path too long");
     SC_TRY_MSG(currentPath.append(entry.name), "Path too long");
-
-    if (options.forwardSlashes)
-    {
-        // Convert backslashes to forward slashes
-        wchar_t*     pathData   = currentPath.writableSpan().data();
-        const size_t pathLength = currentPath.view().sizeInBytes() / sizeof(wchar_t);
-        for (size_t i = dirLen; i < pathLength; ++i)
-        {
-            if (pathData[i] == L'\\')
-                pathData[i] = L'/';
-        }
-    }
-    entry.path  = currentPath.view();
-    entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
 
     entry.parentFileDescriptor = parent.fileDescriptor;
     if (dirEnumerator.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
@@ -137,6 +149,24 @@ SC::Result SC::FileSystemIterator::enumerateNextInternal(Entry& entry)
     {
         entry.type = Type::File;
     }
+
+    if (options.forwardSlashes)
+    {
+        outputPath              = currentPath;
+        wchar_t*     pathData   = outputPath.writableSpan().data();
+        const size_t pathLength = outputPath.view().sizeInBytes() / sizeof(wchar_t);
+        for (size_t i = 0; i < pathLength; ++i)
+        {
+            if (pathData[i] == L'\\')
+                pathData[i] = L'/';
+        }
+        entry.path = outputPath.view();
+    }
+    else
+    {
+        entry.path = currentPath.view();
+    }
+    entry.level = static_cast<decltype(entry.level)>(recurseStack.size() - 1);
     return Result(true);
 }
 
@@ -156,11 +186,19 @@ SC::Result SC::FileSystemIterator::recurseSubdirectoryInternal(Entry& entry)
         newParent.textLengthInBytes = recursePath.view().sizeInBytes();
         SC_TRY(recurseStack.push_back(newParent));
     }
-    SC_TRY_MSG(recursePath.append(L"\\*.*"), "Directory path is too long");
+    StringPath searchPath = recursePath;
+    SC_TRY_MSG(searchPath.append(L"\\*.*"), "Directory path is too long");
+    FileSystemIteratorWindowsDetail::WindowsPath::TransportString transportPath;
+    const wchar_t* searchPattern = searchPath.view().getNullTerminatedNative();
+    if (fileSystemIteratorNeedsWindowsLongPathTransport(searchPath.view()))
+    {
+        SC_TRY(FileSystemIteratorWindowsDetail::WindowsPath::appendTransportPrefix(searchPath.view(), transportPath));
+        searchPattern = transportPath.view().getNullTerminatedNative();
+    }
 
     FolderState&      currentFolder = recurseStack.back();
     WIN32_FIND_DATAW& dirEnumerator = reinterpret_cast<WIN32_FIND_DATAW&>(dirEnumeratorBuffer);
-    currentFolder.fileDescriptor    = ::FindFirstFileW(recursePath.view().getNullTerminatedNative(), &dirEnumerator);
+    currentFolder.fileDescriptor    = ::FindFirstFileW(searchPattern, &dirEnumerator);
     if (INVALID_HANDLE_VALUE == currentFolder.fileDescriptor)
     {
         return Result::Error("FindFirstFileW failed");

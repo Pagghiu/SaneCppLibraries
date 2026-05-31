@@ -38,6 +38,130 @@ extern int pclose(FILE *stream);
 #define PCLOSE pclose
 #endif
 #include <time.h>
+
+#ifdef _WIN32
+enum {
+    SC_WINDOWS_LOGICAL_PATH_CAPACITY   = 1024,
+    SC_WINDOWS_TRANSPORT_PATH_CAPACITY = SC_WINDOWS_LOGICAL_PATH_CAPACITY + 6
+};
+
+static int WindowsPath_isDriveLetter(wchar_t character) {
+    return (character >= L'a' && character <= L'z') || (character >= L'A' && character <= L'Z');
+}
+
+static int WindowsPath_hasUNCServerAndShare(const wchar_t* data, int length) {
+    int firstSeparator = 0;
+    while (firstSeparator < length && data[firstSeparator] != L'\\') firstSeparator += 1;
+    if (firstSeparator == 0 || firstSeparator >= length - 1) return 0;
+    int secondSeparator = firstSeparator + 1;
+    while (secondSeparator < length && data[secondSeparator] != L'\\') secondSeparator += 1;
+    return secondSeparator > firstSeparator + 1;
+}
+
+static int WindowsPath_isUNC(const wchar_t* data, int length) {
+    return length >= 5 && data[0] == L'\\' && data[1] == L'\\' &&
+           WindowsPath_hasUNCServerAndShare(data + 2, length - 2);
+}
+
+static int WindowsPath_isDriveAbsolute(const wchar_t* data, int length) {
+    return length >= 3 && WindowsPath_isDriveLetter(data[0]) && data[1] == L':' && data[2] == L'\\';
+}
+
+static int WindowsPath_stripTransportPrefix(wchar_t* logicalPath, int* logicalLength) {
+    int length = *logicalLength;
+    int hasWin32Prefix =
+        length >= 4 && logicalPath[0] == L'\\' && logicalPath[1] == L'\\' && logicalPath[2] == L'?' &&
+        logicalPath[3] == L'\\';
+    int hasNtPrefix =
+        length >= 4 && logicalPath[0] == L'\\' && logicalPath[1] == L'?' && logicalPath[2] == L'?' &&
+        logicalPath[3] == L'\\';
+    if (hasWin32Prefix || hasNtPrefix) {
+        if (length >= 8 && (logicalPath[4] == L'U' || logicalPath[4] == L'u') &&
+            (logicalPath[5] == L'N' || logicalPath[5] == L'n') &&
+            (logicalPath[6] == L'C' || logicalPath[6] == L'c') && logicalPath[7] == L'\\') {
+            if (!WindowsPath_hasUNCServerAndShare(logicalPath + 8, length - 8)) return 0;
+            memmove(logicalPath + 2, logicalPath + 8, (size_t)(length - 8 + 1) * sizeof(wchar_t));
+            logicalPath[0] = L'\\';
+            logicalPath[1] = L'\\';
+            *logicalLength = length - 6;
+            return 1;
+        }
+        if (length >= 7 && WindowsPath_isDriveLetter(logicalPath[4]) && logicalPath[5] == L':' &&
+            logicalPath[6] == L'\\') {
+            memmove(logicalPath, logicalPath + 4, (size_t)(length - 4 + 1) * sizeof(wchar_t));
+            *logicalLength = length - 4;
+            return 1;
+        }
+        return 0;
+    }
+
+    if (length >= 3 && logicalPath[0] == L'\\' && logicalPath[1] == L'\\' && logicalPath[2] == L'?') return 0;
+    if (length >= 3 && logicalPath[0] == L'\\' && logicalPath[1] == L'?' && logicalPath[2] == L'?') return 0;
+    return 1;
+}
+
+static int WindowsPath_prepareTransportPath(const char* utf8Path, wchar_t* transportPath, size_t transportCapacity) {
+    wchar_t logicalPath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    int convertedLength =
+        MultiByteToWideChar(CP_UTF8, 0, utf8Path, -1, logicalPath, (int)(SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1));
+    if (convertedLength <= 0) {
+        return 0;
+    }
+    int logicalLength = convertedLength - 1;
+    for (int idx = 0; idx < logicalLength; ++idx) {
+        if (logicalPath[idx] == L'/') {
+            logicalPath[idx] = L'\\';
+        }
+    }
+
+    if (!WindowsPath_stripTransportPrefix(logicalPath, &logicalLength)) {
+        return 0;
+    }
+
+    if (!(WindowsPath_isUNC(logicalPath, logicalLength) ||
+          WindowsPath_isDriveAbsolute(logicalPath, logicalLength))) {
+        wchar_t absolutePath[SC_WINDOWS_LOGICAL_PATH_CAPACITY + 1];
+        DWORD absoluteLength =
+            GetFullPathNameW(logicalPath, (DWORD)(SC_WINDOWS_LOGICAL_PATH_CAPACITY + 1), absolutePath, NULL);
+        if (absoluteLength == 0 || absoluteLength > SC_WINDOWS_LOGICAL_PATH_CAPACITY) {
+            return 0;
+        }
+        memcpy(logicalPath, absolutePath, ((size_t)absoluteLength + 1) * sizeof(wchar_t));
+        logicalLength = (int)absoluteLength;
+    } else if (logicalLength > SC_WINDOWS_LOGICAL_PATH_CAPACITY) {
+        return 0;
+    }
+
+    if (logicalLength >= 2 && logicalPath[0] == L'\\' && logicalPath[1] == L'\\') {
+        int written = _snwprintf(transportPath, transportCapacity, L"\\\\?\\UNC\\%ls", logicalPath + 2);
+        return written > 0 && (size_t)written < transportCapacity;
+    }
+    int written = _snwprintf(transportPath, transportCapacity, L"\\\\?\\%ls", logicalPath);
+    return written > 0 && (size_t)written < transportCapacity;
+}
+
+static int WindowsPath_createDirectoryAlias(const char* aliasPathUtf8, const char* targetPathUtf8) {
+    wchar_t aliasPath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    wchar_t targetPath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    if (!WindowsPath_prepareTransportPath(aliasPathUtf8, aliasPath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1) ||
+        !WindowsPath_prepareTransportPath(targetPathUtf8, targetPath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
+        return 0;
+    }
+
+    DWORD attributes = GetFileAttributesW(aliasPath);
+    if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+        return 1;
+    }
+
+    DWORD flags = SYMBOLIC_LINK_FLAG_DIRECTORY;
+#ifdef SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE
+    flags |= SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+#endif
+    return CreateSymbolicLinkW(aliasPath, targetPath, flags) != 0;
+}
+
+static const char* windowsCommandWorkingDirectory = NULL;
+#endif
 #include <stdint.h>
 #ifdef __APPLE__
 #include <mach/mach_time.h>
@@ -153,6 +277,11 @@ int String_containsPathSeparator(const char* str);
 const char* Path_fileName(const char* path);
 char* deriveToolIdentity(const char* toolPath);
 int isSCBuildDefinitionSource(const char* toolPath);
+#ifdef _WIN32
+unsigned long long String_hashFnv1a(const char* str);
+unsigned long long String_hashCombine(unsigned long long hash, const char* str);
+char* buildWindowsToolOutputDir(BootloaderArgs* args, const char* toolCpp);
+#endif
 
 // Implementation
 PathContext Path_init(void) {
@@ -164,6 +293,51 @@ PathContext Path_init(void) {
 #endif
     return ctx;
 }
+
+#ifdef _WIN32
+unsigned long long String_hashFnv1a(const char* str) {
+    unsigned long long hash = 1469598103934665603ULL;
+    while (str && *str) {
+        hash ^= (unsigned char)*str++;
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+unsigned long long String_hashCombine(unsigned long long hash, const char* str) {
+    while (str && *str) {
+        hash ^= (unsigned char)*str++;
+        hash *= 1099511628211ULL;
+    }
+    hash ^= 0xFFU;
+    hash *= 1099511628211ULL;
+    return hash;
+}
+
+char* buildWindowsToolOutputDir(BootloaderArgs* args, const char* toolCpp) {
+    const char* cacheBase = getenv("SC_BUILD_TOOL_CACHE_DIR");
+    if (!cacheBase || !cacheBase[0]) cacheBase = getenv("LOCALAPPDATA");
+    if (!cacheBase || !cacheBase[0]) cacheBase = getenv("TEMP");
+    if (!cacheBase || !cacheBase[0]) {
+        return Path_join(args->buildDir, "_Tools");
+    }
+
+    unsigned long long hash = String_hashFnv1a(args->projectDir ? args->projectDir : args->libraryDir);
+    hash = String_hashCombine(hash, args->buildDir);
+    hash = String_hashCombine(hash, args->toolName);
+    hash = String_hashCombine(hash, toolCpp);
+
+    char hashDirectory[32];
+    snprintf(hashDirectory, sizeof(hashDirectory), "%016llx", hash);
+
+    char* scBuildDir = Path_join(cacheBase, "SC-build");
+    char* toolCache  = Path_join(scBuildDir, "ToolCache");
+    char* outputDir  = Path_join(toolCache, hashDirectory);
+    free(scBuildDir);
+    free(toolCache);
+    return outputDir;
+}
+#endif
 
 FileSystemContext FileSystem_init(void) {
     FileSystemContext ctx;
@@ -335,6 +509,19 @@ char* String_duplicate(const char* str) {
     return result;
 }
 
+void String_unescapeJsonInPlace(char* str) {
+    if (!str) return;
+    char* read  = str;
+    char* write = str;
+    while (*read) {
+        if (*read == '\\' && read[1] != '\0') {
+            ++read;
+        }
+        *write++ = *read++;
+    }
+    *write = '\0';
+}
+
 int String_containsPathSeparator(const char* str) {
     if (!str) return 0;
     while (*str) {
@@ -407,22 +594,16 @@ char* Path_join(const char* a, const char* b) {
 // FileSystem functions
 FILE* FileSystem_open(const char* path, const char* mode) {
 #ifdef _WIN32
-    size_t len = strlen(path);
-    wchar_t* wpath = NULL;
-    size_t wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-    if (wpath) {
-        MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-        size_t mlen = strlen(mode);
-        wchar_t* wmode = (wchar_t*)malloc((mlen + 1) * sizeof(wchar_t));
-        if (wmode) {
-            for (size_t i = 0; i <= mlen; ++i) wmode[i] = mode[i];
-            FILE* fp = _wfopen(wpath, wmode);
-            free(wmode);
-            free(wpath);
-            return fp;
-        }
-        free(wpath);
+    wchar_t wpath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    if (!WindowsPath_prepareTransportPath(path, wpath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) return NULL;
+
+    size_t mlen = strlen(mode);
+    wchar_t* wmode = (wchar_t*)malloc((mlen + 1) * sizeof(wchar_t));
+    if (wmode) {
+        for (size_t i = 0; i <= mlen; ++i) wmode[i] = mode[i];
+        FILE* fp = _wfopen(wpath, wmode);
+        free(wmode);
+        return fp;
     }
     return NULL;
 #else
@@ -432,20 +613,15 @@ FILE* FileSystem_open(const char* path, const char* mode) {
 
 TimePoint FileSystem_getModificationTime(const char* path) {
 #ifdef _WIN32
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    if (wlen > 0) {
-        wchar_t* wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-        if (wpath) {
-            MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-            WIN32_FILE_ATTRIBUTE_DATA info;
-            int ret = GetFileAttributesExW(wpath, GetFileExInfoStandard, &info);
-            free(wpath);
-            if (ret != 0) {
-                ULARGE_INTEGER fileTime;
-                fileTime.LowPart  = info.ftLastWriteTime.dwLowDateTime;
-                fileTime.HighPart = info.ftLastWriteTime.dwHighDateTime;
-                return (TimePoint)(fileTime.QuadPart * 100ULL);
-            }
+    wchar_t wpath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    if (WindowsPath_prepareTransportPath(path, wpath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
+        WIN32_FILE_ATTRIBUTE_DATA info;
+        int ret = GetFileAttributesExW(wpath, GetFileExInfoStandard, &info);
+        if (ret != 0) {
+            ULARGE_INTEGER fileTime;
+            fileTime.LowPart  = info.ftLastWriteTime.dwLowDateTime;
+            fileTime.HighPart = info.ftLastWriteTime.dwHighDateTime;
+            return (TimePoint)(fileTime.QuadPart * 100ULL);
         }
     }
     return 0;
@@ -465,17 +641,9 @@ TimePoint FileSystem_getModificationTime(const char* path) {
 int FileSystem_exists(const char* path) {
 #ifdef _WIN32
     struct _stat info;
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    if (wlen > 0) {
-        wchar_t* wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-        if (wpath) {
-            MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-            int ret = _wstat(wpath, &info);
-            free(wpath);
-            return ret == 0;
-        }
-    }
-    return 0;
+    wchar_t wpath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    return WindowsPath_prepareTransportPath(path, wpath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1) &&
+           _wstat(wpath, &info) == 0;
 #else
     struct stat info;
     return stat(path, &info) == 0;
@@ -485,18 +653,10 @@ int FileSystem_exists(const char* path) {
 int FileSystem_isDirectory(const char* path) {
 #ifdef _WIN32
     struct _stat info;
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    if (wlen > 0) {
-        wchar_t* wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-        if (wpath) {
-            MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-            int ret = _wstat(wpath, &info);
-            free(wpath);
-            if (ret != 0) return 0;
-            return (info.st_mode & _S_IFDIR) != 0;
-        }
-    }
-    return 0;
+    wchar_t wpath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    if (!WindowsPath_prepareTransportPath(path, wpath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) return 0;
+    if (_wstat(wpath, &info) != 0) return 0;
+    return (info.st_mode & _S_IFDIR) != 0;
 #else
     struct stat info;
     if (stat(path, &info) != 0) return 0;
@@ -506,17 +666,9 @@ int FileSystem_isDirectory(const char* path) {
 
 int FileSystem_createDirectory(const char* path) {
 #ifdef _WIN32
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
-    if (wlen > 0) {
-        wchar_t* wpath = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-        if (wpath) {
-            MultiByteToWideChar(CP_UTF8, 0, path, -1, wpath, wlen);
-            int ret = _wmkdir(wpath);
-            free(wpath);
-            return ret;
-        }
-    }
-    return -1;
+    wchar_t wpath[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    if (!WindowsPath_prepareTransportPath(path, wpath, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) return -1;
+    return _wmkdir(wpath);
 #else
     return mkdir(path, 0755);
 #endif
@@ -748,7 +900,40 @@ void setupCompilation(CompilationInfo* ci) {
     ci->toolCpp = toolCpp;
     ci->scCpp = Path_join(args->libraryDir, "SC.cpp");
     ci->toolsCpp = Path_join(args->toolSourceDir, "Tools.cpp");
-    ci->toolOutputDir = Path_join(args->buildDir, "_Tools");
+#ifdef _WIN32
+    if (ci->targetOS && strcmp(ci->targetOS, "Windows") == 0) {
+        ci->toolOutputDir = buildWindowsToolOutputDir(args, toolCpp);
+    } else
+#endif
+    {
+        ci->toolOutputDir = Path_join(args->buildDir, "_Tools");
+    }
+
+#ifdef _WIN32
+    if (!builtInTool && args->projectDir && isSCBuildDefinitionSource(ci->toolCpp) &&
+        strlen(ci->toolCpp) >= MAX_PATH) {
+        FileSystem_createDirectoryRecursive(ci->toolOutputDir);
+
+        char* aliasRoot = Path_join(ci->toolOutputDir, "_ProjectRoot");
+        if (!aliasRoot || !WindowsPath_createDirectoryAlias(aliasRoot, args->projectDir)) {
+            fprintf(stderr, "Error: Failed creating long-path build-tool source alias\n");
+            free(aliasRoot);
+            exit(1);
+        }
+
+        char* aliasToolCpp = Path_join(aliasRoot, Path_fileName(ci->toolCpp));
+        if (!aliasToolCpp) {
+            fprintf(stderr, "Error: Failed creating long-path build-tool source path\n");
+            free(aliasRoot);
+            exit(1);
+        }
+
+        free(ci->toolCpp);
+        ci->toolCpp = aliasToolCpp;
+        toolCpp = ci->toolCpp;
+        free(aliasRoot);
+    }
+#endif
 
     // intermediateDir
     char* inter1 = Path_join(ci->toolOutputDir, "_Intermediates");
@@ -809,22 +994,23 @@ int runCommand(const char* command) {
 #ifdef _WIN32
     STARTUPINFOW si = {sizeof(si)};
     PROCESS_INFORMATION pi;
-    size_t len = strlen(command);
-    int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
+    wchar_t wcmd[4096];
+    wchar_t wdir[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    LPCWSTR workingDirectory = NULL;
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, 4096);
     if (wlen == 0) return 1;
-    wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-    if (!wcmd) return 1;
-    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
-    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+    if (windowsCommandWorkingDirectory &&
+        WindowsPath_prepareTransportPath(windowsCommandWorkingDirectory, wdir, SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
+        workingDirectory = wdir;
+    }
+    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, workingDirectory, &si, &pi)) {
         WaitForSingleObject(pi.hProcess, INFINITE);
-        DWORD exitCode;
+        DWORD exitCode = 0xFFFFFFFFu;
         GetExitCodeProcess(pi.hProcess, &exitCode);
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
-        free(wcmd);
         return exitCode == 0 ? 0 : 1;
     } else {
-        free(wcmd);
         return 1;
     }
 #else
@@ -910,6 +1096,7 @@ StringVector parseJsonDependencies(FILE* file) {
             char* end = start ? strstr(start + 1, "\"") : NULL;
             if (start && end) {
                 *end = 0;
+                String_unescapeJsonInPlace(start + 1);
                 StringVector_add(&deps, start + 1);
             }
         }
@@ -932,6 +1119,7 @@ StringVector parseJsonDependencies(FILE* file) {
                 if (end) {
                     *end = 0;
                     char* dep = start + 1;
+                    String_unescapeJsonInPlace(dep);
                     if (strlen(dep) > 0 && strstr(dep, "windows kits") == NULL &&
                         strstr(dep, "microsoft visual studio") == NULL && strcmp(dep, "Includes") != 0 &&
                         strcmp(dep, "ImportedModules") != 0) {
@@ -1089,10 +1277,11 @@ int checkNeedsRebuild(TimePoint objTime, StringVector* sources, StringVector* de
             return 1;
         }
         TimePoint srcTime = FileSystem_getModificationTime(sources->data[i]);
-        if (printMessages) {
-            printf("  Source %s modified (time %llu > %llu), needs rebuild\n", sources->data[i], (unsigned long long)srcTime, (unsigned long long)objTime);
-        }
         if (srcTime > objTime) {
+            if (printMessages) {
+                printf("  Source %s modified (time %llu > %llu), needs rebuild\n", sources->data[i],
+                       (unsigned long long)srcTime, (unsigned long long)objTime);
+            }
             return 1;
         }
     }
@@ -1104,10 +1293,11 @@ int checkNeedsRebuild(TimePoint objTime, StringVector* sources, StringVector* de
             return 1;
         } else {
             TimePoint depTime = FileSystem_getModificationTime(dependencies->data[i]);
-            if (printMessages) {
-                printf("  Dependency %s modified (time %llu > %llu), needs rebuild\n", dependencies->data[i], (unsigned long long)depTime, (unsigned long long)objTime);
-            }
             if (depTime > objTime) {
+                if (printMessages) {
+                    printf("  Dependency %s modified (time %llu > %llu), needs rebuild\n", dependencies->data[i],
+                           (unsigned long long)depTime, (unsigned long long)objTime);
+                }
                 return 1;
             }
         }
@@ -1471,6 +1661,10 @@ int linkWindows(CompilationInfo* ci) {
     char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
     FileSystem_createDirectoryRecursive(exeDir);
     free(exeDir);
+#ifdef _WIN32
+    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
+    windowsCommandWorkingDirectory = ci->toolOutputDir;
+#endif
 
     char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
     char* toolObj = Path_join(ci->intermediateDir, "SC-");
@@ -1481,6 +1675,7 @@ int linkWindows(CompilationInfo* ci) {
     CommandLine_init(&cmd, "link");
     CommandLine_arg(&cmd, "/nologo");
     CommandLine_arg(&cmd, "/DEBUG");
+    CommandLine_arg(&cmd, "/MANIFEST:EMBED");
     StringBuilder sb = StringBuilder_init(256);
     StringBuilder_append(&sb, "/OUT:\"");
     StringBuilder_append(&sb, ci->toolExe);
@@ -1494,6 +1689,14 @@ int linkWindows(CompilationInfo* ci) {
     StringBuilder_append(&sb,".pdb\"");
     CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb));
     StringBuilder_destroy(&sb);
+    char* manifestPath = Path_join(ci->args->toolSourceDir, "LongPathAware.manifest");
+    char* manifestFlag = (char*)malloc(strlen("/MANIFESTINPUT:\"\"") + strlen(manifestPath) + 1);
+    if (manifestFlag) {
+        sprintf(manifestFlag, "/MANIFESTINPUT:\"%s\"", manifestPath);
+        CommandLine_arg(&cmd, manifestFlag);
+        free(manifestFlag);
+    }
+    free(manifestPath);
     CommandLine_argQuoted(&cmd, toolsObj);
     CommandLine_argQuoted(&cmd, toolObj);
     if (!bootstrapLinkStdCpp()) {
@@ -1510,6 +1713,9 @@ int linkWindows(CompilationInfo* ci) {
     CommandLine_destroy(&cmd);
     free(toolsObj);
     free(toolObj);
+#ifdef _WIN32
+    windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
     return ret;
 }
 
@@ -1526,7 +1732,14 @@ int executeTool(BootloaderArgs* args, CompilationInfo* ci) {
     for (int i = 0; i < args->numRemainingArgs; ++i) {
         CommandLine_argQuoted(&cmd, args->remainingArgs[i]);
     }
+#ifdef _WIN32
+    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
+    windowsCommandWorkingDirectory = args->libraryDir;
+#endif
     int ret = CommandLine_run(&cmd);
+#ifdef _WIN32
+    windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
     CommandLine_destroy(&cmd);
     return ret;
 }
@@ -1539,6 +1752,8 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Failed to get arguments\n");
         return 1;
     }
+
+    printMessages = getenv("SC_BOOTSTRAP_DEBUG") != NULL;
 
     BootloaderArgs args = parseArgs((const char**)new_argv, new_argc);
     CompilationInfo ci = CompilationInfo_init(&args);
@@ -1612,10 +1827,20 @@ int main(int argc, char* argv[]) {
 
 int compileWindows(CompilationInfo* ci, int* objsCompiled) {
     // Simplified Windows compilation
-FileSystem_createDirectoryRecursive(ci->intermediateDir);
+    FileSystem_createDirectoryRecursive(ci->intermediateDir);
     FileSystem_createDirectoryRecursive(ci->toolOutputDir);
     char* includeDir = Path_join(ci->args->libraryDir, "Includes");
     int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
+#ifdef _WIN32
+    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
+    windowsCommandWorkingDirectory = ci->toolOutputDir;
+    wchar_t workingDirectory[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    LPCWSTR spawnWorkingDirectory = NULL;
+    if (WindowsPath_prepareTransportPath(ci->toolOutputDir, workingDirectory,
+                                         SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
+        spawnWorkingDirectory = workingDirectory;
+    }
+#endif
 
     int needTools = needsRebuildTools(ci);
     int needTool = needsRebuildToolObj(ci);
@@ -1644,7 +1869,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
                 wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
                 if (wcmd) {
                     MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
-                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, spawnWorkingDirectory, &si, &pi)) {
                         processes[count++] = pi.hProcess;
                         CloseHandle(pi.hThread);
                     }
@@ -1681,7 +1906,7 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
                 wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
                 if (wcmd) {
                     MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
-                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, spawnWorkingDirectory, &si, &pi)) {
                         processes[count++] = pi.hProcess;
                         CloseHandle(pi.hThread);
                     }
@@ -1708,10 +1933,16 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
             CloseHandle(processes[1]);
             if (exit1 != 0 || exit2 != 0) {
                 free(includeDir);
+#ifdef _WIN32
+                windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
                 return 0;
             }
         } else {
             free(includeDir);
+#ifdef _WIN32
+            windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
             return 0;
         }
 #else
@@ -1731,6 +1962,9 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         free(toolsJson);
         if (ret != 0) {
             free(includeDir);
+#ifdef _WIN32
+            windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
             return 0;
         }
     } else if (needTool) {
@@ -1750,6 +1984,9 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         free(toolJson);
         if (ret != 0) {
             free(includeDir);
+#ifdef _WIN32
+            windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
             return 0;
         }
     } else {
@@ -1757,5 +1994,8 @@ FileSystem_createDirectoryRecursive(ci->intermediateDir);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
     free(includeDir);
+#ifdef _WIN32
+    windowsCommandWorkingDirectory = previousWorkingDirectory;
+#endif
     return 1;
 }

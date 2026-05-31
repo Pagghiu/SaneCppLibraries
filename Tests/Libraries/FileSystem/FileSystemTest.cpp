@@ -3,10 +3,22 @@
 #include "Libraries/FileSystem/FileSystem.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Strings/Path.h"
+#include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#include <string.h>
+#include <wchar.h>
+#include <wctype.h>
+
+namespace SC
+{
+namespace FileSystemTestWindowsDetail
+{
+#include "Libraries/Common/WindowsPath.inl"
+}
+} // namespace SC
 #else
 #include <sys/stat.h>
 #include <unistd.h>
@@ -95,6 +107,16 @@ struct SC::FileSystemTest : public SC::TestCase
             report.console.print("currentWorkingDirectory=\"{}\"\n",
                                  FileSystem::Operations::getCurrentWorkingDirectory(stringPath));
         }
+#if SC_PLATFORM_WINDOWS
+        if (test_section("prefixed path input"))
+        {
+            prefixedPathInput();
+        }
+        if (test_section("windows long-path helper"))
+        {
+            windowsLongPathHelper();
+        }
+#endif
     }
 
     void formatError();
@@ -112,6 +134,10 @@ struct SC::FileSystemTest : public SC::TestCase
     void moveDirectory();
     void statAndLStat();
     void permissions();
+    void prefixedPathInput();
+#if SC_PLATFORM_WINDOWS
+    void windowsLongPathHelper();
+#endif
     void snippet();
 };
 
@@ -413,6 +439,25 @@ void SC::FileSystemTest::symbolicLink()
     SC_TEST_EXPECT(fs.removeLinkIfExists("symlinkTarget.txt"));
     SC_TEST_EXPECT(not fs.exists("symlinkTarget.txt"));
     SC_TEST_EXPECT(fs.removeFile("symlinkSource.txt"));
+
+    SC_TEST_EXPECT(fs.makeDirectory("symlinkSourceDirectory"));
+    SC_TEST_EXPECT(fs.writeString("symlinkSourceDirectory/nested.txt", "nested-content"));
+    Result createDirectoryLinkResult = fs.createSymbolicLink("symlinkSourceDirectory", "symlinkTargetDirectory");
+#if SC_PLATFORM_WINDOWS
+    if (createDirectoryLinkResult)
+#else
+    SC_TEST_EXPECT(createDirectoryLinkResult);
+    if (createDirectoryLinkResult)
+#endif
+    {
+        SC_TEST_EXPECT(fs.existsAndIsLink("symlinkTargetDirectory"));
+        SC_TEST_EXPECT(fs.existsAndIsDirectory("symlinkTargetDirectory"));
+        SC_TEST_EXPECT(fs.removeLinkIfExists("symlinkTargetDirectory"));
+        SC_TEST_EXPECT(not fs.exists("symlinkTargetDirectory"));
+    }
+    SC_TEST_EXPECT(fs.existsAndIsDirectory("symlinkSourceDirectory"));
+    SC_TEST_EXPECT(fs.existsAndIsFile("symlinkSourceDirectory/nested.txt"));
+    SC_TEST_EXPECT(fs.removeDirectoryRecursive("symlinkSourceDirectory"));
 }
 
 void SC::FileSystemTest::hardLink()
@@ -421,8 +466,8 @@ void SC::FileSystemTest::hardLink()
     StringPath tempDirectory;
 #if SC_PLATFORM_WINDOWS
     const DWORD tempLength =
-        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
-    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+        ::GetTempPathW(static_cast<DWORD>(StringPath::StorageCapacity), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::StorageCapacity);
     size_t trimmedLength = static_cast<size_t>(tempLength);
     if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
     {
@@ -514,8 +559,8 @@ void SC::FileSystemTest::statAndLStat()
     StringPath tempDirectory;
 #if SC_PLATFORM_WINDOWS
     const DWORD tempLength =
-        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
-    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+        ::GetTempPathW(static_cast<DWORD>(StringPath::StorageCapacity), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::StorageCapacity);
     size_t trimmedLength = static_cast<size_t>(tempLength);
     if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
     {
@@ -609,8 +654,8 @@ void SC::FileSystemTest::permissions()
     StringPath tempDirectory;
 #if SC_PLATFORM_WINDOWS
     const DWORD tempLength =
-        ::GetTempPathW(static_cast<DWORD>(StringPath::MaxPath), tempDirectory.writableSpan().data());
-    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::MaxPath);
+        ::GetTempPathW(static_cast<DWORD>(StringPath::StorageCapacity), tempDirectory.writableSpan().data());
+    SC_TEST_EXPECT(tempLength > 0 and tempLength < StringPath::StorageCapacity);
     size_t trimmedLength = static_cast<size_t>(tempLength);
     if (trimmedLength > 0 and tempDirectory.writableSpan().data()[trimmedLength - 1] == L'\\')
     {
@@ -712,6 +757,101 @@ void SC::FileSystemTest::permissions()
     SC_TEST_EXPECT(fs.changeDirectory(tempDirectory.view()));
     SC_TEST_EXPECT(fs.removeDirectoryRecursive(permissionsDirectoryRoot.view()));
 }
+
+#if SC_PLATFORM_WINDOWS
+void SC::FileSystemTest::prefixedPathInput()
+{
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+
+    StringPath prefixedFilePath;
+    SC_TEST_EXPECT(prefixedFilePath.assign("\\\\?\\"_a8));
+    SC_TEST_EXPECT(prefixedFilePath.append(report.applicationRootDirectory.view()));
+    SC_TEST_EXPECT(prefixedFilePath.append("\\prefixed-path-input.txt"_a8));
+
+    SC_TEST_EXPECT(fs.writeString(prefixedFilePath.view(), "prefixed"));
+    SC_TEST_EXPECT(fs.exists(prefixedFilePath.view()));
+
+    String content = StringEncoding::Ascii;
+    SC_TEST_EXPECT(fs.read(prefixedFilePath.view(), content));
+    SC_TEST_EXPECT(content.view() == "prefixed");
+    SC_TEST_EXPECT(fs.removeFile(prefixedFilePath.view()));
+}
+
+void SC::FileSystemTest::windowsLongPathHelper()
+{
+    using Helper = FileSystemTestWindowsDetail::WindowsPath;
+
+    StringPath logicalPath;
+    SC_TEST_EXPECT(Helper::makeLogicalPath("\\\\?\\C:\\alpha\\beta"_a8, logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == "C:\\alpha\\beta"_a8);
+
+    SC_TEST_EXPECT(Helper::makeLogicalPath("\\\\?\\UNC\\server\\share\\folder"_a8, logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == "\\\\server\\share\\folder"_a8);
+
+    SC_TEST_EXPECT(not Helper::makeLogicalPath("\\\\?\\relative\\folder"_a8, logicalPath));
+    SC_TEST_EXPECT(not Helper::makeLogicalPath("\\\\?\\C:folder"_a8, logicalPath));
+
+    SC_TEST_EXPECT(Helper::makeAbsoluteLogicalPath("child\\leaf.txt"_a8, "C:\\base\\dir"_a8, logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\child\\leaf.txt"_a8);
+
+    SC_TEST_EXPECT(Helper::makeAbsoluteLogicalPath("C:\\base\\dir\\..\\leaf.txt"_a8, {}, logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\..\\leaf.txt"_a8);
+
+    Helper::TransportString transportPath;
+    SC_TEST_EXPECT(Helper::makeTransportPath("\\\\?\\C:\\base\\dir\\file.txt"_a8, {}, logicalPath, transportPath));
+    SC_TEST_EXPECT(logicalPath.view() == "C:\\base\\dir\\file.txt"_a8);
+    SC_TEST_EXPECT(transportPath.view() == "C:\\base\\dir\\file.txt"_a8);
+
+    String driveLogicalAtCap = StringEncoding::Utf8;
+    SC_TEST_EXPECT(driveLogicalAtCap.assign("C:\\"_a8));
+    auto driveBuilder = StringBuilder::createForAppendingTo(driveLogicalAtCap);
+    for (size_t idx = 0; idx < 1021; ++idx)
+    {
+        SC_TEST_EXPECT(driveBuilder.append("a"_a8));
+    }
+    driveBuilder.finalize();
+
+    String prefixedDriveAtCap = StringEncoding::Utf8;
+    SC_TEST_EXPECT(prefixedDriveAtCap.assign("\\\\?\\"_a8));
+    auto prefixedDriveBuilder = StringBuilder::createForAppendingTo(prefixedDriveAtCap);
+    SC_TEST_EXPECT(prefixedDriveBuilder.append(driveLogicalAtCap.view()));
+    prefixedDriveBuilder.finalize();
+    SC_TEST_EXPECT(Helper::makeLogicalPath(prefixedDriveAtCap.view(), logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == driveLogicalAtCap.view());
+    SC_TEST_EXPECT(Helper::makeTransportPath(driveLogicalAtCap.view(), {}, logicalPath, transportPath));
+    SC_TEST_EXPECT(StringView(transportPath.view()).startsWith("\\\\?\\"_a8));
+
+    String uncLogicalAtCap = StringEncoding::Utf8;
+    SC_TEST_EXPECT(uncLogicalAtCap.assign("\\\\server\\share\\"_a8));
+    auto uncBuilder = StringBuilder::createForAppendingTo(uncLogicalAtCap);
+    for (size_t idx = 0; idx < 1009; ++idx)
+    {
+        SC_TEST_EXPECT(uncBuilder.append("a"_a8));
+    }
+    uncBuilder.finalize();
+
+    String prefixedUNCAtCap = StringEncoding::Utf8;
+    SC_TEST_EXPECT(prefixedUNCAtCap.assign("\\\\?\\UNC\\server\\share\\"_a8));
+    auto prefixedUNCBuilder = StringBuilder::createForAppendingTo(prefixedUNCAtCap);
+    for (size_t idx = 0; idx < 1009; ++idx)
+    {
+        SC_TEST_EXPECT(prefixedUNCBuilder.append("a"_a8));
+    }
+    prefixedUNCBuilder.finalize();
+    SC_TEST_EXPECT(Helper::makeLogicalPath(prefixedUNCAtCap.view(), logicalPath));
+    SC_TEST_EXPECT(logicalPath.view() == uncLogicalAtCap.view());
+
+    String overCap = StringEncoding::Utf8;
+    SC_TEST_EXPECT(overCap.assign("C:\\"_a8));
+    auto builder = StringBuilder::createForAppendingTo(overCap);
+    for (size_t idx = 0; idx < 260; ++idx)
+    {
+        SC_TEST_EXPECT(builder.append("abcd\\"_a8));
+    }
+    SC_TEST_EXPECT(not Helper::makeLogicalPath(overCap.view(), logicalPath));
+}
+#endif
 
 void SC::FileSystemTest::snippet()
 {

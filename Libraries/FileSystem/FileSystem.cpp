@@ -8,13 +8,19 @@
 #include <errno.h>
 #include <io.h>
 #include <stdio.h>
+#include <string.h>
 #include <wchar.h>
+#include <wctype.h>
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <winioctl.h>
 
 namespace SC
 {
+namespace FileSystemWindowsDetail
+{
+#include "../Common/WindowsPath.inl"
+}
 
 static constexpr const SC::Result getErrorCode(int errorCode)
 {
@@ -133,39 +139,50 @@ SC::Result SC::FileSystem::init(StringSpan currentWorkingDirectory) { return cha
 
 SC::Result SC::FileSystem::changeDirectory(StringSpan currentWorkingDirectory)
 {
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(FileSystemWindowsDetail::WindowsPath::makeAbsoluteLogicalPath(currentWorkingDirectory,
+                                                                         currentDirectory.view(), currentDirectory));
+    return Result(existsAndIsDirectory(currentDirectory.view()));
+#else
     SC_TRY_MSG(currentDirectory.assign(currentWorkingDirectory),
                "FileSystem::changeDirectory - Cannot assign working directory");
     // TODO: Assert if path is not absolute
     return Result(existsAndIsDirectory("."));
+#endif
 }
 
-bool SC::FileSystem::convert(const StringSpan file, StringPath& destination, StringSpan* encodedPath)
+SC::Result SC::FileSystem::convert(const StringSpan file, StringPath& destination,
+                                   StringNativeBuffer<StringPath::MaxPath + 6 + 1>& transportPath,
+                                   StringSpan*                                      encodedPath)
 {
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(FileSystemWindowsDetail::WindowsPath::makeTransportPath(file, currentDirectory.view(), destination,
+                                                                   transportPath));
+    if (encodedPath != nullptr)
+    {
+        *encodedPath = transportPath.view();
+    }
+    return Result(true);
+#else
+    SC_COMPILER_UNUSED(transportPath);
     SC_TRY(destination.assign(file));
     if (encodedPath)
     {
         *encodedPath = destination.view();
     }
 
-    auto destinationBuffer = destination.writableSpan().data();
-#if SC_PLATFORM_WINDOWS
-
-    const bool absolute =
-        (destination.view().sizeInBytes() >= 4 and destinationBuffer[0] == L'\\' and destinationBuffer[1] == L'\\') or
-        (destination.view().sizeInBytes() >= 4 and destinationBuffer[1] == L':');
-#else
-    const bool absolute = not destination.view().isEmpty() and destinationBuffer[0] == '/';
-#endif
+    auto       destinationBuffer = destination.writableSpan().data();
+    const bool absolute          = not destination.view().isEmpty() and destinationBuffer[0] == '/';
     if (absolute)
     {
         if (encodedPath != nullptr)
         {
             *encodedPath = destination.view();
         }
-        return true;
+        return Result(true);
     }
     if (currentDirectory.view().isEmpty())
-        return false;
+        return Result(false);
 
     StringPath relative = destination;
     destination         = currentDirectory;
@@ -187,7 +204,8 @@ bool SC::FileSystem::convert(const StringSpan file, StringPath& destination, Str
     {
         *encodedPath = destination.view();
     }
-    return true;
+    return Result(true);
+#endif
 }
 
 #define SC_TRY_FORMAT_ERRNO(path, func)                                                                                \
@@ -234,7 +252,7 @@ bool SC::FileSystem::convert(const StringSpan file, StringPath& destination, Str
 SC::Result SC::FileSystem::write(StringSpan path, Span<const char> data)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
 #if SC_PLATFORM_WINDOWS
     HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
                                  FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -285,7 +303,7 @@ SC::Result SC::FileSystem::writeString(StringSpan path, StringSpan text) { retur
 SC::Result SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
 #if SC_PLATFORM_WINDOWS
     HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), FILE_APPEND_DATA, 0, nullptr, OPEN_ALWAYS,
                                  FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -330,7 +348,7 @@ SC::Result SC::FileSystem::writeStringAppend(StringSpan path, StringSpan text)
 SC::Result SC::FileSystem::read(StringSpan path, IGrowableBuffer&& buffer)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
 #if SC_PLATFORM_WINDOWS
     HANDLE hFile = ::CreateFileW(encodedPath.getNullTerminatedNative(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                                  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -437,8 +455,8 @@ SC::Result SC::FileSystem::formatError(int errorNumber, StringSpan item, bool is
 SC::Result SC::FileSystem::rename(StringSpan path, StringSpan newPath)
 {
     StringSpan encodedPath1, encodedPath2;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath1));
-    SC_TRY(convert(newPath, fileFormatBuffer2, &encodedPath2));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
+    SC_TRY(convert(newPath, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
     return FileSystem::Operations::rename(encodedPath1, encodedPath2);
 }
 
@@ -447,7 +465,7 @@ SC::Result SC::FileSystem::removeFiles(Span<const StringSpan> files)
     StringSpan encodedPath;
     for (auto& path : files)
     {
-        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeFile(encodedPath));
     }
     return Result(true);
@@ -463,7 +481,15 @@ SC::Result SC::FileSystem::removeFileIfExists(StringSpan source)
 SC::Result SC::FileSystem::removeLinkIfExists(StringSpan source)
 {
     if (existsAndIsLink(source))
+    {
+#if SC_PLATFORM_WINDOWS
+        if (existsAndIsDirectory(source))
+        {
+            return removeEmptyDirectories(Span<const StringSpan>{source});
+        }
+#endif
         return removeFiles(Span<const StringSpan>{source});
+    }
     return Result(true);
 }
 
@@ -471,8 +497,9 @@ SC::Result SC::FileSystem::removeDirectoriesRecursive(Span<const StringSpan> dir
 {
     for (auto& path : directories)
     {
-        SC_TRY(convert(path, fileFormatBuffer1)); // force write
-        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeDirectoryRecursive(fileFormatBuffer1.view()));
+        StringSpan encodedPath;
+        SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
+        SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeDirectoryRecursive(encodedPath));
     }
     return Result(true);
 }
@@ -484,8 +511,8 @@ SC::Result SC::FileSystem::copyFiles(Span<const CopyOperation> sourceDestination
     StringSpan encodedPath1, encodedPath2;
     for (const CopyOperation& op : sourceDestination)
     {
-        SC_TRY(convert(op.source, fileFormatBuffer1, &encodedPath1));
-        SC_TRY(convert(op.destination, fileFormatBuffer2, &encodedPath2));
+        SC_TRY(convert(op.source, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
+        SC_TRY(convert(op.destination, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
         SC_TRY_FORMAT_NATIVE(op.source, FileSystem::Operations::copyFile(encodedPath1, encodedPath2, op.copyFlags));
     }
     return Result(true);
@@ -497,10 +524,12 @@ SC::Result SC::FileSystem::copyDirectories(Span<const CopyOperation> sourceDesti
         return Result(false);
     for (const CopyOperation& op : sourceDestination)
     {
-        SC_TRY(convert(op.source, fileFormatBuffer1));      // force write
-        SC_TRY(convert(op.destination, fileFormatBuffer2)); // force write
-        SC_TRY_FORMAT_NATIVE(op.source, FileSystem::Operations::copyDirectory(fileFormatBuffer1.view(),
-                                                                              fileFormatBuffer2.view(), op.copyFlags));
+        StringSpan encodedPath1;
+        StringSpan encodedPath2;
+        SC_TRY(convert(op.source, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
+        SC_TRY(convert(op.destination, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
+        SC_TRY_FORMAT_NATIVE(op.source,
+                             FileSystem::Operations::copyDirectory(encodedPath1, encodedPath2, op.copyFlags));
     }
     return Result(true);
 }
@@ -510,7 +539,7 @@ SC::Result SC::FileSystem::removeEmptyDirectories(Span<const StringSpan> directo
     StringSpan encodedPath;
     for (StringSpan path : directories)
     {
-        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::removeEmptyDirectory(encodedPath));
     }
     return Result(true);
@@ -521,7 +550,7 @@ SC::Result SC::FileSystem::makeDirectories(Span<const StringSpan> directories)
     StringSpan encodedPath;
     for (auto& path : directories)
     {
-        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
         SC_TRY_FORMAT_ERRNO(path, FileSystem::Operations::makeDirectory(encodedPath));
     }
     return Result(true);
@@ -532,7 +561,7 @@ SC::Result SC::FileSystem::makeDirectoriesRecursive(Span<const StringSpan> direc
     for (const auto& path : directories)
     {
         StringSpan encodedPath;
-        SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+        SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
         SC_TRY(FileSystem::Operations::makeDirectoryRecursive(encodedPath));
     }
     return Result(true);
@@ -553,8 +582,8 @@ SC::Result SC::FileSystem::makeDirectoriesIfNotExists(Span<const StringSpan> dir
 SC::Result SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, StringSpan linkFile)
 {
     StringSpan sourceFileNative, linkFileNative;
-    SC_TRY(convert(sourceFileOrDirectory, fileFormatBuffer1, &sourceFileNative));
-    SC_TRY(convert(linkFile, fileFormatBuffer2, &linkFileNative));
+    SC_TRY(convert(sourceFileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &sourceFileNative));
+    SC_TRY(convert(linkFile, fileFormatBuffer2, fileTransportBuffer2, &linkFileNative));
     SC_TRY(FileSystem::Operations::createSymbolicLink(sourceFileNative, linkFileNative));
     return Result(true);
 }
@@ -562,8 +591,8 @@ SC::Result SC::FileSystem::createSymbolicLink(StringSpan sourceFileOrDirectory, 
 SC::Result SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan linkFile)
 {
     StringSpan sourceFileNative, linkFileNative;
-    SC_TRY(convert(sourceFile, fileFormatBuffer1, &sourceFileNative));
-    SC_TRY(convert(linkFile, fileFormatBuffer2, &linkFileNative));
+    SC_TRY(convert(sourceFile, fileFormatBuffer1, fileTransportBuffer1, &sourceFileNative));
+    SC_TRY(convert(linkFile, fileFormatBuffer2, fileTransportBuffer2, &linkFileNative));
     SC_TRY(FileSystem::Operations::createHardLink(sourceFileNative, linkFileNative));
     return Result(true);
 }
@@ -571,35 +600,35 @@ SC::Result SC::FileSystem::createHardLink(StringSpan sourceFile, StringSpan link
 bool SC::FileSystem::exists(StringSpan fileOrDirectory)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::exists(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsDirectory(StringSpan directory)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(directory, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(directory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::existsAndIsDirectory(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsFile(StringSpan file)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::existsAndIsFile(encodedPath);
 }
 
 bool SC::FileSystem::existsAndIsLink(StringSpan file)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::existsAndIsLink(encodedPath);
 }
 
 bool SC::FileSystem::canAccess(StringSpan fileOrDirectory, AccessMode accessMode)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(fileOrDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::access(encodedPath, accessMode);
 }
 
@@ -607,8 +636,8 @@ bool SC::FileSystem::moveDirectory(StringSpan sourceDirectory, StringSpan destin
 {
     StringSpan encodedPath1;
     StringSpan encodedPath2;
-    SC_TRY(convert(sourceDirectory, fileFormatBuffer1, &encodedPath1));
-    SC_TRY(convert(destinationDirectory, fileFormatBuffer2, &encodedPath2));
+    SC_TRY(convert(sourceDirectory, fileFormatBuffer1, fileTransportBuffer1, &encodedPath1));
+    SC_TRY(convert(destinationDirectory, fileFormatBuffer2, fileTransportBuffer2, &encodedPath2));
     return FileSystem::Operations::moveDirectory(encodedPath1, encodedPath2);
 }
 
@@ -617,7 +646,7 @@ SC::Result SC::FileSystem::getFileStat(StringSpan file, FileStat& fileStat) { re
 SC::Result SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     SC_TRY(FileSystem::Operations::stat(encodedPath, fileStat));
     return Result(true);
 }
@@ -625,7 +654,7 @@ SC::Result SC::FileSystem::stat(StringSpan file, FileStat& fileStat)
 SC::Result SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     SC_TRY(FileSystem::Operations::lstat(encodedPath, fileStat));
     return Result(true);
 }
@@ -633,7 +662,7 @@ SC::Result SC::FileSystem::lstat(StringSpan file, FileStat& fileStat)
 SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& destination)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(linkFile, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(linkFile, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     SC_TRY(FileSystem::Operations::readSymbolicLink(encodedPath, destination));
     return Result(true);
 }
@@ -641,35 +670,35 @@ SC::Result SC::FileSystem::readSymbolicLink(StringSpan linkFile, StringPath& des
 SC::Result SC::FileSystem::chmod(StringSpan path, uint32_t mode)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::chmod(encodedPath, mode);
 }
 
 SC::Result SC::FileSystem::chown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::chown(encodedPath, uid, gid);
 }
 
 SC::Result SC::FileSystem::lchown(StringSpan path, uint32_t uid, uint32_t gid)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::lchown(encodedPath, uid, gid);
 }
 
 SC::Result SC::FileSystem::lchmod(StringSpan path, uint32_t mode)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(path, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(path, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::lchmod(encodedPath, mode);
 }
 
 SC::Result SC::FileSystem::setLastModifiedTime(StringSpan file, TimeMs time)
 {
     StringSpan encodedPath;
-    SC_TRY(convert(file, fileFormatBuffer1, &encodedPath));
+    SC_TRY(convert(file, fileFormatBuffer1, fileTransportBuffer1, &encodedPath));
     return FileSystem::Operations::setLastModifiedTime(encodedPath, time);
 }
 
@@ -685,6 +714,53 @@ struct SC::FileSystem::Operations::Internal
         if (path.getEncoding() != StringEncoding::Utf16)
             return Result::Error("Path is not native (UTF16)");
         return Result(true);
+    }
+
+    static size_t skipDirectoryRoot(const wchar_t* path, size_t pathLength)
+    {
+        if (pathLength >= 8 and path[0] == L'\\' and path[1] == L'\\' and path[2] == L'?' and path[3] == L'\\' and
+            (path[4] == L'U' or path[4] == L'u') and (path[5] == L'N' or path[5] == L'n') and
+            (path[6] == L'C' or path[6] == L'c') and path[7] == L'\\')
+        {
+            size_t idx = 8;
+            while (idx < pathLength and path[idx] != L'\\' and path[idx] != L'/')
+                idx += 1;
+            if (idx < pathLength)
+                idx += 1;
+            while (idx < pathLength and path[idx] != L'\\' and path[idx] != L'/')
+                idx += 1;
+            if (idx < pathLength)
+                idx += 1;
+            return idx;
+        }
+        if (pathLength >= 7 and path[0] == L'\\' and path[1] == L'\\' and path[2] == L'?' and path[3] == L'\\' and
+            ((path[4] >= L'a' and path[4] <= L'z') or (path[4] >= L'A' and path[4] <= L'Z')) and path[5] == L':' and
+            (path[6] == L'\\' or path[6] == L'/'))
+        {
+            return 7;
+        }
+        if (pathLength >= 2 and path[0] == L'\\' and path[1] == L'\\')
+        {
+            size_t idx = 2;
+            while (idx < pathLength and path[idx] != L'\\' and path[idx] != L'/')
+                idx += 1;
+            if (idx < pathLength)
+                idx += 1;
+            while (idx < pathLength and path[idx] != L'\\' and path[idx] != L'/')
+                idx += 1;
+            if (idx < pathLength)
+                idx += 1;
+            return idx;
+        }
+        if (pathLength >= 3 and path[1] == L':' and (path[2] == L'\\' or path[2] == L'/'))
+        {
+            return 3;
+        }
+        if (pathLength >= 1 and (path[0] == L'\\' or path[0] == L'/'))
+        {
+            return 1;
+        }
+        return 0;
     }
 
     static Result copyFile(StringSpan source, StringSpan destination, FileSystemCopyFlags options,
@@ -869,35 +945,15 @@ SC::Result SC::FileSystem::Operations::makeDirectoryRecursive(StringSpan path)
     const size_t pathLength = path.sizeInBytes() / sizeof(wchar_t);
     if (pathLength < 2)
         return Result::Error("makeDirectoryRecursive: Path is empty");
-    wchar_t temp[MAX_PATH];
+    wchar_t temp[StringPath::MaxPath + 6 + 1] = {};
     // Copy path to temp, ensure null-terminated
-    if (pathLength >= MAX_PATH)
+    if (pathLength > StringPath::MaxPath + 6)
         return Result::Error("makeDirectoryRecursive: Path too long");
     ::memcpy(temp, path.bytesWithoutTerminator(), pathLength * sizeof(wchar_t));
-    temp[pathLength] = 0; // Ensure null-termination
-    // Skip \\\\ or drive letter if present
-    size_t idx = 0;
-    if (pathLength >= 3)
-    {
-        if (temp[0] == L'\\' and temp[1] == L'\\')
-        {
-            // Skip until next backslash or forward slash
-            for (idx = 3; idx < pathLength; ++idx)
-            {
-                if (temp[idx] == L'\\' or temp[idx] == L'/')
-                {
-                    idx += 1; // Skip the backslash or forward slash
-                    break;
-                }
-            }
-        }
-        else if (temp[1] == L':' and (temp[2] == L'\\' or temp[2] == L'/'))
-        {
-            idx = 3; // Skip drive letter and colon and backslash
-        }
-    }
+    temp[pathLength]      = 0; // Ensure null-termination
+    const size_t idxStart = Internal::skipDirectoryRoot(temp, pathLength);
     // Iterate and create directories
-    for (; idx < pathLength; ++idx)
+    for (size_t idx = idxStart; idx < pathLength; ++idx)
     {
         if (temp[idx] == L'\\' or temp[idx] == L'/')
         {
@@ -1019,15 +1075,15 @@ SC::Result SC::FileSystem::Operations::readSymbolicLink(StringSpan path, StringP
         return Result::Error("readSymbolicLink: Unsupported reparse point");
     }
 
-    if (sourceChars >= StringPath::MaxPath)
+    if (sourceChars > StringPath::MaxPath)
     {
         return Result::Error("readSymbolicLink: Failed to store link target");
     }
 
     ::memcpy(destination.writableSpan().data(), sourcePath, sourceChars * sizeof(wchar_t));
     destination.writableSpan().data()[sourceChars] = 0;
-    (void)destination.resize(sourceChars);
-    return Result(true);
+    SC_TRY_MSG(destination.resize(sourceChars), "readSymbolicLink: Failed to store link target");
+    return FileSystemWindowsDetail::WindowsPath::makeLogicalPath(destination.view(), destination);
 }
 
 SC::Result SC::FileSystem::Operations::chmod(StringSpan path, uint32_t mode)
@@ -1207,8 +1263,8 @@ SC::Result SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wc
     }
 
     // Prepare search pattern
-    wchar_t searchPattern[MAX_PATH];
-    if (::swprintf_s(searchPattern, MAX_PATH, L"%s\\*", source) == -1)
+    wchar_t searchPattern[StringPath::MaxPath + 6 + 1] = {};
+    if (::swprintf_s(searchPattern, StringPath::MaxPath + 6 + 1, L"%s\\*", source) == -1)
     {
         return Result::Error("copyDirectoryRecursive: Path too long");
     }
@@ -1229,10 +1285,10 @@ SC::Result SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wc
             continue;
 
         // Build full paths
-        wchar_t sourcePath[MAX_PATH];
-        wchar_t destPath[MAX_PATH];
-        if (::swprintf_s(sourcePath, MAX_PATH, L"%s\\%s", source, findData.cFileName) == -1 ||
-            ::swprintf_s(destPath, MAX_PATH, L"%s\\%s", destination, findData.cFileName) == -1)
+        wchar_t sourcePath[StringPath::MaxPath + 6 + 1] = {};
+        wchar_t destPath[StringPath::MaxPath + 6 + 1]   = {};
+        if (::swprintf_s(sourcePath, StringPath::MaxPath + 6 + 1, L"%s\\%s", source, findData.cFileName) == -1 ||
+            ::swprintf_s(destPath, StringPath::MaxPath + 6 + 1, L"%s\\%s", destination, findData.cFileName) == -1)
         {
             return Result::Error("copyDirectoryRecursive: Path too long");
         }
@@ -1267,8 +1323,8 @@ SC::Result SC::FileSystem::Operations::Internal::copyDirectoryRecursive(const wc
 SC::Result SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInternal(const wchar_t* path)
 {
     // Prepare search pattern
-    wchar_t searchPattern[MAX_PATH];
-    if (::swprintf_s(searchPattern, MAX_PATH, L"%s\\*", path) == -1)
+    wchar_t searchPattern[StringPath::MaxPath + 6 + 1] = {};
+    if (::swprintf_s(searchPattern, StringPath::MaxPath + 6 + 1, L"%s\\*", path) == -1)
     {
         return Result::Error("removeDirectoryRecursive: Path too long");
     }
@@ -1289,8 +1345,8 @@ SC::Result SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInterna
             continue;
 
         // Build full path
-        wchar_t fullPath[MAX_PATH];
-        if (swprintf_s(fullPath, MAX_PATH, L"%s\\%s", path, findData.cFileName) == -1)
+        wchar_t fullPath[StringPath::MaxPath + 6 + 1] = {};
+        if (swprintf_s(fullPath, StringPath::MaxPath + 6 + 1, L"%s\\%s", path, findData.cFileName) == -1)
         {
             return Result::Error("removeDirectoryRecursive: Path too long");
         }
@@ -1326,28 +1382,21 @@ SC::Result SC::FileSystem::Operations::Internal::removeDirectoryRecursiveInterna
 
 SC::StringSpan SC::FileSystem::Operations::getExecutablePath(StringPath& executablePath)
 {
-    // Use GetModuleFileNameW to get the executable path in UTF-16
-    DWORD length =
-        ::GetModuleFileNameW(nullptr, executablePath.writableSpan().data(), static_cast<DWORD>(StringPath::MaxPath));
-    if (length == 0 || length >= StringPath::MaxPath)
+    if (not FileSystemWindowsDetail::WindowsPath::getExecutablePath(executablePath))
     {
         (void)executablePath.resize(0);
         return {};
     }
-    (void)executablePath.resize(length); // length does not include null terminator
     return executablePath.view();
 }
 
 SC::StringSpan SC::FileSystem::Operations::getCurrentWorkingDirectory(StringPath& currentWorkingDirectory)
 {
-    DWORD length =
-        ::GetCurrentDirectoryW(static_cast<DWORD>(StringPath::MaxPath), currentWorkingDirectory.writableSpan().data());
-    if (length == 0 || length >= StringPath::MaxPath)
+    if (not FileSystemWindowsDetail::WindowsPath::getCurrentDirectory(currentWorkingDirectory))
     {
         (void)currentWorkingDirectory.resize(0);
         return {};
     }
-    (void)currentWorkingDirectory.resize(length); // length does not include null terminator
     return currentWorkingDirectory.view();
 }
 
@@ -1369,14 +1418,14 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
     {
         // No separator found, return empty
         (void)applicationRootDirectory.resize(0);
-        ::memset(buffer, 0, StringPath::MaxPath * sizeof(wchar_t));
+        ::memset(buffer, 0, StringPath::StorageCapacity * sizeof(wchar_t));
         return {};
     }
     const size_t copyLen = static_cast<size_t>(lastSeparator);
     buffer[copyLen]      = 0;
     (void)applicationRootDirectory.resize(copyLen);
     // null terminate the path
-    ::memset(buffer + copyLen + 1, 0, (StringPath::MaxPath - copyLen - 1) * sizeof(wchar_t));
+    ::memset(buffer + copyLen + 1, 0, (StringPath::StorageCapacity - copyLen - 1) * sizeof(wchar_t));
     return applicationRootDirectory.view();
 }
 #else
