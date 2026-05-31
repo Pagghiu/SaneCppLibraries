@@ -198,10 +198,9 @@ Current support includes:
 - child task timeout with `waitFor()`;
 - mandatory explicit coroutine frame allocation through `AwaitAllocator`.
 
-`Await` is tested by `SCAwaitTest`, which is separate from `SCTest` because it requires C++20 and the standard
-coroutine header. `Await` is available in the default standard-header-enabled mode and emits a clear diagnostic if
-compiled with `SC_INCLUDE_STD_CPP=0`. Coroutine frame storage is always explicit through `AwaitAllocator`, so enabling
-Await does not add a dependency on the Memory library.
+`Await` is tested by `SCAwaitTest`, which is separate from `SCTest` because normal Await tests and examples use C++20
+coroutines with standard C++ headers enabled. Coroutine frame storage is always explicit through `AwaitAllocator`, so
+enabling Await does not add a dependency on the Memory library.
 
 # Details
 
@@ -493,22 +492,24 @@ Fixed storage should be sized intentionally per workflow. Prefer using diagnosti
 
 # Exceptions
 
-`Await` does not use exceptions for control flow. The C++20 test and examples intentionally keep
+`Await` does not use exceptions for control flow. The C++20 test, examples, and coroutine-shim probe intentionally keep
 `CompileFlags::enableExceptions` disabled, so macOS, Linux, and Windows validation covers the exception-disabled path.
 `AwaitTask::Promise::unhandled_exception()` remains present because the C++ coroutine promise interface requires it when
-compiling against the standard coroutine header.
+compiling coroutine promise types.
 
 # Strict no-stdlib coroutine status
 
-The strict `SC_INCLUDE_STD_CPP=0` coroutine story is intentionally not part of the current MVP bar. Today
-`Libraries/Await/Internal/AwaitCoroutine.h` includes `<coroutine>` for `std::coroutine_traits`,
-`std::coroutine_handle`, and `std::suspend_always`. Coroutine frame storage is still provided by `AwaitAllocator`;
-there is no `std::nothrow` allocation fallback.
+The default/recommended path uses the standard C++ `<coroutine>` header. A strict `SC_INCLUDE_STD_CPP=0` path now exists
+behind the explicit `SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE=1` opt-in macro. In that mode
+`Libraries/Await/Internal/AwaitCoroutine.h` provides the minimal compiler-facing `std::coroutine_traits`,
+`std::coroutine_handle`, `std::suspend_always`, and `std::suspend_never` names used by Await, backed by compiler
+coroutine builtins instead of standard-library headers.
 
-A future `-nostdinc++` shim looks technically possible but should be treated as Stable-track work. It would need to
-provide the compiler-facing coroutine names expected by C++20 and map handles to the compiler coroutine builtins on
-each supported compiler. Until that is proven on macOS, Linux, and Windows, `Await` stays in `SCAwaitTest` instead of
-the normal `SCTest` path.
+This shim is intentionally narrow and is covered by the isolated `SCAwaitCoroutineShimTest` target, not by normal Await
+examples yet. It proves that a tiny coroutine task can compile and run with standard C++ headers disabled and exceptions
+disabled on macOS, Linux, and Windows. Full `SCTest` participation remains Stable-track work: the shim should mature
+against real `AwaitTask` usage and single-file-library generation before the main Await test moves out of
+`SCAwaitTest`.
 
 # Roadmap
 
@@ -518,7 +519,8 @@ the normal `SCTest` path.
 - Add ASan-focused teardown coverage for thread-pool-backed awaiters and child-task destruction.
 - Decide whether filesystem watcher integration should become an explicit stream/channel-style adapter.
 - Continue tightening coroutine allocation portability, especially around member coroutine allocation discovery.
-- Prototype and validate the no-stdlib coroutine shim behind an opt-in macro before moving `Await` into `SCTest`.
+- Grow the no-stdlib coroutine shim from isolated probe coverage toward full Await coverage before moving `Await` into
+  `SCTest`.
 
 # Statistics
 | Type      | Lines Of Code | Comments  | Sum   |

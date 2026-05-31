@@ -8,9 +8,12 @@
 #endif
 #define SC_AWAIT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_AWAIT)
 
-#if !SC_INCLUDE_STD_CPP
-#error                                                                                                                 \
-    "SC::Await requires the standard C++ coroutine header. Build with SC_INCLUDE_STD_CPP=1, or wait for the future no-stdlib coroutine shim."
+#ifndef SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE
+#define SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE 0
+#endif
+
+#if !SC_INCLUDE_STD_CPP && !SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE
+#error "SC::Await requires SC_INCLUDE_STD_CPP=1 or SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE=1."
 #endif
 
 #if !SC_LANGUAGE_CPP_AT_LEAST_20

@@ -320,6 +320,7 @@ static Result addHotReloadIncludePathsDefine(Project& project, const Parameters&
 static constexpr StringView TEST_PROJECT_NAME                        = "SCTest";
 static constexpr StringView AWAIT_TEST_PROJECT_NAME                  = "SCAwaitTest";
 static constexpr StringView BUILD_TEST_PROJECT_NAME                  = "SCBuildTest";
+static constexpr StringView AWAIT_COROUTINE_SHIM_TEST_PROJECT_NAME   = "SCAwaitCoroutineShimTest";
 static constexpr StringView STD_CPP_HEADER_NO_LINK_TEST_PROJECT_NAME = "SCStdCppHeaderNoLinkTest";
 static constexpr StringView ZLIB_FILC_PROJECT_NAME                   = "ZLibFilC";
 
@@ -536,6 +537,24 @@ Result configureStdCppHeaderNoLinkTest(const Parameters& parameters, Workspace& 
     project.files.compile.cppStandard = CppStandard::CPP20;
     project.link.linkStdCpp           = false; // This probe explicitly verifies standard headers without libstdc++.
     project.addFile("Support/CompileTests/StdCppHeaderNoLinkProbe.cpp");
+
+    SC_TRY(workspace.projects.push_back(move(project)));
+    return Result(true);
+}
+
+Result configureSCAwaitCoroutineShimTest(const Parameters& parameters, Workspace& workspace)
+{
+    Project project = {AWAIT_COROUTINE_SHIM_TEST_PROJECT_NAME};
+    project.setRootDirectory(parameters.directories.projectDirectory.view());
+
+    project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
+    project.addPresetConfiguration(Configuration::Preset::Release, parameters);
+
+    configureSaneStrictNoStdCpp(project);
+    project.files.compile.cppStandard = CppStandard::CPP20;
+    project.addIncludePaths({"."});
+    project.addDefines({"SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE=1"});
+    project.addFile("Support/CompileTests/AwaitCoroutineShimProbe.cpp");
 
     SC_TRY(workspace.projects.push_back(move(project)));
     return Result(true);
@@ -784,6 +803,7 @@ Result configure(Definition& definition, const Parameters& parameters)
     SC_TRY(configureSCBuildTest(parameters, defaultWorkspace));
     SC_TRY(configureSCAwaitTest(parameters, defaultWorkspace));
     SC_TRY(configureStdCppHeaderNoLinkTest(parameters, defaultWorkspace));
+    SC_TRY(configureSCAwaitCoroutineShimTest(parameters, defaultWorkspace));
     SC_TRY(configureSCSharedLibrary(parameters, defaultWorkspace));
     SC_TRY(configureTestSTLInterop(parameters, defaultWorkspace));
     SC_TRY(configureExamplesConsole(parameters, defaultWorkspace));
