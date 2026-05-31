@@ -130,6 +130,8 @@ jobs:
                   { os: windows-2025, generator: vs2022 } ]
     runs-on: ${{ matrix.params.os }}
     timeout-minutes: 12
+    env:
+      WINDOWS_LONG_PATH_ARGS: ${{ matrix.config == 'Debug' && matrix.params.os == 'windows-2022' && '--windows-long-path-aware off' || '' }}
 
     steps:
     - uses: actions/checkout@v4
@@ -180,36 +182,36 @@ jobs:
       run: python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
     - name: configure SCTest
       shell: cmd
-      run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build configure SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: configure SCSingleFileLibs
       shell: cmd
-      run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build configure "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: compile SCSingleFileLibs
       shell: cmd
-      run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build compile "SCSingleFileLibs:" ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: compile SCTest
       shell: cmd
-      run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build compile SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: compile SCBuildTest
       shell: cmd
-      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build compile SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
     - name: compile InteropSTL
       shell: cmd
-      run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build compile InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: compile SCStdCppHeaderNoLinkTest
       shell: cmd
-      run: SC.bat build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build compile SCStdCppHeaderNoLinkTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
     - name: test SCTest
       shell: cmd
-      run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} -- --all-tests
+      run: SC.bat build run SCTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS% -- --all-tests
     - name: test SCBuildTest
       shell: cmd
-      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build run SCBuildTest ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
       if: matrix.config == 'Release'
     - name: test InteropSTL
       shell: cmd
-      run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }}
+      run: SC.bat build run InteropSTL ${{ matrix.config }} ${{ matrix.params.generator }} %WINDOWS_LONG_PATH_ARGS%
 
   timing-summary:
     runs-on: ubuntu-latest

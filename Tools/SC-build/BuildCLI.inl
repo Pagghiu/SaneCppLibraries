@@ -109,6 +109,8 @@ Result appendBuildActionHelpAddendum(StringFormatOutput& output, Build::Action::
                        "selection today\n"
                        "  - --triple overrides the resolved compiler target triple\n"
                        "  - --sysroot overrides the resolved toolchain sysroot\n"
+                       "  - --windows-long-path-aware selects the default Windows runtime long-path policy "
+                       "(default/on/off)\n"
                        "  - raw overrides apply after --target and therefore take precedence over friendly profiles\n"),
                    "Failed writing SC-build help");
     }
@@ -608,6 +610,26 @@ static Result applyToolchainValue(Build::Action& action, StringView toolchainVal
     return Result(true);
 }
 
+static Result applyWindowsLongPathAwareValue(Build::Action& action, StringView longPathValue, Console& console)
+{
+    if (longPathValue.isEmpty())
+    {
+        return Result(true);
+    }
+    static constexpr StringView longPathNames[] = {"default", "on", "off"};
+    StringView                  resolved;
+    SC_TRY(resolveKeywordValue("--windows-long-path-aware", longPathValue, longPathNames, resolved, console));
+    if (resolved.equalsIgnoreCaseASCII("default"))
+    {
+        action.parameters.windows.longPathAware.unset();
+    }
+    else
+    {
+        action.parameters.windows.longPathAware = resolved.equalsIgnoreCaseASCII("on");
+    }
+    return Result(true);
+}
+
 static Result resolveOutputModeValue(StringView value, Build::OutputMode::Type& outputMode, Console& console)
 {
     static constexpr StringView outputNames[] = {"quiet", "normal", "verbose"};
@@ -1077,7 +1099,7 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     }
 
     BuildCLIParseContext  context;
-    CommandLineOption     options[14];
+    CommandLineOption     options[15];
     CommandLinePositional positionals[2];
     CommandLineSpec       spec;
     size_t                numOptions = 0;
@@ -1134,6 +1156,12 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     options[numOptions].help      = "Override the toolchain sysroot";
     options[numOptions].valueName = "PATH";
     options[numOptions].value     = CommandLineValue::stringSpan(context.sysroot);
+    numOptions++;
+
+    options[numOptions].longName  = "windows-long-path-aware";
+    options[numOptions].help      = "Default Windows runtime long-path policy (default, on, off)";
+    options[numOptions].valueName = "MODE";
+    options[numOptions].value     = CommandLineValue::stringSpan(context.windowsLongPath);
     numOptions++;
 
     if (actionType == Build::Action::Compile or actionType == Build::Action::Run)
@@ -1277,6 +1305,11 @@ Result prepareBuildAction(Build::Action::Type actionType, Tool::Arguments& argum
     {
         SC_TRY(action.parameters.toolchain.sysroot.assign(context.sysroot));
     }
+    if (not context.windowsLongPath.isEmpty())
+    {
+        SC_TRY(markBuildCLIValueError(
+            applyWindowsLongPathAwareValue(action, context.windowsLongPath, arguments.console), status));
+    }
     if (not context.runner.isEmpty())
     {
         SC_TRY(markBuildCLIValueError(applyRunnerValue(action, context.runner, arguments.console), status));
@@ -1336,6 +1369,45 @@ static Result runBuildValidate(Tool::Arguments& arguments, Build::Directories& d
     return Result(true);
 }
 
+static Result prepareConfigureActionArguments(Tool::Arguments& arguments, Build::Action& action)
+{
+    bool targetSet = false;
+    for (size_t idx = 0; idx < arguments.arguments.sizeInElements(); ++idx)
+    {
+        const StringView argument = arguments.arguments[idx];
+        if (detail::isLongOptionToken(argument))
+        {
+            StringView nameAndMaybeValue = argument.sliceStart(2);
+            StringView longName          = nameAndMaybeValue;
+            StringView value;
+            if (nameAndMaybeValue.splitBefore("=", longName))
+            {
+                SC_TRY(nameAndMaybeValue.splitAfter("=", value));
+            }
+            if (longName.equalsIgnoreCaseASCII("windows-long-path-aware"))
+            {
+                if (value.isEmpty())
+                {
+                    SC_TRY_MSG(idx + 1 < arguments.arguments.sizeInElements(),
+                               "Missing value for --windows-long-path-aware");
+                    value = arguments.arguments[idx + 1];
+                    idx += 1;
+                }
+                SC_TRY(detail::applyWindowsLongPathAwareValue(action, value, arguments.console));
+                continue;
+            }
+            return Result::Error("Unknown SC-build configure option");
+        }
+
+        if (not targetSet)
+        {
+            SC_TRY(detail::setBuildActionTarget(action, argument));
+            targetSet = true;
+        }
+    }
+    return Result(true);
+}
+
 static Result runBuildConfigure(Tool::Arguments& arguments)
 {
     Build::Action action;
@@ -1344,17 +1416,7 @@ static Result runBuildConfigure(Tool::Arguments& arguments)
 
     action.parameters.directories.libraryDirectory = arguments.libraryDirectory.view();
     action.parameters.directories.projectDirectory = arguments.projectDirectory.view();
-    if (arguments.arguments.sizeInElements() >= 1)
-    {
-        if (arguments.arguments[0].splitBefore(SC_NATIVE_STR(":"), action.workspaceName))
-        {
-            SC_TRUST_RESULT(arguments.arguments[0].splitAfter(SC_NATIVE_STR(":"), action.projectName));
-        }
-        else
-        {
-            action.projectName = arguments.arguments[0];
-        }
-    }
+    SC_TRY(prepareConfigureActionArguments(arguments, action));
     action.parameters.generator = Build::Generator::VisualStudio2019;
     action.parameters.platform  = Build::Platform::Windows;
     arguments.console.print("Executing \"{}\" for Visual Studio 2019 on Windows\n", arguments.action);

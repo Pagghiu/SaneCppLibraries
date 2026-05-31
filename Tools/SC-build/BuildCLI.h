@@ -40,6 +40,7 @@ struct BuildCLIParseContext
     StringSpan abi              = {};
     StringSpan targetTriple     = {};
     StringSpan sysroot          = {};
+    StringSpan windowsLongPath  = {};
     StringSpan runner           = {};
     StringSpan runnerPath       = {};
     StringSpan output           = {};

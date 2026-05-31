@@ -621,7 +621,9 @@ SC::Result SC::Build::Definition::enforceDefaults(const Parameters& parameters)
                 buildSupportsWindowsLongPathAwareTargets(project.targetType) and
                 not project.windows.longPathAware.hasBeenSet())
             {
-                project.windows.longPathAware = true;
+                project.windows.longPathAware = parameters.windows.longPathAware.hasBeenSet()
+                                                    ? static_cast<bool>(parameters.windows.longPathAware)
+                                                    : true;
             }
         }
     }

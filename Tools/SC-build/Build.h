@@ -862,7 +862,8 @@ struct Parameters
     Machine hostMachine;   ///< Machine that owns host-side tools and paths
     Machine targetMachine; ///< Machine the produced artifacts are built for
 
-    ExecutionOptions execution;
+    WindowsTargetOptions windows; ///< Default Windows target options for projects that do not set their own policy
+    ExecutionOptions     execution;
 };
 
 /// @brief Add Sane C++ Libraries to a project using either `SC.cpp` or the individual library sources
