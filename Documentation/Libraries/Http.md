@@ -147,9 +147,10 @@ SC.bat build run SCTest Debug -- --test "HttpAsyncFileServerTest" --port-offset 
 SC.bat build compile SCTest Release
 ```
 
-`HttpStressTest` is intentionally bounded and fast. It is a smoke signal for repeated keep-alive requests and WebSocket
-fan-out writes through caller-owned buffer pools. `HttpAsyncFileServerTest` covers the heavier HTTP paths, including
-file requests, range and conditional requests, large PUT uploads, and multipart uploads.
+`HttpStressTest` is intentionally bounded and fast. It is a smoke signal for repeated keep-alive requests, chunked
+request burst decoding, and WebSocket fan-out writes through caller-owned buffer pools. `HttpAsyncFileServerTest` covers
+the heavier HTTP paths, including file requests, range and conditional requests, large PUT uploads, and multipart
+uploads.
 
 # Error Taxonomy
 HTTP APIs return `Result` for protocol, storage, stream, and lifecycle failures. Prefer messages that make the failure

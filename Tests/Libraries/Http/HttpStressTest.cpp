@@ -72,10 +72,15 @@ struct SC::HttpStressTest : public SC::TestCase
         {
             keepAliveManyRequestsSmoke();
         }
+        if (test_section("chunked request burst smoke"))
+        {
+            chunkedRequestBurstSmoke();
+        }
     }
 
     void websocketHubFanoutSmoke();
     void keepAliveManyRequestsSmoke();
+    void chunkedRequestBurstSmoke();
 };
 
 void SC::HttpStressTest::websocketHubFanoutSmoke()
@@ -210,6 +215,178 @@ void SC::HttpStressTest::keepAliveManyRequestsSmoke()
     SC_TEST_EXPECT(context.serverRequests == NumRequests);
     SC_TEST_EXPECT(context.clientResponses == NumRequests);
     SC_TEST_EXPECT(httpServer.getConnections().getNumActiveConnections() <= 1);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpStressTest::chunkedRequestBurstSmoke()
+{
+    constexpr int    NumRequests       = 32;
+    constexpr int    NumConnections    = 4;
+    constexpr int    RequestSlices     = 2;
+    constexpr int    HeaderBytes       = 8 * 1024;
+    constexpr int    StreamBytes       = 1024;
+    constexpr size_t ExpectedBodyBytes = 32;
+    const uint16_t   serverPort        = report.mapPort(6211);
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<RequestSlices, RequestSlices, HeaderBytes, StreamBytes>;
+
+    HttpConnectionType connections[NumConnections];
+    HttpAsyncServer    httpServer;
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+
+    struct RequestSlot
+    {
+        void onData(AsyncBufferView::ID bufferID)
+        {
+            SC_ASSERT_RELEASE(connection != nullptr);
+
+            Span<const char> data;
+            SC_ASSERT_RELEASE(connection->request.getReadableStream().getBuffersPool().getReadableData(bufferID, data));
+
+            const size_t index = connection->getConnectionID().getIndex();
+            SC_ASSERT_RELEASE(index < NumConnections);
+            bodyBytes[index] += data.sizeInBytes();
+            SC_ASSERT_RELEASE(connection->request.consumeBodyBytes(data.sizeInBytes()));
+        }
+
+        void onEnd()
+        {
+            SC_ASSERT_RELEASE(connection != nullptr);
+            if (responded)
+            {
+                return;
+            }
+            responded = true;
+            (void)connection->request.getReadableStream().eventData.removeListener<RequestSlot, &RequestSlot::onData>(
+                *this);
+            (void)connection->request.getReadableStream().eventEnd.removeListener<RequestSlot, &RequestSlot::onEnd>(
+                *this);
+
+            const size_t index = connection->getConnectionID().getIndex();
+            test->recordExpectation("chunked stress connection index", index < NumConnections);
+            test->recordExpectation("chunked stress decoded body size", bodyBytes[index] == expectedBodyBytes);
+            test->recordExpectation("chunked stress response", connection->response.sendEmpty(200));
+            (*ended)++;
+        }
+
+        HttpStressTest* test              = nullptr;
+        size_t*         bodyBytes         = nullptr;
+        size_t          expectedBodyBytes = 0;
+        int*            ended             = nullptr;
+        HttpConnection* connection        = nullptr;
+        bool            responded         = false;
+    };
+
+    RequestSlot requestSlots[NumConnections];
+
+    struct ServerContext
+    {
+        HttpStressTest* test         = nullptr;
+        RequestSlot*    requestSlots = nullptr;
+
+        size_t bodyBytes[NumConnections] = {};
+        size_t expectedBodyBytes         = ExpectedBodyBytes;
+        int    requests                  = 0;
+        int    ended                     = 0;
+
+        void onRequest(HttpConnection& connection)
+        {
+            requests++;
+            const size_t index = connection.getConnectionID().getIndex();
+            test->recordExpectation("chunked stress request index", index < NumConnections);
+            bodyBytes[index]       = 0;
+            RequestSlot& slot      = requestSlots[index];
+            slot.test              = test;
+            slot.bodyBytes         = bodyBytes;
+            slot.expectedBodyBytes = expectedBodyBytes;
+            slot.ended             = &ended;
+            slot.connection        = &connection;
+            slot.responded         = false;
+
+            const bool addedData =
+                connection.request.getReadableStream().eventData.addListener<RequestSlot, &RequestSlot::onData>(slot);
+            test->recordExpectation("chunked stress data listener", addedData);
+            const bool addedEnd =
+                connection.request.getReadableStream().eventEnd.addListener<RequestSlot, &RequestSlot::onEnd>(slot);
+            test->recordExpectation("chunked stress end listener", addedEnd);
+        }
+    } serverContext;
+
+    serverContext.test         = this;
+    serverContext.requestSlots = requestSlots;
+    httpServer.onRequest.bind<ServerContext, &ServerContext::onRequest>(serverContext);
+
+    String endpoint = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(endpoint, "http://127.0.0.1:{}/chunked-stress", serverPort));
+
+    constexpr StringView request = "PUT /chunked-stress HTTP/1.1\r\n"
+                                   "Host: 127.0.0.1\r\n"
+                                   "Transfer-Encoding: chunked\r\n"
+                                   "\r\n"
+                                   "4\r\n0123\r\n"
+                                   "4\r\n4567\r\n"
+                                   "4\r\n89ab\r\n"
+                                   "4\r\ncdef\r\n"
+                                   "4\r\n0123\r\n"
+                                   "4\r\n4567\r\n"
+                                   "4\r\n89ab\r\n"
+                                   "4\r\ncdef\r\n"
+                                   "0\r\n\r\n";
+
+    HttpTestClient clients[NumRequests];
+    struct ClientContext
+    {
+        HttpStressTest*  test       = nullptr;
+        HttpAsyncServer* httpServer = nullptr;
+        AsyncEventLoop*  loop       = nullptr;
+        HttpTestClient*  clients    = nullptr;
+        String*          endpoint   = nullptr;
+        StringSpan       request;
+        int              responses = 0;
+    } clientContext;
+    clientContext.test       = this;
+    clientContext.httpServer = &httpServer;
+    clientContext.loop       = &eventLoop;
+    clientContext.clients    = clients;
+    clientContext.endpoint   = &endpoint;
+    clientContext.request    = request;
+
+    for (HttpTestClient& client : clients)
+    {
+        client.callback = [&clientContext](HttpTestClient& completedClient)
+        {
+            clientContext.responses++;
+            const StringView response(completedClient.getResponse());
+            clientContext.test->recordExpectation("chunked stress response status", response.containsString("200 OK"));
+            if (clientContext.responses == NumRequests)
+            {
+                clientContext.test->recordExpectation("chunked stress stop server", clientContext.httpServer->stop());
+                return;
+            }
+            clientContext.test->recordExpectation(
+                "chunked stress next request",
+                clientContext.clients[clientContext.responses].sendRaw(
+                    *clientContext.loop, clientContext.endpoint->view(), clientContext.request));
+        };
+    }
+    SC_TEST_EXPECT(clients[0].sendRaw(eventLoop, endpoint.view(), request));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("HttpStressTest chunked burst smoke timed out" && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{5000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(httpServer.close());
+
+    SC_TEST_EXPECT(serverContext.requests == NumRequests);
+    SC_TEST_EXPECT(serverContext.ended == NumRequests);
+    SC_TEST_EXPECT(clientContext.responses == NumRequests);
     SC_TEST_EXPECT(eventLoop.close());
 }
 
