@@ -125,7 +125,7 @@ struct SC::FileSystemWatcher::Internal
 
     Result threadCreateFSEvent()
     {
-        SC_TRY(runLoop);
+        SC_TRY(runLoop != nullptr);
         CFArrayRef   pathsArray = nullptr;
         CFStringRef* watchedPaths =
             (CFStringRef*)malloc(sizeof(CFStringRef) * ThreadRunnerDefinition::MaxWatchablePaths);

@@ -27,6 +27,14 @@ struct [[nodiscard]] Result
         return Result(msg);
     }
 
+    static constexpr Result Explicit(bool result) { return Result(result); }
+
+    template <typename T>
+    static constexpr auto Explicit(T&& result)
+    {
+        return move(result);
+    }
+
     /// @brief Constructs an Error from a pointer to an ascii string.
     ///        Caller of this function must ensure such pointer to be valid until Result is used.
     /// @param msg  Pointer to ASCII string representing the message.
@@ -48,7 +56,7 @@ struct [[nodiscard]] Result
 /// @brief Checks the value of the given expression and if failed, returns this value to caller
 #define SC_TRY(expression)                                                                                             \
     {                                                                                                                  \
-        if (auto _exprResConv = SC::Result(expression))                                                                \
+        if (auto _exprResConv = SC::Result::Explicit(expression))                                                      \
             SC_LANGUAGE_LIKELY { (void)0; }                                                                            \
         else                                                                                                           \
         {                                                                                                              \
