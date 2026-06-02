@@ -120,7 +120,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         SC_COMPILER_WARNING_PUSH_OFFSETOF;
         Self& stream = SC_COMPILER_FIELD_OFFSET(Self, request, static_cast<AsyncRequestType&>(result.async));
         stream.finalizeReadableDestruction();
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
   private:
@@ -216,7 +216,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
         SC_COMPILER_WARNING_PUSH_OFFSETOF;
         Self& stream = SC_COMPILER_FIELD_OFFSET(Self, request, static_cast<AsyncRequestType&>(result.async));
         stream.finalizeWritableDestruction();
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
   private:

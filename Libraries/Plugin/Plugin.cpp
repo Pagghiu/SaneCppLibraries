@@ -565,7 +565,7 @@ SC::Result SC::PluginCompiler::compileFile(const PluginDefinition& definition, c
         SC_TRY(argumentsArena.appendMultipleStrings({"-fno-rtti"}));
     }
 
-#if SC_COMPILER_ASAN
+#if defined(__SANITIZE_ADDRESS__)
     SC_TRY(argumentsArena.appendMultipleStrings({"-fsanitize=address,undefined"}));
 #if SC_PLATFORM_APPLE
     SC_TRY(argumentsArena.appendMultipleStrings({"-fno-sanitize=enum,return,float-divide-by-zero,function,vptr"}));
@@ -694,7 +694,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_COMPILER_UNUSED(executablePath);
     SC_TRY(arena.appendMultipleStrings({"-shared", "-Wl,-Bsymbolic-functions"}));
 #endif
-#if SC_COMPILER_ASAN
+#if defined(__SANITIZE_ADDRESS__)
     SC_TRY(arena.appendMultipleStrings({"-fsanitize=address,undefined"}));
 #endif
 #endif

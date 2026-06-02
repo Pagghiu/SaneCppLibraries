@@ -814,6 +814,6 @@ Result configure(Definition& definition, const Parameters& parameters)
     (void)configureSingleFileLibs(definition, parameters);
     return Result(true);
 }
-SC_COMPILER_WARNING_POP;
+SC_COMPILER_WARNING_POP_UNUSED_RESULT;
 } // namespace Build
 } // namespace SC

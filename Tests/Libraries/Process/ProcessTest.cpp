@@ -488,7 +488,7 @@ SC_TEST_EXPECT(process7.setEnvironment("PATH", "/usr/sane_cpp_binaries"));
 // Set the current working directory
 SC_TEST_EXPECT(process7.setWorkingDirectory("/usr/home"));
     //! [ProcessQuickSheetSnippet]
-    SC_COMPILER_WARNING_POP;
+    SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     // clang-format on
     return Result(true);
 }

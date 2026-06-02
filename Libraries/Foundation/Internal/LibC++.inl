@@ -3,7 +3,7 @@
 #include "../../Foundation/Compiler.h"
 #include <stdlib.h> // malloc / free
 
-#if SC_COMPILER_ASAN == 0
+#if !defined(__SANITIZE_ADDRESS__)
 void operator delete(void* p) noexcept
 {
     if (p != 0)

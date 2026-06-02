@@ -58,7 +58,7 @@ void myFunction(MyClass& stuff)
     SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
     stuff.canFail();
     stuff.alsoThisCanFail();
-    SC_COMPILER_WARNING_POP;
+    SC_COMPILER_WARNING_POP_UNUSED_RESULT;
 }
 ```
 

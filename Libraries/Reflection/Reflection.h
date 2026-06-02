@@ -371,7 +371,7 @@ struct VectorArrayVTable
 /// @brief Closes `Reflect<StructName>`struct opened by `SC_REFLECT_STRUCT_VISIT`
 #define SC_REFLECT_STRUCT_LEAVE()                                                                                      \
     ;                                                                                                                  \
-    SC_COMPILER_WARNING_POP                                                                                            \
+    SC_COMPILER_WARNING_POP_OFFSETOF                                                                                   \
     }                                                                                                                  \
     }                                                                                                                  \
     ;

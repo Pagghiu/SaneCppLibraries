@@ -39,7 +39,9 @@ struct SC_FOUNDATION_EXPORT Assert
 //! @addtogroup group_foundation_compiler_macros
 //! @{
 #if SC_PLATFORM_WINDOWS
-#define WFILE WIDEN(__FILE__)
+#define WIDEN2(x) L##x
+#define WIDEN(x)  WIDEN2(x)
+#define WFILE     WIDEN(__FILE__)
 #else
 #define WFILE __FILE__
 #endif

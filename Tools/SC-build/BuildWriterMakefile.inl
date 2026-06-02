@@ -171,7 +171,7 @@ endif
             SC_TRY(writeProject(builder, project, renderer, relativeDirectories));
         }
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -229,7 +229,7 @@ endif # $(CONFIG)
         writeFinalArtifactRule(builder, project, makeTarget.view());
         writeRunExecutableRule(builder, project, makeTarget.view());
         writeSourceFilesList(builder, makeTarget.view(), renderer, project.filesWithSpecificFlags);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -341,7 +341,7 @@ endif
 )delimiter",
                                   makeTarget, artifactName.view()));
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -376,7 +376,7 @@ else
 endif
 )delimiter",
                        makeTarget);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeFinalArtifactRule(StringBuilder& builder, const Project& project, StringView makeTarget)
@@ -418,7 +418,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                            makeTarget);
             break;
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeRunExecutableRule(StringBuilder& builder, const Project& project, StringView makeTarget)
@@ -451,7 +451,7 @@ $({0}_TARGET_DIR)/$({0}_TARGET_NAME): $({0}_OBJECT_FILES) | $({0}_TARGET_DIR)
                            makeTarget);
             break;
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeSourceFilesList(StringBuilder& builder, StringView makeTarget, const Renderer& renderer,
@@ -501,7 +501,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
                                makeTarget, escapedName, escapedPath, extension, itemName, flagsGroup);
             }
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeLinkerFlags(StringBuilder& builder, StringView makeTarget, const Project& project, const LinkFlags& link)
@@ -565,7 +565,7 @@ $({0}_INTERMEDIATE_DIR)/{4}.o: $(CURDIR_ESCAPED)/{2} | $({0}_INTERMEDIATE_DIR)
         builder.append("\n{0}_LDFLAGS := $({0}_TARGET_CPPFLAGS) $({0}_CONFIG_LDFLAGS) $({0}_LIBRARIES) "
                        "$({0}_OS_LDFLAGS) $({0}_EXPORTED_SYMBOLS_LDFLAGS) $(LDFLAGS)",
                        makeTarget);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeCleanRule(StringBuilder& builder, StringView makeTarget)
@@ -588,7 +588,7 @@ endif
 )delimiter",
                        makeTarget);
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeObjectFilesList(StringBuilder& builder, StringView makeTarget, const Renderer& renderer)
@@ -604,7 +604,7 @@ endif
             builder.appendReplaceAll(Path::basename(item.name.view(), extension), " ", "\\ ");
             builder.append(".o \\");
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void writeRebuildOnHeaderChangeRule(StringBuilder& builder, StringView makeTarget)
@@ -617,7 +617,7 @@ endif
 )delimiter",
                        makeTarget);
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     void appendWarnings(StringBuilder& builder, StringView makeTarget, const CompileFlags& compile)
@@ -645,7 +645,7 @@ endif
                 builder.append(" -Wno-{0}", warning.name);
             }
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendDefines(StringBuilder& builder, StringView makeTarget, const RelativeDirectories& relativeDirectories,
@@ -708,7 +708,7 @@ endif
         }
         builder.append("\nendif");
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendCommonFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags)
@@ -745,7 +745,7 @@ endif
             break;
         }
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendCompilerFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags,
@@ -792,7 +792,7 @@ endif
         builder.append("\nendif");
 
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendCompilerLinkFlags(StringBuilder& builder, StringView makeTarget, const Project& project,
@@ -866,7 +866,7 @@ endif
         }
         builder.append("\nendif");
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendExportedSymbolsRules(StringBuilder& builder, StringView makeTarget, const Project& project,
@@ -978,7 +978,7 @@ $({0}_INTERMEDIATE_DIR):
             builder.append("_INTERMEDIATE_DIR)");
         }
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result appendTargetDir(StringBuilder& builder, StringView makeTarget,
@@ -1013,7 +1013,7 @@ $({0}_TARGET_DIR):
             builder.append("_TARGET_DIR)");
         }
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result writeConfiguration(StringBuilder& builder, const Project& project, const Configuration& configuration,
@@ -1059,7 +1059,7 @@ endif
         appendCompilerLinkFlags(builder, makeTarget, project, linkFlags, compileFlags, saneCppFlags);
         SC_TRY(appendExportedSymbolsRules(builder, makeTarget, project, renderer, linkFlags));
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -1075,7 +1075,7 @@ endif
         appendCommonFlags(builder, makeTarget, compileFlags);
         appendCompilerFlags(builder, makeTarget, compileFlags, saneCppFlags);
         return Result(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     static bool writeMergedCompileFlags(StringBuilder& builder, StringView makeTarget)

@@ -146,7 +146,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>\n"
                        "  </PropertyGroup>\n",
                        projectGuid, project.name);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -207,7 +207,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder.append("    <EnableASAN>true</EnableASAN>\n");
         }
         builder.append("  </PropertyGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -218,7 +218,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                [this](StringBuilder& builder, const Project& project,
                                       const Configuration& configuration, StringView platform)
                                { return writeConfigurationProperty(builder, project, configuration, platform); });
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     [[nodiscard]] bool writePropertySheet(StringBuilder& builder, const Configuration& configuration,
@@ -232,7 +232,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             "Label=\"LocalAppDataPlatform\" />\n"
             "  </ImportGroup>\n",
             configuration.name.view(), architecture);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -243,7 +243,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             builder, project,
             [this](StringBuilder& builder, const Project&, const Configuration& configuration, StringView platform)
             { return writePropertySheet(builder, configuration, platform); });
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     [[nodiscard]] bool writePropertyGroup(StringBuilder& builder, const Project& project,
@@ -301,7 +301,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </PropertyGroup>\n");
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -312,7 +312,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                [this](StringBuilder& builder, const Project& project,
                                       const Configuration& configuration, StringView platform)
                                { return writePropertyGroup(builder, project, configuration, platform); });
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     [[nodiscard]] bool writeItemDefinitionGroup(StringBuilder& builder, const Project& project,
@@ -424,7 +424,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         }
         builder.append("  </ItemDefinitionGroup>\n");
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -435,7 +435,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                [this](StringBuilder& builder, const Project& project,
                                       const Configuration& configuration, StringView platform)
                                { return writeItemDefinitionGroup(builder, project, configuration, platform); });
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
     using RenderItem  = WriterInternal::RenderItem;
     using RenderGroup = WriterInternal::RenderGroup;
@@ -469,7 +469,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -503,7 +503,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             writeForAllArchitectures("DisableSpecificWarnings", builder, project, sb.finalize());
         }
         builder.append("    </ClCompile>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -530,7 +530,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                 builder.append("</{0}>\n", tag);
                 return true;
             });
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     [[nodiscard]] bool writeHeaderFiles(StringBuilder& builder, Vector<RenderItem>& files)
@@ -545,7 +545,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -561,7 +561,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -577,7 +577,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -628,7 +628,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  <ImportGroup Label=\"ExtensionTargets\">\n"
                        "  </ImportGroup>\n"
                        "</Project>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -703,7 +703,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "\tEndGlobalSection\n");
 
         builder.append("EndGlobal");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -790,7 +790,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             }
         }
         builder.append("  </ItemGroup>\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -809,7 +809,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         {
             SC_TRY(writeFiltersFolder(builder, it.value));
         }
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -825,7 +825,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         builder.append("  </ItemGroup>\n");
         writeFileFilters(builder, renderer);
         builder.append("</Project>");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 

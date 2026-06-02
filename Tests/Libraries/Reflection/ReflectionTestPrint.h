@@ -90,7 +90,7 @@ inline int printTypes(StringBuilder& builder, int typeIndex, const Reflection::T
     }
 
     builder.append("}\n");
-    SC_COMPILER_WARNING_POP;
+    SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     return types[0].getNumberOfChildren();
 }
 } // namespace SC

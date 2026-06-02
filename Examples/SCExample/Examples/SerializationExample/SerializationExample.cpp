@@ -357,7 +357,7 @@ struct SC::SerializationExampleView
         // -------------------------------------------------------------
         // End of code copied from imgui_demo.cpp
         // -------------------------------------------------------------
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     Result showJSONInFinder(const StringView jsonPath)

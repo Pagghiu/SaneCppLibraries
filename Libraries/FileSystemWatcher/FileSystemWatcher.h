@@ -354,7 +354,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         FolderWatcher& watcher = SC_COMPILER_FIELD_OFFSET(FolderWatcher, asyncStorage, storage);
         fileSystemWatcher->asyncNotify(&watcher);
         result.reactivateRequest(true);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
     Function<void(T_AsyncResult&)> onAsyncPollClose;

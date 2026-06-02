@@ -286,7 +286,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         builder.append(R"delimiter(/* End PBXBuildFile section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -409,7 +409,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
         builder.append("\n/* End PBXFileReference section */");
 
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -436,7 +436,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXFrameworksBuildPhase section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -488,7 +488,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 /* End PBXNativeTarget section */
 )delimiter",
                        project.targetName.view(), productFileName.view(), productExtension, productType);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -532,7 +532,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXProject section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -552,7 +552,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 /* End PBXResourcesBuildPhase section */
 )delimiter",
                        project.name.view());
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -613,7 +613,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 			showEnvVarsInLog = 0;        };
 /* End PBXShellScriptBuildPhase section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -640,7 +640,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End PBXSourcesBuildPhase section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -786,7 +786,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        MTL_ENABLE_DEBUG_INFO = NO;
                        MTL_FAST_MATH = YES;
                        SDKROOT = macosx;)delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -904,7 +904,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             name = {};
         }};)delimiter",
                        xcodeObject.name.view());
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -921,7 +921,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                                                     relativeDirectories.relativeProjectsToIntermediates.view());
         appendVariable(builder, configuration->intermediatesPath.view());
         builder.append("\";");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
     }
 
     [[nodiscard]] bool writeXCBuildConfiguration(StringBuilder& builder, const Project& project,
@@ -971,7 +971,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             }
         }
         builder.append("\n/* End XCBuildConfiguration section */\n");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -1021,7 +1021,7 @@ struct SC::Build::ProjectWriter::WriterXCode
         };
 /* End XCConfigurationList section */
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -1136,7 +1136,7 @@ struct SC::Build::ProjectWriter::WriterXCode
     rootObject = 7B00740A2A73143F00660B94 /* Project object */;
 }
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return true;
     }
 
@@ -1248,7 +1248,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename, lldbinit, //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename,           //
                        "7B00740A2A73143F00660B94", project.name.view(), project.name.view(), filename);
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -1267,7 +1267,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 </dict>
 </plist>
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -1301,7 +1301,7 @@ struct SC::Build::ProjectWriter::WriterXCode
             </scenes>
         </document>
 )delimiter");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 
@@ -1412,7 +1412,7 @@ struct SC::Build::ProjectWriter::WriterXCode
                            project.name.view());
         }
         builder.append("</Workspace>");
-        SC_COMPILER_WARNING_POP;
+        SC_COMPILER_WARNING_POP_UNUSED_RESULT;
         return Result(true);
     }
 };
