@@ -8,7 +8,7 @@
 // Run `./SC.sh build configure` from repo root, then build/run the `AwaitProcessExitCodes` console executable.
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Await/Await.h"
-#include "../../Libraries/Foundation/Deferred.h"
+#include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/Process/Process.h"
 #include "../../Libraries/Strings/Console.h"
 

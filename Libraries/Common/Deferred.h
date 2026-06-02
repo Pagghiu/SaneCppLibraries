@@ -1,7 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Foundation/Compiler.h"
+#ifdef SC_FOUNDATION_DEFERRED_DEFINITION_H
+#if SC_FOUNDATION_DEFERRED_DEFINITION_H != 1
+#error "Deferred.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_DEFERRED_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMove.h"
 
 namespace SC
 {
@@ -44,3 +50,5 @@ Deferred<F> MakeDeferred(F&& f)
 
 //! @}
 } // namespace SC
+
+#endif

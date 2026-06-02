@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "../../Socket/Socket.h"
 
+#include "../../Common/Deferred.h"
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Deferred.h"
 
 #include <arpa/inet.h>   // inet_pton
 #include <errno.h>       // errno

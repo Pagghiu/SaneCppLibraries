@@ -64,7 +64,7 @@ static constexpr NTSTATUS STATUS_SUCCESS = 0;
 #undef RemoveDirectory
 #endif
 
-#include "../../Foundation/Deferred.h"
+#include "../../Common/Deferred.h"
 #include "../../Socket/Socket.h"
 #include "AsyncInternal.h"
 

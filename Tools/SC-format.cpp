@@ -4,7 +4,7 @@
 // TODO: Figure out a way to avoid this macro
 
 #include "../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
-#include "../Libraries/Foundation/Deferred.h"
+#include "../Libraries/Common/Deferred.h"
 #include "SC-package.h"
 
 #if !defined(SC_TOOLS_COMPILED_SEPARATELY)

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Memory/VirtualMemory.h"
-#include "Libraries/Foundation/Deferred.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Testing.h"
 #include <memory.h> // memcmp

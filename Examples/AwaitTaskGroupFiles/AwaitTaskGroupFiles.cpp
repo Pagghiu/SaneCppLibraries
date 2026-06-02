@@ -8,8 +8,8 @@
 // Run `./SC.sh build configure` from repo root, then build/run the `AwaitTaskGroupFiles` console executable.
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Await/Await.h"
+#include "../../Libraries/Common/Deferred.h"
 #include "../../Libraries/FileSystem/FileSystem.h"
-#include "../../Libraries/Foundation/Deferred.h"
 #include "../../Libraries/Memory/String.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/Path.h"

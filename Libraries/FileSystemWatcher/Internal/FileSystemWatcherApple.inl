@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 //! [OpaqueDefinition1Snippet]
+#include "../../Common/Deferred.h"
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
-#include "../../Foundation/Deferred.h"
 #include "FileSystemWatcherThreading.h"
 
 #include <CoreServices/CoreServices.h> // FSEvents

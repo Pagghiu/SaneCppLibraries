@@ -4,7 +4,7 @@
 // Description: Simple integration of SC::AsyncEventLoop within macOS, windows and linux native GUI event loop.
 
 #include "Libraries/Async/Async.h"
-#include "Libraries/Foundation/Deferred.h"
+#include "Libraries/Common/Deferred.h"
 #include "Libraries/Memory/Globals.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Socket/Socket.h"

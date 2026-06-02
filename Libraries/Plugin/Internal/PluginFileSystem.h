@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Deferred.h"
+#include "../../Common/Deferred.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>

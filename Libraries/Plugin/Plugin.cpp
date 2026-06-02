@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
-#include "../Foundation/Deferred.h"
+#include "../Common/Deferred.h"
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
 #include "../Strings/Path.h"

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../../Libraries/Async/Async.h"
 #include "../../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl"
-#include "../../Libraries/Foundation/Deferred.h"
+#include "../../Libraries/Common/Deferred.h"
 #include "BuildWriter.h"
 
 #include "../../Libraries/FileSystem/FileSystem.h"

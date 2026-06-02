@@ -188,7 +188,7 @@ struct sockaddr_alg
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../Foundation/Deferred.h"
+#include "../Common/Deferred.h"
 
 SC::Hashing::Hashing() {}
 
