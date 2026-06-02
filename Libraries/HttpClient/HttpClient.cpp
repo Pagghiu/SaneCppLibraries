@@ -566,8 +566,8 @@ bool SC::HttpClientLocalConditionVariable::wait(HttpClientLocalMutex& mutex, uin
                                   reinterpret_cast<HttpClientLocalMutexStorage*>(mutex.storage),
                                   &deadline) != ETIMEDOUT;
 #else
-    SC_COMPILER_UNUSED(mutex);
-    SC_COMPILER_UNUSED(timeoutMilliseconds);
+    (void)(mutex);
+    (void)(timeoutMilliseconds);
     return true;
 #endif
 }

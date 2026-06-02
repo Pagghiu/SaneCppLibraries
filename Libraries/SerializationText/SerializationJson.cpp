@@ -371,7 +371,7 @@ bool SC::SerializationJson::Reader::getNextField(uint32_t index, StringSpan& tex
 
 bool SC::SerializationJson::Reader::serialize(uint32_t index, bool& value)
 {
-    SC_COMPILER_UNUSED(value);
+    (void)(value);
     SC_TRY(eventuallyExpectComma(index));
     JsonTokenizer::Token token;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
@@ -390,7 +390,7 @@ bool SC::SerializationJson::Reader::serialize(uint32_t index, bool& value)
 
 bool SC::SerializationJson::Reader::serialize(uint32_t index, float& value)
 {
-    SC_COMPILER_UNUSED(value);
+    (void)(value);
     SC_TRY(eventuallyExpectComma(index));
     JsonTokenizer::Token token;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
@@ -400,7 +400,7 @@ bool SC::SerializationJson::Reader::serialize(uint32_t index, float& value)
 
 bool SC::SerializationJson::Reader::serialize(uint32_t index, int32_t& value)
 {
-    SC_COMPILER_UNUSED(value);
+    (void)(value);
     SC_TRY(eventuallyExpectComma(index));
     JsonTokenizer::Token token;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));

@@ -1763,7 +1763,7 @@ Result installDoxygen(StringView packagesCacheDirectory, StringView packagesInst
 
     recipe.functions.testFunction = [](const Download& download, const Package& package)
     {
-        SC_COMPILER_UNUSED(download);
+        (void)(download);
         String result;
         String path;
         switch (HostPlatform)

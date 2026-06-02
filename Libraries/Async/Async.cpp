@@ -67,7 +67,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
 
 void SC::AsyncRequest::setDebugName(const char* newDebugName)
 {
-    SC_COMPILER_UNUSED(newDebugName);
+    (void)(newDebugName);
 #if SC_ASYNC_ENABLE_LOG
     debugName = newDebugName;
 #endif
@@ -524,7 +524,7 @@ SC::Result SC::AsyncFileSend::start(AsyncEventLoop& eventLoop, const FileDescrip
 #if SC_PLATFORM_LINUX
     pipeBufferSize = pipeSize;
 #else
-    SC_COMPILER_UNUSED(pipeSize);
+    (void)(pipeSize);
 #endif
     offset    = fileOffset;
     length    = bytesToSend;

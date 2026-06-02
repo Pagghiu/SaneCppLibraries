@@ -367,18 +367,18 @@ struct SC_HTTP_CLIENT_EXPORT HttpClientOperationListener
 
     /// @brief Called once the response status code and headers are available
     /// @param response Parsed response metadata owned by the current operation
-    virtual void onResponseHead(HttpClientResponse& response) { SC_COMPILER_UNUSED(response); }
+    virtual void onResponseHead(HttpClientResponse& response) { (void)(response); }
 
     /// @brief Called for each response body chunk delivered by poll()
     /// @param data Body bytes valid for the duration of the callback
-    virtual void onResponseBody(Span<const char> data) { SC_COMPILER_UNUSED(data); }
+    virtual void onResponseBody(Span<const char> data) { (void)(data); }
 
     /// @brief Called when the response body completed successfully
     virtual void onResponseComplete() {}
 
     /// @brief Called when the request fails
     /// @param error Operation failure
-    virtual void onError(Result error) { SC_COMPILER_UNUSED(error); }
+    virtual void onError(Result error) { (void)(error); }
 };
 
 struct SC_HTTP_CLIENT_EXPORT HttpClientOperation;

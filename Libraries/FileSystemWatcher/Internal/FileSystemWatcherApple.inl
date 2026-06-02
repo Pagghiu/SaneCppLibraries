@@ -37,7 +37,7 @@ struct SC::FileSystemWatcher::Internal
 
     Result init(FileSystemWatcher& parent, ThreadRunner& runner)
     {
-        SC_COMPILER_UNUSED(runner);
+        (void)(runner);
         self = &parent;
         return Result(true);
     }
@@ -250,8 +250,8 @@ struct SC::FileSystemWatcher::Internal
                                    const FSEventStreamEventFlags* eventFlags, //
                                    const FSEventStreamEventId*    eventIds)
     {
-        SC_COMPILER_UNUSED(streamRef);
-        SC_COMPILER_UNUSED(eventIds);
+        (void)(streamRef);
+        (void)(eventIds);
         Internal&    internal = *reinterpret_cast<Internal*>(info);
         const char** paths    = reinterpret_cast<const char**>(eventPaths);
         for (size_t idx = 0; idx < numEvents; ++idx)

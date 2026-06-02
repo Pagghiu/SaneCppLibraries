@@ -751,7 +751,7 @@ endif
     Result appendCompilerFlags(StringBuilder& builder, StringView makeTarget, const CompileFlags& compileFlags,
                                const SaneCppFlags& saneCppFlags)
     {
-        SC_COMPILER_UNUSED(saneCppFlags);
+        (void)(saneCppFlags);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n\nifeq ($(CLANG_DETECTED),yes)\n");
         // Clang specific flags
@@ -799,7 +799,7 @@ endif
                                    const LinkFlags& linkFlags, const CompileFlags& compileFlags,
                                    const SaneCppFlags& saneCppFlags)
     {
-        SC_COMPILER_UNUSED(saneCppFlags);
+        (void)(saneCppFlags);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append("\n{0}_POST_LINK_STRIP = :", makeTarget);
         builder.append("\n{0}_LINKER := $(CXX)", makeTarget);

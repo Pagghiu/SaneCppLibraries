@@ -115,7 +115,7 @@ bool StringFormatterFor<SC::uint8_t>::format(StringFormatOutput& data, const Str
 
 bool StringFormatterFor<bool>::format(StringFormatOutput& data, const StringSpan specifier, const bool value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(value ? "true"_a8 : "false"_a8);
 }
 
@@ -133,13 +133,13 @@ bool StringFormatterFor<double>::format(StringFormatOutput& data, const StringSp
 
 bool StringFormatterFor<char>::format(StringFormatOutput& data, const StringSpan specifier, const char value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(StringView({&value, sizeof(value)}, false, StringEncoding::Ascii));
 }
 
 bool StringFormatterFor<const char*>::format(StringFormatOutput& data, const StringSpan specifier, const char* value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(StringView::fromNullTerminated(value, StringEncoding::Ascii));
 }
 
@@ -152,14 +152,14 @@ bool StringFormatterFor<const void*>::format(StringFormatOutput& data, const Str
 #if SC_PLATFORM_WINDOWS
 bool StringFormatterFor<wchar_t>::format(StringFormatOutput& data, const StringSpan specifier, const wchar_t value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(StringView({&value, 1}, false));
 }
 
 bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const StringSpan specifier,
                                                 const wchar_t* value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(StringView({value, wcslen(value)}, true));
 }
 #endif
@@ -167,13 +167,13 @@ bool StringFormatterFor<const wchar_t*>::format(StringFormatOutput& data, const 
 bool StringFormatterFor<StringView>::format(StringFormatOutput& data, const StringSpan specifier,
                                             const StringView value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(value);
 }
 
 bool StringFormatterFor<StringSpan>::format(StringFormatOutput& data, const StringSpan specifier, StringSpan value)
 {
-    SC_COMPILER_UNUSED(specifier);
+    (void)(specifier);
     return data.append(value);
 }
 

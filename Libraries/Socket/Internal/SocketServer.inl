@@ -34,7 +34,7 @@ SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress, BindReuseAddres
 #elif !SC_PLATFORM_EMSCRIPTEN
     ::setsockopt(listenSocket, SOL_SOCKET, SO_REUSEADDR, &value, sizeof(value));
 #else
-    SC_COMPILER_UNUSED(value);
+    (void)(value);
 #endif
     const struct sockaddr* sa     = &nativeAddress.handle.reinterpret_as<const struct sockaddr>();
     const socklen_t        saSize = nativeAddress.sizeOfHandle();

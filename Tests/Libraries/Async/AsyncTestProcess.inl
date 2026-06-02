@@ -79,7 +79,7 @@ void SC::AsyncTest::processExitStopBeforeCompletion()
     } state;
     asyncExit.callback = [callbackState = &state](AsyncProcessExit::Result& result)
     {
-        SC_COMPILER_UNUSED(result);
+        (void)(result);
         callbackState->numCallbackCalled++;
     };
     SC_TEST_EXPECT(asyncExit.start(eventLoop, process.handle));

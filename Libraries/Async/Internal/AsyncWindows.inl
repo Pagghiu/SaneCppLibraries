@@ -1181,7 +1181,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     // This is executed on windows thread pool
     static void CALLBACK processExitCallback(void* data, BOOLEAN timeoutOccurred)
     {
-        SC_COMPILER_UNUSED(timeoutOccurred);
+        (void)(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopHandle;
         SC_TRUST_RESULT(async.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loopFd")));

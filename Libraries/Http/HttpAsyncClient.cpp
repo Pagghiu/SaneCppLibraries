@@ -730,7 +730,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
 
     const bool removed = connection->getReadableTransportStream()
                              .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
-    SC_COMPILER_UNUSED(removed);
+    (void)(removed);
 
     if (response.getParser().statusCode < 200 and not responseMustNotHaveBody())
     {
@@ -766,7 +766,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
     }
 
     const size_t bufferedBodyBytes = readData.sizeInBytes() - response.getHeadersLength();
-    SC_COMPILER_UNUSED(bufferedBodyBytes);
+    (void)(bufferedBodyBytes);
 
     if (not responseDelivered and onResponse.isValid())
     {
@@ -841,7 +841,7 @@ void HttpAsyncClient::onResponseBodyData(AsyncBufferView::ID bufferID)
         const bool removed =
             connection->getReadableTransportStream()
                 .eventData.removeListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
-        SC_COMPILER_UNUSED(removed);
+        (void)(removed);
         finishResponse();
     }
 }

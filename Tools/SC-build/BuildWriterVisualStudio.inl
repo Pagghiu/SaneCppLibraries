@@ -452,7 +452,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
     [[nodiscard]] bool writeSourceFiles(StringBuilder& builder, const Project& project, Vector<RenderItem>& files)
     {
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-        SC_COMPILER_UNUSED(project);
+        (void)(project);
         builder.append("  <ItemGroup>\n");
         for (const RenderItem& it : files)
         {
@@ -665,7 +665,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                StringView platform)
 
                             {
-                                SC_COMPILER_UNUSED(project);
+                                (void)(project);
                                 builder.append("\t\t{}|{} = {}|{}\n", configuration.name, platform, configuration.name,
                                                platform);
                                 return true;
@@ -685,7 +685,7 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                                            const Configuration& configuration, StringView platform)
 
                             {
-                                SC_COMPILER_UNUSED(project);
+                                (void)(project);
                                 builder.append("\t\t{}.{}|{}.ActiveCfg = {}|{}\n", projectGuid, configuration.name,
                                                platform, configuration.name, platform);
                                 builder.append("\t\t{}.{}|{}.Build.0 = {}|{}\n", projectGuid, configuration.name,

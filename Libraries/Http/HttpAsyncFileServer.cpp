@@ -75,7 +75,7 @@ Result HttpAsyncFileServer::setOptions(const HttpAsyncFileServerOptions& newOpti
 {
     StringSpan normalizedFallback;
     SC_TRY(Internal::normalizeOptionFilePath(newOptions.spaFallbackPath, normalizedFallback));
-    SC_COMPILER_UNUSED(normalizedFallback);
+    (void)(normalizedFallback);
     options = newOptions;
     return Result(true);
 }

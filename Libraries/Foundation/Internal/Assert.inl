@@ -90,8 +90,8 @@ struct Assert::Internal
         return true;
 #else
 #if SC_PLATFORM_LINUX && !defined(__GLIBC__)
-        SC_COMPILER_UNUSED(backtraceBuffer);
-        SC_COMPILER_UNUSED(backtraceBufferSizeInBytes);
+        (void)(backtraceBuffer);
+        (void)(backtraceBufferSizeInBytes);
         printAscii("Backtrace unavailable on this Linux libc/runtime.\n");
         return false;
 #else

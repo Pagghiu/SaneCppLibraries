@@ -558,7 +558,7 @@ SC::Result SC::Build::Definition::configure(StringView workspaceName, const Buil
         SC_TRY(fs.makeDirectoryRecursive(parameters.directories.outputsDirectory.view()));
         SC_TRY(fs.makeDirectoryRecursive(parameters.directories.intermediatesDirectory.view()));
         SC_TRY(fs.makeDirectoryRecursive(parameters.directories.buildCacheDirectory.view()));
-        SC_COMPILER_UNUSED(workspaceName);
+        (void)(workspaceName);
         return Result(true);
     }
     FilePathsResolver filePathsResolver;
@@ -1366,7 +1366,7 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
 {
     if (action.parameters.generator == Generator::Native)
     {
-        SC_COMPILER_UNUSED(environment);
+        (void)(environment);
         return NativeBuild::execute(definition, action, outputExecutable);
     }
 
@@ -1592,8 +1592,8 @@ SC::Result SC::Build::Action::Internal::compileRunPrint(const Definition& defini
             if (definition.findConfiguration(action.workspaceName, action.projectName, action.configurationName,
                                              workspace, project, configuration))
             {
-                SC_COMPILER_UNUSED(workspace);
-                SC_COMPILER_UNUSED(configuration);
+                (void)(workspace);
+                (void)(configuration);
                 SC_TRY_MSG(project->targetType == TargetType::ConsoleExecutable or
                                project->targetType == TargetType::GUIApplication,
                            "Run requires an executable target");

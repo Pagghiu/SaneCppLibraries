@@ -322,10 +322,10 @@ struct ExtendedStructTypeInfo
     template <typename R, int N>
     constexpr bool operator()(int memberTag, R T::* member, const char (&name)[N], size_t offset)
     {
-        SC_COMPILER_UNUSED(memberTag);
-        SC_COMPILER_UNUSED(name);
-        SC_COMPILER_UNUSED(member);
-        SC_COMPILER_UNUSED(offset);
+        (void)(memberTag);
+        (void)(name);
+        (void)(member);
+        (void)(offset);
         if (not ExtendedTypeInfo<R>().IsPacked)
         {
             return false; // If a given type is not packed, let's stop iterating

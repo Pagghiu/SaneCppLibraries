@@ -164,7 +164,7 @@ SC::Result SC::FileSystem::convert(const StringSpan file, StringPath& destinatio
     }
     return Result(true);
 #else
-    SC_COMPILER_UNUSED(transportPath);
+    (void)(transportPath);
     SC_TRY(destination.assign(file));
     if (encodedPath)
     {
@@ -438,7 +438,7 @@ SC::Result SC::FileSystem::formatError(int errorNumber, StringSpan item, bool is
     else
 #endif
     {
-        SC_COMPILER_UNUSED(isWindowsNativeError);
+        (void)(isWindowsNativeError);
         if (not preciseErrorMessages)
         {
             return getErrorCode(errorNumber);

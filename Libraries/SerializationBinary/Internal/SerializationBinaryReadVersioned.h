@@ -61,7 +61,7 @@ struct SerializerBinaryReadVersioned
         template <typename R, int N>
         constexpr bool operator()(int memberTag, R T::* field, const char (&)[N], size_t offset)
         {
-            SC_COMPILER_UNUSED(offset);
+            (void)(offset);
             if (matchMemberTag == memberTag)
             {
                 consumed = true;

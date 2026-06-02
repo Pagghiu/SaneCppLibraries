@@ -2176,7 +2176,7 @@ struct SC::Build::NativeBuild
                     SC_TRY(commandLine.append(option.view()));
                 }
             }
-            SC_COMPILER_UNUSED(usesCppDriver);
+            (void)(usesCppDriver);
             return Result(true);
         }
 
@@ -2387,7 +2387,7 @@ struct SC::Build::NativeBuild
             const Configuration* configuration = nullptr;
             SC_TRY(findProjectConfiguration(workspace, action.projectName, action.configurationName, project,
                                             configuration));
-            SC_COMPILER_UNUSED(configuration);
+            (void)(configuration);
             SC_TRY(appendProjectBuildOrder(workspace, targetPlatform(actionTargetContext), *project,
                                            action.configurationName, orderedProjects));
         }
@@ -3543,7 +3543,7 @@ struct SC::Build::NativeBuild
                     return Result::Error("MSVC native target triple selection is not implemented yet");
                 }
             }
-            SC_COMPILER_UNUSED(forCompiler);
+            (void)(forCompiler);
             return Result(true);
         }
 
@@ -3584,7 +3584,7 @@ struct SC::Build::NativeBuild
                 SC_TRY(commandLine.append(resolvedProject.resolvedSysroot.view()));
             }
         }
-        SC_COMPILER_UNUSED(forCompiler);
+        (void)(forCompiler);
         return Result(true);
     }
 

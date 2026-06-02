@@ -27,9 +27,6 @@
 #endif
 #define SC_FOUNDATION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FOUNDATION)
 
-/// Silence an `unused variable` or `unused parameter` warning
-#define SC_COMPILER_UNUSED(param) ((void)param)
-
 //! @}
 #include "../Common/CompilerMinMax.h"
 #include "../Common/CompilerMove.h"

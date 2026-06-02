@@ -1119,7 +1119,7 @@ static Result normalizeConsoleOutput(String& output)
     builder.finalize();
     output = move(normalized);
 #else
-    SC_COMPILER_UNUSED(output);
+    (void)(output);
 #endif
     return Result(true);
 }
@@ -1277,7 +1277,7 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
         processArguments[numArguments++] = projectDirectoryOverride;
     }
 #else
-    SC_COMPILER_UNUSED(projectDirectoryOverride);
+    (void)(projectDirectoryOverride);
     SC_TRY(Path::join(scriptPath, {report.libraryRootDirectory.view(), "SC-build.sh"}));
 
     StringSpan processArguments[48];
@@ -1859,10 +1859,10 @@ static Result verifyNoSCExportsFromExecutable(StringView executablePath, StringV
     SC_TRY(fs.init("."));
     SC_TRY_MSG(not importLibraryPath.isEmpty(), "Missing import library path");
     SC_TRY_MSG(not fs.existsAndIsFile(importLibraryPath), "Unexpected import library emitted for executable");
-    SC_COMPILER_UNUSED(executablePath);
+    (void)(executablePath);
     return Result(true);
 #else
-    SC_COMPILER_UNUSED(importLibraryPath);
+    (void)(importLibraryPath);
     String nmPath = StringEncoding::Utf8;
     SC_TRY(resolveHostToolPath("nm", nmPath));
 

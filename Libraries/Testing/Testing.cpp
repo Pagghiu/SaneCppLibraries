@@ -325,11 +325,11 @@ static bool resolveCompiledLibraryRoot(StringSpan executablePath, StringPath& li
     }
     return false;
 #else
-    SC_COMPILER_UNUSED(executablePath);
-    SC_COMPILER_UNUSED(libraryRoot);
-    SC_COMPILER_UNUSED(attempts);
-    SC_COMPILER_UNUSED(maxAttempts);
-    SC_COMPILER_UNUSED(numAttempts);
+    (void)(executablePath);
+    (void)(libraryRoot);
+    (void)(attempts);
+    (void)(maxAttempts);
+    (void)(numAttempts);
     return false;
 #endif
 }

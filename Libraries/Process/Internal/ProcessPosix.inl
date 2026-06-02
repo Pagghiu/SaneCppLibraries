@@ -60,7 +60,7 @@ SC::Result SC::Process::waitForExitSync() { return Internal::waitForPid(processI
 
 SC::Result SC::Process::launchImplementation()
 {
-    SC_COMPILER_UNUSED(options);
+    (void)(options);
     sigset_t emptySignals;
     sigset_t previousSignals;
 

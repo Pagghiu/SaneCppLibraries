@@ -1254,7 +1254,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     Result writeEntitlements(StringBuilder& builder, const Project& project)
     {
-        SC_COMPILER_UNUSED(project);
+        (void)(project);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -1273,7 +1273,7 @@ struct SC::Build::ProjectWriter::WriterXCode
 
     Result writeStoryboard(StringBuilder& builder, const Project& project)
     {
-        SC_COMPILER_UNUSED(project);
+        (void)(project);
         SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
         builder.append(R"delimiter(<?xml version="1.0" encoding="UTF-8" standalone="no"?>
         <document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="13122.16" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">

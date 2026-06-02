@@ -250,7 +250,7 @@ class NativeBuildWindowsLongPath
             }
         }
 #else
-        SC_COMPILER_UNUSED(resolvedProject);
+        (void)(resolvedProject);
 #endif
         SC_TRY(output.assign(path));
         return Result(true);
@@ -466,8 +466,8 @@ class NativeBuildWindowsLongPath
             SC_TRY(resolvedProject.commandWorkingDirectory.assign(aliasRoot.view()));
         }
 #else
-        SC_COMPILER_UNUSED(fs);
-        SC_COMPILER_UNUSED(resolvedProjects);
+        (void)(fs);
+        (void)(resolvedProjects);
 #endif
         return Result(true);
     }

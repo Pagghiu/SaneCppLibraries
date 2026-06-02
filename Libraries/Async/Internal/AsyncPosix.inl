@@ -739,13 +739,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     {
         ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
         {
-            SC_COMPILER_UNUSED(totalBytesWritten);
+            (void)(totalBytesWritten);
             return ::send(fd, data, bytes, 0);
         }
 
         ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
         {
-            SC_COMPILER_UNUSED(totalBytesWritten);
+            (void)(totalBytesWritten);
             return ::writev(fd, vec, remainingVectors);
         }
     };
@@ -762,13 +762,13 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         ssize_t writeSingle(int fd, const char* data, size_t bytes, size_t totalBytesWritten)
         {
-            SC_COMPILER_UNUSED(totalBytesWritten);
+            (void)(totalBytesWritten);
             return ::sendto(fd, data, bytes, 0, address, addressLen);
         }
 
         ssize_t writeMultiple(int fd, struct iovec* vec, int remainingVectors, size_t totalBytesWritten)
         {
-            SC_COMPILER_UNUSED(totalBytesWritten);
+            (void)(totalBytesWritten);
             msghdr msgs;
             memset(&msgs, 0, sizeof(msgs));
             msgs.msg_name    = address;

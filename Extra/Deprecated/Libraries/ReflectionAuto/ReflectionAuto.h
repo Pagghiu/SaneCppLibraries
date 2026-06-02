@@ -33,9 +33,8 @@ template <typename TypeList>
 struct TypeListVisit<TypeList, 0>
 {
     template <typename Visitor>
-    constexpr static bool visit(Visitor&& visitor)
+    constexpr static bool visit(Visitor&&)
     {
-        SC_COMPILER_UNUSED(visitor);
         return true;
     }
 };

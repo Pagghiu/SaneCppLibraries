@@ -644,7 +644,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_TRY_MSG(arena.appendAsSingleString({linkerPath.view()}), "link buffer full");
 
 #if SC_PLATFORM_WINDOWS
-    SC_COMPILER_UNUSED(compilerEnvironment);
+    (void)(compilerEnvironment);
 
     if (not definition.build.contains("libc") and not definition.build.contains("libc++"))
     {
@@ -669,7 +669,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
     SC_TRY(arena.appendAsSingleString({exeName, SC_NATIVE_STR(".lib")}));
 
 #else
-    SC_COMPILER_UNUSED(sysroot);
+    (void)(sysroot);
     SC_TRY(arena.appendMultipleStrings({"-fpic"}));
 
     if (not sysroot.isysroot.isEmpty())
@@ -691,7 +691,7 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 #if SC_PLATFORM_APPLE
     SC_TRY(arena.appendMultipleStrings({"-bundle_loader", executablePath, "-bundle"}));
 #else
-    SC_COMPILER_UNUSED(executablePath);
+    (void)(executablePath);
     SC_TRY(arena.appendMultipleStrings({"-shared", "-Wl,-Bsymbolic-functions"}));
 #endif
 #if defined(__SANITIZE_ADDRESS__)
@@ -869,7 +869,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
     SC_TRY(StringBuilder::format(buffer, "{}Close", definition.identity.identifier.view()));
     SC_TRY_MSG(dynamicLibrary.getSymbol(buffer.view(), pluginClose), "Missing #PluginName#Close");
     SC_TRY(StringBuilder::format(buffer, "{}QueryInterface", definition.identity.identifier.view()));
-    SC_COMPILER_UNUSED(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
+    (void)(dynamicLibrary.getSymbol(buffer.view(), pluginQueryInterface)); // QueryInterface is optional
     numReloads += 1;
     lastLoadTime = PluginNow();
     return Result(true);
@@ -1038,7 +1038,7 @@ SC::Result SC::PluginRegistry::unloadPlugin(const StringView identifier, bool re
         }
         auto closeResult = lib.pluginClose(lib.instance);
         lib.instance     = nullptr;
-        SC_COMPILER_UNUSED(closeResult); // TODO: Print / Return some warning
+        (void)(closeResult); // TODO: Print / Return some warning
     }
     return lib.unload(releaseDebuggerFiles);
 }

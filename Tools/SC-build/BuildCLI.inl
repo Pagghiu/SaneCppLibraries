@@ -481,7 +481,7 @@ static Result applyConfigurationValue(Build::Action& action, StringView configur
         return Result(true);
     }
     StringView resolved;
-    SC_COMPILER_UNUSED(console);
+    (void)(console);
     SC_TRY(resolveConfigurationValue(configurationValue, storage, resolved));
     action.configurationName = resolved;
     return Result(true);

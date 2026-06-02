@@ -43,8 +43,8 @@ int main(int argc, const char* argv[])
     // TODO: It could be worth cleanup and move command-line utf handling somewhere it could be reused
 #if SC_PLATFORM_WINDOWS
     wchar_t* const* nativeArgs = nullptr;
-    SC_COMPILER_UNUSED(argc);
-    SC_COMPILER_UNUSED(argv);
+    (void)(argc);
+    (void)(argv);
     LPWSTR* args = ::CommandLineToArgvW(::GetCommandLineW(), &numArguments);
     if (args == nullptr)
     {

@@ -94,8 +94,8 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     static bool resize(Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                        VectorVTable::DropExcessItems dropExcessItems)
     {
-        SC_COMPILER_UNUSED(property);
-        SC_COMPILER_UNUSED(dropExcessItems);
+        (void)(property);
+        (void)(dropExcessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             auto&      vectorByte = *reinterpret_cast<Container*>(object.data());
@@ -112,8 +112,8 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     static bool resizeWithoutInitialize(Span<char> object, Reflection::TypeInfo property, uint64_t sizeInBytes,
                                         VectorVTable::DropExcessItems dropExcessItems)
     {
-        SC_COMPILER_UNUSED(property);
-        SC_COMPILER_UNUSED(dropExcessItems);
+        (void)(property);
+        (void)(dropExcessItems);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             auto&      vectorByte = *reinterpret_cast<Container*>(object.data());
@@ -131,7 +131,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     [[nodiscard]] static constexpr bool getSegmentSpan(Reflection::TypeInfo property, Span<ByteType> object,
                                                        Span<ByteType>& itemBegin)
     {
-        SC_COMPILER_UNUSED(property);
+        (void)(property);
         if (object.sizeInBytes() >= sizeof(void*))
         {
             using VectorType = typename TypeTraits::SameConstnessAs<ByteType, Container>::type;
@@ -149,7 +149,7 @@ struct VectorArrayVTable<FlatSchemaBuilderTypeErased, Container, ItemType, N>
     [[nodiscard]] static typename TypeTraits::EnableIf<not TypeTraits::IsTriviallyCopyable<Q>::value, void>::type //
         constexpr assignResizeWithoutInitialize(VectorVTable& vector)
     {
-        SC_COMPILER_UNUSED(vector);
+        (void)(vector);
     }
 
     template <typename Q = ItemType>

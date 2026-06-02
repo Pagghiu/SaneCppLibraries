@@ -42,18 +42,18 @@ struct SC::BaseTest : public SC::TestCase
             float    maxF   = MaxValue();
             double   maxD   = MaxValue();
 
-            SC_COMPILER_UNUSED(maxU8);
-            SC_COMPILER_UNUSED(maxU16);
-            SC_COMPILER_UNUSED(maxU32);
-            SC_COMPILER_UNUSED(maxU64);
-            SC_COMPILER_UNUSED(maxI8);
-            SC_COMPILER_UNUSED(maxI16);
-            SC_COMPILER_UNUSED(maxI32);
-            SC_COMPILER_UNUSED(maxI64);
-            SC_COMPILER_UNUSED(maxSS);
-            SC_COMPILER_UNUSED(maxS);
-            SC_COMPILER_UNUSED(maxF);
-            SC_COMPILER_UNUSED(maxD);
+            (void)(maxU8);
+            (void)(maxU16);
+            (void)(maxU32);
+            (void)(maxU64);
+            (void)(maxI8);
+            (void)(maxI16);
+            (void)(maxI32);
+            (void)(maxI64);
+            (void)(maxSS);
+            (void)(maxS);
+            (void)(maxF);
+            (void)(maxD);
         }
     }
 };

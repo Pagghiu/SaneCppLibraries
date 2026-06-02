@@ -54,7 +54,7 @@ extern "C" int __cxa_guard_acquire(guard_type* guard_object)
 }
 
 extern "C" void __cxa_guard_release(guard_type* guard_object) { *reinterpret_cast<unsigned char*>(guard_object) = 1; }
-extern "C" void __cxa_guard_abort(guard_type* guard_object) { SC_COMPILER_UNUSED(guard_object); }
+extern "C" void __cxa_guard_abort(guard_type* guard_object) { (void)(guard_object); }
 
 #if SC_PLATFORM_LINUX
 extern "C" int __cxa_atexit(void (*func)(void*), void* obj, void* dso_symbol);

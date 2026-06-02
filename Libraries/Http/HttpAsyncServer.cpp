@@ -353,7 +353,7 @@ void HttpAsyncServer::onRequestBodyData(HttpConnection& client, AsyncBufferView:
     {
         const bool removed =
             client.getReadableTransportStream().eventData.removeListener(EventBodyDataListener{*this, client});
-        SC_COMPILER_UNUSED(removed);
+        (void)(removed);
         client.getReadableTransportStream().pause();
     }
 }

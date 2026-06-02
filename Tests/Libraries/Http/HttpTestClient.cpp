@@ -295,7 +295,7 @@ SC::StringSpan SC::HttpTestClient::getResponse() const
 
 void SC::HttpTestClient::startSendingHeaders(AsyncSocketConnect::Result& result)
 {
-    SC_COMPILER_UNUSED(result);
+    (void)(result);
 
     Span<const char> toSend;
     if (headerBytes < content.size() and bodyDelay.milliseconds > 0)
@@ -351,7 +351,7 @@ void SC::HttpTestClient::startSendingBody(AsyncLoopTimeout::Result&)
 
 void SC::HttpTestClient::startReceiveResponse(AsyncSocketSend::Result& result)
 {
-    SC_COMPILER_UNUSED(result);
+    (void)(result);
     SC_ASSERT_RELEASE(content.resizeWithoutInitializing(1024));
 
     receivedBytes   = 0;

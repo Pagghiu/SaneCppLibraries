@@ -170,7 +170,7 @@ struct TimeoutGuard
 
 static bool compressionTestsAvailable(SC::TestReport& report)
 {
-    SC_COMPILER_UNUSED(report);
+    (void)(report);
     SC::ZLibAPI zlib;
     if (not zlib.load())
     {
@@ -2050,7 +2050,7 @@ void SC::HttpAsyncClientTest::gzipRequestCompression()
     client.onResponse = [this, &httpServer](HttpAsyncClientResponse& response)
     {
         ResponseCollector* unusedCollector = nullptr;
-        SC_COMPILER_UNUSED(unusedCollector);
+        (void)(unusedCollector);
         SC_TEST_EXPECT(response.getParser().statusCode == 200);
         SC_TEST_EXPECT(httpServer.stop());
     };
