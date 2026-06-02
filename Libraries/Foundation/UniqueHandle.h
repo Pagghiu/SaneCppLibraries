@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Result.h"
+#include "../Common/CompilerMove.h" // forward<UniqueHandle>(other)
+#include "../Common/Result.h"       // Result
 
 namespace SC
 {

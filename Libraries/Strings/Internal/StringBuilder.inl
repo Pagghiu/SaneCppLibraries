@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Foundation/Result.h"
+#include "../../Common/Result.h"
 #include "../../Strings/StringBuilder.h"
 #include "../../Strings/StringConverter.h"
 

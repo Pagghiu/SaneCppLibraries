@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Result.h"
+#include "../../Common/Result.h"
 #include "../../Foundation/StringSpan.h"
 
 namespace SC

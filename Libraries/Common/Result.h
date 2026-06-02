@@ -1,7 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "Compiler.h" // SC_LANGUAGE_LIKELY
+#ifdef SC_FOUNDATION_RESULT_DEFINITION_H
+#if SC_FOUNDATION_RESULT_DEFINITION_H != 1
+#error "Result.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_RESULT_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h"     // SC_FOUNDATION_EXPORT
+#include "CompilerMacrosStdVersion.h" // SC_LANGUAGE_LIKELY
 namespace SC
 {
 struct SC_FOUNDATION_EXPORT Result;
@@ -69,3 +76,5 @@ struct [[nodiscard]] Result
     if (not(expression))                                                                                               \
         SC_LANGUAGE_UNLIKELY { return SC::Result::Error(failedMessage); }
 //! @}
+
+#endif // SC_FOUNDATION_RESULT_DEFINITION_H

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "SerializationJson.h"
-#include "../Foundation/Result.h"
+#include "../Common/Result.h"
 #include "Internal/JsonTokenizer.h"
 
 #include <stdio.h>

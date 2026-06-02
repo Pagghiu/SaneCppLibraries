@@ -1,3 +1,4 @@
+#include "../Libraries/Common/Result.h"
 #include "../Libraries/Foundation/AlignedStorage.h"
 #include "../Libraries/Foundation/Assert.h"
 #include "../Libraries/Foundation/Compiler.h"
@@ -7,7 +8,6 @@
 #include "../Libraries/Foundation/OpaqueObject.h"
 #include "../Libraries/Foundation/Platform.h"
 #include "../Libraries/Foundation/PrimitiveTypes.h"
-#include "../Libraries/Foundation/Result.h"
 #include "../Libraries/Foundation/Span.h"
 #include "../Libraries/Foundation/StringPath.h"
 #include "../Libraries/Foundation/StringSpan.h"

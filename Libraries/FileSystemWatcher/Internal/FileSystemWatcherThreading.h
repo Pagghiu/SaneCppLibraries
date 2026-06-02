@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Common/Result.h"
 #include "../../Foundation/Function.h"
-#include "../../Foundation/Result.h"
 
 #if _WIN32
 #define WIN32_LEAN_AND_MEAN

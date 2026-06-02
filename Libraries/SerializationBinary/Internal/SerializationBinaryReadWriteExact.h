@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Result.h"
+#include "../../Common/Result.h"
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 
 namespace SC

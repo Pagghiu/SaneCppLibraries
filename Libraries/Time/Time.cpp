@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include <time.h>
 
-#include "../Foundation/Result.h"
+#include "../Common/Result.h"
 #include "../Time/Time.h"
 
 #if SC_PLATFORM_WINDOWS

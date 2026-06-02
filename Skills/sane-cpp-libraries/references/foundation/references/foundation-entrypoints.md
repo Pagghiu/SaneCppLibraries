@@ -10,7 +10,7 @@
 
 ## Best Files To Inspect
 
-- `Libraries/Foundation/Result.h`
+- `Libraries/Common/Result.h`
 - `Libraries/Foundation/Span.h`
 - `Libraries/Foundation/StringSpan.h`
 - `Libraries/Foundation/Function.h`

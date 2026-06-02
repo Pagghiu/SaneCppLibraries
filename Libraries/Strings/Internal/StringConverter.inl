@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#include "../../Common/Result.h"
 #include "../../Foundation/Deferred.h"
-#include "../../Foundation/Result.h"
 #include "../../Strings/StringConverter.h"
 #include <memory.h> // memcpy
 

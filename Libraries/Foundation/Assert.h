@@ -1,10 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/Result.h"             // exit
 #include "../Foundation/Compiler.h"       // SC_COMPILER_DEBUG_BREAK
 #include "../Foundation/Platform.h"       // SC_CONFIGURATION_DEBUG
 #include "../Foundation/PrimitiveTypes.h" // size_t
-#include "../Foundation/Result.h"         // exit
 
 namespace SC
 {

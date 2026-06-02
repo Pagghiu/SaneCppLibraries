@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
+#include "../../Common/Result.h"
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Result.h"
 #include "../../Foundation/Span.h"
 #include "../../Socket/Socket.h"
 #include "SocketInternal.h"

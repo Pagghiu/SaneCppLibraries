@@ -4,8 +4,8 @@
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySchema.h"
 
+#include "../../Common/Result.h"
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Result.h"
 namespace SC
 {
 

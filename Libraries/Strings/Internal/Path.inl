@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Foundation/Result.h"
+#include "../../Common/Result.h"
 #include "../../Strings/Path.h"
 #include "../../Strings/StringBuilder.h"
 #if SC_COMPILER_MSVC

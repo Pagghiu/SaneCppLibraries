@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "Libraries/Common/Result.h"
 #include "Libraries/Foundation/Internal/IGrowableBuffer.h"
-#include "Libraries/Foundation/Result.h"
 #include "Libraries/Foundation/StringSpan.h"
 #include <string.h>
 

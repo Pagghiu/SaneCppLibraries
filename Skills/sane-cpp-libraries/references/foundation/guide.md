@@ -15,7 +15,7 @@ Use this guide to anchor every other Sane C++ question in the right base types. 
 ## Start Here
 
 - Read [references/foundation-entrypoints.md](references/foundation-entrypoints.md).
-- Inspect `Libraries/Foundation/Result.h`, `Span.h`, `StringSpan.h`, `Function.h`, `Deferred.h`, `OpaqueObject.h`, and `UniqueHandle.h`.
+- Inspect `Libraries/Common/Result.h`, `Span.h`, `StringSpan.h`, `Function.h`, `Deferred.h`, `OpaqueObject.h`, and `UniqueHandle.h`.
 - Use `Tests/Libraries/Foundation/*` as the behavior reference for these primitives.
 
 ## Key Guidance

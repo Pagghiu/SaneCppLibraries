@@ -7,7 +7,7 @@
 #endif
 #define SC_TESTING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_TESTING)
 
-#include "../Foundation/Result.h"
+#include "../Common/Result.h"
 #include "../Foundation/StringPath.h"
 #include "../Foundation/StringSpan.h"
 

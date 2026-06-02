@@ -8,7 +8,7 @@
 #endif
 #define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
 
-#include "../Foundation/Result.h"
+#include "../Common/Result.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
 #include "Internal/HttpClientThreading.h"

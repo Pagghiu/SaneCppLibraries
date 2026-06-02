@@ -1,7 +1,7 @@
 // Copyright (c) Gabe Csendes
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Result.h"
+#include "../../Common/Result.h"
 #include "../../Process/Process.h"
 #include "../../Strings/StringView.h"
 #include "PluginFileSystem.h"

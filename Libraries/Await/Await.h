@@ -21,7 +21,7 @@
 #endif
 
 #include "../Async/Async.h"
-#include "../Foundation/Result.h"
+#include "../Common/Result.h"
 #include "Internal/AwaitCoroutine.h"
 
 //! @defgroup group_await Await
