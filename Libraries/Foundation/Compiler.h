@@ -21,13 +21,8 @@
 #include "../Common/CompilerMacrosStdVersion.h"
 #include "../Common/CompilerMacrosType.h"
 #include "../Common/CompilerMacrosUnusedResult.h"
-
-#ifndef SC_EXPORT_LIBRARY_FOUNDATION
-#define SC_EXPORT_LIBRARY_FOUNDATION 0
-#endif
-#define SC_FOUNDATION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FOUNDATION)
-
 //! @}
+
 #include "../Common/CompilerMinMax.h"
 #include "../Common/CompilerMove.h"
 #include "../Common/CompilerOffsetOf.h"
