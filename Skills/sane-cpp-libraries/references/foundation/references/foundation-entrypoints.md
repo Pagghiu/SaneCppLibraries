@@ -13,7 +13,7 @@
 - `Libraries/Common/Result.h`
 - `Libraries/Foundation/Span.h`
 - `Libraries/Foundation/StringSpan.h`
-- `Libraries/Foundation/Function.h`
+- `Libraries/Common/Function.h`
 - `Libraries/Common/Deferred.h`
 - `Libraries/Common/UniqueHandle.h`
 - `Libraries/Foundation/OpaqueObject.h`

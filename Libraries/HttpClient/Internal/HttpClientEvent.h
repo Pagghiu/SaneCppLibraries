@@ -10,7 +10,7 @@
 #define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
 #endif
 
-#include "../../Foundation/Function.h"
+#include "../../Common/Function.h"
 
 namespace SC
 {

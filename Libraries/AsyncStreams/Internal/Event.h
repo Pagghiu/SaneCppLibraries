@@ -9,7 +9,7 @@
 #define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
 #endif
 
-#include "../../Foundation/Function.h"
+#include "../../Common/Function.h"
 
 namespace SC
 {

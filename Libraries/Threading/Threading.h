@@ -9,7 +9,7 @@
 
 #include "../Common/Result.h"
 #include "../Foundation/AlignedStorage.h"
-#include "../Foundation/Function.h"
+#include "../Common/Function.h"
 #include "Internal/Optional.h" // UniqueOptional
 
 namespace SC

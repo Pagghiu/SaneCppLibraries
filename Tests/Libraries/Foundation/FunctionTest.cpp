@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/Function.h"
+#include "Libraries/Common/Function.h"
 #include "Libraries/Foundation/Assert.h"
 #include "Libraries/Testing/Testing.h"
 

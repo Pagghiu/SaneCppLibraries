@@ -1,7 +1,13 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Foundation/PrimitiveTypes.h"
+#ifdef SC_FOUNDATION_TYPE_TRAITS_DEFINITION_H
+#if SC_FOUNDATION_TYPE_TRAITS_DEFINITION_H != 1
+#error "TypeTraits.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_TYPE_TRAITS_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMove.h" // RemoveReference
 //!
 //! @defgroup group_foundation Foundation
 //! @copybrief library_foundation
@@ -54,3 +60,5 @@ template <typename U, typename T> struct SameConstnessAs { using type = typename
 // clang-format on
 } // namespace TypeTraits
 } // namespace SC
+
+#endif

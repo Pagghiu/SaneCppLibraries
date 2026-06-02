@@ -1,7 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Foundation/TypeTraits.h" // RemoveReference, AddPointer, IsSame
+#ifdef SC_FOUNDATION_FUNCTION_DEFINITION_H
+#if SC_FOUNDATION_FUNCTION_DEFINITION_H != 1
+#error "Function.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_FUNCTION_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h"     // SC_FOUNDATION_EXPORT
+#include "CompilerMacrosStdVersion.h" // SC_LANGUAGE_IF_CONSTEXPR
+#include "PlacementNew.h"             // PlacementNew
+#include "TypeTraits.h"               // RemoveReference, AddPointer, IsSame
 
 namespace SC
 {
@@ -248,3 +257,4 @@ using Delegate = Function<void(T)>;
 using Action   = Function<void()>;
 //! @}
 } // namespace SC
+#endif

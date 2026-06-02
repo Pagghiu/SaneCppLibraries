@@ -7,7 +7,7 @@
 #endif
 #define SC_PLUGIN_LIBRARY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PLUGIN)
 
-#include "../Foundation/Function.h"
+#include "../Common/Function.h"
 #include "../Foundation/Platform.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/StringPath.h"

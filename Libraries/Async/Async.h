@@ -9,9 +9,9 @@
 #define SC_ASYNC_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC)
 
 #include "../Async/Internal/IntrusiveDoubleLinkedList.h"
+#include "../Common/Function.h"
 #include "../File/File.h"
 #include "../FileSystem/FileSystem.h"
-#include "../Foundation/Function.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"

@@ -9,7 +9,8 @@
 #define SC_THREADING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_THREADING)
 #endif
 
-#include "../../Foundation/TypeTraits.h" // Conditional
+#include "../../Common/PlacementNew.h" // PlacementNew
+#include "../../Common/TypeTraits.h"   // Conditional
 
 namespace SC
 {

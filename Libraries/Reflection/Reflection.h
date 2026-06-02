@@ -8,7 +8,7 @@
 #endif
 #define SC_REFLECTION_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_REFLECTION)
 
-#include "../Foundation/TypeTraits.h" // EnableIf
+#include "../Common/TypeTraits.h" // EnableIf
 #include "ReflectionFoundation.h"
 
 namespace SC

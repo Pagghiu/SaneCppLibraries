@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "Libraries/Foundation/Function.h"
+#include "Libraries/Common/Function.h"
 #include "Libraries/Plugin/PluginHash.h"
 
 struct ITestInterface1

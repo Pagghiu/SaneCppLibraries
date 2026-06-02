@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Libraries/Common/Result.h"
-#include "Libraries/Foundation/Function.h"
+#include "Libraries/Common/Function.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Plugin/PluginHash.h"
 

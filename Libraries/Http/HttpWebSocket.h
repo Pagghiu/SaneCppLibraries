@@ -3,7 +3,7 @@
 #pragma once
 #include "../AsyncStreams/AsyncStreams.h"
 #include "../Common/Result.h"
-#include "../Foundation/Function.h"
+#include "../Common/Function.h"
 #include "../Foundation/Span.h"
 #include "HttpExport.h"
 #include "HttpParser.h"
