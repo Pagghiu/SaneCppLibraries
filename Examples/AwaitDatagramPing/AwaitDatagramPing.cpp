@@ -33,7 +33,7 @@ static Result createDatagramServer(AsyncEventLoop& eventLoop, SocketDescriptor& 
         lastError = server.bind(serverAddress);
         if (lastError)
         {
-            return serverSocket.assign(move(candidate));
+            return Result::Explicit(serverSocket.assign(move(candidate)));
         }
     }
     return lastError;

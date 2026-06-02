@@ -524,7 +524,7 @@ struct SC_ASYNC_EXPORT AsyncSocketAcceptBase : public AsyncRequest
         SC::Result moveTo(SocketDescriptor& client)
         {
             SC_TRY(returnCode);
-            return client.assign(move(completionData.acceptedClient));
+            return SC::Result(client.assign(move(completionData.acceptedClient)));
         }
     };
     using AsyncRequest::start;

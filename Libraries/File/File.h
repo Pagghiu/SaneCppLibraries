@@ -8,12 +8,12 @@
 #define SC_FILE_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE)
 
 #include "../Common/Result.h"
+#include "../Common/UniqueHandle.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/Span.h"
 #include "../Foundation/StringPath.h"
 #include "../Foundation/StringSpan.h"
-#include "../Foundation/UniqueHandle.h"
 
 //! @defgroup group_file File
 //! @copybrief library_file (see @ref library_file for more details)

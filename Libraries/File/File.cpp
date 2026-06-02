@@ -419,7 +419,7 @@ SC::Result SC::FileDescriptor::open(StringSpan filePath, FileOpen mode)
         ::CreateFileW(nullTerminatedPath, accessMode, shareMode, &security, createDisposition, fileFlags, nullptr);
 
     SC_TRY_MSG(fileDescriptor != INVALID_HANDLE_VALUE, "CreateFileW failed");
-    return assign(fileDescriptor);
+    return Result(assign(fileDescriptor));
 }
 
 #else
@@ -813,11 +813,11 @@ SC::Result SC::FileDescriptor::openStdOutDuplicate()
     {
         return Result::Error("DuplicateHandle failed");
     }
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDOUT_FILENO);
     SC_TRY_MSG(duplicated != -1, "dup failed");
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #endif
 }
 
@@ -836,11 +836,11 @@ SC::Result SC::FileDescriptor::openStdErrDuplicate()
     {
         return Result::Error("DuplicateHandle failed");
     }
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDERR_FILENO);
     SC_TRY_MSG(duplicated != -1, "dup failed");
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #endif
 }
 
@@ -859,11 +859,11 @@ SC::Result SC::FileDescriptor::openStdInDuplicate()
     {
         return Result::Error("DuplicateHandle failed");
     }
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #else
     const int duplicated = ::dup(STDIN_FILENO);
     SC_TRY_MSG(duplicated != -1, "dup failed");
-    return assign(duplicated);
+    return Result(assign(duplicated));
 #endif
 }
 
@@ -1235,7 +1235,7 @@ static Result createPendingServerInstance(StringSpan pipeName, const NamedPipeSe
         ::CreateNamedPipeW(nullTerminatedName, openMode, pipeMode, maxPendingConnections, 65536, 65536, 0, nullptr);
     SC_TRY_MSG(handle != INVALID_HANDLE_VALUE, "NamedPipeServer::create CreateNamedPipeW failed");
 
-    return pendingConnection.assign(handle);
+    return Result(pendingConnection.assign(handle));
 }
 } // namespace
 

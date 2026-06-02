@@ -429,7 +429,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
     Result completeAsync(AsyncSocketAccept::Result& res)
     {
-        return res.completionData.acceptedClient.assign(events[res.eventIndex].res);
+        return Result(res.completionData.acceptedClient.assign(events[res.eventIndex].res));
     }
 
     //-------------------------------------------------------------------------------------------------------

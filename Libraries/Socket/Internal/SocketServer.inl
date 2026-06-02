@@ -77,5 +77,5 @@ SC::Result SC::SocketServer::accept(SocketFlags::AddressFamily addressFamily, So
     SocketDescriptor::Handle acceptedClient =
         ::accept(listenDescriptor, &nativeAddress.handle.reinterpret_as<struct sockaddr>(), &nativeSize);
     SC_TRY_MSG(acceptedClient != SocketDescriptor::Invalid, "accept failed");
-    return newClient.assign(acceptedClient);
+    return Result(newClient.assign(acceptedClient));
 }

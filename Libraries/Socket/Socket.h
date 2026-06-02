@@ -8,9 +8,9 @@
 #define SC_SOCKET_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SOCKET)
 
 #include "../Common/Result.h"
+#include "../Common/UniqueHandle.h"
 #include "../Foundation/AlignedStorage.h"
 #include "../Foundation/StringSpan.h"
-#include "../Foundation/UniqueHandle.h"
 
 namespace SC
 {

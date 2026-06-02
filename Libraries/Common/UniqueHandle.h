@@ -1,8 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Common/CompilerMove.h" // forward<UniqueHandle>(other)
-#include "../Common/Result.h"       // Result
+#ifdef SC_FOUNDATION_UNIQUEHANDLE_DEFINITION_H
+#if SC_FOUNDATION_UNIQUEHANDLE_DEFINITION_H != 1
+#error "UniqueHandle.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_UNIQUEHANDLE_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h" // SC_FOUNDATION_EXPORT
+#include "CompilerMove.h"         // forward<UniqueHandle>(other)
 
 namespace SC
 {
@@ -40,32 +46,32 @@ struct SC_FOUNDATION_EXPORT UniqueHandle
     /// @brief Move assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param other The handle to be move-assigned
     /// @return Returns invalid result if close failed
-    Result assign(UniqueHandle&& other)
+    [[nodiscard]] bool assign(UniqueHandle&& other)
     {
         if (other.handle == handle)
-            return Result(false);
+            return false;
         if (close())
         {
             handle = other.handle;
             other.detach();
-            return Result(true);
+            return true;
         }
-        return Result(false);
+        return false;
     }
 
     /// @brief Copy assigns another UniqueHandle to this object, eventually closing existing handle.
     /// @param externalHandle The handle to be copy assigned
     /// @return Returns invalid result if close failed
-    Result assign(const Handle& externalHandle)
+    [[nodiscard]] bool assign(const Handle& externalHandle)
     {
         if (handle == externalHandle)
-            return Result(false);
+            return false;
         if (close())
         {
             handle = externalHandle;
-            return Result(true);
+            return true;
         }
-        return Result(false);
+        return false;
     }
 
     UniqueHandle& operator=(UniqueHandle&& other)
@@ -85,19 +91,20 @@ struct SC_FOUNDATION_EXPORT UniqueHandle
     /// @param outHandle Output native OS handle
     /// @param invalidReturnType the value to be returned if this function fails
     /// @return invalidReturnType if isValid() == `false`
-    Result get(Handle& outHandle, Result invalidReturnType) const
+    template <typename T>
+    T get(Handle& outHandle, T invalidReturnType) const
     {
         if (isValid())
         {
             outHandle = handle;
-            return Result(true);
+            return T(true);
         }
         return invalidReturnType;
     }
 
     /// @brief Closes the handle by calling its OS specific close function
     /// @return `true` if the handle was closed correctly
-    Result close()
+    auto close()
     {
         if (isValid())
         {
@@ -105,7 +112,8 @@ struct SC_FOUNDATION_EXPORT UniqueHandle
             detach();
             return Definition::releaseHandle(handleCopy);
         }
-        return Result(true);
+        // Get the return type of releaseHandle and return a valid value, since we didn't need to close anything
+        return decltype(Definition::releaseHandle(handle))(true);
     }
 
   protected:
@@ -115,3 +123,5 @@ struct SC_FOUNDATION_EXPORT UniqueHandle
 //! @}
 
 } // namespace SC
+
+#endif

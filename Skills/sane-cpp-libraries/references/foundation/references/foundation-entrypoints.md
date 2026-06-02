@@ -15,7 +15,7 @@
 - `Libraries/Foundation/StringSpan.h`
 - `Libraries/Foundation/Function.h`
 - `Libraries/Common/Deferred.h`
-- `Libraries/Foundation/UniqueHandle.h`
+- `Libraries/Common/UniqueHandle.h`
 - `Libraries/Foundation/OpaqueObject.h`
 
 ## Best Examples

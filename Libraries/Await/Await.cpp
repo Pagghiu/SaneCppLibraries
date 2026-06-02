@@ -2239,7 +2239,7 @@ bool AwaitFileSystemOperationAwaiter::await_suspend(AwaitTask::Handle newContinu
         if (operationResult and operation == AwaitFileSystemOperationType::Open)
         {
             FileDescriptor openedFile(result.completionData.handle);
-            operationResult = outFile->assign(move(openedFile));
+            operationResult = Result::Explicit(outFile->assign(move(openedFile)));
         }
         else if (operationResult and operation == AwaitFileSystemOperationType::Read)
         {

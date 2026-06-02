@@ -33,7 +33,7 @@ static Result createProbeServer(AsyncEventLoop& eventLoop, SocketDescriptor& ser
         if (lastError)
         {
             SC_TRY(server.listen(1));
-            return serverSocket.assign(move(candidate));
+            return Result::Explicit(serverSocket.assign(move(candidate)));
         }
     }
     return lastError;

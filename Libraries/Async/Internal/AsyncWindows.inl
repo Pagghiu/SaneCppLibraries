@@ -410,7 +410,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
 
         // TODO: Handle synchronous success
         deferDeleteSocket.disarm();
-        return async.acceptData->clientSocket.assign(clientSocket);
+        return Result(async.acceptData->clientSocket.assign(clientSocket));
     }
 
     static Result completeAsync(AsyncSocketAccept::Result& result)
@@ -427,7 +427,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         HANDLE iocp = ::CreateIoCompletionPort(reinterpret_cast<HANDLE>(clientSocket), loopHandle, 0, 0);
         SC_TRY_MSG(iocp == loopHandle, "completeAsync ACCEPT CreateIoCompletionPort failed");
 
-        return result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket));
+        return Result(result.completionData.acceptedClient.assign(move(operation.acceptData->clientSocket)));
     }
 
     Result cancelAsync(AsyncEventLoop& eventLoop, AsyncSocketAccept& asyncAccept)
@@ -1207,7 +1207,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         {
             return Result::Error("RegisterWaitForSingleObject failed");
         }
-        return async.waitHandle.assign(waitHandle);
+        return Result(async.waitHandle.assign(waitHandle));
     }
 
     static Result completeAsync(AsyncProcessExit::Result& result)

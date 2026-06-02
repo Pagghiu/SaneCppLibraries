@@ -1,5 +1,6 @@
 #include "../Libraries/Common/Deferred.h"
 #include "../Libraries/Common/Result.h"
+#include "../Libraries/Common/UniqueHandle.h"
 #include "../Libraries/Foundation/AlignedStorage.h"
 #include "../Libraries/Foundation/Assert.h"
 #include "../Libraries/Foundation/Compiler.h"
@@ -12,4 +13,3 @@
 #include "../Libraries/Foundation/StringPath.h"
 #include "../Libraries/Foundation/StringSpan.h"
 #include "../Libraries/Foundation/TypeTraits.h"
-#include "../Libraries/Foundation/UniqueHandle.h"

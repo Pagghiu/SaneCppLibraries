@@ -172,14 +172,14 @@ struct AsyncSerialVirtualEndpoint
             return SC::Result::Error("AsyncSerialVirtualEndpoint - ConnectNamedPipe failed");
         }
 
-        const SC::Result serialAssigned = serial.assign(serialSide);
+        const SC::Result serialAssigned = SC::Result(serial.assign(serialSide));
         if (not serialAssigned)
         {
             (void)::CloseHandle(serialSide);
             (void)::CloseHandle(peerSide);
             return serialAssigned;
         }
-        const SC::Result peerAssigned = peer.assign(peerSide);
+        const SC::Result peerAssigned = SC::Result(peer.assign(peerSide));
         if (not peerAssigned)
         {
             (void)serial.close();

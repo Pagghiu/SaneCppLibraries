@@ -33,7 +33,7 @@ static Result createServer(AsyncEventLoop& eventLoop, SocketDescriptor& serverSo
         if (lastError)
         {
             SC_TRY(server.listen(1));
-            return serverSocket.assign(move(candidate));
+            return Result::Explicit(serverSocket.assign(move(candidate)));
         }
     }
     return lastError;
