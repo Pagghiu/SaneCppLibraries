@@ -9,9 +9,9 @@
 #define SC_FILE_SYSTEM_WATCHER_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER)
 
 #include "../Common/Function.h"
+#include "../Common/OpaqueObject.h"
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/Result.h"
-#include "../Foundation/OpaqueObject.h"
 #include "../Foundation/StringPath.h"
 
 namespace SC

@@ -1,7 +1,14 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Common/AlignedStorage.h"
+#if defined(SC_FOUNDATION_OPAQUE_OBJECT_DEFINITION_H)
+#if SC_FOUNDATION_OPAQUE_OBJECT_DEFINITION_H != 1
+#error "OpaqueObject.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_OPAQUE_OBJECT_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "AlignedStorage.h"
+
 namespace SC
 {
 //! @addtogroup group_foundation_utility
@@ -48,11 +55,11 @@ struct SC_FOUNDATION_EXPORT OpaqueObject
     const Object& get() const { return reinterpret_cast<const Object&>(buffer); }
 
   private:
-#if SC_PLATFORM_WINDOWS
+#if defined(_WIN32) || defined(_WIN64)
     static constexpr int Size = Definition::Windows;
-#elif SC_PLATFORM_APPLE
+#elif defined(__APPLE__)
     static constexpr int Size = Definition::Apple;
-#elif SC_PLATFORM_LINUX
+#elif defined(__linux__)
     static constexpr int Size = Definition::Linux;
 #else
     static constexpr int Size = Definition::Default;
@@ -70,3 +77,5 @@ struct SC_FOUNDATION_EXPORT OpaqueObject
 
 //! @}
 } // namespace SC
+
+#endif

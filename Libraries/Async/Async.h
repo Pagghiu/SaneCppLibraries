@@ -10,9 +10,9 @@
 
 #include "../Async/Internal/IntrusiveDoubleLinkedList.h"
 #include "../Common/Function.h"
+#include "../Common/OpaqueObject.h"
 #include "../File/File.h"
 #include "../FileSystem/FileSystem.h"
-#include "../Foundation/OpaqueObject.h"
 #include "../Socket/Socket.h"
 #include "../Threading/Atomic.h"
 #include "../Threading/ThreadPool.h"

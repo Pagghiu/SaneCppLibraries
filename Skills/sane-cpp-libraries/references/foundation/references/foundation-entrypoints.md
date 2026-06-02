@@ -16,7 +16,7 @@
 - `Libraries/Common/Function.h`
 - `Libraries/Common/Deferred.h`
 - `Libraries/Common/UniqueHandle.h`
-- `Libraries/Foundation/OpaqueObject.h`
+- `Libraries/Common/OpaqueObject.h`
 
 ## Best Examples
 
