@@ -1,7 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Foundation/PrimitiveTypes.h"
+#ifdef SC_FOUNDATION_INITIALIZER_LIST_DEFINITION_H
+#if SC_FOUNDATION_INITIALIZER_LIST_DEFINITION_H != 1
+#error "InitializerList.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_INITIALIZER_LIST_DEFINITION_H 1 // Increment to indicate a new version of the file
+
 #if SC_INCLUDE_STD_CPP
 #include <initializer_list>
 #else
@@ -10,7 +15,7 @@ namespace std
 template <class _Ep>
 class initializer_list
 {
-    using size_t = SC::size_t;
+    using size_t = decltype(sizeof(0));
     const _Ep* __begin_;
     size_t     __size_;
 
@@ -34,4 +39,6 @@ class initializer_list
 };
 
 } // namespace std
+#endif
+
 #endif

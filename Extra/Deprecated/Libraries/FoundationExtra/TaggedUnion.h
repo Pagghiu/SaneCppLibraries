@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Libraries/Common/AlignedStorage.h"
-#include "../../Libraries/Foundation/InitializerList.h"
+#include "../../Libraries/Common/InitializerList.h"
+#include "../../Libraries/Common/PlacementNew.h"
 #include "TypeList.h"
 namespace SC
 {
@@ -283,7 +284,7 @@ struct SC::TaggedUnion
         return RuntimeEnumVisit<Visitor>::visit(forward<Visitor>(visitor), type, *this, forward<Arguments>(args)...);
     }
 
-    template <typename Visitor, size_t StartIndex = NumTypes>
+    template <typename Visitor, decltype(sizeof(0)) StartIndex = NumTypes>
     struct RuntimeEnumVisit
     {
         static constexpr auto Index = StartIndex - 1;
@@ -353,8 +354,8 @@ struct SC::TaggedUnion
     template <class... Types>
     struct ComputeMaxSizeAndAlignment<TypeTraits::TypeList<Types...>>
     {
-        static constexpr size_t maxAlignment = MaxElement({alignof(typename Types::type)...});
-        static constexpr size_t maxSize      = MaxElement({sizeof(typename Types::type)...});
+        static constexpr decltype(sizeof(0)) maxAlignment = MaxElement({alignof(typename Types::type)...});
+        static constexpr decltype(sizeof(0)) maxSize      = MaxElement({sizeof(typename Types::type)...});
     };
 
     using Storage = ComputeMaxSizeAndAlignment<typename Union::FieldsTypes>;

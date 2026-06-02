@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/TypeTraits.h"          // SameConstnessAs
-#include "../Foundation/InitializerList.h" // IWYU pragma: keep
-#include "../Foundation/PrimitiveTypes.h"  // IWYU pragma: keep
+#include "../Common/InitializerList.h"    // IWYU pragma: keep
+#include "../Common/TypeTraits.h"         // SameConstnessAs
+#include "../Foundation/PrimitiveTypes.h" // IWYU pragma: keep
 
 namespace SC
 {
