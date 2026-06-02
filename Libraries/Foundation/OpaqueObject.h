@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "AlignedStorage.h"
+#include "../Common/AlignedStorage.h"
 namespace SC
 {
 //! @addtogroup group_foundation_utility

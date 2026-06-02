@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Libraries/Foundation/AlignedStorage.h"
+#include "../../Libraries/Common/AlignedStorage.h"
 #include "../../Libraries/Foundation/InitializerList.h"
 #include "TypeList.h"
 namespace SC

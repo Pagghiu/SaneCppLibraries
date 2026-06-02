@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/AlignedStorage.h"
+#include "../Common/AlignedStorage.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Strings/StringView.h"
 #include "StringsExport.h"

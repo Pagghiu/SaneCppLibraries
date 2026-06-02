@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/Result.h"
-#include "../../Foundation/AlignedStorage.h"
+#include "../../Common/AlignedStorage.h"
 #include "../../Foundation/Span.h"
 namespace SC
 {

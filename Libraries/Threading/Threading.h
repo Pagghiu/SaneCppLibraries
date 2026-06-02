@@ -7,9 +7,11 @@
 #endif
 #define SC_THREADING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_THREADING)
 
-#include "../Common/Result.h"
-#include "../Foundation/AlignedStorage.h"
+#include "../Common/AlignedStorage.h"
 #include "../Common/Function.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/PrimitiveDefinitions.h"
+#include "../Common/Result.h"
 #include "Internal/Optional.h" // UniqueOptional
 
 namespace SC

@@ -10,6 +10,7 @@
 
 #include "../Common/Result.h"
 #include "../Common/Function.h"
+#include "../Common/PlatformMacrosType.h"
 #include "../Foundation/OpaqueObject.h"
 #include "../Foundation/StringPath.h"
 

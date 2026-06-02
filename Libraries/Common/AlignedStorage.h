@@ -1,18 +1,24 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Foundation/PrimitiveTypes.h"
+#if defined(SC_FOUNDATION_ALIGNED_STORAGE_DEFINITION_H)
+#if SC_FOUNDATION_ALIGNED_STORAGE_DEFINITION_H != 1
+#error "AlignedStorage.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_ALIGNED_STORAGE_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h" // SC_FOUNDATION_EXPORT
 
 namespace SC
 {
 #if !DOXYGEN
-template <typename T, size_t E, size_t R = sizeof(T)>
+template <typename T, decltype(sizeof(0)) E, decltype(sizeof(0)) R = sizeof(T)>
 void static_assert_size()
 {
     static_assert(R <= E, "Size mismatch");
 }
 #endif
-#if SC_COMPILER_GCC
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wstringop-overflow="
 #endif
@@ -64,7 +70,9 @@ struct SC_FOUNDATION_EXPORT AlignedStorage
 };
 
 //! @}
-#if SC_COMPILER_GCC
+#if defined(__GNUC__) && !defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
 } // namespace SC
+
+#endif

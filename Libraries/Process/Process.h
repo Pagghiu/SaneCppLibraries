@@ -8,8 +8,8 @@
 #endif
 #define SC_PROCESS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PROCESS)
 
+#include "../Common/AlignedStorage.h"
 #include "../File/File.h"
-#include "../Foundation/AlignedStorage.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringPath.h"
 
