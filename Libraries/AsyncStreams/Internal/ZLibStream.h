@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Result.h"
 #include "../../Common/AlignedStorage.h"
+#include "../../Common/Result.h"
 #include "../../Foundation/Span.h"
 namespace SC
 {

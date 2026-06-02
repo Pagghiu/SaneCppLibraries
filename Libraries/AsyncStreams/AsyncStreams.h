@@ -8,9 +8,9 @@
 #endif
 #define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
 
-#include "../Common/Result.h"
 #include "../Common/AlignedStorage.h"
 #include "../Common/Function.h"
+#include "../Common/Result.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/Span.h"
 #include "Internal/CircularQueue.h"
