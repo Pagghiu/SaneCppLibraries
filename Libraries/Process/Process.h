@@ -301,7 +301,7 @@ struct SC_PROCESS_EXPORT Process
     size_t commandArgumentsNumber = 0;                    // Counts number of arguments (including executable name)
 #endif
 
-    native_char_t              environmentStorage[4096 * 4]; // 16K (w)chars of storage for environment variables
+    native_char_t              environmentStorage[4096 * 8];
     StringSpan::NativeWritable environment;
 
     static constexpr size_t MAX_NUM_ENVIRONMENT = 256;
