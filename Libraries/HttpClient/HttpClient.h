@@ -10,7 +10,7 @@
 
 #include "../Common/Result.h"
 #include "../Common/Span.h"
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 #include "Internal/HttpClientThreading.h"
 
 namespace SC

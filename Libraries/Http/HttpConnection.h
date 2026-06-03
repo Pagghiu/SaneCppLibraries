@@ -6,7 +6,7 @@
 
 #include "../Async/Async.h"
 #include "../AsyncStreams/AsyncRequestStreams.h"
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 #include "Internal/HttpFixedBufferWriter.h"
 #include "Internal/HttpParsedHeaders.h"
 

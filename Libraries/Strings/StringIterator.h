@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/Span.h"
+#include "../Common/StringSpan.h"
 #include "../Foundation/Assert.h" //Assert::unreachable
-#include "../Foundation/StringSpan.h"
 #include "StringsExport.h"
 
 namespace SC

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "Libraries/Async/Async.h"
-#include "Libraries/Foundation/StringSpan.h"
+#include "Libraries/Common/StringSpan.h"
 #include "Libraries/Http/HttpParser.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Socket/Socket.h"

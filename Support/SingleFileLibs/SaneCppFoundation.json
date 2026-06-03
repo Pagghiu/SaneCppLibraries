@@ -13,7 +13,6 @@
         "OpaqueObject.h",
         "Result.h",
         "Span.h",
-        "StringSpan.h",
         "StringPath.h",
         "UniqueHandle.h",
         "IGrowableBuffer.h"

@@ -10,10 +10,10 @@
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Common/Result.h"
 #include "../Common/Span.h"
+#include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "../Foundation/StringPath.h"
-#include "../Foundation/StringSpan.h"
 
 //! @defgroup group_file File
 //! @copybrief library_file (see @ref library_file for more details)

@@ -12,7 +12,7 @@
 
 - `Libraries/Common/Result.h`
 - `Libraries/Common/Span.h`
-- `Libraries/Foundation/StringSpan.h`
+- `Libraries/Common/StringSpan.h`
 - `Libraries/Common/Function.h`
 - `Libraries/Common/Deferred.h`
 - `Libraries/Common/UniqueHandle.h`

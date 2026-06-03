@@ -8,8 +8,8 @@
 #define SC_TESTING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_TESTING)
 
 #include "../Common/Result.h"
+#include "../Common/StringSpan.h"
 #include "../Foundation/StringPath.h"
-#include "../Foundation/StringSpan.h"
 
 namespace SC
 {

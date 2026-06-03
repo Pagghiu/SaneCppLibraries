@@ -1,6 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "Libraries/Foundation/StringSpan.h"
+#include "Libraries/Common/StringSpan.h"
 #include "Libraries/Memory/Memory.h"
 #include "Libraries/Testing/Limits.h"
 #include "Libraries/Testing/Testing.h"

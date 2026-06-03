@@ -9,8 +9,8 @@
 
 #include "../Common/AlignedStorage.h"
 #include "../Common/Result.h"
+#include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
-#include "../Foundation/StringSpan.h"
 
 namespace SC
 {

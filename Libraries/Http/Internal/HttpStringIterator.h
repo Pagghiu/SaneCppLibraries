@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/StringSpan.h"
+#include "../../Common/StringSpan.h"
 #include <ctype.h>
 #include <errno.h>
 #include <stdint.h>

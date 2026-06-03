@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpParser.h"
 #include "../Common/Span.h"
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 #include <string.h> // memchr
 
 namespace

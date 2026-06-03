@@ -3,7 +3,7 @@
 #pragma once
 #include "Libraries/Common/IGrowableBufferSpan.h"
 #include "Libraries/Common/Result.h"
-#include "Libraries/Foundation/StringSpan.h"
+#include "Libraries/Common/StringSpan.h"
 #include <string.h>
 
 namespace SC

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 #include "../Memory/Buffer.h"
 #include "../Memory/Memory.h"
 

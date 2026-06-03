@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/IGrowableBufferSpan.h"
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 
 namespace SC
 {

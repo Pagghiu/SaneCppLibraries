@@ -3,7 +3,7 @@
 #pragma once
 #include "../Common/Result.h"
 #include "../Common/Span.h"
-#include "../Foundation/StringSpan.h"
+#include "../Common/StringSpan.h"
 #include "HttpExport.h"
 
 namespace SC

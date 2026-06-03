@@ -5,6 +5,7 @@
 #include "../Libraries/Common/OpaqueObject.h"
 #include "../Libraries/Common/Result.h"
 #include "../Libraries/Common/Span.h"
+#include "../Libraries/Common/StringSpan.h"
 #include "../Libraries/Common/TypeTraits.h"
 #include "../Libraries/Common/UniqueHandle.h"
 #include "../Libraries/Foundation/Assert.h"
@@ -12,4 +13,3 @@
 #include "../Libraries/Foundation/Platform.h"
 #include "../Libraries/Foundation/PrimitiveTypes.h"
 #include "../Libraries/Foundation/StringPath.h"
-#include "../Libraries/Foundation/StringSpan.h"
