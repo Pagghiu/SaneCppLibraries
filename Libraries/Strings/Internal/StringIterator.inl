@@ -279,7 +279,7 @@ template bool StringIterator<StringIteratorUTF16>::advanceIfMatchesAny(Span<cons
 template <typename CharIterator>
 bool StringIterator<CharIterator>::advanceIfMatchesRange(CodePoint first, CodePoint last)
 {
-    SC_ASSERT_RELEASE(first <= last);
+    SC_STRINGS_ASSERT_RELEASE(first <= last);
     if (it < end)
     {
         const auto decoded = CharIterator::decode(it, end);

@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../FileSystemWatcher/FileSystemWatcher.h"
-#include "../Common/Assert.h"
+
+#define SC_ASSERT_PROVIDER FileSystemWatcherAssert
+#include "../Common/Assert.inl"
+
 #include "Internal/FileSystemWatcherThreading.h" // Needed for the single file build
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"
@@ -88,7 +91,7 @@ void SC::FileSystemWatcher::EventLoopRunner::internalInit(FileSystemWatcher& pse
 
 void SC::FileSystemWatcher::WatcherLinkedList::queueBack(FolderWatcher& item)
 {
-    SC_ASSERT_DEBUG(item.next == nullptr and item.prev == nullptr);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(item.next == nullptr and item.prev == nullptr);
     if (back)
     {
         back->next = &item;
@@ -96,12 +99,12 @@ void SC::FileSystemWatcher::WatcherLinkedList::queueBack(FolderWatcher& item)
     }
     else
     {
-        SC_ASSERT_DEBUG(front == nullptr);
+        SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(front == nullptr);
         front = &item;
     }
     back = &item;
-    SC_ASSERT_DEBUG(back->next == nullptr);
-    SC_ASSERT_DEBUG(front->prev == nullptr);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(back->next == nullptr);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(front->prev == nullptr);
 }
 
 void SC::FileSystemWatcher::WatcherLinkedList::remove(FolderWatcher& item)
@@ -119,7 +122,7 @@ void SC::FileSystemWatcher::WatcherLinkedList::remove(FolderWatcher& item)
         }
         it = static_cast<T*>(it->next);
     }
-    SC_ASSERT_DEBUG(found);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(found);
 #endif
     if (&item == front)
     {

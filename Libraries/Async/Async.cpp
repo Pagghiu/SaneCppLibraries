@@ -3,6 +3,10 @@
 #include "../File/File.h"
 #include "../Foundation/Platform.h"
 #include "Internal/AsyncInternal.h"
+
+#define SC_ASSERT_PROVIDER AsyncAssert
+#include "../Common/Assert.inl"
+
 #include "Internal/IntrusiveDoubleLinkedList.inl" // IWYU pragma: keep
 
 #include <signal.h> // SIGKILL / SIGSTOP
@@ -61,7 +65,7 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::FilePoll: return "FilePoll";
     case Type::FileSystemOperation: return "FileSystemOperation";
     }
-    Assert::unreachable();
+    AsyncAssert::unreachable();
 }
 #endif
 
@@ -172,11 +176,11 @@ void SC::AsyncResult::reactivateRequest(bool shouldBeReactivated)
         case AsyncRequest::State::Active:
         case AsyncRequest::State::Setup: {
             // Should not happen
-            SC_ASSERT_RELEASE(false);
+            SC_ASYNC_ASSERT_RELEASE(false);
         }
         break;
         case AsyncRequest::State::Submitting:
-            SC_ASSERT_RELEASE(AsyncEventLoop::Internal::KernelEvents::needsSubmissionWhenReactivating(async));
+            SC_ASYNC_ASSERT_RELEASE(AsyncEventLoop::Internal::KernelEvents::needsSubmissionWhenReactivating(async));
             break;
         }
     }
@@ -199,11 +203,11 @@ void SC::AsyncResult::reactivateRequest(bool shouldBeReactivated)
         case AsyncRequest::State::Active:
         case AsyncRequest::State::Setup: {
             // Should not happen
-            SC_ASSERT_RELEASE(false);
+            SC_ASYNC_ASSERT_RELEASE(false);
         }
         break;
         case AsyncRequest::State::Submitting:
-            SC_ASSERT_RELEASE(AsyncEventLoop::Internal::KernelEvents::needsSubmissionWhenReactivating(async));
+            SC_ASYNC_ASSERT_RELEASE(AsyncEventLoop::Internal::KernelEvents::needsSubmissionWhenReactivating(async));
             break;
         }
     }
@@ -1083,7 +1087,7 @@ SC::Result SC::AsyncEventLoopMonitor::create(AsyncEventLoop& loop)
         result.reactivateRequest(true);
         wakeUpHasBeenCalled = true;
     };
-    SC_TRY(eventLoopThread.start([this](Thread& thread) { SC_TRUST_RESULT(monitoringLoopThread(thread)); }));
+    SC_TRY(eventLoopThread.start([this](Thread& thread) { SC_ASYNC_TRUST_RESULT(monitoringLoopThread(thread)); }));
     return Result(true);
 }
 
@@ -1243,7 +1247,7 @@ void SC::AsyncEventLoop::Internal::invokeExpiredTimers(AsyncEventLoop& eventLoop
                 // It's possible detecting this case by checking the active state.
                 // In this case it makes sense to re-check the entire active timers list.
                 async = activeLoopTimeouts.front;
-                SC_ASSERT_DEBUG(async == nullptr or async->isActive()); // Should not be possible
+                SC_ASYNC_ASSERT_DEBUG(async == nullptr or async->isActive()); // Should not be possible
             }
         }
         else
@@ -1265,7 +1269,7 @@ void SC::AsyncEventLoop::Internal::stopRequests(AsyncEventLoop& eventLoop, Intru
         {
             Result res = async->stop(eventLoop);
             (void)res;
-            SC_ASSERT_DEBUG(res);
+            SC_ASYNC_ASSERT_DEBUG(res);
         }
         async = asyncNext;
     }
@@ -1335,7 +1339,7 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     {
         Result stopRes = async->stop(eventLoop);
         (void)stopRes;
-        SC_ASSERT_DEBUG(stopRes);
+        SC_ASYNC_ASSERT_DEBUG(stopRes);
     }
 
     stopRequests(eventLoop, activeLoopTimeouts);
@@ -1387,7 +1391,7 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(AsyncEventLoop& eventLo
     break;
     case AsyncRequest::State::Free: {
         // TODO: Stop the completion, it has been cancelled before being submitted
-        SC_ASSERT_RELEASE(false);
+        SC_ASYNC_ASSERT_RELEASE(false);
     }
     break;
     case AsyncRequest::State::Cancelling: {
@@ -1399,7 +1403,7 @@ SC::Result SC::AsyncEventLoop::Internal::stageSubmission(AsyncEventLoop& eventLo
     }
     break;
     case AsyncRequest::State::Active: {
-        SC_ASSERT_DEBUG(false);
+        SC_ASYNC_ASSERT_DEBUG(false);
         return SC::Result::Error("AsyncEventLoop::processSubmissions() got Active handle");
     }
     break;
@@ -1417,7 +1421,7 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
                                                                          AsyncRequest& async, int32_t eventIndex,
                                                                          Result& returnCode)
 {
-    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
+    SC_ASYNC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     removeActiveHandle(async);
     AsyncTeardown teardown;
     prepareTeardown(eventLoop, async, teardown);
@@ -1464,7 +1468,7 @@ SC::Result SC::AsyncEventLoop::Internal::runStep(AsyncEventLoop& eventLoop, Sync
 
 void SC::AsyncEventLoop::Internal::pushToCancellationQueue(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.isCancelling());
+    SC_ASYNC_ASSERT_RELEASE(async.isCancelling());
     if (async.sequence and async.sequence->clearSequenceOnCancel)
     {
         clearSequence(*async.sequence);
@@ -1503,7 +1507,7 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& eventLoop,
     }
     KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     const auto   numActiveHandles = getTotalNumberOfActiveHandle();
-    SC_ASSERT_RELEASE(numActiveHandles >= 0);
+    SC_ASYNC_ASSERT_RELEASE(numActiveHandles >= 0);
     if (numActiveHandles > 0 or numberOfManualCompletions != 0 or hasPendingKernelCancellations)
     {
         hasPendingKernelCancellations = false;
@@ -1568,7 +1572,7 @@ void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& 
     while (async)
     {
         AsyncRequest* next = async->next;
-        SC_ASSERT_RELEASE(async->state == AsyncRequest::State::Cancelling);
+        SC_ASYNC_ASSERT_RELEASE(async->state == AsyncRequest::State::Cancelling);
         if (async->flags & Flag_WaitingKernelCancel)
         {
             // Keep polling until kernel cancellation packet is drained.
@@ -1669,7 +1673,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteCompletions(AsyncEventLoop& eve
             // Cancellations are not delivered on epoll / kqueue backends and they're filtered by
             // KernelEvents::validateEvent on Windows IOCP and Linux io_uring.
             // ASSERTING HERE IS BREAKING A FUNDAMENTAL INVARIANT OF THE LIBRARY, INVESTIGATE AND FIX THE ROOT CAUSE.
-            SC_ASSERT_RELEASE(false);
+            SC_ASYNC_ASSERT_RELEASE(false);
         }
     }
 }
@@ -1723,7 +1727,7 @@ struct SC::AsyncEventLoop::Internal::ActivateAsyncPhase
         AsyncTaskSequence& task = *async.getTask();
         task.returnCode         = KernelEvents::executeOperation(async, task.completion.construct(async));
         eventLoop.internal.manualThreadPoolCompletions.push(async);
-        SC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
+        SC_ASYNC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
     }
 };
 
@@ -1884,7 +1888,7 @@ SC::Result SC::AsyncEventLoop::Internal::activateAsync(AsyncEventLoop& eventLoop
                                                        AsyncRequest& async)
 {
     SC_LOG_MESSAGE("{} {} ACTIVATE\n", async.debugName, AsyncRequest::TypeToString(async.type));
-    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
+    SC_ASYNC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
     SC_TRY(Internal::applyOnAsync(async, ActivateAsyncPhase{eventLoop, kernelEvents}));
     addActiveHandle(async);
     return Result(true);
@@ -2078,13 +2082,13 @@ void SC::AsyncEventLoop::Internal::updateTime()
     ms += static_cast<int64_t>(nowTimeSpec.tv_nsec / (1000 * 1000));
     TimeMs newTime = {ms};
 #endif
-    SC_ASSERT_RELEASE(newTime.milliseconds >= loopTime.milliseconds);
+    SC_ASYNC_ASSERT_RELEASE(newTime.milliseconds >= loopTime.milliseconds);
     loopTime = newTime;
 }
 
 SC::Result SC::AsyncEventLoop::wakeUpFromExternalThread(AsyncLoopWakeUp& async)
 {
-    SC_ASSERT_DEBUG(async.type == AsyncRequest::Type::LoopWakeUp);
+    SC_ASYNC_ASSERT_DEBUG(async.type == AsyncRequest::Type::LoopWakeUp);
     AsyncLoopWakeUp& notifier = *static_cast<AsyncLoopWakeUp*>(&async);
     if (notifier.pendingWakeUps.fetch_add(1) == 0)
     {
@@ -2102,7 +2106,7 @@ void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
     AsyncLoopWakeUp* async = activeLoopWakeUps.front;
     while (async != nullptr)
     {
-        SC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
+        SC_ASYNC_ASSERT_DEBUG(async->type == AsyncRequest::Type::LoopWakeUp);
         AsyncLoopWakeUp* current = async;
         async                    = static_cast<AsyncLoopWakeUp*>(async->next);
 
@@ -2121,7 +2125,7 @@ void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
             }
             if (hasBeenReactivated and current->getPendingWakeUps() > 0)
             {
-                SC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
+                SC_ASYNC_ASSERT_RELEASE(eventLoop.wakeUpFromExternalThread());
             }
         }
     }
@@ -2129,7 +2133,7 @@ void SC::AsyncEventLoop::Internal::executeWakeUps(AsyncEventLoop& eventLoop)
 
 void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
+    SC_ASYNC_ASSERT_RELEASE(async.state == AsyncRequest::State::Active);
     async.state = AsyncRequest::State::Free;
 
     if (async.sequence)
@@ -2179,7 +2183,7 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
 
 void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
+    SC_ASYNC_ASSERT_RELEASE(async.state == AsyncRequest::State::Submitting);
     async.state = AsyncRequest::State::Active;
 
     if ((async.flags & Internal::Flag_ManualCompletion) != 0)
@@ -2264,7 +2268,8 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
 
 void SC::AsyncEventLoop::Internal::scheduleManualCompletion(AsyncRequest& async)
 {
-    SC_ASSERT_RELEASE(async.state == AsyncRequest::State::Setup or async.state == AsyncRequest::State::Submitting);
+    SC_ASYNC_ASSERT_RELEASE(async.state == AsyncRequest::State::Setup or
+                            async.state == AsyncRequest::State::Submitting);
     manualCompletions.queueBack(async);
 }
 

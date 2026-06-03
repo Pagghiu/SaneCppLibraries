@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Assert.h" //Assert::unreachable
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
 #include "StringsExport.h"
@@ -399,7 +398,7 @@ template <typename CharIterator>
 constexpr StringIterator<CharIterator> StringIterator<CharIterator>::sliceFromStartUntil(
     StringIterator otherPoint) const
 {
-    SC_ASSERT_RELEASE(it <= otherPoint.it);
+    SC_STRINGS_ASSERT_RELEASE(it <= otherPoint.it);
     return StringIterator(it, otherPoint.it);
 }
 

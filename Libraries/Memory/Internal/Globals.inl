@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Common/Assert.h"
 #include "../../Memory/Globals.h"
 #include "../../Memory/Memory.h"
 #include "SortedAllocations.inl"
@@ -77,7 +76,7 @@ struct SC::Globals::Internal
         {
             if (memory != nullptr and allocations != nullptr)
             {
-                SC_ASSERT_RELEASE(allocations->removeSorted(memory));
+                SC_MEMORY_ASSERT_RELEASE(allocations->removeSorted(memory));
             }
             return ::free(memory);
         }

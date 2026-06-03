@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Assert.h"
 #include "../Memory/Globals.h"
 #include "../Memory/Memory.h"
 #include "ArenaMapKey.h"
@@ -46,8 +45,8 @@ struct SC::ArenaMap
         auto& allocator = Globals::get(globalsType).allocator;
         T*    newItems  = reinterpret_cast<T*>(allocator.allocate(this, other.itemsSize * sizeof(T), alignof(T)));
         Gen*  newGens   = reinterpret_cast<Gen*>(allocator.allocate(this, other.itemsSize * sizeof(Gen), alignof(Gen)));
-        SC_ASSERT_RELEASE(newItems);
-        SC_ASSERT_RELEASE(newGens);
+        SC_CONTAINERS_ASSERT_RELEASE(newItems);
+        SC_CONTAINERS_ASSERT_RELEASE(newGens);
         Memory::set(newGens, 0, other.itemsSize * sizeof(Gen));
         items       = newItems;
         generations = newGens;
@@ -101,12 +100,12 @@ struct SC::ArenaMap
 
         bool operator==(ArenaMapIterator it) const
         {
-            SC_ASSERT_DEBUG(it.map == map and map != nullptr);
+            SC_CONTAINERS_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index == index;
         }
         bool operator!=(ArenaMapIterator it) const
         {
-            SC_ASSERT_DEBUG(it.map == map and map != nullptr);
+            SC_CONTAINERS_ASSERT_DEBUG(it.map == map and map != nullptr);
             return it.index != index;
         }
 

@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../../Common/Assert.h"
 #include "ZLibStream.h"
 
 #include "ZLibAPI.h"
@@ -220,7 +219,7 @@ SC::Result SC::ZLibStream::process(Span<const char>& input, Span<char>& output)
         // Decompression
         return Internal::decompress(stream, input, output);
     }
-    Assert::unreachable();
+    AsyncStreamsAssert::unreachable();
 }
 
 SC::Result SC::ZLibStream::finalize(Span<char>& output, bool& streamEnded)
@@ -239,5 +238,5 @@ SC::Result SC::ZLibStream::finalize(Span<char>& output, bool& streamEnded)
         // Decompression finalization
         return Internal::decompressFinalize(stream, output, streamEnded);
     }
-    Assert::unreachable();
+    AsyncStreamsAssert::unreachable();
 }

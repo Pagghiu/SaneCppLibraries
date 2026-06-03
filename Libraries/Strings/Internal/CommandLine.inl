@@ -400,7 +400,7 @@ static CommandLineParseResult consumePositional(const CommandLineSpec& spec, siz
     const auto& positional = spec.positionals[positionalIndex];
     if (positional.remaining)
     {
-        SC_ASSERT_RELEASE(positional.parsedValues != nullptr);
+        SC_STRINGS_ASSERT_RELEASE(positional.parsedValues != nullptr);
         const size_t used = positional.parsedValues->sizeInElements();
         if (used >= positional.remainingStorage.sizeInElements())
         {

@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Assert.h"
 #include "AsyncStreams.h"
 //! @addtogroup group_async_streams
 //! @{
@@ -29,7 +28,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
 
     virtual Result asyncRead() override
     {
-        SC_ASSERT_RELEASE(request.isFree());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(request.isFree());
         if (this->getBufferOrPause(0, bufferID, request.buffer))
         {
             request.callback.template bind<Self, &Self::afterRead>(*this);
@@ -63,7 +62,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         Span<char> data;
         if (result.get(data))
         {
-            SC_ASSERT_RELEASE(request.isFree());
+            SC_ASYNC_STREAMS_ASSERT_RELEASE(request.isFree());
             if (result.isEnded())
             {
                 this->getBuffersPool().unrefBuffer(bufferID);
@@ -73,7 +72,7 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
             else
             {
                 const bool continuePushing = this->push(bufferID, data.sizeInBytes());
-                SC_ASSERT_RELEASE(result.getAsync().isFree());
+                SC_ASYNC_STREAMS_ASSERT_RELEASE(result.getAsync().isFree());
                 // Only unref if destroy() wasn't called during push callback (which would have already unref'd)
                 if (not this->hasBeenDestroyed())
                 {
@@ -108,9 +107,9 @@ struct AsyncRequestReadableStream : public AsyncReadableStream
         }
         if (autoCloseDescriptor)
         {
-            SC_ASSERT_RELEASE(request.closeHandle());
+            SC_ASYNC_STREAMS_ASSERT_RELEASE(request.closeHandle());
         }
-        SC_ASSERT_RELEASE(this->finishedDestroyingReadable());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(this->finishedDestroyingReadable());
         request = {};
     }
 
@@ -162,7 +161,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     virtual Result asyncWrite(BufferViewID newBufferID, Function<void(BufferViewID)> cb) override
     {
         bufferID = newBufferID;
-        SC_ASSERT_RELEASE(not callback.isValid());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(not callback.isValid());
         callback = move(cb);
         SC_TRY(this->getBuffersPool().getReadableData(bufferID, request.buffer));
         request.callback.template bind<Self, &Self::afterWrite>(*this);
@@ -204,7 +203,7 @@ struct AsyncRequestWritableStream : public AsyncWritableStream
     {
         if (autoCloseDescriptor)
         {
-            SC_ASSERT_RELEASE(request.closeHandle());
+            SC_ASYNC_STREAMS_ASSERT_RELEASE(request.closeHandle());
         }
         request = {};
         this->finishedDestroyingWritable();

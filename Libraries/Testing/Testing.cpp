@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
-#include "../Common/Assert.h"
+
+#define SC_ASSERT_PROVIDER TestingAssert
+#include "../Common/Assert.inl"
+
 #include "../Common/Span.h"
 #include <stdint.h> // uint16_t, uint32_t
 #include <stdio.h>  // FILE
@@ -746,7 +749,7 @@ SC::TestCase::~TestCase()
 
 bool SC::TestCase::recordExpectation(StringSpan expression, bool status, StringSpan detailedError)
 {
-    SC_ASSERT_DEBUG(expression.isNullTerminated());
+    SC_TESTING_ASSERT_DEBUG(expression.isNullTerminated());
     if (status)
     {
         numTestsSucceeded++;
@@ -799,7 +802,7 @@ bool SC::TestCase::test_section(StringSpan sectionName, Execute execution)
     }
     if (isTestEnabled)
     {
-        SC_ASSERT_DEBUG(sectionName.isNullTerminated());
+        SC_TESTING_ASSERT_DEBUG(sectionName.isNullTerminated());
         if (not report.currentSection.isEmpty())
         {
             report.printSectionResult(*this);
@@ -848,7 +851,7 @@ int SC::TestReport::getTestReturnCode() const { return startupFailure || numTest
 uint16_t SC::TestReport::mapPort(uint16_t basePort) const
 {
     const uint32_t mappedPort = static_cast<uint32_t>(basePort) + static_cast<uint32_t>(portOffset);
-    SC_ASSERT_RELEASE(mappedPort <= 65535);
+    SC_TESTING_ASSERT_RELEASE(mappedPort <= 65535);
     return static_cast<uint16_t>(mappedPort <= 65535 ? mappedPort : basePort);
 }
 

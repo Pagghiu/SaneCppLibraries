@@ -4,7 +4,6 @@
 #include "../../Async/Internal/AsyncLinuxAPI.h"
 #include "../../Async/Internal/AsyncLinuxKernelEvents.h"
 #include "../../Async/Internal/AsyncPosix.inl" // This is only to provide clangd completion (guarded by #pragma once)
-#include "../../Common/Assert.h"
 
 #include <arpa/inet.h>    // sockaddr_in
 #include <errno.h>        // errno
@@ -36,7 +35,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
 
     KernelQueueIoURing() { memset(&ring, 0, sizeof(ring)); }
 
-    ~KernelQueueIoURing() { SC_TRUST_RESULT(close()); }
+    ~KernelQueueIoURing() { SC_ASYNC_TRUST_RESULT(close()); }
 
     Result close()
     {
@@ -224,7 +223,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             {
                 kq.timerIsSet = false;
                 // Sanity check: expired timeouts are reported with ETIME errno
-                SC_ASSERT_RELEASE(cqe.res == -ETIME or cqe.res == -ECANCELED);
+                SC_ASYNC_ASSERT_RELEASE(cqe.res == -ETIME or cqe.res == -ECANCELED);
             }
             else
             {
@@ -731,7 +730,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         {
             return Result::Error("pidfd_open failed");
         }
-        SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
+        SC_ASYNC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
         AsyncLinuxIOUring::prepPollAdd(submission, pidFd, POLLIN);
@@ -766,7 +765,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
 
         const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
         SC_TRY_MSG(sigFd >= 0, "signalfd failed");
-        SC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
+        SC_ASYNC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
         async.signalFdHandle = sigFd;
 
         io_uring_sqe* submission;
@@ -924,7 +923,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         }
         break;
         case AsyncFileSystemOperation::Operation::None: break;
-        default: Assert::unreachable();
+        default: AsyncAssert::unreachable();
         }
 
         return Result(true);
@@ -951,7 +950,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         case AsyncFileSystemOperation::Operation::RemoveDirectory: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::RemoveFile: result.completionData.code = completion.res; break;
         case AsyncFileSystemOperation::Operation::None: break;
-        default: Assert::unreachable();
+        default: AsyncAssert::unreachable();
         }
         return Result(true);
     }
@@ -1144,5 +1143,5 @@ SC::Result SC::AsyncEventLoop::Internal::KernelEvents::teardownAsync(T* async, A
     case Options::ApiType::ForceUseIoUring: return KernelEventsIoURing::teardownAsync(async, teardown); break;
     case Options::ApiType::ForceUseEpoll: return KernelEventsPosix::teardownAsync(async, teardown); break;
     }
-    Assert::unreachable();
+    AsyncAssert::unreachable();
 }

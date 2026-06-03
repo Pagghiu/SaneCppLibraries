@@ -53,22 +53,22 @@ struct SC_CONTAINERS_EXPORT Array : public Segment<detail::ArrayVTable<T, N>>
     using Parent = Segment<detail::ArrayVTable<T, N>>;
     Array() : Parent(sizeof(T) * N) {};
     // clang-format off
-    Array(std::initializer_list<T> list) : Array() { SC_ASSERT_RELEASE(Parent::template assign<T>({list.begin(), list.size()})); }
-    Array(const Array& other) : Array() { SC_ASSERT_RELEASE(Parent::append(other.toSpanConst())); }
-    Array(Array&& other) : Array() { SC_ASSERT_RELEASE(Parent::appendMove(move(other))); }
-    Array& operator=(const Array& other) { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }
-    Array& operator=(Array&& other) { SC_ASSERT_RELEASE(Parent::assignMove(move(other))); return *this; }
+    Array(std::initializer_list<T> list) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::template assign<T>({list.begin(), list.size()})); }
+    Array(const Array& other) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::append(other.toSpanConst())); }
+    Array(Array&& other) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::appendMove(move(other))); }
+    Array& operator=(const Array& other) { SC_CONTAINERS_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }
+    Array& operator=(Array&& other) { SC_CONTAINERS_ASSERT_RELEASE(Parent::assignMove(move(other))); return *this; }
     template <int M>
-    Array(const Array<T, M>& other) : Array() { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst()));}
+    Array(const Array<T, M>& other) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::assign(other.toSpanConst()));}
     template <int M>
-    Array(Array<T, M>&& other) : Array() { SC_ASSERT_RELEASE(Parent::assignMove(move(other))); }
+    Array(Array<T, M>&& other) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::assignMove(move(other))); }
     template <int M>
-    Array& operator=(const Array<T, M>& other) { SC_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }
+    Array& operator=(const Array<T, M>& other) { SC_CONTAINERS_ASSERT_RELEASE(Parent::assign(other.toSpanConst())); return *this; }
     template <int M>
-    Array& operator=(Array<T, M>&& other) { SC_ASSERT_RELEASE(Parent::assignMove(move(other))); return *this; }
-    Array(Span<const T> span) : Array() { SC_ASSERT_RELEASE(Parent::assign(span)); }
+    Array& operator=(Array<T, M>&& other) { SC_CONTAINERS_ASSERT_RELEASE(Parent::assignMove(move(other))); return *this; }
+    Array(Span<const T> span) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::assign(span)); }
     template <typename U>
-    Array(Span<const U> span) : Array() { SC_ASSERT_RELEASE(Parent::assign(span)); }
+    Array(Span<const U> span) : Array() { SC_CONTAINERS_ASSERT_RELEASE(Parent::assign(span)); }
     // clang-format on
 
     /// @brief Check if the current array contains a given value.

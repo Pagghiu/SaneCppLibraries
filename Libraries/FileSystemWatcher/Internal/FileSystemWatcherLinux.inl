@@ -3,7 +3,6 @@
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 #include "FileSystemWatcherThreading.h"
 
-#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
 
 #include <dirent.h>      // opendir, readdir, closedir

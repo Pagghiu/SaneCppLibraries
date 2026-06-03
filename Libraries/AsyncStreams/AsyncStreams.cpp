@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncStreams.h"
-#include "../Common/Assert.h"
+
+#define SC_ASSERT_PROVIDER AsyncStreamsAssert
+#include "../Common/Assert.inl"
+
 #include "Internal/ZLibStream.inl"
 #include "ZLibTransformStreams.h"
 
@@ -13,15 +16,15 @@ namespace SC
 void AsyncBuffersPool::refBuffer(AsyncBufferView::ID bufferID)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    SC_ASSERT_RELEASE(buffer);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(buffer);
     buffer->refs++;
 }
 
 void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
 {
     AsyncBufferView* buffer = getBuffer(bufferID);
-    SC_ASSERT_RELEASE(buffer);
-    SC_ASSERT_RELEASE(buffer->refs != 0);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(buffer);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(buffer->refs != 0);
     buffer->refs--;
     if (buffer->refs == 0)
     {
@@ -37,8 +40,10 @@ void AsyncBuffersPool::unrefBuffer(AsyncBufferView::ID bufferID)
             case AsyncBufferView::Type::Writable: buffer->length = buffer->writableData.sizeInBytes(); break;
             case AsyncBufferView::Type::ReadOnly: buffer->length = buffer->readonlyData.sizeInBytes(); break;
             case AsyncBufferView::Type::Growable: break;
-            case AsyncBufferView::Type::Child: SC_ASSERT_RELEASE(false); break; // Child views are never reusable
-            case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+            case AsyncBufferView::Type::Child:
+                SC_ASYNC_STREAMS_ASSERT_RELEASE(false);
+                break; // Child views are never reusable
+            case AsyncBufferView::Type::Empty: SC_ASYNC_STREAMS_ASSERT_RELEASE(false); break;
             }
         }
         else
@@ -90,7 +95,7 @@ Result AsyncBuffersPool::getReadableData(AsyncBufferView::ID bufferID, Span<cons
         }
         break;
     }
-    case AsyncBufferView::Type::Empty: Assert::unreachable(); break;
+    case AsyncBufferView::Type::Empty: AsyncStreamsAssert::unreachable(); break;
     }
     return Result(true);
 }
@@ -213,7 +218,7 @@ void AsyncBuffersPool::setNewBufferSize(AsyncBufferView::ID bufferID, size_t new
             (void)buffer->getGrowableBuffer(storage, false); // destruct
             break;
         }
-        case AsyncBufferView::Type::Empty: SC_ASSERT_RELEASE(false); break;
+        case AsyncBufferView::Type::Empty: SC_ASYNC_STREAMS_ASSERT_RELEASE(false); break;
         }
     }
 }
@@ -764,7 +769,7 @@ void AsyncWritableStream::tryAsync(Result potentialError)
 void AsyncWritableStream::finishedWriting(AsyncBufferView::ID bufferID, Function<void(AsyncBufferView::ID)>&& callback,
                                           Result res)
 {
-    SC_ASSERT_RELEASE(state == State::Writing or state == State::Ending);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(state == State::Writing or state == State::Ending);
 
     if (not res)
     {
@@ -1034,14 +1039,14 @@ bool AsyncTransformStream::canEndWritable()
         return false; // Still processing stuff
     }
     }
-    Assert::unreachable();
+    AsyncStreamsAssert::unreachable();
 }
 
 //-------------------------------------------------------------------------------------------------------
 // AsyncPipeline
 //-------------------------------------------------------------------------------------------------------
 
-AsyncPipeline::~AsyncPipeline() { SC_ASSERT_DEBUG(unpipe()); }
+AsyncPipeline::~AsyncPipeline() { SC_ASYNC_STREAMS_ASSERT_DEBUG(unpipe()); }
 
 Result AsyncPipeline::validate()
 {
@@ -1294,7 +1299,7 @@ bool AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplex
             break;
         }
     }
-    SC_ASSERT_RELEASE(transformIndex < MaxTransforms);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(transformIndex < MaxTransforms);
 
     AsyncPipeline* pipeline = this;
     auto           lambda   = [pipeline, transformIndex](AsyncBufferView::ID bufferID)
@@ -1311,11 +1316,11 @@ bool AsyncPipeline::listenToEventData(AsyncReadableStream& readable, AsyncDuplex
 
 void AsyncPipeline::dispatchToTransform(AsyncBufferView::ID bufferID, size_t transformIndex)
 {
-    SC_ASSERT_RELEASE(transformIndex < MaxTransforms);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(transformIndex < MaxTransforms);
     AsyncReadableStream* readable  = transformInputs[transformIndex];
     AsyncDuplexStream*   transform = transforms[transformIndex];
-    SC_ASSERT_RELEASE(readable != nullptr);
-    SC_ASSERT_RELEASE(transform != nullptr);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(readable != nullptr);
+    SC_ASYNC_STREAMS_ASSERT_RELEASE(transform != nullptr);
 
     if (hasPendingWritesForReadable(*readable))
     {
@@ -1367,8 +1372,8 @@ void AsyncPipeline::asyncWriteWritable(AsyncBufferView::ID bufferID, AsyncReadab
     if (not writable.canAcceptWrite())
     {
         PendingWrite* pendingWrite = findPendingWrite(readable, writable);
-        SC_ASSERT_RELEASE(pendingWrite != nullptr);
-        SC_ASSERT_RELEASE(not pendingWrite->bufferID.isValid());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(pendingWrite != nullptr);
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(not pendingWrite->bufferID.isValid());
         const bool wasAlreadyBackpressured = hasPendingWritesForReadable(readable);
         pendingWrite->readable             = &readable;
         pendingWrite->writable             = &writable;
@@ -1398,7 +1403,7 @@ bool AsyncPipeline::retryPendingWrites()
         if (not pendingWrite.bufferID.isValid())
             continue;
 
-        SC_ASSERT_RELEASE(pendingWrite.writable != nullptr);
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(pendingWrite.writable != nullptr);
         if (not pendingWrite.writable->canAcceptWrite())
         {
             continue;
@@ -1509,14 +1514,14 @@ void AsyncPipeline::endPipes()
         if (sink->isStillWriting())
         {
             const bool res = sink->eventFinish.addListener<AsyncPipeline, &AsyncPipeline::afterSinkEnd>(*this);
-            SC_ASSERT_RELEASE(res);
+            SC_ASYNC_STREAMS_ASSERT_RELEASE(res);
             allEnded = false;
         }
         sink->end();
     }
     if (allEnded)
     {
-        SC_ASSERT_RELEASE(unpipe());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(unpipe());
     }
 }
 
@@ -1534,12 +1539,12 @@ void AsyncPipeline::afterSinkEnd()
         else
         {
             const bool res = sink->eventFinish.removeListener<AsyncPipeline, &AsyncPipeline::afterSinkEnd>(*this);
-            SC_ASSERT_RELEASE(res);
+            SC_ASYNC_STREAMS_ASSERT_RELEASE(res);
         }
     }
     if (allEnded)
     {
-        SC_ASSERT_RELEASE(unpipe());
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(unpipe());
     }
 }
 

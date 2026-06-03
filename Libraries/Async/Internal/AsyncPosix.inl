@@ -4,7 +4,6 @@
 #include "../../Async/Internal/AsyncInternal.h"
 #include <poll.h>
 
-#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
 #include "../../Socket/Socket.h"
 #include <stdint.h> // uint32_t
@@ -116,7 +115,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
     static constexpr FileDescriptor::Handle wakeUpUserEventIdent = 0x1e7e7711;
 #endif
     KernelQueuePosix() {}
-    ~KernelQueuePosix() { SC_TRUST_RESULT(close()); }
+    ~KernelQueuePosix() { SC_ASYNC_TRUST_RESULT(close()); }
 
     [[nodiscard]] static constexpr bool needsThreadPoolForFileOperations() { return true; }
 
@@ -614,7 +613,8 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         // But probably this means to review the entire process of async stop
         AsyncEventLoop& eventLoop = result.eventLoop;
         async.flags &= ~Internal::Flag_WatcherSet;
-        SC_TRUST_RESULT(KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
+        SC_ASYNC_TRUST_RESULT(
+            KernelQueuePosix::stopSingleWatcherImmediate(eventLoop, async.handle, OUTPUT_EVENTS_MASK));
         if (socketRes == 0)
         {
             SC_TRY_MSG(errorCode == 0, "connect SO_ERROR");
@@ -850,7 +850,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     Result posixWriteActivate(AsyncEventLoop& eventLoop, T& async, WriteApi writeApi, bool watchable)
     {
         const size_t totalBytesToSend = Internal::getSummedSizeOfBuffers(async);
-        SC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
+        SC_ASYNC_ASSERT_RELEASE((async.flags & Internal::Flag_ManualCompletion) == 0);
         if (not posixTryWrite(async, totalBytesToSend, writeApi))
         {
             // Not all bytes have been written, so if descriptor supports watching
@@ -900,7 +900,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             if (current->handle == async.handle)
             {
-                SC_ASSERT_RELEASE(current != &async);
+                SC_ASYNC_ASSERT_RELEASE(current != &async);
                 async.flags |= Internal::Flag_ManualCompletion;
                 eventLoop.internal.manualCompletions.queueBack(*current);
             }
@@ -1379,7 +1379,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
         {
             return Result::Error("pidfd_open failed");
         }
-        SC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
+        SC_ASYNC_ASSERT_RELEASE(async.pidFd.assign(pidFd));
         return setEventWatcher(eventLoop, async, pidFd, INPUT_EVENTS_MASK);
 #endif
     }
@@ -1447,7 +1447,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 
         const int sigFd = ::signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
         SC_TRY_MSG(sigFd >= 0, "signalfd failed");
-        SC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
+        SC_ASYNC_ASSERT_RELEASE(async.signalFd.assign(sigFd));
         async.signalFdHandle = sigFd;
         return setEventWatcher(eventLoop, async, sigFd, INPUT_EVENTS_MASK);
     }

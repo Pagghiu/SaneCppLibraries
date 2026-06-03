@@ -152,7 +152,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
 
         NTSTATUS status = pNtSetInformationFile(handle, &status_block, &file_completion_info,
                                                 sizeof(file_completion_info), FileReplaceCompletionInformation);
-        // SC_ASSERT_RELEASE(status == STATUS_SUCCESS);
+        // SC_ASYNC_ASSERT_RELEASE(status == STATUS_SUCCESS);
         (void)status;
     }
 
@@ -168,7 +168,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         return Result(true);
     }
 
-    ~KernelQueue() { SC_TRUST_RESULT(close()); }
+    ~KernelQueue() { SC_ASYNC_TRUST_RESULT(close()); }
 
     Result close() { return loopFd.close(); }
 
@@ -335,7 +335,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             switch (async->type)
             {
             case AsyncRequest::Type::SocketAccept:
-                SC_TRUST_RESULT(static_cast<AsyncSocketAccept*>(async)->acceptData->clientSocket.close());
+                SC_ASYNC_TRUST_RESULT(static_cast<AsyncSocketAccept*>(async)->acceptData->clientSocket.close());
                 break;
             default: break;
             }
@@ -804,8 +804,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 if (synchronous == false)
                 {
                     // Async operation finished synchronously, must flag a manual completion to avoid waiting forever
-                    SC_ASSERT_RELEASE(eventLoop != nullptr);
-                    SC_ASSERT_RELEASE(numBytes == 0);
+                    SC_ASYNC_ASSERT_RELEASE(eventLoop != nullptr);
+                    SC_ASYNC_ASSERT_RELEASE(numBytes == 0);
                     async.flags |= Internal::Flag_ManualCompletion;
                     async.endedSync = true; // GetOverlappedResult will fail, so we need to remember this is ended
                 }
@@ -829,7 +829,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             if (synchronous == false)
             {
                 // Async operation finished synchronously, must flag a manual completion to avoid waiting forever
-                SC_ASSERT_RELEASE(eventLoop != nullptr);
+                SC_ASYNC_ASSERT_RELEASE(eventLoop != nullptr);
                 async.flags |= Internal::Flag_ManualCompletion;
             }
         }
@@ -933,7 +933,7 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
                 partialBytesWritten += async.buffers[currentBufferIndex].sizeInBytes();
                 currentBufferIndex += 1;
             }
-            SC_ASSERT_RELEASE(partialBytesWritten == async.totalBytesWritten); // Sanity check
+            SC_ASYNC_ASSERT_RELEASE(partialBytesWritten == async.totalBytesWritten); // Sanity check
             while (currentBufferIndex < async.buffers.sizeInElements())
             {
                 size_t writtenBytes;
@@ -1184,7 +1184,8 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         (void)(timeoutOccurred);
         AsyncProcessExit&      async = *static_cast<AsyncProcessExit*>(data);
         FileDescriptor::Handle loopHandle;
-        SC_TRUST_RESULT(async.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loopFd")));
+        SC_ASYNC_TRUST_RESULT(
+            async.eventLoop->internal.kernelQueue.get().loopFd.get(loopHandle, Result::Error("loopFd")));
 
         if (PostQueuedCompletionStatus(loopHandle, 0, 0, &async.overlapped.get().overlapped) == FALSE)
         {

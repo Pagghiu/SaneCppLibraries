@@ -14,7 +14,7 @@ template <typename T>
 struct VirtualArray
 {
     VirtualArray() = default;
-    VirtualArray(size_t maxCapacity) { SC_ASSERT_RELEASE(reserve(maxCapacity)); }
+    VirtualArray(size_t maxCapacity) { SC_CONTAINERS_ASSERT_RELEASE(reserve(maxCapacity)); }
     ~VirtualArray() { clear(); }
 
     /// @brief Releases all reserved memory.

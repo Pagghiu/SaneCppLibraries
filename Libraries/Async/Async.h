@@ -9,6 +9,7 @@
 #define SC_ASYNC_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC)
 
 #include "../Async/Internal/IntrusiveDoubleLinkedList.h"
+#include "../Common/Assert.h"
 #include "../Common/Function.h"
 #include "../Common/OpaqueObject.h"
 #include "../File/File.h"
@@ -19,6 +20,12 @@
 
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(AsyncAssert, SC_ASYNC_EXPORT);
+
+#define SC_ASYNC_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::AsyncAssert, e)
+#define SC_ASYNC_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::AsyncAssert, e)
+#define SC_ASYNC_TRUST_RESULT(expression) SC_ASYNC_ASSERT_RELEASE(expression)
+
 struct ThreadPool;
 struct ThreadPoolTask;
 struct EventObject;

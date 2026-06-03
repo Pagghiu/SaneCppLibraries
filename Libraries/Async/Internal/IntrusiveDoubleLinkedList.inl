@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Assert.h"
+#include "../Async.h"
 #include "IntrusiveDoubleLinkedList.h"
 
 template <typename T>
@@ -25,7 +25,7 @@ void SC::IntrusiveDoubleLinkedList<T>::appendBack(IntrusiveDoubleLinkedList& oth
         return;
     if (other.front)
     {
-        SC_ASSERT_DEBUG(other.front->prev == nullptr);
+        SC_ASYNC_ASSERT_DEBUG(other.front->prev == nullptr);
         queueBackUnchecked(*other.front, *other.back);
     }
     other.clear();
@@ -34,7 +34,7 @@ void SC::IntrusiveDoubleLinkedList<T>::appendBack(IntrusiveDoubleLinkedList& oth
 template <typename T>
 void SC::IntrusiveDoubleLinkedList<T>::queueBack(T& item)
 {
-    SC_ASSERT_DEBUG(item.next == nullptr and item.prev == nullptr);
+    SC_ASYNC_ASSERT_DEBUG(item.next == nullptr and item.prev == nullptr);
     queueBackUnchecked(item, item);
 }
 
@@ -48,12 +48,12 @@ void SC::IntrusiveDoubleLinkedList<T>::queueBackUnchecked(T& item, T& newBack)
     }
     else
     {
-        SC_ASSERT_DEBUG(front == nullptr);
+        SC_ASYNC_ASSERT_DEBUG(front == nullptr);
         front = &item;
     }
     back = &newBack;
-    SC_ASSERT_DEBUG(back->next == nullptr);
-    SC_ASSERT_DEBUG(front->prev == nullptr);
+    SC_ASYNC_ASSERT_DEBUG(back->next == nullptr);
+    SC_ASYNC_ASSERT_DEBUG(front->prev == nullptr);
 }
 
 template <typename T>
@@ -93,7 +93,7 @@ void SC::IntrusiveDoubleLinkedList<T>::remove(T& item)
         }
         it = static_cast<T*>(it->next);
     }
-    SC_ASSERT_DEBUG(found);
+    SC_ASYNC_ASSERT_DEBUG(found);
 #endif
     if (&item == front)
     {

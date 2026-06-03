@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Assert.h"
 #include "../Common/Span.h"
 #include "../Memory/Memory.h"
 #if SC_COMPILER_FILC
@@ -177,7 +176,7 @@ struct SC_MEMORY_EXPORT Segment : public VTable
     Segment& operator=(const Segment& other) noexcept;
 
     // clang-format off
-    template <typename U = T> Segment(Span<const U> span) noexcept : Segment() { SC_ASSERT_RELEASE(assign(span)); }
+    template <typename U = T> Segment(Span<const U> span) noexcept : Segment() { SC_MEMORY_ASSERT_RELEASE(assign(span)); }
     // clang-format on
     Segment(std::initializer_list<T> list) noexcept;
 
@@ -241,13 +240,13 @@ struct SC_MEMORY_EXPORT Segment : public VTable
     [[nodiscard]] T*       end()         noexcept SC_LANGUAGE_LIFETIME_BOUND { return data() + size(); }
     [[nodiscard]] const T* end()   const noexcept SC_LANGUAGE_LIFETIME_BOUND { return data() + size(); }
 
-    [[nodiscard]] T& back()              noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
-    [[nodiscard]] T& front()             noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *data();}
-    [[nodiscard]] const T& back()  const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
-    [[nodiscard]] const T& front() const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_RELEASE(not isEmpty()); return *data();}
+    [[nodiscard]] T& back()              noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
+    [[nodiscard]] T& front()             noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_RELEASE(not isEmpty()); return *data();}
+    [[nodiscard]] const T& back()  const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_RELEASE(not isEmpty()); return *(data() + size() - 1);}
+    [[nodiscard]] const T& front() const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_RELEASE(not isEmpty()); return *data();}
 
-    [[nodiscard]] T&       operator[](size_t idx)       noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
-    [[nodiscard]] const T& operator[](size_t idx) const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
+    [[nodiscard]] T&       operator[](size_t idx)       noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
+    [[nodiscard]] const T& operator[](size_t idx) const noexcept SC_LANGUAGE_LIFETIME_BOUND { SC_MEMORY_ASSERT_DEBUG(idx < size()); return *(data() + idx);}
     // clang-format on
 
     /// @brief Check if is empty (`size()` == 0)

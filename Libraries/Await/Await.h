@@ -8,6 +8,12 @@
 #endif
 #define SC_AWAIT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_AWAIT)
 
+#include "../Common/Assert.h"
+
+#define SC_AWAIT_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::AwaitAssert, e)
+#define SC_AWAIT_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::AwaitAssert, e)
+#define SC_AWAIT_TRUST_RESULT(expression) SC_AWAIT_ASSERT_RELEASE(expression)
+
 #ifndef SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE
 #define SC_AWAIT_ENABLE_NO_STDLIB_COROUTINE 0
 #endif
@@ -35,6 +41,8 @@
 //! @{
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(AwaitAssert, SC_AWAIT_EXPORT);
+
 struct AwaitEventLoop;
 struct AwaitAllocator;
 struct AwaitAllocatorInterface;

@@ -294,9 +294,9 @@ SC::StringView SC::StringView::sliceStartEnd(size_t start, size_t end) const
     return withIterator(
         [&](auto it)
         {
-            SC_ASSERT_RELEASE(it.advanceCodePoints(start));
+            SC_STRINGS_ASSERT_RELEASE(it.advanceCodePoints(start));
             auto startIt = it;
-            SC_ASSERT_RELEASE(start <= end && it.advanceCodePoints(end - start));
+            SC_STRINGS_ASSERT_RELEASE(start <= end && it.advanceCodePoints(end - start));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView({startIt.it, distance},
                               hasNullTerm and (start + distance == sizeInBytesIncludingTerminator()), getEncoding());
@@ -308,7 +308,7 @@ SC::StringView SC::StringView::sliceStart(size_t offset) const
     return withIterator(
         [&](auto it)
         {
-            SC_ASSERT_RELEASE(it.advanceCodePoints(offset));
+            SC_STRINGS_ASSERT_RELEASE(it.advanceCodePoints(offset));
             auto startIt = it;
             it.setToEnd();
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
@@ -324,7 +324,7 @@ SC::StringView SC::StringView::sliceEnd(size_t offset) const
         {
             auto startIt = it;
             it.setToEnd();
-            SC_ASSERT_RELEASE(it.reverseAdvanceCodePoints(offset));
+            SC_STRINGS_ASSERT_RELEASE(it.reverseAdvanceCodePoints(offset));
             const size_t distance = static_cast<size_t>(it.bytesDistanceFrom(startIt));
             return StringView({startIt.it, distance},
                               hasNullTerm and (offset + distance == sizeInBytesIncludingTerminator()), getEncoding());

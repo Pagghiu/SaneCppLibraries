@@ -7,12 +7,19 @@
 #endif
 #define SC_MEMORY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_MEMORY)
 
+#include "../Common/Assert.h"
 #include "../Foundation/PrimitiveTypes.h"
 #if SC_COMPILER_FILC
 #include <stdfil.h>
 #endif
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(MemoryAssert, SC_MEMORY_EXPORT);
+
+#define SC_MEMORY_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::MemoryAssert, e)
+#define SC_MEMORY_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::MemoryAssert, e)
+#define SC_MEMORY_TRUST_RESULT(expression) SC_MEMORY_ASSERT_RELEASE(expression)
+
 struct SC_MEMORY_EXPORT Memory;
 struct SC_MEMORY_EXPORT MemoryAllocator;
 struct SC_MEMORY_EXPORT FixedAllocator;

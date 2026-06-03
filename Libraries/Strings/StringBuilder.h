@@ -121,7 +121,7 @@ struct StringBuilderFor : public StringBuilder
     /// @warning This method can be called only after finalize has been called
     [[nodiscard]] StringView view() noexcept
     {
-        SC_ASSERT_RELEASE(buffer == nullptr);
+        SC_STRINGS_ASSERT_RELEASE(buffer == nullptr);
         return finalizedView;
     }
 };

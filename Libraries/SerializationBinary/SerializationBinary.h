@@ -7,6 +7,17 @@
 #endif
 #define SC_SERIALIZATION_BINARY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIALIZATION_BINARY)
 
+#include "../Common/Assert.h"
+
+namespace SC
+{
+SC_DECLARE_ASSERT_PROVIDER(SerializationBinaryAssert, SC_SERIALIZATION_BINARY_EXPORT);
+
+#define SC_SERIALIZATION_BINARY_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::SerializationBinaryAssert, e)
+#define SC_SERIALIZATION_BINARY_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::SerializationBinaryAssert, e)
+#define SC_SERIALIZATION_BINARY_TRUST_RESULT(expression) SC_SERIALIZATION_BINARY_ASSERT_RELEASE(expression)
+} // namespace SC
+
 #include "Internal/SerializationBinaryBuffer.h"
 #include "Internal/SerializationBinaryReadVersioned.h"
 #include "Internal/SerializationBinaryReadWriteExact.h"
@@ -94,7 +105,8 @@ struct SerializationBinary
     ///
     /// // Deserialization
     /// SC_TRY(SerializerReader::loadExact(deserializedObject, buffer.toSpanConst()));
-    /// SC_ASSERT_RELEASE(objectToSerialize.nestedStruct.doubleVal == deserializedObject.nestedStruct.doubleVal);
+    /// SC_SERIALIZATION_BINARY_ASSERT_RELEASE(objectToSerialize.nestedStruct.doubleVal ==
+    /// deserializedObject.nestedStruct.doubleVal);
     /// @endcode
     template <typename T>
     [[nodiscard]] static bool loadExact(T& value, Span<const char> buffer, size_t* numberOfReads = nullptr)

@@ -37,7 +37,7 @@ bool StringBuilder::appendReplaceAll(StringView source, StringView occurrencesOf
 {
     if (buffer == nullptr)
         return false;
-    SC_ASSERT_RELEASE(occurrencesOf.hasCompatibleEncoding(with));
+    SC_STRINGS_ASSERT_RELEASE(occurrencesOf.hasCompatibleEncoding(with));
 
     if (source.isEmpty())
     {

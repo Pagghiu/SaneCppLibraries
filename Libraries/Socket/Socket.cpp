@@ -3,6 +3,9 @@
 
 #include "Socket.h"
 
+#define SC_ASSERT_PROVIDER SocketAssert
+#include "../Common/Assert.inl"
+
 #if SC_PLATFORM_WINDOWS
 #include "Internal/SocketDescriptorWindows.inl"
 #else

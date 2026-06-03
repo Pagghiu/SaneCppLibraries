@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Common/Assert.h"
 #include "../../Common/Result.h"
 #include "../../Common/Span.h"
 #include "../../Socket/Socket.h"
@@ -75,7 +74,7 @@ SC::SocketFlags::AddressFamily SC::SocketIPAddress::getAddressFamily() const
     }
     else
     {
-        SC_ASSERT_RELEASE(sa->sin_family == AF_INET6);
+        SC_SOCKET_ASSERT_RELEASE(sa->sin_family == AF_INET6);
         return SocketFlags::AddressFamilyIPV6;
     }
 }
@@ -90,7 +89,7 @@ SC::uint16_t SC::SocketIPAddress::getPort() const
     }
     else
     {
-        SC_ASSERT_RELEASE(sa->sin_family == AF_INET6);
+        SC_SOCKET_ASSERT_RELEASE(sa->sin_family == AF_INET6);
         const sockaddr_in6* sa_in6 = (struct sockaddr_in6*)sa;
         return ntohs(sa_in6->sin6_port);
     }

@@ -601,8 +601,8 @@ void HttpWebSocketClientHandshake::onPrepareRequest(HttpAsyncClientRequest& requ
 
 void HttpWebSocketClientHandshake::onResponse(HttpAsyncClientResponse& response)
 {
-    SC_ASSERT_RELEASE(client != nullptr);
-    SC_ASSERT_RELEASE(transport != nullptr);
+    SC_HTTP_ASSERT_RELEASE(client != nullptr);
+    SC_HTTP_ASSERT_RELEASE(transport != nullptr);
 
     Result result = HttpWebSocketHandshake::validateClientResponse(response, clientKey);
     if (result)

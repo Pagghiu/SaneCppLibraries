@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Assert.h"
 #include "../../Process/Internal/StringsArena.h"
 #include "../../Process/Process.h"
 
@@ -35,7 +34,7 @@ struct SC::EnvironmentTable
             // We have some custom user environment variables to add, and we push them to the childEnvironmentArray
             // array. If we also have to inherit paren environment variables, we will need to skip the ones that have
             // been redefined by the user.
-            SC_ASSERT_RELEASE(table.view().isNullTerminated());
+            SC_PROCESS_ASSERT_RELEASE(table.view().isNullTerminated());
             const char* envsView = table.view().bytesWithoutTerminator();
             for (size_t idx = 0; idx < table.numberOfStrings; ++idx)
             {
@@ -57,7 +56,7 @@ struct SC::EnvironmentTable
 #else
                     const native_char_t* equalSign = ::strchr(keyValue, '=');
 #endif
-                    SC_ASSERT_RELEASE(equalSign != nullptr);
+                    SC_PROCESS_ASSERT_RELEASE(equalSign != nullptr);
                     names[idx] = StringSpan({keyValue, static_cast<size_t>(equalSign - keyValue)}, false,
                                             StringEncoding::Native);
                 }

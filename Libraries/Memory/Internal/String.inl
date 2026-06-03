@@ -21,7 +21,7 @@ struct SC::String::Internal
 
 SC::String::String(Buffer&& otherData, StringEncoding encoding) : encoding(encoding)
 {
-    SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
+    SC_MEMORY_ASSERT_RELEASE(data.assignMove(move(otherData)));
     Internal::ensureZeroTermination(data, encoding);
 }
 
@@ -30,7 +30,7 @@ SC::String::String(StringEncoding encoding, uint32_t inlineCapacity) : encoding(
 SC::String::String(Buffer&& otherData, StringEncoding encoding, uint32_t inlineCapacity)
     : String(encoding, inlineCapacity)
 {
-    SC_ASSERT_RELEASE(data.assignMove(move(otherData)));
+    SC_MEMORY_ASSERT_RELEASE(data.assignMove(move(otherData)));
     Internal::ensureZeroTermination(data, encoding);
 }
 
@@ -67,7 +67,7 @@ bool SC::String::assign(StringSpan sv)
 
 SC::String& SC::String::operator=(StringSpan view)
 {
-    SC_ASSERT_RELEASE(assign(view));
+    SC_MEMORY_ASSERT_RELEASE(assign(view));
     return *this;
 }
 

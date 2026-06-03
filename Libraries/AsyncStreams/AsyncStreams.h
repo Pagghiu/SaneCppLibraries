@@ -9,6 +9,7 @@
 #define SC_ASYNC_STREAMS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_ASYNC_STREAMS)
 
 #include "../Common/AlignedStorage.h"
+#include "../Common/Assert.h"
 #include "../Common/Function.h"
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Common/PlatformMacrosInstructionSet.h"
@@ -51,6 +52,11 @@
 //! @{
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(AsyncStreamsAssert, SC_ASYNC_STREAMS_EXPORT);
+
+#define SC_ASYNC_STREAMS_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::AsyncStreamsAssert, e)
+#define SC_ASYNC_STREAMS_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::AsyncStreamsAssert, e)
+#define SC_ASYNC_STREAMS_TRUST_RESULT(expression) SC_ASYNC_STREAMS_ASSERT_RELEASE(expression)
 
 /// @brief A Span of bytes memory to be read or written by async streams
 struct SC_ASYNC_STREAMS_EXPORT AsyncBufferView

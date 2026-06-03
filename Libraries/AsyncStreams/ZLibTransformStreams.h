@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Common/Assert.h"
 #include "AsyncStreams.h"
 #include "Internal/ZLibStream.h"
 
@@ -39,7 +38,7 @@ struct AsyncZLibTransformStreamT : public AsyncTransformStream
 
     virtual Result onProcess(Span<const char> input, Span<char> output) override
     {
-        SC_ASSERT_RELEASE(not finalizing);
+        SC_ASYNC_STREAMS_ASSERT_RELEASE(not finalizing);
         savedInput  = input;
         savedOutput = output;
         finalizing  = false;

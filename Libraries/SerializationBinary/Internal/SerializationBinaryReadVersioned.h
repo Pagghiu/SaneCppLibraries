@@ -4,7 +4,6 @@
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySchema.h"
 
-#include "../../Common/Assert.h"
 #include "../../Common/Result.h"
 namespace SC
 {
@@ -223,7 +222,7 @@ struct SerializerBinaryReadVersioned<BinaryStream, T,
             break;
         }
         // clang-format on
-        SC_ASSERT_DEBUG(false);
+        SC_SERIALIZATION_BINARY_ASSERT_DEBUG(false);
         return false;
     }
 };

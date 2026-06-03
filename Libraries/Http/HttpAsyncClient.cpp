@@ -6,7 +6,6 @@
 #include "Internal/HttpStringIterator.h"
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
-#include "../Common/Assert.h"
 
 #include <string.h>
 
@@ -350,10 +349,10 @@ void HttpAsyncClient::completeTransportSetup(Result result)
             *this);
     const bool addedPipelineError =
         connection->pipeline.eventError.addListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
-    SC_ASSERT_RELEASE(addedReadableError);
-    SC_ASSERT_RELEASE(addedWritableError);
-    SC_ASSERT_RELEASE(addedReadableEnd);
-    SC_ASSERT_RELEASE(addedPipelineError);
+    SC_HTTP_ASSERT_RELEASE(addedReadableError);
+    SC_HTTP_ASSERT_RELEASE(addedWritableError);
+    SC_HTTP_ASSERT_RELEASE(addedReadableEnd);
+    SC_HTTP_ASSERT_RELEASE(addedPipelineError);
 
     Result origin = rememberConnectedOrigin();
     if (not origin)
@@ -576,7 +575,7 @@ void HttpAsyncClient::detachResponseDecompression()
 
 void HttpAsyncClient::onCompressedResponseBodyData(AsyncBufferView::ID bufferID)
 {
-    SC_ASSERT_RELEASE(responseDecoder != nullptr);
+    SC_HTTP_ASSERT_RELEASE(responseDecoder != nullptr);
     Result writeResult = responseDecoder->AsyncWritableStream::write(
         bufferID, {[this](AsyncBufferView::ID writtenBufferID) { onCompressedResponseBodyWritten(writtenBufferID); }});
     if (not writeResult)
@@ -589,7 +588,7 @@ void HttpAsyncClient::onCompressedResponseBodyWritten(AsyncBufferView::ID) {}
 
 void HttpAsyncClient::onCompressedResponseBodyEnd()
 {
-    SC_ASSERT_RELEASE(responseDecoder != nullptr);
+    SC_HTTP_ASSERT_RELEASE(responseDecoder != nullptr);
     detachResponseDecompression();
     responseDecoder->AsyncWritableStream::end();
 }
@@ -816,7 +815,7 @@ void HttpAsyncClient::onResponseData(AsyncBufferView::ID bufferID)
 
     const bool addedBodyData = connection->getReadableTransportStream()
                                    .eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseBodyData>(*this);
-    SC_ASSERT_RELEASE(addedBodyData);
+    SC_HTTP_ASSERT_RELEASE(addedBodyData);
     state = State::StreamingResponse;
 }
 

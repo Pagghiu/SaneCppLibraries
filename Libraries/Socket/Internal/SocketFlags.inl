@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Common/Assert.h"
 #include "../../Socket/Socket.h"
 
 #if !SC_PLATFORM_WINDOWS

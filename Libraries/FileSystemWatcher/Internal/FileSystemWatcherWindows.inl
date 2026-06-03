@@ -113,7 +113,7 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_TRUST_RESULT(eventLoopRunner->windowsStopFolderFilePoll(folderWatcher));
+            SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(eventLoopRunner->windowsStopFolderFilePoll(folderWatcher));
         }
         closeFileHandle(folderWatcher);
         return Result(true);
@@ -198,7 +198,7 @@ struct SC::FileSystemWatcher::Internal
                 FolderWatcherInternal& opaque = entry.internal.get();
 
                 DWORD transferredBytes;
-                SC_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
+                SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
                 OVERLAPPED* overlapped = getOverlapped(entry);
                 ::GetOverlappedResult(opaque.fileHandle, overlapped, &transferredBytes, FALSE);
                 notifyEntry(entry);
@@ -236,7 +236,7 @@ struct SC::FileSystemWatcher::Internal
 
         OVERLAPPED* overlapped = entry.parent->internal.get().getOverlapped(entry);
         ::memset(overlapped, 0, sizeof(OVERLAPPED));
-        SC_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
+        SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
         BOOL success = ::ReadDirectoryChangesW(opaque.fileHandle,                 //
                                                opaque.changesBuffer,              //
                                                sizeof(opaque.changesBuffer),      //
@@ -262,7 +262,7 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
 
 void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher)
 {
-    SC_ASSERT_DEBUG(watcher != nullptr);
-    SC_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher != nullptr);
+    SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
     FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry);
 }

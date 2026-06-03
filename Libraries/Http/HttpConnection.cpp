@@ -4,7 +4,6 @@
 #include "Internal/HttpStringIterator.h"
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
-#include "../Common/Assert.h"
 #include "../Common/Deferred.h"
 #include "Internal/HttpFixedBufferWriter.inl"
 #include "Internal/HttpParsedHeaders.inl"
@@ -419,13 +418,13 @@ StringSpan HttpIncomingMessage::getVersion() const
 
 AsyncReadableStream& HttpIncomingMessage::getReadableStream()
 {
-    SC_ASSERT_RELEASE(readableStream != nullptr);
+    SC_HTTP_ASSERT_RELEASE(readableStream != nullptr);
     return *readableStream;
 }
 
 const AsyncReadableStream& HttpIncomingMessage::getReadableStream() const
 {
-    SC_ASSERT_RELEASE(readableStream != nullptr);
+    SC_HTTP_ASSERT_RELEASE(readableStream != nullptr);
     return *readableStream;
 }
 
@@ -866,7 +865,7 @@ bool HttpOutgoingMessage::ChunkedWritableStream::canEndWritable()
         return false;
     }
 
-    SC_ASSERT_RELEASE(destination != nullptr);
+    SC_HTTP_ASSERT_RELEASE(destination != nullptr);
     finalChunkStarted = true;
     Result finalWrite = destination->write(AsyncBufferView("0\r\n\r\n"), {[this](AsyncBufferView::ID writtenBufferID)
                                                                           { onFinalChunkWritten(writtenBufferID); }});
@@ -882,7 +881,7 @@ bool HttpOutgoingMessage::ChunkedWritableStream::canEndWritable()
 
 void HttpOutgoingMessage::ChunkedWritableStream::onChunkHeaderWritten(AsyncBufferView::ID)
 {
-    SC_ASSERT_RELEASE(destination != nullptr);
+    SC_HTTP_ASSERT_RELEASE(destination != nullptr);
     Result bodyWrite = destination->write(
         currentBodyBufferID, {[this](AsyncBufferView::ID writtenBufferID) { onChunkBodyWritten(writtenBufferID); }});
     if (not bodyWrite)
@@ -893,7 +892,7 @@ void HttpOutgoingMessage::ChunkedWritableStream::onChunkHeaderWritten(AsyncBuffe
 
 void HttpOutgoingMessage::ChunkedWritableStream::onChunkBodyWritten(AsyncBufferView::ID)
 {
-    SC_ASSERT_RELEASE(destination != nullptr);
+    SC_HTTP_ASSERT_RELEASE(destination != nullptr);
     Result terminatorWrite =
         destination->write(AsyncBufferView("\r\n"), {[this](AsyncBufferView::ID writtenBufferID)
                                                      { onChunkTerminatorWritten(writtenBufferID); }});
@@ -915,7 +914,7 @@ void HttpOutgoingMessage::ChunkedWritableStream::onChunkTerminatorWritten(AsyncB
 
 void HttpOutgoingMessage::ChunkedWritableStream::onFinalChunkWritten(AsyncBufferView::ID)
 {
-    SC_ASSERT_RELEASE(destination != nullptr);
+    SC_HTTP_ASSERT_RELEASE(destination != nullptr);
     finalChunkWritten = true;
     destination->end();
     resumeWriting();

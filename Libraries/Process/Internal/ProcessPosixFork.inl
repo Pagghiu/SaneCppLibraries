@@ -1,5 +1,4 @@
 #pragma once
-#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
 #include "../../Process/Internal/EnvironmentTable.h"
 #include "../../Process/Process.h"

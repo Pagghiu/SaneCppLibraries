@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 #include "Plugin.h"
 
+#define SC_ASSERT_PROVIDER PluginAssert
+#include "../Common/Assert.inl"
+
 #include "../Common/Deferred.h"
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
@@ -877,7 +880,7 @@ SC::Result SC::PluginDynamicLibrary::load(const PluginCompiler& compiler, const 
 
 void SC::PluginRegistry::init(Span<PluginDynamicLibrary> librariesStorage)
 {
-    SC_ASSERT_RELEASE(close());
+    SC_PLUGIN_ASSERT_RELEASE(close());
     storage   = librariesStorage;
     libraries = {};
 }

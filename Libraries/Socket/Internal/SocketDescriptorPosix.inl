@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 #include "../../Socket/Socket.h"
 
-#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
 
 #include <arpa/inet.h>   // inet_pton
@@ -234,7 +233,7 @@ Result SocketDescriptor::create(SocketFlags::AddressFamily addressFamily, Socket
                                 SocketFlags::InheritableType inheritable)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
-    SC_TRUST_RESULT(close());
+    SC_SOCKET_TRUST_RESULT(close());
 
     int typeWithAdditions = SocketFlags::toNative(socketType);
 #if defined(SOCK_NONBLOCK)

@@ -260,7 +260,7 @@ struct SmallVector : public Vector<T>
 
     SmallVector(const Vector<T>& other) noexcept : SmallVector() { Vector<T>::operator=(other); }
     SmallVector(Vector<T>&& other) noexcept : SmallVector() { Vector<T>::operator=(move(other)); }
-    SmallVector(std::initializer_list<T> list) noexcept : SmallVector() { SC_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
+    SmallVector(std::initializer_list<T> list) noexcept : SmallVector() { SC_CONTAINERS_ASSERT_RELEASE(Vector<T>::assign({list.begin(), list.size()})); }
     // clang-format on
   protected:
     SmallVector(int num, SegmentAllocator allocator) : Vector<T>(N, allocator) { (void)num; }

@@ -29,16 +29,16 @@ struct SC_STRINGS_EXPORT StringAlgorithms;
 /// Example (Construct)
 /// @code{.cpp}
 /// StringView s("asd");
-/// SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
-/// SC_ASSERT_RELEASE(s.isNullTerminated());
+/// SC_STRINGS_ASSERT_RELEASE(s.sizeInBytes() == 3);
+/// SC_STRINGS_ASSERT_RELEASE(s.isNullTerminated());
 /// @endcode
 /// Example (Construct from null terminated string)
 /// @code{.cpp}
 /// const char* someString = "asdf";
 /// // construct only "asd", not null terminated (as there is 'f' after 'd')
 /// StringView s({someString, strlen(asd) - 1}, false, StringEncoding::Ascii);
-/// SC_ASSERT_RELEASE(s.sizeInBytes() == 3);
-/// SC_ASSERT_RELEASE(not s.isNullTerminated());
+/// SC_STRINGS_ASSERT_RELEASE(s.sizeInBytes() == 3);
+/// SC_STRINGS_ASSERT_RELEASE(not s.isNullTerminated());
 /// //
 /// // ... or
 /// StringView s2 = StringView::fromNullTerminated(s, StringEncoding::Ascii); // s2 == "asdf"
@@ -615,7 +615,7 @@ constexpr bool SC::StringView::equalsIterator(StringView other, size_t& points) 
     case StringEncoding::Utf8: return equalsIterator(it, other.getIterator<StringIteratorUTF8>(), points);
     case StringEncoding::Utf16: return equalsIterator(it, other.getIterator<StringIteratorUTF16>(), points);
     }
-    Assert::unreachable();
+    StringsAssert::unreachable();
 }
 
 [[nodiscard]] constexpr bool SC::StringView::operator==(StringView other) const
@@ -654,7 +654,7 @@ constexpr bool SC::StringView::fullyOverlaps(StringView other, size_t& commonOve
     case StringEncoding::Utf8: return equalsIterator<StringIteratorUTF8>(other, commonOverlappingPoints);
     case StringEncoding::Utf16: return equalsIterator<StringIteratorUTF16>(other, commonOverlappingPoints);
     }
-    Assert::unreachable();
+    StringsAssert::unreachable();
 }
 
 template <typename Func>
@@ -666,7 +666,7 @@ constexpr auto SC::StringView::withIterator(Func&& func) const
     case StringEncoding::Utf8: return func(getIterator<StringIteratorUTF8>());
     case StringEncoding::Utf16: return func(getIterator<StringIteratorUTF16>());
     }
-    Assert::unreachable();
+    StringsAssert::unreachable();
 }
 
 template <typename Func>

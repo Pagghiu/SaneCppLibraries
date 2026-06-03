@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Assert.h"
 #include "../../Memory/Globals.h"
 #include "../../Memory/Memory.h"
 #include "../../Memory/Segment.h"
@@ -142,10 +141,10 @@ struct SC::Segment<VTable>::Internal
 // clang-format off
 template <typename VTable> SC::Segment<VTable>::Segment() noexcept {}
 template <typename VTable> SC::Segment<VTable>::~Segment() noexcept { Internal::releaseInternal(*this); }
-template <typename VTable> SC::Segment<VTable>::Segment(Segment&& other) noexcept { SC_ASSERT_RELEASE(assignMove(move(other))); }
-template <typename VTable> SC::Segment<VTable>::Segment(const Segment& other) noexcept { SC_ASSERT_RELEASE(assign(other.toSpanConst())); }
-template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) noexcept { SC_ASSERT_RELEASE(assignMove(move(other))); return *this;}
-template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(const Segment& other) noexcept { SC_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
+template <typename VTable> SC::Segment<VTable>::Segment(Segment&& other) noexcept { SC_MEMORY_ASSERT_RELEASE(assignMove(move(other))); }
+template <typename VTable> SC::Segment<VTable>::Segment(const Segment& other) noexcept { SC_MEMORY_ASSERT_RELEASE(assign(other.toSpanConst())); }
+template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(Segment&& other) noexcept { SC_MEMORY_ASSERT_RELEASE(assignMove(move(other))); return *this;}
+template <typename VTable> SC::Segment<VTable>& SC::Segment<VTable>::operator=(const Segment& other) noexcept { SC_MEMORY_ASSERT_RELEASE(assign(other.toSpanConst())); return *this; }
 // clang-format on
 
 template <typename VTable>
@@ -162,10 +161,10 @@ template <typename VTable>
 SC::Segment<VTable>::Segment(std::initializer_list<T> list) noexcept : Segment()
 {
     // This is not ideal but we miss an appendMove or assignMove with Span overload
-    SC_ASSERT_RELEASE(reserve(list.size()));
+    SC_MEMORY_ASSERT_RELEASE(reserve(list.size()));
     for (size_t idx = 0; idx < list.size(); ++idx)
     {
-        SC_ASSERT_RELEASE(push_back(move(list.begin()[idx])));
+        SC_MEMORY_ASSERT_RELEASE(push_back(move(list.begin()[idx])));
     }
 }
 

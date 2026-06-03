@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Common/Assert.h"
 #include "../../Socket/Socket.h"
 #include "SocketInternal.h"
 
@@ -22,7 +21,7 @@ SC::Result SC::SocketClient::connect(SocketIPAddress ipAddress)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
     SocketDescriptor::Handle openedSocket;
-    SC_TRUST_RESULT(socket.get(openedSocket, Result::Error("invalid connect socket")));
+    SC_SOCKET_TRUST_RESULT(socket.get(openedSocket, Result::Error("invalid connect socket")));
     socklen_t nativeSize = ipAddress.sizeOfHandle();
     int       res;
     do

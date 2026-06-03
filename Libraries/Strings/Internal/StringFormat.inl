@@ -209,7 +209,7 @@ bool StringFormatOutput::append(StringView text)
     }
     else
     {
-        SC_ASSERT_DEBUG("StringFormatOutput::write - Forgot to set buffer or console" && 0);
+        SC_STRINGS_ASSERT_DEBUG("StringFormatOutput::write - Forgot to set buffer or console" && 0);
         return false;
     }
 }
@@ -243,7 +243,7 @@ void StringFormatOutput::onFormatFailed()
 {
     if (growableBuffer != nullptr)
     {
-        SC_ASSERT_RELEASE(growableBuffer->resizeWithoutInitializing(backupSize));
+        SC_STRINGS_ASSERT_RELEASE(growableBuffer->resizeWithoutInitializing(backupSize));
         growableBuffer = nullptr;
     }
 }

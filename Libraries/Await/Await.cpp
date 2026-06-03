@@ -4,9 +4,12 @@
 
 #if SC_INCLUDE_STD_CPP && SC_LANGUAGE_CPP_AT_LEAST_20
 
-#include "../Common/Assert.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "Await.h"
+
+#define SC_ASSERT_PROVIDER AwaitAssert
+#include "../Common/Assert.inl"
+
 #include <stdlib.h>
 #if SC_PLATFORM_WINDOWS
 #include <windows.h>
@@ -136,7 +139,7 @@ struct AwaitAllocator::BlockHeader
 AwaitAllocator::~AwaitAllocator()
 {
     Result result = close();
-    SC_ASSERT_RELEASE(result);
+    SC_AWAIT_ASSERT_RELEASE(result);
 }
 
 Result AwaitAllocator::createFixed(Span<char> storage)
@@ -226,7 +229,7 @@ Result AwaitAllocator::close()
     }
     if (currentStatistics.bytesInUse != 0 or currentStatistics.numAllocations != currentStatistics.numReleases)
     {
-        SC_ASSERT_RELEASE(false);
+        SC_AWAIT_ASSERT_RELEASE(false);
         return Result::Error("AwaitAllocator closed with live allocations");
     }
 
@@ -302,7 +305,7 @@ void AwaitAllocator::release(void* memory)
     }
 
     AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
-    SC_ASSERT_RELEASE(header.allocator == this);
+    SC_AWAIT_ASSERT_RELEASE(header.allocator == this);
     if (header.allocator != this)
     {
         return;
@@ -310,7 +313,7 @@ void AwaitAllocator::release(void* memory)
 
     currentStatistics.numReleases++;
     currentStatistics.requestedBytesReleased += header.requestedBytes;
-    SC_ASSERT_RELEASE(currentStatistics.bytesInUse >= header.allocatedBytes);
+    SC_AWAIT_ASSERT_RELEASE(currentStatistics.bytesInUse >= header.allocatedBytes);
     currentStatistics.bytesInUse -= header.allocatedBytes;
 
     if (currentMode == AwaitAllocatorMode::Fixed or currentMode == AwaitAllocatorMode::Virtual)
@@ -334,7 +337,7 @@ void AwaitAllocator::releaseFromAnyAllocator(void* memory)
         return;
     }
     AwaitAllocationHeader& header = allocationHeaderFromMemory(memory);
-    SC_ASSERT_RELEASE(header.allocator != nullptr);
+    SC_AWAIT_ASSERT_RELEASE(header.allocator != nullptr);
     if (header.allocator != nullptr)
     {
         header.allocator->release(memory);
@@ -487,7 +490,7 @@ void* AwaitAllocator::allocateFromBlocks(const void*, size_t numBytes, size_t al
 
 void AwaitAllocator::releaseBlock(BlockHeader& header)
 {
-    SC_ASSERT_RELEASE(header.allocator == this);
+    SC_AWAIT_ASSERT_RELEASE(header.allocator == this);
     header.free = true;
 
     if (header.next != nullptr and header.next->free)
@@ -592,7 +595,7 @@ void AwaitAllocator::releaseVirtualMemory()
 #else
     const bool result = ::munmap(virtualMemory, virtualReservedBytes) == 0;
 #endif
-    SC_ASSERT_RELEASE(result);
+    SC_AWAIT_ASSERT_RELEASE(result);
     virtualMemory         = nullptr;
     virtualReservedBytes  = 0;
     virtualCommittedBytes = 0;
@@ -628,7 +631,7 @@ AwaitTask& AwaitTask::operator=(AwaitTask&& other) noexcept
 {
     if (this != &other)
     {
-        SC_ASSERT_RELEASE(not isActive());
+        SC_AWAIT_ASSERT_RELEASE(not isActive());
         destroy();
         handle       = other.handle;
         other.handle = {};
@@ -638,7 +641,7 @@ AwaitTask& AwaitTask::operator=(AwaitTask&& other) noexcept
 
 AwaitTask::~AwaitTask()
 {
-    SC_ASSERT_RELEASE(not isActive());
+    SC_AWAIT_ASSERT_RELEASE(not isActive());
     destroy();
 }
 
@@ -713,7 +716,7 @@ bool AwaitTask::await_suspend(Handle parent)
         return false;
     }
 
-    SC_ASSERT_RELEASE(child.continuation == nullptr);
+    SC_AWAIT_ASSERT_RELEASE(child.continuation == nullptr);
     child.continuation = parent;
 
     parent.promise().cancellation = {this, [](void* object, AwaitEventLoop& await)
@@ -739,7 +742,7 @@ Result AwaitTask::start()
 
 void AwaitTask::resume()
 {
-    SC_ASSERT_RELEASE(handle != nullptr);
+    SC_AWAIT_ASSERT_RELEASE(handle != nullptr);
     handle.resume();
 }
 
@@ -843,7 +846,7 @@ void AwaitTask::Promise::unhandled_exception() noexcept { taskResult = Result::E
 AwaitEventLoop::AwaitEventLoop(AsyncEventLoop& asyncEventLoop, AwaitAllocator& allocator)
     : eventLoop(asyncEventLoop), frameAllocator(&allocator), deferredDestroyList({})
 {
-    SC_ASSERT_RELEASE(allocator.isOpen());
+    SC_AWAIT_ASSERT_RELEASE(allocator.isOpen());
 }
 
 AsyncEventLoop& AwaitEventLoop::asyncEventLoop() { return eventLoop; }

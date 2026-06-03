@@ -57,7 +57,7 @@ void SC::VirtualMemory::release()
 #else
     const bool result = ::munmap(memory, reservedBytes) == 0;
 #endif
-    SC_ASSERT_RELEASE(result);
+    SC_MEMORY_ASSERT_RELEASE(result);
     memory = nullptr;
 
     committedBytes = 0;

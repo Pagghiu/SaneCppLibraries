@@ -1,7 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Threading.h"
-#include "../Common/Assert.h"
+
+#define SC_ASSERT_PROVIDER ThreadingAssert
+#include "../Common/Assert.inl"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ThreadingWindows.inl"
@@ -12,7 +14,7 @@
 //-------------------------------------------------------------------------------------------------------
 // Thread
 //-------------------------------------------------------------------------------------------------------
-SC::Thread::~Thread() { SC_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
+SC::Thread::~Thread() { SC_THREADING_ASSERT_DEBUG(not thread.hasValue() && "Forgot to call join() or detach()"); }
 
 SC::Result SC::Thread::start(Function<void(Thread&)>&& func)
 {

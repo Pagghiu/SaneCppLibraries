@@ -1,7 +1,12 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-// Required include context: declare an Assert type with the same API as Common/Assert.h before including this fragment.
+// Intentionally no #pragma once / include guard.
+// This file is source material for private implementation namespaces.
+// Each including library must get its own copy, especially in single-file amalgamations.
+//
+// Required include context: declare an assert provider with SC_DECLARE_ASSERT_PROVIDER before including this fragment.
+// Optional defines before this file: SC_ASSERT_PROVIDER, SC_ASSERT_NAMESPACE_BEGIN, SC_ASSERT_NAMESPACE_END.
 #if SC_PLATFORM_LINUX
 #if defined(__has_include)
 #if __has_include(<features.h>)
@@ -34,11 +39,14 @@
     {
 #define SC_ASSERT_NAMESPACE_END }
 #endif
+#ifndef SC_ASSERT_PROVIDER
+#define SC_ASSERT_PROVIDER Assert
+#endif
 
 SC_ASSERT_NAMESPACE_BEGIN
-void Assert::exit(int code) { ::_exit(code); }
+void SC_ASSERT_PROVIDER::exit(int code) { ::_exit(code); }
 
-struct Assert::Internal
+struct SC_ASSERT_PROVIDER::Internal
 {
     static void printAscii(const char* str)
     {
@@ -131,14 +139,14 @@ struct Assert::Internal
     }
 };
 
-void Assert::printBacktrace(const char* expression, bool result, const native_char_t* filename, const char* function,
-                            int line)
+void SC_ASSERT_PROVIDER::printBacktrace(const char* expression, bool result, const native_char_t* filename,
+                                        const char* function, int line)
 {
     return printBacktrace(expression, Result(result), filename, function, line);
 }
 
-void Assert::printBacktrace(const char* expression, Result result, const native_char_t* filename, const char* function,
-                            int line)
+void SC_ASSERT_PROVIDER::printBacktrace(const char* expression, Result result, const native_char_t* filename,
+                                        const char* function, int line)
 {
     char buffer[2048];
 #if SC_PLATFORM_WINDOWS
@@ -162,4 +170,7 @@ SC_ASSERT_NAMESPACE_END
 #ifndef SC_ASSERT_KEEP_NAMESPACE_MACROS
 #undef SC_ASSERT_NAMESPACE_BEGIN
 #undef SC_ASSERT_NAMESPACE_END
+#endif
+#ifndef SC_ASSERT_KEEP_PROVIDER
+#undef SC_ASSERT_PROVIDER
 #endif

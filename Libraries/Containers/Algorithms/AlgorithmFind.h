@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Common/Assert.h"
+#include "../ContainersExport.h"
 
 namespace SC
 {
@@ -24,7 +24,7 @@ template <typename ForwardIterator, typename UnaryPredicate>
 constexpr ForwardIterator findIf(ForwardIterator first, ForwardIterator last, UnaryPredicate&& predicate,
                                  size_t* index = nullptr)
 {
-    SC_ASSERT_DEBUG(first <= last);
+    SC_CONTAINERS_ASSERT_DEBUG(first <= last);
     for (auto it = first; it != last; ++it)
     {
         if (predicate(*it))

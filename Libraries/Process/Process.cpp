@@ -1,6 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Process.h"
+
+#define SC_ASSERT_PROVIDER ProcessAssert
+#include "../Common/Assert.inl"
+
 #include "../File/File.h"
 
 #include "Internal/EnvironmentTable.h" // Needed for SingleFileLibs
@@ -102,7 +106,7 @@ void SC::ProcessChain::ProcessLinkedList::clear()
 
 void SC::ProcessChain::ProcessLinkedList::queueBack(Process& process)
 {
-    SC_ASSERT_DEBUG(process.next == nullptr and process.prev == nullptr);
+    SC_PROCESS_ASSERT_DEBUG(process.next == nullptr and process.prev == nullptr);
     if (back)
     {
         back->next   = &process;
@@ -110,12 +114,12 @@ void SC::ProcessChain::ProcessLinkedList::queueBack(Process& process)
     }
     else
     {
-        SC_ASSERT_DEBUG(front == nullptr);
+        SC_PROCESS_ASSERT_DEBUG(front == nullptr);
         front = &process;
     }
     back = &process;
-    SC_ASSERT_DEBUG(back->next == nullptr);
-    SC_ASSERT_DEBUG(front->prev == nullptr);
+    SC_PROCESS_ASSERT_DEBUG(back->next == nullptr);
+    SC_PROCESS_ASSERT_DEBUG(front->prev == nullptr);
 }
 
 //-------------------------------------------------------------------------------------------------------

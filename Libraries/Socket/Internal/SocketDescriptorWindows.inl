@@ -12,7 +12,6 @@ using socklen_t = int;
 #pragma comment(lib, "Ws2_32.lib")
 #endif
 
-#include "../../Common/Assert.h"
 #include "../../Foundation/Compiler.h"
 #include "../../Socket/Socket.h"
 
@@ -233,7 +232,7 @@ SC::Result SC::SocketDescriptor::create(SocketFlags::AddressFamily addressFamily
                                         SocketFlags::InheritableType inheritable)
 {
     SC_TRY(SocketNetworking::isNetworkingInited());
-    SC_TRUST_RESULT(close());
+    SC_SOCKET_TRUST_RESULT(close());
 
     DWORD flags = WSA_FLAG_OVERLAPPED;
     if (inheritable == SocketFlags::NonInheritable)
@@ -289,7 +288,7 @@ void SC::SocketNetworking::initNetworking()
     if (isNetworkingInited() == false)
     {
         WSADATA wsa;
-        SC_ASSERT_RELEASE(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
+        SC_SOCKET_ASSERT_RELEASE(WSAStartup(MAKEWORD(2, 2), &wsa) == 0);
 #if SC_COMPILER_MSVC
         InterlockedExchange(&Internal::get().networkingInited, 1);
 #elif SC_COMPILER_CLANG

@@ -7,12 +7,19 @@
 #endif
 #define SC_TESTING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_TESTING)
 
+#include "../Common/Assert.h"
 #include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/Result.h"
 #include "../Common/StringSpan.h"
 
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(TestingAssert, SC_TESTING_EXPORT);
+
+#define SC_TESTING_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::TestingAssert, e)
+#define SC_TESTING_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::TestingAssert, e)
+#define SC_TESTING_TRUST_RESULT(expression) SC_TESTING_ASSERT_RELEASE(expression)
+
 struct TestCase;
 //! @defgroup group_testing Testing
 //! @copybrief library_testing (see @ref library_testing for more details)

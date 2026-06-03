@@ -8,6 +8,7 @@
 #define SC_THREADING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_THREADING)
 
 #include "../Common/AlignedStorage.h"
+#include "../Common/Assert.h"
 #include "../Common/Function.h"
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/PrimitiveDefinitions.h"
@@ -16,6 +17,11 @@
 
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(ThreadingAssert, SC_THREADING_EXPORT);
+
+#define SC_THREADING_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::ThreadingAssert, e)
+#define SC_THREADING_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::ThreadingAssert, e)
+#define SC_THREADING_TRUST_RESULT(expression) SC_THREADING_ASSERT_RELEASE(expression)
 
 //! @defgroup group_threading Threading
 //! @copybrief library_threading (see @ref library_threading library page for more details)

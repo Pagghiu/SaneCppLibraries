@@ -8,12 +8,19 @@
 #define SC_SOCKET_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SOCKET)
 
 #include "../Common/AlignedStorage.h"
+#include "../Common/Assert.h"
 #include "../Common/Result.h"
 #include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
 
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(SocketAssert, SC_SOCKET_EXPORT);
+
+#define SC_SOCKET_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::SocketAssert, e)
+#define SC_SOCKET_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::SocketAssert, e)
+#define SC_SOCKET_TRUST_RESULT(expression) SC_SOCKET_ASSERT_RELEASE(expression)
+
 //! @addtogroup group_socket
 //! @{
 

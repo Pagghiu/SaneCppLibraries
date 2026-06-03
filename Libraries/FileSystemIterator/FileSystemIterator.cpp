@@ -1,7 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../FileSystemIterator/FileSystemIterator.h"
-#include "../Common/Assert.h"
+
+#define SC_ASSERT_PROVIDER FileSystemIteratorAssert
+#include "../Common/Assert.inl"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemIteratorWindows.inl"
@@ -38,13 +40,13 @@ SC::Result SC::FileSystemIterator::recurseSubdirectory()
 
 SC::FileSystemIterator::FolderState& SC::FileSystemIterator::RecurseStack::back()
 {
-    SC_ASSERT_RELEASE(currentEntry >= 0);
+    SC_FILE_SYSTEM_ITERATOR_ASSERT_RELEASE(currentEntry >= 0);
     return recursiveEntries[size_t(currentEntry)];
 }
 
 void SC::FileSystemIterator::RecurseStack::pop_back()
 {
-    SC_ASSERT_RELEASE(currentEntry >= 0);
+    SC_FILE_SYSTEM_ITERATOR_ASSERT_RELEASE(currentEntry >= 0);
     currentEntry--;
 }
 

@@ -1,5 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "StringsExport.h"
+
+#define SC_ASSERT_PROVIDER StringsAssert
+#include "../Common/Assert.inl"
+
 #include "Internal/CommandLine.inl"
 #include "Internal/Console.inl"
 #include "Internal/Path.inl"

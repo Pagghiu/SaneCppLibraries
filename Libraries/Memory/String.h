@@ -33,7 +33,7 @@ struct SC_MEMORY_EXPORT String
     /// @brief Builds String from a StringSpan
     /// @param sv StringSpan to be assigned to this String
     /// @warning This function will assert if StringSpan::assign fails
-    String(StringSpan sv) { SC_ASSERT_RELEASE(assign(sv)); }
+    String(StringSpan sv) { SC_MEMORY_ASSERT_RELEASE(assign(sv)); }
 
     /// @brief Builds a String from a buffer ensuring zero termination
     /// @warning This function will assert if StringSpan::assign fails
@@ -46,7 +46,7 @@ struct SC_MEMORY_EXPORT String
     template <size_t N>
     String(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
+        SC_MEMORY_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
     }
 
     /// @brief Checks if the memory pointed by the StringSpan is owned by this String
@@ -132,7 +132,7 @@ struct SC_MEMORY_EXPORT String
     template <size_t N>
     String& operator=(const char (&text)[N])
     {
-        SC_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
+        SC_MEMORY_ASSERT_RELEASE(assign(StringSpan({text, N - 1}, true, StringEncoding::Ascii)));
         return *this;
     }
 

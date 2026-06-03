@@ -1,7 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpAsyncFileServer.h"
-#include "../Common/Assert.h"
 #include "../FileSystem/FileSystem.h"
 #include "HttpURLParser.h"
 #include "Internal/HttpStringIterator.h"
@@ -271,7 +270,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
                 {
                     if (not result.isValid())
                     {
-                        SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                        SC_HTTP_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
                         // Error occurred during send, close the response
                         (void)connection.response.end();
                         return;
@@ -280,7 +279,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
                     // Check if the entire file was sent
                     if (result.isComplete())
                     {
-                        SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                        SC_HTTP_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
                         // File send complete, close the response
                         (void)connection.response.end();
                     }
@@ -297,7 +296,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
                 if (not res)
                 {
                     // Failed to start sending file
-                    SC_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
+                    SC_HTTP_ASSERT_RELEASE(stream.sourceFileDescriptor.close());
                     (void)connection.response.end();
                 }
             };
@@ -310,7 +309,7 @@ Result HttpAsyncFileServer::getFile(HttpAsyncFileServer::Stream& stream, HttpCon
             FileDescriptor fd;
             SC_TRY(fd.open(path.view(), FileOpen::Read));
             Result initRes = stream.readableFileStream.init(connection.buffersPool, *eventLoop, fd);
-            SC_ASSERT_RELEASE(initRes);
+            SC_HTTP_ASSERT_RELEASE(initRes);
             SC_TRY(initRes);
             SC_TRY(stream.readableFileStream.request.executeOn(stream.readableFileStreamTask, *threadPool));
             fd.detach();
@@ -363,7 +362,7 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
         stream.writableFileStream.eventFinish.addListener<HttpAsyncFileServer::Stream::PutFileListener,
                                                           &HttpAsyncFileServer::Stream::PutFileListener::onFinish>(
             stream.putFileListener);
-    SC_ASSERT_RELEASE(addedFinishListener);
+    SC_HTTP_ASSERT_RELEASE(addedFinishListener);
 
     connection.pipeline.source   = &connection.request.getReadableStream();
     connection.pipeline.sinks[0] = &stream.writableFileStream;
@@ -374,13 +373,13 @@ Result HttpAsyncFileServer::putFile(HttpAsyncFileServer::Stream& stream, HttpCon
 
 void HttpAsyncFileServer::Stream::PutFileListener::onFinish()
 {
-    SC_ASSERT_RELEASE(connection != nullptr);
+    SC_HTTP_ASSERT_RELEASE(connection != nullptr);
     AsyncWritableStream& writable = *connection->pipeline.sinks[0];
     const bool           removedFinishListener =
         writable.eventFinish.removeListener<HttpAsyncFileServer::Stream::PutFileListener,
                                             &HttpAsyncFileServer::Stream::PutFileListener::onFinish>(*this);
-    SC_ASSERT_RELEASE(removedFinishListener);
-    SC_ASSERT_RELEASE(connection->response.sendEmpty(201));
+    SC_HTTP_ASSERT_RELEASE(removedFinishListener);
+    SC_HTTP_ASSERT_RELEASE(connection->response.sendEmpty(201));
 }
 
 StringSpan HttpAsyncFileServer::Internal::getContentType(const HttpAsyncFileServerOptions& options,
@@ -899,7 +898,7 @@ Result HttpAsyncFileServer::postMultipart(HttpAsyncFileServer::Stream& stream, H
     stream.multipartListener.partHeaders.reset();
     stream.multipartListener.rejectedFileName = false;
 
-    SC_ASSERT_RELEASE((
+    SC_HTTP_ASSERT_RELEASE((
         connection.request.getReadableStream()
             .eventData.addListener<HttpAsyncFileServer::Stream::MultipartListener,
                                    &HttpAsyncFileServer::Stream::MultipartListener::onData>(stream.multipartListener)));
@@ -913,20 +912,20 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
     AsyncBuffersPool&    buffers  = readable.getBuffersPool();
 
     Span<const char> data;
-    SC_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
+    SC_HTTP_ASSERT_RELEASE(buffers.getReadableData(bufferID, data));
 
     size_t           readBytes;
     Span<const char> parsedData;
 
     while (not data.empty() and stream->multipartParser.state != HttpMultipartParser::State::Finished)
     {
-        SC_ASSERT_RELEASE(stream->multipartParser.parse(data, readBytes, parsedData));
+        SC_HTTP_ASSERT_RELEASE(stream->multipartParser.parse(data, readBytes, parsedData));
 
         const bool streamedBody =
             stream->multipartParser.token == HttpMultipartParser::Token::PartBody and parsedData.sizeInBytes() > 0;
         if (streamedBody and currentFd.isValid())
         {
-            SC_ASSERT_RELEASE(currentFd.write(parsedData));
+            SC_HTTP_ASSERT_RELEASE(currentFd.write(parsedData));
         }
 
         bool tokenProcessed = false;
@@ -951,7 +950,8 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
             break;
 
             case HttpMultipartParser::Token::HeaderValue: {
-                SC_ASSERT_RELEASE(partHeaders.addHeader(currentHeaderName, {parsedData, false, StringEncoding::Ascii}));
+                SC_HTTP_ASSERT_RELEASE(
+                    partHeaders.addHeader(currentHeaderName, {parsedData, false, StringEncoding::Ascii}));
                 if (partHeaders.isFile() and not partHeaders.hasSafeFileName())
                 {
                     rejectedFileName = true;
@@ -973,7 +973,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
             case HttpMultipartParser::Token::PartBody: {
                 if (currentFd.isValid() and not streamedBody)
                 {
-                    SC_ASSERT_RELEASE(currentFd.write(parsedData));
+                    SC_HTTP_ASSERT_RELEASE(currentFd.write(parsedData));
                 }
             }
             break;
@@ -983,11 +983,11 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
                 {
                     (void)currentFd.close();
                 }
-                SC_ASSERT_RELEASE((
+                SC_HTTP_ASSERT_RELEASE((
                     readable.eventData.removeListener<HttpAsyncFileServer::Stream::MultipartListener,
                                                       &HttpAsyncFileServer::Stream::MultipartListener::onData>(*this)));
 
-                SC_ASSERT_RELEASE(connection->response.sendEmpty(rejectedFileName ? 400 : 201));
+                SC_HTTP_ASSERT_RELEASE(connection->response.sendEmpty(rejectedFileName ? 400 : 201));
             }
             break;
             default: break;
@@ -995,7 +995,7 @@ void HttpAsyncFileServer::Stream::MultipartListener::onData(AsyncBufferView::ID 
         }
         if (readBytes > 0)
         {
-            SC_ASSERT_RELEASE(data.sliceStart(readBytes, data));
+            SC_HTTP_ASSERT_RELEASE(data.sliceStart(readBytes, data));
         }
         else if (not tokenProcessed)
         {

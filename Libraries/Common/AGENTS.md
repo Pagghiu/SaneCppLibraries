@@ -34,6 +34,7 @@
 
 - Include unguarded `.inl` fragments only from private `.cpp` or internal implementation files, never from public headers.
 - Wrap implementation-only includes in a library-specific private namespace when the fragment defines helper types or functions that should not expose global `SC::` symbols.
+- For `Assert.inl`, each consuming library must declare its own provider type with `SC_DECLARE_ASSERT_PROVIDER`, define its own `SC_${LIBRARY}_ASSERT_RELEASE`, `SC_${LIBRARY}_ASSERT_DEBUG`, and `SC_${LIBRARY}_TRUST_RESULT` macros near the library export macro, then include `Assert.inl` once from that library's implementation with `SC_ASSERT_PROVIDER` set to the provider type.
 - The consuming implementation file is responsible for including required system headers, platform headers, and project headers before an `.inl` fragment.
 - If an `.inl` fragment must use OS APIs or system headers, keep those headers out of the fragment unless the fragment is itself only included from private implementation files and documents that requirement clearly.
 - Do not expose implementation-fragment type names in public APIs.

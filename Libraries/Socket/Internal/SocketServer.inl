@@ -1,6 +1,5 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Common/Assert.h"
 #include "../../Socket/Socket.h"
 #include "SocketInternal.h"
 
@@ -26,7 +25,7 @@ SC::Result SC::SocketServer::bind(SocketIPAddress nativeAddress, BindReuseAddres
     SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
-    SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
+    SC_SOCKET_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
 
     const int value = reuseAddress == BindReuseAddress::Enabled ? 1 : 0;
 #if SC_PLATFORM_WINDOWS
@@ -61,7 +60,7 @@ SC::Result SC::SocketServer::listen(uint32_t numberOfWaitingConnections)
     SC_TRY(SocketNetworking::isNetworkingInited());
     SC_TRY_MSG(socket.isValid(), "Invalid socket");
     SocketDescriptor::Handle listenSocket;
-    SC_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
+    SC_SOCKET_TRUST_RESULT(socket.get(listenSocket, Result::Error("invalid listen socket")));
     SC_TRY_MSG(::listen(listenSocket, static_cast<int>(numberOfWaitingConnections)) != SOCKET_ERROR, "listen failed");
     return Result(true);
 }

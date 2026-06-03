@@ -8,6 +8,7 @@
 #endif
 #define SC_FILE_SYSTEM_WATCHER_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER)
 
+#include "../Common/Assert.h"
 #include "../Common/Function.h"
 #include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/OpaqueObject.h"
@@ -16,6 +17,11 @@
 
 namespace SC
 {
+SC_DECLARE_ASSERT_PROVIDER(FileSystemWatcherAssert, SC_FILE_SYSTEM_WATCHER_EXPORT);
+
+#define SC_FILE_SYSTEM_WATCHER_ASSERT_RELEASE(e)        SC_ASSERT_PROVIDER_RELEASE(SC::FileSystemWatcherAssert, e)
+#define SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(e)          SC_ASSERT_PROVIDER_DEBUG(SC::FileSystemWatcherAssert, e)
+#define SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(expression) SC_FILE_SYSTEM_WATCHER_ASSERT_RELEASE(expression)
 
 //! @defgroup group_file_system_watcher FileSystem Watcher
 //! @copybrief library_file_system_watcher (see @ref library_file_system_watcher for more details)
@@ -331,7 +337,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     virtual Result windowsStopFolderFilePoll(FolderWatcher& watcher) override
     {
         // This is not strictly needed as file handle is being closed soon after anyway
-        // SC_TRUST_RESULT(eventLoop->removeAllAssociationsFor(fwi.fileHandle));
+        // SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(eventLoop->removeAllAssociationsFor(fwi.fileHandle));
         T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
 
         onAsyncPollClose = [&watcher](T_AsyncResult&)
