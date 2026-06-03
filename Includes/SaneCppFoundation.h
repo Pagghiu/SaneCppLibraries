@@ -1,6 +1,7 @@
 #include "../Libraries/Common/AlignedStorage.h"
 #include "../Libraries/Common/Deferred.h"
 #include "../Libraries/Common/Function.h"
+#include "../Libraries/Common/IGrowableBufferStringPath.h"
 #include "../Libraries/Common/InitializerList.h"
 #include "../Libraries/Common/OpaqueObject.h"
 #include "../Libraries/Common/Result.h"
@@ -12,4 +13,3 @@
 #include "../Libraries/Foundation/Compiler.h"
 #include "../Libraries/Foundation/Platform.h"
 #include "../Libraries/Foundation/PrimitiveTypes.h"
-#include "../Libraries/Foundation/StringPath.h"

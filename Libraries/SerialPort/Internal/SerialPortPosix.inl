@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../../Foundation/StringPath.h"
+#include "../../Common/IGrowableBufferStringPath.h"
 
 #include <errno.h>
 #include <fcntl.h>

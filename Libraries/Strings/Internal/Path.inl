@@ -4,7 +4,7 @@
 #include "../../Strings/Path.h"
 #include "../../Strings/StringBuilder.h"
 #if SC_COMPILER_MSVC
-#include "../../Foundation/StringPath.h"
+#include "../../Common/IGrowableBufferStringPath.h"
 #endif
 
 struct SC::Path::Internal

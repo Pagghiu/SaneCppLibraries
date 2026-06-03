@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "../File/File.h"
 #include "../Common/Deferred.h"
-#include "../Foundation/StringPath.h"
+#include "../Common/IGrowableBufferStringPath.h"
 #include <memory.h> // memset
 
 #if SC_PLATFORM_WINDOWS

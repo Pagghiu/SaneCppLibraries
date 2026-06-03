@@ -188,6 +188,11 @@ def amalgamate_files_recursively(library_files, order_list, root_dir, library_na
         full_path = None
         if potential_full_path in library_file_lookup:
             full_path = library_file_lookup[potential_full_path]
+        elif os.path.exists(potential_full_path):
+            relative_path = os.path.relpath(potential_full_path, root_dir)
+            path_parts = relative_path.split(os.sep)
+            if path_parts[0] == 'Libraries' and len(path_parts) > 1 and path_parts[1] == 'Common':
+                full_path = potential_full_path
         elif filename in library_file_lookup: # Fallback to original lookup keys
             full_path = library_file_lookup[filename]
         else:

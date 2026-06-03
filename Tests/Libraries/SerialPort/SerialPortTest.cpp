@@ -1,9 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/SerialPort/SerialPort.h"
+#include "Libraries/Common/IGrowableBufferStringPath.h"
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"
-#include "Libraries/Foundation/StringPath.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Process/Process.h"
 #include "Libraries/Strings/Path.h"

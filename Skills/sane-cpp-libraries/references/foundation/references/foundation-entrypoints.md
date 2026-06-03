@@ -4,6 +4,7 @@
 
 - `SC::Result` for fallible operations.
 - `SC::Span` and `SC::StringSpan` for non-owning views.
+- `SC::StringPath` for fixed-size native path buffers.
 - `SC::Function` for callbacks with a fixed capture budget.
 - `SC::Deferred` for scoped cleanup without exceptions.
 - `SC::UniqueHandle` and `SC::OpaqueObject` for OS resource ownership and static PIMPL-style hiding.
@@ -13,6 +14,7 @@
 - `Libraries/Common/Result.h`
 - `Libraries/Common/Span.h`
 - `Libraries/Common/StringSpan.h`
+- `Libraries/Common/IGrowableBufferStringPath.h`
 - `Libraries/Common/Function.h`
 - `Libraries/Common/Deferred.h`
 - `Libraries/Common/UniqueHandle.h`

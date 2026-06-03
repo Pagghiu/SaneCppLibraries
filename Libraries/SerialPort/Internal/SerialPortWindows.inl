@@ -5,7 +5,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
-#include "../../Foundation/StringPath.h"
+#include "../../Common/IGrowableBufferStringPath.h"
 
 #include <string.h>
 #include <wchar.h>

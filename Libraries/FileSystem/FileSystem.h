@@ -8,9 +8,9 @@
 #define SC_FILE_SYSTEM_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM)
 
 #include "../Common/IGrowableBufferSpan.h"
+#include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/Result.h"
 #include "../Foundation/PrimitiveTypes.h"
-#include "../Foundation/StringPath.h"
 
 namespace SC
 {

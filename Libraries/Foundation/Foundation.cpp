@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #include "../Foundation/Internal/Assert.inl"
-#include "../Foundation/Internal/StringPath.inl"
 
 #if SC_PROVIDE_CPP_RUNTIME_SHIMS
 #include "../Foundation/Internal/LibC++.inl"

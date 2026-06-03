@@ -10,8 +10,8 @@
 
 #include "../Common/AlignedStorage.h"
 #include "../Common/IGrowableBufferSpan.h"
+#include "../Common/IGrowableBufferStringPath.h"
 #include "../File/File.h"
-#include "../Foundation/StringPath.h"
 
 namespace SC
 {

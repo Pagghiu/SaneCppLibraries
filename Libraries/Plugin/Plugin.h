@@ -8,9 +8,9 @@
 #define SC_PLUGIN_LIBRARY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PLUGIN)
 
 #include "../Common/Function.h"
+#include "../Common/IGrowableBufferStringPath.h"
 #include "../Foundation/Platform.h"
 #include "../Foundation/PrimitiveTypes.h"
-#include "../Foundation/StringPath.h"
 #include "Internal/DynamicLibrary.h"
 namespace SC
 {

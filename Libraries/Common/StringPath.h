@@ -1,12 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Common/IGrowableBufferSpan.h"
-#include "../Common/StringSpan.h"
+#ifdef SC_FOUNDATION_STRING_PATH_DEFINITION_H
+#if SC_FOUNDATION_STRING_PATH_DEFINITION_H != 1
+#error "StringPath.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_STRING_PATH_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h" // SC_FOUNDATION_EXPORT
+#include "StringSpan.h"
 
 namespace SC
 {
-
 namespace detail
 {
 /// @brief A fixed size native string that converts to a StringSpan
@@ -64,22 +69,22 @@ struct SC_FOUNDATION_EXPORT StringPath
     [[nodiscard]] bool isEmpty() const { return path.view().isEmpty(); }
     [[nodiscard]] bool append(StringSpan str) { return path.append(str); }
     [[nodiscard]] bool assign(StringSpan str) { return path.assign(str); }
-    [[nodiscard]] bool resize(size_t newSize);
+
+    [[nodiscard]] bool resize(size_t newSize)
+    {
+        if (newSize <= MaxPath)
+        {
+            path.length              = newSize;
+            path.buffer[path.length] = 0;
+        }
+        return newSize <= MaxPath;
+    }
 
     [[nodiscard]] Span<native_char_t> writableSpan() { return path.writableSpan(); }
 
   private:
     detail::StringNativeFixed<StorageCapacity> path;
 };
-
-template <>
-struct SC_FOUNDATION_EXPORT GrowableBuffer<StringPath> : public IGrowableBuffer
-{
-    StringPath& sp;
-    GrowableBuffer(StringPath& string) noexcept;
-    ~GrowableBuffer() noexcept;
-    static bool tryGrowTo(IGrowableBuffer& gb, size_t newSize) noexcept;
-    static auto getEncodingFor(const StringPath& sp) noexcept { return sp.getEncoding(); }
-    void        finalize() noexcept;
-};
 } // namespace SC
+
+#endif // SC_FOUNDATION_STRING_PATH_DEFINITION_H

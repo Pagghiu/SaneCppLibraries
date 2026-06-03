@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 
-#include "../../Foundation/StringPath.h"
+#include "../../Common/IGrowableBufferStringPath.h"
 #include "../../Strings/Console.h" // TODO: Console here is a module circular dependency. Consider type-erasing with a Function
 #include "../../Strings/StringConverter.h"
 #include "../../Strings/StringFormat.h"

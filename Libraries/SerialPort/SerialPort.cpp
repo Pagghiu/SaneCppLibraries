@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../SerialPort/SerialPort.h"
-#include "../Foundation/StringPath.h"
+#include "../Common/IGrowableBufferStringPath.h"
 
 namespace SC
 {

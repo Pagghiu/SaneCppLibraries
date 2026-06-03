@@ -7,8 +7,8 @@
 #endif
 #define SC_FILE_SYSTEM_ITERATOR_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_ITERATOR)
 
+#include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/Result.h"
-#include "../Foundation/StringPath.h"
 
 namespace SC
 {
