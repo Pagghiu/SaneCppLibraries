@@ -3,8 +3,8 @@
 #include "../../FileSystemWatcher/FileSystemWatcher.h"
 #include "FileSystemWatcherThreading.h"
 
+#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
-#include "../../Foundation/Assert.h"
 
 #include <dirent.h>      // opendir, readdir, closedir
 #include <errno.h>       // errno

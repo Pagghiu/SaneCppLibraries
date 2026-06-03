@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../FileSystemWatcher/FileSystemWatcher.h"
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 #include "Internal/FileSystemWatcherThreading.h" // Needed for the single file build
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemWatcherWindows.inl"

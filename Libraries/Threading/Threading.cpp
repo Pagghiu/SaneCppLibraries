@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Threading.h"
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/ThreadingWindows.inl"

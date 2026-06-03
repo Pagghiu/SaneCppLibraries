@@ -1,10 +1,22 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Common/Result.h"             // exit
-#include "../Foundation/Compiler.h"       // SC_COMPILER_DEBUG_BREAK
-#include "../Foundation/Platform.h"       // SC_CONFIGURATION_DEBUG
-#include "../Foundation/PrimitiveTypes.h" // size_t
+#ifdef SC_FOUNDATION_ASSERT_DEFINITION_H
+#if SC_FOUNDATION_ASSERT_DEFINITION_H != 1
+#error "Assert.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_ASSERT_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosDebugBreak.h"
+#include "CompilerMacrosExport.h"
+#include "CompilerMacrosInline.h"
+#include "CompilerMacrosStdVersion.h"
+#include "CompilerMacrosType.h"
+#include "PlatformMacrosDebug.h"
+#include "PlatformMacrosInstructionSet.h"
+#include "PlatformMacrosType.h"
+#include "PrimitiveDefinitions.h"
+#include "Result.h"
 
 namespace SC
 {
@@ -39,11 +51,11 @@ struct SC_FOUNDATION_EXPORT Assert
 //! @addtogroup group_foundation_compiler_macros
 //! @{
 #if SC_PLATFORM_WINDOWS
-#define WIDEN2(x) L##x
-#define WIDEN(x)  WIDEN2(x)
-#define WFILE     WIDEN(__FILE__)
+#define SC_ASSERT_WIDEN2(x)        L##x
+#define SC_ASSERT_WIDEN(x)         SC_ASSERT_WIDEN2(x)
+#define SC_ASSERT_NATIVE_FILE_NAME SC_ASSERT_WIDEN(__FILE__)
 #else
-#define WFILE __FILE__
+#define SC_ASSERT_NATIVE_FILE_NAME __FILE__
 #endif
 /// Assert expression `e` to be true. If Failed, prints the failed assertion with backtrace, breaks debugger and exits
 /// (-1)
@@ -51,7 +63,7 @@ struct SC_FOUNDATION_EXPORT Assert
     if (!(e))                                                                                                          \
         SC_LANGUAGE_UNLIKELY                                                                                           \
         {                                                                                                              \
-            SC::Assert::printBacktrace(#e, e, WFILE, __func__, __LINE__);                                              \
+            SC::Assert::printBacktrace(#e, e, SC_ASSERT_NATIVE_FILE_NAME, __func__, __LINE__);                         \
             SC_COMPILER_DEBUG_BREAK;                                                                                   \
             SC::Assert::exit(-1);                                                                                      \
         }                                                                                                              \
@@ -70,3 +82,5 @@ struct SC_FOUNDATION_EXPORT Assert
 
 //! @}
 } // namespace SC
+
+#endif // SC_FOUNDATION_ASSERT_DEFINITION_H

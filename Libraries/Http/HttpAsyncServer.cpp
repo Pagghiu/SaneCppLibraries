@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "HttpAsyncServer.h"
 
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 
 namespace SC
 {

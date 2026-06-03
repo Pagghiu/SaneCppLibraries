@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../../Foundation/Assert.h"
 
+// Required include context: declare an Assert type with the same API as Common/Assert.h before including this fragment.
 #if SC_PLATFORM_LINUX
 #if defined(__has_include)
 #if __has_include(<features.h>)
@@ -28,8 +28,14 @@
 #include <stdio.h>  // fwrite (posix), snprintf (windows)
 #include <stdlib.h> // free (posix), _exit (windows)
 
-namespace SC
-{
+#ifndef SC_ASSERT_NAMESPACE_BEGIN
+#define SC_ASSERT_NAMESPACE_BEGIN                                                                                      \
+    namespace SC                                                                                                       \
+    {
+#define SC_ASSERT_NAMESPACE_END }
+#endif
+
+SC_ASSERT_NAMESPACE_BEGIN
 void Assert::exit(int code) { ::_exit(code); }
 
 struct Assert::Internal
@@ -146,8 +152,14 @@ void Assert::printBacktrace(const char* expression, Result result, const native_
                "File: " NATIVE_PRINT_SPECIFIER "\n"
                "Function: %s\nLine: %d\n",
                expression, result.message, filename, function, line);
+#undef NATIVE_PRINT_SPECIFIER
     Internal::printAscii(buffer);
     void* backtraceBuffer[256];
     Internal::printBacktrace(backtraceBuffer, sizeof(backtraceBuffer));
 }
-} // namespace SC
+SC_ASSERT_NAMESPACE_END
+
+#ifndef SC_ASSERT_KEEP_NAMESPACE_MACROS
+#undef SC_ASSERT_NAMESPACE_BEGIN
+#undef SC_ASSERT_NAMESPACE_END
+#endif

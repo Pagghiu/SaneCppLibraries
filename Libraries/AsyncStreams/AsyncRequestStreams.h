@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 #include "AsyncStreams.h"
 //! @addtogroup group_async_streams
 //! @{

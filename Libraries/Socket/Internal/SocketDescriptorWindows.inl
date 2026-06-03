@@ -12,7 +12,7 @@ using socklen_t = int;
 #pragma comment(lib, "Ws2_32.lib")
 #endif
 
-#include "../../Foundation/Assert.h"
+#include "../../Common/Assert.h"
 #include "../../Foundation/Compiler.h"
 #include "../../Socket/Socket.h"
 

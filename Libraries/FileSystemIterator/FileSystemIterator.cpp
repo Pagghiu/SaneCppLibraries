@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "../FileSystemIterator/FileSystemIterator.h"
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 
 #if SC_PLATFORM_WINDOWS
 #include "Internal/FileSystemIteratorWindows.inl"

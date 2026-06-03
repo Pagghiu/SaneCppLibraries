@@ -6,7 +6,7 @@
 #include "Internal/HttpStringIterator.h"
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 
 #include <string.h>
 

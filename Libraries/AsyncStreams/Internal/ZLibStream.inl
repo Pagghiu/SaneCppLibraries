@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../../Foundation/Assert.h"
+#include "../../Common/Assert.h"
 #include "ZLibStream.h"
 
 #include "ZLibAPI.h"

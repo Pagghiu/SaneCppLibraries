@@ -4,8 +4,8 @@
 #include "Internal/HttpStringIterator.h"
 
 #include "../AsyncStreams/ZLibTransformStreams.h"
+#include "../Common/Assert.h"
 #include "../Common/Deferred.h"
-#include "../Foundation/Assert.h"
 #include "Internal/HttpFixedBufferWriter.inl"
 #include "Internal/HttpParsedHeaders.inl"
 

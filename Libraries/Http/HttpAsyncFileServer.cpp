@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpAsyncFileServer.h"
+#include "../Common/Assert.h"
 #include "../FileSystem/FileSystem.h"
-#include "../Foundation/Assert.h"
 #include "HttpURLParser.h"
 #include "Internal/HttpStringIterator.h"
 

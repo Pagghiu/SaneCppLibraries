@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "AsyncStreams.h"
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 #include "Internal/ZLibStream.inl"
 #include "ZLibTransformStreams.h"
 

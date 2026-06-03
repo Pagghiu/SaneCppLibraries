@@ -4,7 +4,7 @@
 
 #if SC_INCLUDE_STD_CPP && SC_LANGUAGE_CPP_AT_LEAST_20
 
-#include "../Foundation/Assert.h"
+#include "../Common/Assert.h"
 #include "../Foundation/PrimitiveTypes.h"
 #include "Await.h"
 #include <stdlib.h>

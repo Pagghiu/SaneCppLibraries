@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Assert.h"
+#include "../../Common/Assert.h"
 #include "IntrusiveDoubleLinkedList.h"
 
 template <typename T>

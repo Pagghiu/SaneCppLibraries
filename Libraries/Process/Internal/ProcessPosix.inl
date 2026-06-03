@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Common/Assert.h"
 #include "../../Common/Deferred.h"
-#include "../../Foundation/Assert.h"
 #include "../../Process/Internal/EnvironmentTable.h"
 #include "../../Process/Process.h"
 

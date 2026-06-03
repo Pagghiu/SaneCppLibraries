@@ -4,7 +4,7 @@
         "Compiler.h",
         "Platform.h",
         "PrimitiveTypes.h",
-        "Assert.h",
+        "../Common/Assert.h",
         "../Common/InitializerList.h",
         "../Common/TypeTraits.h",
         "../Common/AlignedStorage.h",

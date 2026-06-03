@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Common/Function.h"
-#include "Libraries/Foundation/Assert.h"
+#include "Libraries/Common/Assert.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC

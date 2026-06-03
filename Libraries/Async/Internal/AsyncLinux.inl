@@ -4,7 +4,7 @@
 #include "../../Async/Internal/AsyncLinuxAPI.h"
 #include "../../Async/Internal/AsyncLinuxKernelEvents.h"
 #include "../../Async/Internal/AsyncPosix.inl" // This is only to provide clangd completion (guarded by #pragma once)
-#include "../../Foundation/Assert.h"
+#include "../../Common/Assert.h"
 
 #include <arpa/inet.h>    // sockaddr_in
 #include <errno.h>        // errno

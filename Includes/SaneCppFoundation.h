@@ -1,4 +1,5 @@
 #include "../Libraries/Common/AlignedStorage.h"
+#include "../Libraries/Common/Assert.h"
 #include "../Libraries/Common/Deferred.h"
 #include "../Libraries/Common/Function.h"
 #include "../Libraries/Common/IGrowableBufferStringPath.h"
@@ -9,7 +10,6 @@
 #include "../Libraries/Common/StringSpan.h"
 #include "../Libraries/Common/TypeTraits.h"
 #include "../Libraries/Common/UniqueHandle.h"
-#include "../Libraries/Foundation/Assert.h"
 #include "../Libraries/Foundation/Compiler.h"
 #include "../Libraries/Foundation/Platform.h"
 #include "../Libraries/Foundation/PrimitiveTypes.h"
