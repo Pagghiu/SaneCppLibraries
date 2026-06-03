@@ -1,11 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../../Common/IGrowableBufferStringPath.h"
 #include "../../Common/Result.h"
 #include "../../Strings/Path.h"
 #include "../../Strings/StringBuilder.h"
-#if SC_COMPILER_MSVC
-#include "../../Common/IGrowableBufferStringPath.h"
-#endif
 
 struct SC::Path::Internal
 {

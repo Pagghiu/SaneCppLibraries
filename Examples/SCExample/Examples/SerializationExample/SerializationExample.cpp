@@ -24,8 +24,7 @@
 // - SerializerTextRead* informs SC::SerializationText that ImVector<T> is a "vector-like" type
 // --------------------------------------------------------------------------------------------------
 #include "Libraries/Reflection/Reflection.h"
-#include "Libraries/SerializationBinary/Internal/SerializationBinaryReadVersioned.h"
-#include "Libraries/SerializationBinary/Internal/SerializationBinaryReadWriteExact.h"
+#include "Libraries/SerializationBinary/SerializationBinary.h"
 #include "Libraries/SerializationText/Internal/SerializationTextReadVersioned.h"
 
 namespace SC
@@ -89,6 +88,8 @@ struct SerializationTextReadVersioned<TextStream, ImVector<T>, void> : public Se
 } // namespace Serialization
 } // namespace SC
 
+#include "Libraries/Common/CompilerMacrosUnusedResult.h"
+#include "Libraries/Common/PlatformType.h"
 #include "Libraries/ContainersReflection/ContainersReflection.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
 #include "Libraries/FileSystem/FileSystem.h"

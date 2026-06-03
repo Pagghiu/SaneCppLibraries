@@ -440,8 +440,88 @@ def write_standalone_header(output_filepath, output_filename, record, dependency
         for embedded_record in ordered_records:
             write_library_block(f, embedded_record, embedded=embedded_record['name'] != record['name'])
 
+def write_test_runtime_shims(f, output_filename):
+    if output_filename.startswith('SaneCppFoundation'):
+        return
+
+    f.write("""#if defined(SC_PROVIDE_CPP_RUNTIME_SHIMS) && SC_PROVIDE_CPP_RUNTIME_SHIMS
+#include <stdlib.h>
+
+#if !defined(__SANITIZE_ADDRESS__)
+void operator delete(void* p) noexcept
+{
+    if (p != 0)
+    {
+        ::free(p);
+    }
+}
+
+void operator delete[](void* p) noexcept
+{
+    if (p != 0)
+    {
+        ::free(p);
+    }
+}
+
+void operator delete(void* p, decltype(sizeof(0))) noexcept
+{
+    if (p != 0)
+    {
+        ::free(p);
+    }
+}
+
+void operator delete[](void* p, decltype(sizeof(0))) noexcept
+{
+    if (p != 0)
+    {
+        ::free(p);
+    }
+}
+
+void* operator new(decltype(sizeof(0)) len) { return ::malloc(len); }
+void* operator new[](decltype(sizeof(0)) len) { return ::malloc(len); }
+#endif
+
+void* __cxa_pure_virtual   = 0;
+void* __gxx_personality_v0 = 0;
+
+using guard_type = long long int;
+extern "C" int __cxa_guard_acquire(guard_type* guard_object)
+{
+    if (*reinterpret_cast<const unsigned char*>(guard_object) != 0)
+    {
+        return 0;
+    }
+    return 1;
+}
+
+extern "C" void __cxa_guard_release(guard_type* guard_object) { *reinterpret_cast<unsigned char*>(guard_object) = 1; }
+extern "C" void __cxa_guard_abort(guard_type* guard_object) { (void)(guard_object); }
+
+#if defined(__linux__)
+extern "C" int __cxa_atexit(void (*func)(void*), void* obj, void* dso_symbol);
+#if defined(__GLIBC__)
+extern "C" int __cxa_thread_atexit(void (*func)(void*), void* obj, void* dso_symbol)
+{
+    int __cxa_thread_atexit_impl(void (*)(void*), void*, void*);
+    return __cxa_thread_atexit_impl(func, obj, dso_symbol);
+}
+#else
+extern "C" int __cxa_thread_atexit(void (*func)(void*), void* obj, void* dso_symbol)
+{
+    return __cxa_atexit(func, obj, dso_symbol);
+}
+#endif
+#endif
+#endif
+
+""")
+
 def write_regular_test(test_filepath, output_filename):
     with open(test_filepath, 'w', encoding='utf-8') as f:
+        write_test_runtime_shims(f, output_filename)
         f.write(f'#define SANE_CPP_IMPLEMENTATION\n')
         f.write(f'#include "{output_filename}"\n\n')
         f.write(f'int main()\n')
@@ -451,6 +531,7 @@ def write_regular_test(test_filepath, output_filename):
 
 def write_standalone_test(test_filepath, output_filename):
     with open(test_filepath, 'w', encoding='utf-8') as f:
+        write_test_runtime_shims(f, output_filename)
         f.write(f'#include "{output_filename}"\n\n')
         f.write(f'#define SANE_CPP_IMPLEMENTATION\n')
         f.write(f'#include "{output_filename}"\n\n')

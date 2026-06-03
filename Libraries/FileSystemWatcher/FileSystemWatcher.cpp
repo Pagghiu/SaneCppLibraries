@@ -4,6 +4,7 @@
 
 #define SC_ASSERT_PROVIDER FileSystemWatcherAssert
 #include "../Common/Assert.inl"
+#include "../Common/Deferred.h"
 
 #include "Internal/FileSystemWatcherThreading.h" // Needed for the single file build
 #if SC_PLATFORM_WINDOWS
