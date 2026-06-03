@@ -20,26 +20,26 @@ Detailed documentation is in the @ref group_foundation topic.
 ## Classes
 | Class                     | Description
 |:--------------------------|:--------------------------------|
-| SC::Span                  | @copybrief SC::Span
-| SC::StringSpan            | @copybrief SC::StringSpan
-| SC::StringPath            | @copybrief SC::StringPath
-| SC::Result                | @copybrief SC::Result
-| SC::Function              | @copybrief SC::Function
-| SC::Deferred              | @copybrief SC::Deferred
-| SC::OpaqueObject          | @copybrief SC::OpaqueObject
-| SC::UniqueHandle          | @copybrief SC::UniqueHandle
+| SC::Span                  | Non-owning contiguous view over caller-provided memory
+| SC::StringSpan            | Non-owning string view with explicit encoding
+| SC::StringPath            | Non-owning path string view
+| SC::Result                | Small success/error result type for APIs without exceptions
+| SC::Function              | Fixed-storage callable wrapper
+| SC::Deferred              | Scope-exit helper for explicit cleanup
+| SC::OpaqueObject          | Fixed-size opaque storage for static PIMPL
+| SC::UniqueHandle          | Move-only RAII wrapper for handles
 
 ## Macros
 - [Compiler Macros](@ref group_foundation_compiler_macros): @copybrief group_foundation_compiler_macros
 
 ## Type Traits
-- [Type Traits](@ref group_foundation_type_traits): @copybrief group_foundation_type_traits
+- Type traits: small compile-time helpers used by Foundation and embedded Common fragments
 
 ## Utilities
 | Class                     | Description
 |:--------------------------|:--------------------------------|
-| SC::Assert                | @copybrief SC::Assert
-| SC::AlignedStorage        | @copybrief SC::AlignedStorage
+| SC::Assert                | Foundation-owned assertion provider
+| SC::AlignedStorage        | Fixed-size aligned storage for hiding implementation details
 
 # Status
 🟩 Usable  
@@ -50,16 +50,16 @@ There is an hard rule in the library [Principles](@ref page_principles) not to i
 Foundation provides all primitive types to be used in headers and classes like SC::UniqueHandle, SC::OpaqueObject, SC::AlignedStorage to encourage static PIMPL in order to hide platform specific implementation details everywhere.
 
 ## Function
-@copydoc SC::Function
+Fixed-storage callable wrapper used when APIs need callbacks without dynamic allocations.
 
 ## Deferred
-@copydoc SC::Deferred
+Scope-exit helper used to run explicit cleanup code when leaving a scope.
 
 ## OpaqueObject
-@copydoc SC::OpaqueObject
+Fixed-size opaque storage used to hide private implementation details in public headers.
 
 ## UniqueHandle
-@copydoc SC::UniqueHandle
+Move-only RAII wrapper used to close or release handles deterministically.
 
 # Blog
 

@@ -57,9 +57,6 @@ Some relevant blog posts are:
 ### StringView::containsString
 @copydoc SC::StringView::containsString
 
-### StringView::compare
-@copydoc SC::StringView::compare
-
 ### StringView::fullyOverlaps
 @copydoc SC::StringView::fullyOverlaps
 

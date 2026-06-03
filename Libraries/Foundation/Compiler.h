@@ -5,6 +5,12 @@
 #include "SCConfig.h"
 #endif
 
+//!
+//! @defgroup group_foundation Foundation
+//! @copybrief library_foundation
+//!
+//! See @ref library_foundation library page for more details.<br>
+
 //! @defgroup group_foundation_compiler_macros Compiler Macros
 //! @ingroup group_foundation
 //! Compiler Macros
