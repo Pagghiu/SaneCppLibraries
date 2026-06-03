@@ -170,9 +170,13 @@ async function amalgamateFilesRecursively({ orderList, ctx, targetLibrary, treeP
   const processed = processedSet || new Set();
   let result = '';
   function resolveToPath(filename) {
+    const relativeToLibrary = joinPath(`Libraries/${targetLibrary}`, filename);
+    if (treePathsSet.has(relativeToLibrary)) return relativeToLibrary;
+    if (treePathsSet.has(filename)) return filename;
+
     for (const p of treePathsSet) {
       if (!p.startsWith(`Libraries/${targetLibrary}/`)) continue;
-      if (p.endsWith(filename) || p === filename) return p;
+      if (p.endsWith(filename)) return p;
     }
     return null;
   }
