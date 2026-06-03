@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/Span.h"
 #include "../Foundation/Assert.h"
-#include "../Foundation/Span.h"
 #include "../Memory/Memory.h"
 #if SC_COMPILER_FILC
 #include <stdfil.h>

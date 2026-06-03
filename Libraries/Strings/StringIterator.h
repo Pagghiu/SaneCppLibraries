@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/Span.h"
 #include "../Foundation/Assert.h" //Assert::unreachable
-#include "../Foundation/Span.h"
 #include "../Foundation/StringSpan.h"
 #include "StringsExport.h"
 

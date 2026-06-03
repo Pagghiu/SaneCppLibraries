@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Testing.h"
+#include "../Common/Span.h"
 #include "../Foundation/Assert.h"
-#include "../Foundation/Span.h"
 #include <stdint.h> // uint16_t, uint32_t
 #include <stdio.h>  // FILE
 #include <stdlib.h> // exit

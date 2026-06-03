@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpParser.h"
-#include "../Foundation/Span.h"
+#include "../Common/Span.h"
 #include "../Foundation/StringSpan.h"
 #include <string.h> // memchr
 

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../../Common/Result.h"
-#include "../../Foundation/Span.h"
+#include "../../Common/Span.h"
 #include "../../Foundation/StringSpan.h"
 #include "../HttpExport.h"
 

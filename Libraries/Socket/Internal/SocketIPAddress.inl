@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 #include "../../Common/Result.h"
+#include "../../Common/Span.h"
 #include "../../Foundation/Assert.h"
-#include "../../Foundation/Span.h"
 #include "../../Socket/Socket.h"
 #include "SocketInternal.h"
 

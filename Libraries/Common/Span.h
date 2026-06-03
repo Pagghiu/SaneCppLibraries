@@ -1,9 +1,16 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#pragma once
-#include "../Common/InitializerList.h"    // IWYU pragma: keep
-#include "../Common/TypeTraits.h"         // SameConstnessAs
-#include "../Foundation/PrimitiveTypes.h" // IWYU pragma: keep
+#ifdef SC_FOUNDATION_SPAN_DEFINITION_H
+#if SC_FOUNDATION_SPAN_DEFINITION_H != 1
+#error "Span.h has been included multiple times in different versions."
+#endif
+#else
+#define SC_FOUNDATION_SPAN_DEFINITION_H 1 // Increment to indicate a new version of the file
+
+#include "CompilerMacrosExport.h" // SC_FOUNDATION_EXPORT
+#include "InitializerList.h"      // IWYU pragma: keep
+#include "PrimitiveDefinitions.h" // IWYU pragma: keep
+#include "TypeTraits.h"           // SameConstnessAs
 
 namespace SC
 {
@@ -129,3 +136,5 @@ struct SC_FOUNDATION_EXPORT Span
 //! @}
 
 } // namespace SC
+
+#endif

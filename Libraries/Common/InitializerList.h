@@ -7,6 +7,8 @@
 #else
 #define SC_FOUNDATION_INITIALIZER_LIST_DEFINITION_H 1 // Increment to indicate a new version of the file
 
+#include "CompilerMacrosStdCpp.h" // SC_INCLUDE_STD_CPP
+
 #if SC_INCLUDE_STD_CPP
 #include <initializer_list>
 #else

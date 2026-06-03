@@ -288,8 +288,8 @@ bool SC::Hashing::getHash(Result& res)
 
 SC::Hashing::Hashing() {}
 SC::Hashing::~Hashing() {}
-bool SC::Hashing::setType(Type newType) { return false; }
-bool SC::Hashing::add(Span<const uint8_t> data) { return false; }
-bool SC::Hashing::getHash(Result& res) { return false; }
+bool SC::Hashing::setType(Type) { return false; }
+bool SC::Hashing::add(Span<const uint8_t>) { return false; }
+bool SC::Hashing::getHash(Result&) { return false; }
 
 #endif

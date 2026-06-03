@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Span.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/Span.h"
 #include "../Strings/StringIterator.h"
 #include "StringsExport.h"
 

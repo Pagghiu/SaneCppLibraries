@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Common/Span.h"
 #include "../../Foundation/PrimitiveTypes.h"
-#include "../../Foundation/Span.h"
 
 namespace SC
 {

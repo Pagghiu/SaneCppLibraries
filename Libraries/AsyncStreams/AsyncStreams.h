@@ -11,8 +11,8 @@
 #include "../Common/AlignedStorage.h"
 #include "../Common/Function.h"
 #include "../Common/Result.h"
+#include "../Common/Span.h"
 #include "../Foundation/Internal/IGrowableBuffer.h"
-#include "../Foundation/Span.h"
 #include "Internal/CircularQueue.h"
 #include "Internal/Event.h"
 

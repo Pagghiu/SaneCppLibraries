@@ -3,6 +3,8 @@
 #include "HashingCBindings.h"
 #include "Hashing.h"
 
+#include "../Common/PlacementNew.h"
+
 SC::Hashing& sc_hashing_self(sc_hashing_t* hashing)
 {
     static_assert(sizeof(sc_hashing_t::opaque) >= sizeof(SC::Hashing), "sc_hashing_t::opaque size");

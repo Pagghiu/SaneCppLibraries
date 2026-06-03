@@ -3,7 +3,7 @@
 #pragma once
 #include "../../Common/AlignedStorage.h"
 #include "../../Common/Result.h"
-#include "../../Foundation/Span.h"
+#include "../../Common/Span.h"
 namespace SC
 {
 //! @addtogroup group_async_streams

@@ -1,8 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/PlatformMacrosType.h"
 #include "../Common/Result.h"
-#include "../Foundation/Span.h"
+#include "../Common/Span.h"
 
 namespace SC
 {

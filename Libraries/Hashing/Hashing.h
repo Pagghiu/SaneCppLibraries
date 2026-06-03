@@ -7,7 +7,9 @@
 #endif
 #define SC_HASHING_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HASHING)
 
-#include "../Foundation/Span.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/Span.h"
+
 namespace SC
 {
 //! @defgroup group_hashing Hashing

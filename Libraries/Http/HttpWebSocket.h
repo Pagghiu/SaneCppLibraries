@@ -4,7 +4,7 @@
 #include "../AsyncStreams/AsyncStreams.h"
 #include "../Common/Function.h"
 #include "../Common/Result.h"
-#include "../Foundation/Span.h"
+#include "../Common/Span.h"
 #include "HttpExport.h"
 #include "HttpParser.h"
 

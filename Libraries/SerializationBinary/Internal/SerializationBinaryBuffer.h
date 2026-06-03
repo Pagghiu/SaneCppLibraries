@@ -1,7 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Span.h"
+#include "../../Common/CompilerMacrosType.h"
+#include "../../Common/PlatformMacrosType.h"
+#include "../../Common/Span.h"
 
 #if SC_PLATFORM_WINDOWS
 extern "C"

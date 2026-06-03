@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Foundation/Span.h"
+#include "../../Common/Span.h"
 #include <memory.h> // memcpy
 
 namespace SC

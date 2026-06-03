@@ -11,7 +11,7 @@
 ## Best Files To Inspect
 
 - `Libraries/Common/Result.h`
-- `Libraries/Foundation/Span.h`
+- `Libraries/Common/Span.h`
 - `Libraries/Foundation/StringSpan.h`
 - `Libraries/Common/Function.h`
 - `Libraries/Common/Deferred.h`
