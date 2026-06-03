@@ -9,8 +9,8 @@
 #define SC_PROCESS_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_PROCESS)
 
 #include "../Common/AlignedStorage.h"
+#include "../Common/IGrowableBufferSpan.h"
 #include "../File/File.h"
-#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "../Foundation/StringPath.h"
 
 namespace SC

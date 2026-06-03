@@ -10,9 +10,10 @@
 
 #include "../Common/AlignedStorage.h"
 #include "../Common/Function.h"
+#include "../Common/IGrowableBufferSpan.h"
+#include "../Common/PlatformMacrosInstructionSet.h"
 #include "../Common/Result.h"
 #include "../Common/Span.h"
-#include "../Foundation/Internal/IGrowableBuffer.h"
 #include "Internal/CircularQueue.h"
 #include "Internal/Event.h"
 

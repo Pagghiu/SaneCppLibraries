@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/AlignedStorage.h"
-#include "../Foundation/Internal/IGrowableBuffer.h"
+#include "../Common/IGrowableBufferSpan.h"
 #include "../Strings/StringView.h"
 #include "StringsExport.h"
 

@@ -3,7 +3,7 @@
 
 // Remember to compile this with SC_INCLUDE_STD_CPP=1, and possibly exceptions and RTTI enabled
 
-#include "Libraries/Foundation/Internal/IGrowableBuffer.h"
+#include "Libraries/Common/IGrowableBufferSpan.h"
 #include "Libraries/Memory/String.h"
 
 #include <string>
