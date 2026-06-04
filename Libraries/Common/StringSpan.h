@@ -196,47 +196,26 @@ struct SC_FOUNDATION_EXPORT StringSpan
         SC_TRY_MSG(string.writableSpan.sliceStart(toSlice, remaining), "StringSpan::append - sliceStart failed");
         size_t         numWritten = 0;
         native_char_t* buffer     = remaining.data();
-#if SC_PLATFORM_WINDOWS
-        if (getEncoding() == StringEncoding::Utf16)
+        if (getEncoding() == StringEncoding::Native or
+            (not SC_PLATFORM_WINDOWS and getEncoding() == StringEncoding::Ascii))
         {
             SC_TRY_MSG(sizeInBytes() < remaining.sizeInBytes(), "StringSpan::append - exceeded buffer size");
             CompilerBuiltins::copy(buffer, bytesWithoutTerminator(), sizeInBytes());
-            buffer[sizeInBytes() / sizeof(wchar_t)] = 0;
+            buffer[sizeInBytes() / sizeof(native_char_t)] = 0;
 
-            numWritten = sizeInBytes() / sizeof(wchar_t);
+            numWritten = sizeInBytes() / sizeof(native_char_t);
         }
+#if SC_PLATFORM_WINDOWS
         else
         {
-            const char* it  = bytesWithoutTerminator();
-            const char* end = it + sizeInBytes();
-            while (it < end)
-            {
-                uint32_t codePoint = 0;
-                SC_TRY_MSG(decodeUTF8Strict(it, end, codePoint), "StringSpan::append - invalid UTF8");
-                if (codePoint <= 0xFFFF)
-                {
-                    SC_TRY_MSG(numWritten + 1 < remaining.sizeInElements(),
-                               "StringSpan::append - exceeded buffer size");
-                    buffer[numWritten++] = static_cast<wchar_t>(codePoint);
-                }
-                else
-                {
-                    SC_TRY_MSG(numWritten + 2 < remaining.sizeInElements(),
-                               "StringSpan::append - exceeded buffer size");
-                    codePoint -= 0x10000;
-                    buffer[numWritten++] = static_cast<wchar_t>(0xD800u + (codePoint >> 10));
-                    buffer[numWritten++] = static_cast<wchar_t>(0xDC00u + (codePoint & 0x3FFu));
-                }
-            }
-            buffer[numWritten] = L'\0';
+            SC_TRY_MSG(appendUTF8ToNative(buffer, remaining.sizeInElements(), numWritten),
+                       "StringSpan::append - invalid UTF8 or exceeded buffer size");
         }
 #else
-        SC_TRY_MSG(getEncoding() != StringEncoding::Utf16, "StringSpan::append - UTF16 not supported");
-        SC_TRY_MSG(sizeInBytes() < remaining.sizeInBytes(), "StringSpan::append - exceeded buffer size");
-        CompilerBuiltins::copy(buffer, bytesWithoutTerminator(), sizeInBytes());
-        buffer[sizeInBytes()] = 0; // Ensure null termination
-
-        numWritten = sizeInBytes();
+        else
+        {
+            SC_TRY_MSG(false, "StringSpan::append - UTF16 not supported");
+        }
 #endif
         string.length = toSlice + numWritten;
         return Result(true);
@@ -246,33 +225,8 @@ struct SC_FOUNDATION_EXPORT StringSpan
     /// @return The decoded code point, or 0 if the sequence is invalid (or end is reached)
     static uint32_t advanceUTF8(const char*& it, const char* end)
     {
-        const uint8_t lead = static_cast<uint8_t>(*(it++));
-        if (lead < 0x80)
-        {
-            return lead;
-        }
-        else if ((lead >> 5) == 0x06 and it < end) // 2-byte sequence
-        {
-            const uint8_t trail = static_cast<uint8_t>(*(it++));
-            if ((trail >> 6) == 0x02)
-                return ((lead & 0x1Fu) << 6) | (trail & 0x3Fu);
-        }
-        else if ((lead >> 4) == 0x0E and it + 1 < end) // 3-byte sequence
-        {
-            const uint8_t trail1 = static_cast<uint8_t>(*(it++));
-            const uint8_t trail2 = static_cast<uint8_t>(*(it++));
-            if ((trail1 >> 6) == 0x02 and (trail2 >> 6) == 0x02)
-                return ((lead & 0x0Fu) << 12) | ((trail1 & 0x3Fu) << 6) | (trail2 & 0x3Fu);
-        }
-        else if ((lead >> 3) == 0x1E and it + 2 < end) // 4-byte sequence
-        {
-            const uint8_t trail1 = static_cast<uint8_t>(*(it++));
-            const uint8_t trail2 = static_cast<uint8_t>(*(it++));
-            const uint8_t trail3 = static_cast<uint8_t>(*(it++));
-            if ((trail1 >> 6) == 0x02 and (trail2 >> 6) == 0x02 and (trail3 >> 6) == 0x02)
-                return ((lead & 0x07u) << 18) | ((trail1 & 0x3Fu) << 12) | ((trail2 & 0x3Fu) << 6) | (trail3 & 0x3F);
-        }
-        return 0; // Invalid sequence
+        uint32_t codePoint = 0;
+        return decodeUTF8(it, end, codePoint) ? codePoint : 0;
     }
 
     /// @brief Decode a single UTF16 code point and advance the iterator
@@ -312,7 +266,37 @@ struct SC_FOUNDATION_EXPORT StringSpan
     size_t hasNullTerm : 1;
 
   private:
-    static bool decodeUTF8Strict(const char*& it, const char* end, uint32_t& codePoint)
+#if SC_PLATFORM_WINDOWS
+    bool appendUTF8ToNative(native_char_t* buffer, size_t capacity, size_t& numWritten) const
+    {
+        const char* it  = bytesWithoutTerminator();
+        const char* end = it + sizeInBytes();
+        while (it < end)
+        {
+            uint32_t codePoint = 0;
+            if (not decodeUTF8(it, end, codePoint))
+                return false;
+            if (codePoint <= 0xFFFF)
+            {
+                if (numWritten + 1 >= capacity)
+                    return false;
+                buffer[numWritten++] = static_cast<wchar_t>(codePoint);
+            }
+            else
+            {
+                if (numWritten + 2 >= capacity)
+                    return false;
+                codePoint -= 0x10000;
+                buffer[numWritten++] = static_cast<wchar_t>(0xD800u + (codePoint >> 10));
+                buffer[numWritten++] = static_cast<wchar_t>(0xDC00u + (codePoint & 0x3FFu));
+            }
+        }
+        buffer[numWritten] = L'\0';
+        return true;
+    }
+#endif
+
+    static bool decodeUTF8(const char*& it, const char* end, uint32_t& codePoint)
     {
         if (it >= end)
             return false;
@@ -324,41 +308,42 @@ struct SC_FOUNDATION_EXPORT StringSpan
             return true;
         }
 
-        uint32_t cp = 0;
-        if ((lead >> 5) == 0x06 and it < end)
+        uint32_t cp           = 0;
+        uint32_t minCodePoint = 0;
+        size_t   numTrailing  = 0;
+        if (lead >= 0xC2 and lead <= 0xDF)
         {
-            const uint8_t trail = static_cast<uint8_t>(*it++);
-            if ((trail >> 6) != 0x02)
-                return false;
-            cp = ((lead & 0x1Fu) << 6) | (trail & 0x3Fu);
-            if (cp < 0x80)
-                return false;
+            cp           = lead & 0x1Fu;
+            minCodePoint = 0x80;
+            numTrailing  = 1;
         }
-        else if ((lead >> 4) == 0x0E and it + 1 < end)
+        else if (lead >= 0xE0 and lead <= 0xEF)
         {
-            const uint8_t trail1 = static_cast<uint8_t>(*it++);
-            const uint8_t trail2 = static_cast<uint8_t>(*it++);
-            if ((trail1 >> 6) != 0x02 or (trail2 >> 6) != 0x02)
-                return false;
-            cp = ((lead & 0x0Fu) << 12) | ((trail1 & 0x3Fu) << 6) | (trail2 & 0x3Fu);
-            if (cp < 0x800 or (cp >= 0xD800 and cp <= 0xDFFF))
-                return false;
+            cp           = lead & 0x0Fu;
+            minCodePoint = 0x800;
+            numTrailing  = 2;
         }
-        else if ((lead >> 3) == 0x1E and it + 2 < end)
+        else if (lead >= 0xF0 and lead <= 0xF4)
         {
-            const uint8_t trail1 = static_cast<uint8_t>(*it++);
-            const uint8_t trail2 = static_cast<uint8_t>(*it++);
-            const uint8_t trail3 = static_cast<uint8_t>(*it++);
-            if ((trail1 >> 6) != 0x02 or (trail2 >> 6) != 0x02 or (trail3 >> 6) != 0x02)
-                return false;
-            cp = ((lead & 0x07u) << 18) | ((trail1 & 0x3Fu) << 12) | ((trail2 & 0x3Fu) << 6) | (trail3 & 0x3F);
-            if (cp < 0x10000 or cp > 0x10FFFF)
-                return false;
+            cp           = lead & 0x07u;
+            minCodePoint = 0x10000;
+            numTrailing  = 3;
         }
         else
         {
             return false;
         }
+        if (static_cast<size_t>(end - it) < numTrailing)
+            return false;
+        for (size_t idx = 0; idx < numTrailing; ++idx)
+        {
+            const uint8_t trail = static_cast<uint8_t>(*it++);
+            if ((trail >> 6) != 0x02)
+                return false;
+            cp = (cp << 6) | (trail & 0x3Fu);
+        }
+        if (cp < minCodePoint or cp > 0x10FFFF or (cp >= 0xD800 and cp <= 0xDFFF))
+            return false;
         codePoint = cp;
         return true;
     }
