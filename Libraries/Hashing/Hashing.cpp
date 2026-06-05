@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Hashing.h"
 
+#include "../Common/CompilerMacrosType.h"
+
 #if SC_PLATFORM_APPLE
 #include <CommonCrypto/CommonDigest.h>
 

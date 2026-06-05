@@ -7,8 +7,8 @@
 [TOC]
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](File.svg)
 

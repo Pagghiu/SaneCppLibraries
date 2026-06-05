@@ -10,7 +10,7 @@
 
 # Dependencies
 - Dependencies: [Reflection](@ref library_reflection), [Strings](@ref library_strings)
-- All dependencies: [Foundation](@ref library_foundation), [Reflection](@ref library_reflection), [Strings](@ref library_strings)
+- All dependencies: [Reflection](@ref library_reflection), [Strings](@ref library_strings)
 
 ![Dependency Graph](SerializationText.svg)
 

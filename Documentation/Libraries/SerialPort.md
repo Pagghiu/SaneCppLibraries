@@ -8,7 +8,7 @@
 
 # Dependencies
 - Dependencies: [File](@ref library_file)
-- All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation)
+- All dependencies: [File](@ref library_file)
 
 ![Dependency Graph](SerialPort.svg)
 

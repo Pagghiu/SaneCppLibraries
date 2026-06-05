@@ -7,8 +7,8 @@
 [SaneCppFileSystemIterator.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFileSystemIterator.h) is a library that enumerates files and directories at a given path.
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](FileSystemIterator.svg)
 

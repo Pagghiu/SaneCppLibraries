@@ -3,6 +3,8 @@
 // Linux backend for HttpClient using libcurl via dlopen.
 #include "HttpClientLinuxAPI.h"
 
+#include "../../Common/PlacementNew.h"
+
 #include <limits.h>
 
 struct SC::HttpClient::Internal

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "../Common/PlatformMacrosType.h"
 #include "../File/File.h"
-#include "../Foundation/Platform.h"
 #include "Internal/AsyncInternal.h"
 
 #define SC_ASSERT_PROVIDER AsyncAssert

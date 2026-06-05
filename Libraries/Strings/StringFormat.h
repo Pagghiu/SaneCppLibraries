@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include "../Common/AlignedStorage.h"
+#include "../Common/CompilerMinMax.h"
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Strings/StringView.h"
 #include "StringsExport.h"

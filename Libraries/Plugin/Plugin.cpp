@@ -6,6 +6,7 @@
 #include "../Common/Assert.inl"
 
 #include "../Common/Deferred.h"
+#include "../Common/PlatformInstructionSet.h"
 #include "../Process/Internal/StringsArena.h"
 #include "../Process/Process.h"
 #include "../Strings/Path.h"

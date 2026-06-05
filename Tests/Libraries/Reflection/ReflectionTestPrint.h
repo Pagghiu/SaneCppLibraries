@@ -1,5 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
+#include "Libraries/Common/CompilerMacrosUnusedResult.h"
 #include "Libraries/Memory/String.h"
 #include "Libraries/Reflection/Reflection.h"
 #include "Libraries/Strings/Console.h"

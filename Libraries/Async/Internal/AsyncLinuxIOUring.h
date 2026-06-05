@@ -3,7 +3,7 @@
 #pragma once
 
 #include "../../Async/Internal/AsyncLinuxUAPI.h"
-#include "../../Foundation/Compiler.h"
+#include "../../Common/CompilerMacrosType.h"
 
 #include <errno.h>
 #include <fcntl.h> // for AT_FDCWD

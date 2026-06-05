@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../../Foundation/Compiler.h"
+#include "../../Common/CompilerMacrosExport.h"
 #ifndef SC_HTTP_CLIENT_EXPORT
 #ifndef SC_EXPORT_LIBRARY_HTTP_CLIENT
 #define SC_EXPORT_LIBRARY_HTTP_CLIENT 0
@@ -10,7 +10,7 @@
 #define SC_HTTP_CLIENT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_HTTP_CLIENT)
 #endif
 
-#include "../../Foundation/PrimitiveTypes.h"
+#include "../../Common/PrimitiveDefinitions.h"
 
 namespace SC
 {

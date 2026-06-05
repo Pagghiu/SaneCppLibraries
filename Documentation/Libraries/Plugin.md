@@ -14,7 +14,7 @@
 
 # Dependencies
 - Dependencies: [Process](@ref library_process), [Strings](@ref library_strings)
-- All dependencies: [File](@ref library_file), [Foundation](@ref library_foundation), [Process](@ref library_process), [Strings](@ref library_strings)
+- All dependencies: [File](@ref library_file), [Process](@ref library_process), [Strings](@ref library_strings)
 
 ![Dependency Graph](Plugin.svg)
 

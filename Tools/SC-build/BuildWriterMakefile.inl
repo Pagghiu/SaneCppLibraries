@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 #include "Build.h"
 
+#include "../../Libraries/Common/CompilerMacrosUnusedResult.h"
 #include "../../Libraries/Strings/StringBuilder.h"
 #include "BuildWriter.h"
 

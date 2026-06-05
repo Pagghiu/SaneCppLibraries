@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_PLUGIN
 #define SC_EXPORT_LIBRARY_PLUGIN 0
 #endif
@@ -10,8 +10,8 @@
 #include "../Common/Assert.h"
 #include "../Common/Function.h"
 #include "../Common/IGrowableBufferStringPath.h"
-#include "../Foundation/Platform.h"
-#include "../Foundation/PrimitiveTypes.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/PrimitiveDefinitions.h"
 #include "Internal/DynamicLibrary.h"
 namespace SC
 {

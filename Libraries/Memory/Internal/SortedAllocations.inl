@@ -1,5 +1,6 @@
 #pragma once
-#include "../../Foundation/PrimitiveTypes.h"
+#include "../../Common/PlacementNew.h"
+#include "../../Common/PrimitiveDefinitions.h"
 
 namespace SC
 {

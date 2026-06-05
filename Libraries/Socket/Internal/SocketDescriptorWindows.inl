@@ -12,7 +12,7 @@ using socklen_t = int;
 #pragma comment(lib, "Ws2_32.lib")
 #endif
 
-#include "../../Foundation/Compiler.h"
+#include "../../Common/CompilerMacrosType.h"
 #include "../../Socket/Socket.h"
 
 #if SC_COMPILER_CLANG

@@ -15,8 +15,8 @@ The "owned" String class is here and not in [Strings](@ref library_strings) libr
 @note If a library doesn't directly or indirectly depend on the Memory library, you can assume that it will not do any runtime / dynamic allocation.
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](Memory.svg)
 

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_CONTAINERS_REFLECTION
 #define SC_EXPORT_LIBRARY_CONTAINERS_REFLECTION 0
 #endif

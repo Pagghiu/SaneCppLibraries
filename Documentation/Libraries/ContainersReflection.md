@@ -9,7 +9,7 @@ Its headers are only meant to be included anywhere the reflection / serializatio
 
 # Dependencies
 - Dependencies: [Containers](@ref library_containers), [Reflection](@ref library_reflection)
-- All dependencies: [Containers](@ref library_containers), [Foundation](@ref library_foundation), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
+- All dependencies: [Containers](@ref library_containers), [Memory](@ref library_memory), [Reflection](@ref library_reflection)
 
 ![Dependency Graph](ContainersReflection.svg)
 

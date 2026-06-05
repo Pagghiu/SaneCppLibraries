@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_FILE_SYSTEM
 #define SC_EXPORT_LIBRARY_FILE_SYSTEM 0
 #endif
@@ -9,8 +9,8 @@
 
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Common/IGrowableBufferStringPath.h"
+#include "../Common/PrimitiveDefinitions.h"
 #include "../Common/Result.h"
-#include "../Foundation/PrimitiveTypes.h"
 
 namespace SC
 {

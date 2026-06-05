@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
+#include "../Common/PlatformMacrosType.h"
 #ifndef SC_EXPORT_LIBRARY_SOCKET
 #define SC_EXPORT_LIBRARY_SOCKET 0
 #endif

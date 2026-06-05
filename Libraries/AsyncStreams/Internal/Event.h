@@ -1,7 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Foundation/Compiler.h"
+#include "../../Common/CompilerMacrosExport.h"
+#include "../../Common/CompilerMove.h"
 #ifndef SC_ASYNC_STREAMS_EXPORT
 #ifndef SC_EXPORT_LIBRARY_ASYNC_STREAMS
 #define SC_EXPORT_LIBRARY_ASYNC_STREAMS 0

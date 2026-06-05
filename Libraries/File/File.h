@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_FILE
 #define SC_EXPORT_LIBRARY_FILE 0
 #endif
@@ -9,11 +9,13 @@
 
 #include "../Common/IGrowableBufferSpan.h"
 #include "../Common/IGrowableBufferStringPath.h"
+#include "../Common/PlatformMacrosInstructionSet.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/PrimitiveDefinitions.h"
 #include "../Common/Result.h"
 #include "../Common/Span.h"
 #include "../Common/StringSpan.h"
 #include "../Common/UniqueHandle.h"
-#include "../Foundation/PrimitiveTypes.h"
 
 //! @defgroup group_file File
 //! @copybrief library_file (see @ref library_file for more details)

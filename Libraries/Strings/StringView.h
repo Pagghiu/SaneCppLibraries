@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/CompilerMacrosLifetimeBound.h"
 #include "../Common/PlatformMacrosType.h"
 #include "../Common/Span.h"
 #include "../Strings/StringIterator.h"

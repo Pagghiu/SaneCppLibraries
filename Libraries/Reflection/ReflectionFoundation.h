@@ -1,8 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/CompilerMacrosType.h"
 #include "../Common/Span.h"
-#include "../Foundation/Compiler.h"
 namespace SC
 {
 namespace Reflection

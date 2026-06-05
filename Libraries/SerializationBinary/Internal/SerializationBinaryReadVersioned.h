@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../../Common/CompilerMinMax.h"
 #include "../../Reflection/ReflectionSchemaCompiler.h"
 #include "SerializationBinarySchema.h"
 

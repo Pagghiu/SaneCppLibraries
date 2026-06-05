@@ -7,8 +7,8 @@
 [SaneCppHashing.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHashing.h) library abstracts OS API to compute MD5, SHA1 and SHA256 hashes.  
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](Hashing.svg)
 

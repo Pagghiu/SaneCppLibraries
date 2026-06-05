@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_SERIAL_PORT
 #define SC_EXPORT_LIBRARY_SERIAL_PORT 0
 #endif

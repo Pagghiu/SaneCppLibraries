@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 // Apple backend for HttpClient using NSURLSession via objc_msgSend.
 
+#include "../../Common/PlacementNew.h"
+
 #include <objc/message.h>
 #include <objc/runtime.h>
 

@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/CompilerOffsetOf.h"
 #include "AsyncStreams.h"
 //! @addtogroup group_async_streams
 //! @{

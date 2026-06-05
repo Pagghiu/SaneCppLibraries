@@ -7,8 +7,8 @@
 [SaneCppAsyncStreams.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsyncStreams.h) is a library that reads and writes data concurrently from async sources to destinations.
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](AsyncStreams.svg)
 

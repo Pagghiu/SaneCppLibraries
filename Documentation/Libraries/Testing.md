@@ -7,8 +7,8 @@
 [SaneCppTesting.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppTesting.h) is a very simple test framework that allows splitting tests in sections and record successful/failed expectations.
 
 # Dependencies
-- Dependencies: [Foundation](@ref library_foundation)
-- All dependencies: [Foundation](@ref library_foundation)
+- Dependencies: *(none)*
+- All dependencies: *(none)*
 
 ![Dependency Graph](Testing.svg)
 
@@ -25,7 +25,7 @@
 Testing library is minimal but it's useful as is for now.
 
 # Description
-Testing integrates with the SC::Result object that is part of [Foundation](@ref library_foundation) library.
+Testing integrates with the SC::Result object provided by the Common fragments.
 So far it doesn't support test discovery and all tests must be manually invoked in the main test file.
 
 ## SC::TestCase

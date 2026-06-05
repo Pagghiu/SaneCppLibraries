@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
+#include "../Common/CompilerOffsetOf.h"
+#include "../Common/PrimitiveDefinitions.h"
 #ifndef SC_EXPORT_LIBRARY_REFLECTION
 #define SC_EXPORT_LIBRARY_REFLECTION 0
 #endif

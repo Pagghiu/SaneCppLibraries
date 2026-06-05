@@ -13,7 +13,7 @@ the coroutine model is refined. Use it for focused experiments and examples, not
 
 # Dependencies
 - Dependencies: [Async](@ref library_async)
-- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)
+- All dependencies: [Async](@ref library_async), [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
 
 ![Dependency Graph](Await.svg)
 

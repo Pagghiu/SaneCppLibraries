@@ -8,7 +8,7 @@
 
 # Dependencies
 - Dependencies: [Async](@ref library_async), [AsyncStreams](@ref library_async_streams)
-- All dependencies: [Async](@ref library_async), [AsyncStreams](@ref library_async_streams), [File](@ref library_file), [FileSystem](@ref library_file_system), [Foundation](@ref library_foundation), [Socket](@ref library_socket), [Threading](@ref library_threading)
+- All dependencies: [Async](@ref library_async), [AsyncStreams](@ref library_async_streams), [File](@ref library_file), [FileSystem](@ref library_file_system), [Socket](@ref library_socket), [Threading](@ref library_threading)
 
 ![Dependency Graph](Http.svg)
 

@@ -3,7 +3,6 @@
         "direct_dependencies": [
             "File",
             "FileSystem",
-            "Foundation",
             "Socket",
             "Threading"
         ],
@@ -16,26 +15,18 @@
         "all_dependencies": [
             "File",
             "FileSystem",
-            "Foundation",
             "Socket",
             "Threading"
         ]
     },
     "AsyncStreams": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Await": {
         "direct_dependencies": [
-            "Async",
-            "Foundation"
+            "Async"
         ],
         "minimal_dependencies": [
             "Async"
@@ -44,28 +35,24 @@
             "Async",
             "File",
             "FileSystem",
-            "Foundation",
             "Socket",
             "Threading"
         ]
     },
     "Containers": {
         "direct_dependencies": [
-            "Foundation",
             "Memory"
         ],
         "minimal_dependencies": [
             "Memory"
         ],
         "all_dependencies": [
-            "Foundation",
             "Memory"
         ]
     },
     "ContainersReflection": {
         "direct_dependencies": [
             "Containers",
-            "Foundation",
             "Memory",
             "Reflection"
         ],
@@ -75,54 +62,29 @@
         ],
         "all_dependencies": [
             "Containers",
-            "Foundation",
             "Memory",
             "Reflection"
         ]
     },
     "File": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "FileSystem": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "FileSystemIterator": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "FileSystemWatcher": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Foundation": {
         "direct_dependencies": [],
@@ -130,22 +92,15 @@
         "all_dependencies": []
     },
     "Hashing": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Http": {
         "direct_dependencies": [
             "Async",
             "AsyncStreams",
-            "FileSystem",
-            "Foundation"
+            "FileSystem"
         ],
         "minimal_dependencies": [
             "Async",
@@ -156,36 +111,22 @@
             "AsyncStreams",
             "File",
             "FileSystem",
-            "Foundation",
             "Socket",
             "Threading"
         ]
     },
     "HttpClient": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Memory": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Plugin": {
         "direct_dependencies": [
-            "Foundation",
             "Process",
             "Strings"
         ],
@@ -195,64 +136,50 @@
         ],
         "all_dependencies": [
             "File",
-            "Foundation",
             "Process",
             "Strings"
         ]
     },
     "Process": {
         "direct_dependencies": [
-            "File",
-            "Foundation"
+            "File"
         ],
         "minimal_dependencies": [
             "File"
         ],
         "all_dependencies": [
-            "File",
-            "Foundation"
+            "File"
         ]
     },
     "Reflection": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "SerialPort": {
         "direct_dependencies": [
-            "File",
-            "Foundation"
+            "File"
         ],
         "minimal_dependencies": [
             "File"
         ],
         "all_dependencies": [
-            "File",
-            "Foundation"
+            "File"
         ]
     },
     "SerializationBinary": {
         "direct_dependencies": [
-            "Foundation",
             "Reflection"
         ],
         "minimal_dependencies": [
             "Reflection"
         ],
         "all_dependencies": [
-            "Foundation",
             "Reflection"
         ]
     },
     "SerializationText": {
         "direct_dependencies": [
-            "Foundation",
             "Reflection",
             "Strings"
         ],
@@ -261,64 +188,33 @@
             "Strings"
         ],
         "all_dependencies": [
-            "Foundation",
             "Reflection",
             "Strings"
         ]
     },
     "Socket": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Strings": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Testing": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Threading": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     },
     "Time": {
-        "direct_dependencies": [
-            "Foundation"
-        ],
-        "minimal_dependencies": [
-            "Foundation"
-        ],
-        "all_dependencies": [
-            "Foundation"
-        ]
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
     }
 }

@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_SERIALIZATION_BINARY
 #define SC_EXPORT_LIBRARY_SERIALIZATION_BINARY 0
 #endif

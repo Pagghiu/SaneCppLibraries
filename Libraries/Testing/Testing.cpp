@@ -5,6 +5,7 @@
 #define SC_ASSERT_PROVIDER TestingAssert
 #include "../Common/Assert.inl"
 
+#include "../Common/CompilerMacrosLibraryPath.h"
 #include "../Common/Span.h"
 #include <stdint.h> // uint16_t, uint32_t
 #include <stdio.h>  // FILE

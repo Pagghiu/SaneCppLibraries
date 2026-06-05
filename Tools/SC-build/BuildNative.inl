@@ -3,6 +3,8 @@
 #include "../../Libraries/Async/Async.h"
 #include "../../Libraries/Async/Internal/IntrusiveDoubleLinkedList.inl"
 #include "../../Libraries/Common/Deferred.h"
+#include "../../Libraries/Common/PlatformInstructionSet.h"
+#include "../../Libraries/Common/PlatformType.h"
 #include "BuildWriter.h"
 
 #include "../../Libraries/FileSystem/FileSystem.h"

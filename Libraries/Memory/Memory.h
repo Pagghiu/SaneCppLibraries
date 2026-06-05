@@ -1,14 +1,17 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
+#include "../Common/CompilerMacrosType.h"
 #ifndef SC_EXPORT_LIBRARY_MEMORY
 #define SC_EXPORT_LIBRARY_MEMORY 0
 #endif
 #define SC_MEMORY_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_MEMORY)
 
 #include "../Common/Assert.h"
-#include "../Foundation/PrimitiveTypes.h"
+#include "../Common/CompilerMove.h"
+#include "../Common/PlacementNew.h"
+#include "../Common/PrimitiveDefinitions.h"
 #if SC_COMPILER_FILC
 #include <stdfil.h>
 #endif

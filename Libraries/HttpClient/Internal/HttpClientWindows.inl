@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MIT
 // Windows backend for HttpClient using WinHTTP.
 
+#include "../../Common/CompilerMacrosType.h"
+#include "../../Common/PlacementNew.h"
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <winhttp.h>

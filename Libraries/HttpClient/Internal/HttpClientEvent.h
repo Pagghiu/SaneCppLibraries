@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../../Foundation/Compiler.h"
+#include "../../Common/CompilerMacrosExport.h"
+#include "../../Common/CompilerMove.h"
 #ifndef SC_HTTP_CLIENT_EXPORT
 #ifndef SC_EXPORT_LIBRARY_HTTP_CLIENT
 #define SC_EXPORT_LIBRARY_HTTP_CLIENT 0

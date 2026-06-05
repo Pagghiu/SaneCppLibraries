@@ -4,6 +4,8 @@
 #include "../Tools.h"
 
 #include "../../Libraries/Common/Function.h"
+#include "../../Libraries/Common/PlatformInstructionSet.h"
+#include "../../Libraries/Common/PlatformType.h"
 #include "../../Libraries/File/File.h"
 #include "../../Libraries/FileSystem/FileSystem.h"
 #include "../../Libraries/Hashing/Hashing.h"

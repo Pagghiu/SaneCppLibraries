@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 #include "Libraries/Process/Process.h"
 #include "Libraries/Async/Async.h"
+#include "Libraries/Common/CompilerMacrosUnusedResult.h"
+#include "Libraries/Common/PlatformType.h"
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/File/File.h"
 #include "Libraries/FileSystem/FileSystem.h"

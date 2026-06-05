@@ -1,6 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "HttpMultipartParser.h"
+#include "../Common/CompilerMinMax.h"
 #include <string.h>
 
 // https://www.chiark.greenend.org.uk/~sgtatham/coroutines.html

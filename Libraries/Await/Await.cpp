@@ -1,10 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosStdCpp.h"
+#include "../Common/CompilerMacrosStdVersion.h"
 
 #if SC_INCLUDE_STD_CPP && SC_LANGUAGE_CPP_AT_LEAST_20
 
-#include "../Foundation/PrimitiveTypes.h"
+#include "../Common/PrimitiveDefinitions.h"
 #include "Await.h"
 
 #define SC_ASSERT_PROVIDER AwaitAssert

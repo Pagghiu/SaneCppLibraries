@@ -1,7 +1,10 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../Foundation/PrimitiveTypes.h"
+#include "../Common/CompilerMacrosType.h"
+#include "../Common/PlatformMacrosInstructionSet.h"
+#include "../Common/PlatformMacrosType.h"
+#include "../Common/PrimitiveDefinitions.h"
 
 namespace SC
 {

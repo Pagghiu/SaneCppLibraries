@@ -1,6 +1,8 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
+#include "../Common/CompilerMacrosLifetimeBound.h"
+#include "../Common/CompilerMinMax.h"
 #include "../Common/Span.h"
 #include "../Memory/Memory.h"
 #if SC_COMPILER_FILC

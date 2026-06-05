@@ -12,7 +12,7 @@ While all libraries are designed to let you use your favorite externally provide
 
 # Dependencies
 - Dependencies: [Memory](@ref library_memory)
-- All dependencies: [Foundation](@ref library_foundation), [Memory](@ref library_memory)
+- All dependencies: [Memory](@ref library_memory)
 
 ![Dependency Graph](Containers.svg)
 

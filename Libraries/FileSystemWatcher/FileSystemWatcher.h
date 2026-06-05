@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
-#include "../Foundation/Compiler.h"
+#include "../Common/CompilerMacrosExport.h"
 #ifndef SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER
 #define SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER 0
 #endif
 #define SC_FILE_SYSTEM_WATCHER_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_FILE_SYSTEM_WATCHER)
 
 #include "../Common/Assert.h"
+#include "../Common/CompilerOffsetOf.h"
 #include "../Common/Function.h"
 #include "../Common/IGrowableBufferStringPath.h"
 #include "../Common/OpaqueObject.h"
