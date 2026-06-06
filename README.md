@@ -23,8 +23,6 @@
 
 Libraries are designed to be used as [Single File Libraries](https://pagghiu.github.io/SaneCppLibraries/page_single_file_libs.html) with minimal [dependencies](https://pagghiu.github.io/SaneCppLibraries/page_dependencies.html) between them and follow a strict **No Allocations** (*) policy.
 
-(*) `Await` is a C++20 draft library that needs explicit coroutine frame storage. Its default/recommended mode uses caller-owned fixed buffers, while virtual memory, malloc/free, and polymorphic allocators are explicit opt-in modes.
-
 Library                                                                                                         | Description                                                               | Single File                                                                                                       
 :---------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------
 [Async](https://pagghiu.github.io/SaneCppLibraries/library_async.html)                                          | 🟨 Async I/O (files, sockets, timers, processes, fs events, tasks)        | [Download](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppAsync.h)                   
@@ -89,14 +87,14 @@ See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_u
 - [Tools](https://pagghiu.github.io/SaneCppLibraries/page_tools.html) is a collection of repository / code automation tools built using libraries themselves
   - Includes a fully self-hosted [SC::Build](https://pagghiu.github.io/SaneCppLibraries/page_build.html) build system where builds are imperatively described using C++ code, can generate XCode / Visual Studio / Make projects, and can also build directly through a native backend on macOS, Linux, and Windows.
 
-## No Allocations
+## No Allocations (*)
 
-- All libraries do not dynamically allocate memory (excluding [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html))
-- All libraries are designed to work inside user-provided memory buffers.
-- All libraries return error codes when running out of such memory buffers.
-- Third-party container classes, including `std::` ones, are supported (see [InteropSTL](Tests/InteropSTL) for an example).
-- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are fully optional and just provided for convenience if user prefers them to `std::` or other equivalent containers library.
-- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are not used by any other library (excluding [Containers Reflection](https://pagghiu.github.io/SaneCppLibraries/library_containers_reflection.html) a small bridge library to describe [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) to [Reflection](https://pagghiu.github.io/SaneCppLibraries/library_reflection.html) library for easy serialization).
+- All libraries are designed to work inside user-provided memory buffers and can be used without dynamic memory allocation.
+- All libraries return error codes when running out of such memory buffers (except in containers assignment operators, where they will assert).
+- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are the only ones that **will allocate**  by default, even if they support working inside fixed memory buffers (**Opt-out allocation**).
+- [Await](https://pagghiu.github.io/SaneCppLibraries/library_await.html) uses by default caller-owned fixed buffers, while virtual memory, malloc/free, and polymorphic allocators are explicit opt-in modes (**Opt-in allocation**).
+- Third-party container classes, including `std::` ones, are fully supported (see [InteropSTL](Tests/InteropSTL) for an example).
+- [Memory](https://pagghiu.github.io/SaneCppLibraries/library_memory.html) and [Containers](https://pagghiu.github.io/SaneCppLibraries/library_containers.html) are provided for convenience if user prefers them to `std::` or to any other equivalent containers library, and they're totally optional.
 
 ## Documentation
 [Documentation](https://pagghiu.github.io/SaneCppLibraries/index.html) is automatically generated using Doxygen and updated at every commit to `main` branch.
