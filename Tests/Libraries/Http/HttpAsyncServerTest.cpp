@@ -257,6 +257,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         {
             responseDiagnosticMessages();
         }
+        if (test_section("server lifecycle diagnostic messages"))
+        {
+            serverLifecycleDiagnosticMessages();
+        }
         if (test_section("connection body copy helper"))
         {
             connectionBodyCopyHelper();
@@ -292,6 +296,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void emptyResponseHelper();
     void responseBodyHelpers();
     void responseDiagnosticMessages();
+    void serverLifecycleDiagnosticMessages();
     void connectionBodyCopyHelper();
     void tlsOptionsAreServerScoped();
     void chunkedRequestDecoding();
@@ -991,6 +996,32 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
         SC_TEST_EXPECT(
             resultMessageEquals(response.sendRedirect(302, ""), "HttpResponse redirect location must not be empty"));
     }
+}
+
+void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    HttpAsyncServer uninitializedServer;
+    SC_TEST_EXPECT(resultMessageEquals(uninitializedServer.start(eventLoop, "127.0.0.1", report.mapPort(6169)),
+                                       "HttpAsyncServer::start - init not called"));
+    SC_TEST_EXPECT(resultMessageEquals(uninitializedServer.stop(), "HttpAsyncServer::stop requires started state"));
+    SC_TEST_EXPECT(
+        resultMessageEquals(uninitializedServer.close(), "HttpAsyncServer::close requires stop before close"));
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType connections[1];
+    HttpAsyncServer    httpServer;
+    const uint16_t     serverPort = report.mapPort(6170);
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+    SC_TEST_EXPECT(resultMessageEquals(httpServer.start(eventLoop, "127.0.0.1", report.mapPort(6171)),
+                                       "HttpAsyncServer::start requires stopped state"));
+    SC_TEST_EXPECT(httpServer.stop());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::HttpAsyncServerTest::connectionBodyCopyHelper()

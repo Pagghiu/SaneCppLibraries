@@ -37,7 +37,7 @@ Result HttpAsyncServer::resizeInternal(SpanWithStride<HttpConnection> connection
 
 Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t port)
 {
-    SC_TRY_MSG(state == State::Stopped, "Must be in stopped state");
+    SC_TRY_MSG(state == State::Stopped, "HttpAsyncServer::start requires stopped state");
     SC_TRY_MSG(connections.getNumTotalConnections() > 0, "HttpAsyncServer::start - init not called");
     SocketIPAddress nativeAddress;
     SC_TRY(nativeAddress.fromAddressPort(address, port));
@@ -56,6 +56,7 @@ Result HttpAsyncServer::start(AsyncEventLoop& loop, StringSpan address, uint16_t
 
 Result HttpAsyncServer::close()
 {
+    SC_TRY_MSG(state == State::Stopping, "HttpAsyncServer::close requires stop before close");
     SC_TRY(waitForStopToFinish());
     SC_TRY(connections.close());
     return Result(true);
@@ -63,7 +64,7 @@ Result HttpAsyncServer::close()
 
 Result HttpAsyncServer::stop()
 {
-    SC_TRY_MSG(state == State::Started, "Must be in started state");
+    SC_TRY_MSG(state == State::Started, "HttpAsyncServer::stop requires started state");
 
     state = State::Stopping;
     if (not asyncServerAccept.isFree())
@@ -84,7 +85,7 @@ Result HttpAsyncServer::stop()
 
 Result HttpAsyncServer::waitForStopToFinish()
 {
-    SC_TRY_MSG(state == State::Stopping, "Must be in stopping state");
+    SC_TRY_MSG(state == State::Stopping, "HttpAsyncServer::waitForStopToFinish requires stopping state");
     while (connections.getNumActiveConnections() > 0)
     {
         SC_TRY(eventLoop->runNoWait());
