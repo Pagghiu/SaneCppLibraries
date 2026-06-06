@@ -621,7 +621,7 @@ void SC::HttpAsyncFileServerTest::httpFileServerTest(bool useAsyncFileSend)
         SC_TEST_EXPECT(::memcmp(content.data(), context.largePutPayload.data(), content.size()) == 0);
         SC_TEST_EXPECT(context.fs.removeFile("large-put.bin"));
 
-        SC_TEST_EXPECT(context.multipartPayload.resizeWithoutInitializing(8 * 1024));
+        SC_TEST_EXPECT(context.multipartPayload.resizeWithoutInitializing(640 * 1024 + 31));
         for (size_t idx = 0; idx < context.multipartPayload.size(); ++idx)
         {
             context.multipartPayload.data()[idx] = static_cast<char>((idx * 37 + 11) & 0xFF);
