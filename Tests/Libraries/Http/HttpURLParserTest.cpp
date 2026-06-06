@@ -8,6 +8,18 @@ namespace SC
 struct HttpURLParserTest;
 }
 
+namespace
+{
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
+} // namespace
+
 struct SC::HttpURLParserTest : public SC::TestCase
 {
     HttpURLParserTest(SC::TestReport& report) : TestCase(report, "HttpURLParserTest")
@@ -60,6 +72,10 @@ struct SC::HttpURLParserTest : public SC::TestCase
         {
             testRequestTargetView();
         }
+        if (test_section("diagnostic messages"))
+        {
+            testDiagnosticMessages();
+        }
         if (test_section("specialChars"))
         {
             testSpecialChars();
@@ -86,6 +102,7 @@ struct SC::HttpURLParserTest : public SC::TestCase
     void testQueryParams();
     void testFormUrlEncoded();
     void testRequestTargetView();
+    void testDiagnosticMessages();
     void testSpecialChars();
     void testIPAddresses();
     void testReuseClearsPreviousResult();
@@ -423,6 +440,23 @@ void SC::HttpURLParserTest::testRequestTargetView()
     SC_TEST_EXPECT(not target.parse("relative/path"));
     SC_TEST_EXPECT(not target.parse("/bad path"));
     SC_TEST_EXPECT(not target.parse("/bad\tpath"));
+}
+
+void SC::HttpURLParserTest::testDiagnosticMessages()
+{
+    HttpRequestTargetView target;
+
+    SC_TEST_EXPECT(resultMessageEquals(target.parse(""), "HttpRequestTargetView empty request target"));
+    SC_TEST_EXPECT(resultMessageEquals(target.parse("/bad path"),
+                                       "HttpRequestTargetView request target contains invalid whitespace"));
+    SC_TEST_EXPECT(resultMessageEquals(target.parse("relative/path"),
+                                       "HttpRequestTargetView only supports origin-form request targets"));
+
+    char       storage[4];
+    StringSpan decoded;
+    SC_TEST_EXPECT(resultMessageEquals(HttpPercentDecode("%2", storage, decoded), "Malformed percent escape"));
+    SC_TEST_EXPECT(
+        resultMessageEquals(HttpPercentDecode("abcdef", {storage, 2}, decoded), "Decoded output buffer is too small"));
 }
 
 void SC::HttpURLParserTest::testSpecialChars()

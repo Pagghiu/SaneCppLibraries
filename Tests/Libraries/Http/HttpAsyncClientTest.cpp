@@ -197,6 +197,15 @@ static SC::Result decompressForTest(SC::ZLibStream::Algorithm algorithm, SC::Spa
     decoded = {outputStorage, sizeof(outputStorage) - remaining.sizeInBytes()};
     return SC::Result(true);
 }
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpAsyncClientTest : public SC::TestCase
@@ -895,7 +904,8 @@ void SC::HttpAsyncClientTest::requestOptions()
     invalidOptions.url        = url.view();
     invalidOptions.bodyMode   = HttpAsyncClient::RequestOptions::BodyMode::Stream;
     invalidOptions.bodyLength = 11;
-    SC_TEST_EXPECT(not client.sendRequest(loop, invalidOptions));
+    SC_TEST_EXPECT(resultMessageEquals(client.sendRequest(loop, invalidOptions),
+                                       "HttpAsyncClient RequestOptions body stream missing"));
 
     HttpAsyncClient::Header headers[] = {{"X-Upload-Mode", "request-options"}};
 

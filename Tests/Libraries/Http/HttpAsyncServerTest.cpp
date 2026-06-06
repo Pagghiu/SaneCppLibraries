@@ -218,6 +218,15 @@ struct TimeoutGuard
         return SC::Result(true);
     }
 };
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpAsyncServerTest : public SC::TestCase
@@ -243,6 +252,10 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
         if (test_section("response body helpers"))
         {
             responseBodyHelpers();
+        }
+        if (test_section("response diagnostic messages"))
+        {
+            responseDiagnosticMessages();
         }
         if (test_section("connection body copy helper"))
         {
@@ -278,6 +291,7 @@ struct SC::HttpAsyncServerTest : public SC::TestCase
     void standardResponseStatuses();
     void emptyResponseHelper();
     void responseBodyHelpers();
+    void responseDiagnosticMessages();
     void connectionBodyCopyHelper();
     void tlsOptionsAreServerScoped();
     void chunkedRequestDecoding();
@@ -929,6 +943,53 @@ void SC::HttpAsyncServerTest::responseBodyHelpers()
         response.setup(headers, writable);
 
         SC_TEST_EXPECT(not response.sendBody(200, "body", "text/plain"));
+    }
+}
+
+void SC::HttpAsyncServerTest::responseDiagnosticMessages()
+{
+    SC::AsyncBufferView  buffers[2] = {};
+    SC::AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    RecordedWritableStream writable;
+    SC_TEST_EXPECT(writable.init(pool));
+
+    char headers[256] = {0};
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(resultMessageEquals(response.addHeader("X-Test", "before-start"),
+                                           "startResponse or startRequest must be the first call"));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(
+            resultMessageEquals(response.startResponse(99, "Bad"), "HttpResponse status code must have three digits"));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(resultMessageEquals(response.startResponse(200, "Bad\rReason"),
+                                           "HttpResponse reason phrase must not contain CR or LF"));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(resultMessageEquals(response.sendRedirect(200, "/not-a-redirect"),
+                                           "HttpResponse redirect status must be 3xx"));
+    }
+
+    {
+        ProbeHttpResponse response;
+        response.setup(headers, writable);
+        SC_TEST_EXPECT(
+            resultMessageEquals(response.sendRedirect(302, ""), "HttpResponse redirect location must not be empty"));
     }
 }
 

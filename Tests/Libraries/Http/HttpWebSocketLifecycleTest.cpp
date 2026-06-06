@@ -143,6 +143,15 @@ static bool bytesEqual(SC::Span<const char> lhs, SC::StringSpan rhs)
     }
     return ::memcmp(lhs.data(), rhs.bytesWithoutTerminator(), lhs.sizeInBytes()) == 0;
 }
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
@@ -177,6 +186,10 @@ struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
         {
             connectionPump();
         }
+        if (test_section("connection pump diagnostics"))
+        {
+            connectionPumpDiagnostics();
+        }
     }
 
     void messageAssembler();
@@ -186,6 +199,7 @@ struct SC::HttpWebSocketLifecycleTest : public SC::TestCase
     void pendingControlBackpressure();
     void sendDataHelper();
     void connectionPump();
+    void connectionPumpDiagnostics();
 };
 
 void SC::HttpWebSocketLifecycleTest::messageAssembler()
@@ -455,6 +469,41 @@ void SC::HttpWebSocketLifecycleTest::connectionPump()
     pump.onData(pingBufferID);
     pool.unrefBuffer(pingBufferID);
     SC_TEST_EXPECT(eventCollector.errors == 1);
+}
+
+void SC::HttpWebSocketLifecycleTest::connectionPumpDiagnostics()
+{
+    HttpWebSocketConnectionPump pump;
+    HttpWebSocketTransportView  invalidTransport;
+
+    SC_TEST_EXPECT(resultMessageEquals(pump.attach(invalidTransport, HttpWebSocketEndpointRole::Server),
+                                       "HttpWebSocketConnectionPump transport is invalid"));
+    SC_TEST_EXPECT(
+        resultMessageEquals(pump.writeFrame("x"_a8.toCharSpan()), "HttpWebSocketConnectionPump is not attached"));
+
+    AsyncBufferView buffers[2] = {};
+    char            storage[2][32];
+    for (size_t idx = 0; idx < 2; ++idx)
+    {
+        buffers[idx] = Span<char>(storage[idx], sizeof(storage[idx]));
+        buffers[idx].setReusable(true);
+    }
+    AsyncBuffersPool pool;
+    pool.setBuffers(buffers);
+
+    PumpReadableStream readable;
+    PumpWritableStream writable;
+    SC_TEST_EXPECT(readable.init(pool));
+    SC_TEST_EXPECT(writable.init(pool));
+
+    HttpWebSocketTransportView transport;
+    transport.readableStream = &readable;
+    transport.writableStream = &writable;
+    transport.buffersPool    = &pool;
+
+    SC_TEST_EXPECT(pump.attach(transport, HttpWebSocketEndpointRole::Server));
+    SC_TEST_EXPECT(resultMessageEquals(pump.writeFrame({}), "HttpWebSocketConnectionPump cannot write empty frame"));
+    pump.detach();
 }
 
 void SC::runHttpWebSocketLifecycleTest(SC::TestReport& report) { HttpWebSocketLifecycleTest test(report); }
