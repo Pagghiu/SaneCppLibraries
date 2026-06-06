@@ -82,6 +82,11 @@ struct PayloadCollector
         return SC::Result(true);
     }
 };
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    return not result and SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpWebSocketHubTest : public SC::TestCase
@@ -96,10 +101,15 @@ struct SC::HttpWebSocketHubTest : public SC::TestCase
         {
             capacityLimit();
         }
+        if (test_section("diagnostic messages"))
+        {
+            diagnosticMessages();
+        }
     }
 
     void fixedSlotJoinLeaveAndBroadcast();
     void capacityLimit();
+    void diagnosticMessages();
 };
 
 void SC::HttpWebSocketHubTest::fixedSlotJoinLeaveAndBroadcast()
@@ -174,6 +184,33 @@ void SC::HttpWebSocketHubTest::capacityLimit()
     size_t index = 0;
     SC_TEST_EXPECT(hub.join(transport, index));
     SC_TEST_EXPECT(not hub.join(transport, index));
+}
+
+void SC::HttpWebSocketHubTest::diagnosticMessages()
+{
+    HttpWebSocketHubClient slots[1];
+    HttpWebSocketSmallHub  hub;
+    SC_TEST_EXPECT(hub.init(slots));
+
+    HttpWebSocketTransportView invalidTransport;
+    size_t                     index = 0;
+    SC_TEST_EXPECT(
+        resultMessageEquals(hub.join(invalidTransport, index), "HttpWebSocketSmallHub transport is invalid"));
+
+    DummyReadableStream readable;
+    DummyWritableStream writable;
+    AsyncBuffersPool    buffersPool;
+
+    HttpWebSocketTransportView transport;
+    transport.readableStream = &readable;
+    transport.writableStream = &writable;
+    transport.buffersPool    = &buffersPool;
+
+    SC_TEST_EXPECT(hub.join(transport, index));
+    SC_TEST_EXPECT(resultMessageEquals(hub.join(transport, index), "HttpWebSocketSmallHub is full"));
+    SC_TEST_EXPECT(
+        resultMessageEquals(hub.broadcastFrame({}), "HttpWebSocketSmallHub cannot broadcast an empty frame"));
+    SC_TEST_EXPECT(resultMessageEquals(hub.leave(2), "HttpWebSocketSmallHub client index out of range"));
 }
 
 void SC::runHttpWebSocketHubTest(SC::TestReport& report) { HttpWebSocketHubTest test(report); }
