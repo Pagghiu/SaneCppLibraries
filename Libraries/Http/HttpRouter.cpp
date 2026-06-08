@@ -202,10 +202,11 @@ Result HttpRouter::formatAllowHeader(StringSpan requestTarget, Span<char> storag
     {
         if (idx > 0)
         {
-            SC_TRY_MSG(HttpRouterInternal::append(storage, offset, ", "), "Allow output buffer is too small");
+            SC_TRY_MSG(HttpRouterInternal::append(storage, offset, ", "),
+                       "HttpRouter Allow output buffer is too small");
         }
         SC_TRY_MSG(HttpRouterInternal::append(storage, offset, HttpRouterInternal::methodName(methods[idx])),
-                   "Allow output buffer is too small");
+                   "HttpRouter Allow output buffer is too small");
     }
     allow = {{storage.data(), offset}, false, StringEncoding::Ascii};
     return Result(true);

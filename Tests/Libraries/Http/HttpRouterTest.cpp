@@ -5,6 +5,14 @@
 
 namespace SC
 {
+namespace
+{
+static bool resultMessageEquals(Result result, StringSpan expected)
+{
+    return not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) == expected;
+}
+} // namespace
+
 struct HttpRouterTest : public TestCase
 {
     HttpRouterTest(SC::TestReport& report) : TestCase(report, "HttpRouterTest")
@@ -13,9 +21,14 @@ struct HttpRouterTest : public TestCase
         {
             routeMatching();
         }
+        if (test_section("diagnostic messages"))
+        {
+            diagnosticMessages();
+        }
     }
 
     void routeMatching();
+    void diagnosticMessages();
 };
 
 void HttpRouterTest::routeMatching()
@@ -67,6 +80,28 @@ void HttpRouterTest::routeMatching()
 
     SC_TEST_EXPECT(not router.formatAllowHeader("/users/42", {allowStorage, 3}, allow));
     SC_TEST_EXPECT(not router.match(HttpParser::Method::HttpGET, "http://example.com/users/42", params, match));
+}
+
+void HttpRouterTest::diagnosticMessages()
+{
+    const HttpRoute routes[] = {
+        {HttpParser::Method::HttpGET, "/users/:id"},
+        {HttpParser::Method::HttpPUT, "/users/:id"},
+    };
+
+    HttpRouter router;
+    SC_TEST_EXPECT(router.init(routes));
+
+    char       allowStorage[3];
+    StringSpan allow;
+    SC_TEST_EXPECT(resultMessageEquals(router.formatAllowHeader("/users/42", allowStorage, allow),
+                                       "HttpRouter Allow output buffer is too small"));
+
+    HttpRouteParam params[1];
+    HttpRouteMatch match;
+    SC_TEST_EXPECT(
+        resultMessageEquals(router.match(HttpParser::Method::HttpGET, "http://example.com/users/42", params, match),
+                            "HttpRequestTargetView only supports origin-form request targets"));
 }
 
 void runHttpRouterTest(SC::TestReport& report) { HttpRouterTest test(report); }
