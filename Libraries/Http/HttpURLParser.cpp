@@ -98,6 +98,23 @@ bool SC::HttpFormUrlEncodedIterator::next(HttpURLQueryItem& item)
     return true;
 }
 
+bool SC::HttpFormUrlEncodedIterator::getValue(StringSpan body, StringSpan name, StringSpan& value)
+{
+    value = {};
+
+    HttpFormUrlEncodedIterator it(body);
+    HttpURLQueryItem           item;
+    while (it.next(item))
+    {
+        if (item.name == name)
+        {
+            value = item.value;
+            return true;
+        }
+    }
+    return false;
+}
+
 static int scHttpHexValue(char value)
 {
     if (value >= '0' and value <= '9')

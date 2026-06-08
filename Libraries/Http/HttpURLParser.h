@@ -37,6 +37,9 @@ struct SC_HTTP_EXPORT HttpFormUrlEncodedIterator
 
     bool next(HttpURLQueryItem& item);
 
+    /// @brief Finds first raw form value matching name in an application/x-www-form-urlencoded body.
+    static bool getValue(StringSpan body, StringSpan name, StringSpan& value);
+
   private:
     StringSpan body;
     size_t     cursor = 0;

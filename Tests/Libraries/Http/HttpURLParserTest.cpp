@@ -397,6 +397,20 @@ void SC::HttpURLParserTest::testFormUrlEncoded()
     SC_TEST_EXPECT(not HttpFormUrlDecode("abc", {storage, 2}, decoded));
 
     SC_TEST_EXPECT(not iterator.next(item));
+
+    StringSpan value;
+    SC_TEST_EXPECT(HttpFormUrlEncodedIterator::getValue("name=first&name=second", "name", value));
+    SC_TEST_EXPECT(value == "first");
+    SC_TEST_EXPECT(HttpFormUrlEncodedIterator::getValue("empty=&flag&encoded=%7Bok%7D", "empty", value));
+    SC_TEST_EXPECT(value.isEmpty());
+    SC_TEST_EXPECT(HttpFormUrlEncodedIterator::getValue("empty=&flag&encoded=%7Bok%7D", "flag", value));
+    SC_TEST_EXPECT(value.isEmpty());
+    SC_TEST_EXPECT(HttpFormUrlEncodedIterator::getValue("empty=&flag&encoded=%7Bok%7D", "encoded", value));
+    SC_TEST_EXPECT(value == "%7Bok%7D");
+    SC_TEST_EXPECT(HttpFormUrlEncodedIterator::getValue("vâlue=tëst"_u8, "vâlue"_u8, value));
+    SC_TEST_EXPECT(value == "tëst"_u8);
+    SC_TEST_EXPECT(not HttpFormUrlEncodedIterator::getValue("", "missing", value));
+    SC_TEST_EXPECT(value.isEmpty());
 }
 
 void SC::HttpURLParserTest::testRequestTargetView()
