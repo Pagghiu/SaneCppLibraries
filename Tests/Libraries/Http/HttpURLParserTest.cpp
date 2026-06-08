@@ -392,9 +392,10 @@ void SC::HttpURLParserTest::testFormUrlEncoded()
 
     SC_TEST_EXPECT(iterator.next(item));
     SC_TEST_EXPECT(item.name == "bad");
-    SC_TEST_EXPECT(not HttpPercentDecode(item.value, storage, decoded));
-    SC_TEST_EXPECT(not HttpFormUrlDecode("%2", storage, decoded));
-    SC_TEST_EXPECT(not HttpFormUrlDecode("abc", {storage, 2}, decoded));
+    SC_TEST_EXPECT(resultMessageEquals(HttpPercentDecode(item.value, storage, decoded), "Malformed percent escape"));
+    SC_TEST_EXPECT(resultMessageEquals(HttpFormUrlDecode("%2", storage, decoded), "Malformed percent escape"));
+    SC_TEST_EXPECT(
+        resultMessageEquals(HttpFormUrlDecode("abc", {storage, 2}, decoded), "Decoded output buffer is too small"));
 
     SC_TEST_EXPECT(not iterator.next(item));
 
