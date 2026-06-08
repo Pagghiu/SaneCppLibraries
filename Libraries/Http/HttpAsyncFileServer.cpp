@@ -55,7 +55,7 @@ Result HttpAsyncFileServer::init(ThreadPool& pool, AsyncEventLoop& loop, StringS
     eventLoop  = &loop;
     threadPool = &pool;
 
-    SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "Invalid directory");
+    SC_TRY_MSG(FileSystem().existsAndIsDirectory(directoryToServe), "HttpAsyncFileServer::init invalid directory");
     SC_TRY(directory.assign(directoryToServe));
     return Result(true);
 }

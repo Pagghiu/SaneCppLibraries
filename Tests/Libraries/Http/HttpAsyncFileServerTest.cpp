@@ -30,6 +30,11 @@ SC::StringSpan httpAsyncFileServerTestMimeLookup(SC::StringSpan extension, void*
     }
     return {};
 }
+
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    return not result and SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
 } // namespace
 
 struct SC::HttpAsyncFileServerTest : public SC::TestCase
@@ -52,10 +57,15 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
         {
             customMimeLookup();
         }
+        if (test_section("option diagnostic messages"))
+        {
+            optionDiagnosticMessages();
+        }
     }
     void httpFileServerTest(bool useAsyncFileSend);
     void uploadPolicy();
     void customMimeLookup();
+    void optionDiagnosticMessages();
 };
 
 void SC::HttpAsyncFileServerTest::customMimeLookup()
@@ -128,6 +138,33 @@ void SC::HttpAsyncFileServerTest::customMimeLookup()
     SC_TEST_EXPECT(eventLoop.run());
     SC_TEST_EXPECT(fileServer.close());
     SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncFileServerTest::optionDiagnosticMessages()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    ThreadPool          threadPool;
+    HttpAsyncFileServer fileServer;
+    SC_TEST_EXPECT(resultMessageEquals(fileServer.init(threadPool, eventLoop, "missing-http-fixture-directory"),
+                                       "HttpAsyncFileServer::init invalid directory"));
+
+    HttpAsyncFileServerOptions options;
+    options.spaFallbackPath = "../app.html";
+    SC_TEST_EXPECT(
+        resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer parent path segment rejected"));
+
+    options.spaFallbackPath = "assets\\app.html";
+    SC_TEST_EXPECT(resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer invalid path character"));
+
+    options.spaFallbackPath = "./app.html";
+    SC_TEST_EXPECT(
+        resultMessageEquals(fileServer.setOptions(options), "HttpAsyncFileServer dot path segment rejected"));
+
+    options.spaFallbackPath = "/app.html";
+    SC_TEST_EXPECT(fileServer.setOptions(options));
     SC_TEST_EXPECT(eventLoop.close());
 }
 
