@@ -16,7 +16,7 @@ Result HttpAsyncServer::initInternal(SpanWithStride<HttpConnection> connectionsS
         }
         if (connection.writableSocketStream.getWriteQueueSize() == 0)
         {
-            return Result::Error("HttpConnection::readableSocketStream::writeQueue is empty");
+            return Result::Error("HttpConnection::writableSocketStream::writeQueue is empty");
         }
         SC_TRY_MSG(connection.buffersPool.getNumBuffers() > 0, "HttpAsyncServer - AsyncBuffersPool is empty");
     }

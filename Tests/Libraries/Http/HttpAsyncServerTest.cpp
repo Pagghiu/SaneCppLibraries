@@ -1000,6 +1000,33 @@ void SC::HttpAsyncServerTest::responseDiagnosticMessages()
 
 void SC::HttpAsyncServerTest::serverLifecycleDiagnosticMessages()
 {
+    {
+        HttpConnection  connection;
+        HttpAsyncServer server;
+        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
+                                           "HttpConnection::readableSocketStream::readQueue is empty"));
+    }
+
+    {
+        HttpConnection               connection;
+        AsyncReadableStream::Request readQueue[1];
+        HttpAsyncServer              server;
+        connection.readableSocketStream.setReadQueue(readQueue);
+        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
+                                           "HttpConnection::writableSocketStream::writeQueue is empty"));
+    }
+
+    {
+        HttpConnection               connection;
+        AsyncReadableStream::Request readQueue[1];
+        AsyncWritableStream::Request writeQueue[1];
+        HttpAsyncServer              server;
+        connection.readableSocketStream.setReadQueue(readQueue);
+        connection.writableSocketStream.setWriteQueue(writeQueue);
+        SC_TEST_EXPECT(resultMessageEquals(server.init(Span<HttpConnection>(&connection, 1)),
+                                           "HttpAsyncServer - AsyncBuffersPool is empty"));
+    }
+
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
