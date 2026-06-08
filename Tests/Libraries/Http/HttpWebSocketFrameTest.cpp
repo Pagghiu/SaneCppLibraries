@@ -543,19 +543,23 @@ void SC::HttpWebSocketFrameTest::invalidFrameRejection()
 
     SC::uint8_t oversizedControl[] = {0x89, 0x7E, 0x00, 0x7E};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(oversizedControl, sizeof(oversizedControl)), consumed));
+    result = reader.parse(byteSpan(oversizedControl, sizeof(oversizedControl)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader control frame payload too large"));
 
     SC::uint8_t invalid64Length[] = {0x82, 0x7F, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(invalid64Length, sizeof(invalid64Length)), consumed));
+    result = reader.parse(byteSpan(invalid64Length, sizeof(invalid64Length)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader invalid 64-bit payload length"));
 
     SC::uint8_t continuationWithoutStart[] = {0x80, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(continuationWithoutStart, sizeof(continuationWithoutStart)), consumed));
+    result = reader.parse(byteSpan(continuationWithoutStart, sizeof(continuationWithoutStart)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader unexpected continuation frame"));
 
     SC::uint8_t unexpectedNewDataFrame[] = {0x01, 0x00, 0x81, 0x00};
     reader.reset(HttpWebSocketEndpointRole::Client);
-    SC_TEST_EXPECT(not reader.parse(byteSpan(unexpectedNewDataFrame, sizeof(unexpectedNewDataFrame)), consumed));
+    result = reader.parse(byteSpan(unexpectedNewDataFrame, sizeof(unexpectedNewDataFrame)), consumed);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpWebSocketFrameReader expected continuation frame"));
 
     HttpWebSocketFrameWriter writer;
     writer.reset(HttpWebSocketEndpointRole::Server);
