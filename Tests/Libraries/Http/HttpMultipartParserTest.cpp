@@ -10,6 +10,18 @@ namespace SC
 struct HttpMultipartParserTest;
 }
 
+namespace
+{
+static bool resultMessageEquals(SC::Result result, SC::StringSpan expected)
+{
+    if (result or result.message == nullptr)
+    {
+        return false;
+    }
+    return SC::StringSpan::fromNullTerminated(result.message, SC::StringEncoding::Ascii) == expected;
+}
+} // namespace
+
 struct SC::HttpMultipartParserTest : public SC::TestCase
 {
     void testMultipart(const StringView originalString, const StringView boundary, bool isStreaming)
@@ -248,6 +260,10 @@ struct SC::HttpMultipartParserTest : public SC::TestCase
             SC_TEST_EXPECT(not HttpMultipartIsSafeFileName("drive:file.txt"));
             SC_TEST_EXPECT(not HttpMultipartIsSafeFileName(StringSpan({"\x01.txt", 5}, false, StringEncoding::Ascii)));
             SC_TEST_EXPECT(HttpMultipartIsSafeFileName("raw-utf8-\xC3\xA8.txt"));
+
+            SC_TEST_EXPECT(resultMessageEquals(disposition.parse(""), "Multipart Content-Disposition is empty"));
+            SC_TEST_EXPECT(resultMessageEquals(disposition.parse(" ; name=\"field\""),
+                                               "Multipart Content-Disposition disposition is empty"));
         }
 
         if (test_section("large data streaming"))
