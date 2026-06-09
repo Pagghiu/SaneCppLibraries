@@ -943,10 +943,7 @@ void SC::HttpAsyncClientTest::requestOptions()
     HttpAsyncClient::Header headers[] = {{"X-Upload-Mode", "request-options"}};
 
     HttpAsyncClient::RequestOptions options;
-    options.method    = HttpParser::Method::HttpPUT;
-    options.url       = url.view();
-    options.headers   = Span<const HttpAsyncClient::Header>(headers);
-    options.keepAlive = false;
+    options.setRequest(HttpParser::Method::HttpPUT, url.view()).setHeaders(headers);
     options.setBody("OptionsBody");
 
     SC_TEST_EXPECT(timeout.start(loop, TimeMs{2000}));
