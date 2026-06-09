@@ -53,6 +53,10 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
         {
             uploadPolicy();
         }
+        if (test_section("uploads disabled"))
+        {
+            uploadsDisabled();
+        }
         if (test_section("custom MIME lookup"))
         {
             customMimeLookup();
@@ -64,6 +68,7 @@ struct SC::HttpAsyncFileServerTest : public SC::TestCase
     }
     void httpFileServerTest(bool useAsyncFileSend);
     void uploadPolicy();
+    void uploadsDisabled();
     void customMimeLookup();
     void optionDiagnosticMessages();
 };
@@ -219,6 +224,71 @@ void SC::HttpAsyncFileServerTest::uploadPolicy()
     };
 
     SC_TEST_EXPECT(client.put(eventLoop, url.view(), "too-large"));
+
+    AsyncLoopTimeout timeout;
+    timeout.callback = [this](AsyncLoopTimeout::Result&)
+    { SC_TEST_EXPECT("Test never finished. Event Loop is stuck. Timeout expired." && false); };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{2000}));
+    eventLoop.excludeFromActiveCount(timeout);
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(fileServer.close());
+    SC_TEST_EXPECT(httpServer.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::HttpAsyncFileServerTest::uploadsDisabled()
+{
+    StringView     webServerFolder = report.applicationRootDirectory.view();
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create());
+
+    using HttpConnectionType = HttpAsyncConnection<2, 2, 8 * 1024, 8 * 1024>;
+
+    HttpConnectionType                  connections[1];
+    HttpAsyncFileServer::StreamQueue<2> streams[1];
+    HttpAsyncServer                     httpServer;
+    HttpAsyncFileServer                 fileServer;
+    ThreadPool                          threadPool;
+    const uint16_t                      serverPort = report.mapPort(26121);
+
+    if (eventLoop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(threadPool.create(2));
+    }
+    SC_TEST_EXPECT(httpServer.init(Span<HttpConnectionType>(connections)));
+    SC_TEST_EXPECT(httpServer.start(eventLoop, "127.0.0.1", serverPort));
+    SC_TEST_EXPECT(fileServer.init(threadPool, eventLoop, webServerFolder));
+
+    HttpAsyncFileServerOptions options;
+    options.enableUploads = false;
+    SC_TEST_EXPECT(fileServer.setOptions(options));
+
+    httpServer.onRequest = [&](HttpConnection& connection)
+    { SC_ASSERT_RELEASE(fileServer.handleRequest(streams[connection.getConnectionID().getIndex()], connection)); };
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(webServerFolder));
+
+    HttpTestClient client;
+    String         url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/disabled-upload.txt", serverPort));
+    struct UploadsDisabledContext
+    {
+        HttpAsyncFileServerTest* test;
+        HttpAsyncServer*         httpServer;
+        FileSystem*              fs;
+    } context       = {this, &httpServer, &fs};
+    client.callback = [&context](HttpTestClient& result)
+    {
+        const StringView response(result.getResponse());
+        context.test->recordExpectation("403 response", response.containsString("403 Forbidden"));
+        context.test->recordExpectation("disabled file missing",
+                                        not context.fs->existsAndIsFile("disabled-upload.txt"));
+        context.test->recordExpectation("stop server", context.httpServer->stop());
+    };
+
+    SC_TEST_EXPECT(client.put(eventLoop, url.view(), "blocked"));
 
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
