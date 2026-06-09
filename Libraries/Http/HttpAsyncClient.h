@@ -103,6 +103,26 @@ struct SC_HTTP_EXPORT HttpAsyncClient
         BodyMode bodyMode  = BodyMode::None;
         bool     keepAlive = false;
 
+        RequestOptions& setRequest(HttpParser::Method newMethod, StringSpan newURL, bool newKeepAlive = false)
+        {
+            method    = newMethod;
+            url       = newURL;
+            keepAlive = newKeepAlive;
+            return *this;
+        }
+
+        RequestOptions& setHeaders(Span<const Header> newHeaders)
+        {
+            headers = newHeaders;
+            return *this;
+        }
+
+        RequestOptions& setKeepAlive(bool newKeepAlive = true)
+        {
+            keepAlive = newKeepAlive;
+            return *this;
+        }
+
         RequestOptions& clearBody()
         {
             body            = {};

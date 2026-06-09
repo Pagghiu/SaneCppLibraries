@@ -341,6 +341,20 @@ void SC::HttpAsyncClientTest::requestOptionBodyHelpers()
     HttpAsyncClient::RequestOptions options;
     SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::None);
 
+    HttpAsyncClient::Header headers[] = {{"X-Test", "yes"}, {"X-Mode", "options"}};
+    SC_TEST_EXPECT(&options.setRequest(HttpParser::Method::HttpPOST, "http://example.com/post", true) == &options);
+    SC_TEST_EXPECT(options.method == HttpParser::Method::HttpPOST);
+    SC_TEST_EXPECT(options.url == "http://example.com/post");
+    SC_TEST_EXPECT(options.keepAlive);
+    SC_TEST_EXPECT(&options.setHeaders(headers) == &options);
+    SC_TEST_EXPECT(options.headers.sizeInElements() == 2);
+    SC_TEST_EXPECT(options.headers[0].name == "X-Test");
+    SC_TEST_EXPECT(options.headers[1].value == "options");
+    SC_TEST_EXPECT(&options.setKeepAlive(false) == &options);
+    SC_TEST_EXPECT(not options.keepAlive);
+    SC_TEST_EXPECT(&options.setKeepAlive() == &options);
+    SC_TEST_EXPECT(options.keepAlive);
+
     HttpAsyncClient::RequestOptions* returned = &options.setBody(StringSpan("abc"));
     SC_TEST_EXPECT(returned == &options);
     SC_TEST_EXPECT(options.bodyMode == HttpAsyncClient::RequestOptions::BodyMode::Span);
