@@ -498,7 +498,7 @@ void SC::HttpAsyncClientTest::httpsRejectedUntilTlsTransportExists()
     client.onError = [&errorCallbackCalled](Result) { errorCallbackCalled = true; };
 
     const Result result = client.get(loop, "https://example.com/");
-    SC_TEST_EXPECT(not result);
+    SC_TEST_EXPECT(resultMessageEquals(result, "HttpAsyncClient https URLs require TLS transport support"));
     SC_TEST_EXPECT(not errorCallbackCalled);
     SC_TEST_EXPECT(client.close());
     SC_TEST_EXPECT(loop.close());
@@ -1621,10 +1621,8 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
     client.onResponse = [this](HttpAsyncClientResponse&) { SC_TEST_EXPECT(false); };
     client.onError    = [this, &ctx](Result result)
     {
-        ctx.errorCalled = true;
-        ctx.errorMessageMatched =
-            not result and StringSpan::fromNullTerminated(result.message, StringEncoding::Ascii) ==
-                               "HttpAsyncClient TLS backend unavailable";
+        ctx.errorCalled         = true;
+        ctx.errorMessageMatched = resultMessageEquals(result, "HttpAsyncClient TLS backend unavailable");
         SC_TEST_EXPECT(ctx.server->stop());
     };
 
