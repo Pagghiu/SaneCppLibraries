@@ -45,10 +45,15 @@ struct ConsumePublicHttpHeaderSymbols
         SC::HttpWebSocketConnectionPump         pump;
         SC::HttpWebSocketSmallHub               hub;
 
-        parser.type    = SC::HttpParser::Type::Request;
-        route.method   = SC::HttpParser::Method::HttpGET;
-        frame.opcode   = SC::HttpWebSocketOpcode::Text;
-        request.method = SC::HttpParser::Method::HttpPOST;
+        parser.type  = SC::HttpParser::Type::Request;
+        route.method = SC::HttpParser::Method::HttpGET;
+        frame.opcode = SC::HttpWebSocketOpcode::Text;
+
+        request.setRequest(SC::HttpParser::Method::HttpPOST, SC::StringSpan("/upload"), true)
+            .setHeaders({&clientHeader, 1})
+            .setKeepAlive(false)
+            .setBody(SC::StringSpan("body"))
+            .clearBody();
 
         frameReader.reset(SC::HttpWebSocketEndpointRole::Server);
         frameWriter.reset(SC::HttpWebSocketEndpointRole::Client);
