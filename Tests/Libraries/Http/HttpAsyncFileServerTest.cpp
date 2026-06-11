@@ -270,25 +270,42 @@ void SC::HttpAsyncFileServerTest::uploadsDisabled()
     FileSystem fs;
     SC_TEST_EXPECT(fs.init(webServerFolder));
 
-    HttpTestClient client;
-    String         url = StringEncoding::Ascii;
-    SC_TEST_EXPECT(StringBuilder::format(url, "http://127.0.0.1:{}/disabled-upload.txt", serverPort));
+    HttpTestClient putClient;
+    HttpTestClient multipartClient;
+    String         putURL       = StringEncoding::Ascii;
+    String         multipartURL = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(putURL, "http://127.0.0.1:{}/disabled-upload.txt", serverPort));
+    SC_TEST_EXPECT(StringBuilder::format(multipartURL, "http://127.0.0.1:{}/upload", serverPort));
     struct UploadsDisabledContext
     {
         HttpAsyncFileServerTest* test;
         HttpAsyncServer*         httpServer;
         FileSystem*              fs;
-    } context       = {this, &httpServer, &fs};
-    client.callback = [&context](HttpTestClient& result)
+        AsyncEventLoop*          loop;
+        HttpTestClient*          multipartClient;
+        String*                  multipartURL;
+    } context          = {this, &httpServer, &fs, &eventLoop, &multipartClient, &multipartURL};
+    putClient.callback = [&context](HttpTestClient& result)
     {
         const StringView response(result.getResponse());
-        context.test->recordExpectation("403 response", response.containsString("403 Forbidden"));
-        context.test->recordExpectation("disabled file missing",
+        context.test->recordExpectation("PUT 403 response", response.containsString("403 Forbidden"));
+        context.test->recordExpectation("disabled PUT file missing",
                                         not context.fs->existsAndIsFile("disabled-upload.txt"));
+        context.test->recordExpectation("start disabled multipart upload",
+                                        context.multipartClient->postMultipart(*context.loop,
+                                                                               context.multipartURL->view(), "file",
+                                                                               "disabled-multipart.txt", "blocked"));
+    };
+    multipartClient.callback = [&context](HttpTestClient& result)
+    {
+        const StringView response(result.getResponse());
+        context.test->recordExpectation("multipart 403 response", response.containsString("403 Forbidden"));
+        context.test->recordExpectation("disabled multipart file missing",
+                                        not context.fs->existsAndIsFile("disabled-multipart.txt"));
         context.test->recordExpectation("stop server", context.httpServer->stop());
     };
 
-    SC_TEST_EXPECT(client.put(eventLoop, url.view(), "blocked"));
+    SC_TEST_EXPECT(putClient.put(eventLoop, putURL.view(), "blocked"));
 
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
