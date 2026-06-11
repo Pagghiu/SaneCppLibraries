@@ -697,7 +697,7 @@ void SC::HttpAsyncServerTest::chunkedRequestRejectsTrailers()
     httpServer.onError = [this, &serverContext](Result result)
     {
         serverContext.sawError = true;
-        SC_TEST_EXPECT(not result);
+        SC_TEST_EXPECT(resultMessageEquals(result, "HttpIncomingMessage non-empty trailers are not supported"));
     };
 
     httpServer.onRequest = [this, &serverContext](HttpConnection& client)
@@ -765,7 +765,7 @@ void SC::HttpAsyncServerTest::maxHeaderSizeError()
     httpServer.onError   = [this, &serverContext](Result result)
     {
         serverContext.sawError = true;
-        SC_TEST_EXPECT(not result);
+        SC_TEST_EXPECT(resultMessageEquals(result, "Header size exceeded limit"));
     };
 
     HttpTestClient client;
