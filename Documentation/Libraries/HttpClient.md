@@ -68,7 +68,7 @@ Protocol policy:
 Proxy policy:
 - `Default` keeps the backend/system proxy behavior
 - `NoProxy` bypasses proxies where the backend exposes per-request control
-- `Http` uses a caller-owned `http://` proxy URL
+- `Http` uses a caller-owned host-only `http://` proxy URL with no path, query, fragment, whitespace, or control bytes
 - `authorization` is an optional exact `Proxy-Authorization` value for explicit HTTP proxies
 - `bypassList` is an optional comma-separated host list for explicit HTTP proxies
 - Apple currently fails fast for non-default proxy policy because `NSURLSession` proxy dictionaries would need a separate supported API shape

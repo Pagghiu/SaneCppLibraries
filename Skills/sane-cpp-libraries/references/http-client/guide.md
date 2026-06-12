@@ -11,7 +11,8 @@ Choose `http-client` when the task needs the separate native-backend client and 
 - Request configuration is grouped into headers, body, and `HttpClientRequestOptions`; streamed uploads live in `HttpClientRequestBody`.
 - Use the request method, body framing, redirect, protocol, and proxy name helpers for allocation-free diagnostics.
 - Use `HttpClientRequest::validate()` when callers want to check request shape before starting an operation.
-- Request URL, method, redirect mode, and headers are validated in `start()` before backend setup; core requests support `http://` and `https://` URLs.
+- Request URL, method, redirect mode, headers, and proxy URL shape are validated in `start()` before backend setup; core requests support `http://` and `https://` URLs.
+- Explicit HTTP proxy URLs must be caller-owned, host-only `http://` values with no path, query, fragment, whitespace, or control bytes.
 - Protocol, TLS, and proxy policies are preflighted against `HttpClientCapabilities` in `start()`.
 - Use `HttpClientSession` only as an optional caller-owned layer for cookies, cached authorization values, Basic auth challenge helpers, and retry bookkeeping.
 - Use `HttpClientSessionAuthChallenge::getTargetName()` and `getSchemeName()` for no-allocation auth diagnostics.
