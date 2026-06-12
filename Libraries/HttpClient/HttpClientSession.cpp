@@ -314,6 +314,14 @@ static bool sessionRequestHasHeader(const SC::HttpClientRequest& request, SC::St
 static bool parseUrl(SC::StringSpan url, ParsedUrl& parsed)
 {
     const SC::Span<const char> bytes = url.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        const unsigned char c = static_cast<unsigned char>(bytes[idx]);
+        if (c <= ' ' or c == 0x7f)
+        {
+            return false;
+        }
+    }
 
     size_t schemeEnd = 0;
     while (schemeEnd + 2 < bytes.sizeInBytes())
@@ -330,7 +338,18 @@ static bool parseUrl(SC::StringSpan url, ParsedUrl& parsed)
     }
 
     const SC::StringSpan scheme = sliceString(url, 0, schemeEnd);
-    parsed.isHttps              = sessionAsciiEqualsIgnoreCase(scheme, SC::StringSpan("https"));
+    if (sessionAsciiEqualsIgnoreCase(scheme, SC::StringSpan("http")))
+    {
+        parsed.isHttps = false;
+    }
+    else if (sessionAsciiEqualsIgnoreCase(scheme, SC::StringSpan("https")))
+    {
+        parsed.isHttps = true;
+    }
+    else
+    {
+        return false;
+    }
 
     const size_t hostStart = schemeEnd + 3;
     size_t       hostEnd   = hostStart;

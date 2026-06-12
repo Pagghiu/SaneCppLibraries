@@ -1553,6 +1553,31 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(prepared.headers[1].name == "Authorization"_a8);
         SC_TEST_EXPECT(prepared.headers[1].value == "Basic dGVzdDpzZWNyZXQ="_a8);
 
+        auto expectSessionUrlRejected = [&](StringSpan url)
+        {
+            HttpClientRequest invalidSource;
+            invalidSource.url = url;
+            SC_TEST_EXPECT(not session.prepareRequest(invalidSource, prepared));
+            SC_TEST_EXPECT(not session.captureResponse(invalidSource, response));
+        };
+
+        {
+            expectSessionUrlRejected("ftp://example.test/api/list"_a8);
+        }
+        {
+            expectSessionUrlRejected("http://"_a8);
+        }
+        {
+            expectSessionUrlRejected("https:///missing-host"_a8);
+        }
+        {
+            expectSessionUrlRejected("https://example.test/bad url"_a8);
+        }
+        {
+            static const char BadUrl[] = {'h', 't', 't', 'p', ':', '/', '/', 'b', 'a', 'd', '\0', 'h', 'o', 's', 't'};
+            expectSessionUrlRejected({{BadUrl, sizeof(BadUrl)}, false, StringEncoding::Ascii});
+        }
+
         session.clearAuthorizations();
         SC_TEST_EXPECT(session.getNumAuthorizations() == 0);
         SC_TEST_EXPECT(not session.findAuthorization("https://example.test"_a8, cachedAuthorization));
