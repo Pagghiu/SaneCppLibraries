@@ -1915,16 +1915,40 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(not operation.start(request, response));
         }
 
+        auto expectProxyUrlRejected = [&](StringSpan proxyUrl)
         {
             HttpClientRequest  request;
             HttpClientResponse response;
 
             request.url                               = "http://127.0.0.1:1/proxy"_a8;
             request.options.proxy.mode                = HttpClientRequestProxyOptions::Http;
-            request.options.proxy.url                 = "https://127.0.0.1:1"_a8;
+            request.options.proxy.url                 = proxyUrl;
             request.options.timeouts.requestTimeoutMs = 1;
 
+            SC_TEST_EXPECT(not request.validate());
             SC_TEST_EXPECT(not operation.start(request, response));
+            SC_TEST_EXPECT(not operation.isRequestInFlight());
+        };
+
+        {
+            expectProxyUrlRejected("https://127.0.0.1:1"_a8);
+        }
+        {
+            expectProxyUrlRejected("http://"_a8);
+        }
+        {
+            expectProxyUrlRejected("http:///missing-host"_a8);
+        }
+        {
+            expectProxyUrlRejected("http://127.0.0.1:1/path"_a8);
+        }
+        {
+            expectProxyUrlRejected("http://bad proxy:1"_a8);
+        }
+        {
+            static const char BadProxyUrl[] = {'h', 't', 't',  'p', ':', '/', '/', 'b',
+                                               'a', 'd', '\0', 'p', 'r', 'o', 'x', 'y'};
+            expectProxyUrlRejected({{BadProxyUrl, sizeof(BadProxyUrl)}, false, StringEncoding::Ascii});
         }
 
 #if SC_PLATFORM_APPLE

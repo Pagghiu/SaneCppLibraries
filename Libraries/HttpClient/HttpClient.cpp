@@ -281,6 +281,20 @@ static bool hasHttpHeaderUnsafeBytes(SC::StringSpan value)
     return false;
 }
 
+static bool hasUrlUnsafeBytes(SC::StringSpan value)
+{
+    const SC::Span<const char> bytes = value.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        const unsigned char c = static_cast<unsigned char>(bytes[idx]);
+        if (c <= ' ' or c == 0x7f)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& proxy)
 {
     SC_TRY_MSG(isValidProxyMode(proxy.mode), "HttpClientRequestOptions: invalid proxy mode");
@@ -292,7 +306,12 @@ static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& 
                    "HttpClientRequestOptions: HTTP proxy URL is empty");
         SC_TRY_MSG(asciiStartsWithIgnoreCase(proxy.url, SC::StringSpan("http://")),
                    "HttpClientRequestOptions: only http:// proxy URLs are supported");
+        SC_TRY_MSG(not hasUrlUnsafeBytes(proxy.url),
+                   "HttpClientRequestOptions: HTTP proxy URL contains whitespace or control bytes");
         const SC::Span<const char> proxyBytes = proxy.url.toCharSpan();
+        SC_TRY_MSG(proxyBytes[HttpProxySchemeBytes] != '/' and proxyBytes[HttpProxySchemeBytes] != '?' and
+                       proxyBytes[HttpProxySchemeBytes] != '#',
+                   "HttpClientRequestOptions: HTTP proxy URL host is empty");
         for (size_t idx = HttpProxySchemeBytes; idx < proxyBytes.sizeInBytes(); ++idx)
         {
             SC_TRY_MSG(proxyBytes[idx] != '/' and proxyBytes[idx] != '?' and proxyBytes[idx] != '#',
@@ -320,11 +339,7 @@ static SC::Result validateRequestUrl(SC::StringSpan url)
     SC_TRY_MSG(url.sizeInBytes() > 0, "HttpClientRequest: URL is empty");
 
     const SC::Span<const char> bytes = url.toCharSpan();
-    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
-    {
-        const unsigned char c = static_cast<unsigned char>(bytes[idx]);
-        SC_TRY_MSG(c > ' ' and c != 0x7f, "HttpClientRequest: URL contains whitespace or control bytes");
-    }
+    SC_TRY_MSG(not hasUrlUnsafeBytes(url), "HttpClientRequest: URL contains whitespace or control bytes");
 
     size_t schemeBytes = 0;
     if (asciiStartsWithIgnoreCase(url, SC::StringSpan("http://")))
