@@ -1,0 +1,68 @@
+name: Feature Request
+description: Request an API, behavior change, platform support, or focused improvement.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for opening a feature request. GitHub issues are the preferred contribution path.
+
+        New library proposals are out of scope for implementation contributions. You may open an issue to discuss future ideas, but please do not submit a code pull request adding a new library unless the maintainer explicitly requested it.
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: Existing reports
+      options:
+        - label: I searched existing issues and discussions for related requests.
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What user need, bug, limitation, or missing platform support motivates this request?
+      placeholder: Describe why this feature matters.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Desired behavior
+      description: What should Sane C++ Libraries do?
+      placeholder: Describe the behavior you want.
+    validations:
+      required: true
+  - type: input
+    id: libraries
+    attributes:
+      label: Affected libraries or tools
+      placeholder: "SC::HttpClient, SC::Build, documentation..."
+  - type: input
+    id: platforms
+    attributes:
+      label: Affected platforms
+      description: Optional. Include OS, architecture, compiler, or configuration if relevant.
+      placeholder: "Windows, Linux, macOS, all platforms..."
+  - type: textarea
+    id: api
+    attributes:
+      label: Optional API or usage sketch
+      description: A rough call-site sketch is helpful but not required.
+      placeholder: |
+        HttpClientRequestOptions options;
+        options.timeout = ...
+  - type: textarea
+    id: validation
+    attributes:
+      label: Suggested validation
+      description: What tests, examples, platforms, or manual checks would prove this works?
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Optional agent prompt
+      description: If helpful, include a prompt an agent or maintainer can use to implement or investigate this request.
+      placeholder: "Starting from a clean checkout..."
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any relevant constraints, links, examples, or notes. Do not include secrets or confidential context.

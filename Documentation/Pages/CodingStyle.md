@@ -2,16 +2,16 @@
 
 [TOC]
 
-> Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or PRs being reviewed.
+> Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or pull requests being reviewed.
 
 @note
-If you really like to contribute check also [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)!
+If you would like to contribute, check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md) for the current issue-first and agent-friendly workflow.
 
 # Formatting
 All files should be formatted according to the `.clang-format` file using `clang-format` version 20.1.8.  
 
 
-Github CI will fail on PR that are not properly formatted.
+Generated, regenerated, or maintainer-merged code must still be formatted. GitHub CI will fail on pull requests that are not properly formatted.
 
 In some specific cases use `// clang-format off` and `// clang-format on` where a custom formatting can improve code look.
 For example many template specializations in the `SC::Reflection` library are better manually formatted/aligned to highlight the pattern.
@@ -190,7 +190,7 @@ All newly added code must have associated tests.
 # Documentation
 
 All public classes should be documented, possibly with an usage example.  
-Documentation website will be automatically updated when a PR is merged to master.
+Documentation website will be automatically updated when changes are merged to master.
 
 # Comments
 

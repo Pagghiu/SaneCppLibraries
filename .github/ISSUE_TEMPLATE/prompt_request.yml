@@ -1,0 +1,60 @@
+name: Prompt Request
+description: Contribute agent-ready context, investigation direction, or a reusable implementation prompt.
+title: "[Prompt Request]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A Prompt Request is an issue-first contribution. It gives a maintainer or agent enough context to investigate, design, or implement a change.
+
+        The prompt itself is optional but preferred. The durable context is the important part.
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: Existing reports
+      options:
+        - label: I searched existing issues and discussions for related reports or requests.
+          required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What should an agent or maintainer investigate or change?
+      placeholder: Describe the desired outcome.
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What should the maintainer or agent know before starting?
+      placeholder: Include links, affected files, observed behavior, design constraints, or prior attempts.
+    validations:
+      required: true
+  - type: input
+    id: libraries
+    attributes:
+      label: Affected libraries or tools
+      placeholder: "SC::Async, SC::Process, Documentation..."
+  - type: input
+    id: platforms
+    attributes:
+      label: Affected platforms
+      description: Optional. Include OS, architecture, compiler, or configuration if relevant.
+      placeholder: "macOS, Windows, Linux, all platforms..."
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Suggested prompt
+      description: Optional but preferred. Ask the agent to read `AGENTS.md` and any relevant local `AGENTS.md` files.
+      placeholder: "Starting from a clean checkout of Sane C++ Libraries..."
+  - type: textarea
+    id: validation
+    attributes:
+      label: Expected validation
+      description: What tests, commands, platforms, or manual checks should be used?
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Do not include secrets, proprietary code, private transcripts, or confidential context.

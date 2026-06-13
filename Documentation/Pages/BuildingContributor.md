@@ -1,6 +1,6 @@
 @page page_building_contributor Building (Contributor)
 
-Follow this guide if you're interested in building the library to contribute (check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)! and [Coding Style](@ref page_coding_style)) or you're simply curious to run the test suite.
+Follow this guide if you need to build the library locally, validate a code pull request, reproduce an issue, or run the test suite. Check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md) for the current contribution workflow and [Coding Style](@ref page_coding_style) for formatting and code rules.
 
 [TOC]
 

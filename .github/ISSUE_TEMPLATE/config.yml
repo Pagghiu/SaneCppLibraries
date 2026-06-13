@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Sane Coding Discord
+    url: https://discord.gg/tyBfFp33Z6
+    about: Informal discussion before opening an actionable issue.
+  - name: GitHub Discussions
+    url: https://github.com/Pagghiu/SaneCppLibraries/discussions
+    about: Design discussion, questions, and broader project topics.

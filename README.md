@@ -103,9 +103,11 @@ See [Building (user)](https://pagghiu.github.io/SaneCppLibraries/page_building_u
 
 - [Sane Coding Discord](https://discord.gg/tyBfFp33Z6)  
 - [X](https://x.com/pagghiu_) `@pagghiu_`
-- [Github Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
+- [GitHub Discussion](https://github.com/Pagghiu/SaneCppLibraries/discussions)
 
 ## Contributing
+
+Contributions are issue-first and agent-friendly; see [CONTRIBUTING.md](CONTRIBUTING.md) for the current workflow.
 
 - [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html) 
 - [Coding Style](https://pagghiu.github.io/SaneCppLibraries/page_coding_style.html)

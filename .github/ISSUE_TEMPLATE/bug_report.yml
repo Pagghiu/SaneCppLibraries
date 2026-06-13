@@ -1,0 +1,72 @@
+name: Bug Report
+description: Report broken behavior, regressions, platform issues, or unexpected failures.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. A clear issue can be the whole contribution.
+
+        If you used an agent to prepare this report, ask it to read `AGENTS.md` and any relevant local `AGENTS.md` files first.
+  - type: checkboxes
+    id: existing
+    attributes:
+      label: Existing reports
+      options:
+        - label: I searched existing issues and discussions for related reports.
+          required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What is broken?
+      placeholder: Describe the bug in a few sentences.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide a minimal reproduction, or the smallest description you can provide.
+      placeholder: List steps, code snippets, commands, input files, or repository state needed to reproduce the issue.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: What should happen?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: What happens instead? Include relevant logs or errors.
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      description: OS, architecture, compiler, generator, and configuration when known.
+      placeholder: "macOS arm64, clang, Debug"
+    validations:
+      required: true
+  - type: textarea
+    id: commands
+    attributes:
+      label: Commands
+      description: Build or test commands that reproduce the issue, if any.
+      placeholder: "./SC.sh build compile SCTest Debug"
+  - type: textarea
+    id: prompt
+    attributes:
+      label: Optional agent prompt
+      description: If helpful, include a prompt an agent or maintainer can use to reproduce, investigate, or fix this.
+      placeholder: "Starting from a clean checkout..."
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any relevant constraints, logs, links, or notes. Do not include secrets or confidential context.
