@@ -1,0 +1,25 @@
+name: Trigger website publish
+
+on:
+  workflow_run:
+    workflows: ["Documentation and Code Coverage"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    if: github.event.workflow_run.conclusion == 'success' && github.repository == 'Pagghiu/SaneCppLibraries'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Astro website publish
+        env:
+          GH_TOKEN: ${{ secrets.WEBSITE_DISPATCH_TOKEN }}
+          SANE_CPP_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          gh api repos/Pagghiu/pagghiu.github.io-source/dispatches \
+            -f event_type=sane-cpp-main-updated \
+            -f client_payload[sha]="$SANE_CPP_SHA"
