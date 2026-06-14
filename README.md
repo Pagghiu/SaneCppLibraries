@@ -9,7 +9,7 @@
 [![Discord](https://img.shields.io/discord/1195076118307426384)](https://discord.gg/tyBfFp33Z6)
 ![GitHub Repo stars](https://img.shields.io/github/stars/Pagghiu/SaneCppLibraries)
 
-**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux.
+**Sane C++ Libraries** is a set of C++ platform abstraction libraries for macOS, Windows and Linux, built for Agents.
 
 [Principles](https://pagghiu.github.io/SaneCppLibraries/page_principles.html):  
 ✅ Fast compile times  
@@ -61,6 +61,8 @@ Each library is color-coded to signal its status:
 </picture>
 
 ## How to use Sane C++ Libraries in your project
+
+Point your agent at repository [Skills](Skills/sane-cpp-libraries/SKILL.md).
 
 ### Option 1: use single file libraries
 1. Obtain a specific library: 
