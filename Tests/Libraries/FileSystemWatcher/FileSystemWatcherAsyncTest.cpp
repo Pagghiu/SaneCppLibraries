@@ -24,6 +24,17 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
         eventLoopSubdirectory(appDirectory);
         eventLoopWatchClose(appDirectory);
         eventLoopWatchStop(appDirectory);
+        eventLoopCloseMultipleWatchers(appDirectory);
+    }
+
+    void submitQueuedWatcher(AsyncEventLoop& eventLoop)
+    {
+        bool             submitted = false;
+        AsyncLoopTimeout timeout;
+        timeout.callback = [&](AsyncLoopTimeout::Result&) { submitted = true; };
+        SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+        SC_TEST_EXPECT(eventLoop.runOnce());
+        SC_TEST_EXPECT(submitted);
     }
 
     void eventLoopSubdirectory(const StringView appDirectory)
@@ -87,6 +98,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             Thread::Sleep(200); // on macOS watch latency is 500 ms, so we sleep to avoid report of 'dir' creation
             watcher.notifyCallback = lambda;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
+            submitQueuedWatcher(eventLoop);
             SC_TEST_EXPECT(fs.write("dir/subdir2/test.txt", "content"));
             SC_TEST_EXPECT(eventLoop.runOnce());
             SC_TEST_EXPECT(params.changes == 1);
@@ -126,6 +138,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             } params;
             watcher.notifyCallback = [&](const FileSystemWatcher::Notification&) { params.changes++; };
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher, path.view()));
+            submitQueuedWatcher(eventLoop);
             SC_TEST_EXPECT(fs.write("salve2.txt", "content"));
             SC_TEST_EXPECT(fs.write("a_tutti2.txt", "content"));
             Thread::Sleep(100);
@@ -198,6 +211,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 #endif
             watcher2.notifyCallback = lambda2;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
+            SC_TEST_EXPECT(eventLoop.runNoWait());
             FileSystem fs1;
             FileSystem fs2;
             SC_TEST_EXPECT(fs1.init(path1.view()));
@@ -238,6 +252,7 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
             };
             watcher2.notifyCallback = lambda3;
             SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
+            SC_TEST_EXPECT(eventLoop.runNoWait());
             SC_TEST_EXPECT(fs2.removeFile("a_tutti.txt"));
             Thread::Sleep(waitForEventsTimeout);
             SC_TEST_EXPECT(eventLoop.runOnce());
@@ -246,6 +261,50 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(fs1.removeFile("salve.txt"));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory(path1.view()));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory(path2.view()));
+        }
+    }
+
+    void eventLoopCloseMultipleWatchers(const StringView appDirectory)
+    {
+        if (test_section("AsyncEventLoop close multiple watchers"))
+        {
+            AsyncEventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+
+            FileSystemWatcherAsyncT<AsyncEventLoop> runner;
+            runner.init(eventLoop);
+            FileSystemWatcher fileEventsWatcher;
+            SC_TEST_EXPECT(fileEventsWatcher.init(runner));
+
+            SmallStringNative<1024> path1, path2;
+            SC_TEST_EXPECT(Path::join(path1, {appDirectory, "__close_multiple_1"}));
+            SC_TEST_EXPECT(Path::join(path2, {appDirectory, "__close_multiple_2"}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(appDirectory));
+            if (fs.existsAndIsDirectory(path1.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoryRecursive(path1.view()));
+            }
+            if (fs.existsAndIsDirectory(path2.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoryRecursive(path2.view()));
+            }
+            SC_TEST_EXPECT(fs.makeDirectory(path1.view()));
+            SC_TEST_EXPECT(fs.makeDirectory(path2.view()));
+
+            FileSystemWatcher::FolderWatcher watcher1, watcher2;
+            watcher1.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+            watcher2.notifyCallback = [](const FileSystemWatcher::Notification&) {};
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher1, path1.view()));
+            SC_TEST_EXPECT(fileEventsWatcher.watch(watcher2, path2.view()));
+            submitQueuedWatcher(eventLoop);
+
+            SC_TEST_EXPECT(fileEventsWatcher.close());
+            SC_TEST_EXPECT(eventLoop.close());
+
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path1.view()));
             SC_TEST_EXPECT(fs.removeEmptyDirectory(path2.view()));
         }

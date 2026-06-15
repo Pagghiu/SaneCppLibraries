@@ -180,7 +180,7 @@ Current support includes:
 - datagram socket `sendTo()`, scatter/gather `sendTo()`, and `receiveFrom()`;
 - loop wake-up waiting with `AwaitLoopWakeUp`;
 - file `fileRead()`, offset `fileRead()`, `fileReadUntilFullOrEOF()`, `fileWrite()`, offset `fileWrite()`,
-  scatter/gather `fileWrite()`, `fileSend()`, and POSIX `filePoll()`;
+  scatter/gather `fileWrite()`, `fileSend()`, and POSIX file readiness via `filePoll()`;
 - serial descriptors through the existing file awaiters, because `SerialDescriptor` is a `FileDescriptor` and `Async`
   models serial I/O with `AsyncFileRead` / `AsyncFileWrite`;
 - selected filesystem operations: `fsOpen()`, `fsClose()`, `fsRead()`, `fsWrite()`, `fsCopyFile()`,
@@ -190,7 +190,7 @@ Current support includes:
 - background `loopWork()`;
 - process exit waiting with `processExit()`;
 - one-shot signal waiting with `signal()`;
-- task cancellation for currently suspended operations, including several socket, file polling, wake-up, and task-group
+- task cancellation for currently suspended operations, including several socket, file readiness, wake-up, and task-group
   waits covered by tests;
 - awaiting explicitly spawned child tasks, or starting and awaiting one with `spawnAndWait()`;
 - structured `AwaitTaskGroup` waiting with caller-provided task pointer storage, `waitAll()`, and `waitAny()`;
@@ -307,7 +307,7 @@ code that returns `Result`, such as `cancelAll()`, `await.run()`, and `clearComp
 # Platform notes
 
 `Await` inherits the platform shape of `Async`. POSIX backends can use `filePoll()` for ordinary file or pipe handles;
-on Windows the awaiter fails fast instead of hanging because normal `AsyncFilePoll` support is not currently exposed for
+on Windows the awaiter fails fast instead of hanging because normal `AsyncFileReadiness` support is not currently exposed for
 those handles.
 
 Thread-pool-backed file and filesystem awaiters use `AsyncFileRead`, `AsyncFileWrite`, `AsyncFileSend`, or

@@ -161,7 +161,8 @@ struct SC_ASYNC_EXPORT AsyncRequest
         FileRead,            ///< Request is an AsyncFileRead object
         FileWrite,           ///< Request is an AsyncFileWrite object
         FileSend,            ///< Request is an AsyncFileSend object
-        FilePoll,            ///< Request is an AsyncFilePoll object
+        FileReadiness,       ///< Request is an AsyncFileReadiness object
+        ExternalCompletion,  ///< Request is an AsyncExternalCompletion object
         FileSystemOperation, ///< Request is an AsyncFileSystemOperation object
     };
 
@@ -931,23 +932,18 @@ struct SC_ASYNC_EXPORT AsyncFileWrite : public AsyncRequest
 #endif
 };
 
-/// @brief Starts an handle polling operation.
-/// Uses `GetOverlappedResult` (windows), `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
-/// Callback will be called when any of the three API signals readiness events on the given file descriptor.
-/// Check @ref library_file_system_watcher for an example usage of this notification.
-struct SC_ASYNC_EXPORT AsyncFilePoll : public AsyncRequest
+/// @brief Starts a file descriptor readiness operation.
+/// Uses `kevent` (macOS), `epoll` (Linux) and `io_uring` (Linux).
+/// Callback will be called when the OS signals readiness events on the given file descriptor.
+struct SC_ASYNC_EXPORT AsyncFileReadiness : public AsyncRequest
 {
-    AsyncFilePoll() : AsyncRequest(Type::FilePoll) {}
+    AsyncFileReadiness() : AsyncRequest(Type::FileReadiness) {}
 
     using CompletionData = AsyncCompletionData;
-    using Result         = AsyncResultOf<AsyncFilePoll, CompletionData>;
+    using Result         = AsyncResultOf<AsyncFileReadiness, CompletionData>;
 
     /// Starts a file descriptor poll operation, monitoring its readiness with appropriate OS API
     SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
-
-#if SC_PLATFORM_WINDOWS
-    [[nodiscard]] void* getOverlappedPtr();
-#endif
 
     Function<void(Result&)> callback;
 
@@ -956,6 +952,51 @@ struct SC_ASYNC_EXPORT AsyncFilePoll : public AsyncRequest
     SC::Result validate(AsyncEventLoop&);
 
     FileDescriptor::Handle handle = FileDescriptor::Invalid;
+};
+
+/// @brief Integrates externally-submitted completion based operations with AsyncEventLoop.
+/// Manual mode is created with start(eventLoop) and completed with AsyncEventLoop::postExternalCompletion().
+/// On Windows, native mode is created with start(eventLoop, handle) and completed by IOCP using getWindowsOverlapped().
+struct SC_ASYNC_EXPORT AsyncExternalCompletion : public AsyncRequest
+{
+    struct CompletionData
+    {
+        size_t bytesTransferred = 0;
+    };
+    using Result = AsyncResultOf<AsyncExternalCompletion, CompletionData>;
+
+    AsyncExternalCompletion() : AsyncRequest(Type::ExternalCompletion) {}
+
+    /// Starts a manual external completion. The request remains active until postExternalCompletion() or stop().
+    SC::Result start(AsyncEventLoop& eventLoop);
+
+#if SC_PLATFORM_WINDOWS
+    /// Starts a Windows IOCP external completion bound to an externally-created overlapped file handle.
+    SC::Result start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor);
+
+    /// Returns the OVERLAPPED pointer to pass to the external Windows API submission.
+    [[nodiscard]] void* getWindowsOverlapped();
+#endif
+
+    /// Marks that a native/manual external operation has been submitted and must complete before reuse.
+    SC::Result markSubmissionPending();
+
+    /// Clears a pending submission after an external submission failed synchronously.
+    SC::Result clearSubmissionPending();
+
+    [[nodiscard]] bool hasSubmissionPending() const { return submissionPending; }
+
+    Function<void(Result&)> callback;
+
+  private:
+    friend struct AsyncEventLoop;
+    SC::Result validate(AsyncEventLoop&);
+
+    FileDescriptor::Handle handle            = FileDescriptor::Invalid;
+    size_t                 bytesTransferred  = 0;
+    bool                   manualMode        = true;
+    bool                   submissionPending = false;
+    bool                   completionPosted  = false;
 #if SC_PLATFORM_WINDOWS
     detail::WinOverlappedOpaque overlapped;
 #endif
@@ -1078,20 +1119,21 @@ struct SC_ASYNC_EXPORT AsyncCompletionVariant
     union
     {
         AsyncCompletionData completionDataLoopWork; // Defined after AsyncCompletionVariant / AsyncTaskSequence
-        AsyncLoopTimeout::CompletionData       completionDataLoopTimeout;
-        AsyncLoopWakeUp::CompletionData        completionDataLoopWakeUp;
-        AsyncProcessExit::CompletionData       completionDataProcessExit;
-        AsyncSignal::CompletionData            completionDataSignal;
-        AsyncSocketAccept::CompletionData      completionDataSocketAccept;
-        AsyncSocketConnect::CompletionData     completionDataSocketConnect;
-        AsyncSocketSend::CompletionData        completionDataSocketSend;
-        AsyncSocketSendTo::CompletionData      completionDataSocketSendTo;
-        AsyncSocketReceive::CompletionData     completionDataSocketReceive;
-        AsyncSocketReceiveFrom::CompletionData completionDataSocketReceiveFrom;
-        AsyncFileRead::CompletionData          completionDataFileRead;
-        AsyncFileWrite::CompletionData         completionDataFileWrite;
-        AsyncFileSend::CompletionData          completionDataFileSend;
-        AsyncFilePoll::CompletionData          completionDataFilePoll;
+        AsyncLoopTimeout::CompletionData        completionDataLoopTimeout;
+        AsyncLoopWakeUp::CompletionData         completionDataLoopWakeUp;
+        AsyncProcessExit::CompletionData        completionDataProcessExit;
+        AsyncSignal::CompletionData             completionDataSignal;
+        AsyncSocketAccept::CompletionData       completionDataSocketAccept;
+        AsyncSocketConnect::CompletionData      completionDataSocketConnect;
+        AsyncSocketSend::CompletionData         completionDataSocketSend;
+        AsyncSocketSendTo::CompletionData       completionDataSocketSendTo;
+        AsyncSocketReceive::CompletionData      completionDataSocketReceive;
+        AsyncSocketReceiveFrom::CompletionData  completionDataSocketReceiveFrom;
+        AsyncFileRead::CompletionData           completionDataFileRead;
+        AsyncFileWrite::CompletionData          completionDataFileWrite;
+        AsyncFileSend::CompletionData           completionDataFileSend;
+        AsyncFileReadiness::CompletionData      completionDataFileReadiness;
+        AsyncExternalCompletion::CompletionData completionDataExternalCompletion;
 
         AsyncFileSystemOperationCompletionData completionDataFileSystemOperation;
     };
@@ -1108,7 +1150,8 @@ struct SC_ASYNC_EXPORT AsyncCompletionVariant
     auto& getCompletion(AsyncFileRead&) { return completionDataFileRead; }
     auto& getCompletion(AsyncFileWrite&) { return completionDataFileWrite; }
     auto& getCompletion(AsyncFileSend&) { return completionDataFileSend; }
-    auto& getCompletion(AsyncFilePoll&) { return completionDataFilePoll; }
+    auto& getCompletion(AsyncFileReadiness&) { return completionDataFileReadiness; }
+    auto& getCompletion(AsyncExternalCompletion&) { return completionDataExternalCompletion; }
     auto& getCompletion(AsyncFileSystemOperation&) { return completionDataFileSystemOperation; }
 
     template <typename T>
@@ -1433,6 +1476,9 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @note The request will be validated immediately and activated during next event loop cycle
     Result start(AsyncRequest& async);
 
+    /// @brief Posts completion for an AsyncExternalCompletion started in manual mode.
+    Result postExternalCompletion(AsyncExternalCompletion& async, size_t bytesTransferred = 0);
+
     /// Interrupts the event loop even if it has active request on it
     void interrupt();
 
@@ -1592,7 +1638,8 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     using FileRead            = AsyncFileRead;
     using FileWrite           = AsyncFileWrite;
     using FileSend            = AsyncFileSend;
-    using FilePoll            = AsyncFilePoll;
+    using FileReadiness       = AsyncFileReadiness;
+    using ExternalCompletion  = AsyncExternalCompletion;
     using FileSystemOperation = AsyncFileSystemOperation;
     using EventObjectType     = EventObject;
     using ResultType          = AsyncResult;
@@ -1600,9 +1647,9 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
   public:
     struct SC_ASYNC_EXPORT InternalDefinition
     {
-        static constexpr int Windows = 552;
-        static constexpr int Apple   = 520;
-        static constexpr int Linux   = 784;
+        static constexpr int Windows = 576;
+        static constexpr int Apple   = 552;
+        static constexpr int Linux   = 816;
         static constexpr int Default = Linux;
 
         static constexpr size_t Alignment = 8;

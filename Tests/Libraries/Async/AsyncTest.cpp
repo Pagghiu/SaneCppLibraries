@@ -208,6 +208,18 @@ SC::AsyncTest::AsyncTest(SC::TestReport& report) : TestCase(report, "AsyncTest")
             fileSend(false); // do not use thread-pool
             fileSend(true);  // use thread-pool
         }
+        if (test_section("file readiness"))
+        {
+            fileReadiness();
+        }
+        if (test_section("file readiness cancel"))
+        {
+            fileReadinessCancel();
+        }
+        if (test_section("external completion manual"))
+        {
+            externalCompletionManual();
+        }
         if (test_section("serial read/write"))
         {
 #if SC_COMPILER_FILC && SC_PLATFORM_LINUX

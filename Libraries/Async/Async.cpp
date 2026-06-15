@@ -62,7 +62,8 @@ const char* SC::AsyncRequest::TypeToString(Type type)
     case Type::FileRead: return "FileRead";
     case Type::FileWrite: return "FileWrite";
     case Type::FileSend: return "FileSend";
-    case Type::FilePoll: return "FilePoll";
+    case Type::FileReadiness: return "FileReadiness";
+    case Type::ExternalCompletion: return "ExternalCompletion";
     case Type::FileSystemOperation: return "FileSystemOperation";
     }
     AsyncAssert::unreachable();
@@ -89,7 +90,7 @@ SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool
     sequence        = &task;
     flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequence;
     flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
-    return Result(true);
+    return SC::Result(true);
 }
 
 void SC::AsyncRequest::disableThreadPool()
@@ -109,7 +110,7 @@ SC::Result SC::AsyncRequest::checkState()
     const bool asyncStateIsFree = state == AsyncRequest::State::Free;
     SC_LOG_MESSAGE("{} {} QUEUE\n", debugName, AsyncRequest::TypeToString(type));
     SC_TRY_MSG(asyncStateIsFree, "Trying to stage AsyncRequest that is in use");
-    return Result(true);
+    return SC::Result(true);
 }
 
 void SC::AsyncRequest::markAsFree()
@@ -502,16 +503,71 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& eventLoop)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncFilePoll::start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fd)
+SC::Result SC::AsyncFileReadiness::start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fd)
 {
+#if SC_PLATFORM_WINDOWS
+    (void)eventLoop;
+    (void)fd;
+    // Windows IOCP is completion-based and does not provide generic file-handle readiness.
+    // Do not emulate this with timer polling. If socket readiness is needed later, add a
+    // dedicated AsyncSocketReadiness using AFD poll / socket-specific mechanisms.
+    return SC::Result::Error("AsyncFileReadiness is not supported on Windows");
+#else
     SC_TRY(checkState());
     handle = fd;
     return eventLoop.start(*this);
+#endif
 }
 
-SC::Result SC::AsyncFilePoll::validate(AsyncEventLoop&)
+SC::Result SC::AsyncFileReadiness::validate(AsyncEventLoop&)
 {
-    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFilePoll - Invalid file descriptor");
+    SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileReadiness - Invalid file descriptor");
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncExternalCompletion::start(AsyncEventLoop& eventLoop)
+{
+    SC_TRY(checkState());
+    handle     = FileDescriptor::Invalid;
+    manualMode = true;
+    return eventLoop.start(*this);
+}
+
+#if SC_PLATFORM_WINDOWS
+SC::Result SC::AsyncExternalCompletion::start(AsyncEventLoop& eventLoop, FileDescriptor::Handle fileDescriptor)
+{
+    SC_TRY(checkState());
+    handle     = fileDescriptor;
+    manualMode = false;
+    return eventLoop.start(*this);
+}
+#endif
+
+SC::Result SC::AsyncExternalCompletion::markSubmissionPending()
+{
+    SC_TRY_MSG(not submissionPending, "AsyncExternalCompletion already has a pending submission");
+    submissionPending = true;
+    bytesTransferred  = 0;
+    completionPosted  = false;
+#if SC_PLATFORM_WINDOWS
+    overlapped.get().userData = this;
+    memset(&overlapped.get().overlapped, 0, sizeof(overlapped.get().overlapped));
+#endif
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncExternalCompletion::clearSubmissionPending()
+{
+    SC_TRY_MSG(submissionPending, "AsyncExternalCompletion has no pending submission");
+    submissionPending = false;
+    bytesTransferred  = 0;
+    completionPosted  = false;
+    return SC::Result(true);
+}
+
+SC::Result SC::AsyncExternalCompletion::validate(AsyncEventLoop&)
+{
+    SC_TRY_MSG(manualMode or handle != FileDescriptor::Invalid, "AsyncExternalCompletion - Invalid file descriptor");
     return SC::Result(true);
 }
 
@@ -849,9 +905,6 @@ SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(*this, Inte
 
 SC::Result SC::AsyncEventLoop::run()
 {
-    // It may happen that getTotalNumberOfActiveHandle() < 0 when re-activating an async that has been calling
-    // excludeFromActiveCount() during initial setup. Now that async would be in the submissions.
-    // One example that matches this case is re-activation of the FilePoll used for shared wakeups.
     while (internal.getTotalNumberOfActiveHandle() != 0 or not internal.submissions.isEmpty() or
            internal.hasPendingKernelCancellations or not internal.cancellations.isEmpty())
     {
@@ -1005,7 +1058,10 @@ void SC::AsyncEventLoop::excludeFromActiveCount(AsyncRequest& async)
     if (not async.isFree() and not async.isCancelling() and not isExcludedFromActiveCount(async))
     {
         async.flags |= Internal::Flag_ExcludeFromActiveCount;
-        internal.numberOfExternals -= 1;
+        if (async.state == AsyncRequest::State::Active and (async.flags & Internal::Flag_ManualCompletion) == 0)
+        {
+            internal.numberOfExternals -= 1;
+        }
     }
 }
 
@@ -1013,8 +1069,11 @@ void SC::AsyncEventLoop::includeInActiveCount(AsyncRequest& async)
 {
     if (not async.isFree() and isExcludedFromActiveCount(async))
     {
+        if (async.state == AsyncRequest::State::Active and (async.flags & Internal::Flag_ManualCompletion) == 0)
+        {
+            internal.numberOfExternals += 1;
+        }
         async.flags &= ~Internal::Flag_ExcludeFromActiveCount;
-        internal.numberOfExternals += 1;
     }
 }
 
@@ -1042,7 +1101,8 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     internal.enumerateRequests(internal.activeFileReads, enumerationCallback);
     internal.enumerateRequests(internal.activeFileWrites, enumerationCallback);
     internal.enumerateRequests(internal.activeFileSends, enumerationCallback);
-    internal.enumerateRequests(internal.activeFilePolls, enumerationCallback);
+    internal.enumerateRequests(internal.activeFileReadiness, enumerationCallback);
+    internal.enumerateRequests(internal.activeExternalCompletions, enumerationCallback);
     internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
 }
 
@@ -1063,6 +1123,32 @@ SC::Result SC::AsyncEventLoop::start(AsyncRequest& async)
                                       async.queueSubmission(*this);
                                       return SC::Result(true);
                                   });
+}
+
+SC::Result SC::AsyncEventLoop::postExternalCompletion(AsyncExternalCompletion& async, size_t bytesTransferred)
+{
+    SC_TRY_MSG(async.manualMode, "AsyncExternalCompletion is not in manual mode");
+    SC_TRY_MSG(async.state == AsyncRequest::State::Active, "AsyncExternalCompletion is not active");
+    SC_TRY_MSG(async.submissionPending, "AsyncExternalCompletion has no pending submission");
+    SC_TRY_MSG(not async.completionPosted, "AsyncExternalCompletion completion already posted");
+    async.bytesTransferred = bytesTransferred;
+    async.completionPosted = true;
+    if ((async.flags & Internal::Flag_ManualCompletion) == 0)
+    {
+        if (async.sequence == nullptr)
+        {
+            internal.activeExternalCompletions.remove(async);
+        }
+        internal.numberOfActiveHandles -= 1;
+        if ((async.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
+        {
+            internal.numberOfExternals += 1;
+        }
+        async.flags |= Internal::Flag_ManualCompletion;
+        internal.numberOfManualCompletions += 1;
+    }
+    internal.manualCompletions.queueBack(async);
+    return wakeUpFromExternalThread();
 }
 
 void SC::AsyncEventLoop::clearSequence(AsyncSequence& sequence) { internal.clearSequence(sequence); }
@@ -1355,7 +1441,8 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     stopRequests(eventLoop, activeFileReads);
     stopRequests(eventLoop, activeFileWrites);
     stopRequests(eventLoop, activeFileSends);
-    stopRequests(eventLoop, activeFilePolls);
+    stopRequests(eventLoop, activeFileReadiness);
+    stopRequests(eventLoop, activeExternalCompletions);
 
     stopRequests(eventLoop, manualCompletions);
 
@@ -1433,8 +1520,10 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
         async.flags &= ~Flag_NeedsTeardown;
     }
     // hasBeenReactivated is required to avoid accessing async when it has been not reactivated (and maybe deallocated)
-    if (hasBeenReactivated and async.state == AsyncRequest::State::Reactivate)
+    if (hasBeenReactivated)
     {
+        // Reactivation can either queue another submission (Reactivate) or immediately make
+        // the request Active again when the backend already submitted the next operation.
         if (teardown.sequence)
         {
             teardown.sequence->runningAsync = true;
@@ -1508,7 +1597,8 @@ SC::Result SC::AsyncEventLoop::Internal::blockingPoll(AsyncEventLoop& eventLoop,
     KernelEvents kernelEvents(eventLoop.internal.kernelQueue.get(), asyncKernelEvents);
     const auto   numActiveHandles = getTotalNumberOfActiveHandle();
     SC_ASYNC_ASSERT_RELEASE(numActiveHandles >= 0);
-    if (numActiveHandles > 0 or numberOfManualCompletions != 0 or hasPendingKernelCancellations)
+    bool shouldSyncWithKernel = numActiveHandles > 0 or numberOfManualCompletions != 0 or hasPendingKernelCancellations;
+    if (shouldSyncWithKernel)
     {
         hasPendingKernelCancellations = false;
         // We may have some manualCompletions queued (for SocketClose for example) but no active handles
@@ -1580,6 +1670,12 @@ void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& 
             async                         = next;
             continue;
         }
+#if SC_PLATFORM_WINDOWS
+        if (async->type == AsyncRequest::Type::ExternalCompletion)
+        {
+            static_cast<AsyncExternalCompletion*>(async)->overlapped.get().userData = nullptr;
+        }
+#endif
         async->markAsFree();
         cancellations.remove(*async);
         if (async->closeCallback)
@@ -1867,7 +1963,8 @@ void SC::AsyncEventLoop::Internal::prepareTeardown(AsyncEventLoop& eventLoop, As
     case AsyncRequest::Type::FileRead:      teardown.fileHandle = static_cast<AsyncFileRead&>(async).handle; break;
     case AsyncRequest::Type::FileWrite:     teardown.fileHandle = static_cast<AsyncFileWrite&>(async).handle; break;
     case AsyncRequest::Type::FileSend:      teardown.fileHandle = static_cast<AsyncFileSend&>(async).fileHandle; break;
-    case AsyncRequest::Type::FilePoll:      teardown.fileHandle = static_cast<AsyncFilePoll&>(async).handle; break;
+    case AsyncRequest::Type::FileReadiness:      teardown.fileHandle = static_cast<AsyncFileReadiness&>(async).handle; break;
+    case AsyncRequest::Type::ExternalCompletion: teardown.fileHandle = static_cast<AsyncExternalCompletion&>(async).handle; break;
 
     // FileSystemOperation
     case AsyncRequest::Type::FileSystemOperation:  break;
@@ -1942,18 +2039,17 @@ SC::Result SC::AsyncEventLoop::Internal::teardownAsync(AsyncTeardown& teardown)
     case AsyncRequest::Type::FileSend:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileSend*>(nullptr), teardown));
         break;
-    case AsyncRequest::Type::FilePoll:
-        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFilePoll*>(nullptr), teardown));
+    case AsyncRequest::Type::FileReadiness:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileReadiness*>(nullptr), teardown));
+        break;
+    case AsyncRequest::Type::ExternalCompletion:
+        SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncExternalCompletion*>(nullptr), teardown));
         break;
     case AsyncRequest::Type::FileSystemOperation:
         SC_TRY(KernelEvents::teardownAsync(static_cast<AsyncFileSystemOperation*>(nullptr), teardown));
         break;
     }
 
-    if ((teardown.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
-    {
-        numberOfExternals += 1;
-    }
     return Result(true);
 }
 
@@ -2148,6 +2244,10 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
     }
 
     numberOfActiveHandles -= 1;
+    if ((async.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
+    {
+        numberOfExternals += 1;
+    }
 
     if (async.sequence and async.type != AsyncRequest::Type::LoopTimeout)
     {
@@ -2173,7 +2273,8 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
         case AsyncRequest::Type::FileRead:      activeFileReads.remove(*static_cast<AsyncFileRead*>(&async));           break;
         case AsyncRequest::Type::FileWrite:     activeFileWrites.remove(*static_cast<AsyncFileWrite*>(&async));         break;
         case AsyncRequest::Type::FileSend:      activeFileSends.remove(*static_cast<AsyncFileSend*>(&async));           break;
-        case AsyncRequest::Type::FilePoll:      activeFilePolls.remove(*static_cast<AsyncFilePoll*>(&async));           break;
+        case AsyncRequest::Type::FileReadiness:      activeFileReadiness.remove(*static_cast<AsyncFileReadiness*>(&async));          break;
+        case AsyncRequest::Type::ExternalCompletion: activeExternalCompletions.remove(*static_cast<AsyncExternalCompletion*>(&async)); break;
 
         // FileSystemOperation
         case AsyncRequest::Type::FileSystemOperation: activeFileSystemOperations.remove(*static_cast<AsyncFileSystemOperation*>(&async)); break;
@@ -2193,6 +2294,10 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     }
 
     numberOfActiveHandles += 1;
+    if ((async.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
+    {
+        numberOfExternals -= 1;
+    }
 
     if (async.sequence and async.type != AsyncRequest::Type::LoopTimeout)
     {
@@ -2258,7 +2363,8 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     case AsyncRequest::Type::FileRead:      activeFileReads.queueBack(*static_cast<AsyncFileRead*>(&async));            break;
     case AsyncRequest::Type::FileWrite:     activeFileWrites.queueBack(*static_cast<AsyncFileWrite*>(&async));          break;
     case AsyncRequest::Type::FileSend:      activeFileSends.queueBack(*static_cast<AsyncFileSend*>(&async));            break;
-    case AsyncRequest::Type::FilePoll:      activeFilePolls.queueBack(*static_cast<AsyncFilePoll*>(&async));            break;
+    case AsyncRequest::Type::FileReadiness:      activeFileReadiness.queueBack(*static_cast<AsyncFileReadiness*>(&async));             break;
+    case AsyncRequest::Type::ExternalCompletion: activeExternalCompletions.queueBack(*static_cast<AsyncExternalCompletion*>(&async));   break;
 
     // FileSystemOperation
     case AsyncRequest::Type::FileSystemOperation: activeFileSystemOperations.queueBack(*static_cast<AsyncFileSystemOperation*>(&async)); break;
@@ -2292,7 +2398,8 @@ SC::Result SC::AsyncEventLoop::Internal::applyOnAsync(AsyncRequest& async, Lambd
     case AsyncRequest::Type::FileRead: SC_TRY(lambda(*static_cast<AsyncFileRead*>(&async))); break;
     case AsyncRequest::Type::FileWrite: SC_TRY(lambda(*static_cast<AsyncFileWrite*>(&async))); break;
     case AsyncRequest::Type::FileSend: SC_TRY(lambda(*static_cast<AsyncFileSend*>(&async))); break;
-    case AsyncRequest::Type::FilePoll: SC_TRY(lambda(*static_cast<AsyncFilePoll*>(&async))); break;
+    case AsyncRequest::Type::FileReadiness: SC_TRY(lambda(*static_cast<AsyncFileReadiness*>(&async))); break;
+    case AsyncRequest::Type::ExternalCompletion: SC_TRY(lambda(*static_cast<AsyncExternalCompletion*>(&async))); break;
     case AsyncRequest::Type::FileSystemOperation:
         SC_TRY(lambda(*static_cast<AsyncFileSystemOperation*>(&async)));
         break;
@@ -2345,7 +2452,8 @@ void SC::detail::AsyncCompletionVariant::destroy()
     case AsyncRequest::Type::FileRead: dtor(completionDataFileRead); break;
     case AsyncRequest::Type::FileWrite: dtor(completionDataFileWrite); break;
     case AsyncRequest::Type::FileSend: dtor(completionDataFileSend); break;
-    case AsyncRequest::Type::FilePoll: dtor(completionDataFilePoll); break;
+    case AsyncRequest::Type::FileReadiness: dtor(completionDataFileReadiness); break;
+    case AsyncRequest::Type::ExternalCompletion: dtor(completionDataExternalCompletion); break;
 
     // FileSystemOperation
     case AsyncRequest::Type::FileSystemOperation: dtor(completionDataFileSystemOperation); break;

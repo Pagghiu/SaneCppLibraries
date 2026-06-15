@@ -92,7 +92,7 @@ struct SC::detail::AsyncWinOverlapped
 #pragma warning(default : 4062)
 #endif
 
-void* SC::AsyncFilePoll::getOverlappedPtr() { return &overlapped.get().overlapped; }
+void* SC::AsyncExternalCompletion::getWindowsOverlapped() { return &overlapped.get().overlapped; }
 
 SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 {
@@ -110,8 +110,8 @@ SC::Result SC::detail::AsyncWinWaitDefinition::releaseHandle(Handle& waitHandle)
 
 struct SC::AsyncEventLoop::Internal::KernelQueue
 {
-    FileDescriptor loopFd;
-    AsyncFilePoll  asyncWakeUp;
+    FileDescriptor          loopFd;
+    AsyncExternalCompletion asyncWakeUp;
 
     KernelQueue() {}
 
@@ -203,12 +203,15 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
     {
         asyncWakeUp.setDebugName("SharedWakeUp");
         asyncWakeUp.callback.bind<KernelQueue, &KernelQueue::completeWakeUp>(*this);
-        return asyncWakeUp.start(eventLoop, 0);
+        SC_TRY(asyncWakeUp.start(eventLoop, 0));
+        SC_TRY(asyncWakeUp.markSubmissionPending());
+        return Result(true);
     }
 
-    void completeWakeUp(AsyncFilePoll::Result& result)
+    void completeWakeUp(AsyncExternalCompletion::Result& result)
     {
         result.eventLoop.internal.executeWakeUps(result.eventLoop);
+        SC_ASYNC_TRUST_RESULT(result.getAsync().markSubmissionPending());
         result.reactivateRequest(true);
     }
 
@@ -236,7 +239,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueue
         FileDescriptor::Handle loopHandle;
         SC_TRY(loopFd.get(loopHandle, Result::Error("watchInputs - Invalid Handle")));
 
-        OVERLAPPED* overlapped = static_cast<OVERLAPPED*>(asyncWakeUp.getOverlappedPtr());
+        OVERLAPPED* overlapped = static_cast<OVERLAPPED*>(asyncWakeUp.getWindowsOverlapped());
         if (::PostQueuedCompletionStatus(loopHandle, 0, 0, overlapped) == FALSE)
         {
             return Result::Error("AsyncEventLoop::wakeUpFromExternalThread() - PostQueuedCompletionStatus");
@@ -331,6 +334,13 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         if (async != nullptr and async->state == AsyncRequest::State::Cancelling)
         {
             async->flags &= ~Internal::Flag_WaitingKernelCancel;
+            if (async->type == AsyncRequest::Type::ExternalCompletion)
+            {
+                AsyncExternalCompletion& external  = *static_cast<AsyncExternalCompletion*>(async);
+                external.submissionPending         = false;
+                external.completionPosted          = false;
+                external.overlapped.get().userData = nullptr;
+            }
             continueProcessing = false; // Don't process cancellations
             switch (async->type)
             {
@@ -341,6 +351,11 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
             }
         }
         return Result(true);
+    }
+
+    [[nodiscard]] size_t getBytesTransferred(uint32_t index) const
+    {
+        return static_cast<size_t>(events[index].dwNumberOfBytesTransferred);
     }
 
     //-------------------------------------------------------------------------------------------------------
@@ -1122,57 +1137,110 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File POLL
+    // File READINESS
     //-------------------------------------------------------------------------------------------------------
-    [[nodiscard]] static bool cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& poll)
+    [[nodiscard]] static bool setupAsync(AsyncEventLoop&, AsyncFileReadiness&) { return true; }
+
+    static Result activateAsync(AsyncEventLoop&, AsyncFileReadiness&)
     {
-        // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it doesn't generate a
-        // cancellation on the IOCP, setting hasPendingKernelCancellations == true would block forever.
-        if (poll.handle == 0)
-        {
-            // The AsyncFilePoll used for wakeUp has no backing file descriptor handle and it doesn't generate a
-            // cancellation on the IOCP, setting hasPendingKernelCancellations == true would block forever.
-            return true;
-        }
-        // If the handle is valid it will generate a cancellation packet on the IOCP.
-        // There is no easy way to check if the handle is valid so we try to duplicate it and check if the
-        // duplicated handle is valid.
-        HANDLE handle  = INVALID_HANDLE_VALUE;
-        HANDLE process = ::GetCurrentProcess();
-        if (::DuplicateHandle(process, poll.handle, process, &handle, 0, FALSE, DUPLICATE_SAME_ACCESS) == TRUE)
-        {
-            if (handle != INVALID_HANDLE_VALUE)
-            {
-                ::CloseHandle(handle);
-                handle = INVALID_HANDLE_VALUE;
-
-                eventLoop.internal.hasPendingKernelCancellations = true;
-            }
-        }
-
-        return true;
+        return Result::Error("AsyncFileReadiness is not supported on Windows");
     }
 
-    [[nodiscard]] static bool teardownAsync(AsyncFilePoll*, AsyncTeardown& teardown)
+    static Result completeAsync(AsyncFileReadiness::Result&) { return Result::Error("AsyncFileReadiness completion"); }
+
+    static Result cancelAsync(AsyncEventLoop&, AsyncFileReadiness&) { return Result(true); }
+
+    [[nodiscard]] static bool teardownAsync(AsyncFileReadiness*, AsyncTeardown&) { return true; }
+
+    //-------------------------------------------------------------------------------------------------------
+    // External COMPLETION
+    //-------------------------------------------------------------------------------------------------------
+    static Result setupAsync(AsyncEventLoop& eventLoop, AsyncExternalCompletion& async)
     {
-        if (teardown.fileHandle == 0)
+        if (not async.manualMode and async.handle != 0)
         {
-            // See comment regarding AsyncFilePoll in cancelAsync
+            SC_TRY(eventLoop.internal.kernelQueue.get().associateExternallyCreatedFileDescriptorHandle(async.handle));
+        }
+        return Result(true);
+    }
+
+    static Result activateAsync(AsyncEventLoop&, AsyncExternalCompletion& async)
+    {
+        if (async.manualMode)
+        {
+            async.flags &= ~Internal::Flag_ManualCompletion;
+        }
+        async.overlapped.get().userData = &async;
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncExternalCompletion::Result& result)
+    {
+        AsyncExternalCompletion& async = result.getAsync();
+        if (not async.submissionPending)
+        {
+            return Result::Error("AsyncExternalCompletion completed without pending submission");
+        }
+        if (async.manualMode)
+        {
+            result.completionData.bytesTransferred = async.bytesTransferred;
+        }
+        else
+        {
+            result.completionData.bytesTransferred = getBytesTransferred(static_cast<uint32_t>(result.eventIndex));
+        }
+        async.submissionPending = false;
+        async.completionPosted  = false;
+        return Result(true);
+    }
+
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncExternalCompletion& async)
+    {
+        if (async.manualMode)
+        {
+            if (async.completionPosted and (async.flags & Internal::Flag_ManualCompletion))
+            {
+                eventLoop.internal.manualCompletions.remove(async);
+            }
+            async.submissionPending = false;
+            async.completionPosted  = false;
+            return Result(true);
+        }
+
+        if (not async.submissionPending)
+        {
+            return Result(true);
+        }
+
+        const BOOL result = ::CancelIoEx(async.handle, &async.overlapped.get().overlapped);
+        if (result != FALSE)
+        {
+            async.flags |= Internal::Flag_WaitingKernelCancel;
+            eventLoop.internal.hasPendingKernelCancellations = true;
+            return Result(true);
+        }
+        const DWORD error = ::GetLastError();
+        if (error == ERROR_NOT_FOUND or error == ERROR_INVALID_HANDLE)
+        {
+            async.submissionPending = false;
+            async.completionPosted  = false;
+            return Result(true);
+        }
+        return Result::Error("AsyncExternalCompletion CancelIoEx failed");
+    }
+
+    [[nodiscard]] static bool teardownAsync(AsyncExternalCompletion*, AsyncTeardown&) { return true; }
+
+    static bool needsSubmissionWhenReactivating(AsyncExternalCompletion& async)
+    {
+        SC_ASYNC_ASSERT_RELEASE(async.submissionPending);
+        if (async.manualMode)
+        {
             return true;
         }
-        HANDLE handle  = INVALID_HANDLE_VALUE;
-        HANDLE process = ::GetCurrentProcess();
-        if (::DuplicateHandle(process, teardown.fileHandle, process, &handle, 0, FALSE, DUPLICATE_SAME_ACCESS) == TRUE)
-        {
-            if (handle != INVALID_HANDLE_VALUE)
-            {
-                ::CloseHandle(handle);
-                handle = INVALID_HANDLE_VALUE;
-
-                teardown.eventLoop->internal.hasPendingKernelCancellations = true;
-            }
-        }
-        return true;
+        // The owner already submitted the next external overlapped operation before reactivating.
+        // Mark it active immediately so an immediate IOCP completion cannot race the activation pass.
+        return false;
     }
 
     //-------------------------------------------------------------------------------------------------------

@@ -1030,14 +1030,14 @@ struct SC_AWAIT_EXPORT AwaitFileSendAwaiter
     Function<void(AsyncResult&)> stopCallback;
 };
 
-/// @brief Awaiter for a single AsyncFilePoll operation.
+/// @brief Awaiter for a single AsyncFileReadiness operation.
 struct SC_AWAIT_EXPORT AwaitFilePollAwaiter
 {
     AwaitFilePollAwaiter(AwaitEventLoop& await, const FileDescriptor& file);
 
     AwaitEventLoop&       await;
     const FileDescriptor& file;
-    AsyncFilePoll         request;
+    AsyncFileReadiness    request;
     Result                operationResult = Result(true);
 
     bool   await_ready() const;

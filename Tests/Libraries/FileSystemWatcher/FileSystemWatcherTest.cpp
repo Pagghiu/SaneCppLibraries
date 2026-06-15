@@ -54,11 +54,26 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 StringView  appDirectory;
                 EventObject eventObject;
             } params;
-            params.appDirectory = appDirectory;
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init(appDirectory));
+
+            constexpr StringView watchDirectoryName = "FileSystemWatcherThreadRunner";
+            SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(watchDirectoryName));
+            SC_TEST_EXPECT(fs.removeFileIfExists("FileSystemWatcherThreadRunner/test.txt"));
+
+            SmallStringNative<1024> path;
+            SC_TEST_EXPECT(Path::join(path, {appDirectory, watchDirectoryName}));
+            params.appDirectory = path.view();
 
             auto lambda = [&](const FileSystemWatcher::Notification& notification)
             {
                 SmallStringNative<1024> expectedBuffer = StringEncoding::Native;
+
+                // Some backends can report directory-level notifications before the file event.
+                if ("test.txt"_a8 != notification.relativePath)
+                {
+                    return;
+                }
 
                 params.callbackThreadID = Thread::CurrentThreadID();
                 params.changes++;
@@ -71,8 +86,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                     SC_TEST_EXPECT(notification.operation == FileSystemWatcher::Operation::Modified);
                 }
                 SC_TEST_EXPECT(params.appDirectory == notification.basePath);
-                // Comparisons must use the same encoding
-                SC_TEST_EXPECT("test.txt"_a8 == notification.relativePath);
                 StringPath fullPath;
                 SC_TEST_EXPECT(notification.getFullPath(fullPath));
 
@@ -83,16 +96,6 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
                 params.eventObject.signal();
             };
 
-            FileSystem fs;
-            SC_TEST_EXPECT(fs.init(appDirectory));
-            if (fs.existsAndIsFile("test.txt"))
-            {
-                SC_TEST_EXPECT(fs.removeFile("test.txt"));
-                Thread::Sleep(200);
-            }
-
-            SmallStringNative<1024> path;
-            SC_TEST_EXPECT(path.assign(appDirectory));
             // Coverage and package caches can create deep folder trees under appDirectory.
             // Provide a larger Linux sub-folder relative paths buffer to avoid spurious overflows.
             char subFolderRelativePathsBuffer[32 * 1024];
@@ -102,14 +105,15 @@ struct SC::FileSystemWatcherTest : public SC::TestCase
             // due to the SC_TEST_EXPECT calls inside the lambda that runs in the thread
             watcher.notifyCallback  = lambda;
             const Result res        = fileEventsWatcher.watch(watcher, path.view());
-            const bool   fsWriteRes = fs.write("test.txt", "content");
+            const bool   fsWriteRes = fs.write("FileSystemWatcherThreadRunner/test.txt", "content");
             SC_TEST_EXPECT(fsWriteRes);
             SC_TEST_EXPECT(res);
             params.eventObject.wait();
             SC_TEST_EXPECT(params.changes > 0);
             SC_TEST_EXPECT(fileEventsWatcher.close());
             SC_TEST_EXPECT(params.callbackThreadID != Thread::CurrentThreadID());
-            SC_TEST_EXPECT(fs.removeFile({"test.txt"_a8}));
+            SC_TEST_EXPECT(fs.removeFile("FileSystemWatcherThreadRunner/test.txt"));
+            SC_TEST_EXPECT(fs.removeEmptyDirectory(watchDirectoryName));
         }
     }
 };

@@ -30,8 +30,8 @@ struct SC::AsyncEventLoop::Internal::KernelQueueIoURing
     AsyncLinuxIOUring ring;
     char              createErrorMessage[64] = {};
 
-    AsyncFilePoll  wakeUpPoll;
-    FileDescriptor wakeUpEventFd;
+    AsyncFileReadiness wakeUpPoll;
+    FileDescriptor     wakeUpEventFd;
 
     KernelQueueIoURing() { memset(&ring, 0, sizeof(ring)); }
 
@@ -381,7 +381,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
             }
             else
             {
-                // One exception to the above: AsyncFilePoll is cancelled by matching its
+                // One exception to the above: AsyncFileReadiness is cancelled by matching its
                 // user_data that will generate a notification that must still be filtered.
                 AsyncRequest* async = getAsyncRequest(idx);
                 if (async->state == AsyncRequest::State::Cancelling)
@@ -691,9 +691,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File POLL
+    // File READINESS
     //-------------------------------------------------------------------------------------------------------
-    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
+    Result activateAsync(AsyncEventLoop& eventLoop, AsyncFileReadiness& async)
     {
         // Documentation says:
         // "Unlike poll or epoll without EPOLLONESHOT, this interface always works in one-shot mode. That is, once the
@@ -705,7 +705,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         return Result(true);
     }
 
-    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncFileReadiness& async)
     {
         io_uring_sqe* submission;
         SC_TRY(getNewSubmission(eventLoop, submission));
@@ -953,6 +953,42 @@ struct SC::AsyncEventLoop::Internal::KernelEventsIoURing
         default: AsyncAssert::unreachable();
         }
         return Result(true);
+    }
+
+    Result activateAsync(AsyncEventLoop&, AsyncExternalCompletion& async)
+    {
+        async.flags &= ~Internal::Flag_ManualCompletion;
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncExternalCompletion::Result& result)
+    {
+        AsyncExternalCompletion& async = result.getAsync();
+        if (not async.submissionPending)
+        {
+            return Result::Error("AsyncExternalCompletion completed without pending submission");
+        }
+        result.completionData.bytesTransferred = async.bytesTransferred;
+        async.submissionPending                = false;
+        async.completionPosted                 = false;
+        return Result(true);
+    }
+
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncExternalCompletion& async)
+    {
+        if (async.completionPosted and (async.flags & Internal::Flag_ManualCompletion))
+        {
+            eventLoop.internal.manualCompletions.remove(async);
+        }
+        async.submissionPending = false;
+        async.completionPosted  = false;
+        return Result(true);
+    }
+
+    static bool needsSubmissionWhenReactivating(AsyncExternalCompletion& async)
+    {
+        SC_ASYNC_ASSERT_RELEASE(async.submissionPending);
+        return true;
     }
 
     //-------------------------------------------------------------------------------------------------------

@@ -12,11 +12,11 @@ Check @ref library_async_streams for an higher level construct when streaming da
 @note
 Check @ref library_await for the C++20 coroutine layer that wraps `AsyncEventLoop` with `co_await` syntax while
 preserving the same request lifetime expectations. It currently covers a small but useful subset of timers, sockets,
-loop wake-ups, files, file polling, selected filesystem operations, process exit, signals, background work, child tasks,
+loop wake-ups, files, file readiness, selected filesystem operations, process exit, signals, background work, child tasks,
 task groups, cancellation, and timeouts.
 
 @note
-`Await` keeps the same platform caveats as `Async`: POSIX file polling is exposed directly, while Windows file polling
+`Await` keeps the same platform caveats as `Async`: POSIX file readiness is exposed directly, while Windows file readiness
 for normal file or pipe handles currently fails fast at the Await layer instead of pretending to be portable. File and
 filesystem operations that need blocking work use caller-provided `ThreadPool` storage.
 
@@ -50,7 +50,8 @@ This is the list of supported async operations:
 | [AsyncLoopWakeUp](@ref SC::AsyncLoopWakeUp)                   | @copybrief SC::AsyncLoopWakeUp            |
 | [AsyncLoopWork](@ref SC::AsyncLoopWork)                       | @copybrief SC::AsyncLoopWork              |
 | [AsyncProcessExit](@ref SC::AsyncProcessExit)                 | @copybrief SC::AsyncProcessExit           |
-| [AsyncFilePoll](@ref SC::AsyncFilePoll)                       | @copybrief SC::AsyncFilePoll              |
+| [AsyncFileReadiness](@ref SC::AsyncFileReadiness)             | @copybrief SC::AsyncFileReadiness         |
+| [AsyncExternalCompletion](@ref SC::AsyncExternalCompletion)   | @copybrief SC::AsyncExternalCompletion    |
 | [AsyncSequence](@ref SC::AsyncSequence)                       | @copybrief SC::AsyncSequence              |
 | [AsyncFileSystemOperation](@ref SC::AsyncFileSystemOperation) | @copybrief SC::AsyncFileSystemOperation   |
 | [AsyncSignal](@ref SC::AsyncSignal)                           | @copybrief SC::AsyncSignal                |
@@ -180,8 +181,11 @@ When using offsets, prefer a single contiguous buffer for portable examples and 
 scatter/gather buffers with an explicit offset needs backend-specific validation before being treated as a portable
 idiom.
 
-## AsyncFilePoll
-@copydoc SC::AsyncFilePoll
+## AsyncFileReadiness
+@copydoc SC::AsyncFileReadiness
+
+## AsyncExternalCompletion
+@copydoc SC::AsyncExternalCompletion
 
 ## AsyncSequence
 @copydoc SC::AsyncSequence

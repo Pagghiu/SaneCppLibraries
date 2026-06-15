@@ -108,7 +108,7 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
 {
     FileDescriptor loopFd;
 
-    AsyncFilePoll wakeUpPoll;
+    AsyncFileReadiness wakeUpPoll;
 #if SC_ASYNC_USE_EPOLL
     FileDescriptor wakeUpEventFd;
 #else
@@ -180,12 +180,12 @@ struct SC::AsyncEventLoop::Internal::KernelQueuePosix
         return Result(true);
     }
 
-    static void completeWakeUp(AsyncFilePoll::Result& result)
+    static void completeWakeUp(AsyncFileReadiness::Result& result)
     {
 #if SC_ASYNC_USE_EPOLL
-        AsyncFilePoll& async = result.getAsync();
-        eventfd_t      value;
-        int            readResult;
+        AsyncFileReadiness& async = result.getAsync();
+        eventfd_t           value;
+        int                 readResult;
         do
         {
             readResult = ::eventfd_read(async.handle, &value);
@@ -1306,9 +1306,9 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
     }
 
     //-------------------------------------------------------------------------------------------------------
-    // File POLL
+    // File READINESS
     //-------------------------------------------------------------------------------------------------------
-    Result setupAsync(AsyncEventLoop& eventLoop, AsyncFilePoll& async)
+    Result setupAsync(AsyncEventLoop& eventLoop, AsyncFileReadiness& async)
     {
 #if SC_ASYNC_USE_EPOLL
         return setEventWatcher(eventLoop, async, async.handle, INPUT_EVENTS_MASK);
@@ -1321,7 +1321,7 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #endif
     }
 
-    static Result teardownAsync(AsyncFilePoll* async, AsyncTeardown& teardown)
+    static Result teardownAsync(AsyncFileReadiness* async, AsyncTeardown& teardown)
     {
 #if SC_ASYNC_USE_EPOLL
         (void)async;
@@ -1340,7 +1340,46 @@ struct SC::AsyncEventLoop::Internal::KernelEventsPosix
 #endif
     }
 
-    static bool needsSubmissionWhenReactivating(AsyncFilePoll&) { return false; }
+    static bool needsSubmissionWhenReactivating(AsyncFileReadiness&) { return false; }
+
+    //-------------------------------------------------------------------------------------------------------
+    // External COMPLETION
+    //-------------------------------------------------------------------------------------------------------
+    static Result activateAsync(AsyncEventLoop&, AsyncExternalCompletion& async)
+    {
+        async.flags &= ~Internal::Flag_ManualCompletion;
+        return Result(true);
+    }
+
+    Result completeAsync(AsyncExternalCompletion::Result& result)
+    {
+        AsyncExternalCompletion& async = result.getAsync();
+        if (not async.submissionPending)
+        {
+            return Result::Error("AsyncExternalCompletion completed without pending submission");
+        }
+        result.completionData.bytesTransferred = async.bytesTransferred;
+        async.submissionPending                = false;
+        async.completionPosted                 = false;
+        return Result(true);
+    }
+
+    Result cancelAsync(AsyncEventLoop& eventLoop, AsyncExternalCompletion& async)
+    {
+        if (async.completionPosted and (async.flags & Internal::Flag_ManualCompletion))
+        {
+            eventLoop.internal.manualCompletions.remove(async);
+        }
+        async.submissionPending = false;
+        async.completionPosted  = false;
+        return Result(true);
+    }
+
+    static bool needsSubmissionWhenReactivating(AsyncExternalCompletion& async)
+    {
+        SC_ASYNC_ASSERT_RELEASE(async.submissionPending);
+        return true;
+    }
 
     //-------------------------------------------------------------------------------------------------------
     // Process EXIT

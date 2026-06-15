@@ -93,21 +93,22 @@ struct SC::AsyncEventLoop::Internal
     IntrusiveDoubleLinkedList<AsyncRequest> cancellations;
 
     // Active phase
-    IntrusiveDoubleLinkedList<AsyncLoopTimeout>       activeLoopTimeouts;
-    IntrusiveDoubleLinkedList<AsyncLoopWakeUp>        activeLoopWakeUps;
-    IntrusiveDoubleLinkedList<AsyncLoopWork>          activeLoopWork;
-    IntrusiveDoubleLinkedList<AsyncProcessExit>       activeProcessExits;
-    IntrusiveDoubleLinkedList<AsyncSignal>            activeSignals;
-    IntrusiveDoubleLinkedList<AsyncSocketAccept>      activeSocketAccepts;
-    IntrusiveDoubleLinkedList<AsyncSocketConnect>     activeSocketConnects;
-    IntrusiveDoubleLinkedList<AsyncSocketSend>        activeSocketSends;
-    IntrusiveDoubleLinkedList<AsyncSocketSendTo>      activeSocketSendsTo;
-    IntrusiveDoubleLinkedList<AsyncSocketReceive>     activeSocketReceives;
-    IntrusiveDoubleLinkedList<AsyncSocketReceiveFrom> activeSocketReceivesFrom;
-    IntrusiveDoubleLinkedList<AsyncFileRead>          activeFileReads;
-    IntrusiveDoubleLinkedList<AsyncFileWrite>         activeFileWrites;
-    IntrusiveDoubleLinkedList<AsyncFileSend>          activeFileSends;
-    IntrusiveDoubleLinkedList<AsyncFilePoll>          activeFilePolls;
+    IntrusiveDoubleLinkedList<AsyncLoopTimeout>        activeLoopTimeouts;
+    IntrusiveDoubleLinkedList<AsyncLoopWakeUp>         activeLoopWakeUps;
+    IntrusiveDoubleLinkedList<AsyncLoopWork>           activeLoopWork;
+    IntrusiveDoubleLinkedList<AsyncProcessExit>        activeProcessExits;
+    IntrusiveDoubleLinkedList<AsyncSignal>             activeSignals;
+    IntrusiveDoubleLinkedList<AsyncSocketAccept>       activeSocketAccepts;
+    IntrusiveDoubleLinkedList<AsyncSocketConnect>      activeSocketConnects;
+    IntrusiveDoubleLinkedList<AsyncSocketSend>         activeSocketSends;
+    IntrusiveDoubleLinkedList<AsyncSocketSendTo>       activeSocketSendsTo;
+    IntrusiveDoubleLinkedList<AsyncSocketReceive>      activeSocketReceives;
+    IntrusiveDoubleLinkedList<AsyncSocketReceiveFrom>  activeSocketReceivesFrom;
+    IntrusiveDoubleLinkedList<AsyncFileRead>           activeFileReads;
+    IntrusiveDoubleLinkedList<AsyncFileWrite>          activeFileWrites;
+    IntrusiveDoubleLinkedList<AsyncFileSend>           activeFileSends;
+    IntrusiveDoubleLinkedList<AsyncFileReadiness>      activeFileReadiness;
+    IntrusiveDoubleLinkedList<AsyncExternalCompletion> activeExternalCompletions;
 
     IntrusiveDoubleLinkedList<AsyncFileSystemOperation> activeFileSystemOperations;
 

@@ -323,3 +323,142 @@ void SC::AsyncTest::fileWriteMultiple(bool useThreadPool)
     SC_TEST_EXPECT(fs.changeDirectory(report.applicationRootDirectory.view()));
     SC_TEST_EXPECT(fs.removeEmptyDirectory(name));
 }
+
+void SC::AsyncTest::fileReadiness()
+{
+    PipeDescriptor pipe;
+    SC_TEST_EXPECT(pipe.createPipe());
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    FileDescriptor::Handle readHandle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, Result::Error("read handle")));
+
+    int                pollCount = 0;
+    AsyncFileReadiness poll;
+    poll.setDebugName("FileReadiness");
+    poll.callback = [this, &pollCount](AsyncFileReadiness::Result& res)
+    {
+        SC_TEST_EXPECT(res.isValid());
+        pollCount++;
+    };
+
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(not poll.start(eventLoop, readHandle));
+    SC_TEST_EXPECT(pollCount == 0);
+#else
+    SC_TEST_EXPECT(poll.start(eventLoop, readHandle));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(pollCount == 0);
+
+    SC_TEST_EXPECT(pipe.writePipe.writeString("x"));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(pollCount == 1);
+
+    char       buffer[1] = {};
+    Span<char> readData;
+    SC_TEST_EXPECT(pipe.readPipe.read({buffer, sizeof(buffer)}, readData));
+    SC_TEST_EXPECT(readData.sizeInBytes() == 1);
+    SC_TEST_EXPECT(readData.data()[0] == 'x');
+#endif
+
+    SC_TEST_EXPECT(pipe.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncTest::fileReadinessCancel()
+{
+    PipeDescriptor pipe;
+    SC_TEST_EXPECT(pipe.createPipe());
+
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    FileDescriptor::Handle readHandle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(pipe.readPipe.get(readHandle, Result::Error("read handle")));
+
+    int                pollCount       = 0;
+    int                afterStopCalled = 0;
+    AsyncFileReadiness poll;
+    poll.setDebugName("FileReadinessCancel");
+    poll.callback = [&pollCount](AsyncFileReadiness::Result&) { pollCount++; };
+
+#if SC_PLATFORM_WINDOWS
+    SC_TEST_EXPECT(not poll.start(eventLoop, readHandle));
+    SC_TEST_EXPECT(pollCount == 0);
+    SC_TEST_EXPECT(afterStopCalled == 0);
+#else
+    SC_TEST_EXPECT(poll.start(eventLoop, readHandle));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(pollCount == 0);
+
+    Function<void(AsyncResult&)> afterStopped = [&](AsyncResult&) { afterStopCalled++; };
+    SC_TEST_EXPECT(poll.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(afterStopCalled == 0);
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(afterStopCalled == 1);
+    SC_TEST_EXPECT(pollCount == 0);
+#endif
+
+    SC_TEST_EXPECT(pipe.close());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncTest::externalCompletionManual()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+
+    struct ExternalCompletionManualState
+    {
+        AsyncTest*               test            = nullptr;
+        AsyncExternalCompletion* completion      = nullptr;
+        int                      completionCount = 0;
+        size_t                   bytes           = 0;
+    };
+
+    AsyncExternalCompletion       completion;
+    ExternalCompletionManualState state;
+    state.test       = this;
+    state.completion = &completion;
+    completion.setDebugName("ExternalCompletionManual");
+    completion.callback = [&state](AsyncExternalCompletion::Result& result)
+    {
+        state.test->recordExpectation(StringSpan("result.isValid()"), result.isValid());
+        state.completionCount++;
+        state.bytes = result.completionData.bytesTransferred;
+        if (state.completionCount <= 2)
+        {
+            state.test->recordExpectation(StringSpan("result.getAsync().markSubmissionPending()"),
+                                          result.getAsync().markSubmissionPending());
+            result.reactivateRequest(true);
+        }
+    };
+
+    SC_TEST_EXPECT(completion.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 17));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(state.completionCount == 1);
+    SC_TEST_EXPECT(state.bytes == 17);
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 23));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(state.completionCount == 2);
+    SC_TEST_EXPECT(state.bytes == 23);
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 42));
+    int                          afterStopCalled = 0;
+    Function<void(AsyncResult&)> afterStopped    = [&](AsyncResult&) { afterStopCalled++; };
+    SC_TEST_EXPECT(completion.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(afterStopCalled == 1);
+    SC_TEST_EXPECT(state.completionCount == 2);
+
+    SC_TEST_EXPECT(eventLoop.close());
+}

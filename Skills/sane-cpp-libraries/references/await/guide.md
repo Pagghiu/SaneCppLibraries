@@ -120,7 +120,7 @@ Choose `await` when the task is specifically about the experimental C++20 corout
   normal `-nostdinc++` use. A shim would need coroutine traits/handles/suspend types plus compiler builtin mapping. This
   is stable-track work, not required for MVP usage.
 - The C++20 Await targets are built with exceptions disabled by default; keep using `Result` and `SC_CO_TRY`.
-- `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFilePoll` is currently only
+- `AwaitEventLoop::filePoll()` fails fast on Windows instead of hanging because `AsyncFileReadiness` is currently only
   useful on the POSIX backends for normal file/pipe handles.
 - For validation, run the smallest relevant `SCAwaitTest` section on macOS, then Linux, then Windows.
 

@@ -78,17 +78,17 @@ struct SC::FileSystemWatcher::Internal
         }
 
         eventLoopRunner->internalInit(parent, notifyFd);
-        return eventLoopRunner->linuxStartSharedFilePoll();
+        return eventLoopRunner->linuxStartSharedFileReadiness();
     }
 
     Result close()
     {
         if (eventLoopRunner)
         {
-            SC_TRY(eventLoopRunner->linuxStopSharedFilePoll());
+            SC_TRY(eventLoopRunner->linuxStopSharedFileReadiness());
         }
 
-        for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+        while (FolderWatcher* entry = self->watchers.front)
         {
             SC_TRY(stopWatching(*entry));
         }

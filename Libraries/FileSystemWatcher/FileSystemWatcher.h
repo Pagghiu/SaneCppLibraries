@@ -159,7 +159,7 @@ struct FileSystemWatcher
         /// @return Valid result if directory was unwatched successfully.
         Result stopWatching();
 
-        /// @brief Sets debug name for AsyncFilePoll used on Windows (used only for debug purposes)
+        /// @brief Sets debug name for AsyncExternalCompletion used on Windows (used only for debug purposes)
         void setDebugName(const char* debugName);
 
       private:
@@ -168,9 +168,9 @@ struct FileSystemWatcher
         friend struct FileSystemWatcherAsyncT;
 #if SC_PLATFORM_WINDOWS
 #if SC_ASYNC_ENABLE_LOG
-        AlignedStorage<120> asyncStorage;
+        AlignedStorage<160> asyncStorage;
 #else
-        AlignedStorage<112> asyncStorage;
+        AlignedStorage<152> asyncStorage;
 #endif
 #endif
         OpaqueObject<FolderWatcherSizes> internal;
@@ -198,15 +198,18 @@ struct FileSystemWatcher
         virtual Result appleWakeUpAndWait()     = 0;
 
 #elif SC_PLATFORM_LINUX
-        virtual Result linuxStartSharedFilePoll() = 0;
-        virtual Result linuxStopSharedFilePoll()  = 0;
+        virtual Result linuxStartSharedFileReadiness() = 0;
+        virtual Result linuxStopSharedFileReadiness()  = 0;
 
         int notifyFd = -1;
 
 #else
-        virtual Result windowsStartFolderFilePoll(FolderWatcher& watcher, void* handle) = 0;
-        virtual Result windowsStopFolderFilePoll(FolderWatcher& watcher)                = 0;
-        virtual void*  windowsGetOverlapped(FolderWatcher& watcher)                     = 0;
+        virtual Result windowsStartFolderExternalCompletion(FolderWatcher& watcher, void* handle) = 0;
+        virtual Result windowsRequestStopFolderExternalCompletion(FolderWatcher& watcher)         = 0;
+        virtual Result windowsWaitFolderExternalCompletionStopped(FolderWatcher& watcher)         = 0;
+        virtual Result windowsMarkFolderExternalCompletionPending(FolderWatcher& watcher)         = 0;
+        virtual Result windowsClearFolderExternalCompletionPending(FolderWatcher& watcher)        = 0;
+        virtual void*  windowsGetOverlapped(FolderWatcher& watcher)                               = 0;
 #endif
         friend struct Internal;
         FileSystemWatcher* fileSystemWatcher = nullptr;
@@ -268,10 +271,11 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
 {
     using Self = FileSystemWatcherAsyncT;
 
-    using T_AsyncLoopWakeUp = typename T_AsyncEventLoop::LoopWakeUp;
-    using T_AsyncFilePoll   = typename T_AsyncEventLoop::FilePoll;
-    using T_EventObject     = typename T_AsyncEventLoop::EventObjectType;
-    using T_AsyncResult     = typename T_AsyncEventLoop::ResultType;
+    using T_AsyncLoopWakeUp         = typename T_AsyncEventLoop::LoopWakeUp;
+    using T_AsyncFileReadiness      = typename T_AsyncEventLoop::FileReadiness;
+    using T_AsyncExternalCompletion = typename T_AsyncEventLoop::ExternalCompletion;
+    using T_EventObject             = typename T_AsyncEventLoop::EventObjectType;
+    using T_AsyncResult             = typename T_AsyncEventLoop::ResultType;
 
     void init(T_AsyncEventLoop& loop) { eventLoop = &loop; }
 
@@ -305,7 +309,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
     T_AsyncLoopWakeUp asyncWakeUp = {};
     T_EventObject     eventObject = {};
 #elif SC_PLATFORM_LINUX
-    virtual Result linuxStartSharedFilePoll() override
+    virtual Result linuxStartSharedFileReadiness() override
     {
         SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
         SC_TRY(eventLoop->associateExternallyCreatedFileDescriptorHandle(notifyFd));
@@ -313,59 +317,89 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         return asyncPoll.start(*eventLoop, notifyFd);
     }
 
-    virtual Result linuxStopSharedFilePoll() override { return asyncPoll.stop(*eventLoop); }
+    virtual Result linuxStopSharedFileReadiness() override { return asyncPoll.stop(*eventLoop); }
 
-    void onEventLoopNotification(typename T_AsyncFilePoll::Result& result)
+    void onEventLoopNotification(typename T_AsyncFileReadiness::Result& result)
     {
         fileSystemWatcher->asyncNotify(nullptr);
         result.reactivateRequest(true);
     }
 
-    T_AsyncFilePoll asyncPoll = {};
+    T_AsyncFileReadiness asyncPoll = {};
 #else
     using FolderWatcher = FileSystemWatcher::FolderWatcher;
-    virtual Result windowsStartFolderFilePoll(FolderWatcher& watcher, void* handle) override
+    virtual Result windowsStartFolderExternalCompletion(FolderWatcher& watcher, void* handle) override
     {
         SC_TRY_MSG(eventLoop != nullptr and fileSystemWatcher != nullptr, "FileSystemWatcherAsync not initialized");
-        SC_TRY(eventLoop->associateExternallyCreatedFileDescriptorHandle(handle));
-        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
-        placementNew(asyncPoll);
-        asyncPoll.setDebugName("FileSystemWatcherAsync Poll");
-        asyncPoll.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
-        return asyncPoll.start(*eventLoop, handle);
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+        placementNew(completion);
+        completion.setDebugName("FileSystemWatcherAsync Completion");
+        completion.callback.template bind<Self, &Self::onEventLoopNotification>(*this);
+        return completion.start(*eventLoop, handle);
     }
 
-    virtual Result windowsStopFolderFilePoll(FolderWatcher& watcher) override
+    virtual Result windowsRequestStopFolderExternalCompletion(FolderWatcher& watcher) override
     {
-        // This is not strictly needed as file handle is being closed soon after anyway
-        // SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(eventLoop->removeAllAssociationsFor(fwi.fileHandle));
-        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
 
-        onAsyncPollClose = [&watcher](T_AsyncResult&)
+        windowsFolderCompletionStopped = false;
+        onAsyncCompletionClose         = [this, &watcher](T_AsyncResult&)
         {
-            T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
-            asyncPoll.~T_AsyncFilePoll();
+            T_AsyncExternalCompletion& completion =
+                watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+            completion.~T_AsyncExternalCompletion();
+            windowsFolderCompletionStopped = true;
         };
-        return asyncPoll.stop(*eventLoop, &onAsyncPollClose);
+        return completion.stop(*eventLoop, &onAsyncCompletionClose);
+    }
+
+    virtual Result windowsWaitFolderExternalCompletionStopped(FolderWatcher&) override
+    {
+        while (not windowsFolderCompletionStopped)
+        {
+            SC_TRY(eventLoop->runOnce());
+        }
+        return Result(true);
+    }
+
+    virtual Result windowsMarkFolderExternalCompletionPending(FolderWatcher& watcher) override
+    {
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+        return completion.markSubmissionPending();
+    }
+
+    virtual Result windowsClearFolderExternalCompletionPending(FolderWatcher& watcher) override
+    {
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+        return completion.clearSubmissionPending();
     }
 
     virtual void* windowsGetOverlapped(FolderWatcher& watcher) override
     {
-        T_AsyncFilePoll& asyncPoll = watcher.asyncStorage.template reinterpret_as<T_AsyncFilePoll>();
-        return asyncPoll.getOverlappedPtr();
+        T_AsyncExternalCompletion& completion =
+            watcher.asyncStorage.template reinterpret_as<T_AsyncExternalCompletion>();
+        return completion.getWindowsOverlapped();
     }
 
-    void onEventLoopNotification(typename T_AsyncFilePoll::Result& result)
+    void onEventLoopNotification(typename T_AsyncExternalCompletion::Result& result)
     {
         SC_COMPILER_WARNING_PUSH_OFFSETOF;
         auto&          storage = reinterpret_cast<decltype(FolderWatcher::asyncStorage)&>(result.getAsync());
         FolderWatcher& watcher = SC_COMPILER_FIELD_OFFSET(FolderWatcher, asyncStorage, storage);
         fileSystemWatcher->asyncNotify(&watcher);
-        result.reactivateRequest(true);
+        if (watcher.parent != nullptr and result.getAsync().hasSubmissionPending())
+        {
+            result.reactivateRequest(true);
+        }
         SC_COMPILER_WARNING_POP_OFFSETOF;
     }
 
-    Function<void(T_AsyncResult&)> onAsyncPollClose;
+    Function<void(T_AsyncResult&)> onAsyncCompletionClose;
+    bool                           windowsFolderCompletionStopped = false;
 #endif
 };
 

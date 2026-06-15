@@ -6,6 +6,8 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
+#include "../../Common/Deferred.h"
+
 struct SC::FileSystemWatcher::FolderWatcherInternal
 {
     uint8_t        changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
@@ -75,7 +77,7 @@ struct SC::FileSystemWatcher::Internal
                 SC_TRY(threadingRunner->thread.join());
             }
         }
-        for (FolderWatcher* entry = self->watchers.front; entry != nullptr; entry = entry->next)
+        while (FolderWatcher* entry = self->watchers.front)
         {
             SC_TRY(stopWatching(*entry));
         }
@@ -102,6 +104,41 @@ struct SC::FileSystemWatcher::Internal
         opaque.fileHandle = INVALID_HANDLE_VALUE;
     }
 
+    Result submitRead(FolderWatcher& entry)
+    {
+        FolderWatcherInternal& opaque     = entry.internal.get();
+        OVERLAPPED*            overlapped = getOverlapped(entry);
+        SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
+
+        if (eventLoopRunner)
+        {
+            SC_TRY(eventLoopRunner->windowsMarkFolderExternalCompletionPending(entry));
+        }
+        auto clearPending = MakeDeferred(
+            [&]()
+            {
+                if (eventLoopRunner)
+                {
+                    SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(
+                        eventLoopRunner->windowsClearFolderExternalCompletionPending(entry));
+                }
+            });
+
+        const BOOL success = ::ReadDirectoryChangesW(opaque.fileHandle,                 //
+                                                     opaque.changesBuffer,              //
+                                                     sizeof(opaque.changesBuffer),      //
+                                                     TRUE,                              // watchSubtree
+                                                     FILE_NOTIFY_CHANGE_FILE_NAME |     //
+                                                         FILE_NOTIFY_CHANGE_DIR_NAME |  //
+                                                         FILE_NOTIFY_CHANGE_LAST_WRITE, //
+                                                     nullptr,                           // lpBytesReturned
+                                                     overlapped,                        // lpOverlapped
+                                                     nullptr);                          // lpCompletionRoutine
+        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
+        clearPending.disarm();
+        return Result(true);
+    }
+
     Result stopWatching(FolderWatcher& folderWatcher)
     {
         folderWatcher.parent->watchers.remove(folderWatcher);
@@ -113,7 +150,10 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(eventLoopRunner->windowsStopFolderFilePoll(folderWatcher));
+            SC_TRY(eventLoopRunner->windowsRequestStopFolderExternalCompletion(folderWatcher));
+            closeFileHandle(folderWatcher);
+            SC_TRY(eventLoopRunner->windowsWaitFolderExternalCompletionStopped(folderWatcher));
+            return Result(true);
         }
         closeFileHandle(folderWatcher);
         return Result(true);
@@ -155,20 +195,10 @@ struct SC::FileSystemWatcher::Internal
         }
         else
         {
-            SC_TRY(eventLoopRunner->windowsStartFolderFilePoll(*entry, newHandle));
+            SC_TRY(eventLoopRunner->windowsStartFolderExternalCompletion(*entry, newHandle));
         }
 
-        BOOL success = ::ReadDirectoryChangesW(newHandle,                         //
-                                               opaque.changesBuffer,              //
-                                               sizeof(opaque.changesBuffer),      //
-                                               TRUE,                              // watchSubtree
-                                               FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                   FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                   FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                               nullptr,                           // lpBytesReturned
-                                               overlapped,                        // lpOverlapped
-                                               nullptr);                          // lpCompletionRoutine
-        SC_TRY_MSG(success == TRUE, "ReadDirectoryChangesW");
+        SC_TRY(submitRead(*entry));
 
         if (threadingRunner and not threadingRunner->thread.wasStarted())
         {
@@ -234,21 +264,10 @@ struct SC::FileSystemWatcher::Internal
             *reinterpret_cast<uint8_t**>(&event) += event->NextEntryOffset;
         } while (true);
 
-        OVERLAPPED* overlapped = entry.parent->internal.get().getOverlapped(entry);
-        ::memset(overlapped, 0, sizeof(OVERLAPPED));
-        SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
-        BOOL success = ::ReadDirectoryChangesW(opaque.fileHandle,                 //
-                                               opaque.changesBuffer,              //
-                                               sizeof(opaque.changesBuffer),      //
-                                               TRUE,                              // watchSubtree
-                                               FILE_NOTIFY_CHANGE_FILE_NAME |     //
-                                                   FILE_NOTIFY_CHANGE_DIR_NAME |  //
-                                                   FILE_NOTIFY_CHANGE_LAST_WRITE, //
-                                               nullptr,                           // lpBytesReturned
-                                               overlapped,                        // lpOverlapped
-                                               nullptr);                          // lpCompletionRoutine
-        // TODO: Handle ReadDirectoryChangesW error
-        (void)success;
+        if (entry.parent != nullptr)
+        {
+            SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(entry.parent->internal.get().submitRead(entry));
+        }
     }
 };
 

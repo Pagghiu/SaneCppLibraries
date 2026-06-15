@@ -2168,7 +2168,7 @@ bool AwaitFilePollAwaiter::await_suspend(AwaitTask::Handle newContinuation)
     operationResult = Result::Error("Await filePoll is not supported on Windows");
     return false;
 #else
-    request.callback = [this](AsyncFilePoll::Result& result)
+    request.callback = [this](AsyncFileReadiness::Result& result)
     {
         operationResult = result.isValid();
         continuation.resume();
