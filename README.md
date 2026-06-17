@@ -1,6 +1,6 @@
 [![Windows](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/windows.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/windows.yml)
 [![Linux+macOS](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/posix.yml/badge.svg)](https://github.com/Pagghiu/SaneCppLibraries/actions/workflows/posix.yml)
-[![Coverage](https://pagghiu.github.io/SaneCppLibraries/coverage/coverage.svg)](https://pagghiu.github.io/SaneCppLibraries/coverage)
+[![Coverage](https://pagghiu.github.io/SaneCppLibraries/reference/doxygen/coverage/coverage.svg)](https://pagghiu.github.io/SaneCppLibraries/reference/doxygen/coverage/)
 
 # Sane C++ Libraries
 
