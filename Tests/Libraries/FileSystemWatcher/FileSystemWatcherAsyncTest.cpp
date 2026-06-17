@@ -29,12 +29,11 @@ struct SC::FileSystemWatcherAsyncTest : public SC::TestCase
 
     void submitQueuedWatcher(AsyncEventLoop& eventLoop)
     {
-        bool             submitted = false;
-        AsyncLoopTimeout timeout;
-        timeout.callback = [&](AsyncLoopTimeout::Result&) { submitted = true; };
-        SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
-        SC_TEST_EXPECT(eventLoop.runOnce());
-        SC_TEST_EXPECT(submitted);
+        for (int idx = 0; idx < 8 and eventLoop.getNumberOfSubmittedRequests() > 0; ++idx)
+        {
+            SC_TEST_EXPECT(eventLoop.runNoWait());
+        }
+        SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
     }
 
     void eventLoopSubdirectory(const StringView appDirectory)
