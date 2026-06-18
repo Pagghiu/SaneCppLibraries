@@ -782,16 +782,14 @@ static Result resolveVisualStudioLLVMToolPath(StringView executableName, String&
     SC_TRY(vswherePath.assign("C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe"));
     SC_TRY_MSG(fs.existsAndIsFile(vswherePath.view()), "Cannot locate vswhere.exe");
 
+    String findPattern = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(findPattern, "VC\\Tools\\Llvm\\x64\\bin\\{}", executableName));
+
     Process process;
     String  output = StringEncoding::Utf8;
-    SC_TRY(process.exec({vswherePath.view(), "-latest", "-property", "installationPath"}, output));
-    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate Visual Studio installation");
-
-    String installPath = StringEncoding::Utf8;
-    SC_TRY(installPath.assign(StringView(output.view()).trimWhiteSpaces()));
-    SC_TRY_MSG(not installPath.isEmpty(), "Visual Studio installation path is empty");
-
-    SC_TRY(Path::join(toolPath, {installPath.view(), "VC", "Tools", "Llvm", "bin", executableName}));
+    SC_TRY(process.exec({vswherePath.view(), "-latest", "-find", findPattern.view()}, output));
+    SC_TRY_MSG(process.getExitStatus() == 0, "Cannot locate Visual Studio bundled LLVM tool");
+    SC_TRY(toolPath.assign(StringView(output.view()).trimWhiteSpaces()));
     SC_TRY_MSG(fs.existsAndIsFile(toolPath.view()), "Bundled LLVM tool is missing");
     return Result(true);
 }
