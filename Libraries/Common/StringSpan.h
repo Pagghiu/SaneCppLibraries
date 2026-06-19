@@ -1,11 +1,11 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #ifdef SC_FOUNDATION_STRING_SPAN_DEFINITION_H
-#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 1
+#if SC_FOUNDATION_STRING_SPAN_DEFINITION_H != 2
 #error "StringSpan.h has been included multiple times in different versions."
 #endif
 #else
-#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 1 // Increment to indicate a new version of the file
+#define SC_FOUNDATION_STRING_SPAN_DEFINITION_H 2 // Increment to indicate a new version of the file
 
 #include "CompilerBuiltins.h"
 #include "PlatformMacrosType.h"
@@ -63,7 +63,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
     constexpr StringSpan(const char (&str)[N]) : text(str), textSizeInBytes(N - 1), encoding(static_cast<uint8_t>(StringEncoding::Ascii)), hasNullTerm(true) {}
 
     /// @brief Constructs a StringView from a null terminated string
-    static StringSpan fromNullTerminated(const char* text, StringEncoding encoding)
+    static constexpr StringSpan fromNullTerminated(const char* text, StringEncoding encoding)
     {
         return text == nullptr ? StringSpan(encoding) : StringSpan({text, CompilerBuiltins::length(text)}, true, encoding);
     }
@@ -90,7 +90,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
     };
 
     /// @brief Ordering comparison between non-normalized StringView (operates on code points, not on utf graphemes)
-    [[nodiscard]] Comparison compare(StringSpan other) const
+    [[nodiscard]] constexpr Comparison compare(StringSpan other) const
     {
         if (getEncoding() == other.getEncoding())
         {
@@ -107,6 +107,15 @@ struct SC_FOUNDATION_EXPORT StringSpan
                        : (textSizeInBytes > other.textSizeInBytes ? Comparison::Bigger : Comparison::Equals);
         }
 
+        if (textSizeInBytes == 0 or other.textSizeInBytes == 0)
+        {
+            return textSizeInBytes < other.textSizeInBytes
+                       ? Comparison::Smaller
+                       : (textSizeInBytes > other.textSizeInBytes ? Comparison::Bigger : Comparison::Equals);
+        }
+        if (text == nullptr or other.text == nullptr)
+            return text == nullptr ? Comparison::Smaller : Comparison::Bigger;
+
         const char *p1 = text, *end1 = p1 + textSizeInBytes;
         const char *p2 = other.text, *end2 = p2 + other.textSizeInBytes;
         while (p1 < end1 and p2 < end2)
@@ -122,12 +131,12 @@ struct SC_FOUNDATION_EXPORT StringSpan
         return p1 < end1 ? Comparison::Bigger : (p2 < end2 ? Comparison::Smaller : Comparison::Equals);
     }
 
-    [[nodiscard]] bool operator==(const StringSpan other) const { return compare(other) == Comparison::Equals; }
-    [[nodiscard]] bool operator!=(const StringSpan other) const { return compare(other) != Comparison::Equals; }
-    [[nodiscard]] bool operator<(const StringSpan other) const { return compare(other) == Comparison::Smaller; }
+    [[nodiscard]] constexpr bool operator==(const StringSpan ss) const { return compare(ss) == Comparison::Equals; }
+    [[nodiscard]] constexpr bool operator!=(const StringSpan ss) const { return compare(ss) != Comparison::Equals; }
+    [[nodiscard]] constexpr bool operator<(const StringSpan ss) const { return compare(ss) == Comparison::Smaller; }
 
     /// @brief Obtain a `const char` Span from this StringView
-    [[nodiscard]] Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
+    [[nodiscard]] constexpr Span<const char> toCharSpan() const { return {text, textSizeInBytes}; }
 
     /// @brief Return true if StringView is empty
     [[nodiscard]] constexpr bool isEmpty() const { return text == nullptr or textSizeInBytes == 0; }
@@ -140,7 +149,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
 
     /// @brief Get size of the StringView in bytes, including null terminator (2 bytes on UTF16)
     /// @warning This method will Assert if this isNullTerminated returns `false`
-    [[nodiscard]] size_t sizeInBytesIncludingTerminator() const
+    [[nodiscard]] constexpr size_t sizeInBytesIncludingTerminator() const
     {
         SC_STRING_SPAN_ASSERT_RELEASE(hasNullTerm);
         return textSizeInBytes > 0 ? textSizeInBytes + StringEncodingGetSize(getEncoding()) : 0;
@@ -200,7 +209,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
             (not SC_PLATFORM_WINDOWS and getEncoding() == StringEncoding::Ascii))
         {
             SC_TRY_MSG(sizeInBytes() < remaining.sizeInBytes(), "StringSpan::append - exceeded buffer size");
-            CompilerBuiltins::copy(buffer, bytesWithoutTerminator(), sizeInBytes());
+            CompilerBuiltins::copy(reinterpret_cast<char*>(buffer), bytesWithoutTerminator(), sizeInBytes());
             buffer[sizeInBytes() / sizeof(native_char_t)] = 0;
 
             numWritten = sizeInBytes() / sizeof(native_char_t);
@@ -223,7 +232,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
 
     /// @brief Decode a single UTF8 code point and advance the iterator
     /// @return The decoded code point, or 0 if the sequence is invalid (or end is reached)
-    static uint32_t advanceUTF8(const char*& it, const char* end)
+    static constexpr uint32_t advanceUTF8(const char*& it, const char* end)
     {
         uint32_t codePoint = 0;
         return decodeUTF8(it, end, codePoint) ? codePoint : 0;
@@ -231,18 +240,19 @@ struct SC_FOUNDATION_EXPORT StringSpan
 
     /// @brief Decode a single UTF16 code point and advance the iterator
     /// @return The decoded code point, or 0 if the sequence is invalid (or end is reached)
-    static uint32_t advanceUTF16(const char*& it, const char* end)
+    static constexpr uint32_t advanceUTF16(const char*& it, const char* end)
     {
         if (it + sizeof(uint16_t) > end)
             return 0;
-        uint16_t lead, trail;
-        CompilerBuiltins::copy(&lead, it, sizeof(uint16_t)); // Avoid potential unaligned read
+        uint16_t lead = static_cast<uint16_t>(static_cast<uint8_t>(it[0]) |
+                                              (static_cast<uint16_t>(static_cast<uint8_t>(it[1])) << 8));
         it += sizeof(uint16_t);
         if (lead < 0xD800 or lead > 0xDFFF)
             return lead;
         if (it + sizeof(uint16_t) > end)
             return 0;
-        CompilerBuiltins::copy(&trail, it, sizeof(uint16_t)); // Avoid potential unaligned read
+        uint16_t trail = static_cast<uint16_t>(static_cast<uint8_t>(it[0]) |
+                                               (static_cast<uint16_t>(static_cast<uint8_t>(it[1])) << 8));
         if ((lead >= 0xDC00) or (trail < 0xDC00) or (trail > 0xDFFF))
             return 0; // trail surrogate without lead / incomplete surrogate pair / invalid trail surrogate
         it += sizeof(uint16_t);
@@ -296,7 +306,7 @@ struct SC_FOUNDATION_EXPORT StringSpan
     }
 #endif
 
-    static bool decodeUTF8(const char*& it, const char* end, uint32_t& codePoint)
+    static constexpr bool decodeUTF8(const char*& it, const char* end, uint32_t& codePoint)
     {
         if (it >= end)
             return false;

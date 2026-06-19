@@ -1,8 +1,6 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/SerializationText/Internal/JsonTokenizer.h"
-#include "Libraries/Containers/Vector.h"
-#include "Libraries/Memory/String.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -12,12 +10,10 @@ struct JsonTokenizerTest;
 
 struct SC::JsonTokenizerTest : public SC::TestCase
 {
-    using It = StringIteratorASCII;
-
-    static constexpr bool testTokenizeObject(StringView text)
+    static constexpr bool testTokenizeObject(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
@@ -25,10 +21,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         return true;
     }
 
-    static constexpr bool testTokenizeObjectWithField(StringView text)
+    static constexpr bool testTokenizeObjectWithField(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
@@ -41,10 +37,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectEnd);
         return true;
     }
-    static constexpr bool testTokenizeObjectWithTwoFields(StringView text)
+    static constexpr bool testTokenizeObjectWithTwoFields(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
@@ -67,10 +63,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         return true;
     }
 
-    static constexpr bool testTokenizeEndOfInput(StringView text)
+    static constexpr bool testTokenizeEndOfInput(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
@@ -80,10 +76,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         return true;
     }
 
-    static constexpr bool testInvalidTokenResetsState(StringView text)
+    static constexpr bool testInvalidTokenResetsState(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
         SC_TRY(token.getType() == JsonTokenizer::Token::ObjectStart);
         SC_TRY(JsonTokenizer::tokenizeNext(it, token));
@@ -91,10 +87,10 @@ struct SC::JsonTokenizerTest : public SC::TestCase
         return true;
     }
 
-    [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringView text)
+    [[nodiscard]] static constexpr JsonTokenizer::Token scanToken(StringSpan text)
     {
-        auto                 it = text.getIterator<It>();
-        JsonTokenizer::Token token;
+        JsonTokenizer::Cursor it(text);
+        JsonTokenizer::Token  token;
         (void)JsonTokenizer::scanToken(it, token);
         return token;
     }
@@ -103,9 +99,9 @@ struct SC::JsonTokenizerTest : public SC::TestCase
     {
         if (test_section("scanToken"))
         {
-            constexpr StringView asdString("\"ASD\"");
-            constexpr StringView escapedQuoteString("\"A\\\"B\"");
-            constexpr StringView escapedBackslashString("\"A\\\\\"B");
+            constexpr StringSpan asdString("\"ASD\"");
+            constexpr StringSpan escapedQuoteString("\"A\\\"B\"");
+            constexpr StringSpan escapedBackslashString("\"A\\\\\"B");
 
             static_assert(scanToken("").getType() == JsonTokenizer::Token::Invalid, "Error");
             static_assert(scanToken(" ").getType() == JsonTokenizer::Token::Invalid, "Error");

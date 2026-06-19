@@ -1,97 +1,41 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "SerializationJson.h"
+#include "../Common/CompilerBuiltins.h"
 #include "../Common/Result.h"
-#include "Internal/JsonTokenizer.h"
 
+#include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 namespace
 {
 using namespace SC;
 
-bool appendJSONStringEscaped(StringFormatOutput& output, StringView text)
+bool appendControlEscape(SerializationTextOutput& output, uint32_t codePoint)
 {
-    SC_TRY(output.append("\""_a8));
-    const char*  bytes     = text.bytesWithoutTerminator();
-    const size_t length    = text.sizeInBytes();
-    size_t       runFrom   = 0;
-    auto         appendRun = [&](size_t until) -> bool
-    {
-        if (until <= runFrom)
-        {
-            return true;
-        }
-        return output.append(StringView({bytes + runFrom, until - runFrom}, false, text.getEncoding()));
-    };
-
     constexpr char hex[] = "0123456789abcdef";
-    for (size_t idx = 0; idx < length; ++idx)
+    switch (codePoint)
     {
-        const unsigned char current = static_cast<unsigned char>(bytes[idx]);
-        StringView          escaped;
-        switch (current)
-        {
-        case '"': escaped = "\\\""_a8; break;
-        case '\\': escaped = "\\\\"_a8; break;
-        case '\b': escaped = "\\b"_a8; break;
-        case '\f': escaped = "\\f"_a8; break;
-        case '\n': escaped = "\\n"_a8; break;
-        case '\r': escaped = "\\r"_a8; break;
-        case '\t': escaped = "\\t"_a8; break;
-        default: break;
-        }
-
-        if (not escaped.isEmpty())
-        {
-            SC_TRY(appendRun(idx));
-            SC_TRY(output.append(escaped));
-            runFrom = idx + 1;
-        }
-        else if (current < 0x20)
-        {
-            char unicodeEscape[] = {'\\', 'u', '0', '0', hex[current >> 4], hex[current & 0x0f]};
-            SC_TRY(appendRun(idx));
-            SC_TRY(output.append(StringView({unicodeEscape, sizeof(unicodeEscape)}, false, StringEncoding::Ascii)));
-            runFrom = idx + 1;
-        }
+    case '"': return output.append("\\\"");
+    case '\\': return output.append("\\\\");
+    case '\b': return output.append("\\b");
+    case '\f': return output.append("\\f");
+    case '\n': return output.append("\\n");
+    case '\r': return output.append("\\r");
+    case '\t': return output.append("\\t");
+    default: break;
     }
-    SC_TRY(appendRun(length));
-    return output.append("\""_a8);
-}
-
-int hexValue(char value)
-{
-    if (value >= '0' and value <= '9')
+    if (codePoint < 0x20)
     {
-        return value - '0';
-    }
-    if (value >= 'a' and value <= 'f')
-    {
-        return 10 + value - 'a';
-    }
-    if (value >= 'A' and value <= 'F')
-    {
-        return 10 + value - 'A';
-    }
-    return -1;
-}
-
-bool containsJSONEscape(StringView escaped)
-{
-    const char*  bytes  = escaped.bytesWithoutTerminator();
-    const size_t length = escaped.sizeInBytes();
-    for (size_t idx = 0; idx < length; ++idx)
-    {
-        if (bytes[idx] == '\\')
-        {
-            return true;
-        }
+        char unicodeEscape[] = {'\\', 'u', '0', '0', hex[codePoint >> 4], hex[codePoint & 0x0f]};
+        return output.append(StringSpan({unicodeEscape, sizeof(unicodeEscape)}, false, StringEncoding::Ascii));
     }
     return false;
 }
 
-bool appendUTF8CodePoint(StringFormatOutput& output, uint32_t codePoint)
+bool appendUTF8CodePoint(SerializationTextOutput& output, uint32_t codePoint)
 {
     char   bytes[4];
     size_t length = 0;
@@ -125,12 +69,169 @@ bool appendUTF8CodePoint(StringFormatOutput& output, uint32_t codePoint)
     {
         return false;
     }
-    return output.append(StringView({bytes, length}, false, StringEncoding::Utf8));
+    return output.append(StringSpan({bytes, length}, false, StringEncoding::Utf8));
+}
+
+bool appendJSONStringEscapedUTF16(SerializationTextOutput& output, StringSpan text)
+{
+    const char* it  = text.bytesWithoutTerminator();
+    const char* end = it + text.sizeInBytes();
+    while (it < end)
+    {
+        const char* before    = it;
+        uint32_t    codePoint = StringSpan::advanceUTF16(it, end);
+        if (codePoint == 0)
+        {
+            uint16_t lead = 0;
+            if (before + sizeof(uint16_t) > end)
+            {
+                return false;
+            }
+            CompilerBuiltins::copy(reinterpret_cast<char*>(&lead), before, sizeof(uint16_t));
+            if (lead != 0)
+            {
+                return false;
+            }
+        }
+        if (codePoint == '"' or codePoint == '\\' or codePoint < 0x20)
+        {
+            SC_TRY(appendControlEscape(output, codePoint));
+        }
+        else
+        {
+            SC_TRY(appendUTF8CodePoint(output, codePoint));
+        }
+    }
+    return true;
+}
+
+bool appendJSONStringEscaped(SerializationTextOutput& output, StringSpan text)
+{
+    SC_TRY(output.append("\""));
+    if (text.getEncoding() == StringEncoding::Utf16)
+    {
+        SC_TRY(appendJSONStringEscapedUTF16(output, text));
+        return output.append("\"");
+    }
+
+    const char*  bytes     = text.bytesWithoutTerminator();
+    const size_t length    = text.sizeInBytes();
+    size_t       runFrom   = 0;
+    auto         appendRun = [&](size_t until) -> bool
+    {
+        if (until <= runFrom)
+        {
+            return true;
+        }
+        return output.append(StringSpan({bytes + runFrom, until - runFrom}, false, text.getEncoding()));
+    };
+
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        const unsigned char current = static_cast<unsigned char>(bytes[idx]);
+        if (current == '"' or current == '\\' or current < 0x20)
+        {
+            SC_TRY(appendRun(idx));
+            SC_TRY(appendControlEscape(output, current));
+            runFrom = idx + 1;
+        }
+    }
+    SC_TRY(appendRun(length));
+    return output.append("\"");
+}
+
+int hexValue(char value)
+{
+    if (value >= '0' and value <= '9')
+    {
+        return value - '0';
+    }
+    if (value >= 'a' and value <= 'f')
+    {
+        return 10 + value - 'a';
+    }
+    if (value >= 'A' and value <= 'F')
+    {
+        return 10 + value - 'A';
+    }
+    return -1;
+}
+
+bool containsJSONEscape(StringSpan escaped)
+{
+    const char*  bytes  = escaped.bytesWithoutTerminator();
+    const size_t length = escaped.sizeInBytes();
+    for (size_t idx = 0; idx < length; ++idx)
+    {
+        if (bytes[idx] == '\\')
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+template <size_t N>
+bool copyTokenToBuffer(StringSpan token, char (&buffer)[N])
+{
+    if (token.getEncoding() == StringEncoding::Utf16 or token.sizeInBytes() >= N)
+    {
+        return false;
+    }
+    CompilerBuiltins::copy(buffer, token.bytesWithoutTerminator(), token.sizeInBytes());
+    buffer[token.sizeInBytes()] = 0;
+    return true;
+}
+
+bool parseInt32(StringSpan token, int32_t& value)
+{
+    char buffer[32];
+    SC_TRY(copyTokenToBuffer(token, buffer));
+    errno        = 0;
+    char* end    = nullptr;
+    long  parsed = ::strtol(buffer, &end, 10);
+    if (errno == 0 and buffer < end and parsed >= INT32_MIN and parsed <= INT32_MAX)
+    {
+        value = static_cast<int32_t>(parsed);
+        return true;
+    }
+    return false;
+}
+
+bool parseFloat(StringSpan token, float& value)
+{
+    char buffer[64];
+    SC_TRY(copyTokenToBuffer(token, buffer));
+    char* end = nullptr;
+    value     = ::strtof(buffer, &end);
+    return buffer < end;
+}
+
+bool appendFormatted(SerializationTextOutput& output, const char* format, int value)
+{
+    char      buffer[32];
+    const int numChars = ::snprintf(buffer, sizeof(buffer), format, value);
+    if (numChars < 0 or static_cast<size_t>(numChars) >= sizeof(buffer))
+    {
+        return false;
+    }
+    return output.append(StringSpan({buffer, static_cast<size_t>(numChars)}, false, StringEncoding::Ascii));
+}
+
+bool appendFormatted(SerializationTextOutput& output, uint8_t floatDigits, double value)
+{
+    char      buffer[64];
+    const int numChars = ::snprintf(buffer, sizeof(buffer), "%.*f", static_cast<int>(floatDigits), value);
+    if (numChars < 0 or static_cast<size_t>(numChars) >= sizeof(buffer))
+    {
+        return false;
+    }
+    return output.append(StringSpan({buffer, static_cast<size_t>(numChars)}, false, StringEncoding::Ascii));
 }
 
 } // namespace
 
-bool SC::SerializationJson::Reader::appendJSONStringUnescaped(StringView escaped, StringFormatOutput& output)
+bool SC::SerializationJson::Reader::appendJSONStringUnescaped(StringSpan escaped, SerializationTextOutput& output)
 {
     const char*  bytes     = escaped.bytesWithoutTerminator();
     const size_t length    = escaped.sizeInBytes();
@@ -141,7 +242,7 @@ bool SC::SerializationJson::Reader::appendJSONStringUnescaped(StringView escaped
         {
             return true;
         }
-        return output.append(StringView({bytes + runFrom, until - runFrom}, false, escaped.getEncoding()));
+        return output.append(StringSpan({bytes + runFrom, until - runFrom}, false, escaped.getEncoding()));
     };
 
     for (size_t idx = 0; idx < length; ++idx)
@@ -155,14 +256,14 @@ bool SC::SerializationJson::Reader::appendJSONStringUnescaped(StringView escaped
         const char escape = bytes[++idx];
         switch (escape)
         {
-        case '"': SC_TRY(output.append("\""_a8)); break;
-        case '\\': SC_TRY(output.append("\\"_a8)); break;
-        case '/': SC_TRY(output.append("/"_a8)); break;
-        case 'b': SC_TRY(output.append(StringView({"\b", 1}, false, StringEncoding::Ascii))); break;
-        case 'f': SC_TRY(output.append(StringView({"\f", 1}, false, StringEncoding::Ascii))); break;
-        case 'n': SC_TRY(output.append("\n"_a8)); break;
-        case 'r': SC_TRY(output.append("\r"_a8)); break;
-        case 't': SC_TRY(output.append("\t"_a8)); break;
+        case '"': SC_TRY(output.append("\"")); break;
+        case '\\': SC_TRY(output.append("\\")); break;
+        case '/': SC_TRY(output.append("/")); break;
+        case 'b': SC_TRY(output.append(StringSpan({"\b", 1}, false, StringEncoding::Ascii))); break;
+        case 'f': SC_TRY(output.append(StringSpan({"\f", 1}, false, StringEncoding::Ascii))); break;
+        case 'n': SC_TRY(output.append("\n")); break;
+        case 'r': SC_TRY(output.append("\r")); break;
+        case 't': SC_TRY(output.append("\t")); break;
         case 'u': {
             SC_TRY(idx + 4 < length);
             uint32_t codePoint = 0;
@@ -195,34 +296,32 @@ bool SC::SerializationJson::Writer::onSerializationEnd() { return output.onForma
 bool SC::SerializationJson::Writer::setOptions(Options opt)
 {
     options = opt;
-    ::snprintf(floatFormatStorage, sizeof(floatFormatStorage), ".%d", options.floatDigits);
-    floatFormat = StringSpan::fromNullTerminated(floatFormatStorage, StringEncoding::Ascii);
     return true;
 }
 
 bool SC::SerializationJson::Writer::startObject(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
-    return output.append("{"_a8);
+    return output.append("{");
 }
 
-bool SC::SerializationJson::Writer::endObject() { return output.append("}"_a8); }
+bool SC::SerializationJson::Writer::endObject() { return output.append("}"); }
 
 bool SC::SerializationJson::Writer::startArray(uint32_t index)
 {
     SC_TRY(eventuallyAddComma(index));
-    return output.append("["_a8);
+    return output.append("[");
 }
 
-bool SC::SerializationJson::Writer::endArray() { return output.append("]"_a8); }
+bool SC::SerializationJson::Writer::endArray() { return output.append("]"); }
 
-bool SC::SerializationJson::Writer::startObjectField(uint32_t index, StringView text)
+bool SC::SerializationJson::Writer::startObjectField(uint32_t index, StringSpan text)
 {
     SC_TRY(eventuallyAddComma(index));
-    return appendJSONStringEscaped(output, text) and output.append(":"_a8);
+    return appendJSONStringEscaped(output, text) and output.append(":");
 }
 
-bool SC::SerializationJson::Writer::serializeStringView(uint32_t index, StringView text)
+bool SC::SerializationJson::Writer::serializeStringSpan(uint32_t index, StringSpan text)
 {
     SC_TRY(eventuallyAddComma(index));
     return appendJSONStringEscaped(output, text);
@@ -230,30 +329,25 @@ bool SC::SerializationJson::Writer::serializeStringView(uint32_t index, StringVi
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, StringSpan text)
 {
-    return serializeStringView(index, text);
-}
-
-bool SC::SerializationJson::Writer::serialize(uint32_t index, StringView text)
-{
-    return serializeStringView(index, text);
+    return serializeStringSpan(index, text);
 }
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, float value)
 {
     SC_TRY(eventuallyAddComma(index));
-    return StringFormatterFor<float>::format(output, floatFormat, value);
+    return appendFormatted(output, options.floatDigits, static_cast<double>(value));
 }
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, double value)
 {
     SC_TRY(eventuallyAddComma(index));
-    return StringFormatterFor<double>::format(output, floatFormat, value);
+    return appendFormatted(output, options.floatDigits, value);
 }
 
 bool SC::SerializationJson::Writer::serialize(uint32_t index, int value)
 {
     SC_TRY(eventuallyAddComma(index));
-    return StringFormatterFor<int>::format(output, StringView(), value);
+    return appendFormatted(output, "%d", value);
 }
 
 bool SC::SerializationJson::Writer::eventuallyAddComma(uint32_t index) { return index > 0 ? output.append(",") : true; }
@@ -300,7 +394,7 @@ bool SC::SerializationJson::Reader::eventuallyExpectComma(uint32_t index)
     return true;
 }
 
-SC::StringView SC::SerializationJson::Reader::serializeInternal(uint32_t index, bool& succeeded)
+SC::StringSpan SC::SerializationJson::Reader::serializeInternal(uint32_t index, bool& succeeded)
 {
     succeeded = false;
     if (eventuallyExpectComma(index))
@@ -318,7 +412,7 @@ SC::StringView SC::SerializationJson::Reader::serializeInternal(uint32_t index, 
 bool SC::SerializationJson::Reader::serialize(uint32_t index, StringSpan& value)
 {
     bool             succeeded;
-    const StringView escaped = serializeInternal(index, succeeded);
+    const StringSpan escaped = serializeInternal(index, succeeded);
     if (not succeeded or containsJSONEscape(escaped))
     {
         return false;
@@ -327,18 +421,7 @@ bool SC::SerializationJson::Reader::serialize(uint32_t index, StringSpan& value)
     return true;
 }
 
-bool SC::SerializationJson::Reader::serialize(uint32_t index, StringView& value)
-{
-    StringSpan span;
-    if (not serialize(index, span))
-    {
-        return false;
-    }
-    value = span;
-    return true;
-}
-
-bool SC::SerializationJson::Reader::startObjectField(uint32_t index, StringView text)
+bool SC::SerializationJson::Reader::startObjectField(uint32_t index, StringSpan text)
 {
     SC_TRY(eventuallyExpectComma(index));
     JsonTokenizer::Token token;
@@ -395,7 +478,7 @@ bool SC::SerializationJson::Reader::serialize(uint32_t index, float& value)
     JsonTokenizer::Token token;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY(token.getType() == JsonTokenizer::Token::Number);
-    return token.getToken(iteratorText).parseFloat(value);
+    return parseFloat(token.getToken(iteratorText), value);
 }
 
 bool SC::SerializationJson::Reader::serialize(uint32_t index, int32_t& value)
@@ -405,7 +488,7 @@ bool SC::SerializationJson::Reader::serialize(uint32_t index, int32_t& value)
     JsonTokenizer::Token token;
     SC_TRY(JsonTokenizer::tokenizeNext(iterator, token));
     SC_TRY(token.getType() == JsonTokenizer::Token::Number);
-    return token.getToken(iteratorText).parseInt32(value);
+    return parseInt32(token.getToken(iteratorText), value);
 }
 
 bool SC::SerializationJson::Reader::tokenizeArrayStart(uint32_t index)

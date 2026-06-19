@@ -1,17 +1,60 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Strings/StringView.h"
+#include "../../Common/CompilerMacrosExport.h"
+#include "../../Common/StringSpan.h"
+#ifndef SC_EXPORT_LIBRARY_SERIALIZATION_TEXT
+#define SC_EXPORT_LIBRARY_SERIALIZATION_TEXT 0
+#endif
+#define SC_SERIALIZATION_TEXT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIALIZATION_TEXT)
 
 namespace SC
 {
-struct JsonTokenizer;
-struct JsonTokenizerTest;
+struct SC_SERIALIZATION_TEXT_EXPORT JsonTokenizer;
+struct SC_SERIALIZATION_TEXT_EXPORT JsonTokenizerTest;
 } // namespace SC
 
 /// @brief Tokenize a JSON text stream, without validating numbers and strings
 struct SC::JsonTokenizer
 {
+    struct SC_SERIALIZATION_TEXT_EXPORT Cursor
+    {
+        StringSpan text;
+        size_t     position = 0;
+        bool       valid    = true;
+
+        constexpr Cursor() = default;
+        constexpr Cursor(StringSpan text) : text(text), valid(text.getEncoding() != StringEncoding::Utf16) {}
+
+        [[nodiscard]] constexpr bool read(char& character)
+        {
+            if (not valid or position >= text.sizeInBytes())
+            {
+                return false;
+            }
+            character = text.bytesWithoutTerminator()[position++];
+            return true;
+        }
+
+        constexpr void stepBackward()
+        {
+            if (position > 0)
+            {
+                position -= 1;
+            }
+        }
+
+        [[nodiscard]] constexpr bool advanceIfMatches(char character)
+        {
+            if (not valid or position >= text.sizeInBytes() or text.bytesWithoutTerminator()[position] != character)
+            {
+                return false;
+            }
+            position += 1;
+            return true;
+        }
+    };
+
     struct Token
     {
         enum Type
@@ -36,10 +79,10 @@ struct SC::JsonTokenizer
         /// @return Token::Type
         constexpr Type getType() const { return type; }
 
-        /// @brief Get current Token as StringView slice from the passed string
-        /// @param source The StringView that has been used when parsing
-        /// @return StringView slice of `source` representing this token
-        constexpr StringView getToken(StringView source) const
+        /// @brief Get current Token as StringSpan slice from the passed string
+        /// @param source The StringSpan that has been used when parsing
+        /// @return StringSpan slice of `source` representing this token
+        constexpr StringSpan getToken(StringSpan source) const
         {
             return {{source.bytesWithoutTerminator() + tokenStartBytes, tokenLengthBytes}, false, source.getEncoding()};
         }
@@ -51,33 +94,40 @@ struct SC::JsonTokenizer
         Type   type;
     };
 
-    // Return
-
-    /// @brief Finds next json token in the iterator
-    /// @param[in,out] it iterator pointing at the text stream of json to parse
+    /// @brief Finds next json token in the cursor
+    /// @param[in,out] it cursor pointing at the text stream of json to parse
     /// @param[out] token Output token from this tokenization operation
-    /// @return `false` when iterator is at end
-    /// @note Token bytes offset used then by Token::getToken are relative to the passed `iterator` start
-    [[nodiscard]] static constexpr bool tokenizeNext(StringIteratorASCII& it, Token& token);
+    /// @return `false` when cursor is at end
+    /// @note Token bytes offset used then by Token::getToken are relative to the passed `cursor` start
+    [[nodiscard]] static constexpr bool tokenizeNext(Cursor& it, Token& token);
 
   private:
     friend struct SC::JsonTokenizerTest;
-    [[nodiscard]] static constexpr bool scanToken(StringIteratorASCII& it, Token& token);
-    [[nodiscard]] static constexpr bool skipWhitespaces(StringIteratorASCII& it);
+    [[nodiscard]] static constexpr bool scanToken(Cursor& it, Token& token);
+    [[nodiscard]] static constexpr bool skipWhitespaces(Cursor& it);
 
-    static constexpr void tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start, Token& token);
-    [[nodiscard]] static constexpr bool isEscapedQuote(StringIteratorASCII it);
-    static constexpr void tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
-                                         Token& token);
-    static constexpr void tokenizeTrue(StringIteratorASCII& it, Token& token);
-    static constexpr void tokenizeFalse(StringIteratorASCII& it, Token& token);
-    static constexpr void tokenizeNull(StringIteratorASCII& it, Token& token);
+    static constexpr void               tokenizeString(Cursor& it, size_t start, Token& token);
+    [[nodiscard]] static constexpr bool isEscapedQuote(StringSpan text, size_t quotePosition);
+    static constexpr void               tokenizeNumber(Cursor& it, char previousChar, Token& token);
+    static constexpr void               tokenizeTrue(Cursor& it, Token& token);
+    static constexpr void               tokenizeFalse(Cursor& it, Token& token);
+    static constexpr void               tokenizeNull(Cursor& it, Token& token);
+
+    [[nodiscard]] static constexpr bool isWhitespace(char character)
+    {
+        return character == '\t' or character == '\n' or character == '\r' or character == ' ';
+    }
+
+    [[nodiscard]] static constexpr bool isNumberCharacter(char character)
+    {
+        return (character >= '0' and character <= '9') or character == '.';
+    }
 };
 
 //-----------------------------------------------------------------------------------------------------------------------
 // Implementation details
 //-----------------------------------------------------------------------------------------------------------------------
-constexpr bool SC::JsonTokenizer::tokenizeNext(StringIteratorASCII& it, Token& token)
+constexpr bool SC::JsonTokenizer::tokenizeNext(Cursor& it, Token& token)
 {
     if (skipWhitespaces(it))
     {
@@ -86,13 +136,13 @@ constexpr bool SC::JsonTokenizer::tokenizeNext(StringIteratorASCII& it, Token& t
     return false;
 }
 
-constexpr bool SC::JsonTokenizer::scanToken(StringIteratorASCII& it, Token& token)
+constexpr bool SC::JsonTokenizer::scanToken(Cursor& it, Token& token)
 {
     token = Token();
 
-    StringIteratorASCII::CodePoint current = 0;
-    const StringIteratorASCII      start   = it;
-    if (not it.advanceRead(current))
+    char         current = 0;
+    const size_t start   = it.position;
+    if (not it.read(current))
     {
         return false;
     }
@@ -110,78 +160,69 @@ constexpr bool SC::JsonTokenizer::scanToken(StringIteratorASCII& it, Token& toke
     case '"': tokenizeString(it, start, token); return true;
     default: tokenizeNumber(it, current, token); break;
     }
-    token.tokenLengthBytes = static_cast<size_t>(it.bytesDistanceFrom(start));
-    auto realStart         = start;
-    realStart.setToStart();
-    token.tokenStartBytes = static_cast<size_t>(start.bytesDistanceFrom(realStart));
+    token.tokenStartBytes  = start;
+    token.tokenLengthBytes = it.position - start;
     return true;
 }
 
-// Returns false when iterator is at end
-constexpr bool SC::JsonTokenizer::skipWhitespaces(StringIteratorASCII& it)
+// Returns false when cursor is at end
+constexpr bool SC::JsonTokenizer::skipWhitespaces(Cursor& it)
 {
-    constexpr StringIteratorSkipTable table({'\t', '\n', '\r', ' '});
-    StringIteratorASCII::CodePoint    current = 0;
-    while (it.advanceRead(current))
+    char current = 0;
+    while (it.read(current))
     {
-        if (not table.matches[current])
+        if (not isWhitespace(current))
         {
-            (void)it.stepBackward(); // put back the read character
+            it.stepBackward(); // put back the read character
             return true;
         }
     }
     return false;
 }
 
-constexpr void SC::JsonTokenizer::tokenizeString(StringIteratorASCII& it, const StringIteratorASCII start, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeString(Cursor& it, size_t start, Token& token)
 {
-    while (it.advanceUntilMatches('"')) // find the end of the string
+    const char*  bytes        = it.text.bytesWithoutTerminator();
+    const size_t contentStart = start + 1;
+    while (it.position < it.text.sizeInBytes())
     {
-        if (isEscapedQuote(it)) // if the quote is escaped continue search
+        if (bytes[it.position] == '"' and not isEscapedQuote(it.text, it.position))
         {
-            (void)it.stepForward();
-            continue;
+            token.type             = Token::String;
+            token.tokenStartBytes  = contentStart;
+            token.tokenLengthBytes = it.position - contentStart;
+            it.position += 1; // eat the ending quote
+            break;
         }
-        StringIteratorASCII startNext = start;
-        (void)startNext.stepForward();  // but let's slice away leading '"'
-        token.type     = Token::String; // Ok we have a (not validated) string
-        auto realStart = start;
-        realStart.setToStart();
-        token.tokenStartBytes  = static_cast<size_t>(startNext.bytesDistanceFrom(realStart));
-        token.tokenLengthBytes = static_cast<size_t>(it.bytesDistanceFrom(startNext));
-        (void)it.advanceCodePoints(1); // eat the ending \" in the iterator
-        break;
+        it.position += 1;
     }
 }
 
-constexpr bool SC::JsonTokenizer::isEscapedQuote(StringIteratorASCII it)
+constexpr bool SC::JsonTokenizer::isEscapedQuote(StringSpan text, size_t quotePosition)
 {
-    size_t backslashes = 0;
-    while (it.isPrecededBy('\\'))
+    size_t      backslashes = 0;
+    const char* bytes       = text.bytesWithoutTerminator();
+    while (quotePosition > 0 and bytes[quotePosition - 1] == '\\')
     {
         backslashes += 1;
-        (void)it.stepBackward();
+        quotePosition -= 1;
     }
     return (backslashes % 2) == 1;
 }
 
-constexpr void SC::JsonTokenizer::tokenizeNumber(StringIteratorASCII& it, StringIteratorASCII::CodePoint previousChar,
-                                                 Token& token)
+constexpr void SC::JsonTokenizer::tokenizeNumber(Cursor& it, char previousChar, Token& token)
 {
     // eat all non whitespaces that could possibly form a number (to be validated, as it may contain multiple dots)
-    constexpr StringIteratorSkipTable numbersTable({'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.'});
-
-    if (not numbersTable.matches[previousChar])
+    if (not isNumberCharacter(previousChar))
     {
         return;
     }
-    StringIteratorASCII::CodePoint current = 0;
-    while (it.advanceRead(current))
+    char current = 0;
+    while (it.read(current))
     {
-        if (not numbersTable.matches[current])
+        if (not isNumberCharacter(current))
         {
-            // not dot and not number
-            (void)it.stepBackward(); // put it back
+            it.stepBackward(); // put it back
             break;
         }
     }
@@ -189,7 +230,7 @@ constexpr void SC::JsonTokenizer::tokenizeNumber(StringIteratorASCII& it, String
     token.type = Token::Number;
 }
 
-constexpr void SC::JsonTokenizer::tokenizeTrue(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeTrue(Cursor& it, Token& token)
 {
     if (it.advanceIfMatches('r') and it.advanceIfMatches('u') and it.advanceIfMatches('e'))
     {
@@ -197,7 +238,7 @@ constexpr void SC::JsonTokenizer::tokenizeTrue(StringIteratorASCII& it, Token& t
     }
 }
 
-constexpr void SC::JsonTokenizer::tokenizeFalse(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeFalse(Cursor& it, Token& token)
 {
     if (it.advanceIfMatches('a') and it.advanceIfMatches('l') and it.advanceIfMatches('s') and it.advanceIfMatches('e'))
     {
@@ -205,7 +246,7 @@ constexpr void SC::JsonTokenizer::tokenizeFalse(StringIteratorASCII& it, Token& 
     }
 }
 
-constexpr void SC::JsonTokenizer::tokenizeNull(StringIteratorASCII& it, Token& token)
+constexpr void SC::JsonTokenizer::tokenizeNull(Cursor& it, Token& token)
 {
     if (it.advanceIfMatches('u') and it.advanceIfMatches('l') and it.advanceIfMatches('l'))
     {

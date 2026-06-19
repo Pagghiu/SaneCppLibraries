@@ -7,7 +7,8 @@
 #endif
 #define SC_SERIALIZATION_TEXT_EXPORT SC_COMPILER_LIBRARY_EXPORT(SC_EXPORT_LIBRARY_SERIALIZATION_TEXT)
 
-#include "../Strings/StringFormat.h" //StringFormatOutput
+#include "Internal/JsonTokenizer.h"
+#include "Internal/SerializationTextOutput.h"
 #include "Internal/SerializationTextReadVersioned.h"
 #include "Internal/SerializationTextReadWriteExact.h"
 
@@ -67,14 +68,20 @@ struct SC::SerializationJson
     template <typename T, typename B>
     [[nodiscard]] static bool write(T& object, B& buffer, Options options = Options())
     {
-        GrowableBuffer<B>  gb = {buffer};
-        StringFormatOutput output(StringEncoding::Ascii, gb);
+        GrowableBuffer<B>       gb = {buffer};
+        SerializationTextOutput output(gb);
 
         Writer stream(output, options);
         if (not stream.onSerializationStart())
+        {
+            output.onFormatFailed();
             return false;
+        }
         if (not Serialization::SerializationTextReadWriteExact<Writer, T>::serialize(0, object, stream))
+        {
+            output.onFormatFailed();
             return false;
+        }
         return stream.onSerializationEnd();
     }
 
@@ -88,7 +95,7 @@ struct SC::SerializationJson
     /// @return `true` if load succeeded
     /// @see SC::SerializationJson for example usage
     template <typename T>
-    [[nodiscard]] static bool loadExact(T& object, StringView text)
+    [[nodiscard]] static bool loadExact(T& object, StringSpan text)
     {
         Reader stream(text);
         return Serialization::SerializationTextReadWriteExact<Reader, T>::serialize(0, object, stream);
@@ -101,7 +108,7 @@ struct SC::SerializationJson
     /// @return `true` if load succeeded
     /// @see SC::SerializationJson for example usage
     template <typename T>
-    [[nodiscard]] static bool loadVersioned(T& object, StringView text)
+    [[nodiscard]] static bool loadVersioned(T& object, StringSpan text)
     {
         Reader stream(text);
         return Serialization::SerializationTextReadVersioned<Reader, T, void>::loadVersioned(0, object, stream);
@@ -112,9 +119,9 @@ struct SC::SerializationJson
     /// Its methods are meant to be called by Serializer
     struct SC_SERIALIZATION_TEXT_EXPORT Writer
     {
-        StringFormatOutput& output;
+        SerializationTextOutput& output;
 
-        Writer(StringFormatOutput& output, Options options) : output(output), options(options) {}
+        Writer(SerializationTextOutput& output, Options options) : output(output), options(options) {}
 
         [[nodiscard]] bool onSerializationStart();
         [[nodiscard]] bool onSerializationEnd();
@@ -133,7 +140,7 @@ struct SC::SerializationJson
             if (not eventuallyAddComma(index))
                 return false;
             size = static_cast<uint32_t>(container.size());
-            return output.append("["_a8);
+            return output.append("[");
         }
 
         template <typename Container>
@@ -142,35 +149,34 @@ struct SC::SerializationJson
             return true;
         }
 
-        [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
+        [[nodiscard]] bool startObjectField(uint32_t index, StringSpan text);
 
         template <typename T>
-        [[nodiscard]] bool serialize(uint32_t index, T& text)
+        [[nodiscard]]
+        typename TypeTraits::EnableIf<not Serialization::SerializationTextIsBaseOf<StringSpan, T>::value,
+                                      bool>::type serialize(uint32_t index, T& text)
         {
-            return serializeStringView(index, text.view());
+            return serializeStringSpan(index, text.view());
         }
 
         [[nodiscard]] bool serialize(uint32_t index, StringSpan text);
-        [[nodiscard]] bool serialize(uint32_t index, StringView text);
         [[nodiscard]] bool serialize(uint32_t index, float value);
         [[nodiscard]] bool serialize(uint32_t index, double value);
         [[nodiscard]] bool serialize(uint32_t index, int value);
 
       private:
-        [[nodiscard]] bool serializeStringView(uint32_t index, StringView text);
+        [[nodiscard]] bool serializeStringSpan(uint32_t index, StringSpan text);
 
         bool eventuallyAddComma(uint32_t index);
 
-        char       floatFormatStorage[5];
-        StringSpan floatFormat;
-        Options    options;
+        Options options;
     };
 
     /// @brief Writer interface for Serializer that parses JSON into C++ types.
     /// Its methods are meant to be called by Serializer
     struct SC_SERIALIZATION_TEXT_EXPORT Reader
     {
-        Reader(StringView text) : iteratorText(text), iterator(text.getIterator<StringIteratorASCII>()) {}
+        Reader(StringSpan text) : iteratorText(text), iterator(text) {}
 
         [[nodiscard]] bool onSerializationStart() { return true; }
         [[nodiscard]] bool onSerializationEnd() { return true; }
@@ -200,25 +206,26 @@ struct SC::SerializationJson
             return true;
         }
 
-        [[nodiscard]] bool startObjectField(uint32_t index, StringView text);
+        [[nodiscard]] bool startObjectField(uint32_t index, StringSpan text);
         [[nodiscard]] bool getNextField(uint32_t index, StringSpan& text, bool& hasMore);
 
         [[nodiscard]] bool serialize(uint32_t index, bool& value);
         [[nodiscard]] bool serialize(uint32_t index, float& value);
         [[nodiscard]] bool serialize(uint32_t index, int32_t& value);
         [[nodiscard]] bool serialize(uint32_t index, StringSpan& value);
-        [[nodiscard]] bool serialize(uint32_t index, StringView& value);
 
         template <typename T>
-        [[nodiscard]] bool serialize(uint32_t index, T& text)
+        [[nodiscard]]
+        typename TypeTraits::EnableIf<not Serialization::SerializationTextIsBaseOf<StringSpan, T>::value,
+                                      bool>::type serialize(uint32_t index, T& text)
         {
             bool succeeded;
             auto escaped = serializeInternal(index, succeeded);
             if (not succeeded)
                 return false;
 
-            GrowableBuffer<T>  gb = {text};
-            StringFormatOutput output(StringEncoding::Utf8, gb);
+            GrowableBuffer<T>       gb = {text};
+            SerializationTextOutput output(gb);
             gb.clear();
             output.onFormatBegin();
             if (not appendJSONStringUnescaped(escaped, output))
@@ -230,15 +237,15 @@ struct SC::SerializationJson
         }
 
       private:
-        [[nodiscard]] static bool appendJSONStringUnescaped(StringView escaped, StringFormatOutput& output);
-        [[nodiscard]] StringView  serializeInternal(uint32_t index, bool& succeeded);
+        [[nodiscard]] static bool appendJSONStringUnescaped(StringSpan escaped, SerializationTextOutput& output);
+        [[nodiscard]] StringSpan  serializeInternal(uint32_t index, bool& succeeded);
 
         [[nodiscard]] bool tokenizeArrayStart(uint32_t index);
         [[nodiscard]] bool tokenizeArrayEnd(uint32_t& size);
         [[nodiscard]] bool eventuallyExpectComma(uint32_t index);
 
-        StringView          iteratorText;
-        StringIteratorASCII iterator;
+        StringSpan            iteratorText;
+        JsonTokenizer::Cursor iterator;
     };
 };
 //! @}

@@ -3,7 +3,6 @@
 #pragma once
 #include "../../Common/StringSpan.h"
 #include "../../Reflection/Reflection.h"
-#include "../../Strings/StringView.h"
 
 namespace SC
 {
@@ -14,12 +13,6 @@ struct Reflect<StringSpan>
 {
     static constexpr TypeCategory getCategory() { return TypeCategory::TypeInvalid; }
 };
-
-template <>
-struct Reflect<StringView>
-{
-    static constexpr TypeCategory getCategory() { return TypeCategory::TypeInvalid; }
-};
 } // namespace Reflection
 
 /// @brief Serializes structured formats mostly text based, like JSON (see @ref library_serialization_text).
@@ -27,6 +20,25 @@ namespace Serialization
 {
 template <typename TextStream, typename T, typename SFINAESelector = void>
 struct SerializationTextReadWriteExact;
+
+/// Wraps the compiler intrinsic because older Apple Clang cannot mangle it directly in a function signature.
+template <typename Base, typename Derived>
+struct SerializationTextIsBaseOf
+{
+    static constexpr bool value = __is_base_of(Base, Derived);
+};
+
+template <typename T, bool IsStringSpanType = SerializationTextIsBaseOf<StringSpan, T>::value>
+struct SerializationTextIsStructSerializable
+{
+    static constexpr bool value = Reflection::IsStruct<T>::value;
+};
+
+template <typename T>
+struct SerializationTextIsStructSerializable<T, true>
+{
+    static constexpr bool value = false;
+};
 
 template <typename TextStream, typename T, typename SFINAESelector>
 struct SerializationTextReadWriteExact
@@ -46,12 +58,15 @@ struct SerializationTextReadWriteExact<TextStream, StringSpan, void>
     }
 };
 
-template <typename TextStream>
-struct SerializationTextReadWriteExact<TextStream, StringView, void>
+template <typename TextStream, typename T>
+struct SerializationTextReadWriteExact<
+    TextStream, T,
+    typename SC::TypeTraits::EnableIf<SerializationTextIsBaseOf<StringSpan, T>::value and
+                                      not SC::TypeTraits::IsSame<StringSpan, T>::value>::type>
 {
-    [[nodiscard]] static constexpr bool serialize(uint32_t index, StringView& object, TextStream& stream)
+    [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
     {
-        return stream.serialize(index, object);
+        return stream.serialize(index, static_cast<StringSpan&>(object));
     }
 };
 
@@ -73,8 +88,8 @@ struct SerializationTextReadWriteExact<TextStream, T[N]>
 };
 
 template <typename TextStream, typename T>
-struct SerializationTextReadWriteExact<TextStream, T,
-                                       typename SC::TypeTraits::EnableIf<Reflection::IsStruct<T>::value>::type>
+struct SerializationTextReadWriteExact<
+    TextStream, T, typename SC::TypeTraits::EnableIf<SerializationTextIsStructSerializable<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool serialize(uint32_t index, T& object, TextStream& stream)
     {

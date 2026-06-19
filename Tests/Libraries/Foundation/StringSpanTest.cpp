@@ -12,6 +12,18 @@ struct StringSpanTest;
 
 struct SC::StringSpanTest : public SC::TestCase
 {
+    static constexpr bool testConstexprEquality()
+    {
+        constexpr char utf16Hello[] = {'h', 0, 'e', 0, 'l', 0, 'l', 0, 'o', 0};
+
+        const StringSpan ascii("hello");
+        const StringSpan utf8({"hello", 5}, false, StringEncoding::Utf8);
+        const StringSpan utf16({utf16Hello, sizeof(utf16Hello)}, false, StringEncoding::Utf16);
+        const StringSpan emptyAscii;
+        const StringSpan emptyUtf8(StringEncoding::Utf8);
+        return ascii == utf8 and utf8 == utf16 and ascii != "world" and emptyAscii == emptyUtf8;
+    }
+
     StringSpanTest(SC::TestReport& report) : TestCase(report, "StringSpanTest")
     {
 
@@ -29,6 +41,7 @@ struct SC::StringSpanTest : public SC::TestCase
     {
         using SS = StringSpan;
         using C  = SS::Comparison;
+        static_assert(testConstexprEquality(), "StringSpan equality must be usable in constant expressions");
         // Test operator==
         {
             SS a("hello");

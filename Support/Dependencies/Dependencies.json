@@ -180,16 +180,13 @@
     },
     "SerializationText": {
         "direct_dependencies": [
-            "Reflection",
-            "Strings"
+            "Reflection"
         ],
         "minimal_dependencies": [
-            "Reflection",
-            "Strings"
+            "Reflection"
         ],
         "all_dependencies": [
-            "Reflection",
-            "Strings"
+            "Reflection"
         ]
     },
     "Socket": {

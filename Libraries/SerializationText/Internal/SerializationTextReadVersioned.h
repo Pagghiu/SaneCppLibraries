@@ -27,12 +27,15 @@ struct SerializationTextReadVersioned<SerializerStream, StringSpan, void>
     }
 };
 
-template <typename SerializerStream>
-struct SerializationTextReadVersioned<SerializerStream, StringView, void>
+template <typename SerializerStream, typename T>
+struct SerializationTextReadVersioned<
+    SerializerStream, T,
+    typename SC::TypeTraits::EnableIf<SerializationTextIsBaseOf<StringSpan, T>::value and
+                                      not SC::TypeTraits::IsSame<StringSpan, T>::value>::type>
 {
-    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, StringView& object, SerializerStream& stream)
+    [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
     {
-        return stream.serialize(index, object);
+        return stream.serialize(index, static_cast<StringSpan&>(object));
     }
 };
 
@@ -46,8 +49,8 @@ struct SerializationTextReadVersioned<SerializerStream, T[N], void>
 };
 
 template <typename SerializerStream, typename T>
-struct SerializationTextReadVersioned<SerializerStream, T,
-                                      typename SC::TypeTraits::EnableIf<Reflection::IsStruct<T>::value>::type>
+struct SerializationTextReadVersioned<
+    SerializerStream, T, typename SC::TypeTraits::EnableIf<SerializationTextIsStructSerializable<T>::value>::type>
 {
     [[nodiscard]] static constexpr bool loadVersioned(uint32_t index, T& object, SerializerStream& stream)
     {

@@ -4,6 +4,7 @@
 #include "Libraries/Containers/Vector.h"
 #include "Libraries/ContainersReflection/ContainersSerialization.h"
 #include "Libraries/ContainersReflection/MemorySerialization.h"
+#include "Libraries/Strings/StringView.h"
 #include "Libraries/Testing/Testing.h"
 
 namespace SC
@@ -116,7 +117,7 @@ void SC::SerializationJsonTest::jsonWrite()
 
     Test test;
     SC_TEST_EXPECT(SerializationJson::write(test, buffer));
-    // Note: StringFormatOutput will NOT null terminate the string
+    // Note: SerializationJson::write will NOT null terminate the string
     const StringView serializedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(serializedJSON == testJSON);
 
