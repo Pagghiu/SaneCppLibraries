@@ -21,7 +21,7 @@ SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& han
     return Result(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
+SC::Result SC::SystemDynamicLibrary::load(StringSpan fullPath)
 {
     SC_TRY(close());
     StringPath fullPathZeroTerminated;
@@ -35,7 +35,7 @@ SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
     return Result(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid GetProcAddress handle");
     char symbolNullTerminated[512];
@@ -79,7 +79,7 @@ SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle& han
     return Result(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
+SC::Result SC::SystemDynamicLibrary::load(StringSpan fullPath)
 {
     SC_TRY(close());
     StringPath fullPathZeroTerminated;
@@ -92,7 +92,7 @@ SC::Result SC::SystemDynamicLibrary::load(StringView fullPath)
     return Result(true);
 }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& symbol) const
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan symbolName, void*& symbol) const
 {
     SC_TRY_MSG(isValid(), "Invalid dlsym handle");
     // Using StringPath just to null terminate the symbol name
@@ -105,8 +105,8 @@ SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView symbolName, void*& sy
 
 SC::Result SC::detail::SystemDynamicLibraryDefinition::releaseHandle(Handle&) { return Result(false); }
 
-SC::Result SC::SystemDynamicLibrary::load(StringView) { return Result(false); }
+SC::Result SC::SystemDynamicLibrary::load(StringSpan) { return Result(false); }
 
-SC::Result SC::SystemDynamicLibrary::loadSymbol(StringView, void*&) const { return Result(false); }
+SC::Result SC::SystemDynamicLibrary::loadSymbol(StringSpan, void*&) const { return Result(false); }
 
 #endif

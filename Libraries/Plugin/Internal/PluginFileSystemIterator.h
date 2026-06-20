@@ -1,7 +1,7 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #pragma once
-#include "../../Strings/Path.h"
+#include "PluginString.h"
 
 #if SC_PLATFORM_WINDOWS
 #include <Windows.h>
@@ -16,18 +16,18 @@ struct PluginFileSystemIterator
 {
     struct Entry
     {
-        StringView name;
+        StringSpan name;
         bool       isDirectory;
     };
     PluginFileSystemIterator() = default;
     ~PluginFileSystemIterator() { close(); }
 
-    Result init(StringView directoryPath)
+    Result init(StringSpan directoryPath)
     {
         SC_TRY(directory.assign(directoryPath));
 
         started       = false;
-        pathSeparator = Path::SeparatorStringView();
+        pathSeparator = SC_NATIVE_STR("/");
 
 #if SC_PLATFORM_WINDOWS
         StringPath searchPath = directory;
@@ -79,7 +79,7 @@ struct PluginFileSystemIterator
         struct dirent* current;
         current = ::readdir(dir);
         SC_TRY(current != nullptr);
-        StringView entryName = StringView::fromNullTerminated(current->d_name, StringEncoding::Utf8);
+        StringSpan entryName = StringSpan::fromNullTerminated(current->d_name, StringEncoding::Utf8);
         StringPath fullPath  = directory;
         SC_TRY(fullPath.append(pathSeparator));
         SC_TRY(fullPath.append(entryName));
@@ -92,7 +92,7 @@ struct PluginFileSystemIterator
 #endif
     }
 
-    StringView pathSeparator;
+    StringSpan pathSeparator;
 
   private:
     StringPath directory;

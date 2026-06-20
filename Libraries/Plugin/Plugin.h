@@ -134,13 +134,13 @@ struct PluginDefinition
     /// @param[in] text Content of .cpp file where to look for plugin definition
     /// @param[out] extracted Extracted comment block out of text
     /// @return `true` if a comment block has been found successfully
-    [[nodiscard]] static bool find(const StringView text, StringView& extracted);
+    [[nodiscard]] static bool find(StringSpan text, StringSpan& extracted);
 
     /// @brief Parses an extracted plugin definition text
     /// @param[in] text An extracted plugin definition text (`extracted` of PluginDefinition::find)
     /// @param[out] pluginDefinition A valid PluginDefinition parsed from the given text
     /// @return `true` if the plugin definition can be parsed successfully
-    [[nodiscard]] static bool parse(StringView text, PluginDefinition& pluginDefinition);
+    [[nodiscard]] static bool parse(StringSpan text, PluginDefinition& pluginDefinition);
 
     /// @brief Gets absolute path of where compiled dynamic library will exist after plugin is compiled
     /// @param fullDynamicPath absolute path of where compiled dynamic library from plugin
@@ -153,8 +153,6 @@ struct PluginDefinition
     Result getDynamicLibraryPDBAbsolutePath(StringPath& fullDynamicPath) const;
 
   private:
-    [[nodiscard]] static bool parseLine(StringIteratorASCII& iterator, StringView& key, StringView& value);
-
     size_t pluginFileIndex = 0;
     friend struct PluginScanner;
 };
@@ -169,14 +167,14 @@ struct PluginScanner
     /// @param foundDefinitions Parsed definitions (it's a slice of definitionsStorage)
     /// @return Valid result if the given directory is accessible and valid PluginDefinition can be parsed
     template <typename T>
-    static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
-                                T& tempFileBuffer, Span<PluginDefinition>& foundDefinitions)
+    static Result scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage, T& tempFileBuffer,
+                                Span<PluginDefinition>& foundDefinitions)
     {
         return scanDirectory(directory, definitionsStorage, GrowableBuffer<T>{tempFileBuffer}, foundDefinitions);
     }
 
   private:
-    static Result scanDirectory(const StringView directory, Span<PluginDefinition> definitionsStorage,
+    static Result scanDirectory(StringSpan directory, Span<PluginDefinition> definitionsStorage,
                                 IGrowableBuffer&& tempFileBuffer, Span<PluginDefinition>& foundDefinitions);
     struct ScannerState;
 };
@@ -201,7 +199,7 @@ struct PluginCompiler
     /// @param linkerLog If provided, will receive the log output produced by the linker
     /// @return Valid result if the Definition can be compiled to a dynamic library linking executablePath
     Result link(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                const PluginCompilerEnvironment& environment, StringView executablePath, Span<char>& linkerLog) const;
+                const PluginCompilerEnvironment& environment, StringSpan executablePath, Span<char>& linkerLog) const;
 
     /// @brief Compiler type (clang/gcc/msvc)
     enum class Type
@@ -228,8 +226,8 @@ struct PluginCompiler
     mutable native_char_t buffer[4096];
 
     Result compileFile(const PluginDefinition& definition, const PluginSysroot& sysroot,
-                       const PluginCompilerEnvironment& compilerEnvironment, StringView sourceFile,
-                       StringView objectFile, Span<char>& compilerLog) const;
+                       const PluginCompilerEnvironment& compilerEnvironment, StringSpan sourceFile,
+                       StringSpan objectFile, Span<char>& compilerLog) const;
     struct CompilerFinder;
 };
 
@@ -251,8 +249,8 @@ struct PluginSysroot
 /// @brief Reads and holds CFLAGS and LDFLAGS environment variables, mainly to pass down sysroot location
 struct PluginCompilerEnvironment
 {
-    StringView cFlags;
-    StringView ldFlags;
+    StringSpan cFlags;
+    StringSpan ldFlags;
 
   private:
     struct Internal;
@@ -267,7 +265,7 @@ struct PluginDynamicLibrary
     uint32_t             numReloads;     ///< Number of times that the plugin has been hot-reloaded
 
     char       errorStorage[1024 * 8] = {}; ///< Storage for last error log (below)
-    StringView lastErrorLog;                ///< Last error log of compiler / linker (if any)
+    StringSpan lastErrorLog;                ///< Last error log of compiler / linker (if any)
 
     /// @brief Try to obtain a given interface as exported by a plugin through SC_PLUGIN_EXPORT_INTERFACES macro
     /// @param[out] outInterface Pointer to the interface that will be returned by the plugin, if it exists
@@ -292,7 +290,7 @@ struct PluginDynamicLibrary
     bool (*pluginQueryInterface)(void* instance, uint32_t hash, void** instanceInterface) = nullptr;
 
     friend struct PluginRegistry;
-    Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringView executablePath);
+    Result load(const PluginCompiler& compiler, const PluginSysroot& sysroot, StringSpan executablePath);
     Result unload(bool releaseDebuggerFiles);
 };
 
@@ -324,23 +322,23 @@ struct PluginRegistry
     /// @param executablePath The loader executable path holding symbols used by the plugin
     /// @param loadMode If to load or force reload of the plugin
     /// @return Valid Result if the plugin has been found, compiled, loaded and inited successfully
-    Result loadPlugin(const StringView identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
-                      StringView executablePath, LoadMode loadMode = LoadMode::Load);
+    Result loadPlugin(StringSpan identifier, const PluginCompiler& compiler, const PluginSysroot& sysroot,
+                      StringSpan executablePath, LoadMode loadMode = LoadMode::Load);
 
     /// @brief Unloads an already loaded plugin by its identifier
     /// @param identifier Identifier of a plugin that must be unloaded
     /// @return Valid Result if an already loaded plugin exists with the given identifier and it can be unloaded
-    Result unloadPlugin(const StringView identifier);
+    Result unloadPlugin(StringSpan identifier);
 
     /// @brief Removes all temporary build products of the Plugin with given identifier
     /// @param identifier Identifier of the plugin
     /// @return Valid Result if all build products for the given plugin can be successfully removed
-    Result removeAllBuildProducts(const StringView identifier);
+    Result removeAllBuildProducts(StringSpan identifier);
 
     /// @brief Find a PluginDynamicLibrary in the registry with a given identifier
     /// @param identifier Identifier of the Plugin to find
     /// @return Pointer to the found PluginDynamicLibrary if found (or `nullptr`)
-    [[nodiscard]] PluginDynamicLibrary* findPlugin(const StringView identifier);
+    [[nodiscard]] PluginDynamicLibrary* findPlugin(StringSpan identifier);
 
     /// @brief Returns the total number of registry entries (counting both loaded and unloaded plugins)
     [[nodiscard]] size_t getNumberOfEntries() const { return libraries.sizeInElements(); }
@@ -358,11 +356,11 @@ struct PluginRegistry
     /// @param relativePath A relative path of the file that has been modified
     /// @param tolerance How many milliseconds must be passed to consider a file as modified
     /// @param onPlugin Callback that will be called with Plugins affected by the modification
-    void getPluginsToReloadBecauseOf(StringView relativePath, TimeMs tolerance,
+    void getPluginsToReloadBecauseOf(StringSpan relativePath, TimeMs tolerance,
                                      Function<void(const PluginIdentifier&)> onPlugin);
 
   private:
-    Result unloadPlugin(const StringView identifier, bool releaseDebuggerFiles);
+    Result unloadPlugin(StringSpan identifier, bool releaseDebuggerFiles);
 
     Span<PluginDynamicLibrary> storage;
     Span<PluginDynamicLibrary> libraries;

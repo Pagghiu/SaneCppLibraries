@@ -8,6 +8,7 @@
 #include "Libraries/FileSystemWatcher/FileSystemWatcher.h"
 #include "Libraries/Memory/Buffer.h"
 #include "Libraries/Memory/String.h"
+#include "Libraries/Plugin/Internal/PluginString.h"
 #include "Libraries/Strings/Path.h"
 #include "Libraries/Strings/StringBuilder.h"
 #include "Libraries/Testing/Testing.h"
@@ -30,7 +31,7 @@ struct SC::PluginTest : public SC::TestCase
         using namespace SC;
         if (test_section("PluginDefinition"))
         {
-            StringView test =
+            StringSpan test =
                 R"(
                 // SC_BEGIN_PLUGIN
                 // Name:          Test Plugin
@@ -42,7 +43,7 @@ struct SC::PluginTest : public SC::TestCase
                 // SC_END_PLUGIN
             )";
             PluginDefinition definition;
-            StringView       extracted;
+            StringSpan       extracted;
             SC_TEST_EXPECT(PluginDefinition::find(test, extracted));
             SC_TEST_EXPECT(PluginDefinition::parse(extracted, definition));
             SC_TEST_EXPECT(definition.identity.name == "Test Plugin");
@@ -109,6 +110,17 @@ struct SC::PluginTest : public SC::TestCase
             const StringView identifierChild  = identifierChildString.view();
             const StringView identifierParent = identifierParentString.view();
 
+#if SC_PLATFORM_WINDOWS
+            StringPath debuggerHandlePath;
+            SC_TEST_EXPECT(PluginString::assign(debuggerHandlePath,
+                                                {SC_NATIVE_STR("\\Device\\Mup\\SCPluginTest\\"), identifierChild,
+                                                 SC_NATIVE_STR("\\"), identifierChild, SC_NATIVE_STR(".pdb")}));
+            StringPath slashSeparatedPDBPath;
+            SC_TEST_EXPECT(PluginString::assign(
+                slashSeparatedPDBPath, {identifierChild, SC_NATIVE_STR("/"), identifierChild, SC_NATIVE_STR(".pdb")}));
+            SC_TEST_EXPECT(PluginString::pathEndsWith(debuggerHandlePath.view(), slashSeparatedPDBPath.view()));
+#endif
+
             // Init compiler and sysroot
             PluginCompiler compiler;
             SC_TEST_EXPECT(PluginCompiler::findBestCompiler(compiler));
@@ -129,6 +141,41 @@ struct SC::PluginTest : public SC::TestCase
             const PluginDynamicLibrary* pluginParent = registry.findPlugin(identifierParent);
             SC_TEST_EXPECT(pluginChild->dynamicLibrary.isValid());
             SC_TEST_EXPECT(pluginParent->dynamicLibrary.isValid());
+
+#if SC_PLATFORM_WINDOWS
+            bool       childReloadMatched = false;
+            StringPath watcherRelativePath;
+            SC_TEST_EXPECT(watcherRelativePath.assign(identifierChild));
+            SC_TEST_EXPECT(watcherRelativePath.append(SC_NATIVE_STR("\\")));
+            SC_TEST_EXPECT(watcherRelativePath.append(identifierChild));
+            SC_TEST_EXPECT(watcherRelativePath.append(SC_NATIVE_STR(".cpp")));
+            registry.getPluginsToReloadBecauseOf(watcherRelativePath.view(), Time::Milliseconds(-1),
+                                                 [&](const PluginIdentifier& plugin)
+                                                 {
+                                                     if (plugin.view() == identifierChild)
+                                                     {
+                                                         childReloadMatched = true;
+                                                     }
+                                                 });
+            SC_TEST_EXPECT(childReloadMatched);
+
+            bool       childReloadMatchedUppercase = false;
+            StringPath watcherUppercasePath;
+            SC_TEST_EXPECT(watcherUppercasePath.assign(SC_NATIVE_STR("TESTPLUGINCHILD\\TESTPLUGINCHILD.CPP")));
+            registry.getPluginsToReloadBecauseOf(watcherUppercasePath.view(), Time::Milliseconds(-1),
+                                                 [&](const PluginIdentifier& plugin)
+                                                 {
+                                                     if (plugin.view() == identifierChild)
+                                                     {
+                                                         childReloadMatchedUppercase = true;
+                                                     }
+                                                 });
+            SC_TEST_EXPECT(childReloadMatchedUppercase);
+#endif
+            int reloadAllMatches = 0;
+            registry.getPluginsToReloadBecauseOf(StringSpan(), Time::Milliseconds(-1),
+                                                 [&](const PluginIdentifier&) { reloadAllMatches++; });
+            SC_TEST_EXPECT(reloadAllMatches == 2);
 
             // Query two interfaces from the child plugins and check their expected behaviour
             ITestInterface1* interface1 = nullptr;

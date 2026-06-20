@@ -3,7 +3,7 @@
 #pragma once
 #include "../../Common/Deferred.h"
 #include "../../Common/Result.h"
-#include "../../Strings/StringView.h"
+#include "PluginString.h"
 
 namespace SC
 {
@@ -23,13 +23,13 @@ struct SC::Debugger
     /// @param fileName The file to unlock
     /// @return Valid Result if file has been successfully unlocked
     /// @note This is only supported on windows for now
-    [[nodiscard]] static Result unlockFileFromAllProcesses(StringView fileName);
+    [[nodiscard]] static Result unlockFileFromAllProcesses(StringSpan fileName);
 
     /// @brief Forcefully deletes a file previously unlocked by Debugger::unlockFileFromAllProcesses
     /// @param fileName The file to delete
     /// @return Valid Result if file has been successfully deleted
     /// @note This is only supported on windows for now
-    [[nodiscard]] static Result deleteForcefullyUnlockedFile(StringView fileName);
+    [[nodiscard]] static Result deleteForcefullyUnlockedFile(StringSpan fileName);
 
   private:
     struct Internal;
@@ -120,21 +120,14 @@ typedef struct _OBJECT_NAME_INFORMATION
 struct SC::Debugger::Internal
 {
     // Loop all system handles and remotely close file handles inside given process that end with file name
-    [[nodiscard]] static bool unlockFileFromProcess(SC::StringView theFile, DWORD processId)
+    [[nodiscard]] static bool unlockFileFromProcess(SC::StringSpan theFile, DWORD processId)
     {
-        Path::ParsedView theFileParsed;
-        (void)Path::parse(theFile, theFileParsed, Path::Type::AsWindows);
-        StringView theFileDirectory;
-        (void)theFile.splitAfter(theFileParsed.root, theFileDirectory);
-        void* nameMemory   = ::malloc(USHRT_MAX * sizeof(WCHAR));
-        auto  deleteMemory = MakeDeferred([&] { ::free(nameMemory); });
+        StringSpan theFileDirectory = PluginString::withoutWindowsRoot(theFile);
+        void*      nameMemory       = ::malloc(USHRT_MAX * sizeof(WCHAR));
+        auto       deleteMemory     = MakeDeferred([&] { ::free(nameMemory); });
 
         Span<WCHAR> nameBuffer = {static_cast<WCHAR*>(nameMemory), USHRT_MAX};
 
-        if (theFile.startsWithAnyOf({'\\'}))
-        {
-            theFile = theFile.sliceStart(1); // Eat one slash
-        }
         //! [DeferredSnippet]
         HANDLE processHandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_DUP_HANDLE, FALSE, processId);
         if (processHandle == nullptr)
@@ -249,11 +242,11 @@ struct SC::Debugger::Internal
                       nameLengthInBytes / sizeof(WCHAR));
             nameBuffer[nameLengthInBytes / sizeof(WCHAR)] = L'\0';
 
-            StringView handleName = StringView({nameBuffer.data(), nameLengthInBytes / sizeof(WCHAR)}, true);
+            StringSpan handleName = StringSpan({nameBuffer.data(), nameLengthInBytes / sizeof(WCHAR)}, true);
             // theFile          is something like              Y:\MyDir\Sub.pdb
             // theFileDirectory is something like                 MyDir\Sub.pdb
             // handleName       is something like \Device\Mup\Mac\MyDir\Sub.pdb
-            if (handleName.endsWith(theFileDirectory))
+            if (PluginString::pathEndsWith(handleName, theFileDirectory))
             {
                 CloseHandle(dupHandle);
                 deferDeleteDupHandle.disarm();
@@ -276,7 +269,7 @@ struct SC::Debugger::Internal
 
 // Find all processes that have an handle open on the given fileName and unlock it
 // https://devblogs.microsoft.com/oldnewthing/20120217-00/?p=8283
-SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringView fileName)
+SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringSpan fileName)
 {
     using namespace SC;
     SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");
@@ -325,7 +318,7 @@ SC::Result SC::Debugger::unlockFileFromAllProcesses(SC::StringView fileName)
 
 bool SC::Debugger::isDebuggerConnected() { return ::IsDebuggerPresent() == TRUE; }
 
-SC::Result SC::Debugger::deleteForcefullyUnlockedFile(SC::StringView fileName)
+SC::Result SC::Debugger::deleteForcefullyUnlockedFile(SC::StringSpan fileName)
 {
     using namespace SC;
     SC_TRY_MSG(fileName.isNullTerminated(), "Filename must be null terminated");

@@ -3,8 +3,8 @@
 #pragma once
 #include "../../Common/Result.h"
 #include "../../Process/Process.h"
-#include "../../Strings/StringView.h"
 #include "PluginFileSystem.h"
+#include "PluginString.h"
 
 namespace SC
 {
@@ -18,7 +18,7 @@ struct VisualStudioPathFinder
     /// @brief Constructs a VisualStudioPathFinder and check if VS locator exists or not
     VisualStudioPathFinder()
     {
-        const StringView wsp = L"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
+        const StringSpan wsp = L"C:\\Program Files (x86)\\Microsoft Visual Studio\\Installer\\vswhere.exe";
         if (PluginFileSystem::existsAndIsFileAbsolute(wsp))
             vsWherePath = wsp;
     }
@@ -35,7 +35,7 @@ struct VisualStudioPathFinder
         if (not Process().exec({vsWherePath, "-prerelease", "-latest", "-property", "installationPath"}, output))
             return Result::Error("Visual Studio Locator cannot be executed.");
 
-        return Result(vsPath.assign(StringView(output.view()).trimEndAnyOf({'\r', '\n'})));
+        return Result(vsPath.assign(PluginString::trimEndNewLines(output.view())));
     }
 
     /// @brief Collects every Visual Studio version that installed on the current system
@@ -52,11 +52,11 @@ struct VisualStudioPathFinder
             return Result::Error("Visual Studio Locator cannot be executed.");
 
         // TODO: Check if VSWhere output is actually UTF8
-        StringViewTokenizer tokenizer(StringView::fromNullTerminated(outputStorage, StringEncoding::Utf8));
-        while (tokenizer.tokenizeNext('\n', StringViewTokenizer::SkipEmpty))
+        PluginString::Tokenizer tokenizer(StringSpan::fromNullTerminated(outputStorage, StringEncoding::Utf8));
+        while (tokenizer.next('\n'))
         {
             StringPath path;
-            if (path.assign(tokenizer.component.trimEndAnyOf({'\r'})))
+            if (path.assign(PluginString::trimEnd(tokenizer.component, '\r')))
             {
                 SC_TRY(vsPaths.push_back(path));
             }
@@ -66,7 +66,7 @@ struct VisualStudioPathFinder
     }
 
   private:
-    StringView vsWherePath;
+    StringSpan vsWherePath;
 };
 
 //! @}

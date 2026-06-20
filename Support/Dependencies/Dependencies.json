@@ -127,17 +127,14 @@
     },
     "Plugin": {
         "direct_dependencies": [
-            "Process",
-            "Strings"
+            "Process"
         ],
         "minimal_dependencies": [
-            "Process",
-            "Strings"
+            "Process"
         ],
         "all_dependencies": [
             "File",
-            "Process",
-            "Strings"
+            "Process"
         ]
     },
     "Process": {
