@@ -79,6 +79,19 @@ static bool asciiStartsWith(SC::StringSpan text, SC::StringSpan prefix)
 
 static bool sessionIsAsciiWhiteSpace(char c) { return c == ' ' or c == '\t' or c == '\r' or c == '\n'; }
 
+static bool sessionHasHttpHeaderUnsafeBytes(SC::StringSpan value)
+{
+    const SC::Span<const char> bytes = value.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        if (bytes[idx] == '\r' or bytes[idx] == '\n' or bytes[idx] == '\0')
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 static SC::StringSpan trimAsciiWhiteSpace(SC::StringSpan text)
 {
     const SC::Span<const char> bytes = text.toCharSpan();
@@ -563,6 +576,8 @@ SC::Result SC::HttpClientSession::addAuthorization(StringSpan origin, StringSpan
     SC_TRY_MSG(initialized, "HttpClientSession: not initialized");
     SC_TRY_MSG(not origin.isEmpty(), "HttpClientSession: auth origin missing");
     SC_TRY_MSG(not authorizationHeader.isEmpty(), "HttpClientSession: authorization header missing");
+    SC_TRY_MSG(not sessionHasHttpHeaderUnsafeBytes(authorizationHeader),
+               "HttpClientSession: authorization header contains invalid bytes");
 
     HttpClientSessionAuthCacheEntry* target = nullptr;
     for (size_t idx = 0; idx < sessionMemory.authEntries.sizeInElements(); ++idx)

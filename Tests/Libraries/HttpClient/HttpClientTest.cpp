@@ -1456,6 +1456,15 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(cachedAuthorization == "Basic dGVzdDpzZWNyZXQ="_a8);
         SC_TEST_EXPECT(session.hasAuthorization("https://example.test"_a8));
         SC_TEST_EXPECT(not session.hasAuthorization("https://other.test"_a8));
+        {
+            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test"_a8, "Basic bad\r\n"_a8));
+            static const char BadAuthorization[] = {'B', 'a', 's', 'i', 'c', ' ', 'b', 'a', 'd', '\0'};
+            SC_TEST_EXPECT(not session.addAuthorization(
+                "https://bad.example.test"_a8,
+                {{BadAuthorization, sizeof(BadAuthorization)}, false, StringEncoding::Ascii}));
+            SC_TEST_EXPECT(session.getNumAuthorizations() == 1);
+            SC_TEST_EXPECT(not session.hasAuthorization("https://bad.example.test"_a8));
+        }
 
         static const char  RawOriginChallengeHeaders[] = "HTTP/1.1 401 Unauthorized\r\n"
                                                          "WWW-Authenticate: Digest realm=\"ignored\", "
