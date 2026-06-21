@@ -1212,6 +1212,20 @@ struct SC::HttpClientTest : public SC::TestCase
 
         SC_TEST_EXPECT(not response.getNextHeader(iterator, header));
 
+        response.headersLength = response.headers.sizeInBytes() + 16;
+        iterator               = {};
+        SC_TEST_EXPECT(response.getNextHeader(iterator, header));
+        SC_TEST_EXPECT(header.name == "Content-Type"_a8);
+        SC_TEST_EXPECT(header.value == "text/plain"_a8);
+
+        response.headers       = {};
+        response.headersLength = 16;
+        iterator               = {};
+        SC_TEST_EXPECT(not response.getNextHeader(iterator, header));
+
+        response.headers       = {RawHeaders, sizeof(RawHeaders) - 1};
+        response.headersLength = sizeof(RawHeaders) - 1;
+
         HttpClientResponseHeaderIterator cookieIterator;
         StringSpan                       value;
         SC_TEST_EXPECT(response.findNextHeader("set-cookie"_a8, cookieIterator, value));

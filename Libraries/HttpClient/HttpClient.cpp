@@ -973,7 +973,8 @@ bool SC::HttpClientResponse::findNextHeader(StringSpan name, HttpClientResponseH
 
 bool SC::HttpClientResponse::getNextHeader(HttpClientResponseHeaderIterator& iterator, HttpClientHeader& header) const
 {
-    const Span<const char> allHeaders = {headers.data(), headersLength};
+    const size_t readableHeaders      = headersLength <= headers.sizeInBytes() ? headersLength : headers.sizeInBytes();
+    const Span<const char> allHeaders = {headers.data(), readableHeaders};
 
     header = {};
 
