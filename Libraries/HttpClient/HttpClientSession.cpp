@@ -376,7 +376,46 @@ static bool parseUrl(SC::StringSpan url, ParsedUrl& parsed)
     }
 
     parsed.origin = sliceString(url, 0, hostEnd);
-    parsed.host   = sliceString(url, hostStart, hostEnd);
+
+    size_t hostnameStart = hostStart;
+    for (size_t idx = hostStart; idx < hostEnd; ++idx)
+    {
+        if (bytes[idx] == '@')
+        {
+            hostnameStart = idx + 1;
+        }
+    }
+
+    size_t hostnameEnd = hostEnd;
+    if (hostnameStart < hostEnd and bytes[hostnameStart] == '[')
+    {
+        size_t closingBracket = hostnameStart + 1;
+        while (closingBracket < hostEnd and bytes[closingBracket] != ']')
+        {
+            closingBracket += 1;
+        }
+        if (closingBracket >= hostEnd)
+        {
+            return false;
+        }
+        hostnameEnd = closingBracket + 1;
+    }
+    else
+    {
+        for (size_t idx = hostnameStart; idx < hostEnd; ++idx)
+        {
+            if (bytes[idx] == ':')
+            {
+                hostnameEnd = idx;
+                break;
+            }
+        }
+    }
+    if (hostnameEnd == hostnameStart)
+    {
+        return false;
+    }
+    parsed.host = sliceString(url, hostnameStart, hostnameEnd);
 
     if (hostEnd < bytes.sizeInBytes() and bytes[hostEnd] == '/')
     {
@@ -420,13 +459,61 @@ static bool cookieDomainMatches(const SC::HttpClientSessionCookie& cookie, SC::S
         {{hostBytes.data() + offset, cookie.domain.sizeInBytes()}, false, SC::StringEncoding::Ascii}, cookie.domain);
 }
 
-static bool cookiePathMatches(const SC::HttpClientSessionCookie& cookie, SC::StringSpan path)
+static bool cookieDomainAttributeMatches(SC::StringSpan domain, SC::StringSpan host)
 {
-    if (cookie.path.isEmpty())
+    if (sessionAsciiEqualsIgnoreCase(domain, host))
     {
         return true;
     }
-    return asciiStartsWith(path, cookie.path);
+    if (host.sizeInBytes() <= domain.sizeInBytes() + 1)
+    {
+        return false;
+    }
+
+    const SC::Span<const char> hostBytes = host.toCharSpan();
+    const size_t               offset    = host.sizeInBytes() - domain.sizeInBytes();
+    if (hostBytes[offset - 1] != '.')
+    {
+        return false;
+    }
+    return sessionAsciiEqualsIgnoreCase(
+        {{hostBytes.data() + offset, domain.sizeInBytes()}, false, SC::StringEncoding::Ascii}, domain);
+}
+
+static SC::StringSpan defaultCookiePath(SC::StringSpan requestPath)
+{
+    const SC::Span<const char> bytes = requestPath.toCharSpan();
+    if (bytes.sizeInBytes() == 0 or bytes[0] != '/')
+    {
+        return SC::StringSpan("/");
+    }
+
+    for (size_t idx = bytes.sizeInBytes(); idx > 0; --idx)
+    {
+        if (bytes[idx - 1] == '/')
+        {
+            return idx == 1 ? SC::StringSpan("/") : sliceString(requestPath, 0, idx - 1);
+        }
+    }
+    return SC::StringSpan("/");
+}
+
+static bool cookiePathMatches(const SC::HttpClientSessionCookie& cookie, SC::StringSpan path)
+{
+    if (cookie.path.isEmpty() or cookie.path == SC::StringSpan("/"))
+    {
+        return true;
+    }
+    if (not asciiStartsWith(path, cookie.path))
+    {
+        return false;
+    }
+    if (path.sizeInBytes() == cookie.path.sizeInBytes() or
+        cookie.path.toCharSpan()[cookie.path.sizeInBytes() - 1] == '/')
+    {
+        return true;
+    }
+    return path.toCharSpan()[cookie.path.sizeInBytes()] == '/';
 }
 
 static bool sessionIsIdempotentMethod(SC::HttpClientRequest::Method method)
@@ -840,7 +927,7 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
     }
 
     StringSpan domain         = parsed.host;
-    StringSpan path           = "/";
+    StringSpan path           = defaultCookiePath(parsed.path);
     uint8_t    flags          = 0;
     bool       explicitDomain = false;
 
@@ -871,12 +958,19 @@ SC::Result SC::HttpClientSession::captureSetCookie(StringSpan requestUrl, String
                 {
                     attributeValue = sliceString(attributeValue, 1, attributeValue.sizeInBytes());
                 }
+                if (attributeValue.isEmpty() or not cookieDomainAttributeMatches(attributeValue, parsed.host))
+                {
+                    return Result(true);
+                }
                 domain         = attributeValue;
                 explicitDomain = true;
             }
             else if (sessionAsciiEqualsIgnoreCase(attributeName, StringSpan("Path")))
             {
-                path = attributeValue;
+                if (not attributeValue.isEmpty() and attributeValue.toCharSpan()[0] == '/')
+                {
+                    path = attributeValue;
+                }
             }
         }
         else if (sessionAsciiEqualsIgnoreCase(attribute, StringSpan("Secure")))

@@ -16,6 +16,7 @@ Choose `http-client` when the task needs the separate native-backend client and 
 - Custom TLS CA paths are caller-owned and must not contain NUL or other control bytes; unsupported CA path policies fail during preflight.
 - Protocol, TLS, and proxy policies are preflighted against `HttpClientCapabilities` in `start()`.
 - Use `HttpClientSession` only as an optional caller-owned layer for cookies, cached authorization values, Basic auth challenge helpers, and retry bookkeeping.
+- Session cookie capture rejects unrelated `Domain` attributes, ignores URL ports for host scope, and applies path-segment matching without allocating.
 - Cached session authorization origins must be exact `http://` or `https://` origins with no path, query, or fragment; values are copied into caller-owned scratch and must not contain CR, LF, or NUL bytes.
 - Use `HttpClientSessionAuthChallenge::getTargetName()` and `getSchemeName()` for no-allocation auth diagnostics.
 - Use `HttpClientSession::findCookie()`, `hasCookie()`, `findAuthorization()`, `hasAuthorization()`, count helpers, and targeted clear helpers to inspect or reset optional session state without allocation.

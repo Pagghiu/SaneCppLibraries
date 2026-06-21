@@ -1441,7 +1441,7 @@ struct SC::HttpClientTest : public SC::TestCase
 
         static const char RawHeaders[] = "HTTP/1.1 200 OK\r\n"
                                          "Set-Cookie: sid=abc; Path=/api; HttpOnly\r\n"
-                                         "Set-Cookie: global=1; Domain=.example.test; Secure\r\n"
+                                         "Set-Cookie: global=1; Domain=.example.test; Path=/; Secure\r\n"
                                          "\r\n";
 
         HttpClientRequest responseRequest;
@@ -1466,6 +1466,26 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT((cookie.flags & HttpClientSessionCookie::DomainCookie) != 0);
         SC_TEST_EXPECT(not session.findCookie("missing"_a8, "example.test"_a8, "/"_a8, cookie));
         SC_TEST_EXPECT(not session.hasCookie("missing"_a8, "example.test"_a8, "/"_a8));
+
+        static const char  RejectedCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                     "Set-Cookie: escaped=1; Domain=other.test\r\n"
+                                                     "\r\n";
+        HttpClientResponse rejectedCookieResponse;
+        rejectedCookieResponse.headers       = {RejectedCookieHeaders, sizeof(RejectedCookieHeaders) - 1};
+        rejectedCookieResponse.headersLength = sizeof(RejectedCookieHeaders) - 1;
+        SC_TEST_EXPECT(session.captureResponse(responseRequest, rejectedCookieResponse));
+        SC_TEST_EXPECT(session.getNumCookies() == 2);
+
+        static const char ScopedCookieHeaders[] = "HTTP/1.1 200 OK\r\n"
+                                                  "Set-Cookie: scoped=1\r\n"
+                                                  "\r\n";
+        HttpClientRequest portResponseRequest;
+        portResponseRequest.url = "https://example.test:8443/api/login"_a8;
+        HttpClientResponse scopedCookieResponse;
+        scopedCookieResponse.headers       = {ScopedCookieHeaders, sizeof(ScopedCookieHeaders) - 1};
+        scopedCookieResponse.headersLength = sizeof(ScopedCookieHeaders) - 1;
+        SC_TEST_EXPECT(session.captureResponse(portResponseRequest, scopedCookieResponse));
+        SC_TEST_EXPECT(session.findCookie("scoped"_a8, "example.test"_a8, "/api"_a8, cookie));
 
         StringSpan basicAuthorization;
         SC_TEST_EXPECT(HttpClientSession::makeBasicAuthorization(
@@ -1580,9 +1600,16 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(prepared.headers.sizeInElements() == 3);
         SC_TEST_EXPECT(prepared.headers[0].name == "X-Test"_a8);
         SC_TEST_EXPECT(prepared.headers[1].name == "Cookie"_a8);
-        SC_TEST_EXPECT(prepared.headers[1].value == "sid=abc; global=1"_a8);
+        SC_TEST_EXPECT(prepared.headers[1].value == "sid=abc; global=1; scoped=1"_a8);
         SC_TEST_EXPECT(prepared.headers[2].name == "Authorization"_a8);
         SC_TEST_EXPECT(prepared.headers[2].value == "Basic dGVzdDpzZWNyZXQ="_a8);
+
+        HttpClientRequest siblingPathSource;
+        siblingPathSource.url = "https://example.test/apix/list"_a8;
+        SC_TEST_EXPECT(session.prepareRequest(siblingPathSource, prepared));
+        SC_TEST_EXPECT(prepared.headers.sizeInElements() == 2);
+        SC_TEST_EXPECT(prepared.headers[0].name == "Cookie"_a8);
+        SC_TEST_EXPECT(prepared.headers[0].value == "global=1"_a8);
 
         HttpClientRequest httpSource;
         httpSource.url = "http://sub.example.test/api/list"_a8;
@@ -1631,7 +1658,7 @@ struct SC::HttpClientTest : public SC::TestCase
         SC_TEST_EXPECT(prepared.headers.sizeInElements() == 2);
         SC_TEST_EXPECT(prepared.headers[0].name == "X-Test"_a8);
         SC_TEST_EXPECT(prepared.headers[1].name == "Cookie"_a8);
-        SC_TEST_EXPECT(prepared.headers[1].value == "sid=abc; global=1"_a8);
+        SC_TEST_EXPECT(prepared.headers[1].value == "sid=abc; global=1; scoped=1"_a8);
 
         session.clearCookies();
         SC_TEST_EXPECT(session.getNumCookies() == 0);

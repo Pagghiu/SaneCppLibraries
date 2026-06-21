@@ -241,6 +241,9 @@ challenge helpers can inspect `WWW-Authenticate` and `Proxy-Authenticate` respon
 prepare a retry header without storing credentials. Auth challenge target and scheme names are
 available as static strings for diagnostics. The caller still drives `HttpClientOperation` directly;
 the session layer only prepares request metadata and records response metadata.
+Cookie capture rejects unrelated `Domain` attributes, ignores URL ports when matching hosts, derives
+the default cookie path from the response request URL, and matches paths at segment boundaries. It is
+a deliberately small transport helper rather than a complete browser cookie store.
 Cached authorization origins must be exact `http://` or `https://` origins with no path, query, or
 fragment. Cached authorization values are copied into caller-provided session scratch and reject CR,
 LF, and NUL bytes before they can become prepared request headers.
