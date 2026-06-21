@@ -13,6 +13,7 @@ Choose `http-client` when the task needs the separate native-backend client and 
 - Use `HttpClientRequest::validate()` when callers want to check request shape before starting an operation.
 - Request URL, method, redirect mode, headers, and proxy URL shape are validated in `start()` before backend setup; core requests support `http://` and `https://` URLs.
 - Explicit HTTP proxy URLs must be caller-owned, host-only `http://` values with no path, query, fragment, whitespace, or control bytes.
+- Custom TLS CA paths are caller-owned and must not contain NUL or other control bytes; unsupported CA path policies fail during preflight.
 - Protocol, TLS, and proxy policies are preflighted against `HttpClientCapabilities` in `start()`.
 - Use `HttpClientSession` only as an optional caller-owned layer for cookies, cached authorization values, Basic auth challenge helpers, and retry bookkeeping.
 - Cached session authorization origins must be exact `http://` or `https://` origins with no path, query, or fragment; values are copied into caller-owned scratch and must not contain CR, LF, or NUL bytes.

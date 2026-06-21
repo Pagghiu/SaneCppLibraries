@@ -510,6 +510,19 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(not capabilities.supportsRequestOptions(options));
             SC_TEST_EXPECT(not capabilities.requireRequestOptions(options));
         }
+        {
+            static const char BadCaPath[] = {'/', 't', 'm', 'p', '/', 's', 'c', '\0', 'c', 'a'};
+
+            HttpClientRequestOptions options;
+            options.tls.caCertificatesPath = {{BadCaPath, sizeof(BadCaPath)}, false, StringEncoding::Ascii};
+            SC_TEST_EXPECT(not capabilities.supportsRequestOptions(options));
+            SC_TEST_EXPECT(not capabilities.requireRequestOptions(options));
+
+            HttpClientRequest request;
+            request.url                            = "https://127.0.0.1:1/preflight"_a8;
+            request.options.tls.caCertificatesPath = options.tls.caCertificatesPath;
+            SC_TEST_EXPECT(not request.validate());
+        }
 
 #if SC_PLATFORM_APPLE
         SC_TEST_EXPECT(not capabilities.protocolHttp11Only);

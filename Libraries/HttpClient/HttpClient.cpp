@@ -295,6 +295,20 @@ static bool hasUrlUnsafeBytes(SC::StringSpan value)
     return false;
 }
 
+static bool hasPathUnsafeBytes(SC::StringSpan value)
+{
+    const SC::Span<const char> bytes = value.toCharSpan();
+    for (size_t idx = 0; idx < bytes.sizeInBytes(); ++idx)
+    {
+        const unsigned char c = static_cast<unsigned char>(bytes[idx]);
+        if (c < ' ' or c == 0x7f)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 static SC::Result validateProxyOptions(const SC::HttpClientRequestProxyOptions& proxy)
 {
     SC_TRY_MSG(isValidProxyMode(proxy.mode), "HttpClientRequestOptions: invalid proxy mode");
@@ -366,6 +380,8 @@ static SC::Result validateRequestOptionsShape(const SC::HttpClientRequestOptions
     SC_TRY_MSG(isValidRedirectMode(options.redirect.mode), "HttpClientRequestOptions: invalid redirect mode");
     SC_TRY_MSG(isValidProtocolPreference(options.protocol.preference),
                "HttpClientRequestOptions: invalid protocol preference");
+    SC_TRY_MSG(not hasPathUnsafeBytes(options.tls.caCertificatesPath),
+               "HttpClientRequestOptions: TLS CA path contains control bytes");
     SC_TRY(validateProxyOptions(options.proxy));
     return SC::Result(true);
 }

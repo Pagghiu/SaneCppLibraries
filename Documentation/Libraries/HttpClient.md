@@ -65,6 +65,11 @@ Protocol policy:
 - `Http2Preferred` enables HTTP/2 where available while allowing HTTP/1.1 fallback
 - `Http2Required` rejects unsupported backends and rejects negotiated HTTP/1.1 responses
 
+TLS policy:
+- `verifyPeer` defaults to enabled; disabling it fails fast on backends that do not expose that policy
+- `caCertificatesPath` is caller-owned and must not contain NUL or other control bytes
+- Unsupported custom CA paths fail in preflight instead of falling back to backend defaults
+
 Proxy policy:
 - `Default` keeps the backend/system proxy behavior
 - `NoProxy` bypasses proxies where the backend exposes per-request control
