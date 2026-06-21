@@ -578,6 +578,10 @@ SC::Result SC::HttpClientSession::addAuthorization(StringSpan origin, StringSpan
     SC_TRY_MSG(not authorizationHeader.isEmpty(), "HttpClientSession: authorization header missing");
     SC_TRY_MSG(not sessionHasHttpHeaderUnsafeBytes(authorizationHeader),
                "HttpClientSession: authorization header contains invalid bytes");
+    ParsedUrl parsedOrigin;
+    SC_TRY_MSG(parseUrl(origin, parsedOrigin), "HttpClientSession: auth origin is invalid");
+    SC_TRY_MSG(parsedOrigin.origin.sizeInBytes() == origin.sizeInBytes(),
+               "HttpClientSession: auth origin must not include path, query, or fragment");
 
     HttpClientSessionAuthCacheEntry* target = nullptr;
     for (size_t idx = 0; idx < sessionMemory.authEntries.sizeInElements(); ++idx)

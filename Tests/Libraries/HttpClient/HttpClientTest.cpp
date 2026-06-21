@@ -1465,6 +1465,16 @@ struct SC::HttpClientTest : public SC::TestCase
             SC_TEST_EXPECT(session.getNumAuthorizations() == 1);
             SC_TEST_EXPECT(not session.hasAuthorization("https://bad.example.test"_a8));
         }
+        {
+            SC_TEST_EXPECT(not session.addAuthorization("ftp://bad.example.test"_a8, basicAuthorization));
+            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test/path"_a8, basicAuthorization));
+            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test?query"_a8, basicAuthorization));
+            SC_TEST_EXPECT(not session.addAuthorization("https://bad.example.test#fragment"_a8, basicAuthorization));
+            static const char BadOrigin[] = {'h', 't', 't', 'p', ':', '/', '/', 'b', 'a', 'd', '\0'};
+            SC_TEST_EXPECT(not session.addAuthorization({{BadOrigin, sizeof(BadOrigin)}, false, StringEncoding::Ascii},
+                                                        basicAuthorization));
+            SC_TEST_EXPECT(session.getNumAuthorizations() == 1);
+        }
 
         static const char  RawOriginChallengeHeaders[] = "HTTP/1.1 401 Unauthorized\r\n"
                                                          "WWW-Authenticate: Digest realm=\"ignored\", "

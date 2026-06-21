@@ -15,7 +15,7 @@ Choose `http-client` when the task needs the separate native-backend client and 
 - Explicit HTTP proxy URLs must be caller-owned, host-only `http://` values with no path, query, fragment, whitespace, or control bytes.
 - Protocol, TLS, and proxy policies are preflighted against `HttpClientCapabilities` in `start()`.
 - Use `HttpClientSession` only as an optional caller-owned layer for cookies, cached authorization values, Basic auth challenge helpers, and retry bookkeeping.
-- Cached session authorization values are copied into caller-owned scratch and must not contain CR, LF, or NUL bytes.
+- Cached session authorization origins must be exact `http://` or `https://` origins with no path, query, or fragment; values are copied into caller-owned scratch and must not contain CR, LF, or NUL bytes.
 - Use `HttpClientSessionAuthChallenge::getTargetName()` and `getSchemeName()` for no-allocation auth diagnostics.
 - Use `HttpClientSession::findCookie()`, `hasCookie()`, `findAuthorization()`, `hasAuthorization()`, count helpers, and targeted clear helpers to inspect or reset optional session state without allocation.
 - Use retry state/count helpers and `HttpClientSession::isRetryableStatusCode()` when coordinating caller-owned retry loops.
