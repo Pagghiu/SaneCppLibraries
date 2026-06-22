@@ -1428,6 +1428,7 @@ struct SC_ASYNC_EXPORT AsyncKernelEvents
   private:
     int numberOfEvents = 0;
     friend struct AsyncEventLoop;
+    friend struct AsyncEventLoopMonitor;
 };
 
 /// @brief Allow library user to provide callbacks signaling different phases of async event loop cycle

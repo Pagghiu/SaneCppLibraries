@@ -1239,7 +1239,11 @@ SC::Result SC::AsyncEventLoopMonitor::close()
     eventObjectExitBlockingMode.signal();
     SC_TRY(eventLoop->wakeUpFromExternalThread());
     SC_TRY(eventLoopThread.join());
-    SC_TRY(eventLoop->dispatchCompletions(asyncKernelEvents));
+    // close() is a teardown path. The monitoring thread may have collected events only because
+    // we woke it to make it exit, and application-owned requests may be stopped immediately after
+    // the monitor closes. Do not dispatch this shutdown batch here; normal event delivery is done
+    // by stopMonitoringAndDispatchCompletions().
+    asyncKernelEvents.numberOfEvents = 0;
     SC_TRY(eventLoopWakeUp.stop(*eventLoop));
     eventLoop = nullptr;
     return Result(true);
