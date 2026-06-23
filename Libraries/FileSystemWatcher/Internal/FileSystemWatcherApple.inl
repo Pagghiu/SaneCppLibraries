@@ -390,7 +390,7 @@ struct SC::FileSystemWatcher::FolderWatcherInternal
 {
 };
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher*)
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
     internal.get().watcher->notifyCallback(internal.get().notification);
 }

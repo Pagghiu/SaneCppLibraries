@@ -102,7 +102,7 @@ struct FileSystemWatcher
     struct FolderWatcherSizes
     {
         static constexpr int MaxNumberOfSubdirs   = 128; // Max number of subfolders tracked in a watcher
-        static constexpr int MaxChangesBufferSize = 1024;
+        static constexpr int MaxChangesBufferSize = 16 * 1024;
 
         static constexpr int Windows = MaxChangesBufferSize + sizeof(void*) + sizeof(void*);
         static constexpr int Apple   = sizeof(void*);
@@ -241,7 +241,7 @@ struct FileSystemWatcher
     /// @return Valid Result if directory is accessible and the watcher is initialized properly.
     Result watch(FolderWatcher& watcher, StringSpan path);
 
-    void asyncNotify(FolderWatcher* watcher);
+    void asyncNotify(FolderWatcher* watcher, size_t bytesTransferred = 0);
 
   private:
     friend decltype(internal);
@@ -390,7 +390,7 @@ struct FileSystemWatcherAsyncT : public FileSystemWatcher::EventLoopRunner
         SC_COMPILER_WARNING_PUSH_OFFSETOF;
         auto&          storage = reinterpret_cast<decltype(FolderWatcher::asyncStorage)&>(result.getAsync());
         FolderWatcher& watcher = SC_COMPILER_FIELD_OFFSET(FolderWatcher, asyncStorage, storage);
-        fileSystemWatcher->asyncNotify(&watcher);
+        fileSystemWatcher->asyncNotify(&watcher, result.completionData.bytesTransferred);
         if (watcher.parent != nullptr and result.getAsync().hasSubmissionPending())
         {
             result.reactivateRequest(true);

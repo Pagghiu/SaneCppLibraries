@@ -227,24 +227,49 @@ struct SC::FileSystemWatcher::Internal
                 FolderWatcher&         entry  = *runner.entries[index];
                 FolderWatcherInternal& opaque = entry.internal.get();
 
-                DWORD transferredBytes;
+                DWORD transferredBytes = 0;
                 SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(opaque.fileHandle != INVALID_HANDLE_VALUE);
                 OVERLAPPED* overlapped = getOverlapped(entry);
-                ::GetOverlappedResult(opaque.fileHandle, overlapped, &transferredBytes, FALSE);
-                notifyEntry(entry);
+                const BOOL  overlappedResult =
+                    ::GetOverlappedResult(opaque.fileHandle, overlapped, &transferredBytes, FALSE);
+                notifyEntry(entry, overlappedResult ? static_cast<size_t>(transferredBytes) : 0);
             }
         }
         threadingRunner->shouldStop.exchange(false);
     }
 
-    static void notifyEntry(FolderWatcher& entry)
+    static void notifyEntry(FolderWatcher& entry, size_t transferredBytes)
     {
-        FolderWatcherInternal&   opaque = entry.internal.get();
-        FILE_NOTIFY_INFORMATION* event  = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(opaque.changesBuffer);
+        FolderWatcherInternal& opaque = entry.internal.get();
+        uint8_t                changesBuffer[FolderWatcherSizes::MaxChangesBufferSize];
+
+        if (transferredBytes > sizeof(changesBuffer))
+        {
+            transferredBytes = sizeof(changesBuffer);
+        }
+        for (size_t idx = 0; idx < transferredBytes; ++idx)
+        {
+            changesBuffer[idx] = opaque.changesBuffer[idx];
+        }
 
         Notification notification;
         notification.basePath = entry.path.view();
 
+        if (transferredBytes == 0)
+        {
+            // Windows reports a zero-byte completion when the change buffer overflowed.
+            // The specific file names are lost, so report a conservative root-level change
+            // instead of parsing stale buffer contents.
+            notification.operation = Operation::AddRemoveRename;
+            entry.notifyCallback(notification);
+            if (entry.parent != nullptr)
+            {
+                SC_FILE_SYSTEM_WATCHER_TRUST_RESULT(entry.parent->internal.get().submitRead(entry));
+            }
+            return;
+        }
+
+        FILE_NOTIFY_INFORMATION* event = reinterpret_cast<FILE_NOTIFY_INFORMATION*>(changesBuffer);
         do
         {
             notification.relativePath = {
@@ -279,9 +304,9 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
     return Result(true);
 }
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher)
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher* watcher, size_t bytesTransferred)
 {
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher != nullptr);
     SC_FILE_SYSTEM_WATCHER_ASSERT_DEBUG(watcher->internal.get().fileHandle != INVALID_HANDLE_VALUE);
-    FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry);
+    FileSystemWatcher::Internal::notifyEntry(*watcher->internal.get().parentEntry, bytesTransferred);
 }

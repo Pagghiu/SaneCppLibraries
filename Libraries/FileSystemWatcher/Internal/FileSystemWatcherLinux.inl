@@ -469,7 +469,7 @@ SC::Result SC::FileSystemWatcher::Notification::getFullPath(StringPath& buffer) 
     return Result(true);
 }
 
-void SC::FileSystemWatcher::asyncNotify(FolderWatcher*)
+void SC::FileSystemWatcher::asyncNotify(FolderWatcher*, size_t)
 {
     internal.get().readAndNotify(internal.get().notifyFd, internal.get().self->watchers);
 }
