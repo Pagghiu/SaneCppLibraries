@@ -140,7 +140,8 @@ struct ApplicationSystem
             if (state.pausedCounter < ApplicationState::NumPauseFrames)
             {
                 state.pausedCounter++;
-                return Result(true); // Additional frames are needed to draw "paused" before entering sleep
+                // Additional frames are needed to draw "paused" before entering sleep
+                return hotReloadSystem.update();
             }
             // If we are here we really want to sleep the app until a new input event OR an I/O event arrives
             // We implement this logic by:
@@ -152,14 +153,16 @@ struct ApplicationSystem
             auto resetLastEventTime = MakeDeferred([this] { lastEventTime.snap(); });
             SC_TRY(eventLoopMonitor.startMonitoring());
             sokol_sleep();
-            return eventLoopMonitor.stopMonitoringAndDispatchCompletions();
+            SC_TRY(eventLoopMonitor.stopMonitoringAndDispatchCompletions());
+            return hotReloadSystem.update();
         }
         else
         {
             // Keep the application running, but use the occasion to check if some I/O event has been queued by the OS.
             // This also updates the loop time, that is needed to fire AsyncLoopTimeouts events with decent precision.
             state.pausedCounter = 0;
-            return eventLoop.runNoWait();
+            SC_TRY(eventLoop.runNoWait());
+            return hotReloadSystem.update();
         }
     }
 

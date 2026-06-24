@@ -190,6 +190,32 @@ struct HotReloadSystem
         return Result(true);
     }
 
+    Result update()
+    {
+        if (not pendingReload.pending)
+        {
+            return Result(true);
+        }
+        const Time::Relative elapsed =
+            Time::HighResolutionCounter().snap().subtractApproximate(pendingReload.lastEvent);
+        if (elapsed < Time::Milliseconds(250))
+        {
+            return Result(true);
+        }
+
+        auto reload = [this](const PluginIdentifier& plugin) { (void)load(plugin.view()); };
+        if (pendingReload.reloadAll)
+        {
+            registry.getPluginsToReloadBecauseOf(StringSpan(), Time::Milliseconds(-1), reload);
+        }
+        else
+        {
+            registry.getPluginsToReloadBecauseOf(pendingReload.relativePath.view(), Time::Milliseconds(-1), reload);
+        }
+        pendingReload = {};
+        return Result(true);
+    }
+
   private:
     AsyncEventLoop* eventLoop = nullptr;
 
@@ -203,12 +229,36 @@ struct HotReloadSystem
 
     FileSystemWatcher::FolderWatcher folderWatcher;
 
+    struct PendingReload
+    {
+        bool pending   = false;
+        bool reloadAll = false;
+
+        StringPath relativePath;
+
+        Time::HighResolutionCounter lastEvent;
+    } pendingReload;
+
     void onFileChange(const FileSystemWatcher::Notification& notification)
     {
-        if (StringView(notification.relativePath).endsWith(".cpp"))
+        pendingReload.pending = true;
+        pendingReload.lastEvent.snap();
+        if (notification.relativePath.isEmpty() or
+            notification.operation == FileSystemWatcher::Operation::AddRemoveRename or pendingReload.reloadAll)
         {
-            auto reload = [this](const PluginIdentifier& plugin) { (void)load(plugin.view()); };
-            registry.getPluginsToReloadBecauseOf(notification.relativePath, Time::Milliseconds(500), reload);
+            pendingReload.reloadAll = true;
+            return;
+        }
+        if (pendingReload.relativePath.isEmpty())
+        {
+            if (not pendingReload.relativePath.assign(notification.relativePath))
+            {
+                pendingReload.reloadAll = true;
+            }
+        }
+        else if (pendingReload.relativePath.view() != notification.relativePath)
+        {
+            pendingReload.reloadAll = true;
         }
     }
 };
