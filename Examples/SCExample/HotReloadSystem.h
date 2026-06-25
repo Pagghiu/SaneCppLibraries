@@ -41,6 +41,9 @@ static bool rebuildHotReloadIncludePaths(StringView executableDirectory, StringV
         {
             SC_TRY(Path::join(includePath, {executableDirectory, line}));
         }
+        StringPath normalizedIncludePath;
+        SC_TRY(Path::normalize(normalizedIncludePath, includePath.view(), Path::AsNative));
+        includePath = move(normalizedIncludePath);
         SC_TRY_MSG(compiler.includePaths.push_back(includePath), "HotReloadSystem exceeded include path capacity");
     }
     return true;

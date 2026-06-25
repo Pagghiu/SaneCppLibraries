@@ -25,12 +25,16 @@ static Result resolveCompiledPathFromExecutableDirectory(StringView compiledPath
                                                          String& resolved)
 {
     SC_TRY_MSG(not compiledPath.isEmpty(), "SCExample missing required compile-time path");
+    String candidate = StringEncoding::Utf8;
     if (Path::isAbsolute(compiledPath, Path::AsNative))
     {
-        SC_TRY(resolved.assign(compiledPath));
-        return Result(true);
+        SC_TRY(candidate.assign(compiledPath));
     }
-    SC_TRY(Path::join(resolved, {executableDirectory, compiledPath}));
+    else
+    {
+        SC_TRY(Path::join(candidate, {executableDirectory, compiledPath}));
+    }
+    SC_TRY(Path::normalize(resolved, candidate.view(), Path::AsNative));
     return Result(true);
 }
 
@@ -73,6 +77,9 @@ static Result buildHotReloadOptions(HotReloadOptionsStorage& storage)
     SC_TRY(resolveCompiledPathFromExecutableDirectory(compiledLibraryRoot, executableDirectory.view(), libraryRoot));
 
     SC_TRY(Path::join(storage.examplesPath, {libraryRoot.view(), "Examples", "SCExample", "Examples"}));
+    String normalizedExamplesPath = StringEncoding::Utf8;
+    SC_TRY(Path::normalize(normalizedExamplesPath, storage.examplesPath.view(), Path::AsNative));
+    storage.examplesPath = move(normalizedExamplesPath);
     SC_TRY(appendLine(storage.defaultIncludePathsText, compiledLibraryRoot));
     SC_TRY(appendLine(storage.defaultIncludePathsText, compiledExtraIncludePaths));
     return Result(true);
