@@ -598,9 +598,8 @@ SC::Result SC::PluginCompiler::compile(const PluginDefinition& plugin, const Plu
     StringPath destFile;
     for (auto& file : plugin.files)
     {
-        StringSpan dirname    = PluginString::dirname(file.absolutePath.view());
         StringSpan outputName = PluginString::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        SC_TRY(PluginString::join(destFile, {dirname, outputName}));
+        SC_TRY(PluginString::join(destFile, {plugin.directory.view(), outputName}));
         SC_TRY(destFile.append(SC_NATIVE_STR(".o")));
         SC_TRY(compileFile(plugin, sysroot, compilerEnvironment, file.absolutePath.view(), destFile.view(),
                            standardOutput));
@@ -680,9 +679,9 @@ SC::Result SC::PluginCompiler::link(const PluginDefinition& definition, const Pl
 
     for (auto& file : definition.files)
     {
-        const StringSpan dirname    = PluginString::dirname(file.absolutePath.view());
         const StringSpan outputName = PluginString::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
-        SC_TRY(arena.appendAsSingleString({dirname, SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}));
+        SC_TRY(arena.appendAsSingleString(
+            {definition.directory.view(), SC_NATIVE_STR("/"), outputName, SC_NATIVE_STR(".o")}));
     }
 
     StringPath destFile;
@@ -1064,11 +1063,10 @@ SC::Result SC::PluginRegistry::removeAllBuildProducts(StringSpan identifier)
 #endif
     for (auto& file : lib.definition.files)
     {
-        StringSpan dirname    = PluginString::dirname(file.absolutePath.view());
         StringSpan outputName = PluginString::basename(file.absolutePath.view(), SC_NATIVE_STR(".cpp"));
 
         StringPath destFile;
-        SC_TRY(PluginString::join(destFile, {dirname, outputName}));
+        SC_TRY(PluginString::join(destFile, {lib.definition.directory.view(), outputName}));
         SC_TRY(destFile.append(".o"));
         SC_TRY(PluginFileSystem::removeFileAbsolute(destFile.view()));
     }
