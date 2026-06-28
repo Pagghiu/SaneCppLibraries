@@ -103,6 +103,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 enumerateRequestsReportsSubmittedAndActiveUserRequests();
             }
+            if (test_section("enumerateRequests reports active sequenced requests"))
+            {
+                enumerateRequestsReportsActiveSequencedRequests();
+            }
 
             if (numRuns == 2)
             {
@@ -130,6 +134,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
+    void enumerateRequestsReportsActiveSequencedRequests();
 
     bool runNoWaitUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate, int maxAttempts = 8)
     {
@@ -873,6 +878,43 @@ void SC::AsyncContractTest::enumerateRequestsReportsSubmittedAndActiveUserReques
     SC_TEST_EXPECT(context.foundSubmitted);
     SC_TEST_EXPECT(context.enumeratedRequests == 2);
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::enumerateRequestsReportsActiveSequencedRequests()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncSequence   sequence;
+    AsyncLoopWakeUp activeWakeUp;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    activeWakeUp.executeOn(sequence);
+    activeWakeUp.callback = [](AsyncLoopWakeUp::Result&) {};
+
+    SC_TEST_EXPECT(activeWakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(activeWakeUp.isActive());
+
+    struct EnumerationContext
+    {
+        AsyncRequest* activeWakeUp       = nullptr;
+        int           enumeratedRequests = 0;
+        bool          foundActiveWakeUp  = false;
+    } context;
+    context.activeWakeUp = &activeWakeUp;
+    eventLoop.enumerateRequests(
+        [ctx = &context](AsyncRequest& request)
+        {
+            ctx->enumeratedRequests++;
+            if (&request == ctx->activeWakeUp)
+            {
+                ctx->foundActiveWakeUp = true;
+            }
+        });
+
+    SC_TEST_EXPECT(context.foundActiveWakeUp);
+    SC_TEST_EXPECT(context.enumeratedRequests == 1);
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(activeWakeUp.isFree());
 }
 
 namespace SC

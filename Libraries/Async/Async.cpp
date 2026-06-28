@@ -1108,6 +1108,7 @@ void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumera
     auto enumerateActiveList = [this, &enumerationCallback](auto& linkedList)
     { internal.enumerateRequests(linkedList, enumerationCallback); };
     internal.forEachActiveRequestList(enumerateActiveList);
+    internal.enumerateSequenceRequests(enumerationCallback);
     internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
 }
 
@@ -1257,15 +1258,33 @@ SC::Result SC::AsyncEventLoopMonitor::close()
 // AsyncEventLoop::Internal
 //-------------------------------------------------------------------------------------------------------
 
+void SC::AsyncEventLoop::Internal::trackSequence(AsyncSequence& sequence)
+{
+    if (not sequence.tracked)
+    {
+        sequences.queueBack(sequence);
+        sequence.tracked = true;
+    }
+}
+
+void SC::AsyncEventLoop::Internal::untrackSequenceIfIdle(AsyncSequence& sequence)
+{
+    if (sequence.tracked and not sequence.runningAsync and sequence.submissions.isEmpty())
+    {
+        sequences.remove(sequence);
+        sequence.tracked = false;
+    }
+}
+
 void SC::AsyncEventLoop::Internal::popNextInSequence(AsyncSequence& sequence)
 {
-    sequence.runningAsync = true;
-    submissions.queueBack(*sequence.submissions.dequeueFront());
+    AsyncRequest* nextRequest = sequence.submissions.dequeueFront();
+    SC_ASYNC_ASSERT_RELEASE(nextRequest != nullptr);
+    sequence.runningAsync   = true;
+    sequence.runningRequest = nextRequest;
+    trackSequence(sequence);
+    submissions.queueBack(*nextRequest);
     numberOfSubmissions += 1;
-    if (sequence.submissions.isEmpty())
-    {
-        clearSequence(sequence);
-    }
 }
 
 void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
@@ -1275,15 +1294,8 @@ void SC::AsyncEventLoop::Internal::queueSubmission(AsyncRequest& async)
     {
         AsyncSequence& sequence = *async.sequence;
         sequence.submissions.queueBack(async);
-        if (sequence.runningAsync)
-        {
-            if (not sequence.tracked)
-            {
-                sequences.queueBack(sequence);
-                sequence.tracked = true;
-            }
-        }
-        else
+        trackSequence(sequence);
+        if (not sequence.runningAsync)
         {
             popNextInSequence(sequence);
         }
@@ -1303,6 +1315,10 @@ void SC::AsyncEventLoop::Internal::resumeSequence(AsyncSequence& sequence)
         {
             popNextInSequence(sequence);
         }
+        else
+        {
+            untrackSequenceIfIdle(sequence);
+        }
     }
 }
 
@@ -1312,11 +1328,7 @@ void SC::AsyncEventLoop::Internal::clearSequence(AsyncSequence& sequence)
     {
         async->markAsFree();
     }
-    if (sequence.tracked)
-    {
-        sequences.remove(sequence);
-        sequence.tracked = false;
-    }
+    untrackSequenceIfIdle(sequence);
 }
 
 SC::AsyncLoopTimeout* SC::AsyncEventLoop::Internal::findEarliestLoopTimeout() const { return activeLoopTimeouts.front; }
@@ -1373,6 +1385,23 @@ void SC::AsyncEventLoop::Internal::stopRequests(AsyncEventLoop& eventLoop, Intru
     }
 }
 
+void SC::AsyncEventLoop::Internal::stopSequenceRequests(AsyncEventLoop& eventLoop)
+{
+    AsyncSequence* sequence = sequences.front;
+    while (sequence != nullptr)
+    {
+        AsyncSequence* next  = sequence->next;
+        AsyncRequest*  async = sequence->runningRequest;
+        if (async and not async->isCancelling() and not async->isFree())
+        {
+            Result res = async->stop(eventLoop);
+            (void)res;
+            SC_ASYNC_ASSERT_DEBUG(res);
+        }
+        sequence = next;
+    }
+}
+
 template <typename T>
 void SC::AsyncEventLoop::Internal::enumerateRequests(IntrusiveDoubleLinkedList<T>&  linkedList,
                                                      Function<void(AsyncRequest&)>& callback)
@@ -1386,6 +1415,21 @@ void SC::AsyncEventLoop::Internal::enumerateRequests(IntrusiveDoubleLinkedList<T
             callback(*async);
         }
         async = asyncNext;
+    }
+}
+
+void SC::AsyncEventLoop::Internal::enumerateSequenceRequests(Function<void(AsyncRequest&)>& callback)
+{
+    AsyncSequence* sequence = sequences.front;
+    while (sequence != nullptr)
+    {
+        AsyncRequest* async = sequence->runningRequest;
+        if (async and async->state == AsyncRequest::State::Active and async->type != AsyncRequest::Type::LoopTimeout and
+            (async->flags & (Flag_Internal | Flag_ManualCompletion)) == 0)
+        {
+            callback(*async);
+        }
+        sequence = sequence->next;
     }
 }
 
@@ -1446,13 +1490,16 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
         res = threadPoolRes2;
 
     // Clear the never submitted requests of all sequences
-    for (AsyncSequence* sequence = sequences.front; sequence != nullptr; sequence = sequence->next)
+    AsyncSequence* sequence = sequences.front;
+    while (sequence != nullptr)
     {
+        AsyncSequence* next = sequence->next;
         clearSequence(*sequence);
+        sequence = next;
     }
-    sequences.clear();
 
     stopRequests(eventLoop, submissions);
+    stopSequenceRequests(eventLoop);
 
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
@@ -1546,7 +1593,9 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
         // the request Active again when the backend already submitted the next operation.
         if (teardown.sequence)
         {
-            teardown.sequence->runningAsync = true;
+            trackSequence(*teardown.sequence);
+            teardown.sequence->runningAsync   = true;
+            teardown.sequence->runningRequest = &async;
         }
     }
     else
@@ -1710,11 +1759,20 @@ void SC::AsyncEventLoop::Internal::completeCancellation(AsyncEventLoop& eventLoo
         static_cast<AsyncExternalCompletion&>(async).overlapped.get().userData = nullptr;
     }
 #endif
+    if (async.sequence and async.sequence->runningRequest == &async)
+    {
+        async.sequence->runningAsync   = false;
+        async.sequence->runningRequest = nullptr;
+    }
     async.markAsFree();
     cancellations.remove(async);
     if (sequenceToResume)
     {
         resumeSequence(*sequenceToResume);
+    }
+    else if (async.sequence)
+    {
+        untrackSequenceIfIdle(*async.sequence);
     }
     if (async.closeCallback)
     {
@@ -2107,6 +2165,12 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
     (void)completeAsync(eventLoop, kernelEvents, async, eventIndex, returnCode);
     if (not async.isCancelling())
     {
+        if (async.sequence and async.sequence->runningRequest == &async)
+        {
+            async.sequence->runningAsync   = false;
+            async.sequence->runningRequest = nullptr;
+            untrackSequenceIfIdle(*async.sequence);
+        }
         async.markAsFree();
     }
 }
@@ -2274,6 +2338,11 @@ void SC::AsyncEventLoop::Internal::removeActiveHandle(AsyncRequest& async)
     if (async.sequence)
     {
         async.sequence->runningAsync = false;
+        if (async.sequence->runningRequest == &async)
+        {
+            async.sequence->runningRequest = nullptr;
+        }
+        untrackSequenceIfIdle(*async.sequence);
     }
 
     if ((async.flags & Internal::Flag_ManualCompletion) != 0)
@@ -2336,6 +2405,13 @@ void SC::AsyncEventLoop::Internal::addActiveHandle(AsyncRequest& async)
     if ((async.flags & Internal::Flag_ExcludeFromActiveCount) != 0)
     {
         numberOfExternals -= 1;
+    }
+
+    if (async.sequence)
+    {
+        trackSequence(*async.sequence);
+        async.sequence->runningAsync   = true;
+        async.sequence->runningRequest = &async;
     }
 
     if (async.sequence and async.type != AsyncRequest::Type::LoopTimeout)

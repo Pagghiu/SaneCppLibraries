@@ -270,6 +270,8 @@ struct SC_ASYNC_EXPORT AsyncSequence
     bool runningAsync = false; // true if an async from this sequence is being run
     bool tracked      = false;
 
+    AsyncRequest* runningRequest = nullptr;
+
     IntrusiveDoubleLinkedList<AsyncRequest> submissions;
 };
 
@@ -1623,7 +1625,7 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     void includeInActiveCount(AsyncRequest& async);
 
     /// @brief Enumerates all user-visible request objects associated with this loop
-    /// @note Submitted, typed-active and manual-completion requests are enumerated. Internal requests are skipped.
+    /// @note Submitted, active and manual-completion requests are enumerated. Internal requests are skipped.
     void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
 
     /// @brief Sets reference to listeners that will signal different events in loop lifetime

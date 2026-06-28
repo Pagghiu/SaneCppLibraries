@@ -153,10 +153,13 @@ struct SC::AsyncEventLoop::Internal
     void executeWakeUps(AsyncEventLoop& eventLoop);
 
     // Setup
+    void trackSequence(AsyncSequence& sequence);
+    void untrackSequenceIfIdle(AsyncSequence& sequence);
     void queueSubmission(AsyncRequest& async);
     void popNextInSequence(AsyncSequence& sequence);
     void resumeSequence(AsyncSequence& sequence);
     void clearSequence(AsyncSequence& sequence);
+    void stopSequenceRequests(AsyncEventLoop& eventLoop);
 
     // Phases
     Result stageSubmission(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
@@ -203,6 +206,8 @@ struct SC::AsyncEventLoop::Internal
 
     template <typename T>
     void enumerateRequests(IntrusiveDoubleLinkedList<T>& linkedList, Function<void(AsyncRequest&)>& callback);
+
+    void enumerateSequenceRequests(Function<void(AsyncRequest&)>& callback);
 
     template <typename Lambda>
     void forEachActiveRequestList(Lambda& lambda);
