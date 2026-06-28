@@ -460,17 +460,25 @@ struct SC_ASYNC_EXPORT AsyncProcessExit : public AsyncRequest
 /// @brief Options for AsyncSignal request configuration
 struct AsyncSignalOptions
 {
-    /// @brief Mode of signal watching
+    /// @brief Reserved signal watching policy.
+    ///
+    /// Current portable behavior follows the normal AsyncRequest completion contract: a signal callback receives one
+    /// delivery and must call Result::reactivateRequest(true) to keep watching for later deliveries.
     enum class Mode : uint8_t
     {
-        Persistent, ///< Callback runs on every delivery until stopped (default)
-        OneShot     ///< Request auto-stops after first successful callback dispatch
+        Persistent, ///< Default policy; future backend parity work may use it for automatic persistence
+        OneShot     ///< Future policy for explicit one-shot watchers
     };
-    Mode mode     = Mode::Persistent; ///< Default mode is Persistent
-    bool coalesce = true;             ///< Merge repeated pending deliveries (default true)
+    Mode mode     = Mode::Persistent; ///< Currently does not bypass the AsyncRequest reactivation contract
+    bool coalesce = true;             ///< Backend hint; portable code should inspect CompletionData::deliveryCount
 };
 
 /// @brief Starts monitoring a signal, notifying about its reception.
+///
+/// AsyncSignal follows the base AsyncRequest lifecycle: after a delivered signal, the request is completed unless the
+/// callback calls Result::reactivateRequest(true). AsyncSignalOptions::mode and coalesce are kept as explicit policy
+/// fields for future backend-parity work, but portable code should not rely on them for automatic reactivation.
+///
 /// On POSIX systems, signals like `SIGINT`, `SIGTERM`, `SIGHUP` are supported.
 /// On Windows, console control signals `CTRL_C_EVENT`, `CTRL_BREAK_EVENT`, and `CTRL_CLOSE_EVENT`
 /// are mapped to `SIGINT` (2), signal 21, and `SIGTERM` (15) respectively.

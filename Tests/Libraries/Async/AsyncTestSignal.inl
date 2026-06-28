@@ -38,7 +38,7 @@ void SC::AsyncTest::signal()
 #endif
 
     //-------------------------------------------------------------------------------------------------------
-    // Test 1: Persistent single watcher - verifies signal delivery and deliveryCount
+    // Test 1: Single watcher - verifies signal delivery and deliveryCount
     //-------------------------------------------------------------------------------------------------------
     {
 #if SC_PLATFORM_WINDOWS
@@ -156,14 +156,6 @@ void SC::AsyncTest::signal()
 #endif
 #endif
     }
-
-    //-------------------------------------------------------------------------------------------------------
-    // Test 2: Multi-watcher fanout - two watchers on same signal on same loop
-    //
-    // NOTE: Same-loop fanout is currently only supported on Windows.
-    // On POSIX systems, only the first watcher registered for a specific signal on a given loop will receive
-    // the signal. Subsequent registrations for the same signal on the same loop will fail.
-    //-------------------------------------------------------------------------------------------------------
 
     //-------------------------------------------------------------------------------------------------------
     // Test 2: Invalid signal rejection
