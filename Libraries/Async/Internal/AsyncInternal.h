@@ -163,7 +163,7 @@ struct SC::AsyncEventLoop::Internal
     Result activateAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
     Result cancelAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
     Result completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async, int32_t eventIndex,
-                         Result result = Result(true), bool* hasBeenReactivated = nullptr);
+                         Result& result, bool* hasBeenReactivated = nullptr);
 
     struct SetupAsyncPhase;
     struct ActivateAsyncPhase;

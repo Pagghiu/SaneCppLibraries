@@ -105,6 +105,7 @@ void runThreadPoolTest(TestReport& report);
 void runOptionalTest(TestReport& report);
 
 // Async
+void runAsyncContractTest(SC::TestReport& report);
 void runAsyncTest(SC::TestReport& report);
 void runAsyncStreamTest(SC::TestReport& report);
 void runAsyncRequestStreamTest(SC::TestReport& report);
@@ -251,6 +252,7 @@ int main(int argc, const char* argv[])
     runOptionalTest(report);
 
     // Async tests
+    runAsyncContractTest(report);
     runAsyncTest(report);
     runAsyncStreamTest(report);
     runAsyncRequestStreamTest(report);

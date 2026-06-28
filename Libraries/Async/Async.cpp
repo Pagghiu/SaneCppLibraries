@@ -1303,7 +1303,10 @@ void SC::AsyncEventLoop::Internal::resumeSequence(AsyncSequence& sequence)
 
 void SC::AsyncEventLoop::Internal::clearSequence(AsyncSequence& sequence)
 {
-    sequence.submissions.clear();
+    while (AsyncRequest* async = sequence.submissions.dequeueFront())
+    {
+        async->markAsFree();
+    }
     if (sequence.tracked)
     {
         sequences.remove(sequence);
@@ -1538,13 +1541,15 @@ SC::Result SC::AsyncEventLoop::Internal::completeAndReactivateOrTeardown(AsyncEv
         SC_TRY(teardownAsync(teardown));
         if (teardown.sequence)
         {
-            resumeSequence(*teardown.sequence);
+            if (not returnCode and teardown.sequence->clearSequenceOnError)
+            {
+                clearSequence(*teardown.sequence);
+            }
+            else
+            {
+                resumeSequence(*teardown.sequence);
+            }
         }
-    }
-    if (not returnCode)
-    {
-        // TODO: We shouldn't probably access async if it has not been reactivated...
-        reportError(eventLoop, kernelEvents, async, returnCode, eventIndex);
     }
     return Result(true);
 }
@@ -2077,7 +2082,7 @@ void SC::AsyncEventLoop::Internal::reportError(AsyncEventLoop& eventLoop, Kernel
 }
 
 SC::Result SC::AsyncEventLoop::Internal::completeAsync(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
-                                                       AsyncRequest& async, int32_t eventIndex, Result returnCode,
+                                                       AsyncRequest& async, int32_t eventIndex, Result& returnCode,
                                                        bool* hasBeenReactivated)
 {
     if (returnCode)
