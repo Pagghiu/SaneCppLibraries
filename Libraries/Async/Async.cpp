@@ -80,7 +80,7 @@ void SC::AsyncRequest::setDebugName(const char* newDebugName)
 
 void SC::AsyncRequest::executeOn(AsyncSequence& task) { sequence = &task; }
 
-SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool)
+SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool, AsyncThreadPoolMode mode)
 {
     if (flags & AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse)
     {
@@ -90,7 +90,15 @@ SC::Result SC::AsyncRequest::executeOn(AsyncTaskSequence& task, ThreadPool& pool
     sequence        = &task;
     flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequence;
     flags |= AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
-    return SC::Result(true);
+    if (mode == AsyncThreadPoolMode::ForceThreadPool)
+    {
+        flags |= AsyncEventLoop::Internal::Flag_ForceThreadPool;
+    }
+    else
+    {
+        flags &= ~AsyncEventLoop::Internal::Flag_ForceThreadPool;
+    }
+    return Result(true);
 }
 
 void SC::AsyncRequest::disableThreadPool()
@@ -102,6 +110,7 @@ void SC::AsyncRequest::disableThreadPool()
         asyncTask->threadPool = nullptr;
         flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequenceInUse;
         flags &= ~AsyncEventLoop::Internal::Flag_AsyncTaskSequence;
+        flags &= ~AsyncEventLoop::Internal::Flag_ForceThreadPool;
     }
 }
 
@@ -128,6 +137,11 @@ SC::AsyncTaskSequence* SC::AsyncRequest::getTask()
         return static_cast<AsyncTaskSequence*>(sequence);
     }
     return nullptr;
+}
+
+bool SC::AsyncRequest::isThreadPoolForced() const
+{
+    return (flags & AsyncEventLoop::Internal::Flag_ForceThreadPool) != 0;
 }
 
 SC::Result SC::AsyncRequest::stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* onClose)
@@ -276,7 +290,10 @@ SC::Result SC::AsyncLoopWork::validate(AsyncEventLoop&)
     return SC::Result(true);
 }
 
-SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool) { return executeOn(task, threadPool); }
+SC::Result SC::AsyncLoopWork::setThreadPool(ThreadPool& threadPool, AsyncThreadPoolMode mode)
+{
+    return executeOn(task, threadPool, mode);
+}
 
 SC::Result SC::AsyncProcessExit::start(AsyncEventLoop& loop, FileDescriptor::Handle process)
 {
@@ -440,7 +457,7 @@ SC::Result SC::AsyncFileRead::validate(AsyncEventLoop& eventLoop)
     SC_TRY_MSG(buffer.sizeInBytes() > 0, "AsyncFileRead - Zero sized read buffer");
     SC_TRY_MSG(handle != FileDescriptor::Invalid, "AsyncFileRead - Invalid file descriptor");
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and not isThreadPoolForced())
     {
         disableThreadPool();
     }
@@ -495,7 +512,7 @@ SC::Result SC::AsyncFileWrite::validate(AsyncEventLoop& eventLoop)
     totalBytesWritten = 0;
 
     // Only use the async tasks for operations and backends that are not io_uring
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and not isThreadPoolForced())
     {
         disableThreadPool();
     }
@@ -671,9 +688,10 @@ void SC::AsyncFileSystemOperation::onOperationCompleted(AsyncLoopWork::Result& r
     // TODO: should we call reactivateRequest here?
 }
 
-SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool)
+SC::Result SC::AsyncFileSystemOperation::setThreadPool(ThreadPool& threadPool, AsyncThreadPoolMode mode)
 {
-    return loopWork.setThreadPool(threadPool);
+    threadPoolMode = mode;
+    return loopWork.setThreadPool(threadPool, mode);
 }
 
 SC::Result SC::AsyncFileSystemOperation::stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped)
@@ -691,7 +709,7 @@ SC::Result SC::AsyncFileSystemOperation::open(AsyncEventLoop& eventLoop, StringS
     operation = Operation::Open;
     new (&openData, PlacementNew()) OpenData({path, mode});
     SC_TRY(validate(eventLoop));
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -713,7 +731,7 @@ SC::Result SC::AsyncFileSystemOperation::close(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Close;
     new (&closeData, PlacementNew()) CloseData({handle});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -733,7 +751,7 @@ SC::Result SC::AsyncFileSystemOperation::read(AsyncEventLoop& eventLoop, FileDes
     SC_TRY(checkState());
     operation = Operation::Read;
     new (&readData, PlacementNew()) ReadData({handle, buffer, offset});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -758,7 +776,7 @@ SC::Result SC::AsyncFileSystemOperation::write(AsyncEventLoop& eventLoop, FileDe
     SC_TRY(checkState());
     operation = Operation::Write;
     new (&writeData, PlacementNew()) WriteData({handle, buffer, offset});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -798,7 +816,7 @@ SC::Result SC::AsyncFileSystemOperation::rename(AsyncEventLoop& eventLoop, Strin
     SC_TRY(checkState());
     operation = Operation::Rename;
     new (&renameData, PlacementNew()) RenameData({path, newPath});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -817,7 +835,7 @@ SC::Result SC::AsyncFileSystemOperation::removeEmptyDirectory(AsyncEventLoop& ev
     SC_TRY(checkState());
     operation = Operation::RemoveDirectory;
     new (&removeData, PlacementNew()) RemoveData({path});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -836,7 +854,7 @@ SC::Result SC::AsyncFileSystemOperation::removeFile(AsyncEventLoop& eventLoop, S
     SC_TRY(checkState());
     operation = Operation::RemoveFile;
     new (&removeData, PlacementNew()) RemoveData({path});
-    if (not eventLoop.needsThreadPoolForFileOperations())
+    if (not eventLoop.needsThreadPoolForFileOperations() and threadPoolMode != AsyncThreadPoolMode::ForceThreadPool)
     {
         return eventLoop.start(*this);
     }
@@ -1085,24 +1103,11 @@ bool SC::AsyncEventLoop::isExcludedFromActiveCount(const AsyncRequest& async)
 /// @brief Enumerates all requests objects associated with this loop
 void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback)
 {
-    // TODO: Consolidate this list with stopAsync
     // TODO: Should cancellations be enumerated as well?
     internal.enumerateRequests(internal.submissions, enumerationCallback);
-    internal.enumerateRequests(internal.activeLoopTimeouts, enumerationCallback);
-    internal.enumerateRequests(internal.activeLoopWakeUps, enumerationCallback);
-    internal.enumerateRequests(internal.activeProcessExits, enumerationCallback);
-    internal.enumerateRequests(internal.activeSignals, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketAccepts, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketConnects, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketSends, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketSendsTo, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketReceives, enumerationCallback);
-    internal.enumerateRequests(internal.activeSocketReceivesFrom, enumerationCallback);
-    internal.enumerateRequests(internal.activeFileReads, enumerationCallback);
-    internal.enumerateRequests(internal.activeFileWrites, enumerationCallback);
-    internal.enumerateRequests(internal.activeFileSends, enumerationCallback);
-    internal.enumerateRequests(internal.activeFileReadiness, enumerationCallback);
-    internal.enumerateRequests(internal.activeExternalCompletions, enumerationCallback);
+    auto enumerateActiveList = [this, &enumerationCallback](auto& linkedList)
+    { internal.enumerateRequests(linkedList, enumerationCallback); };
+    internal.forEachActiveRequestList(enumerateActiveList);
     internal.enumerateRequests(internal.manualCompletions, enumerationCallback);
 }
 
@@ -1384,6 +1389,28 @@ void SC::AsyncEventLoop::Internal::enumerateRequests(IntrusiveDoubleLinkedList<T
     }
 }
 
+template <typename Lambda>
+void SC::AsyncEventLoop::Internal::forEachActiveRequestList(Lambda& lambda)
+{
+    lambda(activeLoopTimeouts);
+    lambda(activeLoopWakeUps);
+    lambda(activeLoopWork);
+    lambda(activeProcessExits);
+    lambda(activeSignals);
+    lambda(activeSocketAccepts);
+    lambda(activeSocketConnects);
+    lambda(activeSocketSends);
+    lambda(activeSocketSendsTo);
+    lambda(activeSocketReceives);
+    lambda(activeSocketReceivesFrom);
+    lambda(activeFileReads);
+    lambda(activeFileWrites);
+    lambda(activeFileSends);
+    lambda(activeFileReadiness);
+    lambda(activeExternalCompletions);
+    lambda(activeFileSystemOperations);
+}
+
 template <typename T>
 SC::Result SC::AsyncEventLoop::Internal::waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList)
 {
@@ -1425,7 +1452,6 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
     }
     sequences.clear();
 
-    // TODO: Consolidate this list with enumerateRequests
     stopRequests(eventLoop, submissions);
 
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
@@ -1435,21 +1461,8 @@ SC::Result SC::AsyncEventLoop::Internal::close(AsyncEventLoop& eventLoop)
         SC_ASYNC_ASSERT_DEBUG(stopRes);
     }
 
-    stopRequests(eventLoop, activeLoopTimeouts);
-    stopRequests(eventLoop, activeLoopWakeUps);
-    stopRequests(eventLoop, activeProcessExits);
-    stopRequests(eventLoop, activeSignals);
-    stopRequests(eventLoop, activeSocketAccepts);
-    stopRequests(eventLoop, activeSocketConnects);
-    stopRequests(eventLoop, activeSocketSends);
-    stopRequests(eventLoop, activeSocketSendsTo);
-    stopRequests(eventLoop, activeSocketReceives);
-    stopRequests(eventLoop, activeSocketReceivesFrom);
-    stopRequests(eventLoop, activeFileReads);
-    stopRequests(eventLoop, activeFileWrites);
-    stopRequests(eventLoop, activeFileSends);
-    stopRequests(eventLoop, activeFileReadiness);
-    stopRequests(eventLoop, activeExternalCompletions);
+    auto stopActiveList = [this, &eventLoop](auto& linkedList) { stopRequests(eventLoop, linkedList); };
+    forEachActiveRequestList(stopActiveList);
 
     stopRequests(eventLoop, manualCompletions);
 
@@ -1679,23 +1692,38 @@ void SC::AsyncEventLoop::Internal::executeCancellationCallbacks(AsyncEventLoop& 
             async                         = next;
             continue;
         }
-#if SC_PLATFORM_WINDOWS
-        if (async->type == AsyncRequest::Type::ExternalCompletion)
-        {
-            static_cast<AsyncExternalCompletion*>(async)->overlapped.get().userData = nullptr;
-        }
-#endif
-        async->markAsFree();
-        cancellations.remove(*async);
-        if (async->closeCallback)
-        {
-            Function<void(AsyncResult&)>& closeCallback = *async->closeCallback;
-
-            Result      result(true);
-            AsyncResult res(eventLoop, *async, result);
-            closeCallback(res);
-        }
+        completeCancellation(eventLoop, *async);
         async = next;
+    }
+}
+
+void SC::AsyncEventLoop::Internal::completeCancellation(AsyncEventLoop& eventLoop, AsyncRequest& async)
+{
+    AsyncSequence* sequenceToResume = nullptr;
+    if (async.sequence and not async.sequence->clearSequenceOnCancel)
+    {
+        sequenceToResume = async.sequence;
+    }
+#if SC_PLATFORM_WINDOWS
+    if (async.type == AsyncRequest::Type::ExternalCompletion)
+    {
+        static_cast<AsyncExternalCompletion&>(async).overlapped.get().userData = nullptr;
+    }
+#endif
+    async.markAsFree();
+    cancellations.remove(async);
+    if (sequenceToResume)
+    {
+        resumeSequence(*sequenceToResume);
+    }
+    if (async.closeCallback)
+    {
+        Function<void(AsyncResult&)> closeCallback = *async.closeCallback;
+        async.closeCallback                        = nullptr;
+
+        Result      result(true);
+        AsyncResult res(eventLoop, async, result);
+        closeCallback(res);
     }
 }
 
@@ -1704,11 +1732,7 @@ void SC::AsyncEventLoop::Internal::runStepExecuteManualCompletions(AsyncEventLoo
 {
     while (AsyncRequest* async = manualCompletions.dequeueFront())
     {
-        Result res(true);
-        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, -1, res))
-        {
-            SC_LOG_MESSAGE("Error completing {}", async->debugName);
-        }
+        completeReadyRequest(eventLoop, kernelEvents, *async);
     }
 }
 
@@ -1717,11 +1741,17 @@ void SC::AsyncEventLoop::Internal::runStepExecuteManualThreadPoolCompletions(Asy
 {
     while (AsyncRequest* async = manualThreadPoolCompletions.pop())
     {
-        Result res(true);
-        if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, *async, -1, res))
-        {
-            SC_LOG_MESSAGE("Error completing {}", async->debugName);
-        }
+        completeReadyRequest(eventLoop, kernelEvents, *async);
+    }
+}
+
+void SC::AsyncEventLoop::Internal::completeReadyRequest(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents,
+                                                        AsyncRequest& async)
+{
+    Result res(true);
+    if (not completeAndReactivateOrTeardown(eventLoop, kernelEvents, async, -1, res))
+    {
+        SC_LOG_MESSAGE("Error completing {}", async.debugName);
     }
 }
 

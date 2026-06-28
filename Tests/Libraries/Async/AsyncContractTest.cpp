@@ -1,6 +1,9 @@
 // Copyright (c) Stefano Cristiano
 // SPDX-License-Identifier: MIT
 #include "Libraries/Async/Async.h"
+#include "Libraries/FileSystem/FileSystem.h"
+#include "Libraries/Memory/String.h"
+#include "Libraries/Strings/Path.h"
 #include "Libraries/Testing/Testing.h"
 #include "Libraries/Threading/ThreadPool.h"
 
@@ -36,6 +39,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 stopFreeRequestFails();
             }
+            if (test_section("latest close callback wins while cancelling"))
+            {
+                latestCloseCallbackWinsWhileCancelling();
+            }
             if (test_section("reactivation keeps request owned"))
             {
                 reactivationKeepsRequestOwned();
@@ -60,6 +67,22 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 sequenceClearsQueuedRequestsOnError();
             }
+            if (test_section("sequence resumes queued requests on cancel when configured"))
+            {
+                sequenceResumesQueuedRequestsOnCancelWhenConfigured();
+            }
+            if (test_section("sequence resumes queued requests on error when configured"))
+            {
+                sequenceResumesQueuedRequestsOnErrorWhenConfigured();
+            }
+            if (test_section("thread pool mode can force supplied pool"))
+            {
+                threadPoolModeCanForceSuppliedPool();
+            }
+            if (test_section("validation failure leaves request free"))
+            {
+                validationFailureLeavesRequestFree();
+            }
             if (test_section("loop close frees submitted requests"))
             {
                 loopCloseFreesSubmittedRequests();
@@ -71,6 +94,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             if (test_section("wakeUp coalescing and one-shot behavior"))
             {
                 wakeUpCoalescingAndOneShotBehavior();
+            }
+            if (test_section("active count exclusion preserves callbacks"))
+            {
+                activeCountExclusionPreservesCallbacks();
             }
             if (test_section("enumerateRequests reports submitted and active user requests"))
             {
@@ -87,15 +114,21 @@ struct SC::AsyncContractTest : public SC::TestCase
     void stopSuppressesNormalCallback();
     void closeCallbackRunsAfterRequestIsFree();
     void stopFreeRequestFails();
+    void latestCloseCallbackWinsWhileCancelling();
     void reactivationKeepsRequestOwned();
     void reactivatedRequestCanBeStoppedFromCallback();
     void normalCallbackIsCopiedBeforeInvocation();
     void nonReactivatedRequestCanBeReusedInsideCallback();
     void sequenceClearsQueuedRequestsOnCancel();
     void sequenceClearsQueuedRequestsOnError();
+    void sequenceResumesQueuedRequestsOnCancelWhenConfigured();
+    void sequenceResumesQueuedRequestsOnErrorWhenConfigured();
+    void threadPoolModeCanForceSuppliedPool();
+    void validationFailureLeavesRequestFree();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void wakeUpCoalescingAndOneShotBehavior();
+    void activeCountExclusionPreservesCallbacks();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
 
     bool runNoWaitUntil(AsyncEventLoop& eventLoop, Function<bool()> predicate, int maxAttempts = 8)
@@ -154,22 +187,31 @@ void SC::AsyncContractTest::closeCallbackRunsAfterRequestIsFree()
     SC_TEST_EXPECT(eventLoop.create(options));
 
     AsyncLoopWakeUp wakeUp;
-    int             closeCallbacks      = 0;
-    bool            wasFreeWhenCallback = false;
+    struct Context
+    {
+        Function<void(AsyncResult&)>* afterStopped         = nullptr;
+        int                           closeCallbacks       = 0;
+        bool                          wasFreeWhenCallback  = false;
+        bool                          closeCallbackCleared = false;
+    } context;
 
     Function<void(AsyncResult&)> afterStopped;
-    afterStopped = [&](AsyncResult& result)
+    context.afterStopped = &afterStopped;
+    afterStopped         = [ctx = &context](AsyncResult& result)
     {
-        closeCallbacks++;
-        wasFreeWhenCallback = result.async.isFree();
+        ctx->closeCallbacks++;
+        ctx->wasFreeWhenCallback  = result.async.isFree();
+        ctx->closeCallbackCleared = result.async.getCloseCallback() == nullptr;
+        *ctx->afterStopped        = Function<void(AsyncResult&)>();
     };
 
     wakeUp.callback = [](AsyncLoopWakeUp::Result&) {};
     SC_TEST_EXPECT(wakeUp.start(eventLoop));
     SC_TEST_EXPECT(eventLoop.runNoWait());
     SC_TEST_EXPECT(wakeUp.stop(eventLoop, &afterStopped));
-    SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return closeCallbacks == 1; }));
-    SC_TEST_EXPECT(wasFreeWhenCallback);
+    SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return context.closeCallbacks == 1; }));
+    SC_TEST_EXPECT(context.wasFreeWhenCallback);
+    SC_TEST_EXPECT(context.closeCallbackCleared);
     SC_TEST_EXPECT(wakeUp.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
@@ -182,6 +224,35 @@ void SC::AsyncContractTest::stopFreeRequestFails()
     AsyncLoopTimeout timeout;
     SC_TEST_EXPECT(not timeout.stop(eventLoop));
     SC_TEST_EXPECT(timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::latestCloseCallbackWinsWhileCancelling()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+    int             firstCloseCallbacks  = 0;
+    int             secondCloseCallbacks = 0;
+    int             normalCallbacks      = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    Function<void(AsyncResult&)> firstAfterStopped;
+    Function<void(AsyncResult&)> secondAfterStopped;
+    firstAfterStopped  = [&](AsyncResult&) { firstCloseCallbacks++; };
+    secondAfterStopped = [&](AsyncResult&) { secondCloseCallbacks++; };
+    wakeUp.callback    = [&](AsyncLoopWakeUp::Result&) { normalCallbacks++; };
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    SC_TEST_EXPECT(wakeUp.stop(eventLoop, &firstAfterStopped));
+    SC_TEST_EXPECT(wakeUp.isCancelling());
+    SC_TEST_EXPECT(wakeUp.stop(eventLoop, &secondAfterStopped));
+    SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return secondCloseCallbacks == 1; }));
+    SC_TEST_EXPECT(firstCloseCallbacks == 0);
+    SC_TEST_EXPECT(secondCloseCallbacks == 1);
+    SC_TEST_EXPECT(normalCallbacks == 0);
+    SC_TEST_EXPECT(wakeUp.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
 
@@ -399,6 +470,257 @@ void SC::AsyncContractTest::sequenceClearsQueuedRequestsOnError()
     SC_TEST_EXPECT(eventLoop.close());
 }
 
+void SC::AsyncContractTest::sequenceResumesQueuedRequestsOnCancelWhenConfigured()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncSequence    sequence;
+    AsyncLoopWakeUp  wakeUp;
+    AsyncLoopTimeout queuedTimeout;
+    int              wakeCallbacks    = 0;
+    int              timeoutCallbacks = 0;
+    int              closeCallbacks   = 0;
+
+    sequence.clearSequenceOnCancel = false;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    Function<void(AsyncResult&)> afterStopped;
+    afterStopped = [&](AsyncResult&) { closeCallbacks++; };
+
+    wakeUp.callback        = [&](AsyncLoopWakeUp::Result&) { wakeCallbacks++; };
+    queuedTimeout.callback = [&](AsyncLoopTimeout::Result&) { timeoutCallbacks++; };
+    wakeUp.executeOn(sequence);
+    queuedTimeout.executeOn(sequence);
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(queuedTimeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    SC_TEST_EXPECT(wakeUp.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return closeCallbacks == 1 and timeoutCallbacks == 1; }, 16));
+    SC_TEST_EXPECT(wakeCallbacks == 0);
+    SC_TEST_EXPECT(timeoutCallbacks == 1);
+    SC_TEST_EXPECT(closeCallbacks == 1);
+    SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(queuedTimeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::sequenceResumesQueuedRequestsOnErrorWhenConfigured()
+{
+    AsyncEventLoop    eventLoop;
+    AsyncTaskSequence sequence;
+    ThreadPool        threadPool;
+    AsyncLoopWork     work;
+    AsyncLoopWork     queuedWork;
+
+    struct Context
+    {
+        int  workCalls           = 0;
+        int  workCallbacks       = 0;
+        int  queuedWorkCalls     = 0;
+        int  queuedWorkCallbacks = 0;
+        bool workWasValid        = true;
+        bool queuedWasValid      = false;
+    } context;
+
+    sequence.clearSequenceOnError = false;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SC_TEST_EXPECT(threadPool.create(1));
+
+    work.work = [ctx = &context]
+    {
+        ctx->workCalls++;
+        return Result::Error("AsyncContractTest expected work error");
+    };
+    work.callback = [ctx = &context](AsyncLoopWork::Result& result)
+    {
+        ctx->workCallbacks++;
+        ctx->workWasValid = result.isValid();
+    };
+    queuedWork.work = [ctx = &context]
+    {
+        ctx->queuedWorkCalls++;
+        return Result(true);
+    };
+    queuedWork.callback = [ctx = &context](AsyncLoopWork::Result& result)
+    {
+        ctx->queuedWorkCallbacks++;
+        ctx->queuedWasValid = result.isValid();
+    };
+
+    SC_TEST_EXPECT(work.executeOn(sequence, threadPool));
+    SC_TEST_EXPECT(queuedWork.executeOn(sequence, threadPool));
+    SC_TEST_EXPECT(work.start(eventLoop));
+    SC_TEST_EXPECT(queuedWork.start(eventLoop));
+
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(context.workCalls == 1);
+    SC_TEST_EXPECT(context.workCallbacks == 1);
+    SC_TEST_EXPECT(not context.workWasValid);
+    SC_TEST_EXPECT(context.queuedWorkCalls == 1);
+    SC_TEST_EXPECT(context.queuedWorkCallbacks == 1);
+    SC_TEST_EXPECT(context.queuedWasValid);
+    SC_TEST_EXPECT(work.isFree());
+    SC_TEST_EXPECT(queuedWork.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::threadPoolModeCanForceSuppliedPool()
+{
+    AsyncEventLoop eventLoop;
+    SC_TEST_EXPECT(eventLoop.create(options));
+    if (eventLoop.needsThreadPoolForFileOperations())
+    {
+        SC_TEST_EXPECT(eventLoop.close());
+        return;
+    }
+
+    SmallStringNative<255> dirPath  = StringEncoding::Native;
+    SmallStringNative<255> filePath = StringEncoding::Native;
+    const StringView       dirName  = "AsyncContractTest";
+    const StringView       fileName = "thread-pool-mode.txt";
+    SC_TEST_EXPECT(Path::join(dirPath, {report.applicationRootDirectory.view(), dirName}));
+    SC_TEST_EXPECT(Path::join(filePath, {dirPath.view(), fileName}));
+
+    FileSystem fs;
+    SC_TEST_EXPECT(fs.init(report.applicationRootDirectory.view()));
+    SC_TEST_EXPECT(fs.makeDirectoryIfNotExists(dirName));
+    SC_TEST_EXPECT(fs.write(filePath.view(), StringView("abcd").toCharSpan()));
+
+    FileDescriptor fd;
+    FileOpen       openMode;
+    openMode.mode     = FileOpen::Read;
+    openMode.blocking = true;
+    SC_TEST_EXPECT(fd.open(filePath.view(), openMode));
+
+    FileDescriptor::Handle handle = FileDescriptor::Invalid;
+    SC_TEST_EXPECT(fd.get(handle, Result::Error("AsyncContractTest invalid file handle")));
+
+    ThreadPool uncreatedThreadPool;
+
+    char              nativeBuffer[4] = {};
+    AsyncFileRead     nativeRead;
+    AsyncTaskSequence nativeSequence;
+    int               nativeCallbacks = 0;
+    bool              nativeWasValid  = false;
+    nativeRead.callback               = [&](AsyncFileRead::Result& result)
+    {
+        nativeCallbacks++;
+        nativeWasValid = result.isValid();
+    };
+    nativeRead.handle = handle;
+    nativeRead.buffer = {nativeBuffer, sizeof(nativeBuffer)};
+    SC_TEST_EXPECT(nativeRead.executeOn(nativeSequence, uncreatedThreadPool));
+    SC_TEST_EXPECT(nativeRead.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(nativeCallbacks == 1);
+    SC_TEST_EXPECT(nativeWasValid);
+    SC_TEST_EXPECT(nativeRead.isFree());
+
+    char              forcedBuffer[4] = {};
+    AsyncFileRead     forcedRead;
+    AsyncTaskSequence forcedSequence;
+    int               forcedCallbacks = 0;
+    bool              forcedWasValid  = true;
+    forcedRead.callback               = [&](AsyncFileRead::Result& result)
+    {
+        forcedCallbacks++;
+        forcedWasValid = result.isValid();
+    };
+    forcedRead.handle = handle;
+    forcedRead.buffer = {forcedBuffer, sizeof(forcedBuffer)};
+    SC_TEST_EXPECT(forcedRead.executeOn(forcedSequence, uncreatedThreadPool, AsyncThreadPoolMode::ForceThreadPool));
+    SC_TEST_EXPECT(forcedRead.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(forcedCallbacks == 1);
+    SC_TEST_EXPECT(not forcedWasValid);
+    SC_TEST_EXPECT(forcedRead.isFree());
+
+    struct OpenContext
+    {
+        int  nativeCallbacks = 0;
+        bool nativeWasValid  = false;
+        int  forcedCallbacks = 0;
+        bool forcedWasValid  = true;
+    } openContext;
+
+    AsyncFileSystemOperation nativeOpen;
+    nativeOpen.callback = [this, ctx = &openContext](AsyncFileSystemOperation::Result& result)
+    {
+        ctx->nativeCallbacks++;
+        ctx->nativeWasValid = result.isValid();
+        if (result.isValid())
+        {
+            FileDescriptor openedFile(result.completionData.handle);
+            SC_TEST_EXPECT(openedFile.close());
+        }
+    };
+    SC_TEST_EXPECT(nativeOpen.setThreadPool(uncreatedThreadPool));
+    SC_TEST_EXPECT(nativeOpen.open(eventLoop, filePath.view(), openMode));
+
+    alignas(uint64_t) uint8_t eventsMemory[8 * 1024];
+    AsyncKernelEvents         kernelEvents;
+    kernelEvents.eventsMemory = eventsMemory;
+
+    SC_TEST_EXPECT(eventLoop.submitRequests(kernelEvents));
+    SC_TEST_EXPECT(nativeOpen.isActive());
+
+    bool foundActiveNativeOpen = false;
+    eventLoop.enumerateRequests(
+        [&nativeOpen, &foundActiveNativeOpen](AsyncRequest& request)
+        {
+            if (&request == &nativeOpen)
+            {
+                foundActiveNativeOpen = true;
+            }
+        });
+    SC_TEST_EXPECT(foundActiveNativeOpen);
+
+    SC_TEST_EXPECT(eventLoop.blockingPoll(kernelEvents));
+    SC_TEST_EXPECT(eventLoop.dispatchCompletions(kernelEvents));
+    SC_TEST_EXPECT(openContext.nativeCallbacks == 1);
+    SC_TEST_EXPECT(openContext.nativeWasValid);
+
+    AsyncFileSystemOperation forcedOpen;
+    forcedOpen.callback = [ctx = &openContext](AsyncFileSystemOperation::Result& result)
+    {
+        ctx->forcedCallbacks++;
+        ctx->forcedWasValid = result.isValid();
+    };
+    SC_TEST_EXPECT(forcedOpen.setThreadPool(uncreatedThreadPool, AsyncThreadPoolMode::ForceThreadPool));
+    SC_TEST_EXPECT(forcedOpen.open(eventLoop, filePath.view(), openMode));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(openContext.forcedCallbacks == 1);
+    SC_TEST_EXPECT(not openContext.forcedWasValid);
+
+    SC_TEST_EXPECT(fd.close());
+    SC_TEST_EXPECT(fs.removeFile(filePath.view()));
+    SC_TEST_EXPECT(fs.removeEmptyDirectory(dirPath.view()));
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::validationFailureLeavesRequestFree()
+{
+    AsyncEventLoop eventLoop;
+    AsyncSignal    signal;
+    int            callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    signal.callback = [&](AsyncSignal::Result&) { callbacks++; };
+
+    Result startResult = signal.start(eventLoop, -1);
+    SC_TEST_EXPECT(not startResult);
+    SC_TEST_EXPECT(signal.isFree());
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 0);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 0);
+
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(signal.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
 void SC::AsyncContractTest::loopCloseFreesSubmittedRequests()
 {
     AsyncEventLoop   eventLoop;
@@ -464,6 +786,48 @@ void SC::AsyncContractTest::wakeUpCoalescingAndOneShotBehavior()
     SC_TEST_EXPECT(lastDeliveries == 1);
     SC_TEST_EXPECT(wakeUp.isFree());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::activeCountExclusionPreservesCallbacks()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+    AsyncLoopWakeUp driverWakeUp;
+    int             callbacks       = 0;
+    int             driverCallbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    wakeUp.callback       = [&](AsyncLoopWakeUp::Result&) { callbacks++; };
+    driverWakeUp.callback = [&](AsyncLoopWakeUp::Result&) { driverCallbacks++; };
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(driverWakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    SC_TEST_EXPECT(driverWakeUp.isActive());
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 2);
+
+    eventLoop.excludeFromActiveCount(wakeUp);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 1);
+
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(driverWakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(driverCallbacks == 1);
+    SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(driverWakeUp.isFree());
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    eventLoop.excludeFromActiveCount(wakeUp);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 0);
+    eventLoop.includeInActiveCount(wakeUp);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 1);
+
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(wakeUp.isFree());
 }
 
 void SC::AsyncContractTest::enumerateRequestsReportsSubmittedAndActiveUserRequests()

@@ -64,6 +64,13 @@ struct AsyncResult;
 struct AsyncSequence;
 struct AsyncTaskSequence;
 
+/// @brief Controls whether an async request should prefer native backend support or force a supplied ThreadPool.
+enum class AsyncThreadPoolMode : uint8_t
+{
+    NativePreferred, ///< Use the supplied ThreadPool only on backends that need it for this operation.
+    ForceThreadPool, ///< Use the supplied ThreadPool even when the backend has native async support.
+};
+
 namespace detail
 {
 struct AsyncWinOverlapped;
@@ -139,7 +146,8 @@ struct SC_ASYNC_EXPORT AsyncRequest
     /// @brief Adds the request to be executed on a specific AsyncTaskSequence
     /// @see AsyncFileRead
     /// @see AsyncFileWrite
-    Result executeOn(AsyncTaskSequence& task, ThreadPool& pool);
+    Result executeOn(AsyncTaskSequence& task, ThreadPool& pool,
+                     AsyncThreadPoolMode mode = AsyncThreadPoolMode::NativePreferred);
 
     /// @brief Disables the thread-pool usage for this request
     void disableThreadPool();
@@ -176,6 +184,7 @@ struct SC_ASYNC_EXPORT AsyncRequest
     /// @return `true` if the stop request has been successfully queued
     /// @note When stopping the request must be valid until afterStopped will be called.
     /// This AsyncRequest cannot be re-used before this callback will be called.
+    /// @note The close callback is copied before invocation, after the request has been marked free.
     Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
 
     /// @brief Returns `true` if this request is free
@@ -212,6 +221,8 @@ struct SC_ASYNC_EXPORT AsyncRequest
     AsyncSequence* sequence = nullptr;
 
     AsyncTaskSequence* getTask();
+
+    [[nodiscard]] bool isThreadPoolForced() const;
 
   private:
     Function<void(AsyncResult&)>* closeCallback = nullptr;
@@ -355,6 +366,9 @@ struct AsyncLoopWakeUpOptions
 /// AsyncLoopWakeUpOptions::coalesce to false to receive one callback per pending wake-up instead.
 /// @note AsyncLoopWakeUp stays active only until its callback runs. To continue receiving wake-ups after a callback,
 /// call AsyncLoopWakeUp::Result::reactivateRequest(true) from inside the callback.
+/// Persistent async-send wrappers should reactivate from the callback before returning.
+/// Calling wakeUp() after the request is free is tolerated for cross-thread race handling, but should not be used as an
+/// application-level notification mechanism.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncLoopWakeUpSnippet1
 ///
@@ -779,7 +793,8 @@ struct SC_ASYNC_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
 /// Additional notes:
 /// - When reactivating the AsyncRequest, remember to increment the offset (SC::AsyncFileRead::offset)
 /// - SC::AsyncFileRead::CompletionData::endOfFile signals end of file reached
-/// - `io_uring` backend will not use thread pool because that API allows proper async file read/writes
+/// - `io_uring` backend will not use thread pool by default because that API allows proper async file read/writes
+/// - Pass `AsyncThreadPoolMode::ForceThreadPool` to `executeOn` to force using the supplied thread pool
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileReadSnippet
 struct SC_ASYNC_EXPORT AsyncFileRead : public AsyncRequest
@@ -1062,7 +1077,7 @@ struct SC_ASYNC_EXPORT AsyncFileSend : public AsyncRequest
     ///             When using thread pool, either blocking mode works.
     /// @param socket The socket descriptor (must be connected)
     /// @param offset File offset to start reading from (0 for beginning)
-    /// @param length Number of bytes to send (0 means send until EOF)
+    /// @param length Number of bytes to send. Must be greater than 0.
     /// @param pipeSize Optional size of the splice pipe (0 means default)
     SC::Result start(AsyncEventLoop& eventLoop, const FileDescriptor& file, const SocketDescriptor& socket,
                      int64_t offset = 0, size_t length = 0, size_t pipeSize = 0);
@@ -1198,7 +1213,7 @@ struct SC_ASYNC_EXPORT AsyncLoopWork : public AsyncRequest
 
     /// @brief Sets the ThreadPool that will supply the thread to run the async work on
     /// @note Always call this method at least once before AsyncLoopWork::start
-    SC::Result setThreadPool(ThreadPool& threadPool);
+    SC::Result setThreadPool(ThreadPool& threadPool, AsyncThreadPoolMode mode = AsyncThreadPoolMode::NativePreferred);
 
     Function<SC::Result()>  work;     /// Called to execute the work in a background threadpool thread
     Function<void(Result&)> callback; /// Called after work is done, on the thread calling EventLoop::run()
@@ -1212,7 +1227,7 @@ struct SC_ASYNC_EXPORT AsyncLoopWork : public AsyncRequest
 /// @brief Starts an asynchronous file system operation (open, close, read, write, sendFile, stat, lstat, fstat, etc.)
 /// Some operations need a file path and others need a file descriptor.
 /// @note Operations will run on the thread pool set with AsyncFileSystemOperation::setThreadPool on all backends except
-/// when the event loop is using io_uring on Linux.
+/// when the event loop is using io_uring on Linux, unless `AsyncThreadPoolMode::ForceThreadPool` is used.
 /// @warning File paths must be encoded in the native encoding of the OS, that is UTF-8 on Posix and UTF-16 on Windows.
 ///
 /// Example of async open operation:
@@ -1270,7 +1285,7 @@ struct SC_ASYNC_EXPORT AsyncFileSystemOperation : public AsyncRequest
     using Result         = AsyncResultOf<AsyncFileSystemOperation, CompletionData>;
 
     /// @brief Sets the thread pool to use for the operation
-    SC::Result setThreadPool(ThreadPool& threadPool);
+    SC::Result setThreadPool(ThreadPool& threadPool, AsyncThreadPoolMode mode = AsyncThreadPoolMode::NativePreferred);
 
     /// @brief Stops the operation, including the internal thread-pool work item when used.
     SC::Result stop(AsyncEventLoop& eventLoop, Function<void(AsyncResult&)>* afterStopped = nullptr);
@@ -1347,9 +1362,10 @@ struct SC_ASYNC_EXPORT AsyncFileSystemOperation : public AsyncRequest
 
   private:
     friend struct AsyncEventLoop;
-    Operation      operation = Operation::None;
-    AsyncLoopWork  loopWork;
-    CompletionData completionData;
+    Operation           operation      = Operation::None;
+    AsyncThreadPoolMode threadPoolMode = AsyncThreadPoolMode::NativePreferred;
+    AsyncLoopWork       loopWork;
+    CompletionData      completionData;
 
     void onOperationCompleted(AsyncLoopWork::Result& res);
 
@@ -1606,7 +1622,8 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @brief Reverses the effect of excludeFromActiveCount for the request
     void includeInActiveCount(AsyncRequest& async);
 
-    /// @brief Enumerates all requests objects associated with this loop
+    /// @brief Enumerates all user-visible request objects associated with this loop
+    /// @note Submitted, typed-active and manual-completion requests are enumerated. Internal requests are skipped.
     void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
 
     /// @brief Sets reference to listeners that will signal different events in loop lifetime

@@ -131,6 +131,7 @@ struct SC::AsyncEventLoop::Internal
     static constexpr int16_t Flag_NeedsTeardown           = 1 << 6; // Request being processed waiting for teardown
     static constexpr int16_t Flag_WaitingKernelCancel     = 1 << 7; // Close callback must wait for kernel cancellation
     static constexpr int16_t Flag_InternalWakeUpUserEvent = 1 << 8; // kqueue wake-up watcher uses EVFILT_USER
+    static constexpr int16_t Flag_ForceThreadPool         = 1 << 9; // Use thread pool even if native async exists
 
     Result close(AsyncEventLoop& eventLoop);
 
@@ -188,6 +189,8 @@ struct SC::AsyncEventLoop::Internal
     Result dispatchCompletions(AsyncEventLoop& eventLoop, SyncMode syncMode, AsyncKernelEvents& kernelEvents);
 
     void executeCancellationCallbacks(AsyncEventLoop& eventLoop);
+    void completeCancellation(AsyncEventLoop& eventLoop, AsyncRequest& async);
+    void completeReadyRequest(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents, AsyncRequest& async);
     void runStepExecuteCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
     void runStepExecuteManualCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
     void runStepExecuteManualThreadPoolCompletions(AsyncEventLoop& eventLoop, KernelEvents& kernelEvents);
@@ -200,6 +203,9 @@ struct SC::AsyncEventLoop::Internal
 
     template <typename T>
     void enumerateRequests(IntrusiveDoubleLinkedList<T>& linkedList, Function<void(AsyncRequest&)>& callback);
+
+    template <typename Lambda>
+    void forEachActiveRequestList(Lambda& lambda);
 
     template <typename T>
     Result waitForThreadPoolTasks(IntrusiveDoubleLinkedList<T>& linkedList);
