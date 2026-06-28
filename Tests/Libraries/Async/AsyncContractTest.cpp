@@ -39,6 +39,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 stopFreeRequestFails();
             }
+            if (test_section("stop submitted request suppresses normal callback"))
+            {
+                stopSubmittedRequestSuppressesNormalCallback();
+            }
             if (test_section("latest close callback wins while cancelling"))
             {
                 latestCloseCallbackWinsWhileCancelling();
@@ -118,6 +122,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void stopSuppressesNormalCallback();
     void closeCallbackRunsAfterRequestIsFree();
     void stopFreeRequestFails();
+    void stopSubmittedRequestSuppressesNormalCallback();
     void latestCloseCallbackWinsWhileCancelling();
     void reactivationKeepsRequestOwned();
     void reactivatedRequestCanBeStoppedFromCallback();
@@ -228,6 +233,35 @@ void SC::AsyncContractTest::stopFreeRequestFails()
 
     AsyncLoopTimeout timeout;
     SC_TEST_EXPECT(not timeout.stop(eventLoop));
+    SC_TEST_EXPECT(timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::stopSubmittedRequestSuppressesNormalCallback()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    int              normalCallbacks = 0;
+    int              closeCallbacks  = 0;
+    bool             wasFreeOnClose  = false;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    Function<void(AsyncResult&)> afterStopped;
+    afterStopped = [&](AsyncResult& result)
+    {
+        closeCallbacks++;
+        wasFreeOnClose = result.async.isFree();
+    };
+
+    timeout.callback = [&](AsyncLoopTimeout::Result&) { normalCallbacks++; };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.getNumberOfSubmittedRequests() == 1);
+    SC_TEST_EXPECT(timeout.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(timeout.isCancelling());
+    SC_TEST_EXPECT(runNoWaitUntil(eventLoop, [&] { return closeCallbacks == 1; }));
+    SC_TEST_EXPECT(normalCallbacks == 0);
+    SC_TEST_EXPECT(closeCallbacks == 1);
+    SC_TEST_EXPECT(wasFreeOnClose);
     SC_TEST_EXPECT(timeout.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
