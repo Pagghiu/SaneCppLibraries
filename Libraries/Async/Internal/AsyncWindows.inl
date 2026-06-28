@@ -1540,11 +1540,6 @@ struct SC::AsyncEventLoop::Internal::KernelEvents
         result.completionData.signalNumber  = result.getAsync().signalNumber;
         result.completionData.deliveryCount = 1;
 
-        // For OneShot mode, do not reactivate
-        if (result.getAsync().signalOptions.mode == AsyncSignalOptions::Mode::OneShot)
-        {
-            // The framework will teardown since we don't call reactivateRequest
-        }
         return Result(true);
     }
 
