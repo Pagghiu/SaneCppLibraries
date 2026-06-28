@@ -1103,7 +1103,7 @@ bool SC::AsyncEventLoop::isExcludedFromActiveCount(const AsyncRequest& async)
 /// @brief Enumerates all requests objects associated with this loop
 void SC::AsyncEventLoop::enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback)
 {
-    // TODO: Should cancellations be enumerated as well?
+    // Cancelling requests are intentionally not part of the portable enumeration contract.
     internal.enumerateRequests(internal.submissions, enumerationCallback);
     auto enumerateActiveList = [this, &enumerationCallback](auto& linkedList)
     { internal.enumerateRequests(linkedList, enumerationCallback); };
