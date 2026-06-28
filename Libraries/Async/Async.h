@@ -1639,8 +1639,10 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @brief Reverses the effect of excludeFromActiveCount for the request
     void includeInActiveCount(AsyncRequest& async);
 
-    /// @brief Enumerates all user-visible request objects associated with this loop
-    /// @note Submitted, active and manual-completion requests are enumerated. Internal requests are skipped.
+    /// @brief Enumerates user-visible request objects associated with this loop.
+    /// @note Submitted requests, typed active requests, active sequenced requests, and manual-completion requests are
+    /// enumerated. Internal requests are skipped. Cancelling requests are not part of the portable enumeration
+    /// contract.
     void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
 
     /// @brief Sets reference to listeners that will signal different events in loop lifetime
