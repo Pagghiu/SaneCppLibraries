@@ -471,10 +471,17 @@ struct AsyncSignalOptions
 };
 
 /// @brief Starts monitoring a signal, notifying about its reception.
-/// Multiple watchers can be registered for the same signal on the same or different loops (fanout).
 /// On POSIX systems, signals like `SIGINT`, `SIGTERM`, `SIGHUP` are supported.
 /// On Windows, console control signals `CTRL_C_EVENT`, `CTRL_BREAK_EVENT`, and `CTRL_CLOSE_EVENT`
 /// are mapped to `SIGINT` (2), signal 21, and `SIGTERM` (15) respectively.
+///
+/// Signal watcher capabilities:
+/// - one watcher for a given signal is supported on all backends.
+/// - multiple different signals on the same loop are supported on all backends.
+/// - multiple watchers for the same signal on Windows are supported through the process-wide console signal registry.
+/// - multiple POSIX watchers for the same signal are backend-dependent and should not be used as a portable fanout
+///   mechanism. Prefer one AsyncSignal per process signal and fan out from that callback when portable behavior
+///   matters.
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncSignalSnippet
 struct SC_ASYNC_EXPORT AsyncSignal : public AsyncRequest
