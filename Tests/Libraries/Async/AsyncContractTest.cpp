@@ -55,6 +55,18 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 reactivatedRequestCanBeStoppedFromCallback();
             }
+            if (test_section("last reactivation decision wins"))
+            {
+                lastReactivationDecisionWins();
+            }
+            if (test_section("non-reactivated request cannot be stopped from callback"))
+            {
+                nonReactivatedRequestCannotBeStoppedFromCallback();
+            }
+            if (test_section("reactivated request uses replaced callback"))
+            {
+                reactivatedRequestUsesReplacedCallback();
+            }
             if (test_section("normal callback is copied before invocation"))
             {
                 normalCallbackIsCopiedBeforeInvocation();
@@ -150,6 +162,9 @@ struct SC::AsyncContractTest : public SC::TestCase
     void latestCloseCallbackWinsWhileCancelling();
     void reactivationKeepsRequestOwned();
     void reactivatedRequestCanBeStoppedFromCallback();
+    void lastReactivationDecisionWins();
+    void nonReactivatedRequestCannotBeStoppedFromCallback();
+    void reactivatedRequestUsesReplacedCallback();
     void normalCallbackIsCopiedBeforeInvocation();
     void nonReactivatedRequestCanBeReusedInsideCallback();
     void sequenceClearsQueuedRequestsOnCancel();
@@ -389,6 +404,89 @@ void SC::AsyncContractTest::reactivatedRequestCanBeStoppedFromCallback()
     SC_TEST_EXPECT(context.normalCallbacks == 1);
     SC_TEST_EXPECT(context.closeCallbacks == 1);
     SC_TEST_EXPECT(context.closeWasDeferred);
+    SC_TEST_EXPECT(timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::lastReactivationDecisionWins()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    int              callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    timeout.callback = [&](AsyncLoopTimeout::Result& result)
+    {
+        callbacks++;
+        result.reactivateRequest(true);
+        SC_TEST_EXPECT(result.getAsync().isActive());
+        result.reactivateRequest(false);
+        SC_TEST_EXPECT(result.getAsync().isFree());
+    };
+
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::nonReactivatedRequestCannotBeStoppedFromCallback()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    struct Context
+    {
+        Function<void(AsyncResult&)> afterStopped;
+        int                          normalCallbacks = 0;
+        int                          closeCallbacks  = 0;
+    } context;
+
+    context.afterStopped = [ctx = &context](AsyncResult&) { ctx->closeCallbacks++; };
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    timeout.callback = [this, ctx = &context](AsyncLoopTimeout::Result& result)
+    {
+        ctx->normalCallbacks++;
+        SC_TEST_EXPECT(result.getAsync().isFree());
+        SC_TEST_EXPECT(not result.getAsync().stop(result.eventLoop, &ctx->afterStopped));
+    };
+
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(context.normalCallbacks == 1);
+    SC_TEST_EXPECT(context.closeCallbacks == 0);
+    SC_TEST_EXPECT(timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::reactivatedRequestUsesReplacedCallback()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    struct Context
+    {
+        AsyncLoopTimeout* timeout        = nullptr;
+        int               firstCallback  = 0;
+        int               secondCallback = 0;
+    } context;
+    context.timeout = &timeout;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    timeout.callback = [ctx = &context](AsyncLoopTimeout::Result& result)
+    {
+        ctx->firstCallback++;
+        ctx->timeout->callback            = [ctx](AsyncLoopTimeout::Result&) { ctx->secondCallback++; };
+        result.getAsync().relativeTimeout = TimeMs{1};
+        result.reactivateRequest(true);
+    };
+
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(runOnceUntil(eventLoop, [&] { return context.secondCallback == 1; }, 16));
+    SC_TEST_EXPECT(context.firstCallback == 1);
+    SC_TEST_EXPECT(context.secondCallback == 1);
     SC_TEST_EXPECT(timeout.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
