@@ -52,8 +52,9 @@ struct EventObject;
 ///
 /// @note If direct `io_uring` setup is not available on the system, the library will fallback to epoll.
 ///
-/// If an async operation is not supported by the OS, the caller can provide a SC::ThreadPool to run it on a thread.
-/// See SC::AsyncFileRead / SC::AsyncFileWrite for an example.
+/// If an operation may require blocking work on a backend, the caller must provide a SC::ThreadPool through the
+/// operation-specific API. Backends that can perform the operation natively, such as Linux `io_uring` file I/O, prefer
+/// native async by default. Pass SC::AsyncThreadPoolMode::ForceThreadPool to force using the supplied pool.
 
 //! @addtogroup group_async
 //! @{
@@ -796,7 +797,7 @@ struct SC_ASYNC_EXPORT AsyncSocketReceiveFrom : public AsyncSocketReceive
 /// Callback will be called when the data read from the file (or pipe) is available. @n
 ///
 /// Call AsyncRequest::executeOn to set a thread pool if this is a buffered file and not a pipe.
-/// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
+/// This is important on APIs with blocking behaviour on buffered file I/O (all APIs except `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a file (or pipe) descriptor handle.
 ///
@@ -877,7 +878,7 @@ struct SC_ASYNC_EXPORT AsyncFileRead : public AsyncRequest
 /// Callback will be called when the file is ready to receive more bytes to write. @n
 ///
 /// Call AsyncRequest::executeOn to set a thread pool if this is a buffered file and not a pipe.
-/// This is important on APIs with blocking behaviour on buffered file I/O (all apis with the exception of `io_uring`).
+/// This is important on APIs with blocking behaviour on buffered file I/O (all APIs except `io_uring`).
 ///
 /// @ref library_file library can be used to open the file and obtain a blocking or non-blocking file descriptor handle.
 /// @n
@@ -888,6 +889,10 @@ struct SC_ASYNC_EXPORT AsyncFileRead : public AsyncRequest
 /// When not using the `Task` remember to:
 /// - Open the file descriptor for non-blocking IO (SC::File::OpenOptions::blocking == `false`)
 /// - Call SC::AsyncEventLoop::associateExternallyCreatedFileDescriptor on the file descriptor
+///
+/// Additional notes:
+/// - `io_uring` backend will not use thread pool by default because that API allows proper async file read/writes
+/// - Pass `AsyncThreadPoolMode::ForceThreadPool` to `executeOn` to force using the supplied thread pool
 ///
 /// \snippet Tests/Libraries/Async/AsyncTest.cpp AsyncFileWriteSnippet
 struct SC_ASYNC_EXPORT AsyncFileWrite : public AsyncRequest
