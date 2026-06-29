@@ -5,7 +5,6 @@
 
 void SC::AsyncTest::loopWakeUpFromExternalThread()
 {
-    // TODO: This test is not actually testing anything (on Linux)
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create(options));
     Thread newThread;
@@ -26,7 +25,6 @@ void SC::AsyncTest::loopWakeUpFromExternalThread()
         }
     };
     SC_TEST_EXPECT(newThread.start(externalThreadLambda));
-    Time::HighResolutionCounter start, end;
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(newThread.join());
     SC_TEST_EXPECT(newThread.start(externalThreadLambda));
