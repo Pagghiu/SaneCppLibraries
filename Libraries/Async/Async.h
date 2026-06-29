@@ -1513,7 +1513,8 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @brief Posts completion for an AsyncExternalCompletion started in manual mode.
     Result postExternalCompletion(AsyncExternalCompletion& async, size_t bytesTransferred = 0);
 
-    /// Interrupts the event loop even if it has active request on it
+    /// Interrupts AsyncEventLoop::run, causing it to return even if counted active work remains.
+    /// Already-owned requests remain owned by the loop and must still complete, be stopped, or be released by close().
     void interrupt();
 
     /// @brief Returns `true` if create has been already called (successfully)
@@ -1522,14 +1523,16 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// Returns true if backend needs a thread pool for non-blocking fs operations (anything but io_uring basically)
     [[nodiscard]] bool needsThreadPoolForFileOperations() const;
 
-    /// Blocks until there are no more active queued requests, dispatching all completions.
+    /// Blocks until there are no more counted active, submitted, or cancelling requests, dispatching completions.
     /// It's useful for applications where the eventLoop is the only (or the main) loop.
     /// One example could be a console based app doing socket IO or a web server.
     /// Waiting on kernel events blocks the current thread with 0% CPU utilization.
+    /// AsyncEventLoop::interrupt makes this function return before active work has drained.
+    /// Requests excluded with AsyncEventLoop::excludeFromActiveCount do not keep this function alive.
     /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
     Result run();
 
-    /// Blocks until at least one request proceeds, ensuring forward progress, dispatching all completions.
+    /// Blocks until at least one request proceeds, ensuring forward progress, dispatching ready completions.
     /// It's useful for application where it's needed to run some idle work after every IO event.
     /// Waiting on requests blocks the current thread with 0% CPU utilization.
     ///
@@ -1540,14 +1543,14 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
     Result runOnce();
 
-    /// Process active requests if any, dispatching their completions, or returns immediately without blocking.
+    /// Process ready requests if any, dispatching their completions, or returns immediately without blocking.
     /// It's useful for game-like applications where the event loop runs every frame and one would like to check
     /// and dispatch its I/O callbacks in-between frames.
     /// This call allows poll-checking I/O without blocking.
     /// @see AsyncEventLoop::blockingPoll to integrate the loop with a GUI event loop
     Result runNoWait();
 
-    /// Submits all queued async requests.
+    /// Submits all queued async requests without running user callbacks.
     /// An AsyncRequest becomes queued after user calls its specific AsyncRequest::start method.
     ///
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
@@ -1556,13 +1559,15 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// Blocks until at least one event happens, ensuring forward progress, without executing completions.
     /// It's one of the three building blocks of AsyncEventLoop::runOnce allowing co-operation of AsyncEventLoop
     /// within another event loop (for example a GUI event loop or another IO event loop).
+    /// User callbacks are not invoked by this function; they run when AsyncEventLoop::dispatchCompletions is called.
+    /// AsyncEventLoopListeners callbacks, if installed, are invoked around this blocking poll.
     ///
     /// One possible example of such integration with a GUI event loop could:
     ///
     /// - Call AsyncEventLoop::submitRequests on the GUI thread to queue some requests
-    /// - Call AsyncEventLoop::blockingPoll on a secondary thread, storying AsyncKernelEvents
+    /// - Call AsyncEventLoop::blockingPoll on a secondary thread, storing AsyncKernelEvents
     /// - Wake up the GUI event loop from the secondary thread after AsyncEventLoop::blockingPoll returns
-    /// - Call AsyncEventLoop:dispatchCompletions on the GUI event loop to dispatch callbacks on GUI thread
+    /// - Call AsyncEventLoop::dispatchCompletions on the GUI event loop to dispatch callbacks on GUI thread
     /// - Repeat all steps
     ///
     /// Waiting on requests blocks the current thread with 0% CPU utilization.
@@ -1574,8 +1579,9 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     Result blockingPoll(AsyncKernelEvents& kernelEvents);
 
     /// Invokes completions for the AsyncKernelEvents collected by a call to AsyncEventLoop::blockingPoll.
-    /// This is typically done when user wants to pool for events on a thread (calling AsyncEventLoop::blockingPoll)
+    /// This is typically done when user wants to poll for events on a thread (calling AsyncEventLoop::blockingPoll)
     /// and dispatch the callbacks on another thread (calling AsyncEventLoop::dispatchCompletions).
+    /// User callbacks run on the thread calling this function.
     /// The typical example would be integrating AsyncEventLoop with a GUI event loop.
     /// @see AsyncEventLoop::blockingPoll for a description on how to integrate AsyncEventLoop with another event loop
     Result dispatchCompletions(AsyncKernelEvents& kernelEvents);
@@ -1633,7 +1639,9 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// @returns `nullptr` if no AsyncLoopTimeout has been started or scheduled
     [[nodiscard]] AsyncLoopTimeout* findEarliestLoopTimeout() const;
 
-    /// @brief Excludes the request from active handles count (to avoid it keeping event loop alive)
+    /// @brief Excludes the request from active handles count so it does not keep AsyncEventLoop::run alive.
+    /// @note The request remains owned by the event loop and can still receive callbacks while another request drives
+    /// the loop.
     void excludeFromActiveCount(AsyncRequest& async);
 
     /// @brief Reverses the effect of excludeFromActiveCount for the request
@@ -1645,8 +1653,8 @@ struct SC_ASYNC_EXPORT AsyncEventLoop
     /// contract.
     void enumerateRequests(Function<void(AsyncRequest&)> enumerationCallback);
 
-    /// @brief Sets reference to listeners that will signal different events in loop lifetime
-    /// @note The structure pointed by this pointer must be valid throughout loop lifetime
+    /// @brief Sets listeners invoked around AsyncEventLoop::blockingPoll.
+    /// @note The structure pointed by this pointer must be valid while installed.
     void setListeners(AsyncEventLoopListeners* listeners);
 
     /// @brief Checks if excludeFromActiveCount() has been called on the given request
