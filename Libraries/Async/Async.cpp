@@ -1753,12 +1753,17 @@ void SC::AsyncEventLoop::Internal::completeCancellation(AsyncEventLoop& eventLoo
     {
         sequenceToResume = async.sequence;
     }
-#if SC_PLATFORM_WINDOWS
     if (async.type == AsyncRequest::Type::ExternalCompletion)
     {
-        static_cast<AsyncExternalCompletion&>(async).overlapped.get().userData = nullptr;
-    }
+        AsyncExternalCompletion& externalCompletion = static_cast<AsyncExternalCompletion&>(async);
+        if (externalCompletion.hasSubmissionPending())
+        {
+            SC_ASYNC_TRUST_RESULT(externalCompletion.clearSubmissionPending());
+        }
+#if SC_PLATFORM_WINDOWS
+        externalCompletion.overlapped.get().userData = nullptr;
 #endif
+    }
     if (async.sequence and async.sequence->runningRequest == &async)
     {
         async.sequence->runningAsync   = false;
