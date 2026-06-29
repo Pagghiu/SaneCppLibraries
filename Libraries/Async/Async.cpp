@@ -924,7 +924,8 @@ SC::Result SC::AsyncEventLoop::runNoWait() { return internal.runStep(*this, Inte
 SC::Result SC::AsyncEventLoop::run()
 {
     while (internal.getTotalNumberOfActiveHandle() != 0 or not internal.submissions.isEmpty() or
-           internal.hasPendingKernelCancellations or not internal.cancellations.isEmpty())
+           internal.numberOfManualCompletions != 0 or internal.hasPendingKernelCancellations or
+           not internal.cancellations.isEmpty())
     {
         SC_TRY(runOnce());
         if (internal.interrupted)

@@ -131,6 +131,18 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 listenersWrapBlockingPollOnly();
             }
+            if (test_section("runNoWait leaves future work pending"))
+            {
+                runNoWaitLeavesFutureWorkPending();
+            }
+            if (test_section("run dispatches posted manual completion"))
+            {
+                runDispatchesPostedManualCompletion();
+            }
+            if (test_section("split phase dispatch controls callback thread"))
+            {
+                splitPhaseDispatchControlsCallbackThread();
+            }
             if (test_section("wakeUp coalescing and one-shot behavior"))
             {
                 wakeUpCoalescingAndOneShotBehavior();
@@ -189,6 +201,9 @@ struct SC::AsyncContractTest : public SC::TestCase
     void loopCloseSuppressesPostedManualCompletion();
     void loopCanBeRecreatedAfterClose();
     void listenersWrapBlockingPollOnly();
+    void runNoWaitLeavesFutureWorkPending();
+    void runDispatchesPostedManualCompletion();
+    void splitPhaseDispatchControlsCallbackThread();
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
     void excludedActiveRequestDoesNotKeepRunAlive();
@@ -1136,6 +1151,99 @@ void SC::AsyncContractTest::listenersWrapBlockingPollOnly()
     SC_TEST_EXPECT(context.afterPollCalls == 1);
 
     eventLoop.setListeners(nullptr);
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::runNoWaitLeavesFutureWorkPending()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    int              callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    timeout.callback = [&](AsyncLoopTimeout::Result&) { callbacks++; };
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1000}));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(timeout.isActive());
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(timeout.isFree());
+}
+
+void SC::AsyncContractTest::runDispatchesPostedManualCompletion()
+{
+    AsyncEventLoop          eventLoop;
+    AsyncExternalCompletion completion;
+    int                     callbacks        = 0;
+    size_t                  bytesTransferred = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    completion.callback = [&](AsyncExternalCompletion::Result& result)
+    {
+        callbacks++;
+        bytesTransferred = result.completionData.bytesTransferred;
+    };
+    SC_TEST_EXPECT(completion.start(eventLoop));
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(completion.isActive());
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 37));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(bytesTransferred == 37);
+    SC_TEST_EXPECT(completion.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::splitPhaseDispatchControlsCallbackThread()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+
+    alignas(uint64_t) uint8_t eventsMemory[8 * 1024];
+    AsyncKernelEvents         kernelEvents;
+    kernelEvents.eventsMemory = eventsMemory;
+
+    struct Context
+    {
+        AsyncEventLoop*    eventLoop    = nullptr;
+        AsyncKernelEvents* kernelEvents = nullptr;
+
+        Result   dispatchResult   = Result(false);
+        int      callbacks        = 0;
+        uint64_t callbackThreadID = 0;
+        uint64_t dispatchThreadID = 0;
+    } context;
+    context.eventLoop    = &eventLoop;
+    context.kernelEvents = &kernelEvents;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    wakeUp.callback = [ctx = &context](AsyncLoopWakeUp::Result&)
+    {
+        ctx->callbacks++;
+        ctx->callbackThreadID = Thread::CurrentThreadID();
+    };
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.submitRequests(kernelEvents));
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(eventLoop.blockingPoll(kernelEvents));
+    SC_TEST_EXPECT(context.callbacks == 0);
+
+    const uint64_t          pollingThreadID = Thread::CurrentThreadID();
+    Thread                  dispatchThread;
+    Function<void(Thread&)> dispatchFunction = [ctx = &context](Thread&)
+    {
+        ctx->dispatchThreadID = Thread::CurrentThreadID();
+        ctx->dispatchResult   = ctx->eventLoop->dispatchCompletions(*ctx->kernelEvents);
+    };
+    SC_TEST_EXPECT(dispatchThread.start(move(dispatchFunction)));
+    SC_TEST_EXPECT(dispatchThread.join());
+    SC_TEST_EXPECT(context.dispatchResult);
+    SC_TEST_EXPECT(context.callbacks == 1);
+    SC_TEST_EXPECT(context.callbackThreadID == context.dispatchThreadID);
+    SC_TEST_EXPECT(context.callbackThreadID != pollingThreadID);
+    SC_TEST_EXPECT(wakeUp.isFree());
     SC_TEST_EXPECT(eventLoop.close());
 }
 
