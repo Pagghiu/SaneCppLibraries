@@ -111,6 +111,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 activeCountExclusionPreservesCallbacks();
             }
+            if (test_section("excluded active request does not keep run alive"))
+            {
+                excludedActiveRequestDoesNotKeepRunAlive();
+            }
             if (test_section("enumerateRequests reports submitted and active user requests"))
             {
                 enumerateRequestsReportsSubmittedAndActiveUserRequests();
@@ -148,6 +152,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void listenersWrapBlockingPollOnly();
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
+    void excludedActiveRequestDoesNotKeepRunAlive();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
     void enumerateRequestsReportsActiveSequencedRequests();
 
@@ -954,6 +959,30 @@ void SC::AsyncContractTest::activeCountExclusionPreservesCallbacks()
     SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 0);
     eventLoop.includeInActiveCount(wakeUp);
     SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 1);
+
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(wakeUp.isFree());
+}
+
+void SC::AsyncContractTest::excludedActiveRequestDoesNotKeepRunAlive()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+    int             callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    wakeUp.callback = [&](AsyncLoopWakeUp::Result&) { callbacks++; };
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 1);
+
+    eventLoop.excludeFromActiveCount(wakeUp);
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() == 0);
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(wakeUp.isActive());
 
     SC_TEST_EXPECT(eventLoop.close());
     SC_TEST_EXPECT(wakeUp.isFree());
