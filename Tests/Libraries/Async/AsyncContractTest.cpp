@@ -91,6 +91,14 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 sequenceResumesQueuedRequestsOnErrorWhenConfigured();
             }
+            if (test_section("loop close frees sequenced requests"))
+            {
+                loopCloseFreesSequencedRequests();
+            }
+            if (test_section("loop close waits for active task sequence"))
+            {
+                loopCloseWaitsForActiveTaskSequence();
+            }
             if (test_section("thread pool mode can force supplied pool"))
             {
                 threadPoolModeCanForceSuppliedPool();
@@ -171,6 +179,8 @@ struct SC::AsyncContractTest : public SC::TestCase
     void sequenceClearsQueuedRequestsOnError();
     void sequenceResumesQueuedRequestsOnCancelWhenConfigured();
     void sequenceResumesQueuedRequestsOnErrorWhenConfigured();
+    void loopCloseFreesSequencedRequests();
+    void loopCloseWaitsForActiveTaskSequence();
     void threadPoolModeCanForceSuppliedPool();
     void validationFailureLeavesRequestFree();
     void loopCloseFreesSubmittedRequests();
@@ -731,6 +741,91 @@ void SC::AsyncContractTest::sequenceResumesQueuedRequestsOnErrorWhenConfigured()
     SC_TEST_EXPECT(work.isFree());
     SC_TEST_EXPECT(queuedWork.isFree());
     SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::loopCloseFreesSequencedRequests()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncSequence    sequence;
+    AsyncLoopWakeUp  wakeUp;
+    AsyncLoopTimeout queuedTimeout;
+    int              wakeCallbacks    = 0;
+    int              timeoutCallbacks = 0;
+
+    sequence.clearSequenceOnCancel = false;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    wakeUp.callback        = [&](AsyncLoopWakeUp::Result&) { wakeCallbacks++; };
+    queuedTimeout.callback = [&](AsyncLoopTimeout::Result&) { timeoutCallbacks++; };
+    wakeUp.executeOn(sequence);
+    queuedTimeout.executeOn(sequence);
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(queuedTimeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.isActive());
+    SC_TEST_EXPECT(not queuedTimeout.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(wakeCallbacks == 0);
+    SC_TEST_EXPECT(timeoutCallbacks == 0);
+    SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(queuedTimeout.isFree());
+}
+
+void SC::AsyncContractTest::loopCloseWaitsForActiveTaskSequence()
+{
+    AsyncEventLoop    eventLoop;
+    AsyncTaskSequence sequence;
+    ThreadPool        threadPool;
+    AsyncLoopWork     work;
+    AsyncLoopWork     queuedWork;
+
+    struct Context
+    {
+        EventObject workStarted;
+        EventObject allowWorkToFinish;
+        Atomic<int> workCalls           = 0;
+        int         workCallbacks       = 0;
+        int         queuedWorkCalls     = 0;
+        int         queuedWorkCallbacks = 0;
+    } context;
+
+    sequence.clearSequenceOnCancel = false;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SC_TEST_EXPECT(threadPool.create(1));
+
+    work.work = [ctx = &context]
+    {
+        ctx->workCalls.fetch_add(1);
+        ctx->workStarted.signal();
+        ctx->allowWorkToFinish.wait();
+        return Result(true);
+    };
+    work.callback   = [ctx = &context](AsyncLoopWork::Result&) { ctx->workCallbacks++; };
+    queuedWork.work = [ctx = &context]
+    {
+        ctx->queuedWorkCalls++;
+        return Result(true);
+    };
+    queuedWork.callback = [ctx = &context](AsyncLoopWork::Result&) { ctx->queuedWorkCallbacks++; };
+
+    SC_TEST_EXPECT(work.executeOn(sequence, threadPool));
+    SC_TEST_EXPECT(queuedWork.executeOn(sequence, threadPool));
+    SC_TEST_EXPECT(work.start(eventLoop));
+    SC_TEST_EXPECT(queuedWork.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    context.workStarted.wait();
+    context.allowWorkToFinish.signal();
+
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(context.workCalls.load() == 1);
+    SC_TEST_EXPECT(context.workCallbacks == 0);
+    SC_TEST_EXPECT(context.queuedWorkCalls == 0);
+    SC_TEST_EXPECT(context.queuedWorkCallbacks == 0);
+    SC_TEST_EXPECT(work.isFree());
+    SC_TEST_EXPECT(queuedWork.isFree());
+    SC_TEST_EXPECT(threadPool.destroy());
 }
 
 void SC::AsyncContractTest::threadPoolModeCanForceSuppliedPool()
