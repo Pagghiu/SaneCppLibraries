@@ -115,6 +115,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 excludedActiveRequestDoesNotKeepRunAlive();
             }
+            if (test_section("run exits on interrupt with active work"))
+            {
+                runExitsOnInterruptWithActiveWork();
+            }
             if (test_section("enumerateRequests reports submitted and active user requests"))
             {
                 enumerateRequestsReportsSubmittedAndActiveUserRequests();
@@ -153,6 +157,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
     void excludedActiveRequestDoesNotKeepRunAlive();
+    void runExitsOnInterruptWithActiveWork();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
     void enumerateRequestsReportsActiveSequencedRequests();
 
@@ -986,6 +991,31 @@ void SC::AsyncContractTest::excludedActiveRequestDoesNotKeepRunAlive()
 
     SC_TEST_EXPECT(eventLoop.close());
     SC_TEST_EXPECT(wakeUp.isFree());
+}
+
+void SC::AsyncContractTest::runExitsOnInterruptWithActiveWork()
+{
+    AsyncEventLoop   eventLoop;
+    AsyncLoopTimeout timeout;
+    int              callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    timeout.callback = [&](AsyncLoopTimeout::Result& result)
+    {
+        callbacks++;
+        result.getAsync().relativeTimeout = TimeMs{1};
+        result.reactivateRequest(true);
+        eventLoop.interrupt();
+    };
+
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{1}));
+    SC_TEST_EXPECT(eventLoop.run());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(not timeout.isFree());
+    SC_TEST_EXPECT(eventLoop.getNumberOfActiveRequests() + eventLoop.getNumberOfSubmittedRequests() == 1);
+
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(timeout.isFree());
 }
 
 void SC::AsyncContractTest::enumerateRequestsReportsSubmittedAndActiveUserRequests()
