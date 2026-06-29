@@ -95,6 +95,14 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 loopCloseFreesActiveRequests();
             }
+            if (test_section("loop close drains pending close callback"))
+            {
+                loopCloseDrainsPendingCloseCallback();
+            }
+            if (test_section("loop close suppresses posted manual completion"))
+            {
+                loopCloseSuppressesPostedManualCompletion();
+            }
             if (test_section("loop can be recreated after close"))
             {
                 loopCanBeRecreatedAfterClose();
@@ -152,6 +160,8 @@ struct SC::AsyncContractTest : public SC::TestCase
     void validationFailureLeavesRequestFree();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
+    void loopCloseDrainsPendingCloseCallback();
+    void loopCloseSuppressesPostedManualCompletion();
     void loopCanBeRecreatedAfterClose();
     void listenersWrapBlockingPollOnly();
     void wakeUpCoalescingAndOneShotBehavior();
@@ -809,6 +819,51 @@ void SC::AsyncContractTest::loopCloseFreesActiveRequests()
     SC_TEST_EXPECT(eventLoop.close());
     SC_TEST_EXPECT(callbacks == 0);
     SC_TEST_EXPECT(wakeUp.isFree());
+}
+
+void SC::AsyncContractTest::loopCloseDrainsPendingCloseCallback()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+    int             normalCallbacks = 0;
+    int             closeCallbacks  = 0;
+    bool            wasFreeOnClose  = false;
+
+    Function<void(AsyncResult&)> afterStopped;
+    afterStopped = [&](AsyncResult& result)
+    {
+        closeCallbacks++;
+        wasFreeOnClose = result.async.isFree();
+    };
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    wakeUp.callback = [&](AsyncLoopWakeUp::Result&) { normalCallbacks++; };
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.stop(eventLoop, &afterStopped));
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(normalCallbacks == 0);
+    SC_TEST_EXPECT(closeCallbacks == 1);
+    SC_TEST_EXPECT(wasFreeOnClose);
+    SC_TEST_EXPECT(wakeUp.isFree());
+}
+
+void SC::AsyncContractTest::loopCloseSuppressesPostedManualCompletion()
+{
+    AsyncEventLoop          eventLoop;
+    AsyncExternalCompletion completion;
+    int                     callbacks = 0;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    completion.callback = [&](AsyncExternalCompletion::Result&) { callbacks++; };
+    SC_TEST_EXPECT(completion.start(eventLoop));
+    SC_TEST_EXPECT(completion.markSubmissionPending());
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(eventLoop.postExternalCompletion(completion, 17));
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(callbacks == 0);
+    SC_TEST_EXPECT(not completion.hasSubmissionPending());
+    SC_TEST_EXPECT(completion.isFree());
 }
 
 void SC::AsyncContractTest::loopCanBeRecreatedAfterClose()
