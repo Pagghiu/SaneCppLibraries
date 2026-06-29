@@ -99,6 +99,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 loopCanBeRecreatedAfterClose();
             }
+            if (test_section("listeners wrap blocking poll only"))
+            {
+                listenersWrapBlockingPollOnly();
+            }
             if (test_section("wakeUp coalescing and one-shot behavior"))
             {
                 wakeUpCoalescingAndOneShotBehavior();
@@ -141,6 +145,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
     void loopCanBeRecreatedAfterClose();
+    void listenersWrapBlockingPollOnly();
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
@@ -822,6 +827,57 @@ void SC::AsyncContractTest::loopCanBeRecreatedAfterClose()
     SC_TEST_EXPECT(eventLoop.runOnce());
     SC_TEST_EXPECT(callbacks == 2);
     SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+}
+
+void SC::AsyncContractTest::listenersWrapBlockingPollOnly()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+
+    struct ListenerContext
+    {
+        int callbacks        = 0;
+        int beforePollCalls  = 0;
+        int afterPollCalls   = 0;
+        int callbackSnapshot = 0;
+    } context;
+
+    AsyncEventLoopListeners listeners;
+    listeners.beforeBlockingPoll = [&context](AsyncEventLoop&) { context.beforePollCalls++; };
+    listeners.afterBlockingPoll  = [&context](AsyncEventLoop&) { context.afterPollCalls++; };
+
+    alignas(uint64_t) uint8_t eventsMemory[8 * 1024];
+    AsyncKernelEvents         kernelEvents;
+    kernelEvents.eventsMemory = eventsMemory;
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    eventLoop.setListeners(&listeners);
+
+    wakeUp.callback = [&](AsyncLoopWakeUp::Result&)
+    {
+        context.callbacks++;
+        context.callbackSnapshot = context.beforePollCalls + context.afterPollCalls;
+    };
+
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.submitRequests(kernelEvents));
+    SC_TEST_EXPECT(context.beforePollCalls == 0);
+    SC_TEST_EXPECT(context.afterPollCalls == 0);
+
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(eventLoop.blockingPoll(kernelEvents));
+    SC_TEST_EXPECT(context.beforePollCalls == 1);
+    SC_TEST_EXPECT(context.afterPollCalls == 1);
+    SC_TEST_EXPECT(context.callbacks == 0);
+
+    SC_TEST_EXPECT(eventLoop.dispatchCompletions(kernelEvents));
+    SC_TEST_EXPECT(context.callbacks == 1);
+    SC_TEST_EXPECT(context.callbackSnapshot == 2);
+    SC_TEST_EXPECT(context.beforePollCalls == 1);
+    SC_TEST_EXPECT(context.afterPollCalls == 1);
+
+    eventLoop.setListeners(nullptr);
     SC_TEST_EXPECT(eventLoop.close());
 }
 
