@@ -95,6 +95,10 @@ struct SC::AsyncContractTest : public SC::TestCase
             {
                 loopCloseFreesActiveRequests();
             }
+            if (test_section("loop can be recreated after close"))
+            {
+                loopCanBeRecreatedAfterClose();
+            }
             if (test_section("wakeUp coalescing and one-shot behavior"))
             {
                 wakeUpCoalescingAndOneShotBehavior();
@@ -136,6 +140,7 @@ struct SC::AsyncContractTest : public SC::TestCase
     void validationFailureLeavesRequestFree();
     void loopCloseFreesSubmittedRequests();
     void loopCloseFreesActiveRequests();
+    void loopCanBeRecreatedAfterClose();
     void wakeUpCoalescingAndOneShotBehavior();
     void activeCountExclusionPreservesCallbacks();
     void enumerateRequestsReportsSubmittedAndActiveUserRequests();
@@ -789,6 +794,35 @@ void SC::AsyncContractTest::loopCloseFreesActiveRequests()
     SC_TEST_EXPECT(eventLoop.close());
     SC_TEST_EXPECT(callbacks == 0);
     SC_TEST_EXPECT(wakeUp.isFree());
+}
+
+void SC::AsyncContractTest::loopCanBeRecreatedAfterClose()
+{
+    AsyncEventLoop  eventLoop;
+    AsyncLoopWakeUp wakeUp;
+    int             callbacks = 0;
+
+    wakeUp.callback = [&](AsyncLoopWakeUp::Result&) { callbacks++; };
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(callbacks == 1);
+    SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
+    SC_TEST_EXPECT(not eventLoop.isInitialized());
+
+    SC_TEST_EXPECT(eventLoop.create(options));
+    SC_TEST_EXPECT(eventLoop.isInitialized());
+    SC_TEST_EXPECT(wakeUp.start(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runNoWait());
+    SC_TEST_EXPECT(wakeUp.wakeUp(eventLoop));
+    SC_TEST_EXPECT(eventLoop.runOnce());
+    SC_TEST_EXPECT(callbacks == 2);
+    SC_TEST_EXPECT(wakeUp.isFree());
+    SC_TEST_EXPECT(eventLoop.close());
 }
 
 void SC::AsyncContractTest::wakeUpCoalescingAndOneShotBehavior()
