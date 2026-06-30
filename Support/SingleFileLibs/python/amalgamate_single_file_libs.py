@@ -43,6 +43,16 @@ def get_library_files(root_dir, library_name):
                 files.append(os.path.join(root, filename))
     return files
 
+def get_common_files(root_dir):
+    """Gets all .h, .cpp and .inl files for Libraries/Common."""
+    common_dir = os.path.join(root_dir, 'Libraries', 'Common')
+    files = []
+    for root, _, filenames in os.walk(common_dir):
+        for filename in filenames:
+            if filename.endswith(('.h', '.cpp', '.inl')):
+                files.append(os.path.join(root, filename))
+    return files
+
 def get_git_version():
     """Retrieves the git version information."""
     try:
@@ -81,7 +91,59 @@ def count_loc(content):
             
     return code_lines, comment_lines
 
-def _process_file_recursively(file_path, processed_files, root_dir, current_library_name, authors_info, spdx_set):
+def make_loc(code=0, comments=0):
+    return {'code': code, 'comments': comments}
+
+def add_loc(lhs, rhs):
+    return make_loc(lhs['code'] + rhs['code'], lhs['comments'] + rhs['comments'])
+
+def sum_loc(values):
+    total = make_loc()
+    for value in values:
+        total = add_loc(total, value)
+    return total
+
+def count_files_loc(files):
+    content = ""
+    for file_path in files:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content += f.read().rstrip() + '\n'
+        except Exception as e:
+            print(f"Error processing file {file_path}: {e}")
+    code, comments = count_loc(content)
+    return make_loc(code, comments)
+
+def count_files_loc_by_kind(files):
+    headers = []
+    sources = []
+    for file_path in files:
+        if file_path.endswith('.h'):
+            headers.append(file_path)
+        elif file_path.endswith(('.cpp', '.inl')):
+            sources.append(file_path)
+    return {
+        'header': count_files_loc(headers),
+        'source': count_files_loc(sources),
+    }
+
+def split_processed_loc(lines_by_origin):
+    owned_code, owned_comments = count_loc(''.join(lines_by_origin['owned']))
+    common_code, common_comments = count_loc(''.join(lines_by_origin['common']))
+    return {
+        'owned': make_loc(owned_code, owned_comments),
+        'common': make_loc(common_code, common_comments),
+    }
+
+def processed_line_origin(file_path, root_dir):
+    relative_path_from_root = os.path.relpath(os.path.realpath(file_path), root_dir)
+    path_parts = relative_path_from_root.split(os.sep)
+    if path_parts[0] == 'Libraries' and len(path_parts) > 1 and path_parts[1] == 'Common':
+        return 'common'
+    return 'owned'
+
+def _process_file_recursively(file_path, processed_files, root_dir, current_library_name, authors_info, spdx_set,
+                              lines_by_origin):
     # Normalize file_path to ensure consistent representation
     normalized_file_path = os.path.realpath(file_path)
 
@@ -147,22 +209,28 @@ def _process_file_recursively(file_path, processed_files, root_dir, current_libr
                     if path_parts[0] in ['Libraries', 'LibrariesExtra'] and len(path_parts) > 1: # Ensure there's a library name
                         included_library_name = path_parts[1]
                         if path_parts[0] == 'Libraries' and included_library_name == 'Common':
-                            file_content += _process_file_recursively(normalized_abs_included_path, processed_files, root_dir, current_library_name, authors_info, spdx_set)
+                            file_content += _process_file_recursively(normalized_abs_included_path, processed_files,
+                                                                      root_dir, current_library_name, authors_info,
+                                                                      spdx_set, lines_by_origin)
                         elif included_library_name == current_library_name:
-                            file_content += _process_file_recursively(normalized_abs_included_path, processed_files, root_dir, current_library_name, authors_info, spdx_set)
+                            file_content += _process_file_recursively(normalized_abs_included_path, processed_files,
+                                                                      root_dir, current_library_name, authors_info,
+                                                                      spdx_set, lines_by_origin)
                         else:
                             # This is an include from another library, so we strip it.
                             pass
                         continue
                 
                 file_content += line
+                lines_by_origin[processed_line_origin(normalized_file_path, root_dir)].append(line)
     except Exception as e:
         print(f"Error processing file {file_path}: {e}")
         return "" # Return empty string on error
     file_content = file_content.rstrip() + '\n\n'
     return file_content
 
-def amalgamate_files_recursively(library_files, order_list, root_dir, library_name, processed_files, authors_info, spdx_set):
+def amalgamate_files_recursively(library_files, order_list, root_dir, library_name, processed_files, authors_info,
+                                 spdx_set, lines_by_origin):
     """Amalgamates files, inlining internal includes."""
     content = ""
     
@@ -210,7 +278,8 @@ def amalgamate_files_recursively(library_files, order_list, root_dir, library_na
             
         # Ensure full_path is always a realpath before passing to recursive processing
         full_path = os.path.realpath(full_path) # Redundant but safe
-        content += _process_file_recursively(full_path, processed_files, root_dir, library_name, authors_info, spdx_set)
+        content += _process_file_recursively(full_path, processed_files, root_dir, library_name, authors_info, spdx_set,
+                                             lines_by_origin)
     return content
 
 def normalize_content_for_hash(content):
@@ -274,6 +343,8 @@ def build_library_record(root_dir, library_name, data):
     processed_files_for_lib = set()
     authors_info_for_lib = defaultdict(int)
     spdx_set_for_lib = set()
+    header_lines_by_origin = {'owned': [], 'common': []}
+    sources_lines_by_origin = {'owned': [], 'common': []}
 
     if os.path.exists(order_file_path):
         print(f"  (Using order file: {os.path.basename(order_file_path)})")
@@ -282,26 +353,32 @@ def build_library_record(root_dir, library_name, data):
         include_order = order_data.get('includeOrder', [])
         implementation_order = order_data.get('implementationOrder', [])
         headers = amalgamate_files_recursively(library_files, include_order, root_dir, library_name,
-                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib,
+                                               header_lines_by_origin)
         sources = amalgamate_files_recursively(library_files, implementation_order, root_dir, library_name,
-                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib,
+                                               sources_lines_by_origin)
     else:
         public_headers = [f for f in library_files if f.endswith('.h') and 'Internal' not in f.split(os.sep)]
         # Make deterministic across platforms/runs
         public_headers.sort(key=lambda p: os.path.basename(p))
         public_header_basenames_for_lib = [os.path.basename(f) for f in public_headers]
         headers = amalgamate_files_recursively(library_files, public_header_basenames_for_lib, root_dir, library_name,
-                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib,
+                                               header_lines_by_origin)
 
         source_files = [f for f in library_files if f.endswith('.cpp')]
         # Make deterministic across platforms/runs
         source_files.sort(key=lambda p: os.path.basename(p))
         source_basenames = [os.path.basename(f) for f in source_files]
         sources = amalgamate_files_recursively(library_files, source_basenames, root_dir, library_name,
-                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib)
+                                               processed_files_for_lib, authors_info_for_lib, spdx_set_for_lib,
+                                               sources_lines_by_origin)
 
     header_code_loc, header_comment_loc = count_loc(headers)
     sources_code_loc, sources_comment_loc = count_loc(sources)
+    header_processed_loc = split_processed_loc(header_lines_by_origin)
+    sources_processed_loc = split_processed_loc(sources_lines_by_origin)
 
     return {
         'name': library_name,
@@ -314,6 +391,10 @@ def build_library_record(root_dir, library_name, data):
         'header_comment_loc': header_comment_loc,
         'sources_code_loc': sources_code_loc,
         'sources_comment_loc': sources_comment_loc,
+        'owned_header_loc': header_processed_loc['owned'],
+        'owned_sources_loc': sources_processed_loc['owned'],
+        'common_header_loc': header_processed_loc['common'],
+        'common_sources_loc': sources_processed_loc['common'],
         'content_hash': calculate_content_hash(headers, sources),
     }
 
@@ -540,7 +621,24 @@ def write_standalone_test(test_filepath, output_filename):
         f.write(f'    return 0;\n')
         f.write(f'}}\n')
 
-def update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc, sources_code_loc, sources_comment_loc):
+def format_code_loc_row(label, split_loc):
+    header_loc = split_loc['header']['code']
+    source_loc = split_loc['source']['code']
+    return f"| {label:<11} | {header_loc}\t\t| {source_loc}\t\t| {header_loc + source_loc}\t|"
+
+def payload_split_loc(record):
+    return {
+        'header': make_loc(record['header_code_loc'], record['header_comment_loc']),
+        'source': make_loc(record['sources_code_loc'], record['sources_comment_loc']),
+    }
+
+def common_loc_used(record):
+    return sum_loc([record['common_header_loc'], record['common_sources_loc']])
+
+def owned_processed_loc(record):
+    return sum_loc([record['owned_header_loc'], record['owned_sources_loc']])
+
+def update_library_doc_statistics(library_name, root_dir, metrics):
     """Updates the statistics section in the library's documentation markdown file."""
     doc_path = os.path.join(root_dir, 'Documentation', 'Libraries', f'{library_name}.md')
     if not os.path.exists(doc_path):
@@ -555,16 +653,20 @@ def update_library_doc_statistics(library_name, root_dir, header_code_loc, heade
     if num_replacements == 0:
         content = content.rstrip()
 
-    total_loc = header_code_loc + header_comment_loc + sources_code_loc + sources_comment_loc
-    total_code_loc = header_code_loc + sources_code_loc
-    total_comment_loc = header_comment_loc + sources_comment_loc
-    
+    rows = [
+        format_code_loc_row('Library', metrics['library_source']),
+        format_code_loc_row('Single File', metrics['regular_payload']),
+        format_code_loc_row('Standalone', metrics['standalone_payload']),
+    ]
+
     stats_section = f"""\n\n# Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | {header_code_loc}\t\t\t| {header_comment_loc}\t\t| {header_code_loc + header_comment_loc}\t|
-| Sources   | {sources_code_loc}\t\t\t| {sources_comment_loc}\t\t| {sources_code_loc + sources_comment_loc}\t|
-| Sum       | {total_code_loc}\t\t\t| {total_comment_loc}\t\t| {total_loc}\t|
+LOC counts exclude comments. Library counts files physically under `Libraries/{library_name}`.\nSingle File counts
+`SaneCpp{library_name}.h`.\nStandalone counts `SaneCpp{library_name}Standalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+{chr(10).join(rows)}
 """
 
     # Always append the statistics section at the end of the markdown page
@@ -578,11 +680,8 @@ def camel_to_snake(name):
     import re
     return re.sub(r'(?<!^)(?=[A-Z])', '_', name).lower()
 
-def update_table_loc_in_file(file_path, lib_line_counts, is_readme=False):
-    """
-    Updates the 'LOC' column in the libraries table in the given file with the correct values (excluding comments).
-    If is_readme is True, expects the table format as in README.md.
-    """
+def update_table_loc_in_file(file_path, lib_metrics, common_metrics, is_readme=False):
+    """Updates the libraries table with owned, Common, regular single-file and standalone LOC."""
     if not os.path.isfile(file_path):
         return
     with open(file_path, 'r', encoding='utf-8') as f:
@@ -605,54 +704,30 @@ def update_table_loc_in_file(file_path, lib_line_counts, is_readme=False):
         while table_end < len(lines) and lines[table_end].strip():
             table_end += 1
 
+    table_lines = [
+        "Library                                     | Description                                   | Header LOC | Source LOC | Standalone LOC\n",
+        ":-------------------------------------------|:----------------------------------------------|-----------:|-----------:|---------------:\n",
+    ]
 
-    # Build a normalized name map for matching
-    def normalize(name):
-        return name.replace(' ', '').replace('_', '').lower()
+    for lib_name, metrics in lib_metrics.items():
+        table_lines.append(
+            f"@subpage library_{camel_to_snake(lib_name):<22} | @copybrief library_{camel_to_snake(lib_name):<22} |"
+            f" {metrics['library_source']['header']['code']} | {metrics['library_source']['source']['code']} |"
+            f" {metrics['standalone_payload']['header']['code'] + metrics['standalone_payload']['source']['code']}\n")
 
-    lib_name_map = {normalize(lib): lib for lib in lib_line_counts}
+    table_lines.append(
+        f"Common source fragments                    | Shared source fragments, not a library       |"
+        f" {common_metrics['source']['header']['code']} | {common_metrics['source']['source']['code']} | -\n")
 
-    # Update the table lines
-    for i in range(table_start, table_end):
-        line = lines[i]
-        parts = line.split('|')
-        if len(parts) < 3:
-            continue
-        lib_col = parts[0].strip()
-        if is_readme:
-            m = re.match(r'\[([A-Za-z0-9_ ]+)\]', lib_col)
-            if m:
-                lib_name_raw = m.group(1)
-                lib_name_norm = normalize(lib_name_raw)
-                lib_name = lib_name_map.get(lib_name_norm)
-                if not lib_name:
-                    continue
-            else:
-                continue
-        else:
-            # In Libraries.md, the first column is @subpage library_xxx
-            lib_name = None
-            for lib in lib_line_counts:
-                if f'@subpage library_{camel_to_snake(lib)}' == lib_col:
-                    lib_name = lib
-                    break
-            if not lib_name:
-                continue
-        if lib_name in lib_line_counts:
-            loc = lib_line_counts[lib_name][1]  # non-comment lines
-            parts[-1] = f'   {loc}\n'
-            lines[i] = '|'.join(parts)
+    lines[table_start - 2:table_end] = table_lines
 
     with open(file_path, 'w', encoding='utf-8') as f:
         f.writelines(lines)
 
-def update_libraries_md_table(lib_line_counts, root_dir):
-    """
-    Updates the 'Lines of code' column in the Libraries.md table with the correct values (excluding comments).
-    Also updates the table in README.md.
-    """
+def update_libraries_md_table(lib_metrics, common_metrics, root_dir):
+    """Updates the library LOC table in Libraries.md."""
     libraries_md_path = os.path.join(root_dir, 'Documentation', 'Pages', 'Libraries.md')
-    update_table_loc_in_file(libraries_md_path, lib_line_counts, is_readme=False)
+    update_table_loc_in_file(libraries_md_path, lib_metrics, common_metrics, is_readme=False)
 
     # readme_md_path = os.path.join(root_dir, 'README.md')
     # update_table_loc_in_file(readme_md_path, lib_line_counts, is_readme=True)
@@ -668,14 +743,18 @@ def add_total_loc_after_table(file_path, total_loc_str, is_readme=False):
     in_table = False
     for line in lines:
         stripped_line = line.strip()
-        if not in_table and stripped_line.startswith("LOC") and "| Count" in stripped_line:
+        if stripped_line.startswith("All LOC counts in the table") and stripped_line.endswith("exclude comments."):
+            continue
+        if (not in_table and ((stripped_line.startswith("LOC") and "| Count" in stripped_line) or
+                              (stripped_line.startswith("LOC metric") and "|" in stripped_line))):
             in_table = True
-        
+            continue
+
+        if in_table and '|' not in stripped_line and not stripped_line.startswith(":"):
+            in_table = False
+
         if not in_table:
             new_lines.append(line)
-
-        if in_table and stripped_line.startswith("*Total*"):
-            in_table = False
     lines = new_lines
 
     # Find the table start and end
@@ -731,24 +810,22 @@ def main():
     for library_name in dependencies:
         dependency_orders[library_name] = validate_dependency_order(library_name, dependencies)
 
-    lib_line_counts = {}
-    total_header_loc = 0
-    total_sources_loc = 0
-    total_comment_loc = 0
+    common_metrics = {'source': count_files_loc_by_kind(get_common_files(root_dir))}
+    lib_metrics = {}
 
     for library_name, record in records_by_name.items():
-        header_code_loc = record['header_code_loc']
-        header_comment_loc = record['header_comment_loc']
-        sources_code_loc = record['sources_code_loc']
-        sources_comment_loc = record['sources_comment_loc']
-
-        total_header_loc += header_code_loc
-        total_sources_loc += sources_code_loc
-        total_comment_loc += header_comment_loc + sources_comment_loc
-        lib_line_counts[library_name] = (header_code_loc + sources_code_loc, header_code_loc + sources_code_loc)
+        standalone_records = [records_by_name[name] for name in dependency_orders[library_name] + [library_name]]
+        standalone_payload = payload_split_loc(aggregate_records(standalone_records))
+        metrics = {
+            'library_source': count_files_loc_by_kind(get_library_files(root_dir, library_name)),
+            'owned_processed': owned_processed_loc(record),
+            'common_used': common_loc_used(record),
+            'regular_payload': payload_split_loc(record),
+            'standalone_payload': standalone_payload,
+        }
+        lib_metrics[library_name] = metrics
         if args.update_loc:
-            update_library_doc_statistics(library_name, root_dir, header_code_loc, header_comment_loc,
-                                          sources_code_loc, sources_comment_loc)
+            update_library_doc_statistics(library_name, root_dir, metrics)
 
         output_filename = f'SaneCpp{library_name}.h'
         output_filepath = os.path.join(single_file_lib_dir, output_filename)
@@ -767,16 +844,20 @@ def main():
         standalone_test_filepath = os.path.join(single_file_lib_test_dir, standalone_test_filename)
         write_standalone_test(standalone_test_filepath, standalone_output_filename)
     if args.update_loc:
-        update_libraries_md_table(lib_line_counts, root_dir)
-        total_loc_str_sum = f"{total_header_loc + total_sources_loc + total_comment_loc}"
+        update_libraries_md_table(lib_metrics, common_metrics, root_dir)
+        library_headers = sum_loc([metrics['library_source']['header'] for metrics in lib_metrics.values()])
+        library_sources = sum_loc([metrics['library_source']['source'] for metrics in lib_metrics.values()])
+
+        def code_sum(header_loc, source_loc):
+            return header_loc['code'] + source_loc['code']
 
         table = [
-            "LOC               | Count",
-            ":-----------------|:-----------------",
-            f"Header            | {total_header_loc}",
-            f"Implementation    | {total_sources_loc}",
-            f"Comments          | {total_comment_loc}",
-            f"*Total*           | {total_loc_str_sum}"
+            "LOC metric                         | Header | Source | Sum",
+            ":-----------------------------------|-------:|-------:|----:",
+            f"Library source                      | {library_headers['code']} | {library_sources['code']} | {code_sum(library_headers, library_sources)}",
+            f"Common source fragments             | {common_metrics['source']['header']['code']} | {common_metrics['source']['source']['code']} | {code_sum(common_metrics['source']['header'], common_metrics['source']['source'])}",
+            "",
+            "All LOC counts in the tables above exclude comments."
         ]
         total_loc_str = "\n".join(table)
         
