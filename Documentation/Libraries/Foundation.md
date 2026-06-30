@@ -69,6 +69,7 @@ Some relevant blog posts are:
 - [June 2025 Update](https://pagghiu.github.io/site/blog/2025-06-30-SaneCppLibrariesUpdate.html)
 - [July 2025 Update](https://pagghiu.github.io/site/blog/2025-07-31-SaneCppLibrariesUpdate.html)
 - [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
+- [June 2026 Update](https://pagghiu.github.io/site/blog/2026-06-30-SaneCppLibrariesUpdate.html)
 
 # Roadmap
 
