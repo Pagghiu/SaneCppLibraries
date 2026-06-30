@@ -263,8 +263,14 @@ It's possible associating a `string` literal with each type or member, so that t
 Lastly it's also possible associating to a field an `MemberTag` integer field, that can be leveraged by by binary serializers to keep track of the field position in binary formats. This allows binary formats to avoid using strings at all for format versioning/evolution, allowing some executable size benefits. This makes also possible not breaking binary file formats just because a field / member was renamed. This is leveraged by the [Serialization Binary](@ref library_serialization_binary).
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 605			| 268		| 873	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 605			| 268		| 873	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Reflection`.
+Single File counts
+`SaneCppReflection.h`.
+Standalone counts `SaneCppReflectionStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 616		| 0		| 616	|
+| Single File | 930		| 0		| 930	|
+| Standalone  | 930		| 0		| 930	|

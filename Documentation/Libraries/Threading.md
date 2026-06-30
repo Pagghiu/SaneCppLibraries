@@ -1,6 +1,6 @@
 @page library_threading Threading
 
-@brief 🟩 Atomic, thread, thread pool, mutex, semaphore, barrier, rw-lock, condition variable
+@brief 🟩 Atomic, thread, pool, mutex, semaphore, barrier and more
 
 [TOC]
 
@@ -77,8 +77,14 @@ This is the list of videos that have been recorded showing some of the internal 
 - Support more types in Atomic<T>
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 409			| 250		| 659	|
-| Sources   | 916			| 168		| 1084	|
-| Sum       | 1325			| 418		| 1743	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Threading`.
+Single File counts
+`SaneCppThreading.h`.
+Standalone counts `SaneCppThreadingStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 433		| 926		| 1359	|
+| Single File | 1088		| 1102		| 2190	|
+| Standalone  | 1088		| 1102		| 2190	|

@@ -141,8 +141,14 @@ any system or compiler header.
 - Allow plugin to be compiled with different compiler from the one used in the Host
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 369			| 232		| 601	|
-| Sources   | 1528			| 273		| 1801	|
-| Sum       | 1897			| 505		| 2402	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Plugin`.
+Single File counts
+`SaneCppPlugin.h`.
+Standalone counts `SaneCppPluginStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 865		| 1322		| 2187	|
+| Single File | 1688		| 1977		| 3665	|
+| Standalone  | 4275		| 5617		| 9892	|

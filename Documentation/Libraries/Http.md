@@ -216,8 +216,14 @@ Recent example and test call sites point to these remaining improvement seams:
 - Http 3.0
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1517			| 871		| 2388	|
-| Sources   | 7781			| 1050		| 8831	|
-| Sum       | 9298			| 1921		| 11219	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Http`.
+Single File counts
+`SaneCppHttp.h`.
+Standalone counts `SaneCppHttpStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1861		| 7587		| 9448	|
+| Single File | 2641		| 8007		| 10648	|
+| Standalone  | 10541		| 23331		| 33872	|

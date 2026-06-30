@@ -293,8 +293,14 @@ Some relevant blog posts are:
 - HTTP/3
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1050			| 359		| 1409	|
-| Sources   | 4703			| 633		| 5336	|
-| Sum       | 5753			| 992		| 6745	|
+LOC counts exclude comments. Library counts files physically under `Libraries/HttpClient`.
+Single File counts
+`SaneCppHttpClient.h`.
+Standalone counts `SaneCppHttpClientStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1188		| 4754		| 5942	|
+| Single File | 2018		| 4858		| 6876	|
+| Standalone  | 2018		| 4858		| 6876	|

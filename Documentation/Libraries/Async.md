@@ -1,6 +1,6 @@
 @page library_async Async
 
-@brief 🟨 Async I/O (files, sockets, timers, processes, fs events, threads wake-up)
+@brief 🟨 Async I/O (files, sockets, timers, processes, fs events, threads, signals)
 
 [TOC]
 
@@ -229,8 +229,14 @@ SC::ArenaMap from the [Containers](@ref library_containers) can be used to preal
 - Signal handling (multi-watcher, cross-platform)
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 885			| 830		| 1715	|
-| Sources   | 6443			| 1454		| 7897	|
-| Sum       | 7328			| 2284		| 9612	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Async`.
+Single File counts
+`SaneCppAsync.h`.
+Standalone counts `SaneCppAsyncStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1926		| 5842		| 7768	|
+| Single File | 1646		| 6974		| 8620	|
+| Standalone  | 6190		| 13279		| 19469	|

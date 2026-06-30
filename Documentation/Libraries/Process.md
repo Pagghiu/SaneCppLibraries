@@ -1,6 +1,6 @@
 @page library_process Process
 
-@brief 🟩 Create child processes and chain them (also usable with [Async](@ref library_async) library)
+@brief 🟩 Launch processes and chain them (also usable with [Async](@ref library_async) library)
 
 [TOC]
 
@@ -70,8 +70,14 @@ Some relevant blog posts are:
 - None so far
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 256			| 251		| 507	|
-| Sources   | 1139			| 301		| 1440	|
-| Sum       | 1395			| 552		| 1947	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Process`.
+Single File counts
+`SaneCppProcess.h`.
+Standalone counts `SaneCppProcessStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 408		| 1103		| 1511	|
+| Single File | 1384		| 1825		| 3209	|
+| Standalone  | 2587		| 3640		| 6227	|

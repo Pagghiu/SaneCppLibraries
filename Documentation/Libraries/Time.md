@@ -80,8 +80,14 @@ Some relevant blog posts are:
 - No Plan
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 129			| 137		| 266	|
-| Sources   | 205			| 37		| 242	|
-| Sum       | 334			| 174		| 508	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Time`.
+Single File counts
+`SaneCppTime.h`.
+Standalone counts `SaneCppTimeStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 133		| 208		| 341	|
+| Single File | 238		| 303		| 541	|
+| Standalone  | 238		| 303		| 541	|

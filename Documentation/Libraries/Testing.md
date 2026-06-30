@@ -46,8 +46,14 @@ So far it doesn't support test discovery and all tests must be manually invoked 
 - Template tests
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 140			| 105		| 245	|
-| Sources   | 762			| 70		| 832	|
-| Sum       | 902			| 175		| 1077	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Testing`.
+Single File counts
+`SaneCppTesting.h`.
+Standalone counts `SaneCppTestingStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 155		| 791		| 946	|
+| Single File | 1178		| 1382		| 2560	|
+| Standalone  | 1178		| 1382		| 2560	|

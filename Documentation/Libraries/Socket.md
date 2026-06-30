@@ -80,8 +80,14 @@ Some relevant blog posts are:
 - None so far
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 145			| 225		| 370	|
-| Sources   | 894			| 156		| 1050	|
-| Sum       | 1039			| 381		| 1420	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Socket`.
+Single File counts
+`SaneCppSocket.h`.
+Standalone counts `SaneCppSocketStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 185		| 894		| 1079	|
+| Single File | 1158		| 1080		| 2238	|
+| Standalone  | 1158		| 1080		| 2238	|

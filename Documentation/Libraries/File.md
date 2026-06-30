@@ -87,8 +87,14 @@ SC::NamedPipeName::build can be used to compose platform-native endpoint names f
 - None for now
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 189			| 203		| 392	|
-| Sources   | 1342			| 202		| 1544	|
-| Sum       | 1531			| 405		| 1936	|
+LOC counts exclude comments. Library counts files physically under `Libraries/File`.
+Single File counts
+`SaneCppFile.h`.
+Standalone counts `SaneCppFileStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 200		| 1364		| 1564	|
+| Single File | 1203		| 1815		| 3018	|
+| Standalone  | 1203		| 1815		| 3018	|

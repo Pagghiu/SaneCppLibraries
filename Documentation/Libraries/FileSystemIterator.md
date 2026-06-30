@@ -43,8 +43,14 @@ Some relevant blog posts are:
 - No hypothesis has been made so far
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 82			| 73		| 155	|
-| Sources   | 358			| 68		| 426	|
-| Sum       | 440			| 141		| 581	|
+LOC counts exclude comments. Library counts files physically under `Libraries/FileSystemIterator`.
+Single File counts
+`SaneCppFileSystemIterator.h`.
+Standalone counts `SaneCppFileSystemIteratorStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 92		| 402		| 494	|
+| Single File | 1121		| 977		| 2098	|
+| Standalone  | 1121		| 977		| 2098	|

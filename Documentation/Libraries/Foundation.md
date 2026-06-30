@@ -76,8 +76,14 @@ Some relevant blog posts are:
 - Things will be added as needed
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1103			| 684		| 1787	|
-| Sources   | 362			| 72		| 434	|
-| Sum       | 1465			| 756		| 2221	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Foundation`.
+Single File counts
+`SaneCppFoundation.h`.
+Standalone counts `SaneCppFoundationStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 27		| 64		| 91	|
+| Single File | 1597		| 216		| 1813	|
+| Standalone  | 1597		| 216		| 1813	|

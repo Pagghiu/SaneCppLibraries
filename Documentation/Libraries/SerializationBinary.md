@@ -108,8 +108,14 @@ This can be solved implementing streaming binary serializer or experimenting wit
 - None so far
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 570			| 280		| 850	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 570			| 280		| 850	|
+LOC counts exclude comments. Library counts files physically under `Libraries/SerializationBinary`.
+Single File counts
+`SaneCppSerializationBinary.h`.
+Standalone counts `SaneCppSerializationBinaryStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 593		| 0		| 593	|
+| Single File | 1013		| 0		| 1013	|
+| Standalone  | 1943		| 0		| 1943	|

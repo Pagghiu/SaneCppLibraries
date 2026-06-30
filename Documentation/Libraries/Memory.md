@@ -1,6 +1,6 @@
 @page library_memory Memory
 
-@brief 🟩 Heap Allocation, Custom allocators, Virtual Memory, Buffer, Segment
+@brief 🟩 Heap Allocation, Custom allocators, Virtual Memory, Buffer
 
 [TOC]
 
@@ -89,8 +89,14 @@ These blog posts have been written after the split from foundation:
 For this reason this library is missing Smart Pointers.
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 524			| 415		| 939	|
-| Sources   | 1026			| 211		| 1237	|
-| Sum       | 1550			| 626		| 2176	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Memory`.
+Single File counts
+`SaneCppMemory.h`.
+Standalone counts `SaneCppMemoryStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 554		| 1053		| 1607	|
+| Single File | 1566		| 1183		| 2749	|
+| Standalone  | 1566		| 1183		| 2749	|

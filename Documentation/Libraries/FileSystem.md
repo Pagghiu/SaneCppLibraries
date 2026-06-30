@@ -1,6 +1,6 @@
 @page library_file_system File System
 
-@brief 🟩 File System operations { exists, copy, delete } for { files and directories }
+@brief 🟩 File System ops { exists, copy, delete } for { files, directories }
 
 [TOC]
 
@@ -158,8 +158,14 @@ Use SC::Path from [Strings](@ref library_strings) library to parse and compose p
 - `statfs`
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 177			| 289		| 466	|
-| Sources   | 1800			| 276		| 2076	|
-| Sum       | 1977			| 565		| 2542	|
+LOC counts exclude comments. Library counts files physically under `Libraries/FileSystem`.
+Single File counts
+`SaneCppFileSystem.h`.
+Standalone counts `SaneCppFileSystemStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 188		| 1858		| 2046	|
+| Single File | 1095		| 2308		| 3403	|
+| Standalone  | 1095		| 2308		| 3403	|

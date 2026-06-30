@@ -22,8 +22,14 @@ Its headers are only meant to be included anywhere the reflection / serializatio
 The reason for this library to exist is only to allow [Reflection](@ref library_reflection), [Serialization Binary](@ref library_serialization_binary) and [Serialization Text](@ref library_serialization_text) libraries not to be depending on [Containers](@ref library_containers) and [Memory](@ref library_memory).
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 217			| 99		| 316	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 217			| 99		| 316	|
+LOC counts exclude comments. Library counts files physically under `Libraries/ContainersReflection`.
+Single File counts
+`SaneCppContainersReflection.h`.
+Standalone counts `SaneCppContainersReflectionStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 231		| 0		| 231	|
+| Single File | 251		| 0		| 251	|
+| Standalone  | 4269		| 1340		| 5609	|

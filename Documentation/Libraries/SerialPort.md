@@ -60,8 +60,14 @@ Example command:
 - Port enumeration and hotplug monitoring
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 52			| 41		| 93	|
-| Sources   | 591			| 76		| 667	|
-| Sum       | 643			| 117		| 760	|
+LOC counts exclude comments. Library counts files physically under `Libraries/SerialPort`.
+Single File counts
+`SaneCppSerialPort.h`.
+Standalone counts `SaneCppSerialPortStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 55		| 599		| 654	|
+| Single File | 86		| 1428		| 1514	|
+| Standalone  | 1289		| 3243		| 4532	|

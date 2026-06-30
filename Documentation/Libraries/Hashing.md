@@ -37,8 +37,14 @@ The library is very simple it it has what is needed so far (mainly by [Build](@r
 - None for now
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 90			| 97		| 187	|
-| Sources   | 286			| 51		| 337	|
-| Sum       | 376			| 148		| 524	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Hashing`.
+Single File counts
+`SaneCppHashing.h`.
+Standalone counts `SaneCppHashingStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 95		| 292		| 387	|
+| Single File | 404		| 372		| 776	|
+| Standalone  | 404		| 372		| 776	|

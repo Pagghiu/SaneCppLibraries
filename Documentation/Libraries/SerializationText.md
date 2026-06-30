@@ -70,8 +70,14 @@ trivially done by just pushing the outputs of the tokenizer into a hierarchical 
 - YAML Serializer
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 357			| 142		| 499	|
-| Sources   | 560			| 92		| 652	|
-| Sum       | 917			| 234		| 1151	|
+LOC counts exclude comments. Library counts files physically under `Libraries/SerializationText`.
+Single File counts
+`SaneCppSerializationText.h`.
+Standalone counts `SaneCppSerializationTextStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 632		| 471		| 1103	|
+| Single File | 1385		| 468		| 1853	|
+| Standalone  | 2315		| 468		| 2783	|

@@ -95,8 +95,14 @@ Some relevant blog posts are:
 - None
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 959			| 459		| 1418	|
-| Sources   | 0			| 0		| 0	|
-| Sum       | 959			| 459		| 1418	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Containers`.
+Single File counts
+`SaneCppContainers.h`.
+Standalone counts `SaneCppContainersStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1007		| 3		| 1010	|
+| Single File | 1522		| 157		| 1679	|
+| Standalone  | 3088		| 1340		| 4428	|

@@ -1,6 +1,6 @@
 @page library_strings Strings
 
-@brief 🟩 String formatting / conversion / manipulation (ASCII / UTF8 / UTF16)
+@brief 🟩 UTF String formatting / conversion / manipulation
 
 [TOC]
 
@@ -165,8 +165,14 @@ we will investigate if there OS functions allowing to achieve that functionality
 - Grapheme Cluster iteration
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1012			| 1081		| 2093	|
-| Sources   | 3115			| 398		| 3513	|
-| Sum       | 4127			| 1479		| 5606	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Strings`.
+Single File counts
+`SaneCppStrings.h`.
+Standalone counts `SaneCppStringsStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1056		| 3143		| 4199	|
+| Single File | 2076		| 3399		| 5475	|
+| Standalone  | 2076		| 3399		| 5475	|

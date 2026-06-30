@@ -1,6 +1,6 @@
 @page library_file_system_watcher File System Watcher
 
-@brief 🟩 Notifications {add, remove, rename, modified} for files and directories
+@brief 🟩 Notifications {add, remove, rename, modify} for files / directories
 
 [TOC]
 
@@ -73,8 +73,14 @@ The behavior between these different system also depends on the file system wher
 - Allow users to provide their own thread instead of creating it behind the scenes
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 219			| 144		| 363	|
-| Sources   | 1311			| 302		| 1613	|
-| Sum       | 1530			| 446		| 1976	|
+LOC counts exclude comments. Library counts files physically under `Libraries/FileSystemWatcher`.
+Single File counts
+`SaneCppFileSystemWatcher.h`.
+Standalone counts `SaneCppFileSystemWatcherStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 511		| 1122		| 1633	|
+| Single File | 1613		| 1532		| 3145	|
+| Standalone  | 1613		| 1532		| 3145	|

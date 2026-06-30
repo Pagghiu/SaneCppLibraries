@@ -529,8 +529,14 @@ against real `AwaitTask` usage and single-file-library generation before the mai
   `SCTest`.
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 1186			| 361		| 1547	|
-| Sources   | 3225			| 545		| 3770	|
-| Sum       | 4411			| 906		| 5317	|
+LOC counts exclude comments. Library counts files physically under `Libraries/Await`.
+Single File counts
+`SaneCppAwait.h`.
+Standalone counts `SaneCppAwaitStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 1199		| 3231		| 4430	|
+| Single File | 1580		| 3382		| 4962	|
+| Standalone  | 7770		| 16661		| 24431	|

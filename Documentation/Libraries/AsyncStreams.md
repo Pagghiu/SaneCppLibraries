@@ -94,8 +94,14 @@ Some relevant blog posts are:
 - readable + read mode
 
 # Statistics
-| Type      | Lines Of Code | Comments  | Sum   |
-|-----------|---------------|-----------|-------|
-| Headers   | 786			| 441		| 1227	|
-| Sources   | 1886			| 278		| 2164	|
-| Sum       | 2672			| 719		| 3391	|
+LOC counts exclude comments. Library counts files physically under `Libraries/AsyncStreams`.
+Single File counts
+`SaneCppAsyncStreams.h`.
+Standalone counts `SaneCppAsyncStreamsStandalone.h` and intentionally includes dependency
+payloads.
+
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 924		| 1798		| 2722	|
+| Single File | 1710		| 2045		| 3755	|
+| Standalone  | 1710		| 2045		| 3755	|
