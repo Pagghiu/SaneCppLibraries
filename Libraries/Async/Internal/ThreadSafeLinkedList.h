@@ -11,6 +11,7 @@ struct ThreadSafeLinkedList
     void push(T& item)
     {
         mutex.lock();
+        item.next = nullptr;
         if (head == nullptr)
         {
             head = &item;
@@ -51,7 +52,7 @@ struct ThreadSafeLinkedList
         T* current = head;
         T* prev    = nullptr;
 
-        do
+        while (current != nullptr)
         {
             if (current == &item)
             {
@@ -67,15 +68,12 @@ struct ThreadSafeLinkedList
                 {
                     tail = prev;
                 }
-                else
-                {
-                    current->next = nullptr;
-                }
+                current->next = nullptr;
                 break;
             }
             prev    = current;
             current = current->next;
-        } while (current != nullptr);
+        }
         mutex.unlock();
     }
 
