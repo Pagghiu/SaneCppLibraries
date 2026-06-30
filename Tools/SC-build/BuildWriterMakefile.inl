@@ -638,6 +638,10 @@ endif
                        "-Wunused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized "
                        "-Wunknown-pragmas -Wenum-conversion -Werror=float-conversion -Werror=implicit-fallthrough",
                        makeTarget);
+        builder.append("\nifeq ($(COMPILER_TYPE),clang)"
+                       "\n{0}_WARNING_CPPFLAGS += -Werror=implicit-int-float-conversion"
+                       "\nendif",
+                       makeTarget);
         for (const Warning& warning : compile.warnings)
         {
             // TODO: Differentiate between Clang and GCC warnings

@@ -2203,6 +2203,10 @@ struct SC::Build::NativeBuild
         SC_TRY(commandLine.append("-Wunknown-pragmas"));
         SC_TRY(commandLine.append("-Wenum-conversion"));
         SC_TRY(commandLine.append("-Werror=float-conversion"));
+        if (adapter.isClangLike())
+        {
+            SC_TRY(commandLine.append("-Werror=implicit-int-float-conversion"));
+        }
         SC_TRY(commandLine.append("-Werror=implicit-fallthrough"));
         for (const Warning& warning : flags.warnings)
         {

@@ -1434,7 +1434,6 @@ SC::StringSpan SC::FileSystem::Operations::getApplicationRootDirectory(StringPat
 #include <errno.h>    // errno
 #include <fcntl.h>    // AT_FDCWD
 #include <limits.h>   // PATH_MAX
-#include <math.h>     // round
 #include <stdio.h>    // rename
 #include <string.h>   // strcmp
 #include <sys/stat.h> // mkdir
@@ -1465,7 +1464,10 @@ struct SC::FileSystem::Operations::Internal
 
 static SC::TimeMs posixTimespecToTimeMs(const struct timespec& ts)
 {
-    return SC::TimeMs{static_cast<SC::int64_t>(::round(ts.tv_nsec / 1.0e6) + ts.tv_sec * 1000)};
+    constexpr SC::int64_t nanosecondsToMilliseconds = 1000 * 1000;
+    constexpr SC::int64_t roundingNanoseconds       = nanosecondsToMilliseconds / 2;
+    return SC::TimeMs{static_cast<SC::int64_t>(ts.tv_sec) * 1000 +
+                      (static_cast<SC::int64_t>(ts.tv_nsec) + roundingNanoseconds) / nanosecondsToMilliseconds};
 }
 
 static SC::FileSystemEntryType posixEntryTypeFromMode(mode_t mode)

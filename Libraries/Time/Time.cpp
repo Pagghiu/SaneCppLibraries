@@ -9,8 +9,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <sys/timeb.h>
-#else
-#include <math.h> // round
 #endif
 #include <stdint.h> // INT64_MAX
 
@@ -49,7 +47,10 @@ SC::Time::Realtime SC::Time::Realtime::now()
 #else
     struct timespec nowTimeSpec;
     clock_gettime(CLOCK_REALTIME, &nowTimeSpec);
-    return static_cast<int64_t>(round(nowTimeSpec.tv_nsec / 1.0e6) + nowTimeSpec.tv_sec * 1000);
+    constexpr int64_t nanosecondsToMilliseconds = 1000 * 1000;
+    constexpr int64_t roundingNanoseconds       = nanosecondsToMilliseconds / 2;
+    return static_cast<int64_t>(nowTimeSpec.tv_sec) * 1000 +
+           (static_cast<int64_t>(nowTimeSpec.tv_nsec) + roundingNanoseconds) / nanosecondsToMilliseconds;
 #endif
 }
 
@@ -183,7 +184,7 @@ SC::Time::Relative SC::Time::HighResolutionCounter::getRelative() const
     return Relative::fromSeconds(static_cast<double>(part1) / part2);
 #else
     constexpr int32_t secondsToNanoseconds = 1000000000;
-    return Relative::fromSeconds(part1 + static_cast<double>(part2) / secondsToNanoseconds);
+    return Relative::fromSeconds(static_cast<double>(part1) + static_cast<double>(part2) / secondsToNanoseconds);
 #endif
 }
 

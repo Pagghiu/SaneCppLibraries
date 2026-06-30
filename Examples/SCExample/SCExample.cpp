@@ -309,7 +309,7 @@ struct ApplicationView
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate,
                     ImGui::GetIO().Framerate);
         ImGui::Text("Frame %d", state.numberOfFrames++);
-        ImGui::Text("Time %.3f", state.loopTime.getMonotonicMilliseconds() / 1000.0f);
+        ImGui::Text("Time %.3f", static_cast<double>(state.loopTime.getMonotonicMilliseconds()) / 1000.0);
         ImGui::PushItemWidth(100);
         ImGui::InputInt("Continue drawing for (ms)", &state.continueDrawingForMs);
         ImGui::InputInt("Timeout occurs every (ms)", &state.timeoutOccursEveryMs);

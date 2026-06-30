@@ -79,10 +79,10 @@ struct Time::Relative
     Relative() : seconds(0.0) {}
 
     /// @brief Construct a Relative from milliseconds
-    Relative(Milliseconds time) : seconds(static_cast<double>(time.ms / 1e3)) {}
+    Relative(Milliseconds time) : seconds(static_cast<double>(time.ms) / 1e3) {}
 
     /// @brief Construct a Relative from nanoseconds
-    Relative(Nanoseconds time) : seconds(static_cast<double>(time.ns / 1e9)) {}
+    Relative(Nanoseconds time) : seconds(static_cast<double>(time.ns) / 1e9) {}
 
     /// @brief Construct a Relative from seconds
     Relative(Seconds time) : seconds(static_cast<double>(time.sec)) {}

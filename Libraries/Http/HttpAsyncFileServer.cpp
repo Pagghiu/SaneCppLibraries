@@ -11,8 +11,6 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <sys/timeb.h>
-#else
-#include <math.h>
 #endif
 
 namespace SC
@@ -801,7 +799,10 @@ int64_t HttpAsyncFileServer::Internal::getCurrentTimeMilliseconds()
 #else
     struct timespec nowTimeSpec;
     clock_gettime(CLOCK_REALTIME, &nowTimeSpec);
-    return static_cast<int64_t>(round(nowTimeSpec.tv_nsec / 1.0e6) + nowTimeSpec.tv_sec * 1000);
+    constexpr int64_t nanosecondsToMilliseconds = 1000 * 1000;
+    constexpr int64_t roundingNanoseconds       = nanosecondsToMilliseconds / 2;
+    return static_cast<int64_t>(nowTimeSpec.tv_sec) * 1000 +
+           (static_cast<int64_t>(nowTimeSpec.tv_nsec) + roundingNanoseconds) / nanosecondsToMilliseconds;
 #endif
 }
 

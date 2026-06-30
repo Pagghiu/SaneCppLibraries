@@ -475,8 +475,8 @@ struct SC::SerializationSuiteTest::SerializationTest : public SC::TestCase
                                                            SerializationBinaryOptions(), &numReadOperations));
 
             // Verification
-            SC_TEST_EXPECT(deserializedObject.intToFloat == objectToSerialize.intToFloat);
-            SC_TEST_EXPECT(deserializedObject.floatToInt == objectToSerialize.floatToInt);
+            SC_TEST_EXPECT(deserializedObject.intToFloat == static_cast<float>(objectToSerialize.intToFloat));
+            SC_TEST_EXPECT(deserializedObject.floatToInt == static_cast<uint32_t>(objectToSerialize.floatToInt));
             SC_TEST_EXPECT(deserializedObject.uint16To32 == objectToSerialize.uint16To32);
             SC_TEST_EXPECT(deserializedObject.signed16ToUnsigned == objectToSerialize.signed16ToUnsigned);
         }
