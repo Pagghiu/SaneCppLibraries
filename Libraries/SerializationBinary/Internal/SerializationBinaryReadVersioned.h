@@ -223,7 +223,6 @@ struct SerializerBinaryReadVersioned<BinaryStream, T,
             break;
         }
         // clang-format on
-        SC_SERIALIZATION_BINARY_ASSERT_DEBUG(false);
         return false;
     }
 };
