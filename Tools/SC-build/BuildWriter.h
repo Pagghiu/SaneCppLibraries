@@ -73,6 +73,8 @@ struct FilePathsResolver
 
     Result resolve(const Build::Definition& definition);
 
+    static Result normalizeLookupPath(String& output, StringView path);
+
     static Result enumerateFileSystemFor(StringView path, const VectorSet<FilesSelection>& filters,
                                          VectorMap<String, Vector<String>>& filtersToFiles);
     static Result mergePathsFor(const FilesSelection& selection, const StringView rootDirectory, String& buffer,
@@ -257,7 +259,7 @@ struct SC::Build::WriterInternal
         {
             if (Path::isAbsolute(file.base.view(), Path::AsNative))
             {
-                SC_TRY(Path::normalize(renderedFile, file.base.view(), Path::AsPosix));
+                SC_TRY(FilePathsResolver::normalizeLookupPath(renderedFile, file.base.view()));
                 SC_TRY(Path::append(renderedFile, {file.mask.view()}, Path::AsPosix));
             }
             else
@@ -270,7 +272,7 @@ struct SC::Build::WriterInternal
                 SC_TRY(Path::join(renderedFile, {paths}, Path::Posix::SeparatorStringView(), true));
             }
             String normalizedRenderedFile = StringEncoding::Utf8;
-            SC_TRY(Path::normalize(normalizedRenderedFile, renderedFile.view(), Path::AsPosix));
+            SC_TRY(FilePathsResolver::normalizeLookupPath(normalizedRenderedFile, renderedFile.view()));
             const Vector<String>* res = filePathsResolver.resolvedPaths.get(normalizedRenderedFile.view());
             if (res == nullptr)
             {

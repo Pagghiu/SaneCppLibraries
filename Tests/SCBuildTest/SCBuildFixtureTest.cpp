@@ -1304,6 +1304,341 @@ static Result captureExternalBuildCommand(TestReport& report, StringView working
     return Result(true);
 }
 
+struct BootstrapSyntheticCheckout
+{
+    String root              = StringEncoding::Utf8;
+    String builtInToolSource = StringEncoding::Utf8;
+    String builtInToolHeader = StringEncoding::Utf8;
+    String customToolSource  = StringEncoding::Utf8;
+};
+
+static Result writeBootstrapProbeSource(FileSystem& fs, StringView sourcePath, StringView toolName,
+                                        StringView dependencyHeader)
+{
+    String source  = StringEncoding::Utf8;
+    auto   builder = StringBuilder::create(source);
+    SC_TRY(builder.append("// Copyright (c) Stefano Cristiano\n"
+                          "// SPDX-License-Identifier: MIT\n"
+                          "#include <stdio.h>\n"
+                          "#if defined(_WIN32)\n"
+                          "using NativeChar = wchar_t;\n"
+                          "#else\n"
+                          "using NativeChar = char;\n"
+                          "#endif\n"));
+    if (not dependencyHeader.isEmpty())
+    {
+        SC_TRY(builder.append("#include \"{}\"\n", dependencyHeader));
+    }
+    SC_TRY(builder.append(
+        "\n"
+        "static bool printNative(const NativeChar* value)\n"
+        "{\n"
+        "#if defined(_WIN32)\n"
+        "    while (*value != 0)\n"
+        "    {\n"
+        "        unsigned int codePoint = static_cast<unsigned int>(*value++);\n"
+        "        if (codePoint >= 0xD800 and codePoint <= 0xDBFF and *value >= 0xDC00 and *value <= 0xDFFF)\n"
+        "        {\n"
+        "            codePoint = 0x10000 + ((codePoint - 0xD800) << 10) + "
+        "static_cast<unsigned int>(*value++ - 0xDC00);\n"
+        "        }\n"
+        "        char utf8[4];\n"
+        "        int length = 0;\n"
+        "        if (codePoint <= 0x7F) utf8[length++] = static_cast<char>(codePoint);\n"
+        "        else if (codePoint <= 0x7FF)\n"
+        "        {\n"
+        "            utf8[length++] = static_cast<char>(0xC0 | (codePoint >> 6));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | (codePoint & 0x3F));\n"
+        "        }\n"
+        "        else if (codePoint <= 0xFFFF)\n"
+        "        {\n"
+        "            utf8[length++] = static_cast<char>(0xE0 | (codePoint >> 12));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | (codePoint & 0x3F));\n"
+        "        }\n"
+        "        else\n"
+        "        {\n"
+        "            utf8[length++] = static_cast<char>(0xF0 | (codePoint >> 18));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | ((codePoint >> 12) & 0x3F));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | ((codePoint >> 6) & 0x3F));\n"
+        "            utf8[length++] = static_cast<char>(0x80 | (codePoint & 0x3F));\n"
+        "        }\n"
+        "        fwrite(utf8, 1, static_cast<size_t>(length), stdout);\n"
+        "    }\n"
+        "#else\n"
+        "    fputs(value, stdout);\n"
+        "#endif\n"
+        "    fputc('\\n', stdout);\n"
+        "    return true;\n"
+        "}\n"
+        "\n"
+        "int bootstrapProbeMain(int argc, const NativeChar* const* argv)\n"
+        "{\n"
+        "    if (argc < 7) return -1;\n"
+        "    printf(\"BOOTSTRAP_PROBE_OK\\n\");\n"
+        "    printf(\"BOOTSTRAP_PROBE_TOOL="));
+    SC_TRY(builder.append(toolName));
+    SC_TRY(
+        builder.append("\\n\");\n"
+                       "    printf(\"BOOTSTRAP_PROBE_ACTION=\"); if (not printNative(argv[6])) return -1;\n"
+                       "    printf(\"BOOTSTRAP_PROBE_LIBRARY=\"); if (not printNative(argv[1])) return -1;\n"
+                       "    printf(\"BOOTSTRAP_PROBE_TOOL_SOURCE=\"); if (not printNative(argv[2])) return -1;\n"
+                       "    printf(\"BOOTSTRAP_PROBE_TOOL_DESTINATION=\"); if (not printNative(argv[3])) return -1;\n"
+                       "    printf(\"BOOTSTRAP_PROBE_PROJECT=\"); if (not printNative(argv[4])) return -1;\n"
+                       "    for (int idx = 7; idx < argc; ++idx)\n"
+                       "    {\n"
+                       "        printf(\"BOOTSTRAP_PROBE_ARG[%d]=\", idx - 7);\n"
+                       "        if (not printNative(argv[idx])) return -1;\n"
+                       "    }\n"
+                       "    return 0;\n"
+                       "}\n"));
+    builder.finalize();
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(sourcePath, Path::AsNative)));
+    return fs.writeString(sourcePath, source.view());
+}
+
+static Result copyBootstrapCheckoutPath(FileSystem& fs, StringView sourceRoot, StringView destinationRoot,
+                                        StringView relativePath, bool directory)
+{
+    String sourcePath      = StringEncoding::Utf8;
+    String destinationPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(sourcePath, {sourceRoot, relativePath}));
+    SC_TRY(Path::join(destinationPath, {destinationRoot, relativePath}));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(destinationPath.view(), Path::AsNative)));
+    if (directory)
+    {
+        return fs.copyDirectory(sourcePath.view(), destinationPath.view());
+    }
+    return fs.copyFile(sourcePath.view(), destinationPath.view());
+}
+
+static Result writeBootstrapForwardingInclude(FileSystem& fs, StringView sourceRoot, StringView destinationRoot,
+                                              StringView relativePath)
+{
+    String sourcePath      = StringEncoding::Utf8;
+    String destinationPath = StringEncoding::Utf8;
+    String normalizedPath  = StringEncoding::Utf8;
+    String contents        = StringEncoding::Utf8;
+    SC_TRY(Path::join(sourcePath, {sourceRoot, relativePath}));
+    SC_TRY(Path::join(destinationPath, {destinationRoot, relativePath}));
+    SC_TRY(Path::normalize(normalizedPath, sourcePath.view(), Path::AsPosix));
+    SC_TRY(StringBuilder::format(contents,
+                                 "// Copyright (c) Stefano Cristiano\n"
+                                 "// SPDX-License-Identifier: MIT\n"
+                                 "#include \"{}\"\n",
+                                 normalizedPath.view()));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(destinationPath.view(), Path::AsNative)));
+    return fs.writeString(destinationPath.view(), contents.view());
+}
+
+static Result createBootstrapSyntheticCheckout(TestReport& report, StringView caseName,
+                                               BootstrapSyntheticCheckout& checkout)
+{
+    FileSystem fs;
+    SC_TRY(fs.init(report.libraryRootDirectory.view()));
+
+    String scratchRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(scratchRoot,
+                      {report.libraryRootDirectory.view(), "_Build", "_TestScratch", "ToolsBootstrap", caseName}));
+    if (fs.existsAndIsDirectory(scratchRoot.view()))
+    {
+        SC_TRY(fs.removeDirectoryRecursive(scratchRoot.view()));
+    }
+    SC_TRY(fs.makeDirectoryRecursive(scratchRoot.view()));
+    SC_TRY(Path::join(checkout.root, {scratchRoot.view(), "synthetic checkout spazio cafe \xC3\xA8"}));
+    SC_TRY(fs.makeDirectoryRecursive(checkout.root.view()));
+
+    SC_TRY(copyBootstrapCheckoutPath(fs, report.libraryRootDirectory.view(), checkout.root.view(), "SC.sh", false));
+    SC_TRY(copyBootstrapCheckoutPath(fs, report.libraryRootDirectory.view(), checkout.root.view(), "SC.bat", false));
+    SC_TRY(copyBootstrapCheckoutPath(fs, report.libraryRootDirectory.view(), checkout.root.view(),
+                                     "Tools/LongPathAware.manifest", false));
+    SC_TRY(writeBootstrapForwardingInclude(fs, report.libraryRootDirectory.view(), checkout.root.view(),
+                                           "Tools/ToolsBootstrap.c"));
+#if SC_PLATFORM_WINDOWS
+    String bootstrapExecutableSource      = StringEncoding::Utf8;
+    String bootstrapExecutableDestination = StringEncoding::Utf8;
+    SC_TRY(Path::join(bootstrapExecutableSource,
+                      {report.libraryRootDirectory.view(), "_Build", "_Tools", "Windows", "ToolsBootstrap.exe"}));
+    SC_TRY(Path::join(bootstrapExecutableDestination,
+                      {checkout.root.view(), "_Build", "_Tools", "Windows", "ToolsBootstrap.exe"}));
+    SC_TRY(fs.makeDirectoryRecursive(Path::dirname(bootstrapExecutableDestination.view(), Path::AsNative)));
+    SC_TRY(fs.copyFile(bootstrapExecutableSource.view(), bootstrapExecutableDestination.view()));
+    SC_TRY(fs.setLastModifiedTime(bootstrapExecutableDestination.view(),
+                                  TimeMs{Time::Realtime::now().milliseconds + 2000}));
+#endif
+    String fixtureToolsSource      = StringEncoding::Utf8;
+    String fixtureToolsDestination = StringEncoding::Utf8;
+    SC_TRY(Path::join(fixtureToolsSource, {report.libraryRootDirectory.view(), "Tests", "SCBuildTest", "Fixtures",
+                                           "ToolsBootstrap", "Tools.cpp"}));
+    SC_TRY(Path::join(fixtureToolsDestination, {checkout.root.view(), "Tools", "Tools.cpp"}));
+    SC_TRY(fs.copyFile(fixtureToolsSource.view(), fixtureToolsDestination.view()));
+    String fixtureScSource = StringEncoding::Utf8;
+    SC_TRY(Path::join(fixtureScSource, {checkout.root.view(), "SC.cpp"}));
+    SC_TRY(fs.writeString(fixtureScSource.view(), "// Copyright (c) Stefano Cristiano\n"
+                                                  "// SPDX-License-Identifier: MIT\n"));
+    String includesDirectory = StringEncoding::Utf8;
+    SC_TRY(Path::join(includesDirectory, {checkout.root.view(), "Includes"}));
+    SC_TRY(fs.makeDirectoryRecursive(includesDirectory.view()));
+#if !SC_PLATFORM_WINDOWS
+    String scriptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(scriptPath, {checkout.root.view(), "SC.sh"}));
+    SC_TRY(fs.chmod(scriptPath.view(), 0755u));
+#endif
+
+    SC_TRY(Path::join(checkout.builtInToolSource, {checkout.root.view(), "Tools", "SC-bootstrap-probe.cpp"}));
+    SC_TRY(
+        writeBootstrapProbeSource(fs, checkout.builtInToolSource.view(), "SC-bootstrap-probe", "SC-bootstrap-probe.h"));
+    SC_TRY(Path::join(checkout.builtInToolHeader, {checkout.root.view(), "Tools", "SC-bootstrap-probe.h"}));
+    SC_TRY(fs.writeString(checkout.builtInToolHeader.view(), "// Bootstrap probe fixture header\n"));
+
+    SC_TRY(Path::join(checkout.customToolSource,
+                      {checkout.root.view(), "Custom Tools \xC3\xA8", "Probe Tool spazio \xC3\xA8.cpp"}));
+    SC_TRY(writeBootstrapProbeSource(fs, checkout.customToolSource.view(), "SC-bootstrap-probe-custom", {}));
+    String customToolHeader = StringEncoding::Utf8;
+    SC_TRY(Path::join(customToolHeader, {checkout.root.view(), "Tools", "SC-bootstrap-probe-custom.h"}));
+    SC_TRY(fs.writeString(customToolHeader.view(), "// Custom bootstrap probe fixture header\n"));
+    return Result(true);
+}
+
+#if SC_PLATFORM_WINDOWS
+static Result createBootstrapLongRootCaseName(String& caseName)
+{
+    auto builder = StringBuilder::create(caseName);
+    SC_TRY(builder.append("long-custom-probe-"));
+    SmallString<32> timestamp;
+    SC_TRY(StringBuilder::format(timestamp, "{}", Time::Realtime::now().milliseconds));
+    SC_TRY(builder.append(timestamp.view()));
+    while (caseName.view().sizeInBytes() < 123)
+    {
+        SC_TRY(builder.append("-root-segment"));
+    }
+    SC_TRY(builder.append("-root"));
+    builder.finalize();
+    return Result(true);
+}
+#endif
+
+static Result captureBootstrapScriptCommand(const BootstrapSyntheticCheckout& checkout,
+                                            Span<const StringSpan> arguments, CapturedProcessOutput& capturedOutput)
+{
+    String scriptPath = StringEncoding::Utf8;
+#if SC_PLATFORM_WINDOWS
+    SC_TRY(Path::join(scriptPath, {checkout.root.view(), "SC.bat"}));
+    String shellCommand = StringEncoding::Utf8;
+    auto   shellBuilder = StringBuilder::create(shellCommand);
+    SC_TRY(shellBuilder.append("\"\"{}\"", scriptPath.view()));
+    for (const StringSpan argument : arguments)
+    {
+        SC_TRY(shellBuilder.append(" \"{}\"", argument));
+    }
+    SC_TRY(shellBuilder.append("\""));
+    shellBuilder.finalize();
+    StringSpan processArguments[48];
+    size_t     numArguments          = 0;
+    processArguments[numArguments++] = "cmd";
+    processArguments[numArguments++] = "/d";
+    processArguments[numArguments++] = "/s";
+    processArguments[numArguments++] = "/c";
+    processArguments[numArguments++] = shellCommand.view();
+#else
+    SC_TRY(Path::join(scriptPath, {checkout.root.view(), "SC.sh"}));
+    StringSpan processArguments[48];
+    size_t     numArguments          = 0;
+    processArguments[numArguments++] = scriptPath.view();
+#endif
+#if !SC_PLATFORM_WINDOWS
+    for (const StringSpan argument : arguments)
+    {
+        SC_TRY_MSG(numArguments < sizeof(processArguments) / sizeof(processArguments[0]), "Too many bootstrap args");
+        processArguments[numArguments++] = argument;
+    }
+#endif
+
+    Process process;
+#if SC_PLATFORM_WINDOWS
+    FileSystem fs;
+    SC_TRY(fs.init(checkout.root.view()));
+    wchar_t     temporaryDirectoryBuffer[MAX_PATH + 1];
+    const DWORD temporaryDirectoryLength = ::GetTempPathW(MAX_PATH + 1, temporaryDirectoryBuffer);
+    SC_TRY_MSG(temporaryDirectoryLength > 0 and temporaryDirectoryLength <= MAX_PATH,
+               "GetTempPathW for bootstrap capture failed");
+    String temporaryDirectory = StringEncoding::Utf8;
+    SC_TRY(
+        Path::normalize(temporaryDirectory,
+                        StringSpan({temporaryDirectoryBuffer, temporaryDirectoryLength}, false, StringEncoding::Native),
+                        Path::AsNative));
+    SC_TRY(process.setWorkingDirectory(temporaryDirectory.view()));
+    String          captureDirectory = StringEncoding::Utf8;
+    String          stdoutPath       = StringEncoding::Utf8;
+    String          stderrPath       = StringEncoding::Utf8;
+    SmallString<64> captureDirectoryName;
+    static uint32_t captureIndex = 0;
+    captureIndex += 1;
+    SC_TRY(StringBuilder::format(captureDirectoryName, "SCBuildTest-ToolsBootstrap-{}-{}",
+                                 static_cast<uint32_t>(::GetCurrentProcessId()), captureIndex));
+    SC_TRY(Path::join(captureDirectory, {temporaryDirectory.view(), captureDirectoryName.view()}));
+    SC_TRY(fs.makeDirectoryRecursive(captureDirectory.view()));
+    SC_TRY(Path::join(stdoutPath, {captureDirectory.view(), "stdout.txt"}));
+    SC_TRY(Path::join(stderrPath, {captureDirectory.view(), "stderr.txt"}));
+
+    FileOpen captureMode    = FileOpen::Write;
+    captureMode.inheritable = true;
+    FileDescriptor stdoutFile;
+    FileDescriptor stderrFile;
+    SC_TRY(stdoutFile.open(stdoutPath.view(), captureMode));
+    SC_TRY(stderrFile.open(stderrPath.view(), captureMode));
+
+    SC_TRY(process.exec({processArguments, numArguments}, stdoutFile, {}, stderrFile));
+    capturedOutput.exitStatus = process.getExitStatus();
+    SC_TRY(stdoutFile.close());
+    SC_TRY(stderrFile.close());
+    SC_TRY(fs.read(stdoutPath.view(), capturedOutput.stdOut));
+#else
+    SC_TRY(process.setWorkingDirectory(checkout.root.view()));
+    SC_TRY(process.exec({processArguments, numArguments}, capturedOutput.stdOut, {}, capturedOutput.stdErr));
+    capturedOutput.exitStatus = process.getExitStatus();
+#endif
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdOut));
+    SC_TRY(normalizeConsoleOutput(capturedOutput.stdErr));
+    return Result(true);
+}
+
+static bool bootstrapOutputContainsCompileStep(const CapturedProcessOutput& output)
+{
+    return StringView(output.stdOut.view()).containsString("\nTools.cpp\n") or
+           StringView(output.stdOut.view()).containsString("\nSC-bootstrap-probe.cpp\n") or
+           StringView(output.stdOut.view()).containsString("\nSC-Probe Tool spazio \xC3\xA8.cpp\n") or
+           StringView(output.stdOut.view()).containsString("Linking bootstrap-probe") or
+           StringView(output.stdOut.view()).containsString("Linking Probe Tool spazio \xC3\xA8");
+}
+
+static bool bootstrapOutputContainsUpToDateStep(const CapturedProcessOutput& output)
+{
+    return StringView(output.stdOut.view()).containsString("is up to date");
+}
+
+static Result appendBootstrapProbeCommonChecks(const CapturedProcessOutput& output, StringView expectedTool,
+                                               Span<const StringSpan> expectedArguments)
+{
+    SC_TRY_MSG(output.exitStatus == 0, "Bootstrap probe process failed");
+    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_OK"), "Bootstrap probe did not run");
+    String expectedLine = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(expectedLine, "BOOTSTRAP_PROBE_TOOL={}", expectedTool));
+    SC_TRY_MSG(StringView(output.stdOut.view()).containsString(expectedLine.view()), "Unexpected bootstrap probe tool");
+    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("BOOTSTRAP_PROBE_ACTION=verify"),
+               "Unexpected bootstrap probe action");
+    SC_TRY_MSG(StringView(output.stdOut.view()).containsString("synthetic checkout spazio cafe"),
+               "Bootstrap probe output does not contain synthetic checkout root");
+
+    for (size_t idx = 0; idx < expectedArguments.sizeInElements(); ++idx)
+    {
+        SC_TRY(StringBuilder::format(expectedLine, "BOOTSTRAP_PROBE_ARG[{}]={}", idx, expectedArguments[idx]));
+        SC_TRY_MSG(StringView(output.stdOut.view()).containsString(expectedLine.view()),
+                   "Missing forwarded bootstrap probe argument");
+    }
+    return Result(true);
+}
+
 #if SC_PLATFORM_WINDOWS
 static Result computeWindowsImportLibraryPath(const Build::Action& action, StringView projectName, String& libraryPath)
 {
@@ -1936,6 +2271,170 @@ struct SCBuildFixtureTest : public SC::TestCase
             SC_TEST_EXPECT(StringView(buildRoot.view()).containsString("_Tests"));
             SC_TEST_EXPECT(directories.packagesCacheDirectory.view() == expectedPackagesCacheDirectory.view());
             SC_TEST_EXPECT(directories.packagesInstallDirectory.view() == expectedPackagesInstallDir.view());
+        }
+
+        if (test_section("bootstrap script runs built-in probe from synthetic checkout with spaces and utf8"))
+        {
+            BootstrapSyntheticCheckout checkout;
+            SC_TRUST_RESULT(createBootstrapSyntheticCheckout(report, "builtin-probe", checkout));
+
+            StringSpan forwardedArguments[] = {"plain",      "hello world",     "path with spaces",
+                                               "slash/path", "backslash\\path", "semi;colon"};
+            StringSpan commandArguments[]   = {"bootstrap-probe",     "verify",
+                                               forwardedArguments[0], forwardedArguments[1],
+                                               forwardedArguments[2], forwardedArguments[3],
+                                               forwardedArguments[4], forwardedArguments[5]};
+
+            CapturedProcessOutput firstRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, firstRun));
+            SC_TRUST_RESULT(appendBootstrapProbeCommonChecks(firstRun, "SC-bootstrap-probe", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(firstRun));
+
+            CapturedProcessOutput secondRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, secondRun));
+            SC_TRUST_RESULT(appendBootstrapProbeCommonChecks(secondRun, "SC-bootstrap-probe", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsUpToDateStep(secondRun));
+            SC_TEST_EXPECT(not bootstrapOutputContainsCompileStep(secondRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            Thread::Sleep(1100);
+            SC_TRUST_RESULT(
+                fs.writeString(checkout.builtInToolHeader.view(), "// Bootstrap probe fixture header after touch\n"));
+
+            CapturedProcessOutput afterHeaderTouchRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, afterHeaderTouchRun));
+            SC_TRUST_RESULT(
+                appendBootstrapProbeCommonChecks(afterHeaderTouchRun, "SC-bootstrap-probe", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(afterHeaderTouchRun));
+        }
+
+        if (test_section("bootstrap script runs custom probe from synthetic checkout with spaces and utf8"))
+        {
+            BootstrapSyntheticCheckout checkout;
+            SC_TRUST_RESULT(createBootstrapSyntheticCheckout(report, "custom-probe", checkout));
+
+            StringSpan forwardedArguments[] = {"custom plain", "custom hello world",      "custom path with spaces",
+                                               "custom/slash", "custom\\backslash\\path", "custom;semicolon"};
+            StringSpan commandArguments[]   = {checkout.customToolSource.view(),
+                                               "verify",
+                                               forwardedArguments[0],
+                                               forwardedArguments[1],
+                                               forwardedArguments[2],
+                                               forwardedArguments[3],
+                                               forwardedArguments[4],
+                                               forwardedArguments[5]};
+
+            CapturedProcessOutput firstRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, firstRun));
+            SC_TRUST_RESULT(
+                appendBootstrapProbeCommonChecks(firstRun, "SC-bootstrap-probe-custom", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(firstRun));
+
+            CapturedProcessOutput secondRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, secondRun));
+            SC_TRUST_RESULT(
+                appendBootstrapProbeCommonChecks(secondRun, "SC-bootstrap-probe-custom", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsUpToDateStep(secondRun));
+            SC_TEST_EXPECT(not bootstrapOutputContainsCompileStep(secondRun));
+
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            Thread::Sleep(1100);
+            SC_TRUST_RESULT(writeBootstrapProbeSource(fs, checkout.customToolSource.view(), "SC-bootstrap-probe-custom",
+                                                      "../Tools/SC-bootstrap-probe-custom.h"));
+
+            CapturedProcessOutput afterSourceTouchRun;
+            SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, afterSourceTouchRun));
+            SC_TRUST_RESULT(
+                appendBootstrapProbeCommonChecks(afterSourceTouchRun, "SC-bootstrap-probe-custom", forwardedArguments));
+            SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(afterSourceTouchRun));
+        }
+
+#if SC_PLATFORM_WINDOWS
+        if (test_section("bootstrap script runs long custom probe path on Windows"))
+        {
+            BootstrapSyntheticCheckout checkout;
+            String                     caseName = StringEncoding::Utf8;
+            SC_TRUST_RESULT(createBootstrapLongRootCaseName(caseName));
+            Result createdCheckout = createBootstrapSyntheticCheckout(report, caseName.view(), checkout);
+
+            if (not createdCheckout)
+            {
+                report.console.printLine(
+                    "Skipping Windows long custom bootstrap path: filesystem could not materialize the long checkout "
+                    "tree");
+            }
+            else
+            {
+                SC_TEST_EXPECT(checkout.customToolSource.view().sizeInBytes() > MAX_PATH);
+                SC_TEST_EXPECT(checkout.root.view().sizeInBytes() < MAX_PATH);
+
+                StringSpan forwardedArguments[] = {"long custom plain", "long custom path with spaces",
+                                                   "long/custom/slash"};
+                StringSpan commandArguments[]   = {checkout.customToolSource.view(), "verify", forwardedArguments[0],
+                                                   forwardedArguments[1], forwardedArguments[2]};
+
+                CapturedProcessOutput firstRun;
+                SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, firstRun));
+                SC_TRUST_RESULT(
+                    appendBootstrapProbeCommonChecks(firstRun, "SC-bootstrap-probe-custom", forwardedArguments));
+                SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(firstRun));
+
+                CapturedProcessOutput secondRun;
+                SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, secondRun));
+                SC_TRUST_RESULT(
+                    appendBootstrapProbeCommonChecks(secondRun, "SC-bootstrap-probe-custom", forwardedArguments));
+                SC_TEST_EXPECT(bootstrapOutputContainsUpToDateStep(secondRun));
+                SC_TEST_EXPECT(not bootstrapOutputContainsCompileStep(secondRun));
+
+                Thread::Sleep(1100);
+                FileSystem fs;
+                SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+                SC_TRUST_RESULT(writeBootstrapProbeSource(fs, checkout.customToolSource.view(),
+                                                          "SC-bootstrap-probe-custom",
+                                                          "../Tools/SC-bootstrap-probe-custom.h"));
+
+                CapturedProcessOutput afterSourceTouchRun;
+                SC_TRUST_RESULT(captureBootstrapScriptCommand(checkout, commandArguments, afterSourceTouchRun));
+                SC_TRUST_RESULT(appendBootstrapProbeCommonChecks(afterSourceTouchRun, "SC-bootstrap-probe-custom",
+                                                                 forwardedArguments));
+                SC_TEST_EXPECT(bootstrapOutputContainsCompileStep(afterSourceTouchRun));
+            }
+        }
+#endif
+
+        if (test_section("Visual Studio generator stages long-path manifest locally"))
+        {
+            String             buildRoot = StringEncoding::Utf8;
+            Build::Directories directories;
+            SC_TRUST_RESULT(createFixtureDirectories(report, buildRoot, directories));
+
+            Build::Action action;
+            action.action                  = Build::Action::Configure;
+            action.workspaceName           = FixtureWorkspaceName;
+            action.projectName             = FixtureProjectName;
+            action.configurationName       = "Debug";
+            action.parameters.generator    = Build::Generator::VisualStudio2022;
+            action.parameters.platform     = Build::Platform::Windows;
+            action.parameters.architecture = Build::Architecture::Intel64;
+            action.parameters.directories  = directories;
+            SC_TEST_EXPECT(Build::Action::execute(action, configureTinyConsoleProgram));
+
+            String projectPath = StringEncoding::Utf8;
+            SC_TRUST_RESULT(Path::join(projectPath, {directories.projectsDirectory.view(), "VisualStudio2022",
+                                                     FixtureWorkspaceName, "TinyConsoleProgram.vcxproj"}));
+            FileSystem fs;
+            SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
+            String projectContents = StringEncoding::Utf8;
+            SC_TRUST_RESULT(fs.read(projectPath.view(), projectContents));
+            const StringView projectView(projectContents.view());
+            SC_TEST_EXPECT(projectView.containsString(
+                "<AdditionalManifestFiles>$(SCBuildLongPathManifestPath);%(AdditionalManifestFiles)"));
+            SC_TEST_EXPECT(projectView.containsString("BeforeTargets=\"Link\""));
+            SC_TEST_EXPECT(
+                projectView.containsString("<Copy SourceFiles=\"$(ProjectDir)TinyConsoleProgram.long-path.manifest\""));
+            SC_TEST_EXPECT(projectView.containsString("DestinationFiles=\"$(SCBuildLongPathManifestPath)\""));
         }
 
         if (test_section("native backend builds and runs fixture"))

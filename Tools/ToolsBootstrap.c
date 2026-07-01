@@ -39,10 +39,14 @@ extern int pclose(FILE *stream);
 #endif
 #include <time.h>
 
+char* Path_join(const char* a, const char* b);
+int FileSystem_createDirectoryRecursive(const char* path);
+
 #ifdef _WIN32
 enum {
     SC_WINDOWS_LOGICAL_PATH_CAPACITY   = 1024,
-    SC_WINDOWS_TRANSPORT_PATH_CAPACITY = SC_WINDOWS_LOGICAL_PATH_CAPACITY + 6
+    SC_WINDOWS_TRANSPORT_PATH_CAPACITY = SC_WINDOWS_LOGICAL_PATH_CAPACITY + 6,
+    SC_WINDOWS_BOOTSTRAP_ALIAS_LIMIT   = 240
 };
 
 static int WindowsPath_isDriveLetter(wchar_t character) {
@@ -160,6 +164,82 @@ static int WindowsPath_createDirectoryAlias(const char* aliasPathUtf8, const cha
     return CreateSymbolicLinkW(aliasPath, targetPath, flags) != 0;
 }
 
+static int WindowsPath_isSeparator(char character) {
+    return character == '\\' || character == '/';
+}
+
+static int WindowsPath_isUnderDirectory(const char* path, const char* directory, const char** relativePath) {
+    size_t directoryLength = strlen(directory);
+    while (directoryLength > 0 && WindowsPath_isSeparator(directory[directoryLength - 1])) {
+        directoryLength -= 1;
+    }
+    if (directoryLength == 0 || _strnicmp(path, directory, directoryLength) != 0) {
+        return 0;
+    }
+    if (path[directoryLength] == '\0') {
+        *relativePath = path + directoryLength;
+        return 1;
+    }
+    if (!WindowsPath_isSeparator(path[directoryLength])) {
+        return 0;
+    }
+    *relativePath = path + directoryLength + 1;
+    return 1;
+}
+
+static char* WindowsPath_createProjectRootSourceAlias(const char* toolOutputDir, const char* projectDir,
+                                                      const char* sourcePath) {
+    const char* relativePath = NULL;
+    if (!WindowsPath_isUnderDirectory(sourcePath, projectDir, &relativePath) || relativePath[0] == '\0') {
+        return NULL;
+    }
+    FileSystem_createDirectoryRecursive(toolOutputDir);
+
+    char* aliasRoot = Path_join(toolOutputDir, "_ProjectRoot");
+    if (!aliasRoot || !WindowsPath_createDirectoryAlias(aliasRoot, projectDir)) {
+        free(aliasRoot);
+        return NULL;
+    }
+
+    char* aliasToolCpp = Path_join(aliasRoot, relativePath);
+    free(aliasRoot);
+    return aliasToolCpp;
+}
+
+static int WindowsPath_replaceWithProjectRootSourceAlias(char** sourcePath, const char* toolOutputDir,
+                                                         const char* projectDir) {
+    char* aliasPath = WindowsPath_createProjectRootSourceAlias(toolOutputDir, projectDir, *sourcePath);
+    if (!aliasPath) {
+        return 0;
+    }
+    if (strlen(aliasPath) >= MAX_PATH) {
+        free(aliasPath);
+        return -1;
+    }
+    free(*sourcePath);
+    *sourcePath = aliasPath;
+    return 1;
+}
+
+static void WindowsPath_applyProjectRootSourceAliasIfNeeded(char** sourcePath, const char* toolOutputDir,
+                                                            const char* projectDir, const char* sourceDescription) {
+    if (!projectDir || strlen(*sourcePath) < SC_WINDOWS_BOOTSTRAP_ALIAS_LIMIT) {
+        return;
+    }
+
+    const int aliasResult = WindowsPath_replaceWithProjectRootSourceAlias(sourcePath, toolOutputDir, projectDir);
+    if (aliasResult == 0) {
+        fprintf(stderr, "Error: Failed creating long-path %s source alias\n", sourceDescription);
+        exit(1);
+    }
+    if (aliasResult < 0) {
+        fprintf(stderr,
+                "Error: Long-path %s source has a project-relative path too long for bootstrap compilation\n",
+                sourceDescription);
+        exit(1);
+    }
+}
+
 static const char* windowsCommandWorkingDirectory = NULL;
 #endif
 #include <stdint.h>
@@ -200,6 +280,14 @@ typedef struct {
 typedef struct {
     char separator;
 } PathContext;
+
+typedef struct {
+#ifdef _WIN32
+    clock_t startTime;
+#else
+    struct timeval startTime;
+#endif
+} BootstrapTimer;
 
 PathContext Path_init(void);
 
@@ -273,10 +361,19 @@ int StringVector_containsPath(const StringVector* sv, const char* str);
 char* StringBuilder_join(const StringBuilder* sb, const char* sep);
 
 char* String_duplicate(const char* str);
+char* String_concat3(const char* a, const char* b, const char* c);
 int String_containsPathSeparator(const char* str);
 const char* Path_fileName(const char* path);
 char* deriveToolIdentity(const char* toolPath);
 int isSCBuildDefinitionSource(const char* toolPath);
+const char* objectExtension(void);
+const char* dependencyExtension(const CompilationInfo* ci);
+char* Path_joinWithExtension(const char* directory, const char* stem, const char* extension);
+char* buildToolStem(const char* toolName);
+char* buildToolsObjectPath(const CompilationInfo* ci);
+char* buildToolObjectPath(const CompilationInfo* ci);
+char* buildToolsDependencyPath(const CompilationInfo* ci);
+char* buildToolDependencyPath(const CompilationInfo* ci);
 #ifdef _WIN32
 unsigned long long String_hashFnv1a(const char* str);
 unsigned long long String_hashCombine(unsigned long long hash, const char* str);
@@ -509,6 +606,38 @@ char* String_duplicate(const char* str) {
     return result;
 }
 
+char* String_concat3(const char* a, const char* b, const char* c) {
+    size_t lenA = strlen(a);
+    size_t lenB = strlen(b);
+    size_t lenC = strlen(c);
+    char* result = (char*)malloc(lenA + lenB + lenC + 1);
+    if (!result) return NULL;
+    memcpy(result, a, lenA);
+    memcpy(result + lenA, b, lenB);
+    memcpy(result + lenA + lenB, c, lenC);
+    result[lenA + lenB + lenC] = 0;
+    return result;
+}
+
+char* detectTargetOS(void) {
+#ifdef _WIN32
+    return String_duplicate("Windows");
+#else
+    FILE* uname_file = POPEN("uname", "r");
+    if (uname_file) {
+        char buf[256];
+        if (fgets(buf, sizeof(buf), uname_file)) {
+            size_t len = strlen(buf);
+            if (len > 0 && buf[len - 1] == '\n') buf[len - 1] = 0;
+            PCLOSE(uname_file);
+            return String_duplicate(buf);
+        }
+        PCLOSE(uname_file);
+    }
+    return String_duplicate("POSIX");
+#endif
+}
+
 void String_unescapeJsonInPlace(char* str) {
     if (!str) return;
     char* read  = str;
@@ -563,6 +692,158 @@ char* deriveToolIdentity(const char* toolPath) {
 int isSCBuildDefinitionSource(const char* toolPath) {
     const char* fileName = Path_fileName(toolPath);
     return strcmp(fileName, "SC-build.cpp") == 0;
+}
+
+char* buildBuiltInToolSourcePath(const BootloaderArgs* args) {
+    char* toolCpp = Path_join(args->toolSourceDir, "SC-");
+    toolCpp = (char*)realloc(toolCpp, strlen(toolCpp) + strlen(args->toolName) + strlen(".cpp") + 1);
+    if (toolCpp) {
+        strcat(toolCpp, args->toolName);
+        strcat(toolCpp, ".cpp");
+    }
+    return toolCpp;
+}
+
+char* resolveToolSource(BootloaderArgs* args, int* builtInTool) {
+    *builtInTool = 1;
+
+    char* toolCpp = buildBuiltInToolSourcePath(args);
+    if (FileSystem_exists(toolCpp)) {
+        return toolCpp;
+    }
+
+    char* potentialCpp = String_duplicate(args->toolName);
+    if (FileSystem_exists(potentialCpp)) {
+        free(toolCpp);
+        *builtInTool = 0;
+
+        char* toolIdentity = deriveToolIdentity(potentialCpp);
+        if (!toolIdentity) {
+            fprintf(stderr, "Error: Failed deriving tool name from \"%s\"\n", potentialCpp);
+            free(potentialCpp);
+            exit(1);
+        }
+        free(args->toolName);
+        args->toolName = toolIdentity;
+        return potentialCpp;
+    }
+
+    free(potentialCpp);
+    fprintf(stderr, "Error: Tool \"%s\" doesn't exist\n", args->toolName);
+    free(toolCpp);
+    exit(1);
+}
+
+char* buildBuiltInToolHeaderPath(const BootloaderArgs* args) {
+    char* toolH = Path_join(args->toolSourceDir, "SC-");
+    toolH = (char*)realloc(toolH, strlen(toolH) + strlen(args->toolName) + strlen(".h") + 1);
+    if (toolH) {
+        strcat(toolH, args->toolName);
+        strcat(toolH, ".h");
+    }
+    return toolH;
+}
+
+char* buildToolExecutablePath(const CompilationInfo* ci) {
+    char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS ? ci->targetOS : "Unknown");
+    char* exeName = "SC-";
+    exeName = (char*)malloc(strlen(exeName) + strlen(ci->args->toolName) + 1);
+    if (exeName) {
+        strcpy(exeName, "SC-");
+        strcat(exeName, ci->args->toolName);
+        char* exeExt = "";
+#ifdef _WIN32
+        exeExt = ".exe";
+#endif
+        exeName = (char*)realloc(exeName, strlen(exeName) + strlen(exeExt) + 1);
+        if (exeName) strcat(exeName, exeExt);
+    }
+
+    char* toolExe = exeName ? Path_join(exeDir, exeName) : NULL;
+    free(exeName);
+    free(exeDir);
+    return toolExe;
+}
+
+char* buildToolOutputDirectory(BootloaderArgs* args, const char* toolCpp, const char* targetOS) {
+#ifdef _WIN32
+    if (targetOS && strcmp(targetOS, "Windows") == 0) {
+        return buildWindowsToolOutputDir(args, toolCpp);
+    }
+#endif
+    return Path_join(args->buildDir, "_Tools");
+}
+
+char* buildToolIntermediateDirectory(const CompilationInfo* ci) {
+    char* inter1 = Path_join(ci->toolOutputDir, "_Intermediates");
+    char* path = Path_join(inter1, ci->targetOS ? ci->targetOS : "Unknown");
+    free(inter1);
+    return path;
+}
+
+#ifdef _WIN32
+void setupWindowsSourceAliases(CompilationInfo* ci) {
+    WindowsPath_applyProjectRootSourceAliasIfNeeded(&ci->scCpp, ci->toolOutputDir, ci->args->projectDir, "SC.cpp");
+    WindowsPath_applyProjectRootSourceAliasIfNeeded(&ci->toolsCpp, ci->toolOutputDir, ci->args->projectDir,
+                                                    "shared-tool");
+    WindowsPath_applyProjectRootSourceAliasIfNeeded(&ci->toolCpp, ci->toolOutputDir, ci->args->projectDir,
+                                                    "build-tool");
+}
+#endif
+
+const char* objectExtension(void) {
+#ifdef _WIN32
+    return "obj";
+#else
+    return "o";
+#endif
+}
+
+const char* dependencyExtension(const CompilationInfo* ci) {
+    return ci->targetOS && strcmp(ci->targetOS, "Windows") == 0 ? "json" : "d";
+}
+
+char* Path_joinWithExtension(const char* directory, const char* stem, const char* extension) {
+    char* fileName = String_concat3(stem, ".", extension);
+    if (!fileName) return NULL;
+    char* path = Path_join(directory, fileName);
+    free(fileName);
+    return path;
+}
+
+char* buildToolStem(const char* toolName) {
+    size_t prefixLength = strlen("SC-");
+    size_t toolLength = strlen(toolName);
+    char* stem = (char*)malloc(prefixLength + toolLength + 1);
+    if (!stem) return NULL;
+    memcpy(stem, "SC-", prefixLength);
+    memcpy(stem + prefixLength, toolName, toolLength);
+    stem[prefixLength + toolLength] = 0;
+    return stem;
+}
+
+char* buildToolsObjectPath(const CompilationInfo* ci) {
+    return Path_joinWithExtension(ci->intermediateDir, "Tools", objectExtension());
+}
+
+char* buildToolObjectPath(const CompilationInfo* ci) {
+    char* stem = buildToolStem(ci->args->toolName);
+    if (!stem) return NULL;
+    char* path = Path_joinWithExtension(ci->intermediateDir, stem, objectExtension());
+    free(stem);
+    return path;
+}
+
+char* buildToolsDependencyPath(const CompilationInfo* ci) {
+    return Path_joinWithExtension(ci->intermediateDir, "Tools", dependencyExtension(ci));
+}
+
+char* buildToolDependencyPath(const CompilationInfo* ci) {
+    char* stem = buildToolStem(ci->args->toolName);
+    if (!stem) return NULL;
+    char* path = Path_joinWithExtension(ci->intermediateDir, stem, dependencyExtension(ci));
+    free(stem);
+    return path;
 }
 
 // Path functions
@@ -814,6 +1095,18 @@ void freeArgs(int argc, char** args) {
     free(args);
 }
 
+void BootloaderArgs_copyRemainingArgs(BootloaderArgs* args, const char** string_argv, int firstIndex, int argc) {
+    args->numRemainingArgs = (argc > firstIndex) ? (argc - firstIndex) : 0;
+    if (args->numRemainingArgs > 0) {
+        args->remainingArgs = (char**)malloc(args->numRemainingArgs * sizeof(char*));
+        if (args->remainingArgs) {
+            for (int i = 0; i < args->numRemainingArgs; ++i) {
+                args->remainingArgs[i] = String_duplicate(string_argv[firstIndex + i]);
+            }
+        }
+    }
+}
+
 // parseArgs
 BootloaderArgs parseArgs(const char** string_argv, int argc) {
     BootloaderArgs args;
@@ -825,15 +1118,7 @@ BootloaderArgs parseArgs(const char** string_argv, int argc) {
         args.buildDir = String_duplicate(string_argv[3]);
         args.projectDir = String_duplicate(string_argv[4]);
         args.toolName = (argc >= 6) ? String_duplicate(string_argv[5]) : String_duplicate("build");
-        args.numRemainingArgs = (argc > 6) ? (argc - 6) : 0;
-        if (args.numRemainingArgs > 0) {
-            args.remainingArgs = (char**)malloc(args.numRemainingArgs * sizeof(char*));
-            if (args.remainingArgs) {
-                for (int i = 0; i < args.numRemainingArgs; ++i) {
-                    args.remainingArgs[i] = String_duplicate(string_argv[6 + i]);
-                }
-            }
-        }
+        BootloaderArgs_copyRemainingArgs(&args, string_argv, 6, argc);
     } else {
         args.toolName = String_duplicate("build");
     }
@@ -843,147 +1128,37 @@ BootloaderArgs parseArgs(const char** string_argv, int argc) {
 // setupCompilation
 void setupCompilation(CompilationInfo* ci) {
     BootloaderArgs* args = ci->args;
-#ifdef _WIN32
-    ci->targetOS = (char*)malloc(strlen("Windows") + 1);
-    if (ci->targetOS) strcpy(ci->targetOS, "Windows");
-#else
-    FILE* uname_file = POPEN("uname", "r");
-    if (uname_file) {
-        char buf[256];
-        if (fgets(buf, sizeof(buf), uname_file)) {
-            size_t len = strlen(buf);
-            if (len > 0 && buf[len - 1] == '\n') buf[len - 1] = 0;
-            ci->targetOS = (char*)malloc(len + 1);
-            if (ci->targetOS) strcpy(ci->targetOS, buf);
-        }
-        PCLOSE(uname_file);
-    }
-    if (!ci->targetOS) {
-        ci->targetOS = (char*)malloc(strlen("POSIX") + 1);
-        if (ci->targetOS) strcpy(ci->targetOS, "POSIX");
-    }
-#endif
+    ci->targetOS = detectTargetOS();
 
     // Set paths like original
-    int builtInTool = 1;
-    char* toolCpp = Path_join(args->toolSourceDir, "SC-");
-    toolCpp = (char*)realloc(toolCpp, strlen(toolCpp) + strlen(args->toolName) + strlen(".cpp") + 1);
-    if (toolCpp) {
-        strcat(toolCpp, args->toolName);
-        strcat(toolCpp, ".cpp");
-    }
-
-    if (!FileSystem_exists(toolCpp)) {
-        // Try if toolName is path to cpp file
-        char* potentialCpp = String_duplicate(args->toolName);
-        if (FileSystem_exists(potentialCpp)) {
-            free(toolCpp);
-            toolCpp = potentialCpp;
-            builtInTool = 0;
-            char* toolIdentity = deriveToolIdentity(toolCpp);
-            if (!toolIdentity) {
-                fprintf(stderr, "Error: Failed deriving tool name from \"%s\"\n", toolCpp);
-                free(toolCpp);
-                exit(1);
-            }
-            free(args->toolName);
-            args->toolName = toolIdentity;
-        } else {
-            free(potentialCpp);
-            fprintf(stderr, "Error: Tool \"%s\" doesn't exist\n", args->toolName);
-            free(toolCpp);
-            exit(1);
-        }
-    }
+    int builtInTool = 0;
+    char* toolCpp = resolveToolSource(args, &builtInTool);
 
     // Set ci fields
     ci->toolCpp = toolCpp;
     ci->scCpp = Path_join(args->libraryDir, "SC.cpp");
     ci->toolsCpp = Path_join(args->toolSourceDir, "Tools.cpp");
-#ifdef _WIN32
-    if (ci->targetOS && strcmp(ci->targetOS, "Windows") == 0) {
-        ci->toolOutputDir = buildWindowsToolOutputDir(args, toolCpp);
-    } else
-#endif
-    {
-        ci->toolOutputDir = Path_join(args->buildDir, "_Tools");
-    }
+    ci->toolOutputDir = buildToolOutputDirectory(args, toolCpp, ci->targetOS);
 
 #ifdef _WIN32
-    if (!builtInTool && args->projectDir && isSCBuildDefinitionSource(ci->toolCpp) &&
-        strlen(ci->toolCpp) >= MAX_PATH) {
-        FileSystem_createDirectoryRecursive(ci->toolOutputDir);
-
-        char* aliasRoot = Path_join(ci->toolOutputDir, "_ProjectRoot");
-        if (!aliasRoot || !WindowsPath_createDirectoryAlias(aliasRoot, args->projectDir)) {
-            fprintf(stderr, "Error: Failed creating long-path build-tool source alias\n");
-            free(aliasRoot);
-            exit(1);
-        }
-
-        char* aliasToolCpp = Path_join(aliasRoot, Path_fileName(ci->toolCpp));
-        if (!aliasToolCpp) {
-            fprintf(stderr, "Error: Failed creating long-path build-tool source path\n");
-            free(aliasRoot);
-            exit(1);
-        }
-
-        free(ci->toolCpp);
-        ci->toolCpp = aliasToolCpp;
-        toolCpp = ci->toolCpp;
-        free(aliasRoot);
-    }
+    setupWindowsSourceAliases(ci);
+    toolCpp = ci->toolCpp;
 #endif
 
     // intermediateDir
-    char* inter1 = Path_join(ci->toolOutputDir, "_Intermediates");
-    ci->intermediateDir = Path_join(inter1, ci->targetOS ? ci->targetOS : "Unknown");
-    free(inter1);
+    ci->intermediateDir = buildToolIntermediateDirectory(ci);
 
     // dep files
-    char* ext = ci->targetOS && strcmp(ci->targetOS, "Windows") == 0 ? ".json" : ".d";
-    char* temp = Path_join(ci->intermediateDir, "Tools");
-    ci->toolsDepFile = (char*)malloc(strlen(temp) + strlen(ext) + 1);
-    if (ci->toolsDepFile) {
-        strcpy(ci->toolsDepFile, temp);
-        strcat(ci->toolsDepFile, ext);
-    }
-    free(temp);
-    temp = Path_join(ci->intermediateDir, "SC-");
-    temp = (char*)realloc(temp, strlen(temp) + strlen(args->toolName) + strlen(ext) + 1);
-    if (temp) {
-        strcat(temp, args->toolName);
-        strcat(temp, ext);
-        ci->toolDepFile = temp;
-    }
+    ci->toolsDepFile = buildToolsDependencyPath(ci);
+    ci->toolDepFile  = buildToolDependencyPath(ci);
 
     // toolH
     if (builtInTool && strstr(toolCpp, "ToolsBootstrap.") != toolCpp) { // Not this file
-        ci->toolH = Path_join(args->toolSourceDir, "SC-");
-        ci->toolH = (char*)realloc(ci->toolH, strlen(ci->toolH) + strlen(args->toolName) + strlen(".h") + 1);
-        if (ci->toolH) {
-            strcat(ci->toolH, args->toolName);
-            strcat(ci->toolH, ".h");
-        }
+        ci->toolH = buildBuiltInToolHeaderPath(args);
     }
 
     // toolExe
-    char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS ? ci->targetOS : "Unknown");
-    char* exeName = "SC-";
-    exeName = (char*)malloc(strlen(exeName) + strlen(args->toolName) + 1);
-    if (exeName) {
-        strcpy(exeName, "SC-");
-        strcat(exeName, args->toolName);
-        char* exeExt = "";
-#ifdef _WIN32
-        exeExt = ".exe";
-#endif
-        exeName = (char*)realloc(exeName, strlen(exeName) + strlen(exeExt) + 1);
-        if (exeName) strcat(exeName, exeExt);
-        ci->toolExe = Path_join(exeDir, exeName);
-        free(exeName);
-    }
-    free(exeDir);
+    ci->toolExe = buildToolExecutablePath(ci);
 }
 
 // Command execution implementation
@@ -1045,9 +1220,56 @@ int CommandLine_run(CommandLine* cl) {
     return ret;
 }
 
+int CommandLine_runInWorkingDirectory(CommandLine* cl, const char* workingDirectory) {
+#ifdef _WIN32
+    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
+    windowsCommandWorkingDirectory      = workingDirectory;
+    int ret                             = CommandLine_run(cl);
+    windowsCommandWorkingDirectory      = previousWorkingDirectory;
+    return ret;
+#else
+    (void)workingDirectory;
+    return CommandLine_run(cl);
+#endif
+}
+
 void CommandLine_destroy(CommandLine* cl) {
     StringVector_destroy(&cl->args);
 }
+
+#ifdef _WIN32
+static int WindowsCommandLine_spawn(CommandLine* cmd, LPCWSTR workingDirectory, HANDLE* process) {
+    char* command = StringVector_join(&cmd->args, " ");
+    if (!command) return 0;
+
+    int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
+    if (wlen <= 0) {
+        free(command);
+        return 0;
+    }
+
+    wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
+    if (!wcmd) {
+        free(command);
+        return 0;
+    }
+
+    int spawned = 0;
+    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
+
+    STARTUPINFOW si = {sizeof(si)};
+    PROCESS_INFORMATION pi;
+    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, workingDirectory, &si, &pi)) {
+        *process = pi.hProcess;
+        CloseHandle(pi.hThread);
+        spawned = 1;
+    }
+
+    free(wcmd);
+    free(command);
+    return spawned;
+}
+#endif
 
 void StringVector_addFromString(StringVector* sv, const char* str, const char* delim) {
     char* s = (char*)malloc(strlen(str) + 1);
@@ -1305,108 +1527,76 @@ int checkNeedsRebuild(TimePoint objTime, StringVector* sources, StringVector* de
     return 0;
 }
 
-int needsRebuildTools(CompilationInfo* ci) {
-    char objExt[5] = "o";
-#ifdef _WIN32
-    strcpy(objExt, "obj");
-#endif
-    char* toolsObj = Path_join(ci->intermediateDir, "Tools");
-    toolsObj = (char*)realloc(toolsObj, strlen(toolsObj) + strlen(objExt) + 2);
-    if (toolsObj) {
-        strcat(toolsObj, ".");
-        strcat(toolsObj, objExt);
+static int dependenciesContainRequiredSources(StringVector* deps, const char* first, const char* second) {
+    if (deps->count == 0 || !StringVector_containsPath(deps, first)) {
+        return 0;
     }
-    TimePoint objTime = FileSystem_getModificationTime(toolsObj);
+    return second == NULL || StringVector_containsPath(deps, second);
+}
+
+static void printObjectRebuildStatus(const char* label, int needsRebuild) {
+    if (!printMessages) {
+        return;
+    }
+    if (needsRebuild) {
+        printf("  %s obj needs rebuild\n", label);
+    } else {
+        printf("  %s obj up to date\n", label);
+    }
+}
+
+static int needsRebuildObject(const char* label, const char* objectPath, const char* dependencyPath,
+                              const char* dependencyBaseDir, StringVector* sources, const char* requiredFirst,
+                              const char* requiredSecond) {
+    TimePoint objTime = FileSystem_getModificationTime(objectPath);
     if (objTime == 0) {
-        if (printMessages) printf("  Tools obj file not found, needs rebuild\n");
-        free(toolsObj);
-        return 1; // Obj doesn't exist
+        if (printMessages) printf("  %s obj file not found, needs rebuild\n", label);
+        return 1;
     }
+
+    StringVector deps = parseDependencies(dependencyPath, dependencyBaseDir);
+    if (!dependenciesContainRequiredSources(&deps, requiredFirst, requiredSecond)) {
+        if (printMessages) {
+            printf("  %s obj dependencies are stale, needs rebuild\n", label);
+        }
+        StringVector_destroy(&deps);
+        return 1;
+    }
+
+    int ret = checkNeedsRebuild(objTime, sources, &deps);
+    printObjectRebuildStatus(label, ret);
+    StringVector_destroy(&deps);
+    return ret;
+}
+
+int needsRebuildTools(CompilationInfo* ci) {
+    char* toolsObj = buildToolsObjectPath(ci);
 
     StringVector sources;
     StringVector_init(&sources, 2);
     StringVector_add(&sources, ci->scCpp);
     StringVector_add(&sources, ci->toolsCpp);
 
-    StringVector deps = parseDependencies(ci->toolsDepFile, ci->intermediateDir);
-
-    if (deps.count == 0 || !StringVector_containsPath(&deps, ci->toolsCpp) ||
-        !StringVector_containsPath(&deps, ci->scCpp)) {
-        if (printMessages) {
-            printf("  Tools obj dependencies are stale, needs rebuild\n");
-        }
-        StringVector_destroy(&sources);
-        StringVector_destroy(&deps);
-        free(toolsObj);
-        return 1;
-    }
-
-    int ret = checkNeedsRebuild(objTime, &sources, &deps);
-
-    if (printMessages) {
-        if (ret) {
-            printf("  Tools obj needs rebuild\n");
-        } else {
-            printf("  Tools obj up to date\n");
-        }
-    }
+    int ret = needsRebuildObject("Tools", toolsObj, ci->toolsDepFile, ci->intermediateDir, &sources, ci->toolsCpp,
+                                 ci->scCpp);
 
     StringVector_destroy(&sources);
-    StringVector_destroy(&deps);
     free(toolsObj);
     return ret;
 }
 
 int needsRebuildToolObj(CompilationInfo* ci) {
-    char objExt[5] = "o";
-#ifdef _WIN32
-    strcpy(objExt, "obj");
-#endif
-    StringBuilder sb;
-    sb = StringBuilder_init(256);
-    StringBuilder_append(&sb, "SC-");
-    StringBuilder_append(&sb, ci->args->toolName);
-    StringBuilder_append(&sb, ".");
-    StringBuilder_append(&sb, objExt);
-    char* toolObj = Path_join(ci->intermediateDir, StringBuilder_get_buffer(&sb));
-    StringBuilder_destroy(&sb);
-
-    TimePoint objTime = FileSystem_getModificationTime(toolObj);
-    if (objTime == 0) {
-        if (printMessages) printf("  Tool obj file not found, needs rebuild\n");
-        free(toolObj);
-        return 1;
-    }
+    char* toolObj = buildToolObjectPath(ci);
 
     StringVector sources;
     StringVector_init(&sources, 2);
     StringVector_add(&sources, ci->toolCpp);
     if (ci->toolH) StringVector_add(&sources, ci->toolH);
 
-    StringVector deps = parseDependencies(ci->toolDepFile, ci->intermediateDir);
-
-    if (deps.count == 0 || !StringVector_containsPath(&deps, ci->toolCpp)) {
-        if (printMessages) {
-            printf("  Tool obj dependencies are stale, needs rebuild\n");
-        }
-        StringVector_destroy(&sources);
-        StringVector_destroy(&deps);
-        free(toolObj);
-        return 1;
-    }
-
-    int ret = checkNeedsRebuild(objTime, &sources, &deps);
-
-    if (printMessages) {
-        if (ret) {
-            printf("  Tool obj needs rebuild\n");
-        } else {
-            printf("  Tool obj up to date\n");
-        }
-    }
+    int ret =
+        needsRebuildObject("Tool", toolObj, ci->toolDepFile, ci->intermediateDir, &sources, ci->toolCpp, NULL);
 
     StringVector_destroy(&sources);
-    StringVector_destroy(&deps);
     free(toolObj);
     return ret;
 }
@@ -1415,22 +1605,8 @@ int needsRebuildExe(CompilationInfo* ci) {
     TimePoint exeTime = FileSystem_getModificationTime(ci->toolExe);
     if (exeTime == 0) return 1;
 
-    char objExt[5] = "o";
-#ifdef _WIN32
-    strcpy(objExt, "obj");
-#endif
-
-    char* toolsObj = Path_join(ci->intermediateDir, "Tools");
-    toolsObj = (char*)realloc(toolsObj, strlen(toolsObj) + strlen(objExt) + 2);
-    if (toolsObj) {
-        strcat(toolsObj, ".");
-        strcat(toolsObj, objExt);
-    }
-
-    char* toolObj = Path_join(ci->intermediateDir, "SC-");
-    toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".") + strlen(objExt) + 1);
-    sprintf(toolObj + strlen(toolObj), "%s.%s", ci->args->toolName, objExt);
-
+    char* toolsObj = buildToolsObjectPath(ci);
+    char* toolObj  = buildToolObjectPath(ci);
     TimePoint toolsObjTime = FileSystem_getModificationTime(toolsObj);
     TimePoint toolObjTime = FileSystem_getModificationTime(toolObj);
 
@@ -1476,6 +1652,128 @@ void buildCompileCommandPOSIX(CommandLine* cmd, const char* compiler, const char
     CommandLine_argQuoted(cmd, input);
 }
 
+static void prepareBootstrapExecutableDirectory(const CompilationInfo* ci) {
+    char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
+    FileSystem_createDirectoryRecursive(exeDir);
+    free(exeDir);
+}
+
+#ifndef _WIN32
+static int runPOSIXObjectCompilation(const char* compiler, const char* includeDir, const char* output,
+                                     const char* input, int useClang, int defineSCBuild) {
+    CommandLine cmd;
+    buildCompileCommandPOSIX(&cmd, compiler, includeDir, output, input, useClang, defineSCBuild);
+    int ret = CommandLine_run(&cmd);
+    CommandLine_destroy(&cmd);
+    return ret == 0;
+}
+
+static int runSharedToolsPOSIXObjectCompilation(const CompilationInfo* ci, const char* compiler,
+                                                const char* includeDir, int useClang) {
+    char* toolsObj = buildToolsObjectPath(ci);
+    int compiled = runPOSIXObjectCompilation(compiler, includeDir, toolsObj, ci->toolsCpp, useClang, 0);
+    free(toolsObj);
+    return compiled;
+}
+
+static int runBuildToolPOSIXObjectCompilation(const CompilationInfo* ci, const char* compiler,
+                                              const char* includeDir, int useClang, int defineSCBuild) {
+    char* toolObj = buildToolObjectPath(ci);
+    int compiled = runPOSIXObjectCompilation(compiler, includeDir, toolObj, ci->toolCpp, useClang, defineSCBuild);
+    free(toolObj);
+    return compiled;
+}
+
+static int linkPOSIX(CompilationInfo* ci, const char* compiler, const char* cCompiler, int useClang) {
+    prepareBootstrapExecutableDirectory(ci);
+
+    char* toolsObj = buildToolsObjectPath(ci);
+    char* toolObj  = buildToolObjectPath(ci);
+
+    CommandLine cmd;
+    CommandLine_init(&cmd, (!useClang && !bootstrapLinkStdCpp()) ? cCompiler : compiler);
+    CommandLine_arg(&cmd, "-o");
+    CommandLine_argQuoted(&cmd, ci->toolExe);
+    CommandLine_argQuoted(&cmd, toolsObj);
+    CommandLine_argQuoted(&cmd, toolObj);
+    if (strcmp(ci->targetOS, "Linux") == 0) {
+        CommandLine_arg(&cmd, "-rdynamic");
+    }
+    CommandLine_arg(&cmd, "-ldl");
+    CommandLine_arg(&cmd, "-lpthread");
+    if (strcmp(ci->targetOS, "Linux") == 0 && !useClang && !bootstrapLinkStdCpp()) {
+        CommandLine_arg(&cmd, "-lm");
+    }
+    if (useClang && !bootstrapLinkStdCpp()) {
+        CommandLine_arg(&cmd, "-nostdlib++");
+    }
+    if (strcmp(ci->targetOS, "Darwin") == 0) {
+        CommandLine_arg(&cmd, "-framework");
+        CommandLine_arg(&cmd, "CoreFoundation");
+        CommandLine_arg(&cmd, "-framework");
+        CommandLine_arg(&cmd, "CoreServices");
+    }
+    int ret = CommandLine_run(&cmd);
+    CommandLine_destroy(&cmd);
+    free(toolsObj);
+    free(toolObj);
+    return ret;
+}
+
+static int detectPOSIXCompiler(const char** compiler, const char** cCompiler, int* useClang) {
+    if (runCommand("clang++ --version > /dev/null 2>&1") == 0) {
+        *compiler  = "clang++";
+        *cCompiler = "clang";
+        *useClang  = 1;
+        return 1;
+    }
+    if (runCommand("g++ --version > /dev/null 2>&1") == 0) {
+        *compiler  = "g++";
+        *cCompiler = "gcc";
+        *useClang  = 0;
+        return 1;
+    }
+    return 0;
+}
+
+static int waitForPOSIXProcess(pid_t pid) {
+    int status = 0;
+    if (waitpid(pid, &status, 0) != pid) {
+        return 0;
+    }
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
+
+static int waitForPOSIXObjectCompilations(pid_t pid1, pid_t pid2) {
+    int success1 = waitForPOSIXProcess(pid1);
+    int success2 = waitForPOSIXProcess(pid2);
+    return success1 && success2;
+}
+
+static int runParallelPOSIXObjectCompilations(const CompilationInfo* ci, const char* compiler, const char* includeDir,
+                                              int useClang, int defineSCBuild) {
+    pid_t pid1 = fork();
+    if (pid1 < 0) {
+        return 0;
+    }
+    if (pid1 == 0) {
+        exit(runSharedToolsPOSIXObjectCompilation(ci, compiler, includeDir, useClang) ? 0 : 1);
+    }
+
+    pid_t pid2 = fork();
+    if (pid2 < 0) {
+        waitForPOSIXProcess(pid1);
+        return 0;
+    }
+    if (pid2 == 0) {
+        exit(runBuildToolPOSIXObjectCompilation(ci, compiler, includeDir, useClang, defineSCBuild) ? 0 : 1);
+    }
+
+    return waitForPOSIXObjectCompilations(pid1, pid2);
+}
+#endif
+
+#ifdef _WIN32
 void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, const char* includeDir,
                                 const char* output, const char* input, const char* jsonFile, const char* pdbName,
                                 int defineSCBuild) {
@@ -1520,162 +1818,60 @@ void buildCompileCommandWindows(CommandLine* cmd, const char* intermediateDir, c
     CommandLine_argQuoted(cmd, input);
 }
 
-#ifndef _WIN32
-int compilePOSIX(CompilationInfo* ci) {
-    // Simplified: assume clang++ or g++
-    FileSystem_createDirectoryRecursive(ci->intermediateDir);
-    FileSystem_createDirectoryRecursive(ci->toolOutputDir); // Wait, already there
-
-    char* compiler = "";
-    char* cCompiler = "";
-    char* includeDir = Path_join(ci->args->libraryDir, "Includes");
-    int useClang = 0;
-    int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
-    if (runCommand("clang++ --version > /dev/null 2>&1") == 0) {
-        compiler = "clang++";
-        cCompiler = "clang";
-        useClang = 1;
-    } else if (runCommand("g++ --version > /dev/null 2>&1") == 0) {
-        compiler = "g++";
-        cCompiler = "gcc";
-    } else {
-        free(includeDir);
-        return 1;
+char* buildWindowsLinkManifestSourcePath(const CompilationInfo* ci) {
+    char* manifestPath = String_duplicate(ci->toolsCpp);
+    if (!manifestPath) {
+        return NULL;
     }
 
-    int needTools = needsRebuildTools(ci);
-    int needTool = needsRebuildToolObj(ci);
-
-    if (needTools && needTool) {
-        // Compile both in parallel
-        pid_t pid1 = fork();
-        if (pid1 == 0) {
-            // Compile Tools.cpp
-            char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
-            CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolsObj, ci->toolsCpp, useClang, 0);
-            int ret = CommandLine_run(&cmd);
-            CommandLine_destroy(&cmd);
-            free(toolsObj);
-            exit(ret);
-        }
-        pid_t pid2 = fork();
-        if (pid2 == 0) {
-            // Compile SC-tool.cpp
-            char* toolObj = Path_join(ci->intermediateDir, "SC-");
-            toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
-            sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
-            CommandLine cmd;
-            buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolObj, ci->toolCpp, useClang,
-                                     defineSCBuild);
-            int ret = CommandLine_run(&cmd);
-            CommandLine_destroy(&cmd);
-            free(toolObj);
-            exit(ret);
-        }
-        int status1, status2;
-        waitpid(pid1, &status1, 0);
-        waitpid(pid2, &status2, 0);
-        if (WEXITSTATUS(status1) != 0 || WEXITSTATUS(status2) != 0) {
-            free(includeDir);
-            return 1;
-        }
-        printf("Tools.cpp\n");
-        printf("SC-%s.cpp\n", ci->args->toolName);
-    } else if (needTools) {
-        char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
-        CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolsObj, ci->toolsCpp, useClang, 0);
-        printf("Tools.cpp\n");
-        int ret = CommandLine_run(&cmd);
-        CommandLine_destroy(&cmd);
-        free(toolsObj);
-        if (ret != 0) {
-            free(includeDir);
-            return 1;
-        }
-    } else if (needTool) {
-        char* toolObj = Path_join(ci->intermediateDir, "SC-");
-        toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
-        sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
-        CommandLine cmd;
-        buildCompileCommandPOSIX(&cmd, compiler, includeDir, toolObj, ci->toolCpp, useClang,
-                                 defineSCBuild);
-        printf("SC-%s.cpp\n", ci->args->toolName);
-        int ret = CommandLine_run(&cmd);
-        CommandLine_destroy(&cmd);
-        free(toolObj);
-        if (ret != 0) {
-            free(includeDir);
-            return 1;
-        }
-    } else {
-        printf("\"%s\" is up to date\n", ci->toolsCpp);
-        printf("\"%s\" is up to date\n", ci->toolCpp);
+    char* lastSlash     = strrchr(manifestPath, '/');
+    char* lastBackslash = strrchr(manifestPath, '\\');
+    char* lastSeparator = lastSlash;
+    if (lastBackslash && (!lastSeparator || lastBackslash > lastSeparator)) {
+        lastSeparator = lastBackslash;
     }
-    free(includeDir);
-
-    if (needsRebuildExe(ci)) {
-        char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
-        FileSystem_createDirectoryRecursive(exeDir);
-        free(exeDir);
-        char* toolsObj = Path_join(ci->intermediateDir, "Tools.o");
-        char* toolObj = Path_join(ci->intermediateDir, "SC-");
-        toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".o") + 1);
-        sprintf(toolObj + strlen(toolObj), "%s.o", ci->args->toolName);
-        CommandLine cmd;
-        CommandLine_init(&cmd, (!useClang && !bootstrapLinkStdCpp()) ? cCompiler : compiler);
-        CommandLine_arg(&cmd, "-o");
-        CommandLine_argQuoted(&cmd, ci->toolExe);
-        CommandLine_argQuoted(&cmd, toolsObj);
-        CommandLine_argQuoted(&cmd, toolObj);
-        if (strcmp(ci->targetOS, "Linux") == 0) {
-            CommandLine_arg(&cmd, "-rdynamic");
-        }
-        CommandLine_arg(&cmd, "-ldl");
-        CommandLine_arg(&cmd, "-lpthread");
-        if (strcmp(ci->targetOS, "Linux") == 0 && !useClang && !bootstrapLinkStdCpp()) {
-            CommandLine_arg(&cmd, "-lm");
-        }
-        if (useClang && !bootstrapLinkStdCpp()) {
-            CommandLine_arg(&cmd, "-nostdlib++");
-        }
-        if (strcmp(ci->targetOS, "Darwin") == 0) {
-            CommandLine_arg(&cmd, "-framework");
-            CommandLine_arg(&cmd, "CoreFoundation");
-            CommandLine_arg(&cmd, "-framework");
-            CommandLine_arg(&cmd, "CoreServices");
-        }
-        int ret = CommandLine_run(&cmd);
-        CommandLine_destroy(&cmd);
-        free(toolsObj);
-        free(toolObj);
-        return ret;
+    if (!lastSeparator) {
+        free(manifestPath);
+        return Path_join(ci->args->toolSourceDir, "LongPathAware.manifest");
     }
-    return 0;
+
+    lastSeparator[1] = '\0';
+    char* resizedManifestPath =
+        (char*)realloc(manifestPath, strlen(manifestPath) + strlen("LongPathAware.manifest") + 1);
+    if (!resizedManifestPath) {
+        free(manifestPath);
+        return NULL;
+    }
+    manifestPath = resizedManifestPath;
+    strcat(manifestPath, "LongPathAware.manifest");
+    return manifestPath;
 }
-#endif
 
-int linkWindows(CompilationInfo* ci) {
-    printf("Linking %s\n", ci->args->toolName);
-    char* exeDir = Path_join(ci->toolOutputDir, ci->targetOS);
-    FileSystem_createDirectoryRecursive(exeDir);
-    free(exeDir);
-#ifdef _WIN32
-    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
-    windowsCommandWorkingDirectory = ci->toolOutputDir;
-#endif
+int stageWindowsLinkManifest(const CompilationInfo* ci) {
+    char* sourcePath      = buildWindowsLinkManifestSourcePath(ci);
+    char* destinationPath = Path_join(ci->toolOutputDir, "LongPathAware.manifest");
+    if (!sourcePath || !destinationPath) {
+        free(sourcePath);
+        free(destinationPath);
+        return 0;
+    }
 
-    char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
-    char* toolObj = Path_join(ci->intermediateDir, "SC-");
-    toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".obj") + 1);
-    sprintf(toolObj + strlen(toolObj), "%s.obj", ci->args->toolName);
+    wchar_t sourceTransport[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    wchar_t destinationTransport[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    int prepared = WindowsPath_prepareTransportPath(sourcePath, sourceTransport,
+                                                    SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1) &&
+                   WindowsPath_prepareTransportPath(destinationPath, destinationTransport,
+                                                    SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1);
+    int copied = prepared && CopyFileW(sourceTransport, destinationTransport, FALSE) != 0;
+    if (!copied) {
+        fprintf(stderr, "Error: Failed staging Windows long-path manifest\n");
+    }
+    free(sourcePath);
+    free(destinationPath);
+    return copied;
+}
 
-    CommandLine cmd;
-    CommandLine_init(&cmd, "link");
-    CommandLine_arg(&cmd, "/nologo");
-    CommandLine_arg(&cmd, "/DEBUG");
-    CommandLine_arg(&cmd, "/MANIFEST:EMBED");
+char* buildWindowsLinkOutputAndPdbFlag(const CompilationInfo* ci) {
     StringBuilder sb = StringBuilder_init(256);
     StringBuilder_append(&sb, "/OUT:\"");
     StringBuilder_append(&sb, ci->toolExe);
@@ -1686,62 +1882,308 @@ int linkWindows(CompilationInfo* ci) {
     StringBuilder_append(&sb, ci->targetOS);
     StringBuilder_append(&sb, "/SC-");
     StringBuilder_append(&sb, ci->args->toolName);
-    StringBuilder_append(&sb,".pdb\"");
-    CommandLine_arg(&cmd, StringBuilder_get_buffer(&sb));
+    StringBuilder_append(&sb, ".pdb\"");
+    char* flag = String_duplicate(StringBuilder_get_buffer(&sb));
     StringBuilder_destroy(&sb);
-    char* manifestPath = Path_join(ci->args->toolSourceDir, "LongPathAware.manifest");
-    char* manifestFlag = (char*)malloc(strlen("/MANIFESTINPUT:\"\"") + strlen(manifestPath) + 1);
+    return flag;
+}
+
+char* buildWindowsLinkManifestFlag(const CompilationInfo* ci) {
+    if (!stageWindowsLinkManifest(ci)) {
+        return NULL;
+    }
+    return String_duplicate("/MANIFESTINPUT:\"LongPathAware.manifest\"");
+}
+
+void addWindowsNoStdCppLinkArguments(CommandLine* cmd) {
+    CommandLine_arg(cmd, "/NODEFAULTLIB:libcpmt");
+    CommandLine_arg(cmd, "/NODEFAULTLIB:libcpmtd");
+    CommandLine_arg(cmd, "/NODEFAULTLIB:msvcprt");
+    CommandLine_arg(cmd, "/NODEFAULTLIB:msvcprtd");
+    CommandLine_arg(cmd, "/NODEFAULTLIB:msvcp140");
+    CommandLine_arg(cmd, "/NODEFAULTLIB:msvcp140d");
+}
+
+void addWindowsSystemLinkLibraries(CommandLine* cmd) {
+    CommandLine_arg(cmd, "Advapi32.lib");
+    CommandLine_arg(cmd, "Shell32.lib");
+}
+
+static int runWindowsObjectCompilation(const char* intermediateDir, const char* includeDir, const char* output,
+                                       const char* input, const char* jsonFile, const char* pdbName,
+                                       int defineSCBuild) {
+    CommandLine cmd;
+    buildCompileCommandWindows(&cmd, intermediateDir, includeDir, output, input, jsonFile, pdbName, defineSCBuild);
+    int ret = CommandLine_run(&cmd);
+    CommandLine_destroy(&cmd);
+    return ret == 0;
+}
+
+static int runSharedToolsObjectCompilation(const CompilationInfo* ci, const char* includeDir) {
+    char* toolsObj  = buildToolsObjectPath(ci);
+    char* toolsJson = buildToolsDependencyPath(ci);
+    int compiled =
+        runWindowsObjectCompilation(ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp, toolsJson, "Tools", 0);
+    free(toolsObj);
+    free(toolsJson);
+    return compiled;
+}
+
+static int runBuildToolObjectCompilation(const CompilationInfo* ci, const char* includeDir, int defineSCBuild) {
+    char* toolObj  = buildToolObjectPath(ci);
+    char* toolJson = buildToolDependencyPath(ci);
+    int compiled = runWindowsObjectCompilation(ci->intermediateDir, includeDir, toolObj, ci->toolCpp, toolJson,
+                                               ci->args->toolName, defineSCBuild);
+    free(toolObj);
+    free(toolJson);
+    return compiled;
+}
+
+static int spawnWindowsObjectCompilation(const char* intermediateDir, const char* includeDir, const char* output,
+                                         const char* input, const char* jsonFile, const char* pdbName,
+                                         int defineSCBuild, LPCWSTR workingDirectory, HANDLE* process) {
+    CommandLine cmd;
+    buildCompileCommandWindows(&cmd, intermediateDir, includeDir, output, input, jsonFile, pdbName, defineSCBuild);
+    int spawned = WindowsCommandLine_spawn(&cmd, workingDirectory, process);
+    CommandLine_destroy(&cmd);
+    return spawned;
+}
+
+static int spawnSharedToolsObjectCompilation(const CompilationInfo* ci, const char* includeDir,
+                                             LPCWSTR workingDirectory, HANDLE* process) {
+    char* toolsObj  = buildToolsObjectPath(ci);
+    char* toolsJson = buildToolsDependencyPath(ci);
+    int spawned = spawnWindowsObjectCompilation(ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp, toolsJson,
+                                                "Tools", 0, workingDirectory, process);
+    free(toolsObj);
+    free(toolsJson);
+    return spawned;
+}
+
+static int spawnBuildToolObjectCompilation(const CompilationInfo* ci, const char* includeDir, int defineSCBuild,
+                                           LPCWSTR workingDirectory, HANDLE* process) {
+    char* toolObj  = buildToolObjectPath(ci);
+    char* toolJson = buildToolDependencyPath(ci);
+    int spawned = spawnWindowsObjectCompilation(ci->intermediateDir, includeDir, toolObj, ci->toolCpp, toolJson,
+                                                ci->args->toolName, defineSCBuild, workingDirectory, process);
+    free(toolObj);
+    free(toolJson);
+    return spawned;
+}
+
+static int waitForWindowsObjectCompilations(HANDLE* processes, int count) {
+    if (count != 2) {
+        for (int idx = 0; idx < count; ++idx) {
+            WaitForSingleObject(processes[idx], INFINITE);
+            CloseHandle(processes[idx]);
+        }
+        return 0;
+    }
+
+    WaitForMultipleObjects(2, processes, TRUE, INFINITE);
+    DWORD exit1, exit2;
+    GetExitCodeProcess(processes[0], &exit1);
+    GetExitCodeProcess(processes[1], &exit2);
+    CloseHandle(processes[0]);
+    CloseHandle(processes[1]);
+    return exit1 == 0 && exit2 == 0;
+}
+
+typedef struct {
+    const char* previousWorkingDirectory;
+    wchar_t spawnWorkingDirectoryBuffer[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
+    LPCWSTR spawnWorkingDirectory;
+} WindowsBootstrapCompileWorkingDirectory;
+
+static void WindowsBootstrapCompileWorkingDirectory_enter(WindowsBootstrapCompileWorkingDirectory* context,
+                                                          const char* toolOutputDir) {
+    context->previousWorkingDirectory = windowsCommandWorkingDirectory;
+    context->spawnWorkingDirectory    = NULL;
+    windowsCommandWorkingDirectory    = toolOutputDir;
+    if (WindowsPath_prepareTransportPath(toolOutputDir, context->spawnWorkingDirectoryBuffer,
+                                         SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
+        context->spawnWorkingDirectory = context->spawnWorkingDirectoryBuffer;
+    }
+}
+
+static void WindowsBootstrapCompileWorkingDirectory_leave(WindowsBootstrapCompileWorkingDirectory* context) {
+    windowsCommandWorkingDirectory = context->previousWorkingDirectory;
+}
+
+static int runParallelWindowsObjectCompilations(const CompilationInfo* ci, const char* includeDir, int defineSCBuild,
+                                                LPCWSTR workingDirectory) {
+    HANDLE processes[2];
+    int count = 0;
+    if (spawnSharedToolsObjectCompilation(ci, includeDir, workingDirectory, &processes[count])) {
+        count += 1;
+    }
+    if (spawnBuildToolObjectCompilation(ci, includeDir, defineSCBuild, workingDirectory, &processes[count])) {
+        count += 1;
+    }
+    return waitForWindowsObjectCompilations(processes, count);
+}
+#endif
+
+static char* prepareBootstrapCompileDirectories(CompilationInfo* ci) {
+    FileSystem_createDirectoryRecursive(ci->intermediateDir);
+    FileSystem_createDirectoryRecursive(ci->toolOutputDir);
+    return Path_join(ci->args->libraryDir, "Includes");
+}
+
+#ifndef _WIN32
+int compilePOSIX(CompilationInfo* ci) {
+    // Simplified: assume clang++ or g++
+    const char* compiler  = "";
+    const char* cCompiler = "";
+    char* includeDir      = prepareBootstrapCompileDirectories(ci);
+    int useClang = 0;
+    int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
+    int success = 1;
+    if (!detectPOSIXCompiler(&compiler, &cCompiler, &useClang)) {
+        success = 0;
+        goto cleanup;
+    }
+
+    int needTools = needsRebuildTools(ci);
+    int needTool = needsRebuildToolObj(ci);
+
+    if (needTools && needTool) {
+        if (!runParallelPOSIXObjectCompilations(ci, compiler, includeDir, useClang, defineSCBuild)) {
+            success = 0;
+            goto cleanup;
+        }
+        printf("Tools.cpp\n");
+        printf("SC-%s.cpp\n", ci->args->toolName);
+    } else if (needTools) {
+        printf("Tools.cpp\n");
+        if (!runSharedToolsPOSIXObjectCompilation(ci, compiler, includeDir, useClang)) {
+            success = 0;
+            goto cleanup;
+        }
+    } else if (needTool) {
+        printf("SC-%s.cpp\n", ci->args->toolName);
+        if (!runBuildToolPOSIXObjectCompilation(ci, compiler, includeDir, useClang, defineSCBuild)) {
+            success = 0;
+            goto cleanup;
+        }
+    } else {
+        printf("\"%s\" is up to date\n", ci->toolsCpp);
+        printf("\"%s\" is up to date\n", ci->toolCpp);
+    }
+
+cleanup:
+    free(includeDir);
+    if (!success) {
+        return 1;
+    }
+
+    if (needsRebuildExe(ci)) {
+        return linkPOSIX(ci, compiler, cCompiler, useClang);
+    }
+    return 0;
+}
+#endif
+
+#ifdef _WIN32
+int linkWindows(CompilationInfo* ci) {
+    printf("Linking %s\n", ci->args->toolName);
+    prepareBootstrapExecutableDirectory(ci);
+
+    char* toolsObj = buildToolsObjectPath(ci);
+    char* toolObj  = buildToolObjectPath(ci);
+
+    CommandLine cmd;
+    CommandLine_init(&cmd, "link");
+    CommandLine_arg(&cmd, "/nologo");
+    CommandLine_arg(&cmd, "/DEBUG");
+    CommandLine_arg(&cmd, "/MANIFEST:EMBED");
+    char* outputAndPdbFlag = buildWindowsLinkOutputAndPdbFlag(ci);
+    if (outputAndPdbFlag) {
+        CommandLine_arg(&cmd, outputAndPdbFlag);
+        free(outputAndPdbFlag);
+    }
+    char* manifestFlag = buildWindowsLinkManifestFlag(ci);
     if (manifestFlag) {
-        sprintf(manifestFlag, "/MANIFESTINPUT:\"%s\"", manifestPath);
         CommandLine_arg(&cmd, manifestFlag);
         free(manifestFlag);
     }
-    free(manifestPath);
     CommandLine_argQuoted(&cmd, toolsObj);
     CommandLine_argQuoted(&cmd, toolObj);
     if (!bootstrapLinkStdCpp()) {
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:libcpmt");
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:libcpmtd");
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcprt");
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcprtd");
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcp140");
-        CommandLine_arg(&cmd, "/NODEFAULTLIB:msvcp140d");
+        addWindowsNoStdCppLinkArguments(&cmd);
     }
-    CommandLine_arg(&cmd, "Advapi32.lib");
-    CommandLine_arg(&cmd, "Shell32.lib");
-    int ret = CommandLine_run(&cmd);
+    addWindowsSystemLinkLibraries(&cmd);
+    int ret = CommandLine_runInWorkingDirectory(&cmd, ci->toolOutputDir);
     CommandLine_destroy(&cmd);
     free(toolsObj);
     free(toolObj);
-#ifdef _WIN32
-    windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
     return ret;
 }
 
 int compileWindows(CompilationInfo* ci, int* objsCompiled);
+#endif
+
+void CommandLine_addBootstrapToolArguments(CommandLine* cmd, BootloaderArgs* args, CompilationInfo* ci) {
+    CommandLine_argQuoted(cmd, args->libraryDir);
+    CommandLine_argQuoted(cmd, args->toolSourceDir);
+    CommandLine_argQuoted(cmd, args->buildDir);
+    CommandLine_argQuoted(cmd, args->projectDir ? args->projectDir : args->libraryDir);
+    CommandLine_argQuoted(cmd, args->toolName);
+    for (int i = 0; i < args->numRemainingArgs; ++i) {
+        CommandLine_argQuoted(cmd, args->remainingArgs[i]);
+    }
+}
 
 int executeTool(BootloaderArgs* args, CompilationInfo* ci) {
     CommandLine cmd;
     CommandLine_init(&cmd, ci->toolExe);
-    CommandLine_argQuoted(&cmd, args->libraryDir);
-    CommandLine_argQuoted(&cmd, args->toolSourceDir);
-    CommandLine_argQuoted(&cmd, args->buildDir);
-    CommandLine_argQuoted(&cmd, args->projectDir ? args->projectDir : args->libraryDir);
-    CommandLine_argQuoted(&cmd, args->toolName);
-    for (int i = 0; i < args->numRemainingArgs; ++i) {
-        CommandLine_argQuoted(&cmd, args->remainingArgs[i]);
-    }
-#ifdef _WIN32
-    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
-    windowsCommandWorkingDirectory = args->libraryDir;
-#endif
-    int ret = CommandLine_run(&cmd);
-#ifdef _WIN32
-    windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
+    CommandLine_addBootstrapToolArguments(&cmd, args, ci);
+    int ret = CommandLine_runInWorkingDirectory(&cmd, args->libraryDir);
     CommandLine_destroy(&cmd);
     return ret;
+}
+
+static void destroyBootstrapInvocation(CompilationInfo* ci, BootloaderArgs* args, int argc, char** argv) {
+    CompilationInfo_destroy(ci);
+    BootloaderArgs_destroy(args);
+    freeArgs(argc, argv);
+}
+
+static int failBootstrapInvocation(CompilationInfo* ci, BootloaderArgs* args, int argc, char** argv,
+                                   const char* message) {
+    fprintf(stderr, "%s\n", message);
+    destroyBootstrapInvocation(ci, args, argc, argv);
+    return 1;
+}
+
+static int reportBootstrapToolResult(BootloaderArgs* args, int ret) {
+    if (ret != 0) {
+        fprintf(stderr, "Tool \"%s\" execution failed with code %d\n", args->toolName, ret);
+    } else {
+        printf("Tool \"%s\" executed successfully\n", args->toolName);
+    }
+    return ret == 0 ? 0 : -1;
+}
+
+static BootstrapTimer BootstrapTimer_start(void) {
+    BootstrapTimer timer;
+#ifdef _WIN32
+    timer.startTime = clock();
+#else
+    gettimeofday(&timer.startTime, NULL);
+#endif
+    return timer;
+}
+
+static double BootstrapTimer_elapsedSeconds(BootstrapTimer* timer) {
+#ifdef _WIN32
+    clock_t endTime = clock();
+    return (double)(endTime - timer->startTime) / CLOCKS_PER_SEC;
+#else
+    struct timeval endTime;
+    gettimeofday(&endTime, NULL);
+    return (endTime.tv_sec - timer->startTime.tv_sec) + (endTime.tv_usec - timer->startTime.tv_usec) / 1000000.0;
+#endif
 }
 
 // Main
@@ -1762,240 +2204,75 @@ int main(int argc, char* argv[]) {
     int needsCompile = needsRebuildTools(&ci) || needsRebuildToolObj(&ci);
     int needsLink = needsRebuildExe(&ci);
 
-#ifdef _WIN32
-    clock_t start_time = clock();
-#else
-    struct timeval start_time;
-    gettimeofday(&start_time, NULL);
-#endif
+    BootstrapTimer timer = BootstrapTimer_start();
     if (needsCompile || needsLink) {
         printf("Rebuilding %s tool...\n", args.toolName);
 #ifdef _WIN32
         int objsCompiled = 0;
         if (!compileWindows(&ci, &objsCompiled)) {
-            fprintf(stderr, "Compilation failed\n");
-            CompilationInfo_destroy(&ci);
-            BootloaderArgs_destroy(&args);
-            freeArgs(new_argc, new_argv);
-            return 1;
+            return failBootstrapInvocation(&ci, &args, new_argc, new_argv, "Compilation failed");
         }
         if (objsCompiled || needsLink) {
             if (linkWindows(&ci) != 0) {
-                fprintf(stderr, "Linking failed\n");
-                CompilationInfo_destroy(&ci);
-                BootloaderArgs_destroy(&args);
-                freeArgs(new_argc, new_argv);
-                return 1;
+                return failBootstrapInvocation(&ci, &args, new_argc, new_argv, "Linking failed");
             }
         }
 #else
         if (compilePOSIX(&ci) != 0) {
-            fprintf(stderr, "Compilation failed\n");
-            CompilationInfo_destroy(&ci);
-            BootloaderArgs_destroy(&args);
-            freeArgs(new_argc, new_argv);
-            return 1;
+            return failBootstrapInvocation(&ci, &args, new_argc, new_argv, "Compilation failed");
         }
 #endif
-#ifdef _WIN32
-        clock_t end_time = clock();
-        double duration = (double)(end_time - start_time) / CLOCKS_PER_SEC;
-#else
-        struct timeval end_time;
-        gettimeofday(&end_time, NULL);
-        double duration = (end_time.tv_sec - start_time.tv_sec) + (end_time.tv_usec - start_time.tv_usec) / 1000000.0;
-#endif
+        double duration = BootstrapTimer_elapsedSeconds(&timer);
         printf("Time to compile \"%s\" tool: %.2f seconds\n", args.toolName, duration);
     } else {
         printf("\"%s\" is up to date\n", ci.toolCpp);
     }
 
-    int ret = executeTool(&args, &ci);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Tool \"%s\" execution failed with code %d\n", args.toolName, ret);
-    }
-    else
-    {
-        printf("Tool \"%s\" executed successfully\n", args.toolName);
-    }
-    CompilationInfo_destroy(&ci);
-    BootloaderArgs_destroy(&args);
-    freeArgs(new_argc, new_argv);
-    return ret == 0 ? 0 : -1;
+    int ret        = executeTool(&args, &ci);
+    int exitStatus = reportBootstrapToolResult(&args, ret);
+    destroyBootstrapInvocation(&ci, &args, new_argc, new_argv);
+    return exitStatus;
 }
 
+#ifdef _WIN32
 int compileWindows(CompilationInfo* ci, int* objsCompiled) {
     // Simplified Windows compilation
-    FileSystem_createDirectoryRecursive(ci->intermediateDir);
-    FileSystem_createDirectoryRecursive(ci->toolOutputDir);
-    char* includeDir = Path_join(ci->args->libraryDir, "Includes");
+    char* includeDir = prepareBootstrapCompileDirectories(ci);
     int defineSCBuild = isSCBuildDefinitionSource(ci->toolCpp);
-#ifdef _WIN32
-    const char* previousWorkingDirectory = windowsCommandWorkingDirectory;
-    windowsCommandWorkingDirectory = ci->toolOutputDir;
-    wchar_t workingDirectory[SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1];
-    LPCWSTR spawnWorkingDirectory = NULL;
-    if (WindowsPath_prepareTransportPath(ci->toolOutputDir, workingDirectory,
-                                         SC_WINDOWS_TRANSPORT_PATH_CAPACITY + 1)) {
-        spawnWorkingDirectory = workingDirectory;
-    }
-#endif
+    WindowsBootstrapCompileWorkingDirectory workingDirectory;
+    WindowsBootstrapCompileWorkingDirectory_enter(&workingDirectory, ci->toolOutputDir);
 
     int needTools = needsRebuildTools(ci);
     int needTool = needsRebuildToolObj(ci);
+    int success = 1;
 
     if (needTools && needTool) {
-        // Compile both in parallel
-#ifdef _WIN32
-        HANDLE processes[2];
-        int count = 0;
-#endif
-        // Spawn Tools.obj compilation
-        {
-            *objsCompiled = 1;
-            char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
-            char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
-            CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp,
-                                       toolsJson, "Tools", 0);
-#ifdef _WIN32
-            char* command = StringVector_join(&cmd.args, " ");
-            STARTUPINFOW si = {sizeof(si)};
-            PROCESS_INFORMATION pi;
-            size_t len = strlen(command);
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
-            if (wlen > 0) {
-                wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-                if (wcmd) {
-                    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
-                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, spawnWorkingDirectory, &si, &pi)) {
-                        processes[count++] = pi.hProcess;
-                        CloseHandle(pi.hThread);
-                    }
-                    free(wcmd);
-                }
-            }
-            free(command);
-#else
-            int ret = CommandLine_run(&cmd);
-            if (ret != 0) return 0;
-#endif
-            CommandLine_destroy(&cmd);
-            free(toolsObj);
-            free(toolsJson);
+        *objsCompiled = 1;
+        if (!runParallelWindowsObjectCompilations(ci, includeDir, defineSCBuild,
+                                                  workingDirectory.spawnWorkingDirectory)) {
+            success = 0;
+            goto cleanup;
         }
-        // Spawn SC-tool.obj compilation
-        {
-            char* toolObj = Path_join(ci->intermediateDir, "SC-");
-            toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".obj") + 1);
-            sprintf(toolObj + strlen(toolObj), "%s.obj", ci->args->toolName);
-            char* toolJson = Path_join(ci->intermediateDir, "SC-");
-            toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
-            sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
-            CommandLine cmd;
-            buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolObj, ci->toolCpp,
-                                       toolJson, ci->args->toolName, defineSCBuild);
-#ifdef _WIN32
-            char* command = StringVector_join(&cmd.args, " ");
-            STARTUPINFOW si = {sizeof(si)};
-            PROCESS_INFORMATION pi;
-            size_t len = strlen(command);
-            int wlen = MultiByteToWideChar(CP_UTF8, 0, command, -1, NULL, 0);
-            if (wlen > 0) {
-                wchar_t* wcmd = (wchar_t*)malloc(wlen * sizeof(wchar_t));
-                if (wcmd) {
-                    MultiByteToWideChar(CP_UTF8, 0, command, -1, wcmd, wlen);
-                    if (CreateProcessW(NULL, wcmd, NULL, NULL, FALSE, 0, NULL, spawnWorkingDirectory, &si, &pi)) {
-                        processes[count++] = pi.hProcess;
-                        CloseHandle(pi.hThread);
-                    }
-                    free(wcmd);
-                }
-            }
-            free(command);
-#else
-            int ret = CommandLine_run(&cmd);
-            if (ret != 0) return 0;
-#endif
-            CommandLine_destroy(&cmd);
-            free(toolObj);
-            free(toolJson);
-        }
-#ifdef _WIN32
-        // Wait for both
-        if (count == 2) {
-            WaitForMultipleObjects(2, processes, TRUE, INFINITE);
-            DWORD exit1, exit2;
-            GetExitCodeProcess(processes[0], &exit1);
-            GetExitCodeProcess(processes[1], &exit2);
-            CloseHandle(processes[0]);
-            CloseHandle(processes[1]);
-            if (exit1 != 0 || exit2 != 0) {
-                free(includeDir);
-#ifdef _WIN32
-                windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
-                return 0;
-            }
-        } else {
-            free(includeDir);
-#ifdef _WIN32
-            windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
-            return 0;
-        }
-#else
-        printf("Tools.cpp\n");
-        printf("SC-%s.cpp\n", ci->args->toolName);
-#endif
     } else if (needTools) {
         *objsCompiled = 1;
-        char* toolsObj = Path_join(ci->intermediateDir, "Tools.obj");
-        char* toolsJson = Path_join(ci->intermediateDir, "Tools.json");
-        CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolsObj, ci->toolsCpp, toolsJson,
-                                   "Tools", 0);
-        int ret = CommandLine_run(&cmd);
-        CommandLine_destroy(&cmd);
-        free(toolsObj);
-        free(toolsJson);
-        if (ret != 0) {
-            free(includeDir);
-#ifdef _WIN32
-            windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
-            return 0;
+        if (!runSharedToolsObjectCompilation(ci, includeDir)) {
+            success = 0;
+            goto cleanup;
         }
     } else if (needTool) {
         *objsCompiled = 1;
-        char* toolObj = Path_join(ci->intermediateDir, "SC-");
-        toolObj = (char*)realloc(toolObj, strlen(toolObj) + strlen(ci->args->toolName) + strlen(".obj") + 1);
-        sprintf(toolObj + strlen(toolObj), "%s.obj", ci->args->toolName);
-        char* toolJson = Path_join(ci->intermediateDir, "SC-");
-        toolJson = (char*)realloc(toolJson, strlen(toolJson) + strlen(ci->args->toolName) + strlen(".json") + 1);
-        sprintf(toolJson + strlen(toolJson), "%s.json", ci->args->toolName);
-        CommandLine cmd;
-        buildCompileCommandWindows(&cmd, ci->intermediateDir, includeDir, toolObj, ci->toolCpp, toolJson,
-                                   ci->args->toolName, defineSCBuild);
-        int ret = CommandLine_run(&cmd);
-        CommandLine_destroy(&cmd);
-        free(toolObj);
-        free(toolJson);
-        if (ret != 0) {
-            free(includeDir);
-#ifdef _WIN32
-            windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
-            return 0;
+        if (!runBuildToolObjectCompilation(ci, includeDir, defineSCBuild)) {
+            success = 0;
+            goto cleanup;
         }
     } else {
         printf("\"%s\" is up to date\n", ci->toolsCpp);
         printf("\"%s\" is up to date\n", ci->toolCpp);
     }
+
+cleanup:
     free(includeDir);
-#ifdef _WIN32
-    windowsCommandWorkingDirectory = previousWorkingDirectory;
-#endif
-    return 1;
+    WindowsBootstrapCompileWorkingDirectory_leave(&workingDirectory);
+    return success;
 }
+#endif

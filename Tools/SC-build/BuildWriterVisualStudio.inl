@@ -83,6 +83,36 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
         return Result(true);
     }
 
+    [[nodiscard]] static bool writeLongPathManifestStagingProperties(StringBuilder& builder, const Project& project)
+    {
+        if (not shouldWriteLongPathManifest(project))
+        {
+            return true;
+        }
+        return builder.append(
+            "  <PropertyGroup>\n"
+            "    <SCBuildLongPathManifestDirectory>$(TEMP)\\SC-build\\Manifests\\$(ProjectGuid)\\$(Configuration)\\"
+            "$(Platform)</SCBuildLongPathManifestDirectory>\n"
+            "    <SCBuildLongPathManifestPath>$(SCBuildLongPathManifestDirectory)\\{}.long-path.manifest</"
+            "SCBuildLongPathManifestPath>\n"
+            "  </PropertyGroup>\n",
+            project.name);
+    }
+
+    [[nodiscard]] static bool writeLongPathManifestStagingTarget(StringBuilder& builder, const Project& project)
+    {
+        if (not shouldWriteLongPathManifest(project))
+        {
+            return true;
+        }
+        return builder.append("  <Target Name=\"SCBuildStageLongPathManifest\" BeforeTargets=\"Link\">\n"
+                              "    <MakeDir Directories=\"$(SCBuildLongPathManifestDirectory)\" />\n"
+                              "    <Copy SourceFiles=\"$(ProjectDir){}.long-path.manifest\" "
+                              "DestinationFiles=\"$(SCBuildLongPathManifestPath)\" SkipUnchangedFiles=\"true\" />\n"
+                              "  </Target>\n",
+                              project.name);
+    }
+
     [[nodiscard]] bool writeConfiguration(StringBuilder& builder, const Configuration& configuration,
                                           StringView platform)
     {
@@ -416,9 +446,8 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
             if (isLongPathAware(project, configuration))
             {
                 builder.append("    <Manifest>\n");
-                builder.append("      <AdditionalManifestFiles>$(ProjectDir){}.long-path.manifest;"
-                               "%(AdditionalManifestFiles)</AdditionalManifestFiles>\n",
-                               project.name);
+                builder.append("      <AdditionalManifestFiles>$(SCBuildLongPathManifestPath);"
+                               "%(AdditionalManifestFiles)</AdditionalManifestFiles>\n");
                 builder.append("    </Manifest>\n");
             }
         }
@@ -618,14 +647,16 @@ struct SC::Build::ProjectWriter::WriterVisualStudio
                        "  </ImportGroup>\n");
 
         SC_TRY(writePropertyGroups(builder, project));
+        SC_TRY(writeLongPathManifestStagingProperties(builder, project));
         SC_TRY(writeItemDefinitionGroups(builder, project));
         SC_TRY(writeSourceFiles(builder, project, renderer.renderItems));
         SC_TRY(writeHeaderFiles(builder, renderer.renderItems));
         SC_TRY(writeInlineFiles(builder, renderer.renderItems));
         SC_TRY(writeNatvisFiles(builder, renderer.renderItems));
 
-        builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.targets\" />\n"
-                       "  <ImportGroup Label=\"ExtensionTargets\">\n"
+        builder.append("  <Import Project=\"$(VCTargetsPath)\\Microsoft.Cpp.targets\" />\n");
+        SC_TRY(writeLongPathManifestStagingTarget(builder, project));
+        builder.append("  <ImportGroup Label=\"ExtensionTargets\">\n"
                        "  </ImportGroup>\n"
                        "</Project>\n");
         SC_COMPILER_WARNING_POP_UNUSED_RESULT;

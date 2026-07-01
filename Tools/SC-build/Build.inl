@@ -663,6 +663,22 @@ bool SC::Build::Definition::findConfiguration(StringView workspaceName, StringVi
     return true;
 }
 
+SC::Result SC::Build::FilePathsResolver::normalizeLookupPath(String& output, StringView path)
+{
+    SC_TRY(Path::normalize(output, path, Path::AsPosix));
+    const StringView outputView(output.view());
+    if (outputView.startsWith("\\\\"_a8))
+    {
+        String canonical = StringEncoding::Utf8;
+        auto   builder   = StringBuilder::create(canonical);
+        SC_TRY(builder.append("//"));
+        SC_TRY(builder.append(outputView.sliceStart(2)));
+        builder.finalize();
+        output = move(canonical);
+    }
+    return Result(true);
+}
+
 SC::Result SC::Build::FilePathsResolver::enumerateFileSystemFor(StringView                         path,
                                                                 const VectorSet<FilesSelection>&   filters,
                                                                 VectorMap<String, Vector<String>>& filtersToFiles)
@@ -769,7 +785,7 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
     {
         FilesSelection absFile;
         absFile.action = file.action;
-        SC_TRY(Path::normalize(absFile.base, file.base.view(), Path::Type::AsPosix));
+        SC_TRY(normalizeLookupPath(absFile.base, file.base.view()));
         SC_TRY(absFile.mask.assign(file.mask.view()));
         SC_TRY(paths.getOrCreate(absFile.base.view())->insert(absFile));
         return Result(true);
@@ -783,14 +799,14 @@ SC::Result SC::Build::FilePathsResolver::mergePathsFor(const FilesSelection& fil
                 return Result::Error("Absolute path detected");
             }
             SC_TRY(Path::append(buffer, {file.mask.view()}, Path::AsPosix));
-            SC_TRY(Path::normalize(normalizedPath, buffer.view(), Path::AsPosix));
+            SC_TRY(normalizeLookupPath(normalizedPath, buffer.view()));
             auto* value = paths.getOrCreate(normalizedPath.view());
             SC_TRY(value != nullptr and value->insert(file));
         }
         return Result(true);
     }
     SC_TRY(Path::append(buffer, {file.base.view()}, Path::AsPosix));
-    SC_TRY(Path::normalize(normalizedPath, buffer.view(), Path::AsPosix));
+    SC_TRY(normalizeLookupPath(normalizedPath, buffer.view()));
     // Some example cases:
     // 1. /SC/Tests/SCTest
     // 2. /SC/Libraries
