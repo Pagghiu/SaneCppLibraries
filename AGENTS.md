@@ -10,6 +10,10 @@
 4. **No system headers in public `.h`** — only in `.cpp` or internal files
 5. **No dependencies** — neither external nor between libraries (check existing patterns)
 
+## Architecture
+
+All architecture relevant decisions must be saved as explicit ADR in [Architecture](Architecture) folder.
+
 ## Commands
 
 ```bash
