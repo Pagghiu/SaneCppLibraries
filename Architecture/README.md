@@ -5,8 +5,9 @@ This directory records architectural decisions for Sane C++ Libraries.
 ADRs use scoped identifiers so decisions can be referenced across libraries without one global numbering queue:
 
 - `SC-NNNN`: project-wide decisions shared by all libraries.
-- `JSON-NNNN`: Json library decisions.
-- Future library scopes should use short uppercase slugs, for example `MEM-NNNN`, `CONT-NNNN`, or `ASYNC-NNNN`.
+- `COMMON-NNNN`: source-fragment decisions for `Libraries/Common`.
+- `FOUNDATION-NNNN`: Foundation library decisions.
+- Future library scopes should use short uppercase slugs, for example `JSON-NNNN`, `MEM-NNNN`, `CONT-NNNN`, or `ASYNC-NNNN`.
 
 ## ADR Format
 
@@ -57,3 +58,5 @@ Reference formats:
 ## Scopes
 
 - [Global](Global/README.md): project-wide decisions with `SC-NNNN` identifiers.
+- [Common](Common/README.md): source-fragment decisions with `COMMON-NNNN` identifiers.
+- [Foundation](Foundation/README.md): Foundation library decisions with `FOUNDATION-NNNN` identifiers.
