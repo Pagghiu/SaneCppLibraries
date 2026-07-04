@@ -12,7 +12,7 @@
 
 ## Architecture
 
-All architecture relevant decisions must be saved as explicit ADR in [Architecture](Architecture) folder.
+All architecture relevant decisions must be saved as explicit ADR in [Architecture](Architecture/README.md).
 
 ## Commands
 
