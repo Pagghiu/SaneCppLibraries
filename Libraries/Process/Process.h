@@ -87,7 +87,8 @@ struct SC_PROCESS_EXPORT Process
 
     struct SC_PROCESS_EXPORT Options
     {
-        bool windowsHide; ///< [Windows] Hides child process window (default == Process::isWindowsConsoleSubsystem)
+        bool windowsHide;                  ///< [Windows] Hides child process window
+        bool windowsCreateNewProcessGroup; ///< [Windows] Creates a console process group rooted at the child
         Options();
     };
 

@@ -116,6 +116,10 @@ SC::Result SC::Process::launchImplementation()
     {
         creationFlags |= CREATE_NO_WINDOW;
     }
+    if (options.windowsCreateNewProcessGroup)
+    {
+        creationFlags |= CREATE_NEW_PROCESS_GROUP;
+    }
     ZeroMemory(&startupInfo, sizeof(STARTUPINFO));
     startupInfo.cb         = sizeof(STARTUPINFO);
     startupInfo.hStdInput  = ::GetStdHandle(STD_INPUT_HANDLE);

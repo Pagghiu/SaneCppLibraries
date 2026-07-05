@@ -125,7 +125,11 @@ void SC::ProcessChain::ProcessLinkedList::queueBack(Process& process)
 //-------------------------------------------------------------------------------------------------------
 // Process
 //-------------------------------------------------------------------------------------------------------
-SC::Process::Options::Options() { windowsHide = Process::isWindowsConsoleSubsystem(); }
+SC::Process::Options::Options()
+{
+    windowsHide                  = Process::isWindowsConsoleSubsystem();
+    windowsCreateNewProcessGroup = false;
+}
 
 SC::Result SC::Process::launch(const StdOut& stdOutput, const StdIn& stdInput, const StdErr& stdError)
 {
