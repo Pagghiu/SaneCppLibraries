@@ -612,7 +612,9 @@ struct SC::Build::NativeBuild
         case Platform::Linux:
             if (WriterInternal::shouldPreserveExportedSymbols(*resolvedProject.project, resolvedProject.linkFlags))
             {
-                SC_TRY(commandLine.append("objcopy"));
+                String objcopyTool = StringEncoding::Utf8;
+                SC_TRY(resolveLinuxBinutilsTool(resolvedProject.targetContext, "objcopy"_a8, objcopyTool));
+                SC_TRY(commandLine.append(objcopyTool.view()));
                 SC_TRY(commandLine.append("--strip-unneeded"));
                 String option = StringEncoding::Utf8;
                 SC_TRY(StringBuilder::format(option, "--keep-symbols={}", resolvedProject.exportedSymbolsPath.view()));
@@ -620,7 +622,9 @@ struct SC::Build::NativeBuild
             }
             else
             {
-                SC_TRY(commandLine.append("strip"));
+                String stripTool = StringEncoding::Utf8;
+                SC_TRY(resolveLinuxBinutilsTool(resolvedProject.targetContext, "strip"_a8, stripTool));
+                SC_TRY(commandLine.append(stripTool.view()));
                 SC_TRY(commandLine.append("--strip-unneeded"));
             }
             break;
@@ -1909,8 +1913,7 @@ struct SC::Build::NativeBuild
         {
             SC_TRY(commandLine.append("-fuse-ld=lld"));
         }
-        if (resolvedProject.adapter.family == Toolchain::FilC and
-            not resolvedProject.adapter.linkerToolDirectory.isEmpty())
+        if (not resolvedProject.adapter.linkerToolDirectory.isEmpty())
         {
             SC_TRY(commandLine.append("-B"));
             SC_TRY(commandLine.append(resolvedProject.adapter.linkerToolDirectory.view()));
@@ -2791,6 +2794,92 @@ struct SC::Build::NativeBuild
         return Result(true);
     }
 
+    static constexpr StringView linuxGNUToolPrefix(Architecture::Type architecture)
+    {
+        switch (architecture)
+        {
+        case Architecture::Intel64: return "x86_64-linux-gnu";
+        case Architecture::Arm64: return "aarch64-linux-gnu";
+        case Architecture::Intel32:
+        case Architecture::Any:
+        case Architecture::Wasm: return {};
+        }
+        Assert::unreachable();
+    }
+
+    static Result resolveLinuxBinutilsTool(const ResolvedTargetContext& targetContext, StringView tool, String& output)
+    {
+        const StringView prefix = linuxGNUToolPrefix(targetArchitecture(targetContext));
+        if (not prefix.isEmpty())
+        {
+            String candidate = StringEncoding::Utf8;
+            SC_TRY(StringBuilder::format(candidate, "{}-{}", prefix, tool));
+            if (resolveRunnableHostCommand(candidate.view(), output))
+            {
+                return Result(true);
+            }
+        }
+        if (resolveRunnableHostCommand(tool, output))
+        {
+            return Result(true);
+        }
+        SC_TRY(output.assign(tool));
+        return Result(true);
+    }
+
+    static constexpr bool isLinuxHostCrossArchitectureTarget(const ResolvedTargetContext& targetContext)
+    {
+        return targetContext.hostMachine.platform == Platform::Linux and
+               targetPlatform(targetContext) == Platform::Linux and
+               targetArchitecture(targetContext) != targetContext.hostMachine.architecture;
+    }
+
+    static Result configureLinuxCrossLinkerDirectory(const Parameters&            parameters,
+                                                     const ResolvedTargetContext& targetContext,
+                                                     CompilerAdapter&             adapter)
+    {
+        if (adapter.family != Toolchain::Clang or not isLinuxHostCrossArchitectureTarget(targetContext))
+        {
+            return Result(true);
+        }
+
+        const StringView prefix = linuxGNUToolPrefix(targetArchitecture(targetContext));
+        if (prefix.isEmpty())
+        {
+            return Result(true);
+        }
+
+        String linkerName = StringEncoding::Utf8;
+        String linkerPath = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(linkerName, "{}-ld", prefix));
+        if (not resolveRunnableHostCommand(linkerName.view(), linkerPath))
+        {
+            return Result(true);
+        }
+
+        FileSystem fs;
+        SC_TRY(fs.init("."));
+
+        String wrapperRoot = StringEncoding::Utf8;
+        String wrapperPath = StringEncoding::Utf8;
+        SC_TRY(StringBuilder::format(wrapperRoot, "{}/linux-cross-linker-{}",
+                                     parameters.directories.buildCacheDirectory,
+                                     architectureName(targetArchitecture(targetContext))));
+        SC_TRY(Path::join(wrapperPath, {wrapperRoot.view(), "ld"}));
+        SC_TRY(fs.makeDirectoryRecursive(wrapperRoot.view()));
+
+        String script  = StringEncoding::Utf8;
+        auto   builder = StringBuilder::create(script);
+        SC_TRY(builder.append("#!/bin/sh\n"));
+        SC_TRY(builder.append("exec \"{}\" \"$@\"\n", linkerPath.view()));
+        builder.finalize();
+
+        SC_TRY(fs.writeString(wrapperPath.view(), script.view()));
+        SC_TRY(fs.chmod(wrapperPath.view(), 0755u));
+        SC_TRY(adapter.linkerToolDirectory.assign(wrapperRoot.view()));
+        return Result(true);
+    }
+
     static Result resolvePackagedLinuxSysroot(const Parameters& parameters, const ResolvedTargetContext& context,
                                               String& sysroot)
     {
@@ -2926,12 +3015,29 @@ struct SC::Build::NativeBuild
         return targetArchitecture(context) == context.hostMachine.architecture;
     }
 
-    static constexpr bool canRunThroughHostTranslation(const Parameters&            parameters,
-                                                       const ResolvedTargetContext& context)
+    static bool pathExists(StringView path)
     {
-        return parameters.toolchain.family == Toolchain::FilC and targetPlatform(context) == Platform::Linux and
-               context.hostMachine.platform == Platform::Linux and
-               context.targetMachine.environment == TargetEnvironment::Native;
+        FileSystem fs;
+        if (not fs.init("."))
+        {
+            return false;
+        }
+        return fs.exists(path);
+    }
+
+    static bool canRunThroughHostTranslation(const Parameters& parameters, const ResolvedTargetContext& context)
+    {
+        if (parameters.toolchain.family == Toolchain::FilC and targetPlatform(context) == Platform::Linux and
+            context.hostMachine.platform == Platform::Linux and
+            context.targetMachine.environment == TargetEnvironment::Native)
+        {
+            return true;
+        }
+
+        return targetPlatform(context) == Platform::Linux and context.hostMachine.platform == Platform::Linux and
+               context.hostMachine.architecture == Architecture::Arm64 and
+               targetArchitecture(context) == Architecture::Intel64 and
+               pathExists("/proc/sys/fs/binfmt_misc/RosettaLinux");
     }
 
     static constexpr bool shouldPreferWineConsole(const ResolvedTargetContext& context)
@@ -2961,16 +3067,6 @@ struct SC::Build::NativeBuild
             SC_TRY(appendRunnerArgument(destination, argument.view()));
         }
         return Result(true);
-    }
-
-    static bool pathExists(StringView path)
-    {
-        FileSystem fs;
-        if (not fs.init("."))
-        {
-            return false;
-        }
-        return fs.exists(path);
     }
 
     static Result resolveHostCommandPath(StringView executable, String& output)
@@ -4143,7 +4239,7 @@ struct SC::Build::NativeBuild
             break;
         case Toolchain::HostDefault: return Result::Error("Unexpected HostDefault toolchain");
         }
-        return Result(true);
+        return configureLinuxCrossLinkerDirectory(parameters, targetContext, adapter);
     }
 
     static Result expandConfiguredPath(StringView baseDirectory, StringView configuredPath, const Variables& variables,
