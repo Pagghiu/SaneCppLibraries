@@ -34,6 +34,9 @@ void runGlobalsContainerTest(TestReport& report);
 void runFileTest(TestReport& report);
 void runSerialPortTest(TestReport& report);
 
+// Fibers
+void runFibersTest(TestReport& report);
+
 // FileSystem
 void runFileSystemTest(TestReport& report);
 void runPathTest(TestReport& report);
@@ -178,6 +181,9 @@ int main(int argc, const char* argv[])
     // File tests
     runFileTest(report);
     runSerialPortTest(report);
+
+    // Fibers tests
+    runFibersTest(report);
 
     // FileSystem tests
     runFileSystemTest(report);

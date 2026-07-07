@@ -24,6 +24,7 @@ INPUT                  = ../../_Build/_Dependencies/Dependencies.md \
                          ../../Libraries/FileSystem \
                          ../../Libraries/FileSystemIterator \
                          ../../Libraries/FileSystemWatcher \
+                         ../../Libraries/Fibers \
                          ../../Libraries/Foundation \
                          ../../Libraries/Hashing \
                          ../../Libraries/Http \

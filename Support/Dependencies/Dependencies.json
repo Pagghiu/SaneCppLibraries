@@ -66,6 +66,11 @@
             "Reflection"
         ]
     },
+    "Fibers": {
+        "direct_dependencies": [],
+        "minimal_dependencies": [],
+        "all_dependencies": []
+    },
     "File": {
         "direct_dependencies": [],
         "minimal_dependencies": [],
