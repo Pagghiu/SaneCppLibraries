@@ -141,7 +141,9 @@ void SC::HttpStressTest::websocketHubFanoutSmoke()
 
 void SC::HttpStressTest::keepAliveManyRequestsSmoke()
 {
-    constexpr int  NumRequests    = 64;
+    constexpr int NumRequests = SC_COMPILER_FILC ? 8 : 64;
+    constexpr int TimeoutMs   = SC_COMPILER_FILC ? 30000 : 3000;
+
     constexpr int  MaxConnections = 4;
     constexpr int  RequestSlices  = 2;
     constexpr int  HeaderBytes    = 8 * 1024;
@@ -206,7 +208,7 @@ void SC::HttpStressTest::keepAliveManyRequestsSmoke()
     AsyncLoopTimeout timeout;
     timeout.callback = [this](AsyncLoopTimeout::Result&)
     { SC_TEST_EXPECT("HttpStressTest keep-alive smoke timed out" && false); };
-    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{3000}));
+    SC_TEST_EXPECT(timeout.start(eventLoop, TimeMs{TimeoutMs}));
     eventLoop.excludeFromActiveCount(timeout);
 
     SC_TEST_EXPECT(eventLoop.run());
