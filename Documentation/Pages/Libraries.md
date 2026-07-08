@@ -10,6 +10,7 @@ Library                                     | Description                       
 @subpage library_containers             | @copybrief library_containers             | 1007 | 3 | 4428
 @subpage library_containers_reflection  | @copybrief library_containers_reflection  | 231 | 0 | 5609
 @subpage library_fibers                 | @copybrief library_fibers                 | 0 | 0 | 0
+@subpage library_fibers_async           | @copybrief library_fibers_async           | 0 | 0 | 0
 @subpage library_file                   | @copybrief library_file                   | 200 | 1364 | 3018
 @subpage library_file_system            | @copybrief library_file_system            | 188 | 1858 | 3403
 @subpage library_file_system_iterator   | @copybrief library_file_system_iterator   | 92 | 402 | 2098

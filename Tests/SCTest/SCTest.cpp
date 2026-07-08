@@ -35,6 +35,7 @@ void runFileTest(TestReport& report);
 void runSerialPortTest(TestReport& report);
 
 // Fibers
+void runFibersAsyncTest(TestReport& report);
 void runFibersTest(TestReport& report);
 
 // FileSystem
@@ -184,6 +185,7 @@ int main(int argc, const char* argv[])
 
     // Fibers tests
     runFibersTest(report);
+    runFibersAsyncTest(report);
 
     // FileSystem tests
     runFileSystemTest(report);

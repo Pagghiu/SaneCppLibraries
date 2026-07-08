@@ -4,6 +4,7 @@
 #include "Libraries/AsyncStreams/AsyncStreams.cpp"
 #include "Libraries/Containers/Containers.cpp"
 #include "Libraries/Fibers/Fibers.cpp"
+#include "Libraries/FibersAsync/FibersAsync.cpp"
 #include "Libraries/File/File.cpp"
 #include "Libraries/FileSystem/FileSystem.cpp"
 #include "Libraries/FileSystemIterator/FileSystemIterator.cpp"
