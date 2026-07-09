@@ -30,8 +30,6 @@ struct ConsumePublicHttpHeaderSymbols
         SC::HttpRoute                           route;
         SC::HttpRouteMatch                      routeMatch;
         SC::HttpRouter                          router;
-        SC::HttpAsyncServerTlsOptions           serverTls;
-        SC::HttpAsyncClientTlsOptions           clientTls;
         SC::HttpAsyncClient::Header             clientHeader;
         SC::HttpAsyncClient::RequestOptions     request;
         SC::HttpAsyncFileServerOptions          fileServerOptions;
@@ -78,8 +76,6 @@ struct ConsumePublicHttpHeaderSymbols
         (void)authorization;
         (void)routeMatch;
         (void)router;
-        (void)serverTls;
-        (void)clientTls;
         (void)clientHeader;
         (void)fileServerOptions;
         (void)multipartDisposition;

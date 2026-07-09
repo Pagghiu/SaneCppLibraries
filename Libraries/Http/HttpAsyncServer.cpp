@@ -75,9 +75,6 @@ Result HttpAsyncServer::stop()
     for (size_t idx = 0; idx < connections.getNumTotalConnections(); ++idx)
     {
         HttpConnection& client = static_cast<HttpConnection&>(connections.getConnectionAt(idx));
-        // Destroy can be safely called in any state (including already destroyed)
-        client.readableSocketStream.destroy();
-        client.writableSocketStream.destroy();
         closeAsync(client);
     }
     return Result(true);
@@ -184,14 +181,74 @@ void HttpAsyncServer::onNewClient(AsyncSocketAccept::Result& result)
     client.resetTransportStreams();
     client.readableSocketStream.setAutoDestroy(true);
     client.writableSocketStream.setAutoDestroy(false); // needed for keep-alive logic
-    client.response.setWritableStream(client.getWritableTransportStream());
 
-    EventDataListener dataListener{*this, client};
-    SC_HTTP_TRUST_RESULT(client.getReadableTransportStream().eventData.addListener(dataListener));
-    SC_HTTP_TRUST_RESULT(client.getReadableTransportStream().start());
+    Result setup = beginTransportConnection(client);
+    if (not setup)
+    {
+        if (onError.isValid())
+        {
+            onError(setup);
+        }
+        closeAsync(client);
+    }
 
     // Only reactivate asyncAccept if there are available clients (otherwise it's being reactivated in closeAsync)
     result.reactivateRequest(connections.getNumActiveConnections() < connections.getNumTotalConnections());
+}
+
+Result HttpAsyncServer::beginHttpConnection(HttpConnection& client)
+{
+    client.response.setWritableStream(client.getWritableTransportStream());
+
+    EventDataListener dataListener{*this, client};
+    SC_TRY_MSG(client.getReadableTransportStream().eventData.addListener(dataListener),
+               "HttpAsyncServer readable data listener unavailable");
+    if (client.getReadableTransportStream().canStart())
+    {
+        SC_TRY(client.getReadableTransportStream().start());
+    }
+    else
+    {
+        client.getReadableTransportStream().resumeReading();
+    }
+    return Result(true);
+}
+
+Result HttpAsyncServer::beginTransportConnection(HttpConnection& client)
+{
+    if (not transportSetup.isValid())
+    {
+        return beginHttpConnection(client);
+    }
+
+    HttpAsyncServerTransportSetup setup;
+    setup.connection = &client;
+    setup.eventLoop  = eventLoop;
+    setup.complete   = {[this, &client](Result result) { onTransportSetupComplete(client, result); }};
+    return transportSetup(setup);
+}
+
+void HttpAsyncServer::onTransportSetupComplete(HttpConnection& client, Result result)
+{
+    if (not result)
+    {
+        if (onError.isValid())
+        {
+            onError(result);
+        }
+        closeAsync(client);
+        return;
+    }
+
+    Result setup = beginHttpConnection(client);
+    if (not setup)
+    {
+        if (onError.isValid())
+        {
+            onError(setup);
+        }
+        closeAsync(client);
+    }
 }
 
 void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID)
@@ -290,9 +347,12 @@ void HttpAsyncServer::onStreamReceive(HttpConnection& client, AsyncBufferView::I
                     client.request.setHeaderMemory(client.getHeaderMemory());
                     client.response.reset();
 
-                    Result writableRes =
-                        client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
-                    SC_HTTP_TRUST_RESULT(writableRes);
+                    if (&client.getWritableTransportStream() == &client.writableSocketStream)
+                    {
+                        Result writableRes =
+                            client.writableSocketStream.init(client.buffersPool, *pself.eventLoop, client.socket);
+                        SC_HTTP_TRUST_RESULT(writableRes);
+                    }
 
                     // Resume reading in any case to avoid deadlocking
                     client.getReadableTransportStream().resumeReading();
@@ -374,6 +434,11 @@ void HttpAsyncServer::closeAsync(HttpConnection& client)
     (void)client.getReadableTransportStream().eventEnd.removeListener(endListener);
     EventCloseListener closeListener{*this, client};
     (void)client.getReadableTransportStream().eventClose.removeListener(closeListener);
+
+    if (transportClose.isValid())
+    {
+        transportClose(client);
+    }
 
     const bool readWasDestroyed  = client.readableSocketStream.hasBeenDestroyed();
     const bool writeWasDestroyed = client.writableSocketStream.hasBeenDestroyed();

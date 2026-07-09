@@ -24,16 +24,16 @@ struct SC_HTTP_EXPORT HttpAsyncConnection
 {
 };
 
-/// @brief TLS policy for future `HttpAsyncServer` HTTPS listeners.
+/// @brief Mutable transport setup view used by `HttpAsyncServer` after accepting a TCP socket.
 ///
-/// The pointed-to certificate, key, and ALPN buffers must outlive the server listener using these options.
-struct SC_HTTP_EXPORT HttpAsyncServerTlsOptions
+/// The default setup keeps `connection` using its socket streams. A custom setup can install alternate active streams
+/// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP.
+struct SC_HTTP_EXPORT HttpAsyncServerTransportSetup
 {
-    bool enabled = false;
+    HttpConnection* connection = nullptr;
+    AsyncEventLoop* eventLoop  = nullptr;
 
-    Span<const char> pemCertificateChain;
-    Span<const char> pemPrivateKey;
-    Span<StringSpan> alpnProtocols;
+    Function<void(Result)> complete;
 };
 
 /// @brief Async Http Server
@@ -87,13 +87,18 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     /// @brief Gets the maximum accepted request-header size in bytes.
     [[nodiscard]] uint32_t getMaxHeaderSize() const { return maxHeaderSize; }
 
-    /// @brief Sets TLS options used by future HTTPS listener integration.
-    void setTlsOptions(const HttpAsyncServerTlsOptions& options) { tlsOptions = options; }
+    /// @brief Sets an optional transport setup hook invoked after accepting TCP and before HTTP reads request bytes.
+    void setTransportSetup(Function<Result(HttpAsyncServerTransportSetup&)>&& setup) { transportSetup = move(setup); }
 
-    /// @brief Restores default plain HTTP listener options.
-    void clearTlsOptions() { tlsOptions = {}; }
+    /// @brief Sets an optional transport teardown hook invoked before HTTP destroys an accepted socket's streams.
+    void setTransportClose(Function<void(HttpConnection&)>&& close) { transportClose = move(close); }
 
-    [[nodiscard]] const HttpAsyncServerTlsOptions& getTlsOptions() const { return tlsOptions; }
+    /// @brief Clears optional transport setup and teardown hooks.
+    void clearTransportSetup()
+    {
+        transportSetup = {};
+        transportClose = {};
+    }
 
     /// @brief Returns true if the server has been started
     [[nodiscard]] bool isStarted() const { return state == State::Started; }
@@ -126,7 +131,8 @@ struct SC_HTTP_EXPORT HttpAsyncServer
 
     uint32_t maxHeaderSize = 8 * 1024;
 
-    HttpAsyncServerTlsOptions tlsOptions;
+    Function<Result(HttpAsyncServerTransportSetup&)> transportSetup;
+    Function<void(HttpConnection&)>                  transportClose;
 
     enum class State
     {
@@ -140,11 +146,14 @@ struct SC_HTTP_EXPORT HttpAsyncServer
     bool     defaultKeepAlive         = true; ///< Server-wide keep-alive default
     uint32_t maxRequestsPerConnection = 0;    ///< Max requests per connection (0 = unlimited)
 
-    void onNewClient(AsyncSocketAccept::Result& result);
-    void closeAsync(HttpConnection& requestClient);
-    void deactivateConnection(HttpConnection& requestClient);
-    void onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
-    void onRequestBodyData(HttpConnection& client, AsyncBufferView::ID bufferID);
+    void   onNewClient(AsyncSocketAccept::Result& result);
+    void   closeAsync(HttpConnection& requestClient);
+    void   deactivateConnection(HttpConnection& requestClient);
+    Result beginHttpConnection(HttpConnection& client);
+    Result beginTransportConnection(HttpConnection& client);
+    void   onStreamReceive(HttpConnection& client, AsyncBufferView::ID bufferID);
+    void   onRequestBodyData(HttpConnection& client, AsyncBufferView::ID bufferID);
+    void   onTransportSetupComplete(HttpConnection& client, Result result);
 
     Result waitForStopToFinish();
     Result initInternal(SpanWithStride<HttpConnection> connections);

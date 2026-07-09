@@ -220,15 +220,9 @@ Result HttpAsyncClient::prepareRequest(const RequestPreset& preset)
         response.initBodyStream(connection->buffersPool, {[this]() -> Result { return onResponseBodyStreamRead(); }}));
 
     SC_TRY(currentURL.parse(preset.url));
-    if (HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https"))
-    {
-        SC_TRY_MSG(transportSetup.isValid(), "HttpAsyncClient https URLs require TLS transport support");
-    }
-    else
-    {
-        SC_TRY_MSG(HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "http"),
-                   "HttpAsyncClient only supports http and https URLs");
-    }
+    const bool isHttp  = HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "http");
+    const bool isHttps = HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https");
+    SC_TRY_MSG(isHttp or isHttps, "HttpAsyncClient only supports http and https URLs");
     SC_TRY_MSG(currentURL.username.isEmpty() and currentURL.password.isEmpty(),
                "HttpAsyncClient userinfo not supported");
     return Result(true);
@@ -243,7 +237,10 @@ Result HttpAsyncClient::ensureConnected()
 {
     if (canReuseConnectionFor(currentURL.protocol, currentURL.host, currentURL.port))
     {
-        SC_TRY(connection->writableSocketStream.init(connection->buffersPool, *eventLoop, connection->socket));
+        if (&connection->getWritableTransportStream() == &connection->writableSocketStream)
+        {
+            SC_TRY(connection->writableSocketStream.init(connection->buffersPool, *eventLoop, connection->socket));
+        }
         SC_TRY(beginResponseRead());
         return beginRequestSend();
     }
@@ -296,11 +293,25 @@ void HttpAsyncClient::onConnected(AsyncSocketConnect::Result& result)
         setup.url        = &currentURL;
         setup.complete   = {[this](Result setupResult) { completeTransportSetup(setupResult); }};
 
+        Result nativeSocket =
+            connection->socket.get(setup.nativeSocket, Result::Error("HttpAsyncClient invalid socket"));
+        if (not nativeSocket)
+        {
+            fail(nativeSocket);
+            return;
+        }
+
         Result setupResult = transportSetup(setup);
         if (not setupResult)
         {
             fail(setupResult);
         }
+        return;
+    }
+
+    if (HttpStringIterator::equalsIgnoreCase(currentURL.protocol, "https"))
+    {
+        fail(Result::Error("HttpAsyncClient HTTPS transport not configured"));
         return;
     }
 
@@ -381,7 +392,7 @@ Result HttpAsyncClient::beginResponseRead()
     const bool addedResponseData = connection->getReadableTransportStream()
                                        .eventData.addListener<HttpAsyncClient, &HttpAsyncClient::onResponseData>(*this);
     SC_TRY_MSG(addedResponseData, "HttpAsyncClient failed to register response listener");
-    if (requestCount == 0)
+    if (connection->getReadableTransportStream().canStart())
     {
         SC_TRY(connection->getReadableTransportStream().start());
     }
@@ -915,6 +926,10 @@ void HttpAsyncClient::closeConnection()
         .eventEnd.removeListener<HttpAsyncClient, &HttpAsyncClient::onReadableEnd>(*this);
     (void)connection->pipeline.eventError.removeListener<HttpAsyncClient, &HttpAsyncClient::onPipelineError>(*this);
     (void)connection->pipeline.unpipe();
+    if (transportClose.isValid())
+    {
+        transportClose();
+    }
     connection->readableSocketStream.destroy();
     connection->writableSocketStream.destroy();
     connection->resetTransportStreams();

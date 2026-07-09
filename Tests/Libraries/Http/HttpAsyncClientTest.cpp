@@ -260,13 +260,9 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
         {
             httpsTransportSetupReportsTlsBackendError();
         }
-        if (test_section("HTTPS rejected until TLS transport exists"))
+        if (test_section("HTTPS requires transport adapter"))
         {
-            httpsRejectedUntilTlsTransportExists();
-        }
-        if (test_section("TLS options are client scoped"))
-        {
-            tlsOptionsAreClientScoped();
+            httpsRequiresTransportAdapter();
         }
         if (test_section("zero-length response"))
         {
@@ -324,8 +320,7 @@ struct SC::HttpAsyncClientTest : public SC::TestCase
     void transportSetupHookDefersRequest();
     void httpsTransportSetupHookDispatch();
     void httpsTransportSetupReportsTlsBackendError();
-    void httpsRejectedUntilTlsTransportExists();
-    void tlsOptionsAreClientScoped();
+    void httpsRequiresTransportAdapter();
     void zeroLengthResponse();
     void chunkedResponse();
     void chunkedResponseRejectsTrailers();
@@ -485,52 +480,39 @@ void SC::HttpAsyncClientTest::basicGet()
     SC_TEST_EXPECT(loop.close());
 }
 
-void SC::HttpAsyncClientTest::httpsRejectedUntilTlsTransportExists()
+void SC::HttpAsyncClientTest::httpsRequiresTransportAdapter()
 {
     AsyncEventLoop loop;
     SC_TEST_EXPECT(loop.create());
 
+    const uint16_t tcpPort       = report.mapPort(8051);
+    StringSpan     serverAddress = "127.0.0.1";
+
+    SocketIPAddress nativeAddress;
+    SC_TEST_EXPECT(nativeAddress.fromAddressPort(serverAddress, tcpPort));
+
+    SocketDescriptor serverSocket;
+    SocketServer     server(serverSocket);
+    SC_TEST_EXPECT(serverSocket.create(nativeAddress.getAddressFamily()));
+    SC_TEST_EXPECT(server.bind(nativeAddress));
+    SC_TEST_EXPECT(server.listen(1));
+
     ClientConnection clientStorage;
     HttpAsyncClient  client;
 
-    bool errorCallbackCalled = false;
+    Result error(false);
     SC_TEST_EXPECT(client.init(clientStorage));
-    client.onError = [&errorCallbackCalled](Result) { errorCallbackCalled = true; };
+    client.onError = [&error](Result result) { error = result; };
 
-    const Result result = client.get(loop, "https://example.com/");
-    SC_TEST_EXPECT(resultMessageEquals(result, "HttpAsyncClient https URLs require TLS transport support"));
-    SC_TEST_EXPECT(not errorCallbackCalled);
+    String url = StringEncoding::Ascii;
+    SC_TEST_EXPECT(StringBuilder::format(url, "https://127.0.0.1:{}/", tcpPort));
+
+    SC_TEST_EXPECT(client.get(loop, url.view()));
+    SC_TEST_EXPECT(loop.run());
+    SC_TEST_EXPECT(resultMessageEquals(error, "HttpAsyncClient HTTPS transport not configured"));
     SC_TEST_EXPECT(client.close());
+    SC_TEST_EXPECT(server.close());
     SC_TEST_EXPECT(loop.close());
-}
-
-void SC::HttpAsyncClientTest::tlsOptionsAreClientScoped()
-{
-    ClientConnection clientStorage;
-    HttpAsyncClient  client;
-
-    const char customCA[] = "-----BEGIN CERTIFICATE-----\n-----END CERTIFICATE-----\n";
-
-    SC_TEST_EXPECT(client.init(clientStorage));
-    SC_TEST_EXPECT(client.getTlsOptions().verifyPeer);
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.empty());
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath.isEmpty());
-
-    HttpAsyncClientTlsOptions options;
-    options.verifyPeer         = false;
-    options.caCertificates     = {customCA, sizeof(customCA) - 1};
-    options.caCertificatesPath = "/tmp/sane-cpp-ca.pem";
-    client.setTlsOptions(options);
-
-    SC_TEST_EXPECT(not client.getTlsOptions().verifyPeer);
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.sizeInBytes() == sizeof(customCA) - 1);
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath == "/tmp/sane-cpp-ca.pem");
-
-    client.clearTlsOptions();
-    SC_TEST_EXPECT(client.getTlsOptions().verifyPeer);
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificates.empty());
-    SC_TEST_EXPECT(client.getTlsOptions().caCertificatesPath.isEmpty());
-    SC_TEST_EXPECT(client.close());
 }
 
 void SC::HttpAsyncClientTest::headResponse()
@@ -1432,6 +1414,7 @@ void SC::HttpAsyncClientTest::transportSetupHookDefersRequest()
             test->recordExpectation("transport setup connection", setup.connection != nullptr);
             test->recordExpectation("transport setup loop", setup.eventLoop != nullptr);
             test->recordExpectation("transport setup url", setup.url != nullptr and setup.url->protocol == "http");
+            test->recordExpectation("transport setup native socket", setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("transport setup complete", setup.complete.isValid());
 
             setupCalled       = true;
@@ -1523,6 +1506,8 @@ void SC::HttpAsyncClientTest::httpsTransportSetupHookDispatch()
             test->recordExpectation("https transport setup loop", setup.eventLoop != nullptr);
             test->recordExpectation("https transport setup url",
                                     setup.url != nullptr and setup.url->protocol == "https");
+            test->recordExpectation("https transport setup native socket",
+                                    setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("https transport setup complete", setup.complete.isValid());
 
             setupCalled = true;
@@ -1602,6 +1587,8 @@ void SC::HttpAsyncClientTest::httpsTransportSetupReportsTlsBackendError()
             test->recordExpectation("https tls error setup loop", setup.eventLoop != nullptr);
             test->recordExpectation("https tls error setup url",
                                     setup.url != nullptr and setup.url->protocol == "https");
+            test->recordExpectation("https tls error setup native socket",
+                                    setup.nativeSocket != SocketDescriptor::Invalid);
             test->recordExpectation("https tls error setup complete", setup.complete.isValid());
 
             setupCalled = true;

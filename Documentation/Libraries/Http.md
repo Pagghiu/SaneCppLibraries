@@ -29,6 +29,8 @@ This allows handling incomplete responses without needing holding it entirely in
 
 The HTTP server is for now just a basic implementations and it's missing many important features.
 It's however capable of serving files through http while staying inside a few user provided fixed buffers, without allocating any kind of dynamic memory.
+`HttpAsyncServer` accepts plain TCP connections and can be composed with an alternate transport through its transport
+setup hooks. TLS-backed HTTPS composition lives in the separate `Https` library.
 
 The HTTP client follows the same fixed-memory approach used by the server side:
 - caller-provided connection storage through `SC::HttpAsyncClientConnection`
@@ -37,6 +39,8 @@ The HTTP client follows the same fixed-memory approach used by the server side:
 - incremental response-header parsing into fixed buffers
 - streamed response bodies exposed through `SC::AsyncReadableStream`
 - optional sequential keep-alive reuse for requests targeting the same origin
+- transport-neutral post-connect setup and teardown hooks that can replace the active streams, inspect the URL, and
+  use the connected native socket handle when a transport adapter needs it
 
 The expected client lifecycle is stream-first:
 1. Create `SC::HttpAsyncClientConnection<...>` storage and initialize `SC::HttpAsyncClient`
@@ -46,7 +50,8 @@ The expected client lifecycle is stream-first:
 5. Consume the response body incrementally and use the response readable stream `eventEnd` as the completion signal
 
 Current client limitations:
-- `http` only, no `https`
+- `http` is active by default
+- `https` URLs require an installed transport adapter; `HttpsClientTransport` provides the TLS implementation
 - one in-flight request at a time
 - no HTTP pipelining
 - no redirect policy helper
@@ -60,7 +65,7 @@ Typical categories:
 - Protocol errors: malformed HTTP syntax, invalid URL/request-target data, bad WebSocket frames, invalid masking,
   invalid chunk framing, unsupported transfer encodings, or unexpected response bodies.
 - Unsupported feature errors: explicit limits such as unsupported content encodings, WebSocket extensions, pipelined
-  body data, non-empty chunk trailers, or TLS when using this library.
+  body data, non-empty chunk trailers, or an `https` URL without a configured transport adapter.
 - Storage errors: fixed header memory, caller-provided output buffers, stream queues, or `AsyncBuffersPool` capacity are
   too small for the requested operation.
 - Stream/transport errors: socket disconnects, readable/writable stream failures, file stream failures, or backpressure

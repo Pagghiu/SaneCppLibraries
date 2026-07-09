@@ -11,17 +11,19 @@ namespace SC
 //! @{
 
 struct HttpWebSocketTransportView;
-
 /// @brief Mutable transport setup view used by `HttpAsyncClient` after the TCP socket connects.
 ///
 /// The default setup keeps `connection` using its socket streams. A custom setup can install alternate active streams
-/// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP.
+/// with `HttpConnectionBase::setTransportStreams()` and must call `complete` when the transport is ready for HTTP. The
+/// setup also exposes the connected socket handle for transport adapters.
 struct SC_HTTP_EXPORT HttpAsyncClientTransportSetup
 {
     HttpConnectionBase* connection = nullptr;
     AsyncEventLoop*     eventLoop  = nullptr;
 
     const HttpURLParser* url = nullptr;
+
+    SocketDescriptor::Handle nativeSocket = SocketDescriptor::Invalid;
 
     Function<void(Result)> complete;
 };
@@ -37,18 +39,6 @@ struct SC_HTTP_EXPORT HttpAsyncClientConnection
         this->readableSocketStream.setAutoDestroy(false);
         this->writableSocketStream.setAutoDestroy(false);
     }
-};
-
-/// @brief TLS policy for `HttpAsyncClient` HTTPS requests.
-///
-/// The pointed-to CA buffers and paths must outlive requests using these options. `https://` transport wiring is still
-/// in progress, but the policy lives on the client so request and response message types stay HTTP-only.
-struct SC_HTTP_EXPORT HttpAsyncClientTlsOptions
-{
-    bool verifyPeer = true;
-
-    Span<const char> caCertificates;
-    StringSpan       caCertificatesPath;
 };
 
 /// @brief Asynchronous HTTP/1.1 client using caller-provided fixed storage
@@ -184,22 +174,23 @@ struct SC_HTTP_EXPORT HttpAsyncClient
     /// @brief Disables response decompression for future requests.
     void clearResponseDecompression() { responseDecoder = nullptr; }
 
-    /// @brief Sets TLS verification options used by future HTTPS transport integration.
-    void setTlsOptions(const HttpAsyncClientTlsOptions& options) { tlsOptions = options; }
-
-    /// @brief Restores default TLS verification options.
-    void clearTlsOptions() { tlsOptions = {}; }
-
-    [[nodiscard]] const HttpAsyncClientTlsOptions& getTlsOptions() const { return tlsOptions; }
-
     /// @brief Sets an optional transport setup hook invoked after TCP connect and before HTTP request bytes are sent.
     ///
     /// The hook can leave the socket streams active for plain HTTP, or install alternate active streams and complete
     /// later. This keeps TLS and other transport adapters outside the core Http library.
     void setTransportSetup(Function<Result(HttpAsyncClientTransportSetup&)>&& setup) { transportSetup = move(setup); }
 
+    /// @brief Sets an optional transport teardown hook invoked before HTTP destroys the connected socket streams.
+    ///
+    /// An adapter that installs alternate transport streams must release its listeners and state from this hook.
+    void setTransportClose(Function<void()>&& close) { transportClose = move(close); }
+
     /// @brief Clears the optional transport setup hook and restores default socket transport setup.
-    void clearTransportSetup() { transportSetup = {}; }
+    void clearTransportSetup()
+    {
+        transportSetup = {};
+        transportClose = {};
+    }
 
     /// @brief Hands the connected socket streams to a WebSocket owner after a validated `101` response.
     Result detachWebSocketTransport(HttpWebSocketTransportView& transport);
@@ -339,16 +330,19 @@ struct SC_HTTP_EXPORT HttpAsyncClient
 
     HttpConnectionBase* connection = nullptr;
 
-    AsyncEventLoop*                                  eventLoop      = nullptr;
-    HttpAsyncClientRequest*                          currentRequest = nullptr;
-    HttpAsyncClientRequest                           request;
-    HttpAsyncClientResponse                          response;
-    AsyncSocketConnect                               connectAsync;
-    RequestPreset                                    currentPreset;
-    SyncZLibTransformStream*                         responseDecoder       = nullptr;
-    bool                                             responseDecoderActive = false;
-    HttpAsyncClientTlsOptions                        tlsOptions;
+    AsyncEventLoop*         eventLoop      = nullptr;
+    HttpAsyncClientRequest* currentRequest = nullptr;
+
+    HttpAsyncClientRequest  request;
+    HttpAsyncClientResponse response;
+    AsyncSocketConnect      connectAsync;
+    RequestPreset           currentPreset;
+
+    SyncZLibTransformStream* responseDecoder       = nullptr;
+    bool                     responseDecoderActive = false;
+
     Function<Result(HttpAsyncClientTransportSetup&)> transportSetup;
+    Function<void()>                                 transportClose;
 
     State state = State::Idle;
 
