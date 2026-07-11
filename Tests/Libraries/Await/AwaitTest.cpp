@@ -579,6 +579,7 @@ struct SC::AwaitTest : public SC::TestCase
         co_return Result(true);
     }
 
+    //! [AwaitEchoConversationSnippet]
     static AwaitTask tinyEchoServer(AwaitEventLoop& await, const SocketDescriptor& serverSocket,
                                     SocketDescriptor& accepted)
     {
@@ -620,6 +621,7 @@ struct SC::AwaitTest : public SC::TestCase
 
         co_return Result(true);
     }
+    //! [AwaitEchoConversationSnippet]
 
     static AwaitTask sendToReceiveFromOnce(AwaitEventLoop& await, const SocketDescriptor& sender,
                                            const SocketDescriptor& receiver, SocketIPAddress receiverAddress)

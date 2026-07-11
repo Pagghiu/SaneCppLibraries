@@ -74,7 +74,8 @@ void SC::VirtualMemoryTest::virtualMemory()
     SC_TEST_EXPECT(virtualMemory.decommit(0));
     SC_TEST_EXPECT(memory == virtualMemory.data());
 
-    // Finally release (don't forget, VirtualMemory has no destructor!)
+    // Release explicitly when the reservation should be returned before scope exit.
+    // The VirtualMemory destructor would otherwise release it automatically.
     virtualMemory.release();
     SC_TEST_EXPECT(virtualMemory.data() == nullptr);
     //! [VirtualMemorySnippet]

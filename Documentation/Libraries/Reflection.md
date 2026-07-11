@@ -1,12 +1,12 @@
 @page library_reflection Reflection
 
-@brief 🟩 Describe C++ types at compile time for serialization
+@brief 🟩 Describe C++ object structure at compile time, primarily for serialization.
 
 [TOC]
 
-[SaneCppReflection.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppReflection.h) is a library building a compile time schema describing a struct with the main objective of serialization.
+[SaneCppReflection.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppReflection.h) lets an application describe the fields of its own C++ structures without adding metadata to those structures. The description is `constexpr`, allocation-free, and deliberately small: primitive values, C arrays, structures, and adapter-defined vector-like types.
 
-@note You need to include headers from [Serialization Adapters](@ref library_containers_reflection) in order to use `SC::Vector` or `SC::String` or any other reflect-able class provided by other libraries with this one.
+Reflection is infrastructure rather than a general-purpose introspection system. Its main consumers are [Serialization Binary](@ref library_serialization_binary) and [Serialization Text](@ref library_serialization_text). It does not discover arbitrary C++ members, access fields by a dynamic string API, perform I/O, or manage object storage.
 
 # Dependencies
 - Dependencies: *(none)*
@@ -15,252 +15,77 @@
 ![Dependency Graph](Reflection.svg)
 
 
-# Features
+# When Reflection Fits
 
-- Reflection info is built at compile time
-- Free of heap allocations
-- Describe primitive types
-- Describe C-Arrays
-- Describe SC::Vector, SC::VectorMap, SC::Array, SC::String
-- Describe Structs composition of any supported type
-- Identify types that can be serialized with a single memcpy
+Use Reflection when the set of serializable fields is known at compile time and you are willing to register those fields explicitly. It is a good fit for application state, messages, settings, or file-format structures that need one shared description for binary and textual serialization.
 
-# Details
+It is less suitable when you need runtime registration, arbitrary graph traversal, polymorphic object construction, or transparent support for pointers and references. Those types have no built-in reflection model. Reflection also does not preserve C++ invariants during deserialization by itself; that policy belongs to the serializer and the reflected type design.
 
-@copydetails group_reflection
+The library has no dependency on SC containers. Primitive types, C arrays, and user structures work directly. If an object graph contains `SC::Vector`, `SC::Array`, `SC::VectorMap`, `SC::Buffer`, or `SC::String`, include the opt-in [Containers Reflection](@ref library_containers_reflection) adapters. This keeps the base library independent, but means container support is not automatic merely because the container header is visible.
 
-# Status
+# The Description You Write
 
-🟩 Usable  
-Under described limitations, the library should be usable.
+A reflected structure specializes `SC::Reflection::Reflect<T>` outside the structure itself. Its `visit` function presents each selected member as four pieces of information:
 
-# Roadmap
+- a numeric member tag;
+- a pointer-to-member;
+- a textual field name;
+- the byte offset within the containing structure.
 
-🟦 Complete Features:
-- To be decided
+The member pointer is how serializers access the value without casting from a byte offset. Text serializers use the name, while versioned binary serialization uses the numeric tag. Keeping both explicit lets a C++ member be renamed without necessarily breaking the binary format, or lets a textual name change independently when a format intentionally changes. Tags therefore belong to the persisted format: do not renumber them casually, and do not reuse a removed tag for a different meaning.
 
-💡 Unplanned Features:
-- None so far
-
-# Description
-The main target use case is generating reflection information to be used for automatic serialization.
-There are many rules and limitations so far, and the main one is not supporting any type of reference or pointer.
-The output of the process is a *schema* of the reflected type.
-This schema is an array of SC::Reflection::TypeInfo tracking the type and offset location (in bytes) of the field in the structure it belongs to.  
-Fields that refer to non-primitive types (like other structs for example) can follow a *link* index that describes that field elsewhere in the scheme.
-
-## Packed attribute
-The schema contains information about all the types of all fields of the structure and the *packing state*.  
-A *packed struct* is made of primitive types that are described to the Reflection system so that there are no padding bytes left in the struct.  
-Example of packed struct: 
-```cpp
-struct Vec3
-{
-    float x;
-    float y;
-    float z;
-};
-```
-Example of non-packed struct: 
-```cpp
-struct Vec3
-{
-    float x;
-    uint16_t y; 
-    // we have 4 bytes of padding between y and z
-    float z;
-};
-```
-A *recursively packed struct* is a struct made of other structs or arrays of structs without any padding bytes inside of themselves.
-Example of recursively packed struct:
-```cpp
-struct ArrayOfVec3
-{
-    Vec3 array[10];
-};
-
-struct Vec3
-{
-    int32_t someNumber;
-    ArrayOfVec3 array;
-};
-```
-
-The *recursively packed* property allows binary serializers and deserializer to optimize reading / writing with a single `memcpy` (for example [Serialization Binary](@ref library_serialization_binary)).  
-
-@note This means that serializers like [Serialization Binary](@ref library_serialization_binary) will not invoke type constructor when deserializing a Packed type, as all members are explicitly written by serialization.
-
-## How to use it
-
-Describing a structure is done externally to the struct itself, specializing a SC::Reflection::Reflect<> struct.  
-
-For Example:
-@snippet Tests/Libraries/Reflection/ReflectionTest.cpp reflectionSnippet1
-
-## Struct member info
-- These fields are required for binary and text serialization with **Versioning** support
-    - `MemberTag` (integer)
-    - `Pointer to Member`
-    - `Field Name` (string)
-    - `Field Byte Offset` in its parent struct
-- This means being able to deserialize data from an older version of the program:
-    - For **Binary Formats**: retaining data in struct members with matching `MemberTag`
-    - For **Textual Formats**: retaining data in struct members with matching `Field Name`
-    - Specifying both of them allow refactoring names of c++ struct members without breaking serialization formats
-- The `Field Byte Offset` is necessary to generate an unique versioning signature of a given Struct
-- The `Pointer to Member` allows serializing / deserializing without `reinterpret_cast<>` (we could use `Field Byte Offset` as an alternative)
-
-@note Additional considerations regarding the level of *repetition*:
-- There are techniques to get *field name as string* from member pointer on all compilers, but they're all C++ 20+.  
-- There are techniques to get compile-time offset of field from member pointer but they are complex and increase compile time unnecessarily.
-- We could hash the `Field Name` to obtain `MemberTag` but an explicit integer has been preferred to allow breaking textual formats and binary formats independently.
-
-## Reflection Macros
-With some handy macros one can save typing and they're generally preferable.
-
-```cpp
-
-SC_REFLECT_STRUCT_VISIT(TestNamespace::SimpleStructure)
-
-SC_REFLECT_STRUCT_FIELD(0, f0)
-SC_REFLECT_STRUCT_FIELD(1, f1)
-SC_REFLECT_STRUCT_FIELD(2, f2)
-SC_REFLECT_STRUCT_FIELD(3, f3)
-SC_REFLECT_STRUCT_FIELD(4, f4)
-SC_REFLECT_STRUCT_FIELD(5, f5)
-SC_REFLECT_STRUCT_FIELD(6, f6)
-SC_REFLECT_STRUCT_FIELD(7, f7)
-SC_REFLECT_STRUCT_FIELD(8, f8)
-SC_REFLECT_STRUCT_FIELD(9, f9)
-SC_REFLECT_STRUCT_FIELD(10, arrayOfInt);
-
-SC_REFLECT_STRUCT_LEAVE()
-```
-
-## Example (print schema)
-To understand a little bit more how Serialization library can use this information, let's try to print the schema.  
-The *compile time* flat schema can be obtained by calling SC::Reflection::Schema::compile:
-
-```cpp
-using namespace SC;
-using namespace SC::Reflection;
-
-constexpr auto SimpleStructureFlatSchema = Schema::compile<TestNamespace::SimpleStructure>();
-```
-
-For example we could print the schema with the following code:
-
-@include Tests/Libraries/Reflection/ReflectionTestPrint.h
-
-Called with the following code
-```cpp
-///....
-printFlatSchema(report.console, SimpleStructureFlatSchema.typeInfos.values, SimpleStructureFlatSchema.typeNames.values);
-
-```
-
-It will print the following output for the above struct:
-
-```
-[00] TestNamespace::SimpleStructure (Struct with 11 members - Packed = false)
-{
-[01] Type=TypeUINT8   	Offset=0	Size=1	Name=f0
-[02] Type=TypeUINT16  	Offset=2	Size=2	Name=f1
-[03] Type=TypeUINT32  	Offset=4	Size=4	Name=f2
-[04] Type=TypeUINT64  	Offset=8	Size=8	Name=f3
-[05] Type=TypeINT8    	Offset=16	Size=1	Name=f4
-[06] Type=TypeINT16   	Offset=18	Size=2	Name=f5
-[07] Type=TypeINT32   	Offset=20	Size=4	Name=f6
-[08] Type=TypeINT64   	Offset=24	Size=8	Name=f7
-[09] Type=TypeFLOAT32 	Offset=32	Size=4	Name=f8
-[10] Type=TypeDOUBLE64	Offset=40	Size=8	Name=f9
-[11] Type=TypeArray   	Offset=48	Size=12	Name=arrayOfInt	[LinkIndex=12]
-}
-[12] Array (Array of size 3 with 1 children)
-{
-[13] Type=TypeINT32   	         	Size=4	Name=int
-}
-```
-Another example with a more complex structure building on top of the simple one:
+The `SC_REFLECT_STRUCT_VISIT`, `SC_REFLECT_STRUCT_FIELD`, and `SC_REFLECT_STRUCT_LEAVE` macros are the usual spelling. This test-backed example shows composition and SC container adapters in the same object graph:
 
 @snippet Tests/Libraries/Reflection/ReflectionTest.cpp reflectionSnippet2
 
-Printing the schema of `ComplexStructure` outputs the following:
+The order written is normally the visit order used by exact serializers. The field name is produced from the member token by the macro. For unusual mappings, the underlying explicit `Reflect<T>` specialization remains available; the complete form is exercised here:
 
-@note `Packed` structs will get their members sorted by `offsetInBytes`.  
-For regular structs, they are left in the same order as the visit sequence.  
-This allows some substantial simplifications in [Serialization Binary](@ref library_serialization_binary) implementation.
+@snippet Tests/Libraries/Reflection/ReflectionTest.cpp reflectionSnippet1
 
-```
-[00] TestNamespace::ComplexStructure (Struct with 6 members - Packed = false)
-{
-[01] Type=TypeUINT8   	Offset=0	Size=1	Name=f1
-[02] Type=TypeStruct  	Offset=8	Size=64	Name=simpleStructure	[LinkIndex=7]
-[03] Type=TypeStruct  	Offset=72	Size=64	Name=simpleStructure2	[LinkIndex=7]
-[04] Type=TypeUINT16  	Offset=136	Size=2	Name=f4
-[05] Type=TypeStruct  	Offset=144	Size=72	Name=intermediateStructure	[LinkIndex=19]
-[06] Type=TypeVector  	Offset=216	Size=8	Name=vectorOfStructs	[LinkIndex=22]
-}
-[07] TestNamespace::SimpleStructure (Struct with 11 members - Packed = false)
-{
-[08] Type=TypeUINT8   	Offset=0	Size=1	Name=f0
-[09] Type=TypeUINT16  	Offset=2	Size=2	Name=f1
-[10] Type=TypeUINT32  	Offset=4	Size=4	Name=f2
-[11] Type=TypeUINT64  	Offset=8	Size=8	Name=f3
-[12] Type=TypeINT8    	Offset=16	Size=1	Name=f4
-[13] Type=TypeINT16   	Offset=18	Size=2	Name=f5
-[14] Type=TypeINT32   	Offset=20	Size=4	Name=f6
-[15] Type=TypeINT64   	Offset=24	Size=8	Name=f7
-[16] Type=TypeFLOAT32 	Offset=32	Size=4	Name=f8
-[17] Type=TypeDOUBLE64	Offset=40	Size=8	Name=f9
-[18] Type=TypeArray   	Offset=48	Size=12	Name=arrayOfInt	[LinkIndex=24]
-}
-[19] TestNamespace::IntermediateStructure (Struct with 2 members - Packed = false)
-{
-[20] Type=TypeVector  	Offset=0	Size=8	Name=vectorOfInt	[LinkIndex=26]
-[21] Type=TypeStruct  	Offset=8	Size=64	Name=simpleStructure	[LinkIndex=7]
-}
-[22] SC::Vector (Vector with 1 children)
-{
-[23] Type=TypeStruct  	         	Size=64	Name=TestNamespace::SimpleStructure	[LinkIndex=7]
-}
-[24] Array (Array of size 3 with 1 children - Packed = true)
-{
-[25] Type=TypeINT32   	         	Size=4	Name=int
-}
-[26] SC::Vector (Vector with 1 children)
-{
-[27] Type=TypeINT32   	         	Size=4	Name=int
-}
-```
+# Two Ways Consumers Use It
 
-# Implementation
-As already said in the introduction, effort has been put to keep the library as *readable* as possible, within the limits of C++.  
-The only technique used is template partial specialization and some care in writing functions that are valid in `constexpr` context.  
-For example generation of the schema is done through partial specialization of the SC::Reflection::Reflect template, by redefining the `visit` constexpr static member function for a given type.
-Inside the visit function, it's possible to let the Reflection system *know* about a given field. 
+The member visitor is the simplest mental model. A consumer calls `Reflect<T>::visit(visitor)`, and the visitor receives each registered pointer-to-member plus its metadata. Exact binary and text serializers use this path directly, recursing into the member's reflected type.
 
-The output of reflection is an array of SC::Reflection::TypeInfo referred to as **Flat Schema** at compile time.  
-Such compile time information is used when serializing and deserializing data that has missing fields.
+For versioning and type-level inspection, `SC::Reflection::Schema::compile<T>()` converts the same description into a flat compile-time schema. Each entry is an eight-byte `SC::Reflection::TypeInfo`. A structure entry is followed by entries for its fields; a non-primitive field links to the later entry that describes that structure or array. Repeated complex types share their linked description rather than expanding forever.
 
-@snippet Libraries/Reflection/Reflection.h reflectionSnippet3
+The result contains parallel fixed-size arrays of type information and type names, trimmed at compile time to the entries actually used. Schema compilation performs no heap allocation and creates no runtime registry. Its default compile-time working limits are 20 distinct complex links and 100 total type entries; callers with a larger model can override both template arguments. The stored representation itself uses an eight-bit link index and child count and 16-bit sizes and offsets. Although the member-tag field occupies 16 bits, the current registration and schema-building interfaces accept an eight-bit tag. This is intentionally a compact schema rather than an unbounded metadata format.
 
-@snippet Libraries/Reflection/Reflection.h reflectionSnippet4
+# Packing Is a Serialization Property
 
-The flat schema is generated by SC::Reflection::SchemaCompiler, that walks the structures and building an array of SC::Reflection::TypeInfo describing each field.  
+Reflection computes `ExtendedTypeInfo<T>::IsPacked` recursively. A structure is considered packed only when every reflected member is packed and the sum of their sizes equals `sizeof(T)`. C arrays inherit the packing state of their element type. This detects padding between reflected fields and padding introduced by nested types.
 
-- Primitive types just need a single SC::Reflection::TypeInfo.  
-- Complex types are described using multiple SC::Reflection::TypeInfo.  
+The name can be misleading: Reflection does not apply a compiler packing attribute and does not change layout. It only reports that the reflected bytes already form a gap-free span. [Serialization Binary](@ref library_serialization_binary) can use that fact to copy an exact-format value in one operation; for a packed structure it may therefore write or restore member bytes without invoking per-member construction logic. A type whose invariants require setters, validation, or custom construction should not rely on that fast path merely because its physical layout happens to be packed.
 
-For example a struct is defined by a SC::Reflection::TypeInfo that contains information on the `numberOfChildren` of the struct, corresponding to the number of fields. `numberOfChildren` SC::Reflection::TypeInfo exist immediately after the struct itself in the flat schema array.  
-If type of one of these fields is complex (for example it refers to another struct) it contains a  *link*.  
-A Link is an index/offset in the flat schema array (`linkIndex` field).  
+For packed structures, the compiled flat schema sorts immediate member entries by byte offset. Non-packed structures retain registration order. This is an implementation contract used by binary serialization, not a reason to depend on schema order in application code.
 
-This simple data structure allows to describe hierarchically all types in a structure decomposing it into its primitive types or into special classes that must be handled specifically (SC::Vector, SC::Array etc.).  
-It also has an additional nice property that it's trivially serializable by dumping this (compile time known) array with a single `memcpy` or by calculating an `hash` that can act as a unique signature of the entire type itself (for versioning purposes).  
+# Allocation, Ownership, and Lifetime
 
-It's possible associating a `string` literal with each type or member, so that text based serializer can refer to it, as used by the JSON [Serialization Text](@ref library_serialization_text).  
-Lastly it's also possible associating to a field an `MemberTag` integer field, that can be leveraged by by binary serializers to keep track of the field position in binary formats. This allows binary formats to avoid using strings at all for format versioning/evolution, allowing some executable size benefits. This makes also possible not breaking binary file formats just because a field / member was renamed. This is leveraged by the [Serialization Binary](@ref library_serialization_binary).
+Reflection owns no object data and allocates no memory. A `Reflect<T>` specialization contains compile-time functions; a compiled schema is a `constexpr` value whose storage belongs to the caller or program image. Type and field names are non-owning views into compiler-generated names or string literals and are expected to have static lifetime.
+
+The library also does not allocate while visiting an object. Allocation can still occur in a higher-level operation: for example, a versioned deserializer may need to resize an owning vector or string through [Containers Reflection](@ref library_containers_reflection). That allocation policy and any failure reporting come from the container adapter and serializer, not from Reflection.
+
+Offsets and sizes are narrowed into the compact schema representation. Very large structures, members beyond the representable offset, or very large schemas should be treated as outside the intended design rather than assumed to degrade gracefully. `Schema::compile` reports exhausted compile-time capacity as a compile error, but narrowing a size or offset is not a general runtime bounds-checking facility.
+
+# Relationship to Neighboring Libraries
+
+- [Containers Reflection](@ref library_containers_reflection) adds reflection and resize/data traits for SC owning containers. Use it only when those types occur in the reflected graph.
+- [Serialization Binary](@ref library_serialization_binary) consumes member tags, layout information, packing state, and compiled schemas for exact or version-aware binary formats.
+- [Serialization Text](@ref library_serialization_text) consumes field names and member visitors for JSON and other textual traversal.
+- [Containers](@ref library_containers) and [Memory](@ref library_memory) provide storage types, but Reflection intentionally does not depend on them.
+
+That separation is the main tradeoff. The base abstraction remains dependency-free and allocation-free, while applications must opt into adapters for every non-primitive family they want serializers to understand. Custom vector-like types are possible, but require more than a name: they need a `Reflect` category/build description, `ExtendedTypeInfo` access and resizing operations, and serializer specializations appropriate to each format. The Serialization example demonstrates that full extension seam with `ImVector<T>`.
+
+# Status and Practical Limits
+
+🟩 Usable under the documented model.
+
+The stable center is explicit reflection of value-like structures for SC serialization. Important limits to evaluate up front are:
+
+- no built-in pointers, references, polymorphic graphs, enums, variants, or arbitrary standard-library containers;
+- metadata must be registered explicitly and kept consistent with format compatibility decisions;
+- the compact flat schema has bounded integer fields and compile-time capacities;
+- container ownership and deserialization allocation require separate adapters;
+- packing enables byte-copy optimizations whose semantics may be inappropriate for invariant-heavy types.
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Reflection`.

@@ -17,6 +17,7 @@ struct VersionedVectorTest;
 } // namespace SC
 
 //! [serializationJsonSnippet1]
+//! [serializationJsonModelSnippet]
 struct SC::Test
 {
     int    x      = 2;
@@ -42,6 +43,7 @@ SC_REFLECT_STRUCT_FIELD(2, xy)
 SC_REFLECT_STRUCT_FIELD(3, myTest)
 SC_REFLECT_STRUCT_FIELD(4, myVector)
 SC_REFLECT_STRUCT_LEAVE()
+//! [serializationJsonModelSnippet]
 
 struct SC::EscapedStringTest
 {
@@ -111,6 +113,7 @@ struct SC::SerializationJsonTest : public SC::TestCase
 void SC::SerializationJsonTest::jsonWrite()
 {
     //! [serializationJsonWriteSnippet]
+    //! [serializationJsonBasicWriteSnippet]
     constexpr StringView testJSON = R"({"x":2,"y":1.50,"xy":[1,3],"myTest":"asdf","myVector":["Str1","Str2"]})"_a8;
 
     SmallBuffer<256> buffer;
@@ -120,6 +123,7 @@ void SC::SerializationJsonTest::jsonWrite()
     // Note: SerializationJson::write will NOT null terminate the string
     const StringView serializedJSON({buffer.data(), buffer.size()}, false, StringEncoding::Ascii);
     SC_TEST_EXPECT(serializedJSON == testJSON);
+    //! [serializationJsonBasicWriteSnippet]
 
     constexpr StringView escapedJSON = R"({"value":"quote\"slash\\line\nunicode A"})"_a8;
     EscapedStringTest    escaped;
@@ -171,6 +175,7 @@ void SC::SerializationJsonTest::jsonLoadExact()
 void SC::SerializationJsonTest::jsonLoadVersioned()
 {
     //! [serializationJsonLoadVersionedSnippet]
+    //! [serializationJsonBasicVersionedSnippet]
     constexpr StringView scrambledJson =
         R"({"y"  :  1.50, "x": 2.0, "myVector"  :  ["Str1","Str2"], "myTest":"asdf"})"_a8;
     Test test;
@@ -180,6 +185,7 @@ void SC::SerializationJsonTest::jsonLoadVersioned()
     (void)test.myTest.assign("FDFSA"_a8);
     SC_TEST_EXPECT(SerializationJson::loadVersioned(test, scrambledJson));
     SC_TEST_EXPECT(test == Test());
+    //! [serializationJsonBasicVersionedSnippet]
 
     constexpr StringView escapedJSON = R"({"value":"quote\"slash\\line\nunicode \u0041"})"_a8;
     EscapedStringTest    escaped;

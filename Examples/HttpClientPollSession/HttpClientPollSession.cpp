@@ -52,6 +52,7 @@ Result saneMain(Span<StringSpan> args)
         return Result::Error("Missing URL argument");
     }
 
+    //! [HttpClientPollRequestSnippet]
     HttpClient client;
     SC_TRY(client.init());
 
@@ -120,6 +121,7 @@ Result saneMain(Span<StringSpan> args)
         size_t numPolled = 0;
         SC_TRY(scheduler.pollReady(numPolled, 100));
     }
+    //! [HttpClientPollRequestSnippet]
 
     SC_TRY(collector.error);
     SC_TRY_MSG(collector.completed, "Response did not complete");

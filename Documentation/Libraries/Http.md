@@ -1,10 +1,21 @@
 @page library_http Http
 
-@brief 🟥 HTTP parser, server and client
+@brief 🟥 Allocation-free HTTP/1.1 client, server, parser, and WebSocket building blocks
 
 [TOC]
 
-[SaneCppHttp.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttp.h) is a library implementing a hand-written HTTP/1.1 parser, server and client.
+`Http` is the low-level HTTP/1.1 stack for applications already built around SC's asynchronous event loop and streams.
+It provides an incremental parser, an asynchronous client and server, static-file serving, routing and header helpers,
+multipart processing, and WebSocket handshake and framing support. The implementation does not allocate: connection
+capacity, stream queues, header space, and body buffering are chosen and owned by the caller.
+
+That control is the main reason to choose this library. It is a good fit when memory bounds and transport integration
+matter more than a high-level, batteries-included HTTP API. It is not currently a general replacement for a mature
+internet-facing HTTP stack: applications must supply policy such as redirects, authentication, retries, request limits,
+and security hardening, and some valid protocol features are deliberately rejected rather than partially handled.
+
+[SaneCppHttp.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttp.h) packages the library
+as a single-file distribution.
 
 # Dependencies
 - Dependencies: [Async](@ref library_async), [AsyncStreams](@ref library_async_streams)
@@ -13,213 +24,157 @@
 ![Dependency Graph](Http.svg)
 
 
-# Features
-- HTTP 1.1 Parser
-- HTTP 1.1 Server
-- HTTP 1.1 Client
+# The model: messages moving through fixed storage
 
-# Status
-🟥 Draft  
-In current state the library is able to host simple static website but it cannot be used for any internet facing application.  
-Additionally its API will be changing heavily as it's undergoing major re-design to make it fully allocation free and extend it to support more of the HTTP 1.1 standard.
+The parser consumes whatever bytes are currently available and reports tokens as soon as they are complete. Headers do
+not require the entire message body to be resident, and bodies remain streams. This is the same model at every level:
 
-# Description
-The HTTP parser is an incremental parser, that will emit events as soon as a valid element has been successfully parsed.
-This allows handling incomplete responses without needing holding it entirely in memory.
+- `HttpRequest` and `HttpAsyncClientResponse` are incoming messages. They expose parsed headers and an
+  `AsyncReadableStream` for the body.
+- `HttpResponse` and `HttpAsyncClientRequest` are outgoing messages. They build headers in fixed storage and expose an
+  `AsyncWritableStream` for the body.
+- `HttpConnectionBase` holds the active streams and buffer pool. Server-side `HttpConnection` adds the request/response
+  pair; `HttpAsyncClient` owns the inverse request/response pair over caller-provided connection storage.
 
-The HTTP server is for now just a basic implementations and it's missing many important features.
-It's however capable of serving files through http while staying inside a few user provided fixed buffers, without allocating any kind of dynamic memory.
-`HttpAsyncServer` accepts plain TCP connections and can be composed with an alternate transport through its transport
-setup hooks. TLS-backed HTTPS composition lives in the separate `Https` library.
+This symmetry makes streaming explicit. Receiving response headers is not request completion: attach body listeners to
+`HttpAsyncClientResponse::getReadableStream()` and treat its `eventEnd` as completion. Likewise, a server callback may
+start a response while the request body is still arriving; it must consume, pipe, or deliberately reject that body.
 
-The HTTP client follows the same fixed-memory approach used by the server side:
-- caller-provided connection storage through `SC::HttpAsyncClientConnection`
-- request headers built inside fixed header memory
-- fixed-span or streamed request bodies with explicit `Content-Length`
-- incremental response-header parsing into fixed buffers
-- streamed response bodies exposed through `SC::AsyncReadableStream`
-- optional sequential keep-alive reuse for requests targeting the same origin
-- transport-neutral post-connect setup and teardown hooks that can replace the active streams, inspect the URL, and
-  use the connected native socket handle when a transport adapter needs it
+The incremental design has a cost. Parsed URL and header views exposed by an active connection point into its header
+storage. They are meaningful only for the current message and must not be retained after the connection is reused. Spans
+passed to asynchronous writes must also remain alive until the write completes. Where stack-owned response text cannot
+meet that lifetime, use the `HttpConnection::sendBodyCopy`, `sendTextCopy`, or `sendJsonCopy` helpers; these copy into
+the connection's fixed buffer pool and can fail when that pool is full.
 
-The expected client lifecycle is stream-first:
-1. Create `SC::HttpAsyncClientConnection<...>` storage and initialize `SC::HttpAsyncClient`
-2. Call `start(loop, method, url)` and configure the active `SC::HttpAsyncClientRequest` inside `onPrepareRequest`, or use `get` / `put` / `post`
-3. Send headers through `HttpAsyncClientRequest::sendHeaders()` and write any manual request body through `HttpAsyncClientRequest::getWritableStream()`
-4. Handle `onResponse` once headers are parsed and attach to `HttpAsyncClientResponse::getReadableStream()`
-5. Consume the response body incrementally and use the response readable stream `eventEnd` as the completion signal
+# Choosing memory limits
 
-Current client limitations:
-- `http` is active by default
-- `https` URLs require an installed transport adapter; `HttpsClientTransport` provides the TLS implementation
-- one in-flight request at a time
-- no HTTP pipelining
-- no redirect policy helper
+`HttpAsyncConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes>` and
+`HttpAsyncClientConnection<ReadQueue, WriteQueue, HeaderBytes, StreamBytes>` make the common configuration a type-level
+choice. On the server, the span passed to `HttpAsyncServer::init()` fixes maximum concurrent connections. Each element
+contains its own read queue, write queue, stream storage, and shared request/response header space.
 
-# Error Categories
-HTTP APIs report failures through `SC::Result` and keep the error text stable enough to diagnose the failing layer.
-The library does not use exceptions or a large error hierarchy; instead, messages are grouped by prefix and by the
-operation that produced them.
+These limits are behavior, not tuning hints:
 
-Typical categories:
-- Protocol errors: malformed HTTP syntax, invalid URL/request-target data, bad WebSocket frames, invalid masking,
-  invalid chunk framing, unsupported transfer encodings, or unexpected response bodies.
-- Unsupported feature errors: explicit limits such as unsupported content encodings, WebSocket extensions, pipelined
-  body data, non-empty chunk trailers, or an `https` URL without a configured transport adapter.
-- Storage errors: fixed header memory, caller-provided output buffers, stream queues, or `AsyncBuffersPool` capacity are
-  too small for the requested operation.
-- Stream/transport errors: socket disconnects, readable/writable stream failures, file stream failures, or backpressure
-  that could not be queued.
-- Lifecycle errors: calling request/response methods in the wrong order, starting a second client request while one is
-  active, using an uninitialized server/client, or writing after a stream has ended.
+- a request or response whose headers exceed available header storage fails;
+- a burst that cannot fit the fixed async queues applies backpressure or reports an error;
+- full-message assembly, decompression output, multipart field collection, and WebSocket message assembly need explicit
+  caller storage when requested;
+- increasing concurrent connection count multiplies the per-connection storage chosen by the application.
 
-Common prefixes point to the owner of the invariant:
-- `HttpIncomingMessage`: request/response body framing and chunked decoding.
-- `HttpOutgoingMessage` / `HttpResponse` / `HttpAsyncClientRequest`: outgoing header/body ordering and fixed header
-  storage.
-- `HttpAsyncServer` / `HttpAsyncClient`: async connection lifecycle and transport integration.
-- `HttpAsyncFileServer`: safe path extraction, upload policy, file/range/validator formatting.
-- `HttpURLParser` / `HttpRequestTargetView`: URL and origin-form request-target parsing.
-- `HttpWebSocketHandshake`, `HttpWebSocketFrameReader`, `HttpWebSocketFrameWriter`, `HttpWebSocketEndpoint`,
-  `HttpWebSocketConnectionPump`, and `HttpWebSocketSmallHub`: WebSocket handshake, frame protocol, control-frame
-  lifecycle, stream pumping, and hub capacity/backpressure.
+The library reports these conditions through `Result`; it does not silently truncate and does not throw. Error messages
+usually name the layer enforcing the invariant (`HttpIncomingMessage`, `HttpAsyncClient`, `HttpWebSocketFrameReader`,
+and so on), which is more useful here than a large exception hierarchy.
 
-When adding new HTTP errors, prefer messages that name the component first, then the violated invariant, for example
-`HttpWebSocketFrameReader control frame payload too large`. This keeps errors readable without adding allocations or a
-new dependency.
+# Representative server
 
-# Videos
+The server owns no connection allocation. This tested example fixes capacity at three connections and sizes each
+connection's queues and storage at compile time. The callback reads the parsed request and writes the response through
+that connection; shutdown must finish before the connection array is reclaimed. The example deliberately uses an
+application-owned `String` for its response body to exercise asynchronous span lifetime. That allocation is in the test
+application, not the server; a bounded application can instead write caller-owned fixed storage or use the connection's
+fixed-pool copy helpers.
 
-This is the list of videos that have been recorded showing some of the internal thoughts that have been going into this library:
+@snippet Tests/Libraries/Http/HttpAsyncServerTest.cpp HttpAsyncServerSnippet
+
+For an API server, place `HttpRouter` in the callback to match a method and path template without allocation. It is a
+small dispatcher, not a framework: middleware, request contexts, authorization, and response schemas remain application
+code. `Examples/ApiServer/ApiServer.cpp` is the more representative source when evaluating that shape.
+
+For files, `HttpAsyncFileServer` composes with `HttpAsyncServer` and the File/Threading stack. It streams GET responses
+and uploads, and supports ranges, validators, MIME lookup, upload limits, and optional SPA fallback. Its root directory,
+option strings, connection storage, and per-request stream objects are caller-owned; it is convenient infrastructure,
+not a hardened reverse proxy.
+
+# Representative client
+
+The client processes one request at a time. Convenience methods cover bodyless requests and fixed-span PUT/POST/PATCH;
+`start()` plus `onPrepareRequest` is the lower-level path for streamed or manually written bodies. Response bodies are
+always consumed as streams, even when the application chooses to collect them.
+
+Before the tested excerpt, the application creates an `HttpAsyncClientConnection<...>`, passes it to `client.init()`,
+and builds the URL in caller-owned storage. The `ResponseCollector` shown here attaches stream listeners and invokes its
+completion callback on `eventEnd`; an allocation-free application would collect into a fixed span or process each data
+event directly. Run the event loop after starting the request, then close the client before reclaiming its connection
+storage.
+
+@snippet Tests/Libraries/Http/HttpAsyncClientTest.cpp HttpAsyncClientBasicSnippet
+
+Sequential keep-alive reuse is supported for the same origin. A different origin reconnects; pipelining is not
+supported. Redirect handling is application policy. Plain `http` uses the socket streams directly. An `https` URL is
+rejected unless a transport setup adapter is installed; the neighboring `Https` library supplies
+the TLS composition without putting TLS inside the HTTP message layer.
+
+Optional gzip/deflate response decoding is also a composition: the client inserts AsyncStreams transform streams when
+enabled, while the caller still consumes the decoded readable stream and provides the fixed storage used by the
+connection.
+
+# Protocol helpers and deliberate boundaries
+
+The library includes focused pieces that can also be used below the client/server surfaces:
+
+- `HttpParser` incrementally tokenizes HTTP/1.x request or response headers.
+- `HttpURLParser`, `HttpRequestTargetView`, and query/form iterators return zero-copy raw slices; percent/form decoding
+  writes into caller-provided storage.
+- `HttpHeaders` helpers parse and format common cookie, authorization, cache-control, and content-type values.
+- `HttpMultipartParser` parses streamed multipart bodies, while `HttpMultipartWriter` emits validated multipart request
+  content.
+- `HttpRouter` matches methods and path parameters against caller-owned route tables and parameter storage.
+- `HttpWebSocketHandshake`, frame reader/writer, endpoint, stream pump, and small hub cover RFC 6455 handshakes, framing,
+  control frames, and bounded fan-out without turning WebSockets into a separate networking runtime.
+
+Unsupported input is generally rejected explicitly. Current boundaries include one in-flight client request, no HTTP
+pipelining or client redirect-following policy, no HTTP/2 or HTTP/3, no WebSocket extension negotiation, and limited
+trailer support. Server responses do have a checked `HttpResponse::sendRedirect` formatting helper.
+TLS belongs to `Https`; DNS and sockets belong to `Socket`; asynchronous byte ownership and backpressure belong to
+`AsyncStreams`. Keeping those seams visible avoids pulling transport and policy concerns into the HTTP message layer,
+but it also means an application integrates more pieces itself.
+
+# Operational notes
+
+`HttpAsyncServer::stop()` begins asynchronous shutdown; `close()` waits for outstanding work and releases references to
+caller memory. The same ownership rule applies to the client: close it before destroying its connection storage. For
+servers, set an explicit maximum header size and bound uploads and keep-alive request counts for the deployment.
+
+The focused executable examples are useful complements to the snippets:
+
+- `Examples/ApiServer` shows method/path routing and streaming echo responses.
+- `Examples/AsyncWebServer` shows static files, uploads, and WebSocket connection pumping.
+- `Examples/HttpClientAsyncGet` shows the public asynchronous client lifecycle.
+- [SCExample](@ref page_examples) contains the GUI-integrated `WebServerExample`.
+
+The implementation is still marked draft. Before adopting it for an exposed service, evaluate the supported protocol
+surface against your threat model and put a production proxy in front where appropriate. The bounded
+`HttpStressTest` exercises repeated keep-alive requests, chunked request bursts, and WebSocket fan-out; it is a regression
+signal, not a claim of protocol conformance or internet hardening.
+
+# Further material
 
 - [Ep.27 - C++ Async Http Web Server](https://www.youtube.com/watch?v=yg438A9Db50)
+- [August 2024 update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
+- [September 2025 update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
+- [November 2025 update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
+- [December 2025 update](https://pagghiu.github.io/site/blog/2025-12-31-SaneCppLibrariesUpdate.html)
+- [January 2026 update](https://pagghiu.github.io/site/blog/2026-01-31-SaneCppLibrariesUpdate.html)
+- [February 2026 update](https://pagghiu.github.io/site/blog/2026-02-28-SaneCppLibrariesUpdate.html)
+- [March 2026 update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
+- [May 2026 update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
+- [June 2026 update](https://pagghiu.github.io/site/blog/2026-06-30-SaneCppLibrariesUpdate.html)
 
-# Blog
+# API reference
 
-Some relevant blog posts are:
-
-- [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
-- [September 2025 Update](https://pagghiu.github.io/site/blog/2025-09-30-SaneCppLibrariesUpdate.html)
-- [November 2025 Update](https://pagghiu.github.io/site/blog/2025-11-30-SaneCppLibrariesUpdate.html)
-- [December 2025 Update](https://pagghiu.github.io/site/blog/2025-12-31-SaneCppLibrariesUpdate.html)
-- [January 2026 Update](https://pagghiu.github.io/site/blog/2026-01-31-SaneCppLibrariesUpdate.html)
-- [February 2026 Update](https://pagghiu.github.io/site/blog/2026-02-28-SaneCppLibrariesUpdate.html)
-- [March 2026 Update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
-- [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
-- [June 2026 Update](https://pagghiu.github.io/site/blog/2026-06-30-SaneCppLibrariesUpdate.html)
+The reference is intentionally secondary to the model and examples above.
 
 ## HttpAsyncServer
+
 @copydoc SC::HttpAsyncServer
 
 ## HttpAsyncFileServer
+
 @copydoc SC::HttpAsyncFileServer
 
 ## HttpAsyncClient
-`SC::HttpAsyncClient` supports both convenience helpers for fixed in-memory request bodies and the lower-level
-`start()` flow for streamed or manually written request bodies. The API reference below includes small examples for
-both styles of usage.
 
 @copydoc SC::HttpAsyncClient
-
-# Validation
-For HTTP changes, start with the focused test, then run the broader stress and portability checks before merging.
-
-Local macOS / Linux:
-
-```sh
-./SC.sh build compile SCTest Debug
-./SC.sh build run SCTest Debug -- --test "HttpStressTest"
-./SC.sh build run SCTest Debug -- --test "HttpAsyncFileServerTest"
-./SC.sh build compile SCTest Release
-./SC.sh build compile "SCSingleFileLibs:" Release
-./SC.sh build documentation
-```
-
-Linux VM:
-
-```sh
-./SC.sh build compile SCTest Debug
-./SC.sh build run SCTest Debug -- --test "HttpStressTest" --port-offset 200
-./SC.sh build run SCTest Debug -- --test "HttpAsyncFileServerTest" --port-offset 200
-./SC.sh build compile SCTest Release
-./SC.sh build compile "SCSingleFileLibs:" Release
-```
-
-Windows VM:
-
-```bat
-SC.bat build compile SCTest Debug
-SC.bat build run SCTest Debug -- --test "HttpStressTest" --port-offset 400
-SC.bat build run SCTest Debug -- --test "HttpAsyncFileServerTest" --port-offset 400
-SC.bat build compile SCTest Release
-```
-
-`HttpStressTest` is intentionally bounded and fast. It is a smoke signal for repeated keep-alive requests, chunked
-request burst decoding, and WebSocket fan-out writes through caller-owned buffer pools. `HttpAsyncFileServerTest` covers
-the heavier HTTP paths, including file requests, range and conditional requests, large PUT uploads, and multipart
-uploads.
-
-# Error Taxonomy
-HTTP APIs return `Result` for protocol, storage, stream, and lifecycle failures. Prefer messages that make the failure
-class obvious:
-
-- Protocol errors: syntactically valid HTTP/WebSocket input that violates the protocol state machine, for example
-  unexpected continuations, invalid control-frame fragmentation, or invalid request target usage.
-- Malformed input: invalid bytes or incomplete syntax, for example bad request lines, invalid header fields, malformed
-  multipart boundaries, or invalid extended WebSocket lengths.
-- Unsupported feature: valid input intentionally not implemented by this library layer, for example HTTP trailers in
-  request chunked decoding.
-- Storage too small: caller-provided fixed storage cannot hold output, headers, copied response bodies, parsed fields, or
-  queued async buffers. These errors should never silently truncate.
-- Stream or transport failure: async read/write, file, socket, or buffer-pool operations failed below the HTTP parser.
-- Lifecycle misuse: APIs were called in the wrong order or after ownership changed, for example writing after upgrade or
-  attaching a WebSocket pump twice without detach.
-
-# API Friction Audit
-Recent example and test call sites point to these remaining improvement seams:
-
-- Response bodies: use `HttpResponse::sendBody` / `sendJson` when the body span stays alive until the async write
-  finishes, and `HttpConnection::sendBodyCopy` / `sendTextCopy` / `sendJsonCopy` when stack-owned response text should
-  be copied into the connection's fixed async buffer pool before returning.
-- Method routing: `HttpRouter::formatAllowHeader` can feed `HttpResponse::sendMethodNotAllowed` directly for the common
-  405 + `Allow` + empty-body response path.
-- Redirects: `HttpResponse::sendRedirect` emits the 3xx status, `Location`, and empty-body framing as one checked
-  operation.
-- Header writing: `HttpWriteBasicAuthorizationCredentials` writes Basic authorization from raw username/password into
-  caller-provided storage, avoiding caller-side temporary allocation or ad-hoc base64 helpers.
-- Multipart writing: `HttpMultipartWriter` rejects unsafe boundaries, field names, filenames, and content-type values
-  before they can be written into request headers.
-- Streaming echo responses: `Examples/ApiServer/ApiServer.cpp` now uses `AsyncPipeline` to mirror the request body into
-  the response body without collecting it in memory or hand-rolling pause/drain listeners.
-- WebSocket examples: `Examples/AsyncWebServer/AsyncWebServer.cpp` and the collaborative canvas now use
-  `HttpWebSocketConnectionPump` for listener lifecycle and automatic control-frame flushing. The canvas keeps its
-  caller-owned message assembler, source-client suppression, and best-effort dropped-broadcast accounting as application
-  policy.
-- File uploads: `HttpAsyncFileServerTest` covers PUT and multipart uploads well, and `Examples/AsyncWebServer` now
-  exposes upload enable/disable and max-size policy from the command line. `HttpAsyncFileServerOptions` also supports
-  SPA fallback, validators, ranges, and a zero-allocation MIME lookup hook.
-
-# Examples
-
-- [SCExample](@ref page_examples) features the `WebServerExample` sample showing how to use SC::HttpAsyncFileServer and SC::HttpAsyncServer
-- Unit tests show how to use `SC::HttpAsyncClient`, `SC::HttpAsyncFileServer` and `SC::HttpAsyncServer`
-
-# Roadmap
-
-🟨 MVP
-- HTTP 1.1 Chunked Encoding
-
-🟩 Usable Features:
-- Connection Upgrade
-- Multipart streamed encoding
-
-🟦 Complete Features:
-- HTTPS
-- Support all HTTP verbs / methods
-
-💡 Unplanned Features:
-- Http 2.0 
-- Http 3.0
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/Http`.

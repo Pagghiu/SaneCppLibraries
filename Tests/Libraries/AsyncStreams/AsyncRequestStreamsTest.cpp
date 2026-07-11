@@ -293,6 +293,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     AsyncEventLoop eventLoop;
     SC_TEST_EXPECT(eventLoop.create());
 
+    //! [AsyncStreamsBufferPoolSnippet]
     constexpr size_t numberOfBuffers = 2;
     constexpr size_t bufferBytesSize = 16;
     AsyncBufferView  buffers[numberOfBuffers];
@@ -307,11 +308,12 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     }
     AsyncBuffersPool pool;
     pool.setBuffers(buffers);
+    //! [AsyncStreamsBufferPoolSnippet]
 
     ReadableFileStream           readable;
-    AsyncReadableStream::Request readableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
+    AsyncReadableStream::Request readableRequests[numberOfBuffers + 1]; // A queue with N + 1 slots can hold N requests
     WritableFileStream           writable;
-    AsyncWritableStream::Request writableRequests[numberOfBuffers + 1]; // Only N-1 slots will be used
+    AsyncWritableStream::Request writableRequests[numberOfBuffers + 1]; // A queue with N + 1 slots can hold N requests
 
     FileOpen openModeRead;
     openModeRead.mode     = FileOpen::Read;
@@ -330,6 +332,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     SC_TEST_EXPECT(writeDescriptor.open(writeablePath.view(), openModeWrite));
     SC_TEST_EXPECT(eventLoop.associateExternallyCreatedFileDescriptor(writeDescriptor));
 
+    //! [AsyncStreamsFilePipelineSnippet]
     readable.setReadQueue(readableRequests);
     writable.setWriteQueue(writableRequests);
     SC_TEST_EXPECT(readable.init(pool, eventLoop, readDescriptor));
@@ -340,6 +343,7 @@ void SC::AsyncRequestStreamsTest::fileToFile()
     AsyncPipeline pipeline = {&readable, {}, {&writable}};
     SC_TEST_EXPECT(pipeline.pipe());
     SC_TEST_EXPECT(pipeline.start());
+    //! [AsyncStreamsFilePipelineSnippet]
 
     // Safety timout against hangs
     AsyncLoopTimeout timeout;

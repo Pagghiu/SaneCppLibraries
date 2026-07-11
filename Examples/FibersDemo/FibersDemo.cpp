@@ -15,6 +15,7 @@ namespace SC
 {
 static Result runCpuFibers(Console& console)
 {
+    //! [FibersCpuTasksSnippet]
     struct State
     {
         int partials[3] = {};
@@ -52,10 +53,12 @@ static Result runCpuFibers(Console& console)
     console.print("CPU fibers completed: partials=[{}, {}, {}], total={}\n", state.partials[0], state.partials[1],
                   state.partials[2], total);
     return Result(true);
+    //! [FibersCpuTasksSnippet]
 }
 
 static Result runAsyncFibers(Console& console)
 {
+    //! [FibersAsyncSleepSnippet]
     struct State
     {
         FiberAsyncIO* io        = nullptr;
@@ -103,10 +106,12 @@ static Result runAsyncFibers(Console& console)
     console.print("FibersAsync sleeps completed: {}\n", state.completed);
     SC_TRY(eventLoop.close());
     return Result(true);
+    //! [FibersAsyncSleepSnippet]
 }
 
 static Result runWorkerPoolAsyncFibers(Console& console)
 {
+    //! [FibersAsyncWorkerPoolSnippet]
     static constexpr size_t NumWorkers = 2;
 
     struct State
@@ -147,6 +152,7 @@ static Result runWorkerPoolAsyncFibers(Console& console)
     console.print("Worker-pool FibersAsync sleeps completed: {}\n", state.completed);
     SC_TRY(eventLoop.close());
     return Result(true);
+    //! [FibersAsyncWorkerPoolSnippet]
 }
 
 static Result runFibersDemo()

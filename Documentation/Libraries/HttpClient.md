@@ -1,10 +1,13 @@
 @page library_http_client Http Client
 
-@brief 🟥 Streaming-first HTTP client with native OS backends
+@brief 🟥 Allocation-free HTTP client over the operating system's native transport
 
 [TOC]
 
-[SaneCppHttpClient.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttpClient.h) is a streaming-first HTTP client built on native OS backends.
+[SaneCppHttpClient.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppHttpClient.h)
+provides HTTP requests without making an HTTP stack another dependency of the application. It wraps
+`NSURLSession` on Apple platforms, WinHTTP on Windows, and libcurl on Linux behind one request and
+streaming-response model.
 
 # Dependencies
 - Dependencies: *(none)*
@@ -13,285 +16,142 @@
 ![Dependency Graph](HttpClient.svg)
 
 
-# Features
-- Native OS backends (NSURLSession on Apple, WinHTTP on Windows, libcurl on Linux)
-- Poll-driven core API with an optional `HttpClientAsyncT` adapter for `AsyncStreams`
-- Inline, sized-stream, or chunked-stream request bodies
-- Optional caller-owned session helpers for cookies, auth cache entries, and retry bookkeeping
-- Optional caller-owned operation scheduler for many poll-driven operations
-- Async streaming integration available through `SC::HttpClientAsyncT`
-- Blocking helper for simple synchronous workflows
+# Is HttpClient the right layer?
 
-# Status
-🟥 Draft  
-The API is stabilizing and the streaming core is in place, but consider everything HIGHLY experimental.
+Choose HttpClient when an application needs outbound HTTP or HTTPS on the three supported desktop
+platforms, wants native transport integration, and can budget memory before starting a request. The
+library is particularly suited to tools, agents, and embedded-style applications where an implicit
+heap-owned response, cookie jar, or worker object would be undesirable.
 
-# Description
-HttpClient is designed to stay allocation-free by relying on caller-provided buffers and queues. The core library is poll-driven and independent from `Async`, `AsyncStreams`, `Threading`, and `Time`. Response headers and transport metadata are written into user-provided buffers, while response body chunks are delivered during `poll()` through a small listener interface.
+It is not a byte-for-byte portable HTTP implementation. The operating system still owns DNS, TLS,
+connection pooling, and protocol negotiation, so observable transport behavior can differ between
+Apple, Windows, and Linux. `HttpClient::getCapabilities()` makes policy differences queryable, and
+request startup fails when a requested protocol, TLS, or proxy policy is unsupported; it does not
+quietly weaken an explicit requirement.
 
-`HttpClientRequest` groups caller-owned headers, body, and transport options into one request object. Request bodies are explicitly framed as fixed-size inline bytes, a fixed-size stream, or a chunked stream by setting `HttpClientRequestBody::framing`. Redirect, timeout, TLS, and protocol concerns are grouped under `HttpClientRequestOptions`.
-Request URL, method, redirect mode, header names, and header values are validated before any backend-specific request setup starts.
-URLs must use the `http://` or `https://` scheme, include a non-empty host, and avoid whitespace or control bytes.
-Header names must be HTTP token names, and header values reject CR, LF, and NUL bytes.
-Request methods, body framing modes, redirect modes, protocol preferences, and proxy modes expose static name helpers for allocation-free diagnostics.
-`HttpClientRequest::validate()` exposes the same request-shape checks used by `HttpClientOperation::start()`.
-The request object is copied by value when an operation starts, but URL, headers, body bytes, streamed-body providers, and option string views remain caller-owned and must outlive the operation.
+The API is 🟥 **Draft** and still highly experimental. In particular, applications should expect API
+changes while backend behavior and the streaming adapters converge.
 
-For stream-first integration there is a separate `SC::HttpClientAsyncT<T_AsyncEventLoop, T_AsyncStreams>` adapter that translates the same core operation into `AsyncReadableStream` and `AsyncWritableStream`.
+The neighboring [Http](@ref library_http) library solves a different problem: it implements HTTP/1.1
+parsing, servers, WebSockets, and an `AsyncStreams` client over caller-selected socket transports.
+Use that client when control over the HTTP/1.1 connection and stream pipeline matters. Use HttpClient
+when native HTTPS, native proxy behavior, and HTTP/2 negotiation matter more than identical transport
+internals. HttpClient itself has no SC library dependency; its optional Async adapter composes with
+[Async](@ref library_async) and [AsyncStreams](@ref library_async_streams) in application code.
 
-For stateful workflows there is a separate `SC::HttpClientSession` helper declared in
-`Libraries/HttpClient/HttpClientSession.h`. It remains layered above the transport core: cookies,
-authorization cache entries, prepared request headers, retry state, and all durable strings live in
-caller-provided spans and scratch buffers. `prepareRequest()` produces a derived request that must
-be started before reusing the same session header scratch for another prepared request.
+# The request is a description; the operation owns the conversation
 
-For high-concurrency poll loops there is a separate `SC::HttpClientOperationScheduler` helper
-declared in `Libraries/HttpClient/HttpClientScheduler.h`. It owns no operations and starts no
-requests; it only installs itself as the operation notifier and tracks ready operations in
-caller-provided bytes so callers can poll signaled operations instead of scanning blindly.
+The core has three distinct lifetimes:
 
-Current limitations:
-- One in-flight request per `SC::HttpClientOperation`
-- Multiple `HttpClientOperation` instances can share one `SC::HttpClient`
-- `Transfer-Encoding` is controlled by `HttpClientRequestBody::framing`; callers must not provide it manually
-- Chunked request trailers are not exposed
-- Apple treats `Default` and `Http2Preferred` as `NSURLSession` default policy, but fails fast for forced `Http11Only` or `Http2Required`
-- `Http2Required` must negotiate HTTP/2; supported backends fail the request instead of silently downgrading
-- Some TLS customizations fail fast on backends that do not support them yet
+1. `HttpClient` initializes the platform backend and may be shared by multiple operations.
+2. `HttpClientRequest` describes one request using non-owning views. Starting an operation copies the
+   description, not the URL, headers, inline body, option strings, or body provider behind those views.
+3. `HttpClientOperation` carries one in-flight request and delivers response events from `poll()`.
+   Its queues, response chunks, raw headers, metadata, and backend scratch all come from
+   `HttpClientOperationMemory` supplied by the caller.
 
-Protocol policy:
-- `Default` lets the backend choose
-- `Http11Only` forces HTTP/1.1 where the backend exposes that control
-- `Http2Preferred` enables HTTP/2 where available while allowing HTTP/1.1 fallback
-- `Http2Required` rejects unsupported backends and rejects negotiated HTTP/1.1 responses
+One operation carries at most one request at a time. Concurrency means creating multiple operations
+against the same client, each with separate memory. `poll()` invokes a listener with a response head,
+zero or more body spans, and completion or error. A body span is borrowed only for that callback;
+copy it or consume it before returning. By contrast, response header and effective-URL views point
+into operation memory and remain tied to that storage's lifetime.
 
-TLS policy:
-- `verifyPeer` defaults to enabled; disabling it fails fast on backends that do not expose that policy
-- `caCertificatesPath` is caller-owned and must not contain NUL or other control bytes
-- Unsupported custom CA paths fail in preflight instead of falling back to backend defaults
+This excerpt is compiled as part of `HttpClientPollSession`. It shows the real amount of storage and
+coordination needed for a single poll-driven request; the fixed sizes are application policy, not
+library constants.
 
-Proxy policy:
-- `Default` keeps the backend/system proxy behavior
-- `NoProxy` bypasses proxies where the backend exposes per-request control
-- `Http` uses a caller-owned host-only `http://` proxy URL with no path, query, fragment, whitespace, or control bytes
-- `authorization` is an optional exact `Proxy-Authorization` value for explicit HTTP proxies
-- `bypassList` is an optional comma-separated host list for explicit HTTP proxies
-- Apple currently fails fast for non-default proxy policy because `NSURLSession` proxy dictionaries would need a separate supported API shape
+@snippet Examples/HttpClientPollSession/HttpClientPollSession.cpp HttpClientPollRequestSnippet
 
-Response headers:
-- `HttpClientResponse::headers` remains the raw caller-owned header buffer view and source of truth
-- `getProtocolName()` returns static names for negotiated protocol metadata
-- `isInformationalStatus()`, `isSuccessfulStatus()`, `isRedirectStatus()`, and error helpers classify status codes
-- `getNextHeader()` walks parsed header name/value views with a caller-owned iterator
-- `findNextHeader()` supports repeated headers without building a map
-- `hasHeader()` checks for a header name without exposing a value view
-- common helpers such as `getContentLength()`, `getContentType()`, `getContentEncoding()`,
-  `getTransferEncoding()`, `getLocation()`, `getWwwAuthenticate()`, and `getProxyAuthenticate()` stay layered over the raw buffer
-- `getNextTransferCoding()` iterates comma-separated `Transfer-Encoding` tokens and classifies common codings without allocation
-- `hasContentCoding()` and `hasTransferCoding()` scan classified coding tokens without caching parsed state
+The listener in that example copies body chunks into another fixed buffer. An application can instead
+parse, hash, decompress, or write each chunk as it arrives. If the chosen event queue, header buffer,
+metadata buffer, or response buffers are exhausted, the operation reports an error rather than
+allocating or truncating silently.
 
-Capability reporting:
-- `HttpClient::getCapabilities()` returns the compiled backend and supported policy groups
-- `HttpClientCapabilities::supports(feature)` exposes the same fields through a stable feature enum for future transport expansion
-- `HttpClientCapabilities::supportsAll()` / `requireFeatures()` let callers fail fast when they need a backend feature set
-- `HttpClientCapabilities::supportsRequestOptions()` / `requireRequestOptions()` preflight request policy without starting an operation
-- `HttpClientCapabilities::hasBackend()` / `requireBackend()` let callers fail fast when they intentionally target one compiled backend
-- `HttpClient::init(requiredBackend/features)` overloads apply the same checks before backend initialization
-- `HttpClientOperation::start()` preflights protocol, TLS, and proxy policy against those capabilities before backend request setup
-- `HttpClientCapabilities::getBackendName()` returns a static backend name for logs, diagnostics, and tests
-- `HttpClientCapabilities::getFeatureName()` returns static feature names for capability diagnostics
-- capability fields describe explicit API support, not whether a remote server will negotiate a feature
-- `contentCodingPolicy` is currently false because decompression belongs in a future caller-owned streaming layer
+# Request bodies and response metadata
 
-Content-coding policy:
-- The core client does not request or decode compressed content on behalf of the caller
-- Callers can still send `Accept-Encoding` explicitly as a normal request header
-- `Content-Encoding` is exposed as response metadata through `getContentEncoding()`
-- `getNextContentCoding()` iterates comma-separated `Content-Encoding` tokens and classifies common codings without allocation
-- `hasContentCoding()` checks for a classified `Content-Encoding` token without building a token list
-- `HttpClientContentCoding::writeAcceptEncoding()` builds `Accept-Encoding` values into caller-owned buffers
-- Decompression should be built as a caller-owned streaming transform above the raw response body, not as hidden state inside `HttpClientOperation`
-- `AsyncStreams` already provides zlib/gzip/deflate transform primitives that callers can compose explicitly when they opt into that dependency
+An outgoing body has explicit framing:
 
-# Recommended Patterns
+- `FixedSize` borrows an inline byte span.
+- `SizedStream` repeatedly calls a `HttpClientRequestBodyProvider` and requires the declared byte
+  count to match what the provider produces.
+- `ChunkedStream` pulls from the provider without a declared length.
 
-Blocking:
-```cpp
-SC::HttpClientRequest request;
-request.url = "https://example.com"_a8;
+The provider and everything referenced by the request must outlive completion or cancellation.
+`Transfer-Encoding` belongs to the framing policy and must not also be supplied as a raw request
+header. Request validation rejects malformed HTTP(S) URLs, invalid method/header data, CR/LF/NUL in
+header values, and inconsistent body descriptions before backend setup.
 
-SC::HttpClientResponse response;
-char body[4096];
-size_t bodyLength = 0;
-SC_TRY(SC::HttpClient::executeBlocking(request, response, {body, sizeof(body)}, bodyLength, memory));
-```
+`HttpClientResponse::headers` is the raw, caller-owned source of truth. Iterators and convenience
+functions inspect repeated headers, content length/type/encoding, transfer codings, redirects, and
+authentication challenges without building a map. The client does not add `Accept-Encoding` or
+decompress a response. This is deliberate: compressed bytes can be fed into a caller-owned transform,
+including an `AsyncStreams` gzip/deflate pipeline when that dependency is acceptable.
 
-`executeBlocking()` treats `body` as a hard caller-owned capacity. If the response body does not fit,
-the helper returns an error instead of silently truncating; `bodyLength` still reports the bytes copied
-before the overflow was detected.
+For a small synchronous request, `HttpClient::executeBlocking()` drives the same operation model and
+copies into a caller-provided body span. The span is a hard limit: overflow is an error, and
+`bodyLength` reports how many bytes were copied before it was detected. The helper still needs an
+`HttpClientOperationMemory`; it is convenience for control flow, not hidden storage.
 
-Poll-driven:
-```cpp
-SC::HttpClient client;
-SC_TRY(client.init());
+# Optional state and event-loop layers
 
-SC::HttpClientOperation operation;
-SC_TRY(operation.init(client, memory));
-SC_TRY(operation.start(request, response, &listener));
-while (operation.isRequestInFlight())
-{
-    SC_TRY(operation.poll(16));
-}
-```
+The transport core deliberately does not own durable policy. Three optional helpers cover common
+application shapes while preserving caller ownership:
 
-Async stream adapter:
-```cpp
-SC::AsyncEventLoop loop;
-SC_TRY(loop.create());
+- `HttpClientSession` prepares cookie and exact-origin `Authorization` headers, captures response
+  cookies, and tracks retry attempts in caller-provided slots and scratch spans. It is a small
+  transport helper, not a browser cookie store: cookie matching is intentionally limited and only
+  Basic authentication challenge helpers are provided. A prepared request borrows the session's
+  header workspace, so start it before preparing another request with the same workspace.
+- `HttpClientOperationScheduler` installs the operation notifier and records readiness in one
+  caller-provided byte per registered operation. It avoids scanning every operation, but owns no
+  operation, starts no request, and does not change the one-request-per-operation rule.
+- `HttpClientAsyncT<AsyncEventLoop, AsyncStreams>` translates response callbacks into an
+  `AsyncReadableStream` and streamed uploads into an `AsyncWritableStream`. Its stream buffers and
+  queues are additional caller-owned memory. It is an adapter over `HttpClientOperation`, not a
+  second transport implementation.
 
-SC::HttpClientAsyncT<SC::AsyncEventLoop, SC::AsyncStreams> operation;
-SC_TRY(operation.init(client, loop, operationMemory, asyncMemory));
-SC_TRY(operation.start(request, response));
-while (operation.isRequestInFlight())
-{
-    SC_TRY(loop.runOnce());
-}
-```
+Retries remain an application decision. Before retrying, consider the method, whether the body
+provider can replay its data, the transport result, and any response status. The session helper can
+bookkeep that policy but never hides the original `Result` or restarts an operation by itself.
 
-Session layer:
-```cpp
-SC::HttpClientSession session;
-SC_TRY(session.init(sessionMemory));
-SC_TRY(session.prepareRequest(sourceRequest, preparedRequest));
-SC_TRY(operation.start(preparedRequest, response));
-```
+# Backend policy and current limits
 
-Scheduler:
-```cpp
-SC::HttpClientOperationScheduler scheduler;
-SC_TRY(scheduler.init(schedulerMemory));
-while (scheduler.hasRequestsInFlight())
-{
-    size_t numPolled = 0;
-    SC_TRY(scheduler.pollReady(numPolled, 16));
-}
-```
+Defaults let the native backend choose where possible. Stronger policies should be checked through
+`HttpClientCapabilities::supportsRequestOptions()` or allowed to fail during `start()`:
 
-# Allocation-Free Audit
+- `Http2Required` rejects a backend that cannot enforce HTTP/2 and rejects an HTTP/1.1 negotiation;
+  `Http2Preferred` permits fallback. Apple currently cannot force HTTP/1.1 or require HTTP/2 through
+  this API shape.
+- Peer verification is enabled by default. A custom CA path or disabling verification fails on a
+  backend that cannot honor it.
+- The default proxy mode preserves system behavior. Explicit no-proxy and HTTP-proxy policies are
+  backend capabilities; Apple currently rejects non-default proxy policy.
+- Redirects are off by default. Following redirects is constrained by method policy and a caller-set
+  maximum.
+- Native backend APIs may allocate internally. The allocation-free guarantee is that HttpClient does
+  not add heap containers, owned strings, cookie/auth stores, or decompression state around them.
+- Chunked request trailers, non-Basic authentication policy, HTTP/3, pluggable backend selection, and
+  uniform advanced TLS customization are not provided.
 
-The stabilization audit treats `Libraries/HttpClient` as a caller-owned layer. The core operation,
-session helper, and scheduler do not allocate durable state: request/response views point into
-caller-owned storage, session cookies/auth entries copy into caller-provided scratch, and scheduler
-readiness uses caller-provided bytes. Native backend APIs may allocate internally, but the library
-does not introduce heap containers, owned strings, hidden cookie/auth stores, or decompression state.
-Operation-memory validation rejects missing event queues, response buffers, response-header storage,
-response-metadata storage, empty per-buffer response storage, and undersized sliced response memory.
+Capability fields describe what this build can request from its backend, not what a remote server
+will negotiate. Applications with a hard deployment requirement can pass required backend/features
+to `HttpClient::init()` and fail before accepting work.
 
-# Details
+# Where to look next
 
-@copydetails group_http_client
+- `Examples/HttpClientPollSession` is the complete poll-driven example used above, including the
+  session and scheduler layers.
+- `Examples/HttpClientAsyncGet` shows the `AsyncStreams` adapter and its extra queues and buffers.
+- `Tests/Libraries/HttpClient/HttpClientTest.cpp` exercises blocking, poll-driven, concurrent,
+  scheduled, streamed-upload, Async, validation, and policy-failure paths against a local server.
+- The [March 2026](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html),
+  [May 2026](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html), and
+  [June 2026](https://pagghiu.github.io/site/blog/2026-06-30-SaneCppLibrariesUpdate.html) updates record
+  the design's recent evolution.
 
-## HttpClient
-@copydoc SC::HttpClient
-
-## HttpClientRequest
-@copydoc SC::HttpClientRequest
-
-## HttpClientResponse
-@copydoc SC::HttpClientResponse
-
-## HttpClientRequestBodyProvider
-@copydoc SC::HttpClientRequestBodyProvider
-
-## HttpClientOperationListener
-@copydoc SC::HttpClientOperationListener
-
-## HttpClientOperationNotifier
-@copydoc SC::HttpClientOperationNotifier
-
-## HttpClientResponseBuffer
-@copydoc SC::HttpClientResponseBuffer
-
-## HttpClientOperationEvent
-@copydoc SC::HttpClientOperationEvent
-
-## HttpClientOperationMemory
-@copydoc SC::HttpClientOperationMemory
-
-## HttpClientOperation
-@copydoc SC::HttpClientOperation
-
-## Async Adapter
-`SC::HttpClientAsyncT` and `SC::HttpClientAsyncOperationMemoryT` are declared in
-`Libraries/HttpClient/HttpClientAsync.h`.
-
-They provide the optional `Async` / `AsyncStreams` integration layer on top of the poll-driven
-`HttpClientOperation` core, reusing the same request, response, and caller-owned operation memory model.
-
-With the standard Async Streams library, instantiate the adapter as
-`SC::HttpClientAsyncT<SC::AsyncEventLoop, SC::AsyncStreams>` and the adapter memory as
-`SC::HttpClientAsyncOperationMemoryT<SC::AsyncStreams>`.
-
-## Session Layer
-`SC::HttpClientSession` is optional and does not own allocations. It can capture `Set-Cookie`
-headers into caller-provided cookie slots, add cached `Authorization` values by exact origin, and
-track retry attempts for one logical request. It also provides `makeBasicAuthorization()` to build
-`Authorization` or `Proxy-Authorization` values into caller-owned buffers. Basic authentication
-challenge helpers can inspect `WWW-Authenticate` and `Proxy-Authenticate` response headers and
-prepare a retry header without storing credentials. Auth challenge target and scheme names are
-available as static strings for diagnostics. The caller still drives `HttpClientOperation` directly;
-the session layer only prepares request metadata and records response metadata.
-Cookie capture rejects unrelated `Domain` attributes, ignores URL ports when matching hosts, derives
-the default cookie path from the response request URL, and matches paths at segment boundaries. It is
-a deliberately small transport helper rather than a complete browser cookie store.
-Cached authorization origins must be exact `http://` or `https://` origins with no path, query, or
-fragment. Cached authorization values are copied into caller-provided session scratch and reject CR,
-LF, and NUL bytes before they can become prepared request headers.
-Use `findCookie()`, `hasCookie()`, `findAuthorization()`, `hasAuthorization()`, `getNumCookies()`,
-and `getNumAuthorizations()` to inspect caller-owned session state without allocating.
-`clearCookies()` and `clearAuthorizations()` clear their slots independently; use `clear()` when
-you also want to reclaim session scratch space.
-Retry helpers expose idempotent-method checks, retryable-status checks, and remaining-attempt state
-without hiding the transport `Result` that caused the retry decision.
-
-## Operation Scheduler
-`SC::HttpClientOperationScheduler` is optional and caller-owned. Register initialized
-`HttpClientOperation` pointers plus one ready byte per operation, start requests normally, then call
-`pollReady()` from the application loop. The scheduler uses the existing notifier hook and never
-changes the single-operation request/response contract.
-Use `getNumOperations()`, `isOperationRegistered()`, and `getNumRequestsInFlight()` for allocation-free
-orchestration diagnostics.
-
-# Blog
-
-Some relevant blog posts are:
-
-- [March 2026 Update](https://pagghiu.github.io/site/blog/2026-03-31-SaneCppLibrariesUpdate.html)
-- [May 2026 Update](https://pagghiu.github.io/site/blog/2026-05-31-SaneCppLibrariesUpdate.html)
-- [June 2026 Update](https://pagghiu.github.io/site/blog/2026-06-30-SaneCppLibrariesUpdate.html)
-
-# Examples
-
-- `Examples/SaneHttpGet` shows the blocking helper with caller-owned buffers
-- `Examples/HttpClientAsyncGet` shows the optional async-stream adapter with caller-owned queues
-- `Examples/HttpClientPollSession` shows poll-driven operation memory, the optional session layer, and the operation scheduler
-- Unit tests in `Tests/Libraries/HttpClient` show blocking, poll-driven, session, scheduler, and upload usage patterns
-- AsyncStreams examples show how to integrate streaming pipelines with `AsyncReadableStream`
-
-# Roadmap
-
-🟨 MVP
-- No remaining MVP item in the allocation-free core; non-Basic authentication schemes remain application- or backend-specific policy.
-
-🟩 Usable Features:
-- Higher-level content-coding transform composition helpers
-- Broader TLS customization parity
-
-🟦 Complete Features:
-- Pluggable backend selection
-
-💡 Unplanned Features:
-- HTTP/3
+For API signatures and per-member contracts, see @ref group_http_client. The public headers separate
+the layers explicitly: `HttpClient.h` for the core, `HttpClientSession.h` for state,
+`HttpClientScheduler.h` for readiness coordination, and `HttpClientAsync.h` for stream integration.
 
 # Statistics
 LOC counts exclude comments. Library counts files physically under `Libraries/HttpClient`.

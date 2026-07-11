@@ -608,7 +608,7 @@ SC_TRY(threadPool.create(4));
 // Assuming an already created (and running) AsyncEventLoop named `eventLoop`
 // ...
 
-// Assuming an already created threadPool named `eventLoop
+// Assuming an already created threadPool named `threadPool`
 // ...
 
 // Open the file

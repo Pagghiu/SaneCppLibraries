@@ -4,7 +4,13 @@
 
 [TOC]
 
-[SaneCppFibers.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFibers.h) is a stackful fiber runtime in Sane C++ style: explicit storage, stable objects, cooperative suspension, and no hidden dynamic allocation.
+[SaneCppFibers.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFibers.h) is an experimental
+stackful task runtime: code can suspend from an ordinary nested call stack without blocking the OS thread that runs it.
+Tasks, stacks, workers, and bounded queues remain explicit program-owned resources.
+
+@warning
+The library is a draft. The implementation has broad test coverage, including multi-worker execution, but its API and
+operational experience are not yet mature enough to treat it as a stable general-purpose job system.
 
 # Dependencies
 - Dependencies: *(none)*
@@ -13,25 +19,25 @@
 ![Dependency Graph](Fibers.svg)
 
 
-# What Fibers Is For
+# Where Fibers Fits
 
 `Fibers` is a CPU/tasking runtime for code that wants synchronous-looking control flow without blocking an OS thread.
 A fiber owns a stack, can call normal C++ functions, and can cooperatively suspend with `FiberScheduler::yield()` or by
 waiting on fiber primitives. Later it can resume on the same worker or on another worker.
 
-The intended long-term shape is a small no-allocation runtime for micro-tasking workloads: many short jobs over time,
-bounded pools of reusable `FiberTask` objects and stacks, work stealing between worker threads, and explicit memory
-budgets chosen by the caller.
+It is aimed at bounded micro-tasking workloads: many short jobs over time, reusable task and stack slots, optional work
+stealing between worker threads, and memory budgets selected in advance by the caller. It is not an I/O library,
+preemptive thread scheduler, or transparent replacement for `std::thread`.
 
 Use `Fibers` when you want:
 
 - stackful tasks that can suspend from ordinary call stacks;
 - caller-owned task, stack, worker, and queue storage;
 - cooperative synchronization primitives such as events, semaphores, mutexes, counters, and task groups;
-- a runtime that can run on one thread today and on a caller-provided worker pool when parallelism is useful;
+- a runtime that can run on one thread or on a caller-provided worker pool when parallelism is useful;
 - no dependency on [Async](@ref library_async), [Await](@ref library_await), or [Threading](@ref library_threading).
 
-# Mental Model
+# The Scheduling Model
 
 `FiberScheduler` owns the logical scheduling state, but not the storage of the things it schedules. A task is made from:
 
@@ -40,72 +46,34 @@ Use `Fibers` when you want:
 - a `FiberTask::Procedure` returning plain `Result`;
 - optional cancellation, counter, and user-data inputs through `FiberTaskSpawnOptions`.
 
-The scheduler runs ready tasks until they complete, yield, or wait. When a task yields or a wait is satisfied, it is
-queued back as ready using intrusive links already present in `FiberTask`; normal yield/wake publication does not
-allocate.
+The scheduler runs a ready task until it completes, explicitly yields, or waits on a fiber primitive. This is cooperative:
+a task that neither returns nor suspends monopolizes its worker. When a task becomes runnable again, intrusive links in
+`FiberTask` put it back on a ready queue without allocating.
 
-# A Small CPU Example
+`runOnce()` and the other scheduler-driving calls are useful for a single-threaded owner. `FiberWorkerPool` instead owns
+OS threads while it is running and lets workers steal ready tasks. Parallel workers do not change the cooperative rule
+inside each task, and they mean resumed code must be safe to run on a different OS thread.
+
+# A Representative CPU Workload
 
 `FiberTaskPool` is the ergonomic way to run many bounded tasks without manually pairing each task with a stack. The
 pool does not grow: if all slots are active, producers can wait for capacity and try again.
 
-```cpp
-struct State
-{
-    int partials[3] = {};
-};
-
-FiberScheduler scheduler;
-FiberTask      tasks[3];
-char           stackMemory[3 * 64 * 1024] = {};
-FiberTaskPool  pool({tasks, 3}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
-FiberTaskGroup group(scheduler);
-State          state;
-
-for (size_t taskIndex = 0; taskIndex < 3; ++taskIndex)
-{
-    SC_TRY(group.spawn(pool, FiberTask::Procedure(
-                                 [&state, taskIndex](FiberScheduler& scheduler)
-                                 {
-                                     for (int value = 0; value < 5; ++value)
-                                     {
-                                         state.partials[taskIndex] += static_cast<int>(taskIndex + 1) * value;
-                                         SC_TRY(scheduler.yield());
-                                     }
-                                     return Result(true);
-                                 })));
-}
-
-SC_TRY(group.waitAll());
-```
+@snippet Examples/FibersDemo/FibersDemo.cpp FibersCpuTasksSnippet
 
 This is still ordinary C++ control flow. The call to `yield()` cooperatively gives another ready fiber a chance to run,
 but no OS thread is blocked waiting for preemption.
 
-# Bounded Fan-Out
+# Capacity Is Part of Control Flow
 
 When producing more work than the pool can hold at once, capacity pressure is explicit. From inside a fiber,
 `waitForSpawnCapacity()` suspends cooperatively until at least one pool slot is available.
 
-```cpp
-while (hasMoreJobs())
-{
-    FiberTask* spawnedTask = nullptr;
-    Result     spawned     = pool.spawn(scheduler, makeJob(), &spawnedTask);
-    if (spawned)
-    {
-        continue;
-    }
+Capacity is observable through `hasAvailableTask()` and `availableCount()`. `waitForSpawnCapacity()` cooperatively
+suspends a producing fiber until a slot becomes available; an external producer must instead drive or coordinate with
+the scheduler. There is no unbounded overflow queue hidden behind `spawn()`.
 
-    SC_TRY(pool.waitForSpawnCapacity(scheduler));
-    SC_TRY(pool.spawn(scheduler, makeJob(), &spawnedTask));
-}
-```
-
-`Result` is still reserved for real errors or cancellation. Capacity is observable through `hasAvailableTask()` and
-`availableCount()`, while waiting is modeled as an explicit scheduling operation.
-
-# Worker Pools And Work Stealing
+# Adding Worker Threads
 
 `FiberWorkerPool` runs one `FiberScheduler` on caller-provided OS thread storage. Workers can steal ready fibers from
 each other, and optional allocator-backed worker deques avoid placing worker queue storage on the heap.
@@ -122,7 +90,8 @@ SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers})
 SC_TRY(workerPool.join());
 ```
 
-For higher-throughput scheduling, provide explicit deque storage through `FiberAllocator`:
+For higher-throughput scheduling, explicit deque storage can be provided through `FiberAllocator`. The fixed allocator
+uses a caller buffer; the virtual allocator reserves a caller-selected address-space budget and commits pages on demand.
 
 ```cpp
 char           allocatorStorage[64 * 1024] = {};
@@ -139,12 +108,16 @@ SC_TRY(allocator.close());
 ```
 
 The worker pool owns OS threads while running, but the memory for workers, thread handles, deques, tasks, and stacks is
-still selected by the caller.
+still selected by the caller. `join()` waits for scheduled work and worker shutdown; lifecycle ordering is therefore
+part of application shutdown rather than destructor magic.
 
-# Scalable Task And Stack Storage
+# Choosing Task and Stack Storage
 
-For simple examples, `FiberTaskPool(Span<FiberTask>, Span<char>, stackSize)` is often enough. For larger systems, the
-draft API also has explicit classes for reusable task records and virtual-memory-backed stack slots:
+For small fixed workloads, `FiberTaskPool(Span<FiberTask>, Span<char>, stackSize)` partitions one buffer into stack
+slots. Every slot reserves its entire stack in physical memory, which is simple but can become expensive at high
+capacities. Stack size is a hard correctness limit, not just a performance knob; overflowing it is not recoverable.
+
+For larger systems, the draft API also has reusable allocator-backed task records and virtual-memory-backed stack slots:
 
 ```cpp
 FiberAllocator allocator;
@@ -169,9 +142,11 @@ FiberTaskPool pool;
 SC_TRY(pool.create(taskClass, stackClass));
 ```
 
-This keeps the public memory budget explicit while preparing the runtime for large numbers of tasks over time.
+`FiberStackClass` reserves fixed-size virtual slots, optionally with guard pages, and reports committed and high-water
+usage. `FiberTaskClass` bounds reusable task records. Both must outlive every slot acquired from them, and close-time
+validation rejects live allocations or task/stack slots.
 
-# Synchronization Primitives
+# Waiting, Coordination, and Cancellation
 
 Fiber primitives suspend the current fiber instead of blocking the OS thread:
 
@@ -182,7 +157,7 @@ Fiber primitives suspend the current fiber instead of blocking the OS thread:
 - `FiberMutex` protects cooperative fiber critical sections and diagnoses recursive or wrong-owner use.
 - `FiberTaskGroup` spawns child tasks and collects errors without dynamic allocation.
 
-Example using a semaphore as a cooperative concurrency limit:
+For example, a semaphore can bound how many fibers enter a cooperative region:
 
 ```cpp
 FiberSemaphore limit(4);
@@ -197,8 +172,6 @@ SC_TRY(group.spawn(pool, FiberTask::Procedure(
                              })));
 ```
 
-# Cancellation
-
 Cancellation is cooperative. `FiberCancellationTokenSource` can request cancellation for a group of spawned tasks, and
 the scheduler wakes interruptible waits so tasks can return an error `Result`.
 
@@ -212,8 +185,10 @@ SC_TRY(scheduler.requestCancel(cancelSource));
 ```
 
 Tasks should still return plain `Result`; there is no exception dependency and no hidden cancellation object allocation.
+Cancellation cannot interrupt arbitrary computation: task code must reach a cancellation-aware wait or explicitly
+check its token.
 
-# Thread-Local State
+# Lifetime and Thread-Local State
 
 `FiberTask` execution is not pinned to the OS thread that first started the task. A task may yield, become ready again,
 and later resume on a different worker thread, for example after work stealing or when another thread drives the same
@@ -224,7 +199,12 @@ current OS thread, not to the fiber, so a resumed task may observe a different v
 Use explicit task state instead, such as captured state in the task procedure, caller-owned objects, or
 `FiberTask::userData()`.
 
-# Allocation Model
+The task object, its stack, procedure captures, `userData`, synchronization primitives, and any state reached through
+them must remain alive and at stable addresses until the task completes. A `FiberTaskGroup` helps join related work but
+does not make borrowed state owning. Destroying a scheduler or storage class while work is active is a programming
+error diagnosed by the library.
+
+# Allocation Policy
 
 `Fibers` follows the Sane C++ allocation rules:
 
@@ -235,10 +215,12 @@ Use explicit task state instead, such as captured state in the task procedure, c
 - virtual stack storage uses explicit reservation and capacity limits;
 - close-time validation catches live allocations or live task/stack slots.
 
-This means the runtime can apply backpressure instead of silently growing. Producers either provide enough capacity,
-wait for capacity, or receive a normal `Result` error when setup/allocation fails.
+This means the runtime applies backpressure instead of silently growing. Producers provide enough capacity, wait for
+capacity, or handle setup/allocation failure. `FiberAllocator::createMalloc()` is an explicit interoperability escape
+hatch; choosing it gives up the fixed-memory property even though allocation remains visible in configuration and
+statistics.
 
-# Fibers vs Await vs Async
+# Relationship to Neighboring Libraries
 
 [Async](@ref library_async) is the low-level callback I/O library. [Await](@ref library_await) is a C++20 coroutine
 wrapper over `Async`. `Fibers` is different: it is stackful, does not require C++20 coroutines, and can suspend through
@@ -247,28 +229,19 @@ ordinary nested function calls because each fiber has an explicit stack.
 I/O integration is intentionally not part of `Fibers`; it lives in [FibersAsync](@ref library_fibers_async), which
 depends on both `Fibers` and `Async`.
 
-# Features
+[Threading](@ref library_threading) is the lower-level choice when work naturally maps to OS threads or must block in
+foreign code. Fibers trade a per-task stack and cooperative scheduling discipline for the ability to suspend through
+ordinary nested functions. Await trades that stack for compiler-generated coroutine frames and requires C++20.
 
-| Fibers API                                | Description                       |
-|:------------------------------------------|:----------------------------------|
-| [FiberStack](@ref SC::FiberStack)         | Caller-owned stack storage used by fiber contexts. |
-| [FiberVirtualStack](@ref SC::FiberVirtualStack) | Virtual-memory-backed stack storage with an optional guard page. |
-| [FiberStackClass](@ref SC::FiberStackClass) | Fixed-size virtual stack slot class with explicit capacity. |
-| [FiberTask](@ref SC::FiberTask)           | Caller-owned task object scheduled by `FiberScheduler`. |
-| [FiberTaskClass](@ref SC::FiberTaskClass) | Allocator-backed fixed-capacity storage for reusable `FiberTask` objects. |
-| [FiberTaskPool](@ref SC::FiberTaskPool)   | Caller-owned pool pairing task objects with stack slots. |
-| [FiberTaskGroup](@ref SC::FiberTaskGroup) | Helper for spawning child tasks and waiting for completion/errors. |
-| [FiberCounter](@ref SC::FiberCounter)     | Counter used to suspend fibers until work completes. |
-| [FiberEvent](@ref SC::FiberEvent)         | Manual-reset event that wakes waiting fibers when signaled. |
-| [FiberAutoResetEvent](@ref SC::FiberAutoResetEvent) | Auto-reset event that wakes one waiting fiber per signal. |
-| [FiberSemaphore](@ref SC::FiberSemaphore) | Counting semaphore for cooperative fibers. |
-| [FiberMutex](@ref SC::FiberMutex)         | Cooperative mutex for fibers running on one scheduler. |
-| [FiberAllocator](@ref SC::FiberAllocator) | Explicit allocator for scheduler/deque and scalable runtime storage. |
-| [FiberWorker](@ref SC::FiberWorker)       | Caller-owned execution agent for running ready fibers on an OS thread. |
-| [FiberWorkerPool](@ref SC::FiberWorkerPool) | No-allocation OS-thread-owning worker pool using caller-provided storage. |
-| [FiberScheduler](@ref SC::FiberScheduler) | Cooperative scheduler with explicit workers and caller-owned storage. |
+# API Reference
 
-# Complete Examples
+The complete class and method reference is in [the Fibers API group](@ref group_fibers). Start with
+[FiberScheduler](@ref SC::FiberScheduler), [FiberTaskPool](@ref SC::FiberTaskPool),
+[FiberTaskGroup](@ref SC::FiberTaskGroup), and [FiberWorkerPool](@ref SC::FiberWorkerPool). Storage-heavy deployments
+should also read [FiberTaskClass](@ref SC::FiberTaskClass), [FiberStackClass](@ref SC::FiberStackClass), and their
+diagnostics types.
+
+# Further Examples
 
 - `Examples/FibersDemo` shows a tiny CPU fiber workload, `FibersAsync` sleeps, and worker-pool I/O.
 - `Examples/FibersBenchmark` contains explicit benchmark-style workloads for yield/resume and sustained micro-tasking.
@@ -296,6 +269,6 @@ Current support includes:
 - cooperative task cancellation, including waking tasks suspended on counters and primitives;
 - focused `SCTest` coverage for the raw context switch layer, scheduler primitives, worker pools, and storage classes.
 
-# Details
-
-@copydetails group_fibers
+# Statistics
+LOC counts exclude comments. Library counts files physically under `Libraries/Fibers`. Single File and Standalone
+counts are regenerated with the amalgamated library outputs.

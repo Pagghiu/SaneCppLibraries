@@ -4,8 +4,9 @@
 
 [TOC]
 
-[SaneCppFibersAsync.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFibersAsync.h) is a bridge between [Fibers](@ref library_fibers) and [Async](@ref library_async). It lets fiber tasks call async I/O helpers in synchronous-looking code while preserving the caller-owned request, buffer, and event-loop model from `Async`.
-
+[SaneCppFibersAsync.h](https://github.com/Pagghiu/SaneCppLibraries/releases/latest/download/SaneCppFibersAsync.h)
+lets a [Fibers](@ref library_fibers) task wait for [Async](@ref library_async) I/O using ordinary function calls. It is
+for code that benefits from blocking-shaped control flow but must not block the event-loop thread.
 
 # Dependencies
 - Dependencies: [Async](@ref library_async), [Fibers](@ref library_fibers)
@@ -14,271 +15,140 @@
 ![Dependency Graph](FibersAsync.svg)
 
 
-# What FibersAsync Is For
+# The bridge, not another runtime
 
-`FibersAsync` is the I/O bridge for stackful fibers. It does not replace `AsyncEventLoop` and it does not replace
-`FiberScheduler`. Instead, `FiberAsyncIO` wraps both:
+`FibersAsync` does not own an I/O runtime or a scheduler. Its central object, SC::FiberAsyncIO, joins a caller-owned
+SC::AsyncEventLoop to a caller-owned SC::FiberScheduler. A fiber calls `sleep`, `receive`, `fileRead`, or another helper;
+the bridge starts the corresponding `AsyncRequest`, suspends that fiber, and makes it ready again when the request
+completes. Other fibers and callbacks can continue on the same loop in the meantime.
 
-```cpp
-AsyncEventLoop eventLoop;
-SC_TRY(eventLoop.create());
+This is the useful mental model:
 
-FiberScheduler    scheduler;
-FiberAsyncCommand commands[8];
-FiberAsyncIO      io(scheduler, eventLoop, commands);
-```
+1. operation state and the underlying async request live on the current fiber's stable stack;
+2. the fiber waits on a `FiberCounter`, yielding its OS thread;
+3. the async callback records a plain SC::Result and wakes the fiber;
+4. the original call resumes and returns that result.
 
-Fiber tasks can then wait for timers, sockets, files, processes, or signals by calling `io.sleep()`, `io.receive()`,
-`io.fileRead()`, and similar methods. Internally, the lower-level `AsyncRequest` starts on the wrapped event loop, and
-the current fiber suspends until the async completion wakes it.
+There is no coroutine transformation and no second hidden event loop. The price is that every call must run inside a
+scheduled fiber, and the application must explicitly drive both the scheduler and the event loop.
 
-# Design Intent
+# A complete wait
 
-The library keeps the spirit of `Async`:
+The demo's sleep example is compiled as part of the `FibersDemo` executable:
 
-- `FiberAsyncIO` uses an externally owned `AsyncEventLoop&`;
-- `FiberAsyncIO` uses an externally owned `FiberScheduler&`;
-- methods return plain `Result`;
-- extra operation outputs are explicit caller-provided result objects;
-- buffers, sockets, files, tasks, stacks, and output objects must remain valid while the operation is active;
-- callback-style `Async` code and fiber-style `FibersAsync` code can share the same event loop;
-- cross-thread event-loop access goes through bounded caller-provided `FiberAsyncCommand` storage.
+@snippet Examples/FibersDemo/FibersDemo.cpp FibersAsyncSleepSnippet
 
-`FibersAsync` is deliberately concrete for now. A more abstract `FiberIO` facade should wait until there is a second real
-backend worth sharing behind one API.
+SC::FiberAsyncIO::runUntilComplete drives ready fibers and async completions until neither remains. The shorter
+`runOnce`, `runNoWait`, and `runUntilIdle` variants exist for embedding the bridge in a larger application loop. A
+successful wait does not mean that an OS thread slept: only the calling fiber was suspended.
 
-# A Sleep Example
+The example also exposes the storage model. The caller supplies the event loop, scheduler, command slots, tasks, stacks,
+task group, and error collection. `FiberAsyncIO` itself borrows the event loop, scheduler, and command span; the
+scheduler and task group use the remaining storage.
 
-The simplest example is a fiber that waits without blocking the OS thread:
+# What the I/O calls return
 
-```cpp
-struct State
-{
-    FiberAsyncIO* io        = nullptr;
-    int           completed = 0;
-};
+Operations return SC::Result for success, cancellation, or an OS/backend error. Values produced by an operation use
+small explicit output records:
 
-AsyncEventLoop eventLoop;
-SC_TRY(eventLoop.create());
+- socket sends report a byte count; receives report a span into the supplied buffer and whether the peer disconnected;
+- file reads report a span into the supplied buffer and EOF; writes report the byte count;
+- file-to-socket transfer reports bytes transferred and whether the backend used zero-copy;
+- process and signal waits report exit or delivery information.
 
-FiberScheduler scheduler;
-FiberAsyncIO   io(scheduler, eventLoop);
-FiberTask      task;
-char           stackMemory[64 * 1024] = {};
-FiberStack     stack({stackMemory, sizeof(stackMemory)});
-State          state;
-state.io = &io;
+One-shot calls such as `send` and `fileWrite` may complete only part of the input. Use `sendAll` or `fileWriteAll` when
+the whole span is required. Likewise, `fileReadExact` repeats reads until the buffer is full or EOF is reached. Offset
+variants keep the position explicit rather than advancing the descriptor's shared position.
 
-SC_TRY(scheduler.spawn(task, stack,
-                       FiberTask::Procedure(
-                           [&state](FiberScheduler&)
-                           {
-                               SC_TRY(state.io->sleep(TimeMs{1}));
-                               state.completed++;
-                               return Result(true);
-                           })));
+The bridge currently covers timers, TCP and datagram sockets, files and readiness, file-to-socket transfer, process
+exit, and one-shot signal waits. It is not a stream protocol, buffered reader, DNS resolver, or general blocking-call
+adapter; framing, buffering, retries, and higher-level protocols remain application or neighboring-library policy.
 
-SC_TRY(io.runUntilComplete());
-SC_TRY(task.result());
-SC_TRY(eventLoop.close());
-```
+# Memory and lifetime are part of the API
 
-`io.runUntilComplete()` drives both sides: ready fibers through `FiberScheduler`, and async completions through
-`AsyncEventLoop`.
+Normal operation does not allocate a coroutine frame or heap-backed request. That predictability requires several hard
+lifetime rules:
 
-# Socket Echo Shape
+- SC::AsyncEventLoop and SC::FiberScheduler must outlive SC::FiberAsyncIO;
+- each SC::FiberTask and its SC::FiberStack must remain alive and memory-stable until the task completes;
+- descriptors, input spans, receive buffers, and output records must remain valid until their call resumes;
+- cross-thread SC::FiberAsyncCommand storage must outlive the bridge and any operation using it.
 
-Socket helpers follow the same Sane C++ result-object pattern as `Async`: operation status is returned as `Result`, and
-data about the operation is written into explicit output objects.
+The request and callback state are stack-local, which is safe specifically because a suspended fiber retains its stack.
+Destroying or moving any referenced storage early is a correctness bug, not an operation the bridge copies around.
 
-```cpp
-Result echoOnce(FiberAsyncIO& io, const SocketDescriptor& socket)
-{
-    char receiveBuffer[1024] = {};
+Capacity is similarly explicit. The application chooses the number and size of fiber stacks and, for worker-pool I/O,
+the number of command slots. This makes peak memory visible, but it also means exhaustion is possible and must be
+designed for.
 
-    FiberAsyncSocketReceiveResult received;
-    SC_TRY(io.receive(socket, {receiveBuffer, sizeof(receiveBuffer)}, received));
+# Worker threads and the event-loop owner
 
-    if (received.disconnected)
-    {
-        return Result(true);
-    }
+SC::AsyncEventLoop remains owner-thread-affine. A fiber may nevertheless resume on a worker thread. In that case the
+bridge queues the request's start or stop procedure in caller-provided SC::FiberAsyncCommand storage, wakes the owner,
+and waits for the owner to execute it.
 
-    FiberAsyncSocketSendResult sent;
-    SC_TRY(io.sendAll(socket, received.data, &sent));
-    return Result(true);
-}
-```
+The source-backed worker-pool example shows the division of responsibilities:
 
-`receive()` writes the actual received byte range into `received.data`, which points into the caller-provided buffer.
-`sendAll()` repeats lower-level send operations until the whole span is sent or an error/cancellation occurs.
+@snippet Examples/FibersDemo/FibersDemo.cpp FibersAsyncWorkerPoolSnippet
 
-# File I/O Shape
+Only the owner thread calls `runOwnerUntilComplete`; worker threads execute fibers. Command storage is a bounded queue,
+not scratch space sized only for one call. If simultaneous cross-thread starts and cancellation stops can fill it, the
+operation fails rather than allocating. Size it from the intended concurrency or impose producer backpressure. For a
+single-threaded scheduler, command storage can be omitted.
 
-File helpers also use caller-provided buffers and optional result objects:
+# Cancellation and shutdown
 
-```cpp
-Result copyChunk(FiberAsyncIO& io, const FileDescriptor& input, const FileDescriptor& output)
-{
-    char readBuffer[4096] = {};
+Cancellation is cooperative. SC::FiberScheduler::requestCancel wakes an interruptible fiber wait; the bridge stops the
+underlying request when necessary and resumes the call with an error `Result`. SC::FiberAsyncIO::cancelAll asks the
+scheduler to cancel all active fibers. Their pending bridge operations are then stopped through the same cooperative
+path; callback-style requests sharing the event loop are not selected by this call.
 
-    FiberAsyncFileReadResult readResult;
-    SC_TRY(io.fileRead(input, {readBuffer, sizeof(readBuffer)}, readResult));
-    if (readResult.endOfFile or readResult.data.sizeInBytes() == 0)
-    {
-        return Result(true);
-    }
+Cancellation does not relax lifetime rules. The owner loop still has to process the stop/completion path, the fiber must
+resume, and its task, stack, buffers, and request dependencies must remain alive until that happens. Treat
+`runUntilComplete`/`runOwnerUntilComplete`, task result collection, and `AsyncEventLoop::close` as an ordered shutdown
+sequence.
 
-    FiberAsyncFileWriteResult writeResult;
-    SC_TRY(io.fileWriteAll(output, readResult.data, &writeResult));
-    return Result(true);
-}
-```
+# Choosing between the neighboring libraries
 
-Offsets are explicit through `fileReadAt()`, `fileReadExactAt()`, `fileWriteAt()`, and `fileWriteAllAt()`. File
-readiness is available through `filePoll()` for the currently supported platform/backend cases.
+Use [Async](@ref library_async) directly when callbacks fit the state machine, minimizing per-operation stack memory and
+making every suspension point explicit. Add `FibersAsync` when a workflow is easier to express as nested ordinary calls
+or must suspend through existing call layers. Each concurrent fiber then needs its own explicitly sized stack.
 
-# Worker-Pool I/O
+[Await](@ref library_await) offers another sequential syntax over the same `AsyncEventLoop`. It uses C++20 `co_await`
+and allocator-backed coroutine frames; `FibersAsync` uses stackful switching and caller-provided stacks. Await generally
+fits code designed around coroutines. FibersAsync fits code that needs to suspend through ordinary non-coroutine helper
+functions, at the cost of coarser stack reservations and a draft runtime surface.
 
-`AsyncEventLoop` remains owner-thread-affine. If a fiber running on a worker thread starts I/O, `FiberAsyncIO` posts the
-start/stop command back to the owner thread through bounded `FiberAsyncCommand` storage.
+[Fibers](@ref library_fibers) remains the scheduling and synchronization layer. It is useful without I/O, while
+`FibersAsync` is specifically the adapter from its tasks to `Async`. Neither library turns arbitrary blocking system
+calls into cooperative waits.
 
-```cpp
-static constexpr size_t NumWorkers = 2;
-
-AsyncEventLoop eventLoop;
-SC_TRY(eventLoop.create());
-
-FiberScheduler    scheduler;
-FiberAsyncCommand commands[8];
-FiberAsyncIO      io(scheduler, eventLoop, commands);
-
-FiberWorker       workers[NumWorkers];
-FiberWorkerThread threads[NumWorkers];
-FiberWorkerPool   workerPool;
-
-SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-SC_TRY(io.runOwnerUntilComplete());
-SC_TRY(workerPool.join());
-SC_TRY(eventLoop.close());
-```
-
-The command storage size is a real capacity limit. If cross-thread producers can submit more simultaneous starts/stops
-than the storage can hold, provide more `FiberAsyncCommand` slots or design the producer to apply backpressure.
-
-# Cancellation
-
-Cancellation is cooperative and result-based. A task suspended in a `FiberAsyncIO` operation can be canceled through the
-fiber scheduler; `FiberAsyncIO` stops the underlying async request when needed and wakes the fiber with an error
-`Result`.
-
-```cpp
-SC_TRY(scheduler.requestCancel(task));
-SC_TRY(io.runUntilComplete());
-
-if (not task.result())
-{
-    // The task observed cancellation or another operation error.
-}
-```
-
-`FiberAsyncIO::cancelAll()` is also available as an I/O bridge helper for canceling pending async operations associated
-with the bridge.
-
-# Lifetime Rules
-
-The lifetime rules are intentionally close to `Async` and `Fibers`:
-
-- `AsyncEventLoop` must outlive `FiberAsyncIO`;
-- `FiberScheduler` must outlive `FiberAsyncIO`;
-- `FiberAsyncCommand` storage must outlive cross-thread operations using it;
-- `FiberTask` and `FiberStack` storage must outlive the spawned task;
-- sockets, files, buffers, and output result objects must outlive the operation using them;
-- request objects used internally are stack-local to the suspended fiber and remain valid because the fiber stack is
-  stable while suspended.
-
-This is the key difference from a heap-backed async framework: the caller chooses the maximum number of simultaneous
-tasks, stacks, command posts, and buffers.
-
-# Allocation Model
-
-`FibersAsync` does not allocate coroutine frames and does not need C++20 coroutines. It relies on the active fiber stack
-to hold the operation state while the fiber is suspended. Cross-thread command posting uses caller-provided
-`Span<FiberAsyncCommand>` storage, and normal same-thread usage can omit command storage.
-
-The lower-level `Async` and `Fibers` rules still apply: request objects and fiber objects must be memory-stable, and any
-capacity that can grow must be supplied explicitly by the caller.
-
-# Relationship To Await
-
-[Await](@ref library_await) and `FibersAsync` both make `Async` code easier to read, but they make different tradeoffs.
-
-`Await` uses C++20 coroutines and explicit `AwaitAllocator` coroutine-frame allocation. It is a good fit when you want
-`co_await` syntax and compiler-generated coroutine state machines.
-
-`FibersAsync` uses stackful fibers. It is a good fit when you want ordinary synchronous-looking function calls, the
-ability to suspend through existing nested call stacks, and explicit stack storage instead of coroutine frames.
-
-Both libraries keep callback-style `Async` integration possible because both wrap an existing `AsyncEventLoop&` instead
-of owning a separate I/O runtime.
-
-# Features
-
-| FibersAsync API                                      | Description                                      |
-|:----------------------------------------------------|:-------------------------------------------------|
-| [FiberAsyncIO](@ref SC::FiberAsyncIO)               | Synchronous-looking fiber I/O wrapper around an externally owned `AsyncEventLoop`. |
-| [FiberAsyncCommand](@ref SC::FiberAsyncCommand)     | Bounded command slot for owner-thread I/O posting. |
-| [FiberAsyncSocketSendResult](@ref SC::FiberAsyncSocketSendResult) | Result object populated by `send`, `sendTo`, and `sendAll`. |
-| [FiberAsyncSocketReceiveResult](@ref SC::FiberAsyncSocketReceiveResult) | Result object populated by `receive`. |
-| [FiberAsyncSocketReceiveFromResult](@ref SC::FiberAsyncSocketReceiveFromResult) | Result object populated by `receiveFrom`. |
-| [FiberAsyncFileWriteResult](@ref SC::FiberAsyncFileWriteResult) | Result object populated by file write helpers. |
-| [FiberAsyncFileReadResult](@ref SC::FiberAsyncFileReadResult) | Result object populated by file read helpers. |
-| [FiberAsyncFileSendOptions](@ref SC::FiberAsyncFileSendOptions) | Options for `fileSend`. |
-| [FiberAsyncFileSendResult](@ref SC::FiberAsyncFileSendResult) | Result object populated by `fileSend`. |
-| [FiberAsyncProcessExitResult](@ref SC::FiberAsyncProcessExitResult) | Result object populated by `processExit`. |
-| [FiberAsyncSignalResult](@ref SC::FiberAsyncSignalResult) | Result object populated by `signal`. |
-
-# Complete Examples
-
-- `Examples/FibersDemo` shows two sleeping fiber tasks driven by one `FiberAsyncIO`, then the same bridge used with a
-  worker pool.
-- `Tests/Libraries/FibersAsync/FibersAsyncTest.cpp` contains focused examples for sleeps, sockets, UDP, files,
-  `fileSend`, process exit, signals, cancellation, command queue overflow, and worker-pool cross-thread operation
-  posting.
-- `Examples/FibersBenchmark` focuses on CPU scheduling rather than I/O, but it is useful context for how the same
-  scheduler scales task execution.
-
-# Status
+# Status and practical limits
 
 🟥 Draft
 
-Current support includes:
+The implementation has focused tests for same-thread and worker-pool waits, sockets, datagrams, files, `fileSend`,
+process exit, signals, cancellation races, and command-queue overflow on macOS, Linux, and Windows. The API is still
+draft: DNS and stream conveniences are absent, backend coverage follows what `Async` supports on each platform, and the
+run-loop/cancellation surface may evolve as larger applications exercise it.
 
-- `sleep()`;
-- socket `accept()` and `connect()`;
-- socket `receive()`;
-- one-shot socket `send()`;
-- socket `sendAll()`;
-- datagram socket `sendTo()` and `receiveFrom()`;
-- file `fileRead()`, `fileReadAt()`, `fileReadExact()`, `fileReadExactAt()`;
-- file `fileWrite()`, `fileWriteAt()`, `fileWriteAll()`, and `fileWriteAllAt()`;
-- file readiness through `filePoll()` where supported by the underlying `Async` backend;
-- file-to-socket transfer through `fileSend()`;
-- process exit waiting through `processExit()`;
-- one-shot signal waiting through `signal()`;
-- owner-thread diagnostics through release assertions and `isOwnerThread()`;
-- bounded cross-thread command posting from worker fibers to the event-loop owner thread;
-- cooperative cancellation of pending operations through `FiberScheduler::requestCancel*` and `FiberAsyncIO::cancelAll()`;
-- focused macOS, Linux, and Windows test coverage in `FibersAsyncTest`.
+For the exact operation list and result fields, see [SC::FiberAsyncIO](@ref SC::FiberAsyncIO) and the
+[FibersAsync module](@ref group_fibers_async). `Examples/FibersDemo` is the smallest end-to-end example;
+`Tests/Libraries/FibersAsync/FibersAsyncTest.cpp` contains the edge cases.
 
 # Roadmap
 
-- Add DNS and stream helpers when real examples justify the API.
-- Explore blocking/threaded backends only after the concrete `FiberAsyncIO` bridge remains stable.
-- Keep expanding cancellation and shutdown stress tests around stop/complete races.
-- Revisit integration adapters between `AwaitTask` and fiber tasks after both libraries stabilize.
-- Consider a runtime-selectable `FiberIO` facade only after at least two real backends exist.
+- Add DNS or stream helpers only when concrete consumers establish the right ownership and buffering model.
+- Continue stress-testing cancellation, shutdown, and command-capacity races.
+- Consider a backend-neutral fiber I/O facade only after a second real backend exists.
 
-# Details
+# Statistics
+LOC counts exclude comments. Library counts files physically under `Libraries/FibersAsync`.
+Single File counts `SaneCppFibersAsync.h`.
+Standalone counts `SaneCppFibersAsyncStandalone.h` and intentionally includes dependency payloads.
 
-@copydetails group_fibers_async
+| Metric      | Header | Source | Sum   |
+|-------------|--------|--------|-------|
+| Library     | 147    | 910    | 1057  |
+| Single File | 510    | 1063   | 1573  |
+| Standalone  | 8416   | 19290  | 27706 |
