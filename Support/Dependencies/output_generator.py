@@ -110,8 +110,11 @@ def write_dot(project_root, minimal_map, rank_map, ranks):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         f.write('digraph LibraryDependencies {\n')
-        f.write('  node [shape=box];\n')
-        f.write('  splines=line;\n')
+        f.write('  graph [bgcolor="transparent", pad="0.3", nodesep="0.45", ranksep="0.7"];\n')
+        f.write('  node [shape=box, style="rounded,filled", color="#7895D5", fillcolor="#E9F1FF", '
+                'fontcolor="#17233D", fontname="Helvetica Neue", fontsize=13, penwidth=1.4, margin="0.16,0.1"];\n')
+        f.write('  edge [color="#6B8FC9", penwidth=1.5, arrowsize=0.75];\n')
+        f.write('  splines=polyline;\n')
         f.write('\n')
         # Nodes
         for lib in sorted(minimal_map):
@@ -141,13 +144,23 @@ def write_individual_dots(project_root, libraries, dep_map, minimal_map, transit
         output_path = os.path.join(output_dir, f'{lib}.dot')
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write(f'digraph {lib}Dependencies {{\n')
-            f.write('  node [shape=box];\n')
-            f.write('  splines=line;\n')
+            f.write('  graph [bgcolor="transparent", pad="0.3", nodesep="0.5", ranksep="0.75"];\n')
+            f.write('  node [shape=box, style="rounded,filled", color="#7895D5", fillcolor="#E9F1FF", '
+                    'fontcolor="#17233D", fontname="Helvetica Neue", fontsize=13, penwidth=1.4, margin="0.18,0.11"];\n')
+            f.write('  edge [color="#6B8FC9", penwidth=1.6, arrowsize=0.78];\n')
+            f.write('  splines=polyline;\n')
             f.write('\n')
             # Nodes: the library and its transitive dependencies
             all_nodes = {lib} | set(transitive_map[lib])
             for node in sorted(all_nodes):
-                f.write(f'  {node};\n')
+                if node == lib:
+                    attributes = ('color="#A8B0FF", fillcolor="#5158D9", fontcolor="#FFFFFF", '
+                                  'penwidth=2.2')
+                elif node in minimal_map[lib]:
+                    attributes = 'color="#39BDA7", fillcolor="#DDF8F2", penwidth=1.8'
+                else:
+                    attributes = 'color="#7895D5", fillcolor="#E9F1FF"'
+                f.write(f'  {node} [{attributes}];\n')
             f.write('\n')
             # Edges: lib to its minimal deps, then deps to their minimal deps
             edges = set()
@@ -160,7 +173,8 @@ def write_individual_dots(project_root, libraries, dep_map, minimal_map, transit
                     if dep in all_nodes:
                         edges.add((node, dep))
             for src, dst in sorted(edges):
-                f.write(f'  {src} -> {dst};\n')
+                edge_color = '#747CF0' if src == lib else '#6B8FC9'
+                f.write(f'  {src} -> {dst} [color="{edge_color}"];\n')
             f.write('}\n')
         print(f"Individual DOT file written to {output_path}")
 
