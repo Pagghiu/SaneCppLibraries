@@ -5,6 +5,7 @@
 // Standalone Fibers scheduler benchmark for comparing worker-pool and deque changes without polluting normal tests.
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Fibers/Fibers.h"
+#include "../../Libraries/FibersAsync/FibersAsync.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Threading/Atomic.h"
 #include "../../Libraries/Threading/Threading.h"
@@ -332,6 +333,7 @@ static Result runForcedStealingBenchmark(Console& console)
 
     FiberTaskPool taskPool;
     SC_TRY(taskPool.create(taskClass, stackClass));
+    taskPool.fillHighWaterMarks();
 
     FiberScheduler scheduler;
     FiberCounter   gate;
@@ -392,11 +394,74 @@ static Result runForcedStealingBenchmark(Console& console)
     console.print("  completedCommittedBytes={} taskAllocatorPeakBytes={} allocatorFailures={}\n",
                   completedDiagnostics.stackClass.committedSizeBytes, allocator.peakUsed(),
                   allocator.statistics().numAllocationFailures);
+    console.print("  peakStackHighWaterUsed={}\n", completedDiagnostics.stackClass.highWaterUsedBytes);
 
     SC_TRY(taskPool.close());
     SC_TRY(taskClass.close());
     stackClass.release();
     SC_TRY(allocator.close());
+    return Result(true);
+}
+
+[[nodiscard]] static Result runFiberAsyncHighWaterBenchmark(Console& console)
+{
+    static constexpr size_t NumTasks  = 64;
+    static constexpr size_t StackSize = FiberStackSize::SixtyFourKiB;
+
+    struct State
+    {
+        FiberAsyncIO* io        = nullptr;
+        int           completed = 0;
+    };
+
+    AsyncEventLoop eventLoop;
+    SC_TRY(eventLoop.create());
+
+    FiberScheduler scheduler;
+    FiberAsyncIO   io(scheduler, eventLoop);
+    FiberTask      tasks[NumTasks];
+    static char    stackMemory[NumTasks * StackSize] = {};
+    FiberTaskPool  taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, StackSize);
+    State          state;
+    state.io = &io;
+
+    taskPool.fillHighWaterMarks();
+    for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+    {
+        SC_TRY(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                             [&state](FiberScheduler&)
+                                             {
+                                                 SC_TRY(state.io->sleep(TimeMs{1}));
+                                                 state.completed += 1;
+                                                 return Result(true);
+                                             })));
+    }
+
+    Time::HighResolutionCounter start;
+    start.snap();
+    SC_TRY(io.run());
+    Time::HighResolutionCounter finish;
+    finish.snap();
+
+    SC_TRY_MSG(state.completed == static_cast<int>(NumTasks), "FibersAsync high-water benchmark did not complete");
+
+    size_t maxStackUsed = 0;
+    for (size_t taskIndex = 0; taskIndex < taskPool.capacity(); ++taskIndex)
+    {
+        size_t stackUsed = 0;
+        SC_TRY(taskPool.stackHighWaterUsedBytes(taskIndex, stackUsed));
+        if (stackUsed > maxStackUsed)
+        {
+            maxStackUsed = stackUsed;
+        }
+    }
+
+    const Time::HighResolutionCounter elapsed = finish.subtractExact(start);
+    console.print("FibersBenchmark FibersAsync stack high water\n");
+    console.print("  tasks={} stackSize={} elapsedMs={} maxStackUsed={}\n", NumTasks, StackSize,
+                  static_cast<size_t>(elapsed.toMilliseconds().ms), maxStackUsed);
+
+    SC_TRY(eventLoop.close());
     return Result(true);
 }
 
@@ -777,6 +842,7 @@ static Result runFibersBenchmark()
     SC_TRY(runWorkerPoolBenchmark(console));
     SC_TRY(runForcedStealingBenchmark(console));
     SC_TRY(runMassSuspensionBenchmark(console));
+    SC_TRY(runFiberAsyncHighWaterBenchmark(console));
     SC_TRY(runMicroTaskBenchmarks(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console));
     return Result(true);

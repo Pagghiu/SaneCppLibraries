@@ -276,6 +276,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         char       secondStackMemory[64 * 1024] = {};
         FiberStack firstStack({firstStackMemory, sizeof(firstStackMemory)});
         FiberStack secondStack({secondStackMemory, sizeof(secondStackMemory)});
+        firstStack.fillHighWaterMark();
+        secondStack.fillHighWaterMark();
 
         State state;
         state.io = &io;
@@ -303,6 +305,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(secondTask.isCompleted());
         SC_TEST_EXPECT(firstTask.result());
         SC_TEST_EXPECT(secondTask.result());
+        SC_TEST_EXPECT(firstStack.highWaterUsedBytes() > 0);
+        SC_TEST_EXPECT(secondStack.highWaterUsedBytes() > 0);
         SC_TEST_EXPECT(eventLoop.close());
     }
 
