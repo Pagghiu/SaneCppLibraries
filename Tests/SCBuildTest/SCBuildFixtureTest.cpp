@@ -1497,24 +1497,39 @@ static Result createBootstrapSyntheticCheckout(TestReport& report, StringView ca
     String customToolHeader = StringEncoding::Utf8;
     SC_TRY(Path::join(customToolHeader, {checkout.root.view(), "Tools", "SC-bootstrap-probe-custom.h"}));
     SC_TRY(fs.writeString(customToolHeader.view(), "// Custom bootstrap probe fixture header\n"));
+#if SC_PLATFORM_WINDOWS
+    // Sources on a shared filesystem can have a clock ahead of the Windows-local object cache.
+    const TimeMs stableSourceTime = {Time::Realtime::now().milliseconds - 60000};
+    SC_TRY(fs.setLastModifiedTime(fixtureScSource.view(), stableSourceTime));
+    SC_TRY(fs.setLastModifiedTime(fixtureToolsDestination.view(), stableSourceTime));
+    SC_TRY(fs.setLastModifiedTime(checkout.builtInToolSource.view(), stableSourceTime));
+    SC_TRY(fs.setLastModifiedTime(checkout.builtInToolHeader.view(), stableSourceTime));
+    SC_TRY(fs.setLastModifiedTime(checkout.customToolSource.view(), stableSourceTime));
+    SC_TRY(fs.setLastModifiedTime(customToolHeader.view(), stableSourceTime));
+#endif
     return Result(true);
 }
 
 #if SC_PLATFORM_WINDOWS
-static Result createBootstrapLongRootCaseName(String& caseName)
+static Result createBootstrapLongCustomToolSource(TestReport& report, BootstrapSyntheticCheckout& checkout)
 {
-    auto builder = StringBuilder::create(caseName);
-    SC_TRY(builder.append("long-custom-probe-"));
-    SmallString<32> timestamp;
-    SC_TRY(StringBuilder::format(timestamp, "{}", Time::Realtime::now().milliseconds));
-    SC_TRY(builder.append(timestamp.view()));
-    while (caseName.view().sizeInBytes() < 123)
+    String customToolDirectory = StringEncoding::Utf8;
+    String customToolSource    = StringEncoding::Utf8;
+    SC_TRY(Path::join(customToolDirectory, {checkout.root.view(), "Custom Tools \xC3\xA8"}));
+    SC_TRY(Path::join(customToolSource, {customToolDirectory.view(), "Probe Tool spazio \xC3\xA8.cpp"}));
+    while (customToolSource.view().sizeInBytes() <= MAX_PATH)
     {
-        SC_TRY(builder.append("-root-segment"));
+        SC_TRY(Path::append(customToolDirectory, {"long-custom-source-segment"}, Path::AsNative));
+        SC_TRY(Path::join(customToolSource, {customToolDirectory.view(), "Probe Tool spazio \xC3\xA8.cpp"}));
     }
-    SC_TRY(builder.append("-root"));
-    builder.finalize();
-    return Result(true);
+
+    FileSystem fs;
+    SC_TRY(fs.init(report.libraryRootDirectory.view()));
+    SC_TRY(checkout.customToolSource.assign(customToolSource.view()));
+    SC_TRY(writeBootstrapProbeSource(fs, checkout.customToolSource.view(), "SC-bootstrap-probe-custom", {}));
+
+    const TimeMs stableSourceTime = {Time::Realtime::now().milliseconds - 60000};
+    return fs.setLastModifiedTime(checkout.customToolSource.view(), stableSourceTime);
 }
 #endif
 
@@ -2355,9 +2370,14 @@ struct SCBuildFixtureTest : public SC::TestCase
         if (test_section("bootstrap script runs long custom probe path on Windows"))
         {
             BootstrapSyntheticCheckout checkout;
-            String                     caseName = StringEncoding::Utf8;
-            SC_TRUST_RESULT(createBootstrapLongRootCaseName(caseName));
+            SmallString<64>            caseName;
+            SC_TRUST_RESULT(
+                StringBuilder::format(caseName, "long-custom-probe-{}", Time::Realtime::now().milliseconds));
             Result createdCheckout = createBootstrapSyntheticCheckout(report, caseName.view(), checkout);
+            if (createdCheckout)
+            {
+                createdCheckout = createBootstrapLongCustomToolSource(report, checkout);
+            }
 
             if (not createdCheckout)
             {
@@ -2368,7 +2388,6 @@ struct SCBuildFixtureTest : public SC::TestCase
             else
             {
                 SC_TEST_EXPECT(checkout.customToolSource.view().sizeInBytes() > MAX_PATH);
-                SC_TEST_EXPECT(checkout.root.view().sizeInBytes() < MAX_PATH);
 
                 StringSpan forwardedArguments[] = {"long custom plain", "long custom path with spaces",
                                                    "long/custom/slash"};
