@@ -1097,6 +1097,14 @@ struct FiberWorkerPoolWakeEvent
 
     ~FiberWorkerPoolWakeEvent() { ::DeleteCriticalSection(&mutex); }
 
+    void notifyOne()
+    {
+        ::EnterCriticalSection(&mutex);
+        generation += 1;
+        ::WakeConditionVariable(&condition);
+        ::LeaveCriticalSection(&mutex);
+    }
+
     void notifyAll()
     {
         ::EnterCriticalSection(&mutex);
@@ -1105,14 +1113,17 @@ struct FiberWorkerPoolWakeEvent
         ::LeaveCriticalSection(&mutex);
     }
 
-    void wait(uint32_t observedGeneration)
+    [[nodiscard]] bool wait(uint32_t observedGeneration)
     {
         ::EnterCriticalSection(&mutex);
+        bool waited = false;
         while (generation == observedGeneration)
         {
+            waited = true;
             ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
         }
         ::LeaveCriticalSection(&mutex);
+        return waited;
     }
 #else
     pthread_mutex_t mutex;
@@ -1131,6 +1142,14 @@ struct FiberWorkerPoolWakeEvent
         ::pthread_mutex_destroy(&mutex);
     }
 
+    void notifyOne()
+    {
+        ::pthread_mutex_lock(&mutex);
+        generation += 1;
+        ::pthread_cond_signal(&condition);
+        ::pthread_mutex_unlock(&mutex);
+    }
+
     void notifyAll()
     {
         ::pthread_mutex_lock(&mutex);
@@ -1139,15 +1158,18 @@ struct FiberWorkerPoolWakeEvent
         ::pthread_mutex_unlock(&mutex);
     }
 
-    void wait(uint32_t observedGeneration)
+    [[nodiscard]] bool wait(uint32_t observedGeneration)
     {
         ::pthread_mutex_lock(&mutex);
+        bool waited = false;
         while (generation == observedGeneration)
         {
+            waited        = true;
             const int res = ::pthread_cond_wait(&condition, &mutex);
             (void)res;
         }
         ::pthread_mutex_unlock(&mutex);
+        return waited;
     }
 #endif
 
@@ -1503,7 +1525,7 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
 Result FiberWorkerPool::requestStop()
 {
     fiberAtomicStore(stopRequested, 1);
-    wakeWorkers();
+    wakeAllWorkers();
     return Result(true);
 }
 
@@ -1568,9 +1590,11 @@ bool FiberWorkerPool::isRunning() const { return fiberAtomicLoad(running) != 0; 
 
 size_t FiberWorkerPool::workerCount() const { return workers.sizeInElements(); }
 
-void FiberWorkerPool::wakeWorkers() { wakeEvent.get().notifyAll(); }
+void FiberWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
 
-void FiberWorkerPool::waitForWork(uint32_t observedGeneration) { wakeEvent.get().wait(observedGeneration); }
+void FiberWorkerPool::wakeAllWorkers() { wakeEvent.get().notifyAll(); }
+
+bool FiberWorkerPool::waitForWork(uint32_t observedGeneration) { return wakeEvent.get().wait(observedGeneration); }
 
 uint32_t FiberWorkerPool::wakeGeneration() const { return wakeEvent.get().currentGeneration(); }
 
@@ -1601,7 +1625,15 @@ Result FiberWorkerPool::workerMain(size_t workerIndex)
             const uint32_t observedGeneration = wakeGeneration();
             if (fiberAtomicLoad(stopRequested) == 0 and scheduler.hasActiveFibers() and not scheduler.hasReadyFibers())
             {
-                waitForWork(observedGeneration);
+                {
+                    FiberScheduler::LockGuard guard(scheduler);
+                    worker.parkAttempts += 1;
+                }
+                if (waitForWork(observedGeneration))
+                {
+                    FiberScheduler::LockGuard guard(scheduler);
+                    worker.parkedWakeups += 1;
+                }
             }
         }
     }
@@ -4540,6 +4572,8 @@ void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDia
     diagnostics.failedSteals      = worker.failedSteals;
     diagnostics.runAttempts       = worker.runAttempts;
     diagnostics.idlePolls         = worker.idlePolls;
+    diagnostics.parkAttempts      = worker.parkAttempts;
+    diagnostics.parkedWakeups     = worker.parkedWakeups;
     diagnostics.executedFibers    = worker.executedFibers;
     diagnostics.completedFibers   = worker.completedFibers;
     diagnostics.yieldedFibers     = worker.yieldedFibers;
@@ -4577,6 +4611,8 @@ void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDia
         diagnostics.failedSteals += worker.failedSteals;
         diagnostics.runAttempts += worker.runAttempts;
         diagnostics.idlePolls += worker.idlePolls;
+        diagnostics.parkAttempts += worker.parkAttempts;
+        diagnostics.parkedWakeups += worker.parkedWakeups;
         diagnostics.executedFibers += worker.executedFibers;
         diagnostics.completedFibers += worker.completedFibers;
         diagnostics.yieldedFibers += worker.yieldedFibers;
@@ -4604,6 +4640,8 @@ void FiberScheduler::resetWorkerDiagnostics(FiberWorker& worker)
     worker.failedSteals       = 0;
     worker.runAttempts        = 0;
     worker.idlePolls          = 0;
+    worker.parkAttempts       = 0;
+    worker.parkedWakeups      = 0;
     worker.executedFibers     = 0;
     worker.completedFibers    = 0;
     worker.yieldedFibers      = 0;
@@ -4632,6 +4670,8 @@ void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
         worker.failedSteals       = 0;
         worker.runAttempts        = 0;
         worker.idlePolls          = 0;
+        worker.parkAttempts       = 0;
+        worker.parkedWakeups      = 0;
         worker.executedFibers     = 0;
         worker.completedFibers    = 0;
         worker.yieldedFibers      = 0;
@@ -4643,7 +4683,7 @@ void FiberScheduler::notifyReadyWorkUnlocked()
 {
     if (workerPool != nullptr)
     {
-        workerPool->wakeWorkers();
+        workerPool->wakeOneWorker();
     }
 }
 
@@ -5140,9 +5180,10 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
         task.preferredWorker   = nullptr;
         activeFibers -= 1;
         worker->completedFibers += 1;
-        if (activeFibers == 0)
+        if (activeFibers == 0 and workerPool != nullptr)
         {
-            notifyReadyWorkUnlocked();
+            // Every parked worker must recheck the now-empty scheduler before the pool can join.
+            workerPool->wakeAllWorkers();
         }
         unlinkActiveUnlocked(task);
         worker->workerTask = nullptr;

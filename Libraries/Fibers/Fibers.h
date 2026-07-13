@@ -372,6 +372,8 @@ struct SC_FIBERS_EXPORT FiberWorker
     size_t          stealCursor            = 0;
     size_t          runAttempts            = 0;
     size_t          idlePolls              = 0;
+    size_t          parkAttempts           = 0;
+    size_t          parkedWakeups          = 0;
     size_t          executedFibers         = 0;
     size_t          completedFibers        = 0;
     size_t          yieldedFibers          = 0;
@@ -451,6 +453,8 @@ struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
     size_t failedSteals      = 0;
     size_t runAttempts       = 0;
     size_t idlePolls         = 0;
+    size_t parkAttempts      = 0;
+    size_t parkedWakeups     = 0;
     size_t executedFibers    = 0;
     size_t completedFibers   = 0;
     size_t yieldedFibers     = 0;
@@ -537,8 +541,9 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
     mutable volatile int32_t running            = 0;
     bool                     localDequesCreated = false;
 
-    void                   wakeWorkers();
-    void                   waitForWork(uint32_t observedGeneration);
+    void                   wakeOneWorker();
+    void                   wakeAllWorkers();
+    [[nodiscard]] bool     waitForWork(uint32_t observedGeneration);
     [[nodiscard]] uint32_t wakeGeneration() const;
 
     Result workerMain(size_t workerIndex);
