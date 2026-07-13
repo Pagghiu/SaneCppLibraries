@@ -170,6 +170,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerPoolCounterCancellationStress();
         }
+        if (test_section("worker pool external spawn stress"))
+        {
+            workerPoolExternalSpawnStress();
+        }
         if (test_section("worker stealing"))
         {
             workerStealing();
@@ -3346,6 +3350,136 @@ struct SC::FibersTest : public SC::TestCase
                            "Worker stress test did not complete every task");
                 SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == 0,
                            "Worker stress test unexpectedly cancelled a task");
+            }
+            return allocator.close();
+        };
+
+        for (size_t round = 0; round < NumRounds; ++round)
+        {
+            SC_TEST_EXPECT(runRound(false));
+            SC_TEST_EXPECT(runRound(true));
+        }
+    }
+
+    void workerPoolExternalSpawnStress()
+    {
+        static constexpr size_t NumWorkers    = 4;
+        static constexpr size_t NumTasks      = 64;
+        static constexpr size_t StackSize     = FiberStackSize::ThirtyTwoKiB;
+        static constexpr size_t NumYields     = 4;
+        static constexpr size_t NumRounds     = 3;
+        static constexpr size_t DequeCapacity = NumTasks;
+
+        struct State
+        {
+            FiberCounter*   gate      = nullptr;
+            Atomic<int32_t> entered   = 0;
+            Atomic<int32_t> completed = 0;
+            Atomic<int32_t> cancelled = 0;
+        };
+
+        auto runRound = [](bool cancelWaiters) -> Result
+        {
+            static FiberTask anchor;
+            static FiberTask tasks[NumTasks];
+            static char      anchorStackMemory[StackSize]          = {};
+            static char      taskStackMemory[NumTasks * StackSize] = {};
+            static char      allocatorStorage[32 * 1024]           = {};
+
+            FiberScheduler               scheduler;
+            FiberCancellationTokenSource cancellationSource;
+            FiberCounter                 gate;
+            FiberWorker                  workers[NumWorkers];
+            FiberWorkerThread            threads[NumWorkers];
+            FiberWorkerPool              workerPool;
+            FiberAllocator               allocator;
+            FiberWorkerPoolOptions       workerPoolOptions;
+            State                        state;
+            state.gate = &gate;
+
+            SC_TRY(allocator.createFixed(allocatorStorage));
+            workerPoolOptions.dequeAllocator         = &allocator;
+            workerPoolOptions.dequeCapacityPerWorker = DequeCapacity;
+
+            scheduler.add(gate);
+            FiberStack anchorStack({anchorStackMemory, sizeof(anchorStackMemory)});
+            SC_TRY(scheduler.spawn(anchor, anchorStack,
+                                   FiberTask::Procedure([&gate](FiberScheduler& currentScheduler)
+                                                        { return currentScheduler.wait(gate); })));
+            SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, workerPoolOptions));
+
+            FiberTaskSpawnOptions spawnOptions;
+            if (cancelWaiters)
+            {
+                spawnOptions.cancellationToken = cancellationSource.token();
+            }
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                FiberStack taskStack({taskStackMemory + taskIndex * StackSize, StackSize});
+                SC_TRY(scheduler.spawn(tasks[taskIndex], taskStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler& currentScheduler)
+                                           {
+                                               state.entered.fetch_add(1, memory_order_release);
+                                               Result waitResult = currentScheduler.wait(*state.gate);
+                                               if (not waitResult)
+                                               {
+                                                   state.cancelled.fetch_add(1, memory_order_relaxed);
+                                                   return waitResult;
+                                               }
+                                               for (size_t yieldIndex = 0; yieldIndex < NumYields; ++yieldIndex)
+                                               {
+                                                   SC_TRY(currentScheduler.yield());
+                                               }
+                                               state.completed.fetch_add(1, memory_order_relaxed);
+                                               return Result(true);
+                                           }),
+                                       spawnOptions));
+            }
+
+            size_t waitIterations = 0;
+            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            {
+                Thread::Sleep(1);
+                waitIterations += 1;
+            }
+
+            const bool allWaitersEntered  = state.entered.load(memory_order_acquire) == static_cast<int32_t>(NumTasks);
+            Result     cancellationResult = Result(true);
+            if (cancelWaiters)
+            {
+                cancellationResult = scheduler.requestCancel(cancellationSource);
+            }
+            else if (not allWaitersEntered)
+            {
+                cancellationResult = scheduler.requestCancelAll();
+            }
+            const Result releaseResult = scheduler.done(gate);
+
+            SC_TRY(workerPool.join());
+            SC_TRY(cancellationResult);
+            SC_TRY(releaseResult);
+            SC_TRY_MSG(allWaitersEntered, "External spawn stress test did not enter every wait");
+            SC_TRY_MSG(anchor.result(), "External spawn stress anchor did not complete");
+            SC_TRY_MSG(not scheduler.hasActiveFibers(), "External spawn stress test left active fibers");
+            if (cancelWaiters)
+            {
+                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
+                           "Cancelled external spawn stress tasks completed normally");
+                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                           "External spawn stress test did not cancel every task");
+            }
+            else
+            {
+                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                           "External spawn stress test did not complete every task");
+                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == 0,
+                           "External spawn stress test unexpectedly cancelled a task");
+            }
+            for (FiberTask& task : tasks)
+            {
+                SC_TRY_MSG(cancelWaiters ? not task.result() : task.result(),
+                           "External spawn stress task result did not match the round");
             }
             return allocator.close();
         };
