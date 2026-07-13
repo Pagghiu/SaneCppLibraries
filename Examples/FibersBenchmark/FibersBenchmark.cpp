@@ -43,6 +43,50 @@ static bool hasWorkerCount(Span<size_t> counts, size_t count)
     return false;
 }
 
+static const char* benchmarkPlatformName()
+{
+#if SC_PLATFORM_WINDOWS
+    return "Windows";
+#elif SC_PLATFORM_APPLE
+    return "macOS";
+#elif SC_PLATFORM_LINUX
+    return "Linux";
+#else
+    return "Unknown";
+#endif
+}
+
+static const char* benchmarkArchitectureName()
+{
+#if SC_PLATFORM_ARM64
+    return "ARM64";
+#elif SC_PLATFORM_INTEL and SC_PLATFORM_64_BIT
+    return "x86_64";
+#else
+    return "Unknown";
+#endif
+}
+
+static const char* benchmarkCompilerName()
+{
+#if defined(_MSC_VER)
+    return "MSVC";
+#elif defined(__clang__)
+    return "Clang";
+#elif defined(__GNUC__)
+    return "GCC";
+#else
+    return "Unknown";
+#endif
+}
+
+static void printBenchmarkEnvironment(Console& console)
+{
+    console.print("FibersBenchmark environment: platform={} architecture={} compiler={} hardwareWorkers={}\n",
+                  benchmarkPlatformName(), benchmarkArchitectureName(), benchmarkCompilerName(),
+                  availableHardwareWorkers());
+}
+
 static Result runWorkerPoolBenchmark(Console& console)
 {
     static constexpr size_t NumWorkers             = 4;
@@ -147,6 +191,118 @@ static Result runWorkerPoolBenchmark(Console& console)
     console.print("  allocatorPeakBytes={} allocatorFailures={} maxStackUsed={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures, maxStackUsed);
 
+    return Result(true);
+}
+
+static Result runForcedStealingBenchmark(Console& console)
+{
+    static constexpr size_t NumWorkers             = 4;
+    static constexpr size_t NumTasks               = 256;
+    static constexpr size_t StackSize              = 64 * 1024;
+    static constexpr size_t DequeCapacityPerWorker = NumTasks;
+    static constexpr int    WorkIterations         = 20000;
+
+    struct State
+    {
+        FiberCounter*   gate = nullptr;
+        Atomic<int32_t> waiting;
+        Atomic<int32_t> completed;
+        Atomic<int32_t> checksum;
+    };
+
+    FiberScheduler    scheduler;
+    FiberWorker       workers[NumWorkers];
+    FiberWorkerThread threads[NumWorkers];
+    FiberWorkerPool   workerPool;
+
+    FiberTask     tasks[NumTasks];
+    static char   stackMemory[NumTasks * StackSize] = {};
+    FiberTaskPool taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, StackSize);
+
+    FiberTask      releaseTask;
+    char           releaseStackMemory[StackSize] = {};
+    FiberStack     releaseStack({releaseStackMemory, sizeof(releaseStackMemory)});
+    FiberCounter   gate;
+    FiberAllocator allocator;
+    static char    dequeStorage[NumWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) + 4096] = {};
+    State          state;
+    state.gate = &gate;
+
+    SC_TRY(allocator.createFixed(dequeStorage));
+    SC_TRY(scheduler.createWorkerDeques(allocator, {workers, NumWorkers}, DequeCapacityPerWorker));
+    scheduler.add(gate);
+
+    for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+    {
+        SC_TRY(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                             [&state, taskIndex](FiberScheduler& runningScheduler)
+                                             {
+                                                 state.waiting.fetch_add(1, memory_order_relaxed);
+                                                 SC_TRY(runningScheduler.wait(*state.gate));
+
+                                                 uint32_t value = static_cast<uint32_t>(taskIndex + 1);
+                                                 for (int iteration = 0; iteration < WorkIterations; ++iteration)
+                                                 {
+                                                     value = value * 1664525u + 1013904223u;
+                                                 }
+                                                 state.checksum.fetch_add(static_cast<int32_t>(value),
+                                                                          memory_order_relaxed);
+                                                 state.completed.fetch_add(1, memory_order_relaxed);
+                                                 return Result(true);
+                                             })));
+        SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
+    }
+
+    SC_TRY_MSG(state.waiting.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+               "Forced-steal benchmark tasks did not reach the gate");
+    SC_TRY(scheduler.spawn(
+        releaseTask, releaseStack,
+        FiberTask::Procedure([&gate](FiberScheduler& runningScheduler) { return runningScheduler.done(gate); })));
+    SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
+    SC_TRY_MSG(scheduler.readyFiberCount(workers[0]) == NumTasks,
+               "Forced-steal benchmark did not prepare worker zero's local backlog");
+
+    Time::HighResolutionCounter start;
+    start.snap();
+    SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+    SC_TRY(workerPool.join());
+    Time::HighResolutionCounter finish;
+    finish.snap();
+
+    FiberWorkerDiagnostics diagnostics;
+    scheduler.workerDiagnostics({workers, NumWorkers}, diagnostics);
+    SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+               "Forced-steal benchmark did not complete every task");
+    SC_TRY_MSG(diagnostics.stolenFibers > 0, "Forced-steal benchmark did not steal work");
+    SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Forced-steal benchmark task pool did not fully recycle");
+    SC_TRY_MSG(not scheduler.hasActiveFibers(), "Forced-steal benchmark left active fibers");
+
+    const Time::HighResolutionCounter elapsed     = finish.subtractExact(start);
+    const int64_t                     elapsedNs   = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
+    const int64_t                     elapsedMs   = elapsed.toMilliseconds().ms;
+    const int64_t                     tasksPerSec = static_cast<int64_t>(NumTasks) * 1000000000 / elapsedNs;
+
+    console.print("FibersBenchmark forced stealing\n");
+    console.print("  workers={} preparedLocalBacklog={} workIterations={}\n", NumWorkers, NumTasks,
+                  static_cast<size_t>(WorkIterations));
+    console.print("  elapsedMs={} elapsedNs={} tasksPerSec={} completed={} checksum={}\n",
+                  static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs), static_cast<size_t>(tasksPerSec),
+                  static_cast<size_t>(state.completed.load(memory_order_relaxed)),
+                  static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
+    console.print("  stealAttempts={} stolenFibers={} failedSteals={} queuePeak={} spilled={}\n",
+                  diagnostics.stealAttempts, diagnostics.stolenFibers, diagnostics.failedSteals,
+                  diagnostics.readyPeakFibers, diagnostics.spilledFibers);
+    for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
+    {
+        FiberWorkerDiagnostics workerDiagnostics;
+        scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
+        console.print("  worker[{}] executed={} completed={} steals={} failedSteals={}\n", workerIndex,
+                      workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
+                      workerDiagnostics.stolenFibers, workerDiagnostics.failedSteals);
+    }
+
+    scheduler.releaseWorkerDeques({workers, NumWorkers});
+    SC_TRY(allocator.close());
     return Result(true);
 }
 
@@ -509,7 +665,9 @@ static Result runFibersBenchmark()
 {
     Console console;
     Console::tryAttachingToParentConsole();
+    printBenchmarkEnvironment(console);
     SC_TRY(runWorkerPoolBenchmark(console));
+    SC_TRY(runForcedStealingBenchmark(console));
     SC_TRY(runMicroTaskBenchmarks(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console));
     return Result(true);

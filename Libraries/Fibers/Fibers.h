@@ -630,6 +630,7 @@ struct SC_FIBERS_EXPORT FiberTask
     FiberTask*             previousReady    = nullptr;
     FiberTask*             nextWaiting      = nullptr;
     FiberTask*             nextActive       = nullptr;
+    FiberTask*             previousActive   = nullptr;
     FiberTask*             nextGroup        = nullptr;
     FiberCounter*          waitingCounter   = nullptr;
     FiberCounter*          suspendCounter   = nullptr;

@@ -3898,6 +3898,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     task.previousReady        = nullptr;
     task.nextWaiting          = nullptr;
     task.nextActive           = nullptr;
+    task.previousActive       = nullptr;
     task.nextGroup            = nullptr;
     task.waitingCounter       = nullptr;
     task.suspendCounter       = nullptr;
@@ -3922,6 +3923,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         task.cancellationToken    = FiberCancellationToken();
         task.previousReady        = nullptr;
         task.nextActive           = nullptr;
+        task.previousActive       = nullptr;
         task.nextGroup            = nullptr;
         task.waitingCounter       = nullptr;
         task.suspendCounter       = nullptr;
@@ -5140,24 +5142,32 @@ Result FiberScheduler::cancelTaskUnlocked(FiberTask& task)
 
 void FiberScheduler::linkActiveUnlocked(FiberTask& task)
 {
-    task.nextActive = activeHead;
-    activeHead      = &task;
+    task.nextActive     = activeHead;
+    task.previousActive = nullptr;
+    if (activeHead != nullptr)
+    {
+        activeHead->previousActive = &task;
+    }
+    activeHead = &task;
 }
 
 void FiberScheduler::unlinkActiveUnlocked(FiberTask& task)
 {
-    FiberTask** link = &activeHead;
-    while (*link != nullptr)
+    if (task.previousActive != nullptr)
     {
-        if (*link == &task)
-        {
-            *link           = task.nextActive;
-            task.nextActive = nullptr;
-            return;
-        }
-        link = &(*link)->nextActive;
+        task.previousActive->nextActive = task.nextActive;
     }
-    SC_FIBERS_ASSERT_RELEASE(false);
+    else
+    {
+        SC_FIBERS_ASSERT_RELEASE(activeHead == &task);
+        activeHead = task.nextActive;
+    }
+    if (task.nextActive != nullptr)
+    {
+        task.nextActive->previousActive = task.previousActive;
+    }
+    task.nextActive     = nullptr;
+    task.previousActive = nullptr;
 }
 
 bool FiberScheduler::removeCounterWaiterUnlocked(FiberCounter& counter, FiberTask& task)
