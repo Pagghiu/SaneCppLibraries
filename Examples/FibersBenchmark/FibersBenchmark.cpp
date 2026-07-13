@@ -290,16 +290,17 @@ static Result runForcedStealingBenchmark(Console& console)
                   static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs), static_cast<size_t>(tasksPerSec),
                   static_cast<size_t>(state.completed.load(memory_order_relaxed)),
                   static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
-    console.print("  stealAttempts={} stolenFibers={} failedSteals={} queuePeak={} spilled={}\n",
-                  diagnostics.stealAttempts, diagnostics.stolenFibers, diagnostics.failedSteals,
-                  diagnostics.readyPeakFibers, diagnostics.spilledFibers);
+    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} failedSteals={} queuePeak={} spilled={}\n",
+                  diagnostics.stealAttempts, diagnostics.stealVictimProbes, diagnostics.stolenFibers,
+                  diagnostics.failedSteals, diagnostics.readyPeakFibers, diagnostics.spilledFibers);
     for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
     {
         FiberWorkerDiagnostics workerDiagnostics;
         scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
-        console.print("  worker[{}] executed={} completed={} steals={} failedSteals={}\n", workerIndex,
-                      workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
-                      workerDiagnostics.stolenFibers, workerDiagnostics.failedSteals);
+        console.print("  worker[{}] executed={} completed={} stealVictimProbes={} steals={} failedSteals={}\n",
+                      workerIndex, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
+                      workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
+                      workerDiagnostics.failedSteals);
     }
 
     scheduler.releaseWorkerDeques({workers, NumWorkers});
@@ -548,8 +549,9 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   static_cast<size_t>(jobsPerSec), static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
     console.print("  runAttempts={} idlePolls={} executedFibers={} completedFibers={}\n", workerDiagnostics.runAttempts,
                   workerDiagnostics.idlePolls, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers);
-    console.print("  stealAttempts={} stolenFibers={} failedSteals={}\n", workerDiagnostics.stealAttempts,
-                  workerDiagnostics.stolenFibers, workerDiagnostics.failedSteals);
+    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} failedSteals={}\n",
+                  workerDiagnostics.stealAttempts, workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
+                  workerDiagnostics.failedSteals);
     console.print("  queuePeak={} spilled={}\n", workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers);
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,

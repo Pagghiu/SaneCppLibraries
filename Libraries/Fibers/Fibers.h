@@ -351,31 +351,34 @@ struct SC_FIBERS_EXPORT FiberWorker
     Result begin(FiberScheduler& fiberScheduler);
     void   end();
 
-    FiberScheduler* workerScheduler       = nullptr;
-    FiberScheduler* localQueueScheduler   = nullptr;
-    FiberTask*      workerTask            = nullptr;
-    FiberTask*      localReadyHead        = nullptr;
-    FiberTask*      localReadyTail        = nullptr;
-    FiberTask**     localDeque            = nullptr;
-    FiberAllocator* localDequeAllocator   = nullptr;
-    size_t          localReadyFibers      = 0;
-    size_t          localDequeCapacity    = 0;
-    size_t          localDequeHead        = 0;
-    volatile size_t localDequeTop         = 0;
-    volatile size_t localDequeBottom      = 0;
-    size_t          localReadyPeakFibers  = 0;
-    size_t          localSpilledFibers    = 0;
-    size_t          stealAttempts         = 0;
-    size_t          stolenFibers          = 0;
-    size_t          failedSteals          = 0;
-    size_t          runAttempts           = 0;
-    size_t          idlePolls             = 0;
-    size_t          executedFibers        = 0;
-    size_t          completedFibers       = 0;
-    size_t          yieldedFibers         = 0;
-    size_t          waitingFibers         = 0;
-    bool            workerActive          = false;
-    bool            localSchedulingActive = false;
+    FiberScheduler* workerScheduler        = nullptr;
+    FiberScheduler* localQueueScheduler    = nullptr;
+    FiberTask*      workerTask             = nullptr;
+    FiberTask*      localReadyHead         = nullptr;
+    FiberTask*      localReadyTail         = nullptr;
+    FiberTask**     localDeque             = nullptr;
+    FiberAllocator* localDequeAllocator    = nullptr;
+    size_t          localReadyFibers       = 0;
+    size_t          localDequeCapacity     = 0;
+    size_t          localDequeHead         = 0;
+    volatile size_t localDequeTop          = 0;
+    volatile size_t localDequeBottom       = 0;
+    size_t          localReadyPeakFibers   = 0;
+    size_t          localSpilledFibers     = 0;
+    size_t          stealAttempts          = 0;
+    size_t          stealVictimProbes      = 0;
+    size_t          stolenFibers           = 0;
+    size_t          failedSteals           = 0;
+    size_t          stealCursor            = 0;
+    size_t          runAttempts            = 0;
+    size_t          idlePolls              = 0;
+    size_t          executedFibers         = 0;
+    size_t          completedFibers        = 0;
+    size_t          yieldedFibers          = 0;
+    size_t          waitingFibers          = 0;
+    bool            workerActive           = false;
+    bool            localSchedulingActive  = false;
+    bool            stealCursorInitialized = false;
 
     AlignedStorage<FiberContextStorageSize, FiberContextStorageAlignment> rootContextStorage;
 
@@ -438,19 +441,20 @@ struct SC_FIBERS_EXPORT FiberWorkerPoolOptions
 
 struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
 {
-    size_t readyFibers     = 0;
-    size_t readyPeakFibers = 0;
-    size_t dequeCapacity   = 0;
-    size_t spilledFibers   = 0;
-    size_t stealAttempts   = 0;
-    size_t stolenFibers    = 0;
-    size_t failedSteals    = 0;
-    size_t runAttempts     = 0;
-    size_t idlePolls       = 0;
-    size_t executedFibers  = 0;
-    size_t completedFibers = 0;
-    size_t yieldedFibers   = 0;
-    size_t waitingFibers   = 0;
+    size_t readyFibers       = 0;
+    size_t readyPeakFibers   = 0;
+    size_t dequeCapacity     = 0;
+    size_t spilledFibers     = 0;
+    size_t stealAttempts     = 0;
+    size_t stealVictimProbes = 0;
+    size_t stolenFibers      = 0;
+    size_t failedSteals      = 0;
+    size_t runAttempts       = 0;
+    size_t idlePolls         = 0;
+    size_t executedFibers    = 0;
+    size_t completedFibers   = 0;
+    size_t yieldedFibers     = 0;
+    size_t waitingFibers     = 0;
 };
 
 struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics

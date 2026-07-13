@@ -3624,6 +3624,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberWorkerDiagnostics thiefDiagnostics;
             scheduler.workerDiagnostics(workers[1], thiefDiagnostics);
             SC_TEST_EXPECT(thiefDiagnostics.stealAttempts == 3);
+            SC_TEST_EXPECT(thiefDiagnostics.stealVictimProbes == 3);
             SC_TEST_EXPECT(thiefDiagnostics.stolenFibers == 3);
             SC_TEST_EXPECT(thiefDiagnostics.failedSteals == 0);
             SC_TEST_EXPECT(not scheduler.hasActiveFibers());
@@ -3696,6 +3697,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberWorkerDiagnostics diagnostics;
             scheduler.workerDiagnostics(workers[0], diagnostics);
             SC_TEST_EXPECT(diagnostics.stealAttempts == 1);
+            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 1);
             SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
             SC_TEST_EXPECT(diagnostics.failedSteals == 1);
 
@@ -3704,6 +3706,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(diagnostics.readyPeakFibers == 0);
             SC_TEST_EXPECT(diagnostics.spilledFibers == 0);
             SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
+            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
             SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
             SC_TEST_EXPECT(diagnostics.failedSteals == 0);
             SC_TEST_EXPECT(diagnostics.runAttempts == 0);

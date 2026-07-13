@@ -66,6 +66,7 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - Keep fiber stack-size classes caller-selected and page-rounding-aware; do not infer them from task procedures.
 - Retain full stack commitment on acquisition until a fault-handled incremental-commit prototype proves portable guard,
   sanitizer, debugger, and signal/exception behavior.
+- Use bounded deterministic victim sampling for stealing rather than scanning every worker on every idle attempt.
 - Keep yield and wake publication allocation-free for existing fibers.
 - Apply capacity pressure primarily when creating new work, task slots, stack slots, or bounded queue storage.
 - Keep cancellation cooperative and wake-based; do not preempt or unwind running fiber stacks.
@@ -110,3 +111,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
 - [FIBERS-0011 - Keep fiber stack-size classes explicit](fibers-0011-keep-fiber-stack-size-classes-explicit.md)
 - [FIBERS-0012 - Require a prototype before incremental fiber stack commitment](fibers-0012-require-a-prototype-before-incremental-fiber-stack-commitment.md)
+- [FIBERS-0013 - Use bounded deterministic work-stealing victim sampling](fibers-0013-use-bounded-deterministic-work-stealing-victim-sampling.md)

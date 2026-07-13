@@ -1477,9 +1477,11 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
         SC_FIBERS_ASSERT_RELEASE(worker.localReadyHead == nullptr);
         SC_FIBERS_ASSERT_RELEASE(worker.localReadyTail == nullptr);
         SC_FIBERS_ASSERT_RELEASE(worker.localReadyFibers == 0);
-        worker.localDequeHead        = 0;
-        worker.localSchedulingActive = true;
-        worker.localQueueScheduler   = &scheduler;
+        worker.localDequeHead         = 0;
+        worker.localSchedulingActive  = true;
+        worker.localQueueScheduler    = &scheduler;
+        worker.stealCursor            = (idx + 1) % workers.sizeInElements();
+        worker.stealCursorInitialized = true;
 
         FiberWorkerThread& thread = threads[idx];
         SC_FIBERS_ASSERT_RELEASE(not thread.started);
@@ -4001,12 +4003,18 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
     FiberTask* task = nullptr;
     {
         LockGuard guard(*this);
-        for (FiberWorker& groupWorker : workerGroup)
+        for (size_t workerIndex = 0; workerIndex < workerGroup.sizeInElements(); ++workerIndex)
         {
+            FiberWorker& groupWorker = workerGroup[workerIndex];
             SC_FIBERS_ASSERT_RELEASE(groupWorker.localQueueScheduler == nullptr or
                                      groupWorker.localQueueScheduler == this);
             groupWorker.localSchedulingActive = true;
             groupWorker.localQueueScheduler   = this;
+            if (not groupWorker.stealCursorInitialized)
+            {
+                groupWorker.stealCursor            = (workerIndex + 1) % workerGroup.sizeInElements();
+                groupWorker.stealCursorInitialized = true;
+            }
         }
         worker.runAttempts += 1;
         task = popReadyUnlocked(worker, workerGroup);
@@ -4033,12 +4041,18 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
     FiberTask* task = nullptr;
     {
         LockGuard guard(*this);
-        for (FiberWorker& groupWorker : stealWorkers)
+        for (size_t workerIndex = 0; workerIndex < stealWorkers.sizeInElements(); ++workerIndex)
         {
+            FiberWorker& groupWorker = stealWorkers[workerIndex];
             SC_FIBERS_ASSERT_RELEASE(groupWorker.localQueueScheduler == nullptr or
                                      groupWorker.localQueueScheduler == this);
             groupWorker.localSchedulingActive = true;
             groupWorker.localQueueScheduler   = this;
+            if (not groupWorker.stealCursorInitialized)
+            {
+                groupWorker.stealCursor            = (workerIndex + 1) % stealWorkers.sizeInElements();
+                groupWorker.stealCursorInitialized = true;
+            }
         }
         worker.runAttempts += 1;
     }
@@ -4516,19 +4530,20 @@ void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDia
         }
     }
 
-    diagnostics.readyFibers     = readyFibersForWorker;
-    diagnostics.readyPeakFibers = worker.localReadyPeakFibers;
-    diagnostics.dequeCapacity   = worker.localDequeCapacity;
-    diagnostics.spilledFibers   = worker.localSpilledFibers;
-    diagnostics.stealAttempts   = worker.stealAttempts;
-    diagnostics.stolenFibers    = worker.stolenFibers;
-    diagnostics.failedSteals    = worker.failedSteals;
-    diagnostics.runAttempts     = worker.runAttempts;
-    diagnostics.idlePolls       = worker.idlePolls;
-    diagnostics.executedFibers  = worker.executedFibers;
-    diagnostics.completedFibers = worker.completedFibers;
-    diagnostics.yieldedFibers   = worker.yieldedFibers;
-    diagnostics.waitingFibers   = worker.waitingFibers;
+    diagnostics.readyFibers       = readyFibersForWorker;
+    diagnostics.readyPeakFibers   = worker.localReadyPeakFibers;
+    diagnostics.dequeCapacity     = worker.localDequeCapacity;
+    diagnostics.spilledFibers     = worker.localSpilledFibers;
+    diagnostics.stealAttempts     = worker.stealAttempts;
+    diagnostics.stealVictimProbes = worker.stealVictimProbes;
+    diagnostics.stolenFibers      = worker.stolenFibers;
+    diagnostics.failedSteals      = worker.failedSteals;
+    diagnostics.runAttempts       = worker.runAttempts;
+    diagnostics.idlePolls         = worker.idlePolls;
+    diagnostics.executedFibers    = worker.executedFibers;
+    diagnostics.completedFibers   = worker.completedFibers;
+    diagnostics.yieldedFibers     = worker.yieldedFibers;
+    diagnostics.waitingFibers     = worker.waitingFibers;
 }
 
 void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDiagnostics& diagnostics) const
@@ -4557,6 +4572,7 @@ void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDia
         diagnostics.dequeCapacity += worker.localDequeCapacity;
         diagnostics.spilledFibers += worker.localSpilledFibers;
         diagnostics.stealAttempts += worker.stealAttempts;
+        diagnostics.stealVictimProbes += worker.stealVictimProbes;
         diagnostics.stolenFibers += worker.stolenFibers;
         diagnostics.failedSteals += worker.failedSteals;
         diagnostics.runAttempts += worker.runAttempts;
@@ -4583,6 +4599,7 @@ void FiberScheduler::resetWorkerDiagnostics(FiberWorker& worker)
     }
     worker.localSpilledFibers = 0;
     worker.stealAttempts      = 0;
+    worker.stealVictimProbes  = 0;
     worker.stolenFibers       = 0;
     worker.failedSteals       = 0;
     worker.runAttempts        = 0;
@@ -4610,6 +4627,7 @@ void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
         }
         worker.localSpilledFibers = 0;
         worker.stealAttempts      = 0;
+        worker.stealVictimProbes  = 0;
         worker.stolenFibers       = 0;
         worker.failedSteals       = 0;
         worker.runAttempts        = 0;
@@ -4879,6 +4897,8 @@ FiberTask* FiberScheduler::stealWorkerReadyUnlocked(FiberWorker& worker)
 
 FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWorker> stealWorkers)
 {
+    static constexpr size_t NumVictimSamples = 2;
+
     const size_t numWorkers = stealWorkers.sizeInElements();
     if (numWorkers <= 1)
     {
@@ -4887,29 +4907,29 @@ FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWor
 
     worker.stealAttempts += 1;
 
-    size_t startIndex = 0;
-    for (size_t idx = 0; idx < numWorkers; ++idx)
-    {
-        if (&stealWorkers[idx] == &worker)
-        {
-            startIndex = (idx + 1) % numWorkers;
-            break;
-        }
-    }
+    const size_t numVictimsToSample = numWorkers - 1 < NumVictimSamples ? numWorkers - 1 : NumVictimSamples;
+    const size_t startIndex         = worker.stealCursor % numWorkers;
+    size_t       sampledVictims     = 0;
+    size_t       cursorAdvance      = 0;
 
     FiberWorker* victimWithMostReady = nullptr;
     size_t       mostReadyFibers     = 0;
-    for (size_t offset = 0; offset < numWorkers; ++offset)
+    while (sampledVictims < numVictimsToSample and cursorAdvance < numWorkers)
     {
-        FiberWorker& victim = stealWorkers[(startIndex + offset) % numWorkers];
+        FiberWorker& victim = stealWorkers[(startIndex + cursorAdvance) % numWorkers];
+        cursorAdvance += 1;
         if (&victim == &worker)
         {
             continue;
         }
+
+        sampledVictims += 1;
+        worker.stealVictimProbes += 1;
         if (victim.localQueueScheduler != this)
         {
             continue;
         }
+
         size_t victimReadyFibers = victim.localReadyFibers;
         if (victim.localDeque != nullptr)
         {
@@ -4923,6 +4943,7 @@ FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWor
             mostReadyFibers     = victimReadyFibers;
         }
     }
+    worker.stealCursor = (startIndex + cursorAdvance) % numWorkers;
     if (victimWithMostReady == nullptr)
     {
         worker.failedSteals += 1;
