@@ -1346,7 +1346,7 @@ struct SC::FibersTest : public SC::TestCase
     void classBackedTaskPoolWorkers()
     {
         static constexpr size_t NumWorkers = 4;
-        static constexpr size_t NumSlots   = 8;
+        static constexpr size_t NumSlots   = 256;
         static constexpr size_t NumJobs    = 256;
 
         struct State

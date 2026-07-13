@@ -306,7 +306,7 @@ static Result runForcedStealingBenchmark(Console& console)
     return Result(true);
 }
 
-static Result runMassSuspensionBenchmark(Console& console)
+[[nodiscard]] static Result runMassSuspensionBenchmark(Console& console)
 {
     static constexpr size_t NumFibers     = 10000;
     static constexpr size_t StackSize     = 8 * 1024;
@@ -337,12 +337,20 @@ static Result runMassSuspensionBenchmark(Console& console)
     FiberCounter   gate;
     scheduler.add(gate);
 
-    Time::HighResolutionCounter suspendStart;
-    suspendStart.snap();
+    Time::HighResolutionCounter spawnStart;
+    spawnStart.snap();
     for (size_t fiberIndex = 0; fiberIndex < NumFibers; ++fiberIndex)
     {
         SC_TRY(taskPool.spawn(scheduler, FiberTask::Procedure([&gate](FiberScheduler& runningScheduler)
                                                               { return runningScheduler.wait(gate); })));
+    }
+    Time::HighResolutionCounter spawnFinish;
+    spawnFinish.snap();
+
+    Time::HighResolutionCounter suspendStart;
+    suspendStart.snap();
+    for (size_t fiberIndex = 0; fiberIndex < NumFibers; ++fiberIndex)
+    {
         SC_TRY(scheduler.runNoWait());
     }
     Time::HighResolutionCounter suspendFinish;
@@ -368,12 +376,15 @@ static Result runMassSuspensionBenchmark(Console& console)
     SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mass-suspension benchmark left active fibers");
     SC_TRY_MSG(taskPool.availableCount() == NumFibers, "Mass-suspension benchmark did not recycle every slot");
 
+    const Time::HighResolutionCounter spawnElapsed   = spawnFinish.subtractExact(spawnStart);
     const Time::HighResolutionCounter suspendElapsed = suspendFinish.subtractExact(suspendStart);
     const Time::HighResolutionCounter resumeElapsed  = resumeFinish.subtractExact(resumeStart);
     console.print("FibersBenchmark mass suspension\n");
     console.print("  fibers={} stackSize={} guardSize={}\n", NumFibers, StackSize,
                   suspendedDiagnostics.stackClass.guardSizeInBytes);
-    console.print("  suspendElapsedMs={} resumeElapsedMs={}\n", static_cast<size_t>(suspendElapsed.toMilliseconds().ms),
+    console.print("  spawnAndSlotAcquireElapsedMs={} suspendElapsedMs={} resumeElapsedMs={}\n",
+                  static_cast<size_t>(spawnElapsed.toMilliseconds().ms),
+                  static_cast<size_t>(suspendElapsed.toMilliseconds().ms),
                   static_cast<size_t>(resumeElapsed.toMilliseconds().ms));
     console.print("  reservedBytes={} committedBytes={} peakCommittedBytes={}\n",
                   suspendedDiagnostics.stackClass.reservedSizeBytes, suspendedDiagnostics.stackClass.committedSizeBytes,
@@ -422,10 +433,9 @@ struct MicroTaskExternalProducerState
     FiberScheduler*          scheduler      = nullptr;
     FiberTaskPool*           taskPool       = nullptr;
     MicroTaskBenchmarkState* benchmarkState = nullptr;
-    int                      workIterations = 0;
 };
 
-static Result runTinyCpuJob(MicroTaskBenchmarkState& state, int workIterations)
+static Result runCpuPayload(MicroTaskBenchmarkState& state, int workIterations)
 {
     // The seed is runtime state so a compiler cannot reduce the payload to a constant expression.
     uint32_t value = static_cast<uint32_t>(state.completed.load(memory_order_relaxed)) + 1;
@@ -442,7 +452,7 @@ static Result spawnMicroTaskJob(FiberTaskPool& pool, FiberScheduler& scheduler, 
                                 int workIterations)
 {
     SC_TRY(pool.spawn(scheduler, FiberTask::Procedure([&state, workIterations](FiberScheduler&)
-                                                      { return runTinyCpuJob(state, workIterations); })));
+                                                      { return runCpuPayload(state, workIterations); })));
     state.submitted.fetch_add(1, memory_order_relaxed);
     return Result(true);
 }
@@ -588,14 +598,14 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             producerState.scheduler      = &scheduler;
             producerState.taskPool       = &taskPool;
             producerState.benchmarkState = &state;
-            producerState.workIterations = workIterations;
             SC_TRY(producerThread.start(
                 [&producerState](Thread&)
                 {
                     for (size_t idx = 0; idx < NumJobs; ++idx)
                     {
                         Result result = spawnMicroTaskJob(*producerState.taskPool, *producerState.scheduler,
-                                                          *producerState.benchmarkState, producerState.workIterations);
+                                                          *producerState.benchmarkState,
+                                                          producerState.benchmarkState->workIterations);
                         if (not result)
                         {
                             producerState.benchmarkState->producerResult = result;
@@ -636,7 +646,9 @@ static Result runMicroTaskBenchmarks(Console& console)
     const size_t requestedCounts[] = {1, 2, 4, 8, availableHardwareWorkers()};
     for (size_t requestedCount : requestedCounts)
     {
-        size_t workerCount = requestedCount > MaxWorkers ? MaxWorkers : requestedCount;
+        SC_TRY_MSG(requestedCount <= MaxWorkers,
+                   "FibersBenchmark must increase its fixed worker storage for this machine");
+        size_t workerCount = requestedCount;
         if (workerCount == 0)
         {
             workerCount = 1;

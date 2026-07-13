@@ -45,10 +45,85 @@ The target state transition rules are:
 |:--|:--|:--|
 | `Ready` | `Running` | deque owner after local pop, or thief after successful steal; task state gate prevents double claim |
 | `Running` | `Ready` | current worker publishes locally; non-owner publication enters bounded injection or intrusive spill |
-| `Running` | `Waiting` | current worker links under the waited primitive's lock after recording suspension intent |
+| `Running` | `Suspending` | current worker records the wait action, primitive, interruptibility, and preferred worker before switching to its root context |
+| `Suspending` | `Waiting` | root context links the task under the waited primitive's lock only when the primitive remains incomplete and cancellation did not win |
+| `Suspending` | `Ready` | root context observes a completion or cancellation that raced with suspension and publishes the task only after the old stack is inactive |
 | `Waiting` | `Ready` | primitive completion or cancellation claims the task once, unlinks it, then publishes it |
-| `Running` | `Completing` | current worker records final `Result` and reduces active work |
-| `Completing` | `Completed` | worker root context performs post-switch pool/class release and availability notification |
+| `Running` | `Completing` | current worker records final `Result` and switches to its root context |
+| `Completing` | `Completed` | worker root context reduces active work, performs post-switch pool/class release, and notifies availability |
+
+`Suspending` is an internal state, not a new public `FiberTaskStatus`. It models the existing two-phase suspension
+invariant explicitly: an external completion or cancellation may record that it won, but must never queue a task while
+its stack is still executing. The root context is the only code that turns such a recorded outcome into a ready
+publication. This is also why cancellation remains cooperative rather than preempting a running stack.
+
+## Control-Plane Signals And Parking
+
+The replacement for the globally locked counters consists of three control-plane signals. They are implementation
+fields, not new public API.
+
+- `activeFiberCount` is an atomic count. The creating thread increments it before a task's first ready publication;
+  the worker root context decrements it exactly once after final completion has made later resume impossible and before
+  the task/stack slot can be recycled. It includes `Ready`, `Running`, `Suspending`, `Waiting`, and `Completing` tasks.
+- `readyWorkCount` is an atomic conservative count. A publisher increments it before making a task visible in a local
+  deque, injection queue, or intrusive spill. The deque owner or thief decrements it only after successfully claiming
+  a visible task. During publication it may temporarily over-count, which is safe: a worker that observes a non-zero
+  value must retry work discovery rather than conclude that the scheduler is idle.
+- `shutdownRequested` is an atomic flag. Shutdown publication wakes all workers and prevents accepting further work
+  according to the public shutdown contract; it does not make active fiber state disappear.
+
+Task initialization happens-before first publication. `activeFiberCount` increments and `readyWorkCount` increments
+use release semantics; readers that decide whether to park or terminate use acquire semantics. A successful task-state
+gate claim uses acquire-release semantics, with acquire semantics on a failed observation. The existing deque
+publication/steal acquire-release protocol protects the task pointer and its initialized fields. These rules make the
+activity counters conservative control signals, not an alternative ownership mechanism for task memory.
+
+The worker parking sequence is deliberately prepare, recheck, then park:
+
+1. Explore local work, bounded injection/spill work, and the configured steal attempts.
+2. Capture the wake-event generation while its mutex is held, then release that mutex.
+3. Acquire-load `shutdownRequested`, `readyWorkCount`, and `activeFiberCount`.
+4. Retry discovery when ready work is non-zero. Exit only when shutdown is requested and active work is zero. Otherwise
+   wait only while the wake-event generation is unchanged.
+
+Every ready publisher increments `readyWorkCount` before it advances the queue publication point and then increments
+the wake generation before signaling. Therefore a worker either observes the ready work during the recheck or sees the
+generation change when it tries to wait; no ready publication can be lost between recheck and parking. Normal ready
+publication wakes one worker. Shutdown and explicit broadcast operations wake all workers.
+
+## Active Registries And Cancellation
+
+Active-task enumeration is split by ownership instead of using one scheduler-wide active list.
+
+- A task awaiting its first claim from an external producer lives in the bounded injection registry protected by the
+  injection control lock.
+- Once a worker claims a task, that worker becomes its home worker and the task is linked in that worker's intrusive
+  active registry. It remains in that registry while it is ready, running, suspending, or waiting; migration changes
+  execution ownership but does not require moving the control-plane registry entry.
+- Completion unlinks the task from its home registry in O(1) at the root-context reclamation point. Inactive class and
+  pool slots are in no active registry.
+
+Rare cancellation-by-token and cancel-all operations set the cancellation source first, then inspect the injection
+registry and worker registries one at a time. The lock order is cancellation source, injection control, worker control,
+then waited primitive. Normal primitive completion never acquires a worker-control lock while holding a primitive lock.
+This gives cancellation a finite, allocation-free traversal while keeping normal completion and deregistration out of a
+scheduler-global lock. A cancellation scan claims a task's state gate before unlinking a waiter or publishing it, so a
+counter/event completion racing with cancellation observes an already claimed transition and cannot double-resume the
+task.
+
+## Two-Phase Suspension Races
+
+When a running task starts an interruptible wait, it first publishes the `Suspending` intent under the task state gate
+and records `suspendAction`, `suspendCounter`, and `suspendInterruptible`. A primitive completion or cancellation
+during this interval only records the winning outcome under the same gate. It does not enqueue the task. Once control
+has returned to the worker root context, that context either links the still-pending task into the primitive's waiter
+queue as `Waiting`, or consumes the recorded outcome and publishes it as `Ready`. A completion/cancellation after the
+waiter link follows the normal `Waiting -> Ready` rule. The root context clears suspension metadata only after one of
+these paths has become authoritative.
+
+This makes these three races explicit test cases: completion-before-link, cancellation-before-link, and
+completion-versus-cancellation-after-link. Each must prove exactly one ready publication and no switch to a still
+running stack.
 
 ## Consequences
 
@@ -60,8 +135,8 @@ The first implementation intentionally favors one bounded scheduler injection qu
 may still contend under heavy external submission, but it keeps ownership auditable and gives benchmarks a concrete
 baseline before adding per-worker injection or batch stealing.
 
-This decision requires more per-task and per-worker metadata, careful atomic memory-order documentation, and expanded
-race testing. It does not authorize hidden allocation, unbounded queues, or an implicit global scheduler.
+This decision requires more per-task and per-worker metadata and expanded race testing. It does not authorize hidden
+allocation, unbounded queues, or an implicit global scheduler.
 
 ## Alternatives Considered
 

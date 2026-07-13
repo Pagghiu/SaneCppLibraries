@@ -122,10 +122,10 @@ struct SC_FIBERS_EXPORT FiberVirtualStackOptions
 
 struct FiberStackClassDefinition
 {
-    static constexpr int    Windows   = 160;
-    static constexpr int    Apple     = 160;
-    static constexpr int    Linux     = 160;
-    static constexpr int    Default   = 160;
+    static constexpr int    Windows   = 176;
+    static constexpr int    Apple     = 176;
+    static constexpr int    Linux     = 176;
+    static constexpr int    Default   = 176;
     static constexpr size_t Alignment = alignof(void*);
 
     using Object = FiberStackClassInternal;
