@@ -4223,8 +4223,13 @@ struct SC::FibersTest : public SC::TestCase
 
     void stackClass()
     {
+        SC_TEST_EXPECT(FiberStackSize::FourKiB == FiberStackMinimumSize);
+        SC_TEST_EXPECT(FiberStackSize::EightKiB > FiberStackSize::FourKiB);
+        SC_TEST_EXPECT(FiberStackSize::ThirtyTwoKiB > FiberStackSize::EightKiB);
+        SC_TEST_EXPECT(FiberStackSize::SixtyFourKiB > FiberStackSize::ThirtyTwoKiB);
+
         FiberStackClassOptions options;
-        options.stackSizeInBytes = 64 * 1024;
+        options.stackSizeInBytes = FiberStackSize::ThirtyTwoKiB;
         options.maxStacks        = 2;
         options.guardPage        = true;
 

@@ -77,6 +77,16 @@ static constexpr int FiberContextStorageAlignment = 16;
 static constexpr int FiberStackAlignment          = 16;
 static constexpr int FiberStackMinimumSize        = 4096;
 
+//! Common requested sizes for virtual fiber stack classes.
+//! Actual usable and committed size is page-rounded by the active platform.
+struct SC_FIBERS_EXPORT FiberStackSize
+{
+    static constexpr size_t FourKiB      = 4 * 1024;
+    static constexpr size_t EightKiB     = 8 * 1024;
+    static constexpr size_t ThirtyTwoKiB = 32 * 1024;
+    static constexpr size_t SixtyFourKiB = 64 * 1024;
+};
+
 //! Caller-owned stack storage used by fiber contexts.
 struct SC_FIBERS_EXPORT FiberStack
 {
@@ -116,7 +126,7 @@ using FiberVirtualStackOpaque = OpaqueObject<FiberVirtualStackDefinition>;
 //! Options for reserving a virtual-memory-backed fiber stack.
 struct SC_FIBERS_EXPORT FiberVirtualStackOptions
 {
-    size_t usableSizeInBytes = 64 * 1024;
+    size_t usableSizeInBytes = FiberStackSize::SixtyFourKiB;
     bool   guardPage         = true;
 };
 
@@ -134,7 +144,7 @@ using FiberStackClassOpaque = OpaqueObject<FiberStackClassDefinition>;
 
 struct SC_FIBERS_EXPORT FiberStackClassOptions
 {
-    size_t stackSizeInBytes = 64 * 1024;
+    size_t stackSizeInBytes = FiberStackSize::SixtyFourKiB;
     size_t maxStacks        = 0;
     bool   guardPage        = true;
 };

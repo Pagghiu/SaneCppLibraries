@@ -133,7 +133,7 @@ SC_TRY(taskClass.create(allocator, taskOptions));
 
 FiberStackClass stackClass;
 FiberStackClassOptions stackOptions;
-stackOptions.stackSizeInBytes = 64 * 1024;
+stackOptions.stackSizeInBytes = FiberStackSize::ThirtyTwoKiB;
 stackOptions.maxStacks        = 1024;
 stackOptions.guardPage        = true;
 SC_TRY(stackClass.reserve(stackOptions));
@@ -145,6 +145,18 @@ SC_TRY(pool.create(taskClass, stackClass));
 `FiberStackClass` reserves fixed-size virtual slots, optionally with guard pages, and reports committed and high-water
 usage. `FiberTaskClass` bounds reusable task records. Both must outlive every slot acquired from them, and close-time
 validation rejects live allocations or task/stack slots.
+
+# Stack Class Sizing
+
+`FiberStackSize` names common requested sizes for virtual stacks: `FourKiB`, `EightKiB`, `ThirtyTwoKiB`, and
+`SixtyFourKiB`. These are inputs to `FiberVirtualStackOptions` and `FiberStackClassOptions`, not runtime-selected
+profiles. The OS rounds requested stack and guard sizes to its page size, so `FiberStackClassDiagnostics` is the source
+of truth for actual reservation and committed bytes.
+
+Use 4 KiB or 8 KiB only for shallow, measured procedures. 32 KiB is a reasonable starting point for dense cooperative
+workloads, while 64 KiB remains the conservative default. Stack requirements include ordinary nested calls, C++
+temporaries, and any library work below a suspension point. Measure high-water use with `fillHighWaterMarks()` before
+reducing a production stack class, and retain enough margin for platform and build-mode variation.
 
 # Waiting, Coordination, and Cancellation
 

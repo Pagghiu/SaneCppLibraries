@@ -63,6 +63,7 @@ authorizes it because the dependency replaces substantial duplicated implementat
 
 - Keep `Fibers` as an independent CPU runtime with caller-owned storage.
 - Use `FiberAllocator`, not `AwaitAllocator`, for scheduler-specific explicit allocation.
+- Keep fiber stack-size classes caller-selected and page-rounding-aware; do not infer them from task procedures.
 - Keep yield and wake publication allocation-free for existing fibers.
 - Apply capacity pressure primarily when creating new work, task slots, stack slots, or bounded queue storage.
 - Keep cancellation cooperative and wake-based; do not preempt or unwind running fiber stacks.
@@ -105,3 +106,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0008 - Use stack-local waiter nodes for cooperative waits](fibers-0008-use-stack-local-waiter-nodes-for-cooperative-waits.md)
 - [FIBERS-0009 - Keep FiberTaskPool as the ergonomic facade over task and stack classes](fibers-0009-keep-fibertaskpool-as-the-ergonomic-facade-over-task-and-stack-classes.md)
 - [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
+- [FIBERS-0011 - Keep fiber stack-size classes explicit](fibers-0011-keep-fiber-stack-size-classes-explicit.md)
