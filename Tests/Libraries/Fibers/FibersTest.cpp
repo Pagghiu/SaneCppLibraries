@@ -166,6 +166,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerPoolPrimitives();
         }
+        if (test_section("worker pool counter cancellation stress"))
+        {
+            workerPoolCounterCancellationStress();
+        }
         if (test_section("worker stealing"))
         {
             workerStealing();
@@ -3222,6 +3226,130 @@ struct SC::FibersTest : public SC::TestCase
             {
                 SC_TEST_EXPECT(task.result());
             }
+        }
+    }
+
+    void workerPoolCounterCancellationStress()
+    {
+        static constexpr size_t NumWorkers    = 4;
+        static constexpr size_t NumTasks      = 64;
+        static constexpr size_t StackSize     = FiberStackSize::ThirtyTwoKiB;
+        static constexpr size_t NumYields     = 8;
+        static constexpr size_t NumRounds     = 3;
+        static constexpr size_t DequeCapacity = NumTasks;
+
+        struct State
+        {
+            FiberCounter*   gate      = nullptr;
+            Atomic<int32_t> entered   = 0;
+            Atomic<int32_t> completed = 0;
+            Atomic<int32_t> cancelled = 0;
+        };
+
+        auto runRound = [](bool cancelWaiters) -> Result
+        {
+            static FiberTask tasks[NumTasks];
+            static char      stackMemory[NumTasks * StackSize] = {};
+            static char      allocatorStorage[32 * 1024]       = {};
+
+            FiberScheduler               scheduler;
+            FiberCancellationTokenSource cancellationSource;
+            FiberCounter                 gate;
+            FiberTaskPool                taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, StackSize);
+            FiberWorker                  workers[NumWorkers];
+            FiberWorkerThread            threads[NumWorkers];
+            FiberWorkerPool              workerPool;
+            FiberAllocator               allocator;
+            FiberWorkerPoolOptions       options;
+            State                        state;
+            state.gate = &gate;
+
+            SC_TRY(allocator.createFixed(allocatorStorage));
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = DequeCapacity;
+
+            scheduler.add(gate);
+            FiberTaskSpawnOptions spawnOptions;
+            if (cancelWaiters)
+            {
+                spawnOptions.cancellationToken = cancellationSource.token();
+            }
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                SC_TRY(taskPool.spawn(scheduler,
+                                      FiberTask::Procedure(
+                                          [&state](FiberScheduler& currentScheduler)
+                                          {
+                                              state.entered.fetch_add(1, memory_order_release);
+                                              Result waitResult = currentScheduler.wait(*state.gate);
+                                              if (not waitResult)
+                                              {
+                                                  state.cancelled.fetch_add(1, memory_order_relaxed);
+                                                  return waitResult;
+                                              }
+                                              for (size_t yieldIndex = 0; yieldIndex < NumYields; ++yieldIndex)
+                                              {
+                                                  SC_TRY(currentScheduler.yield());
+                                              }
+                                              state.completed.fetch_add(1, memory_order_relaxed);
+                                              return Result(true);
+                                          }),
+                                      spawnOptions));
+            }
+
+            SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
+
+            size_t waitIterations = 0;
+            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            {
+                Thread::Sleep(1);
+                waitIterations += 1;
+            }
+
+            const bool allWaitersEntered = state.entered.load(memory_order_acquire) == static_cast<int32_t>(NumTasks);
+            Result     releaseResult     = Result(true);
+            if (allWaitersEntered)
+            {
+                if (cancelWaiters)
+                {
+                    releaseResult = scheduler.requestCancel(cancellationSource);
+                }
+                else
+                {
+                    releaseResult = scheduler.done(gate);
+                }
+            }
+            else
+            {
+                releaseResult = scheduler.requestCancelAll();
+            }
+
+            SC_TRY(workerPool.join());
+            SC_TRY(releaseResult);
+            SC_TRY_MSG(allWaitersEntered, "Worker stress test did not enter every wait");
+            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Worker stress test left active fibers");
+            SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Worker stress test did not recycle every task slot");
+            if (cancelWaiters)
+            {
+                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
+                           "Cancelled worker stress tasks completed normally");
+                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                           "Worker stress test did not cancel every waiter");
+            }
+            else
+            {
+                SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+                           "Worker stress test did not complete every task");
+                SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == 0,
+                           "Worker stress test unexpectedly cancelled a task");
+            }
+            return allocator.close();
+        };
+
+        for (size_t round = 0; round < NumRounds; ++round)
+        {
+            SC_TEST_EXPECT(runRound(false));
+            SC_TEST_EXPECT(runRound(true));
         }
     }
 
