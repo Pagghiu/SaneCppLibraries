@@ -103,3 +103,5 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0006 - Keep cancellation cooperative and wake-based](fibers-0006-keep-cancellation-cooperative-and-wake-based.md)
 - [FIBERS-0007 - Model spawn backpressure as explicit capacity waiting](fibers-0007-model-spawn-backpressure-as-explicit-capacity-waiting.md)
 - [FIBERS-0008 - Use stack-local waiter nodes for cooperative waits](fibers-0008-use-stack-local-waiter-nodes-for-cooperative-waits.md)
+- [FIBERS-0009 - Keep FiberTaskPool as the ergonomic facade over task and stack classes](fibers-0009-keep-fibertaskpool-as-the-ergonomic-facade-over-task-and-stack-classes.md)
+- [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
