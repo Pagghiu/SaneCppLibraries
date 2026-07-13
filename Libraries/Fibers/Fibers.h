@@ -368,6 +368,8 @@ struct SC_FIBERS_EXPORT FiberWorker
     size_t          stealAttempts          = 0;
     size_t          stealVictimProbes      = 0;
     size_t          stolenFibers           = 0;
+    size_t          stolenBatches          = 0;
+    size_t          stolenBatchPeak        = 0;
     size_t          failedSteals           = 0;
     size_t          stealCursor            = 0;
     size_t          runAttempts            = 0;
@@ -450,6 +452,8 @@ struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
     size_t stealAttempts     = 0;
     size_t stealVictimProbes = 0;
     size_t stolenFibers      = 0;
+    size_t stolenBatches     = 0;
+    size_t stolenBatchPeak   = 0;
     size_t failedSteals      = 0;
     size_t runAttempts       = 0;
     size_t idlePolls         = 0;

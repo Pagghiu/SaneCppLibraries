@@ -292,16 +292,20 @@ static Result runForcedStealingBenchmark(Console& console)
                   static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs), static_cast<size_t>(tasksPerSec),
                   static_cast<size_t>(state.completed.load(memory_order_relaxed)),
                   static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
-    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} failedSteals={} queuePeak={} spilled={}\n",
+    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} stolenBatches={} stolenBatchPeak={} "
+                  "failedSteals={} queuePeak={} spilled={}\n",
                   diagnostics.stealAttempts, diagnostics.stealVictimProbes, diagnostics.stolenFibers,
-                  diagnostics.failedSteals, diagnostics.readyPeakFibers, diagnostics.spilledFibers);
+                  diagnostics.stolenBatches, diagnostics.stolenBatchPeak, diagnostics.failedSteals,
+                  diagnostics.readyPeakFibers, diagnostics.spilledFibers);
     for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
     {
         FiberWorkerDiagnostics workerDiagnostics;
         scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
-        console.print("  worker[{}] executed={} completed={} stealVictimProbes={} steals={} failedSteals={}\n",
+        console.print("  worker[{}] executed={} completed={} stealVictimProbes={} steals={} stealBatches={} "
+                      "stolenBatchPeak={} failedSteals={}\n",
                       workerIndex, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
                       workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
+                      workerDiagnostics.stolenBatches, workerDiagnostics.stolenBatchPeak,
                       workerDiagnostics.failedSteals);
     }
 
@@ -553,9 +557,10 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
         "  runAttempts={} idlePolls={} parkAttempts={} parkedWakeups={} executedFibers={} completedFibers={}\n",
         workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.parkAttempts,
         workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers);
-    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} failedSteals={}\n",
+    console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} stolenBatches={} stolenBatchPeak={} "
+                  "failedSteals={}\n",
                   workerDiagnostics.stealAttempts, workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
-                  workerDiagnostics.failedSteals);
+                  workerDiagnostics.stolenBatches, workerDiagnostics.stolenBatchPeak, workerDiagnostics.failedSteals);
     console.print("  queuePeak={} spilled={}\n", workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers);
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
