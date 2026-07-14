@@ -13,6 +13,7 @@
 
 #include "../../Libraries/Fibers/Internal/FiberContext.h"
 #include "../../Libraries/Strings/Console.h"
+#include <string.h>
 
 #if SC_PLATFORM_WINDOWS
 #define WIN32_LEAN_AND_MEAN
@@ -22,6 +23,7 @@
 #else
 #include <signal.h>
 #include <sys/mman.h>
+#include <sys/wait.h>
 #include <ucontext.h>
 #include <unistd.h>
 #define SC_FIBERS_STACK_GROWTH_NO_INLINE __attribute__((noinline))
@@ -87,11 +89,43 @@ struct StackGrowthPrototype
 
     Result run()
     {
+        SC_TRY(prepare(fiberEntry));
+
+        switchToFiber();
+
+        SC_TRY_MSG(growthEvents >= 2, "Stack growth prototype did not cross enough commit boundaries");
+        SC_TRY_MSG(committedBytes() > initialCommittedBytes,
+                   "Stack growth prototype did not expand its committed range");
+        SC_TRY_MSG(checksum != 0, "Stack growth prototype recursion was optimized away");
+        return Result(true);
+    }
+
+    Result runGuardOverflow()
+    {
+        SC_TRY(prepare(overflowFiberEntry));
+        switchToFiber();
+        return Result::Error("Stack growth guard-overflow probe returned unexpectedly");
+    }
+
+    Result runForeignFault()
+    {
+        SC_TRY(reserve());
+        SC_TRY(installHandler());
+        *reinterpret_cast<volatile int*>(static_cast<size_t>(1)) = 1;
+        return Result::Error("Stack growth foreign-fault probe returned unexpectedly");
+    }
+
+    Result prepare(FiberContextEntry entry)
+    {
         SC_TRY(reserve());
         SC_TRY(installHandler());
         SC_TRY(FiberContextOperations::captureCurrent(mainContext));
-        SC_TRY(FiberContextOperations::create(fiberContext, {guardEnd, UsableBytes}, fiberEntry, this));
+        SC_TRY(FiberContextOperations::create(fiberContext, {guardEnd, UsableBytes}, entry, this));
+        return Result(true);
+    }
 
+    void switchToFiber()
+    {
 #if SC_PLATFORM_WINDOWS
         NT_TIB& threadStack       = *reinterpret_cast<NT_TIB*>(NtCurrentTeb());
         previousStackBase         = threadStack.StackBase;
@@ -111,12 +145,6 @@ struct StackGrowthPrototype
         threadStack.StackBase  = previousStackBase;
         threadStack.StackLimit = previousStackLimit;
 #endif
-
-        SC_TRY_MSG(growthEvents >= 2, "Stack growth prototype did not cross enough commit boundaries");
-        SC_TRY_MSG(committedBytes() > initialCommittedBytes,
-                   "Stack growth prototype did not expand its committed range");
-        SC_TRY_MSG(checksum != 0, "Stack growth prototype recursion was optimized away");
-        return Result(true);
     }
 
     Result reserve()
@@ -325,6 +353,13 @@ struct StackGrowthPrototype
         FiberContextOperations::switchTo(prototype.fiberContext, prototype.mainContext);
     }
 
+    static void overflowFiberEntry(void* userData)
+    {
+        StackGrowthPrototype& prototype = *static_cast<StackGrowthPrototype*>(userData);
+        consumeStack(prototype, 96);
+        FiberContextOperations::switchTo(prototype.fiberContext, prototype.mainContext);
+    }
+
     static SC_FIBERS_STACK_GROWTH_NO_INLINE void consumeStack(StackGrowthPrototype& prototype, size_t depth)
     {
         volatile char stackUse[4096];
@@ -416,31 +451,143 @@ struct StackGrowthPrototype
 #endif
 };
 
-static Result runStackGrowthPrototype()
+static constexpr const char* GuardOverflowMode      = "--guard-overflow";
+static constexpr const char* ForeignFaultMode       = "--foreign-fault";
+static constexpr int         ForeignHandlerExitCode = 73;
+
+#if !SC_PLATFORM_WINDOWS
+static void foreignFaultHandler(int) { _exit(ForeignHandlerExitCode); }
+#endif
+
+static Result runChildMode(const char* mode)
+{
+#if SC_PLATFORM_WINDOWS
+    SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
+#else
+    if (strcmp(mode, ForeignFaultMode) == 0)
+    {
+        struct sigaction action = {};
+        action.sa_handler       = foreignFaultHandler;
+        sigemptyset(&action.sa_mask);
+        SC_TRY_MSG(sigaction(SIGSEGV, &action, nullptr) == 0 and sigaction(SIGBUS, &action, nullptr) == 0,
+                   "Stack growth prototype could not install the foreign-fault probe handler");
+    }
+#endif
+
+    StackGrowthPrototype prototype;
+    if (strcmp(mode, GuardOverflowMode) == 0)
+    {
+        return prototype.runGuardOverflow();
+    }
+    if (strcmp(mode, ForeignFaultMode) == 0)
+    {
+        return prototype.runForeignFault();
+    }
+    return Result::Error("Unknown stack growth prototype child mode");
+}
+
+#if !SC_FIBERS_STACK_GROWTH_HAS_ASAN
+static Result runChildProbe(const char* executable, const char* mode)
+{
+#if SC_PLATFORM_WINDOWS
+    char         commandLine[4096];
+    const size_t executableLength = strlen(executable);
+    const size_t modeLength       = strlen(mode);
+    SC_TRY_MSG(executableLength + modeLength + 5 <= sizeof(commandLine),
+               "Stack growth prototype executable path is too long");
+
+    size_t commandLength         = 0;
+    commandLine[commandLength++] = '"';
+    memcpy(commandLine + commandLength, executable, executableLength);
+    commandLength += executableLength;
+    commandLine[commandLength++] = '"';
+    commandLine[commandLength++] = ' ';
+    memcpy(commandLine + commandLength, mode, modeLength);
+    commandLength += modeLength;
+    commandLine[commandLength] = '\0';
+
+    STARTUPINFOA startup        = {};
+    startup.cb                  = sizeof(startup);
+    PROCESS_INFORMATION process = {};
+    SC_TRY_MSG(
+        CreateProcessA(executable, commandLine, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process),
+        "Stack growth prototype could not create its child process");
+    const DWORD waitResult  = WaitForSingleObject(process.hProcess, INFINITE);
+    DWORD       exitCode    = 0;
+    const BOOL  gotExitCode = GetExitCodeProcess(process.hProcess, &exitCode);
+    CloseHandle(process.hThread);
+    CloseHandle(process.hProcess);
+    SC_TRY_MSG(waitResult == WAIT_OBJECT_0 and gotExitCode == TRUE,
+               "Stack growth prototype could not wait for its child process");
+
+    if (strcmp(mode, ForeignFaultMode) == 0)
+    {
+        SC_TRY_MSG(exitCode == static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION),
+                   "Stack growth prototype swallowed a foreign Windows fault");
+    }
+    else
+    {
+        SC_TRY_MSG(exitCode == static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION) or
+                       exitCode == static_cast<DWORD>(EXCEPTION_STACK_OVERFLOW),
+                   "Stack growth prototype guard overflow did not terminate with a memory fault");
+    }
+#else
+    const pid_t child = fork();
+    SC_TRY_MSG(child >= 0, "Stack growth prototype could not fork its child process");
+    if (child == 0)
+    {
+        execl(executable, executable, mode, static_cast<char*>(nullptr));
+        _exit(127);
+    }
+
+    int status = 0;
+    SC_TRY_MSG(waitpid(child, &status, 0) == child, "Stack growth prototype could not wait for its child process");
+    if (strcmp(mode, ForeignFaultMode) == 0)
+    {
+        SC_TRY_MSG(WIFEXITED(status) and WEXITSTATUS(status) == ForeignHandlerExitCode,
+                   "Stack growth prototype did not forward a foreign POSIX fault");
+    }
+    else
+    {
+        SC_TRY_MSG(WIFSIGNALED(status) and (WTERMSIG(status) == SIGSEGV or WTERMSIG(status) == SIGBUS),
+                   "Stack growth prototype guard overflow did not terminate with a memory signal");
+    }
+#endif
+    return Result(true);
+}
+#endif
+
+static Result runStackGrowthPrototype(const char* executable)
 {
     Console console;
     Console::tryAttachingToParentConsole();
 #if SC_FIBERS_STACK_GROWTH_HAS_ASAN
+    (void)executable;
     console.print("Fibers stack growth prototype skipped: AddressSanitizer owns stack fault handling\n");
     return Result(true);
 #else
-    StackGrowthPrototype prototype;
-    SC_TRY(prototype.run());
+    {
+        StackGrowthPrototype prototype;
+        SC_TRY(prototype.run());
 
-    console.print("Fibers stack growth prototype succeeded\n");
-    console.print("  reservedBytes={} initialCommittedBytes={} growthBytes={} growthEvents={} committedBytes={}\n",
-                  prototype.reservationSize, prototype.initialCommittedBytes,
-                  static_cast<size_t>(StackGrowthPrototype::GrowthBytes), prototype.growthEvents,
-                  prototype.committedBytes());
+        console.print("Fibers stack growth prototype succeeded\n");
+        console.print("  reservedBytes={} initialCommittedBytes={} growthBytes={} growthEvents={} committedBytes={}\n",
+                      prototype.reservationSize, prototype.initialCommittedBytes,
+                      static_cast<size_t>(StackGrowthPrototype::GrowthBytes), prototype.growthEvents,
+                      prototype.committedBytes());
+    }
+    SC_TRY(runChildProbe(executable, GuardOverflowMode));
+    SC_TRY(runChildProbe(executable, ForeignFaultMode));
+    console.print("  guardOverflowProbe=passed foreignFaultProbe=passed\n");
     return Result(true);
 #endif
 }
 } // namespace
 } // namespace SC
 
-int main()
+int main(int argc, char** argv)
 {
-    SC::Result result = SC::runStackGrowthPrototype();
+    SC::Result result = argc == 2 ? SC::runChildMode(argv[1]) : SC::runStackGrowthPrototype(argv[0]);
     if (not result)
     {
         SC::Console console;
