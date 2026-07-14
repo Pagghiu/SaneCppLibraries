@@ -174,6 +174,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerPoolExternalSpawnStress();
         }
+        if (test_section("worker pool concurrent external stress"))
+        {
+            workerPoolConcurrentExternalStress();
+        }
         if (test_section("worker stealing"))
         {
             workerStealing();
@@ -3509,6 +3513,197 @@ struct SC::FibersTest : public SC::TestCase
         {
             SC_TEST_EXPECT(runRound(false));
             SC_TEST_EXPECT(runRound(true));
+        }
+    }
+
+    void workerPoolConcurrentExternalStress()
+    {
+        static constexpr size_t NumWorkers          = 4;
+        static constexpr size_t NumProducers        = 4;
+        static constexpr size_t NumTasksPerProducer = 16;
+        static constexpr size_t NumTasks            = NumProducers * NumTasksPerProducer;
+        static constexpr size_t NumCancelledTasks   = NumTasks / 2;
+        static constexpr size_t StackSize           = FiberStackSize::ThirtyTwoKiB;
+        static constexpr size_t NumYields           = 4;
+        static constexpr size_t NumRounds           = 3;
+        static constexpr size_t DequeCapacity       = NumTasks;
+
+        struct State
+        {
+            FiberCounter*   gate      = nullptr;
+            Atomic<int32_t> entered   = 0;
+            Atomic<int32_t> completed = 0;
+            Atomic<int32_t> cancelled = 0;
+        };
+
+        struct Producer
+        {
+            FiberScheduler*        scheduler = nullptr;
+            FiberCancellationToken cancellationToken;
+            Atomic<bool>*          mayStart    = nullptr;
+            State*                 state       = nullptr;
+            FiberTask*             tasks       = nullptr;
+            char*                  stackMemory = nullptr;
+            Result                 result      = Result(true);
+            bool                   cancelTasks = false;
+        };
+
+        auto runRound = []() -> Result
+        {
+            static FiberTask tasks[NumTasks];
+            static char      stackMemory[NumTasks * StackSize] = {};
+            static char      anchorStackMemory[StackSize]      = {};
+            static char      allocatorStorage[32 * 1024]       = {};
+
+            FiberScheduler               scheduler;
+            FiberCancellationTokenSource cancellationSource;
+            FiberCounter                 gate;
+            FiberTask                    anchor;
+            FiberWorker                  workers[NumWorkers];
+            FiberWorkerThread            workerThreads[NumWorkers];
+            FiberWorkerPool              workerPool;
+            FiberAllocator               allocator;
+            FiberWorkerPoolOptions       workerPoolOptions;
+            Thread                       producerThreads[NumProducers];
+            Producer                     producers[NumProducers];
+            Atomic<bool>                 producersMayStart = false;
+            State                        state;
+            state.gate = &gate;
+
+            SC_TRY(allocator.createFixed(allocatorStorage));
+            workerPoolOptions.dequeAllocator         = &allocator;
+            workerPoolOptions.dequeCapacityPerWorker = DequeCapacity;
+
+            scheduler.add(gate);
+            FiberStack anchorStack({anchorStackMemory, sizeof(anchorStackMemory)});
+            SC_TRY(scheduler.spawn(anchor, anchorStack,
+                                   FiberTask::Procedure([&gate](FiberScheduler& currentScheduler)
+                                                        { return currentScheduler.wait(gate); })));
+            SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {workerThreads, NumWorkers}, workerPoolOptions));
+
+            for (size_t producerIndex = 0; producerIndex < NumProducers; ++producerIndex)
+            {
+                Producer& producer         = producers[producerIndex];
+                producer.scheduler         = &scheduler;
+                producer.cancellationToken = cancellationSource.token();
+                producer.mayStart          = &producersMayStart;
+                producer.state             = &state;
+                producer.tasks             = tasks + producerIndex * NumTasksPerProducer;
+                producer.stackMemory       = stackMemory + producerIndex * NumTasksPerProducer * StackSize;
+                producer.cancelTasks       = producerIndex % 2 != 0;
+
+                SC_TRY(producerThreads[producerIndex].start(
+                    [&producer](Thread&)
+                    {
+                        while (not producer.mayStart->load(memory_order_acquire))
+                        {
+                            Thread::Sleep(1);
+                        }
+
+                        FiberTaskSpawnOptions spawnOptions;
+                        if (producer.cancelTasks)
+                        {
+                            spawnOptions.cancellationToken = producer.cancellationToken;
+                        }
+                        for (size_t taskIndex = 0; taskIndex < NumTasksPerProducer; ++taskIndex)
+                        {
+                            FiberStack taskStack({producer.stackMemory + taskIndex * StackSize, StackSize});
+                            producer.result = producer.scheduler->spawn(
+                                producer.tasks[taskIndex], taskStack,
+                                FiberTask::Procedure(
+                                    [state = producer.state](FiberScheduler& currentScheduler)
+                                    {
+                                        state->entered.fetch_add(1, memory_order_release);
+                                        Result waitResult = currentScheduler.wait(*state->gate);
+                                        if (not waitResult)
+                                        {
+                                            state->cancelled.fetch_add(1, memory_order_relaxed);
+                                            return waitResult;
+                                        }
+                                        for (size_t yieldIndex = 0; yieldIndex < NumYields; ++yieldIndex)
+                                        {
+                                            SC_TRY(currentScheduler.yield());
+                                        }
+                                        state->completed.fetch_add(1, memory_order_relaxed);
+                                        return Result(true);
+                                    }),
+                                spawnOptions);
+                            if (not producer.result)
+                            {
+                                return;
+                            }
+                        }
+                    }));
+            }
+
+            producersMayStart.store(true, memory_order_release);
+            bool producerFailed = false;
+            for (size_t producerIndex = 0; producerIndex < NumProducers; ++producerIndex)
+            {
+                SC_TRY(producerThreads[producerIndex].join());
+                producerFailed = producerFailed or not producers[producerIndex].result;
+            }
+            if (producerFailed)
+            {
+                SC_TRY(scheduler.requestCancelAll());
+                SC_TRY(workerPool.join());
+                return Result::Error("Concurrent external stress producer failed");
+            }
+
+            size_t waitIterations = 0;
+            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            {
+                Thread::Sleep(1);
+                waitIterations += 1;
+            }
+            if (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks))
+            {
+                SC_TRY(scheduler.requestCancelAll());
+                SC_TRY(workerPool.join());
+                return Result::Error("Concurrent external stress tasks did not enter their waits");
+            }
+
+            SC_TRY(scheduler.requestCancel(cancellationSource));
+
+            size_t cancellationWaitIterations = 0;
+            while (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumCancelledTasks) and
+                   cancellationWaitIterations < 1000)
+            {
+                Thread::Sleep(1);
+                cancellationWaitIterations += 1;
+            }
+            if (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumCancelledTasks))
+            {
+                SC_TRY(scheduler.requestCancelAll());
+                SC_TRY(workerPool.join());
+                return Result::Error("Concurrent external stress tasks did not observe cancellation");
+            }
+
+            SC_TRY(scheduler.done(gate));
+            SC_TRY(workerPool.join());
+
+            FiberWorkerDiagnostics workerDiagnostics;
+            scheduler.workerDiagnostics({workers, NumWorkers}, workerDiagnostics);
+            SC_TRY_MSG(anchor.result(), "Concurrent external stress anchor did not complete");
+            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Concurrent external stress left active fibers");
+            SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks - NumCancelledTasks),
+                       "Concurrent external stress did not complete every non-cancelled task");
+            SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumCancelledTasks),
+                       "Concurrent external stress did not cancel every selected task");
+            SC_TRY_MSG(workerDiagnostics.executedFibers >= NumTasks + 1,
+                       "Concurrent external stress did not execute every externally submitted task");
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                const bool shouldBeCancelled = (taskIndex / NumTasksPerProducer) % 2 != 0;
+                SC_TRY_MSG(shouldBeCancelled ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
+                           "Concurrent external stress task result did not match its producer policy");
+            }
+            return allocator.close();
+        };
+
+        for (size_t round = 0; round < NumRounds; ++round)
+        {
+            SC_TEST_EXPECT(runRound());
         }
     }
 
