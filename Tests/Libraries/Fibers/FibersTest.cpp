@@ -4519,6 +4519,12 @@ struct SC::FibersTest : public SC::TestCase
         struct State
         {
             Atomic<int32_t> completed;
+            Atomic<int32_t> resumes[NumTasks];
+        };
+        struct TaskContext
+        {
+            State* state = nullptr;
+            size_t index = 0;
         };
 
         FiberScheduler    scheduler;
@@ -4531,6 +4537,7 @@ struct SC::FibersTest : public SC::TestCase
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
         State             state;
+        TaskContext       contexts[NumTasks];
 
         FiberWorkerPoolOptions badOptions;
         badOptions.dequeCapacityPerWorker = 4;
@@ -4545,14 +4552,18 @@ struct SC::FibersTest : public SC::TestCase
 
         for (size_t idx = 0; idx < NumTasks; ++idx)
         {
+            contexts[idx].state  = &state;
+            contexts[idx].index  = idx;
+            TaskContext* context = &contexts[idx];
             SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
-                                                         [&state](FiberScheduler& scheduler)
+                                                         [context](FiberScheduler& scheduler)
                                                          {
                                                              for (int loop = 0; loop < NumYields; ++loop)
                                                              {
+                                                                 context->state->resumes[context->index].fetch_add(1);
                                                                  SC_TRY(scheduler.yield());
                                                              }
-                                                             state.completed.fetch_add(1);
+                                                             context->state->completed.fetch_add(1);
                                                              return Result(true);
                                                          })));
         }
@@ -4575,6 +4586,10 @@ struct SC::FibersTest : public SC::TestCase
         for (FiberTask& task : tasks)
         {
             SC_TEST_EXPECT(task.result());
+        }
+        for (const Atomic<int32_t>& resumes : state.resumes)
+        {
+            SC_TEST_EXPECT(resumes.load() == NumYields);
         }
     }
 

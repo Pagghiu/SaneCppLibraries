@@ -393,6 +393,25 @@ static void fiberSchedulerUnlock(volatile int32_t& lockValue)
 #endif
 }
 
+static FiberTaskStatus fiberTaskStatusLoad(const volatile int32_t& status)
+{
+#if SC_PLATFORM_WINDOWS
+    return static_cast<FiberTaskStatus>(
+        InterlockedCompareExchange(reinterpret_cast<volatile long*>(const_cast<volatile int32_t*>(&status)), 0, 0));
+#else
+    return static_cast<FiberTaskStatus>(__atomic_load_n(&status, __ATOMIC_ACQUIRE));
+#endif
+}
+
+static void fiberTaskStatusStore(volatile int32_t& status, FiberTaskStatus desired)
+{
+#if SC_PLATFORM_WINDOWS
+    InterlockedExchange(reinterpret_cast<volatile long*>(&status), static_cast<long>(desired));
+#else
+    __atomic_store_n(&status, static_cast<int32_t>(desired), __ATOMIC_RELEASE);
+#endif
+}
+
 struct FiberAvailabilityQueue
 {
     using Predicate = bool (*)(const void* owner);
@@ -2379,22 +2398,25 @@ FiberTask::FiberTask() = default;
 
 FiberTask::~FiberTask() { SC_FIBERS_ASSERT_RELEASE(not isActive()); }
 
-bool FiberTask::isValid() const { return taskStatus != FiberTaskStatus::Invalid; }
+bool FiberTask::isValid() const { return status() != FiberTaskStatus::Invalid; }
 
 bool FiberTask::isStarted() const
 {
-    return taskStatus != FiberTaskStatus::Invalid and taskStatus != FiberTaskStatus::Ready;
+    const FiberTaskStatus currentStatus = status();
+    return currentStatus != FiberTaskStatus::Invalid and currentStatus != FiberTaskStatus::Ready;
 }
 
 bool FiberTask::isCompleted() const
 {
-    return taskStatus == FiberTaskStatus::Completing or taskStatus == FiberTaskStatus::Completed;
+    const FiberTaskStatus currentStatus = status();
+    return currentStatus == FiberTaskStatus::Completing or currentStatus == FiberTaskStatus::Completed;
 }
 
 bool FiberTask::isActive() const
 {
-    return taskStatus == FiberTaskStatus::Ready or taskStatus == FiberTaskStatus::Running or
-           taskStatus == FiberTaskStatus::Waiting or taskStatus == FiberTaskStatus::Completing;
+    const FiberTaskStatus currentStatus = status();
+    return currentStatus == FiberTaskStatus::Ready or currentStatus == FiberTaskStatus::Running or
+           currentStatus == FiberTaskStatus::Waiting or currentStatus == FiberTaskStatus::Completing;
 }
 
 bool FiberTask::isCancellationRequested() const
@@ -2402,7 +2424,7 @@ bool FiberTask::isCancellationRequested() const
     return cancelRequested or cancellationToken.isCancellationRequested();
 }
 
-FiberTaskStatus FiberTask::status() const { return taskStatus; }
+FiberTaskStatus FiberTask::status() const { return fiberTaskStatusLoad(taskStatus); }
 
 Result FiberTask::result() const { return taskResult; }
 
@@ -3987,26 +4009,26 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         return Result::Error("FiberTask procedure is not valid");
     }
 
-    task.procedure            = procedure;
-    task.scheduler            = this;
-    task.completionCounter    = options.counter;
-    task.cancellationToken    = options.cancellationToken;
-    task.nextReady            = nullptr;
-    task.previousReady        = nullptr;
-    task.nextWaiting          = nullptr;
-    task.nextActive           = nullptr;
-    task.previousActive       = nullptr;
-    task.nextGroup            = nullptr;
-    task.waitingCounter       = nullptr;
-    task.suspendCounter       = nullptr;
-    task.originPool           = options.originPool;
-    task.originTaskClass      = options.originTaskClass;
-    task.originStackClass     = options.originStackClass;
-    task.originStackMemory    = options.originStackClass != nullptr ? stack.memory() : Span<char>();
-    task.runningWorker        = nullptr;
-    task.stackOwner           = nullptr;
-    task.taskResult           = Result(true);
-    task.taskStatus           = FiberTaskStatus::Ready;
+    task.procedure         = procedure;
+    task.scheduler         = this;
+    task.completionCounter = options.counter;
+    task.cancellationToken = options.cancellationToken;
+    task.nextReady         = nullptr;
+    task.previousReady     = nullptr;
+    task.nextWaiting       = nullptr;
+    task.nextActive        = nullptr;
+    task.previousActive    = nullptr;
+    task.nextGroup         = nullptr;
+    task.waitingCounter    = nullptr;
+    task.suspendCounter    = nullptr;
+    task.originPool        = options.originPool;
+    task.originTaskClass   = options.originTaskClass;
+    task.originStackClass  = options.originStackClass;
+    task.originStackMemory = options.originStackClass != nullptr ? stack.memory() : Span<char>();
+    task.runningWorker     = nullptr;
+    task.stackOwner        = nullptr;
+    task.taskResult        = Result(true);
+    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
     task.suspendAction        = FiberTaskSuspendAction::None;
     task.cancelRequested      = options.cancellationToken.isCancellationRequested();
     task.suspendInterruptible = false;
@@ -4014,23 +4036,23 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     Result createResult = FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
     if (not createResult)
     {
-        task.procedure            = FiberTask::Procedure();
-        task.scheduler            = nullptr;
-        task.completionCounter    = nullptr;
-        task.cancellationToken    = FiberCancellationToken();
-        task.previousReady        = nullptr;
-        task.nextActive           = nullptr;
-        task.previousActive       = nullptr;
-        task.nextGroup            = nullptr;
-        task.waitingCounter       = nullptr;
-        task.suspendCounter       = nullptr;
-        task.originPool           = nullptr;
-        task.originTaskClass      = nullptr;
-        task.originStackClass     = nullptr;
-        task.originStackMemory    = {};
-        task.runningWorker        = nullptr;
-        task.stackOwner           = nullptr;
-        task.taskStatus           = FiberTaskStatus::Invalid;
+        task.procedure         = FiberTask::Procedure();
+        task.scheduler         = nullptr;
+        task.completionCounter = nullptr;
+        task.cancellationToken = FiberCancellationToken();
+        task.previousReady     = nullptr;
+        task.nextActive        = nullptr;
+        task.previousActive    = nullptr;
+        task.nextGroup         = nullptr;
+        task.waitingCounter    = nullptr;
+        task.suspendCounter    = nullptr;
+        task.originPool        = nullptr;
+        task.originTaskClass   = nullptr;
+        task.originStackClass  = nullptr;
+        task.originStackMemory = {};
+        task.runningWorker     = nullptr;
+        task.stackOwner        = nullptr;
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Invalid);
         task.suspendAction        = FiberTaskSuspendAction::None;
         task.cancelRequested      = false;
         task.suspendInterruptible = false;
@@ -4076,7 +4098,7 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
             worker.idlePolls += 1;
             return activeFibers == 0 ? Result(true) : Result::Error("FiberScheduler cannot make progress");
         }
-        task->taskStatus = FiberTaskStatus::Running;
+        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
     return runReadyTask(*task, worker);
 }
@@ -4106,7 +4128,7 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
             worker.idlePolls += 1;
             return activeFibers == 0 ? Result(true) : Result::Error("FiberScheduler cannot make progress");
         }
-        task->taskStatus = FiberTaskStatus::Running;
+        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
     return runReadyTask(*task, worker);
 }
@@ -4148,7 +4170,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
     if (task != nullptr)
     {
         LockGuard guard(*this);
-        task->taskStatus = FiberTaskStatus::Running;
+        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
     else
     {
@@ -4171,7 +4193,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
             }
             return Result(true);
         }
-        task->taskStatus = FiberTaskStatus::Running;
+        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
     return runReadyTask(*task, worker);
 }
@@ -5122,7 +5144,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
 
     {
         LockGuard guard(*this);
-        SC_FIBERS_ASSERT_RELEASE(task.taskStatus == FiberTaskStatus::Running);
+        SC_FIBERS_ASSERT_RELEASE(task.status() == FiberTaskStatus::Running);
         SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
         worker.workerTask  = &task;
         task.runningWorker = &worker;
@@ -5139,9 +5161,9 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         if (not preparePreferredWorkerReadyPublishUnlocked(task, worker, preferredReadyWorker))
         {
             publishSuspensionUnlocked(task);
-            if (task.taskStatus == FiberTaskStatus::Completing)
+            if (task.status() == FiberTaskStatus::Completing)
             {
-                task.taskStatus           = FiberTaskStatus::Completed;
+                fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completed);
                 FiberTaskPool* originPool = task.originPool;
                 task.originPool           = nullptr;
                 completedTaskClass        = task.originTaskClass;
@@ -5208,8 +5230,8 @@ bool FiberScheduler::preparePreferredWorkerReadyPublishUnlocked(FiberTask& task,
     task.suspendAction        = FiberTaskSuspendAction::None;
     task.suspendCounter       = nullptr;
     task.suspendInterruptible = false;
-    task.taskStatus           = FiberTaskStatus::Ready;
-    outPreferredWorker        = preferredWorker;
+    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
+    outPreferredWorker = preferredWorker;
     return true;
 }
 
@@ -5230,7 +5252,7 @@ void FiberScheduler::publishSuspensionUnlocked(FiberTask& task)
 
     if (suspendAction == FiberTaskSuspendAction::Ready)
     {
-        task.taskStatus = FiberTaskStatus::Ready;
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
         pushReadyUnlocked(task, task.preferredWorker);
         return;
     }
@@ -5239,12 +5261,12 @@ void FiberScheduler::publishSuspensionUnlocked(FiberTask& task)
     SC_FIBERS_ASSERT_RELEASE(counter != nullptr);
     if (counter->counterValue == 0 or (interruptible and task.isCancellationRequested()))
     {
-        task.taskStatus = FiberTaskStatus::Ready;
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
         pushReadyUnlocked(task, task.preferredWorker);
         return;
     }
 
-    task.taskStatus           = FiberTaskStatus::Waiting;
+    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Waiting);
     task.nextWaiting          = nullptr;
     task.waitingCounter       = counter;
     task.suspendInterruptible = interruptible;
@@ -5270,8 +5292,8 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
         LockGuard guard(*this);
         SC_FIBERS_ASSERT_RELEASE(activeFibers > 0);
 
-        task.taskResult        = result;
-        task.taskStatus        = FiberTaskStatus::Completing;
+        task.taskResult = result;
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completing);
         task.cancellationToken = FiberCancellationToken();
         task.suspendAction     = FiberTaskSuspendAction::None;
         task.suspendCounter    = nullptr;
@@ -5302,12 +5324,12 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
 Result FiberScheduler::cancelTaskUnlocked(FiberTask& task)
 {
     task.cancelRequested = true;
-    if (task.taskStatus == FiberTaskStatus::Waiting and task.waitingCounter != nullptr and task.suspendInterruptible)
+    if (task.status() == FiberTaskStatus::Waiting and task.waitingCounter != nullptr and task.suspendInterruptible)
     {
         SC_FIBERS_ASSERT_RELEASE(removeCounterWaiterUnlocked(*task.waitingCounter, task));
         task.waitingCounter       = nullptr;
         task.suspendInterruptible = false;
-        task.taskStatus           = FiberTaskStatus::Ready;
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
         pushReadyUnlocked(task, task.preferredWorker);
     }
     return Result(true);
@@ -5382,7 +5404,7 @@ void FiberScheduler::wakeCounterWaitersUnlocked(FiberCounter& counter)
         task->nextWaiting          = nullptr;
         task->waitingCounter       = nullptr;
         task->suspendInterruptible = false;
-        task->taskStatus           = FiberTaskStatus::Ready;
+        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Ready);
         pushReadyUnlocked(*task, task->preferredWorker);
         task = next;
     }

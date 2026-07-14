@@ -672,7 +672,7 @@ struct SC_FIBERS_EXPORT FiberTask
     void*                  stackOwner           = nullptr;
     void*                  taskUserData         = nullptr;
     Result                 taskResult           = Result(true);
-    FiberTaskStatus        taskStatus           = FiberTaskStatus::Invalid;
+    volatile int32_t       taskStatus           = static_cast<int32_t>(FiberTaskStatus::Invalid);
     FiberTaskSuspendAction suspendAction        = FiberTaskSuspendAction::None;
     bool                   cancelRequested      = false;
     bool                   suspendInterruptible = false;
