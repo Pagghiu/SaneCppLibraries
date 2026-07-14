@@ -1096,9 +1096,10 @@ static void fiberCpuRelax()
 struct FiberWorkerPoolWakeEvent
 {
 #if SC_PLATFORM_WINDOWS
-    CRITICAL_SECTION   mutex;
-    CONDITION_VARIABLE condition;
-    uint32_t           generation = 0;
+    mutable CRITICAL_SECTION mutex;
+    CONDITION_VARIABLE       condition;
+    uint32_t                 generation = 0;
+    uint32_t                 parked     = 0;
 
     FiberWorkerPoolWakeEvent()
     {
@@ -1131,15 +1132,18 @@ struct FiberWorkerPoolWakeEvent
         while (generation == observedGeneration)
         {
             waited = true;
+            parked += 1;
             ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
+            parked -= 1;
         }
         ::LeaveCriticalSection(&mutex);
         return waited;
     }
 #else
-    pthread_mutex_t mutex;
-    pthread_cond_t  condition;
-    uint32_t        generation = 0;
+    mutable pthread_mutex_t mutex;
+    pthread_cond_t          condition;
+    uint32_t                generation = 0;
+    uint32_t                parked     = 0;
 
     FiberWorkerPoolWakeEvent()
     {
@@ -1175,8 +1179,10 @@ struct FiberWorkerPoolWakeEvent
         bool waited = false;
         while (generation == observedGeneration)
         {
-            waited        = true;
+            waited = true;
+            parked += 1;
             const int res = ::pthread_cond_wait(&condition, &mutex);
+            parked -= 1;
             (void)res;
         }
         ::pthread_mutex_unlock(&mutex);
@@ -1187,14 +1193,29 @@ struct FiberWorkerPoolWakeEvent
     uint32_t currentGeneration() const
     {
 #if SC_PLATFORM_WINDOWS
-        ::EnterCriticalSection(const_cast<CRITICAL_SECTION*>(&mutex));
+        ::EnterCriticalSection(&mutex);
         const uint32_t current = generation;
-        ::LeaveCriticalSection(const_cast<CRITICAL_SECTION*>(&mutex));
+        ::LeaveCriticalSection(&mutex);
         return current;
 #else
-        ::pthread_mutex_lock(const_cast<pthread_mutex_t*>(&mutex));
+        ::pthread_mutex_lock(&mutex);
         const uint32_t current = generation;
-        ::pthread_mutex_unlock(const_cast<pthread_mutex_t*>(&mutex));
+        ::pthread_mutex_unlock(&mutex);
+        return current;
+#endif
+    }
+
+    [[nodiscard]] uint32_t parkedCount() const
+    {
+#if SC_PLATFORM_WINDOWS
+        ::EnterCriticalSection(&mutex);
+        const uint32_t current = parked;
+        ::LeaveCriticalSection(&mutex);
+        return current;
+#else
+        ::pthread_mutex_lock(&mutex);
+        const uint32_t current = parked;
+        ::pthread_mutex_unlock(&mutex);
         return current;
 #endif
     }
@@ -1603,6 +1624,8 @@ Result FiberWorkerPool::shutdown()
 bool FiberWorkerPool::isRunning() const { return fiberAtomicLoad(running) != 0; }
 
 size_t FiberWorkerPool::workerCount() const { return workers.sizeInElements(); }
+
+size_t FiberWorkerPool::parkedWorkerCount() const { return wakeEvent.get().parkedCount(); }
 
 void FiberWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
 

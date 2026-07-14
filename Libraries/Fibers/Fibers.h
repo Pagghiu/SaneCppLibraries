@@ -521,6 +521,8 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
 
     [[nodiscard]] bool   isRunning() const;
     [[nodiscard]] size_t workerCount() const;
+    //! Workers currently blocked in the pool wake wait.
+    [[nodiscard]] size_t parkedWorkerCount() const;
 
     struct WakeEventDefinition
     {

@@ -243,6 +243,19 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
     }
 
+    [[nodiscard]] bool waitForAllWorkersToPark(const FiberWorkerPool& workerPool)
+    {
+        for (size_t iteration = 0; iteration < 1000; ++iteration)
+        {
+            if (workerPool.parkedWorkerCount() == workerPool.workerCount())
+            {
+                return true;
+            }
+            Thread::Sleep(1);
+        }
+        return false;
+    }
+
     bool skipProcessExitOnLinuxRosetta()
     {
 #if SC_PLATFORM_LINUX && defined(__x86_64__)
@@ -640,7 +653,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             FiberAsyncIO* io = nullptr;
 
-            Atomic<bool> entered = false;
+            Atomic<bool> entered        = false;
+            Atomic<bool> blockerEntered = false;
 
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
@@ -654,11 +668,17 @@ struct SC::FibersAsyncTest : public SC::TestCase
         FiberAsyncCommand commandStorage[4];
         FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         task;
-        static char       stackMemory[64 * 1024] = {};
+        FiberTask         blockerTask;
+        static char       stackMemory[64 * 1024]        = {};
+        static char       blockerStackMemory[64 * 1024] = {};
         FiberStack        stack({stackMemory, sizeof(stackMemory)});
+        FiberStack        blockerStack({blockerStackMemory, sizeof(blockerStackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
+
+        FiberWorkerPoolOptions workerPoolOptions;
+        workerPoolOptions.idleSpinAttempts = 0;
 
         State state;
         state.io            = &io;
@@ -674,19 +694,49 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                state.resumeThreadID = Thread::CurrentThreadID();
                                                return Result(true);
                                            })));
+        SC_TEST_EXPECT(scheduler.spawn(blockerTask, blockerStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               state.blockerEntered.store(true);
+                                               return state.io->sleep(TimeMs{10 * 1000});
+                                           })));
 
-        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and not state.entered.load(); ++idx)
+        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, workerPoolOptions));
+        for (int idx = 0; idx < 1000 and (not state.entered.load() or not state.blockerEntered.load()); ++idx)
         {
             Thread::Sleep(1);
         }
         SC_TEST_EXPECT(state.entered.load());
+        SC_TEST_EXPECT(state.blockerEntered.load());
+        SC_TEST_EXPECT(waitForAllWorkersToPark(workerPool));
 
+        FiberWorkerDiagnostics beforeIODiagnostics;
+        scheduler.workerDiagnostics({workers, NumWorkers}, beforeIODiagnostics);
+        SC_TEST_EXPECT(beforeIODiagnostics.idleSpinIterations == 0);
+
+        for (int idx = 0; idx < 1000 and not task.isCompleted(); ++idx)
+        {
+            SC_TEST_EXPECT(io.runOwnerNoWait());
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(task.isCompleted());
+
+        FiberWorkerDiagnostics afterIODiagnostics;
+        scheduler.workerDiagnostics({workers, NumWorkers}, afterIODiagnostics);
+        SC_TEST_EXPECT(afterIODiagnostics.idleSpinIterations == 0);
+        SC_TEST_EXPECT(afterIODiagnostics.parkedWakeups > beforeIODiagnostics.parkedWakeups);
+        SC_TEST_EXPECT(scheduler.activeFiberCount() == 1);
+
+        SC_TEST_EXPECT(scheduler.requestCancel(blockerTask));
         SC_TEST_EXPECT(io.runOwner());
 
         SC_TEST_EXPECT(workerPool.join());
+        SC_TEST_EXPECT(workerPool.parkedWorkerCount() == 0);
         SC_TEST_EXPECT(task.isCompleted());
         SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(blockerTask.isCompleted());
+        SC_TEST_EXPECT(not blockerTask.result());
         SC_TEST_EXPECT(state.startThreadID != 0);
         SC_TEST_EXPECT(state.resumeThreadID != 0);
         SC_TEST_EXPECT(state.startThreadID != state.ownerThreadID);
@@ -1459,7 +1509,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
             SocketDescriptor* sender   = nullptr;
             SocketDescriptor* receiver = nullptr;
 
-            Atomic<int32_t> attempted = 0;
+            Atomic<int32_t> attempted      = 0;
+            Atomic<bool>    blockerEntered = false;
 
             uint64_t ownerThreadID         = 0;
             uint64_t sendStartThreadID     = 0;
@@ -1486,13 +1537,19 @@ struct SC::FibersAsyncTest : public SC::TestCase
         FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
         FiberTask         sendTask;
         FiberTask         receiveTask;
+        FiberTask         blockerTask;
         static char       sendStackMemory[64 * 1024]    = {};
         static char       receiveStackMemory[64 * 1024] = {};
+        static char       blockerStackMemory[64 * 1024] = {};
         FiberStack        sendStack({sendStackMemory, sizeof(sendStackMemory)});
         FiberStack        receiveStack({receiveStackMemory, sizeof(receiveStackMemory)});
+        FiberStack        blockerStack({blockerStackMemory, sizeof(blockerStackMemory)});
         FiberWorker       workers[NumWorkers];
         FiberWorkerThread threads[NumWorkers];
         FiberWorkerPool   workerPool;
+
+        FiberWorkerPoolOptions workerPoolOptions;
+        workerPoolOptions.idleSpinAttempts = 0;
 
         State state;
         state.io            = &io;
@@ -1524,21 +1581,52 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                state.sendResumeThreadID = Thread::CurrentThreadID();
                                                return Result(true);
                                            })));
+        SC_TEST_EXPECT(scheduler.spawn(blockerTask, blockerStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               state.blockerEntered.store(true);
+                                               return state.io->sleep(TimeMs{10 * 1000});
+                                           })));
 
-        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and state.attempted.load() < 2; ++idx)
+        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, workerPoolOptions));
+        for (int idx = 0; idx < 1000 and (state.attempted.load() < 2 or not state.blockerEntered.load()); ++idx)
         {
             Thread::Sleep(1);
         }
         SC_TEST_EXPECT(state.attempted.load() == 2);
+        SC_TEST_EXPECT(state.blockerEntered.load());
+        SC_TEST_EXPECT(waitForAllWorkersToPark(workerPool));
 
+        FiberWorkerDiagnostics beforeIODiagnostics;
+        scheduler.workerDiagnostics({workers, NumWorkers}, beforeIODiagnostics);
+        SC_TEST_EXPECT(beforeIODiagnostics.idleSpinIterations == 0);
+
+        for (int idx = 0; idx < 1000 and (not sendTask.isCompleted() or not receiveTask.isCompleted()); ++idx)
+        {
+            SC_TEST_EXPECT(io.runOwnerNoWait());
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(sendTask.isCompleted());
+        SC_TEST_EXPECT(receiveTask.isCompleted());
+
+        FiberWorkerDiagnostics afterIODiagnostics;
+        scheduler.workerDiagnostics({workers, NumWorkers}, afterIODiagnostics);
+        SC_TEST_EXPECT(afterIODiagnostics.idleSpinIterations == 0);
+        SC_TEST_EXPECT(afterIODiagnostics.parkedWakeups > beforeIODiagnostics.parkedWakeups);
+        SC_TEST_EXPECT(scheduler.activeFiberCount() == 1);
+
+        SC_TEST_EXPECT(scheduler.requestCancel(blockerTask));
         SC_TEST_EXPECT(io.runOwner());
 
         SC_TEST_EXPECT(workerPool.join());
+        SC_TEST_EXPECT(workerPool.parkedWorkerCount() == 0);
         SC_TEST_EXPECT(sendTask.isCompleted());
         SC_TEST_EXPECT(receiveTask.isCompleted());
         SC_TEST_EXPECT(sendTask.result());
         SC_TEST_EXPECT(receiveTask.result());
+        SC_TEST_EXPECT(blockerTask.isCompleted());
+        SC_TEST_EXPECT(not blockerTask.result());
         SC_TEST_EXPECT(state.sendResult.numBytes == sizeof(state.sendBuffer));
         SC_TEST_EXPECT(not state.receiveResult.disconnected);
         SC_TEST_EXPECT(state.receiveResult.data.sizeInBytes() == sizeof(state.sendBuffer));
