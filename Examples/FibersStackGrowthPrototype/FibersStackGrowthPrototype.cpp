@@ -56,6 +56,8 @@ static StackGrowthPrototype* installedPrototype                    = nullptr;
 static volatile sig_atomic_t guardOverflowProbeActive              = 0;
 static constexpr int         GuardOverflowExitCode                 = 74;
 alignas(16) static thread_local char signalStackMemory[128 * 1024] = {};
+static Atomic<int32_t>   threadHandlerLifecycle;
+static constexpr int32_t HandlerLifecycleClosing = -1;
 #endif
 
 struct StackGrowthPrototype
@@ -89,6 +91,7 @@ struct StackGrowthPrototype
     bool                  segmentationActionInstalled = false;
     bool                  busActionInstalled          = false;
     bool                  processHandlerOwner         = false;
+    bool                  threadHandlerRegistered     = false;
     volatile sig_atomic_t handlingFault               = 0;
 #endif
 
@@ -97,7 +100,11 @@ struct StackGrowthPrototype
     Result run()
     {
         SC_TRY(prepare(fiberEntry));
+        return runPrepared();
+    }
 
+    Result runPrepared()
+    {
         switchToFiber();
 
         SC_TRY_MSG(growthEvents >= 2, "Stack growth prototype did not cross enough commit boundaries");
@@ -117,6 +124,9 @@ struct StackGrowthPrototype
     Result runForeignFault()
     {
         SC_TRY(reserve());
+#if !SC_PLATFORM_WINDOWS
+        SC_TRY(installProcessHandler());
+#endif
         SC_TRY(installHandler());
         *reinterpret_cast<volatile int*>(static_cast<size_t>(1)) = 1;
         return Result::Error("Stack growth foreign-fault probe returned unexpectedly");
@@ -125,7 +135,15 @@ struct StackGrowthPrototype
     Result prepare(FiberContextEntry entry)
     {
         SC_TRY(reserve());
+#if !SC_PLATFORM_WINDOWS
+        SC_TRY(installProcessHandler());
+#endif
         SC_TRY(installHandler());
+        return prepareContext(entry);
+    }
+
+    Result prepareContext(FiberContextEntry entry)
+    {
         SC_TRY(FiberContextOperations::captureCurrent(mainContext));
         SC_TRY(FiberContextOperations::create(fiberContext, {guardEnd, UsableBytes}, entry, this));
         return Result(true);
@@ -277,9 +295,12 @@ struct StackGrowthPrototype
     {
         SC_TRY_MSG(activePrototype == nullptr, "Another stack growth prototype is already active on this thread");
 #if !SC_PLATFORM_WINDOWS
-        if (installedPrototype == nullptr)
+        SC_TRY(registerThreadHandler());
+        if (installedPrototype == nullptr or not installedPrototype->segmentationActionInstalled or
+            not installedPrototype->busActionInstalled)
         {
-            SC_TRY(installProcessHandler());
+            unregisterThreadHandler();
+            return Result::Error("Complete process handlers must be installed before thread handlers");
         }
 
         activePrototype     = this;
@@ -288,7 +309,7 @@ struct StackGrowthPrototype
         signalStack.ss_size = sizeof(signalStackMemory);
         if (sigaltstack(&signalStack, &previousSignalStack) != 0)
         {
-            activePrototype = nullptr;
+            close();
             return Result::Error("Stack growth prototype could not install its alternate signal stack");
         }
         signalStackInstalled = true;
@@ -300,9 +321,34 @@ struct StackGrowthPrototype
     }
 
 #if !SC_PLATFORM_WINDOWS
+    Result registerThreadHandler()
+    {
+        int32_t handlerCount = threadHandlerLifecycle.load();
+        do
+        {
+            SC_TRY_MSG(handlerCount >= 0, "Stack growth prototype process handlers are closing");
+        } while (not threadHandlerLifecycle.compare_exchange_weak(handlerCount, handlerCount + 1));
+        threadHandlerRegistered = true;
+        return Result(true);
+    }
+
+    void unregisterThreadHandler()
+    {
+        SC_THREADING_ASSERT_RELEASE(threadHandlerRegistered);
+        SC_THREADING_ASSERT_RELEASE(threadHandlerLifecycle.fetch_sub(1) > 0);
+        threadHandlerRegistered = false;
+    }
+
     Result installProcessHandler()
     {
-        SC_TRY_MSG(installedPrototype == nullptr, "Another stack growth prototype owns the process signal handlers");
+        int32_t expectedHandlerCount = 0;
+        SC_TRY_MSG(threadHandlerLifecycle.compare_exchange_strong(expectedHandlerCount, HandlerLifecycleClosing),
+                   "Stack growth prototype signal lifecycle is not idle");
+        if (installedPrototype != nullptr)
+        {
+            threadHandlerLifecycle.store(0);
+            return Result::Error("Another stack growth prototype owns the process signal handlers");
+        }
         installedPrototype  = this;
         processHandlerOwner = true;
 
@@ -312,16 +358,59 @@ struct StackGrowthPrototype
         sigemptyset(&action.sa_mask);
         if (sigaction(SIGSEGV, &action, &previousSegmentationAction) != 0)
         {
-            close();
+            installedPrototype  = nullptr;
+            processHandlerOwner = false;
+            threadHandlerLifecycle.store(0);
             return Result::Error("Stack growth prototype could not install its segmentation signal handler");
         }
         segmentationActionInstalled = true;
         if (sigaction(SIGBUS, &action, &previousBusAction) != 0)
         {
-            close();
+            SC_THREADING_ASSERT_RELEASE(restoreSignalAction(SIGSEGV, previousSegmentationAction));
+            segmentationActionInstalled = false;
+            installedPrototype          = nullptr;
+            processHandlerOwner         = false;
+            threadHandlerLifecycle.store(0);
             return Result::Error("Stack growth prototype could not install its bus signal handler");
         }
         busActionInstalled = true;
+        threadHandlerLifecycle.store(0);
+        return Result(true);
+    }
+
+    Result closeProcessHandler()
+    {
+        if (not processHandlerOwner)
+        {
+            return Result(true);
+        }
+        int32_t expectedHandlerCount = 0;
+        SC_TRY_MSG(threadHandlerLifecycle.compare_exchange_strong(expectedHandlerCount, HandlerLifecycleClosing),
+                   "Stack growth prototype cannot remove process handlers while thread handlers are active");
+        if (busActionInstalled)
+        {
+            if (not restoreSignalAction(SIGBUS, previousBusAction))
+            {
+                threadHandlerLifecycle.store(0);
+                return Result::Error("Stack growth prototype could not restore its bus signal handler");
+            }
+            busActionInstalled = false;
+        }
+        if (segmentationActionInstalled)
+        {
+            if (not restoreSignalAction(SIGSEGV, previousSegmentationAction))
+            {
+                threadHandlerLifecycle.store(0);
+                return Result::Error("Stack growth prototype could not restore its segmentation signal handler");
+            }
+            segmentationActionInstalled = false;
+        }
+        if (installedPrototype == this)
+        {
+            installedPrototype  = nullptr;
+            processHandlerOwner = false;
+        }
+        threadHandlerLifecycle.store(0);
         return Result(true);
     }
 #endif
@@ -329,16 +418,6 @@ struct StackGrowthPrototype
     void close()
     {
 #if !SC_PLATFORM_WINDOWS
-        if (processHandlerOwner and busActionInstalled)
-        {
-            SC_THREADING_ASSERT_RELEASE(restoreSignalAction(SIGBUS, previousBusAction));
-            busActionInstalled = false;
-        }
-        if (processHandlerOwner and segmentationActionInstalled)
-        {
-            SC_THREADING_ASSERT_RELEASE(restoreSignalAction(SIGSEGV, previousSegmentationAction));
-            segmentationActionInstalled = false;
-        }
         if (signalStackInstalled)
         {
             stack_t currentSignalStack = {};
@@ -365,16 +444,21 @@ struct StackGrowthPrototype
             }
             signalStackInstalled = false;
         }
-        if (processHandlerOwner and installedPrototype == this)
-        {
-            installedPrototype  = nullptr;
-            processHandlerOwner = false;
-        }
-#endif
         if (activePrototype == this)
         {
             activePrototype = nullptr;
         }
+        if (threadHandlerRegistered)
+        {
+            unregisterThreadHandler();
+        }
+        SC_THREADING_ASSERT_RELEASE(closeProcessHandler());
+#else
+        if (activePrototype == this)
+        {
+            activePrototype = nullptr;
+        }
+#endif
         if (reservation != nullptr)
         {
 #if SC_PLATFORM_WINDOWS
@@ -668,12 +752,24 @@ static Result runConcurrentGrowthProbe()
         Result       startResult = threads[startedThreads].start(Function<void(Thread&)>(
             [state, &shared](Thread&)
             {
+                state->result = state->prototype.reserve();
+                if (state->result)
+                {
+                    state->result = state->prototype.installHandler();
+                }
+                if (state->result)
+                {
+                    state->result = state->prototype.prepareContext(StackGrowthPrototype::fiberEntry);
+                }
                 shared.ready.fetch_add(1);
                 while (not shared.start.load())
                 {
                     Thread::Sleep(1);
                 }
-                state->result = state->prototype.run();
+                if (state->result)
+                {
+                    state->result = state->prototype.runPrepared();
+                }
                 if (state->result)
                 {
                     state->growthEvents = state->prototype.growthEvents;
@@ -695,6 +791,19 @@ static Result runConcurrentGrowthProbe()
     {
         Thread::Sleep(1);
     }
+
+    bool allWorkersPrepared = true;
+    for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
+    {
+        allWorkersPrepared = allWorkersPrepared and states[threadIndex].result;
+    }
+#if !SC_PLATFORM_WINDOWS
+    bool earlyCloseRefused = false;
+    if (allWorkersPrepared)
+    {
+        earlyCloseRefused = not processHandlerOwner.closeProcessHandler();
+    }
+#endif
     shared.start.store(true);
 
     Result probeResult = Result(true);
@@ -713,6 +822,10 @@ static Result runConcurrentGrowthProbe()
     }
 
 #if !SC_PLATFORM_WINDOWS
+    if (allWorkersPrepared and not earlyCloseRefused)
+    {
+        probeResult = Result::Error("Process signal handler teardown was not refused while workers were active");
+    }
     processHandlerOwner.close();
 #endif
     return probeResult;
@@ -741,7 +854,11 @@ static Result runStackGrowthPrototype(const char* executable)
     SC_TRY(runConcurrentGrowthProbe());
     SC_TRY(runChildProbe(executable, GuardOverflowMode));
     SC_TRY(runChildProbe(executable, ForeignFaultMode));
+#if SC_PLATFORM_WINDOWS
     console.print("  concurrentWorkers=4 guardOverflowProbe=passed foreignFaultProbe=passed\n");
+#else
+    console.print("  concurrentWorkers=4 earlyCloseProbe=passed guardOverflowProbe=passed foreignFaultProbe=passed\n");
+#endif
     return Result(true);
 #endif
 }
