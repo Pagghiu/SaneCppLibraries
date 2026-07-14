@@ -374,6 +374,7 @@ struct SC_FIBERS_EXPORT FiberWorker
     size_t          stealCursor            = 0;
     size_t          runAttempts            = 0;
     size_t          idlePolls              = 0;
+    volatile size_t idleSpinIterations     = 0;
     size_t          parkAttempts           = 0;
     size_t          parkedWakeups          = 0;
     size_t          executedFibers         = 0;
@@ -439,30 +440,32 @@ struct SC_FIBERS_EXPORT FiberWorkerPoolOptions
 {
     FiberAllocator*           dequeAllocator         = nullptr;
     size_t                    dequeCapacityPerWorker = 0;
+    size_t                    idleSpinAttempts       = 32;
     Span<const uint64_t>      affinityMasks;
     FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
 };
 
 struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
 {
-    size_t readyFibers       = 0;
-    size_t readyPeakFibers   = 0;
-    size_t dequeCapacity     = 0;
-    size_t spilledFibers     = 0;
-    size_t stealAttempts     = 0;
-    size_t stealVictimProbes = 0;
-    size_t stolenFibers      = 0;
-    size_t stolenBatches     = 0;
-    size_t stolenBatchPeak   = 0;
-    size_t failedSteals      = 0;
-    size_t runAttempts       = 0;
-    size_t idlePolls         = 0;
-    size_t parkAttempts      = 0;
-    size_t parkedWakeups     = 0;
-    size_t executedFibers    = 0;
-    size_t completedFibers   = 0;
-    size_t yieldedFibers     = 0;
-    size_t waitingFibers     = 0;
+    size_t readyFibers        = 0;
+    size_t readyPeakFibers    = 0;
+    size_t dequeCapacity      = 0;
+    size_t spilledFibers      = 0;
+    size_t stealAttempts      = 0;
+    size_t stealVictimProbes  = 0;
+    size_t stolenFibers       = 0;
+    size_t stolenBatches      = 0;
+    size_t stolenBatchPeak    = 0;
+    size_t failedSteals       = 0;
+    size_t runAttempts        = 0;
+    size_t idlePolls          = 0;
+    size_t idleSpinIterations = 0;
+    size_t parkAttempts       = 0;
+    size_t parkedWakeups      = 0;
+    size_t executedFibers     = 0;
+    size_t completedFibers    = 0;
+    size_t yieldedFibers      = 0;
+    size_t waitingFibers      = 0;
 };
 
 struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
@@ -543,6 +546,7 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
     WakeEventOpaque          wakeEvent;
     mutable volatile int32_t stopRequested      = 0;
     mutable volatile int32_t running            = 0;
+    size_t                   idleSpinAttempts   = 0;
     bool                     localDequesCreated = false;
 
     void                   wakeOneWorker();

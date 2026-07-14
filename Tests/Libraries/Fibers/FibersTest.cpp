@@ -1365,7 +1365,7 @@ struct SC::FibersTest : public SC::TestCase
             Atomic<int32_t> completed;
         };
 
-        static char     taskMemory[256 * 1024] = {};
+        static char     taskMemory[NumSlots * sizeof(FiberTask) + NumSlots + 4096] = {};
         FiberAllocator  allocator;
         FiberTaskClass  taskClass;
         FiberStackClass stackClass;
@@ -3335,6 +3335,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TRY_MSG(allWaitersEntered, "Worker stress test did not enter every wait");
             SC_TRY_MSG(not scheduler.hasActiveFibers(), "Worker stress test left active fibers");
             SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Worker stress test did not recycle every task slot");
+            SC_TRY_MSG(workerDiagnostics.idleSpinIterations > 0, "Worker stress test did not spin before parking");
             SC_TRY_MSG(workerDiagnostics.parkAttempts > 0, "Worker stress test did not park any worker");
             SC_TRY_MSG(workerDiagnostics.parkedWakeups > 0, "Worker stress test did not wake a parked worker");
             if (cancelWaiters)
@@ -3400,6 +3401,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TRY(allocator.createFixed(allocatorStorage));
             workerPoolOptions.dequeAllocator         = &allocator;
             workerPoolOptions.dequeCapacityPerWorker = DequeCapacity;
+            workerPoolOptions.idleSpinAttempts       = 0;
 
             scheduler.add(gate);
             FiberStack anchorStack({anchorStackMemory, sizeof(anchorStackMemory)});
@@ -3454,16 +3456,35 @@ struct SC::FibersTest : public SC::TestCase
             {
                 cancellationResult = scheduler.requestCancelAll();
             }
+
+            size_t cancellationWaitIterations = 0;
+            if (cancelWaiters)
+            {
+                while (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and
+                       cancellationWaitIterations < 1000)
+                {
+                    Thread::Sleep(1);
+                    cancellationWaitIterations += 1;
+                }
+            }
             const Result releaseResult = scheduler.done(gate);
 
             SC_TRY(workerPool.join());
+            FiberWorkerDiagnostics workerDiagnostics;
+            scheduler.workerDiagnostics({workers, NumWorkers}, workerDiagnostics);
             SC_TRY(cancellationResult);
             SC_TRY(releaseResult);
             SC_TRY_MSG(allWaitersEntered, "External spawn stress test did not enter every wait");
             SC_TRY_MSG(anchor.result(), "External spawn stress anchor did not complete");
             SC_TRY_MSG(not scheduler.hasActiveFibers(), "External spawn stress test left active fibers");
+            SC_TRY_MSG(workerDiagnostics.idleSpinIterations == 0,
+                       "External spawn stress test ignored the immediate-parking option");
+            SC_TRY_MSG(workerDiagnostics.parkAttempts > 0,
+                       "External spawn stress test did not park with immediate parking enabled");
             if (cancelWaiters)
             {
+                SC_TRY_MSG(cancellationWaitIterations < 1000,
+                           "External spawn stress test did not observe every cancellation before releasing its anchor");
                 SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
                            "Cancelled external spawn stress tasks completed normally");
                 SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),

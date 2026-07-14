@@ -183,9 +183,11 @@ static Result runWorkerPoolBenchmark(Console& console)
     console.print("  steals={} failedSteals={} queuePeak={} spilled={}\n", workerDiagnostics.stolenFibers,
                   workerDiagnostics.failedSteals, workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers);
     console.print(
-        "  runAttempts={} idlePolls={} parkAttempts={} parkedWakeups={} executedFibers={} completedFibers={}\n",
-        workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.parkAttempts,
-        workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers);
+        "  runAttempts={} idlePolls={} idleSpinIterations={} parkAttempts={} parkedWakeups={} executedFibers={} "
+        "completedFibers={}\n",
+        workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.idleSpinIterations,
+        workerDiagnostics.parkAttempts, workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers,
+        workerDiagnostics.completedFibers);
     console.print("  yieldedFibers={} waitingFibers={}\n", workerDiagnostics.yieldedFibers,
                   workerDiagnostics.waitingFibers);
     console.print("  schedulerLockContentions={} schedulerLockSpinRetries={} schedulerLockPeakSpinRetries={}\n",
@@ -554,9 +556,11 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   static_cast<size_t>(state.submitted.load(memory_order_relaxed)), static_cast<size_t>(completed),
                   static_cast<size_t>(jobsPerSec), static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
     console.print(
-        "  runAttempts={} idlePolls={} parkAttempts={} parkedWakeups={} executedFibers={} completedFibers={}\n",
-        workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.parkAttempts,
-        workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers);
+        "  runAttempts={} idlePolls={} idleSpinIterations={} parkAttempts={} parkedWakeups={} executedFibers={} "
+        "completedFibers={}\n",
+        workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.idleSpinIterations,
+        workerDiagnostics.parkAttempts, workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers,
+        workerDiagnostics.completedFibers);
     console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} stolenBatches={} stolenBatchPeak={} "
                   "failedSteals={}\n",
                   workerDiagnostics.stealAttempts, workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
