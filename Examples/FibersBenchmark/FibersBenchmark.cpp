@@ -303,9 +303,13 @@ static Result runForcedStealingBenchmark(Console& console)
     {
         FiberWorkerDiagnostics workerDiagnostics;
         scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
-        console.print("  worker[{}] executed={} completed={} stealVictimProbes={} steals={} stealBatches={} "
-                      "stolenBatchPeak={} failedSteals={}\n",
-                      workerIndex, workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
+        console.print("  worker[{}] queuePeak={} spills={} executed={} completed={} runAttempts={} idlePolls={} "
+                      "idleSpins={} parks={} wakes={} stealAttempts={} stealVictimProbes={} steals={} "
+                      "stealBatches={} stolenBatchPeak={} failedSteals={}\n",
+                      workerIndex, workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers,
+                      workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
+                      workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.idleSpinIterations,
+                      workerDiagnostics.parkAttempts, workerDiagnostics.parkedWakeups, workerDiagnostics.stealAttempts,
                       workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
                       workerDiagnostics.stolenBatches, workerDiagnostics.stolenBatchPeak,
                       workerDiagnostics.failedSteals);
@@ -571,6 +575,21 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   schedulerDiagnostics.lockSpinRetries);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
+    for (size_t workerIndex = 0; workerIndex < workers.sizeInElements(); ++workerIndex)
+    {
+        FiberWorkerDiagnostics workerDiagnostics;
+        scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
+        console.print("  worker[{}] queuePeak={} spills={} executed={} completed={} runAttempts={} idlePolls={} "
+                      "idleSpins={} parks={} wakes={} stealAttempts={} stealVictimProbes={} steals={} "
+                      "stealBatches={} stolenBatchPeak={} failedSteals={}\n",
+                      workerIndex, workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers,
+                      workerDiagnostics.executedFibers, workerDiagnostics.completedFibers,
+                      workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.idleSpinIterations,
+                      workerDiagnostics.parkAttempts, workerDiagnostics.parkedWakeups, workerDiagnostics.stealAttempts,
+                      workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
+                      workerDiagnostics.stolenBatches, workerDiagnostics.stolenBatchPeak,
+                      workerDiagnostics.failedSteals);
+    }
     return Result(true);
 }
 
