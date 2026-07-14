@@ -13,6 +13,8 @@
 
 #include "../../Libraries/Fibers/Internal/FiberContext.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Threading/Atomic.h"
+#include "../../Libraries/Threading/Threading.h"
 #include <string.h>
 
 #if SC_PLATFORM_WINDOWS
@@ -48,8 +50,13 @@ namespace
 struct StackGrowthPrototype;
 
 // Signal handlers are process-wide, but only the installing thread may own and grow this experimental stack.
-static thread_local StackGrowthPrototype* activePrototype    = nullptr;
-static StackGrowthPrototype*              installedPrototype = nullptr;
+static thread_local StackGrowthPrototype* activePrototype = nullptr;
+#if !SC_PLATFORM_WINDOWS
+static StackGrowthPrototype* installedPrototype                    = nullptr;
+static volatile sig_atomic_t guardOverflowProbeActive              = 0;
+static constexpr int         GuardOverflowExitCode                 = 74;
+alignas(16) static thread_local char signalStackMemory[128 * 1024] = {};
+#endif
 
 struct StackGrowthPrototype
 {
@@ -81,8 +88,8 @@ struct StackGrowthPrototype
     bool                  signalStackInstalled        = false;
     bool                  segmentationActionInstalled = false;
     bool                  busActionInstalled          = false;
+    bool                  processHandlerOwner         = false;
     volatile sig_atomic_t handlingFault               = 0;
-    alignas(16) char signalStackMemory[128 * 1024]    = {};
 #endif
 
     ~StackGrowthPrototype() { close(); }
@@ -268,21 +275,36 @@ struct StackGrowthPrototype
 
     Result installHandler()
     {
-        SC_TRY_MSG(activePrototype == nullptr and installedPrototype == nullptr,
-                   "Another stack growth prototype is already active");
-        activePrototype    = this;
-        installedPrototype = this;
+        SC_TRY_MSG(activePrototype == nullptr, "Another stack growth prototype is already active on this thread");
 #if !SC_PLATFORM_WINDOWS
+        if (installedPrototype == nullptr)
+        {
+            SC_TRY(installProcessHandler());
+        }
+
+        activePrototype     = this;
         stack_t signalStack = {};
         signalStack.ss_sp   = signalStackMemory;
         signalStack.ss_size = sizeof(signalStackMemory);
         if (sigaltstack(&signalStack, &previousSignalStack) != 0)
         {
-            activePrototype    = nullptr;
-            installedPrototype = nullptr;
+            activePrototype = nullptr;
             return Result::Error("Stack growth prototype could not install its alternate signal stack");
         }
         signalStackInstalled = true;
+
+#else
+        activePrototype = this;
+#endif
+        return Result(true);
+    }
+
+#if !SC_PLATFORM_WINDOWS
+    Result installProcessHandler()
+    {
+        SC_TRY_MSG(installedPrototype == nullptr, "Another stack growth prototype owns the process signal handlers");
+        installedPrototype  = this;
+        processHandlerOwner = true;
 
         struct sigaction action = {};
         action.sa_sigaction     = signalHandler;
@@ -300,40 +322,58 @@ struct StackGrowthPrototype
             return Result::Error("Stack growth prototype could not install its bus signal handler");
         }
         busActionInstalled = true;
-#endif
         return Result(true);
     }
+#endif
 
     void close()
     {
 #if !SC_PLATFORM_WINDOWS
-        if (busActionInstalled)
+        if (processHandlerOwner and busActionInstalled)
         {
-            restoreSignalAction(SIGBUS, previousBusAction);
+            SC_THREADING_ASSERT_RELEASE(restoreSignalAction(SIGBUS, previousBusAction));
             busActionInstalled = false;
         }
-        if (segmentationActionInstalled)
+        if (processHandlerOwner and segmentationActionInstalled)
         {
-            restoreSignalAction(SIGSEGV, previousSegmentationAction);
+            SC_THREADING_ASSERT_RELEASE(restoreSignalAction(SIGSEGV, previousSegmentationAction));
             segmentationActionInstalled = false;
         }
         if (signalStackInstalled)
         {
             stack_t currentSignalStack = {};
-            if (sigaltstack(nullptr, &currentSignalStack) == 0 and currentSignalStack.ss_sp == signalStackMemory)
+            SC_THREADING_ASSERT_RELEASE(sigaltstack(nullptr, &currentSignalStack) == 0);
+            SC_THREADING_ASSERT_RELEASE(currentSignalStack.ss_sp == signalStackMemory);
+            stack_t signalStackToRestore = previousSignalStack;
+            if ((signalStackToRestore.ss_flags & SS_DISABLE) != 0)
             {
-                sigaltstack(&previousSignalStack, nullptr);
+                // Darwin validates the size even though disabled-stack storage is ignored.
+                signalStackToRestore.ss_size = sizeof(signalStackMemory);
+            }
+            SC_THREADING_ASSERT_RELEASE(sigaltstack(&signalStackToRestore, nullptr) == 0);
+            stack_t restoredSignalStack = {};
+            SC_THREADING_ASSERT_RELEASE(sigaltstack(nullptr, &restoredSignalStack) == 0);
+            if ((previousSignalStack.ss_flags & SS_DISABLE) != 0)
+            {
+                SC_THREADING_ASSERT_RELEASE((restoredSignalStack.ss_flags & SS_DISABLE) != 0);
+            }
+            else
+            {
+                SC_THREADING_ASSERT_RELEASE(restoredSignalStack.ss_sp == previousSignalStack.ss_sp and
+                                            restoredSignalStack.ss_size == previousSignalStack.ss_size and
+                                            restoredSignalStack.ss_flags == previousSignalStack.ss_flags);
             }
             signalStackInstalled = false;
+        }
+        if (processHandlerOwner and installedPrototype == this)
+        {
+            installedPrototype  = nullptr;
+            processHandlerOwner = false;
         }
 #endif
         if (activePrototype == this)
         {
             activePrototype = nullptr;
-        }
-        if (installedPrototype == this)
-        {
-            installedPrototype = nullptr;
         }
         if (reservation != nullptr)
         {
@@ -376,14 +416,30 @@ struct StackGrowthPrototype
     }
 
 #if !SC_PLATFORM_WINDOWS
-    static void restoreSignalAction(int signal, const struct sigaction& previous)
+    static bool signalActionMatches(const struct sigaction& first, const struct sigaction& second)
+    {
+        if ((first.sa_flags & SA_SIGINFO) != 0 or (second.sa_flags & SA_SIGINFO) != 0)
+        {
+            return (first.sa_flags & SA_SIGINFO) == (second.sa_flags & SA_SIGINFO) and
+                   first.sa_sigaction == second.sa_sigaction;
+        }
+        return first.sa_handler == second.sa_handler;
+    }
+
+    static bool restoreSignalAction(int signal, const struct sigaction& previous)
     {
         struct sigaction current = {};
         if (sigaction(signal, nullptr, &current) == 0 and (current.sa_flags & SA_SIGINFO) != 0 and
             current.sa_sigaction == signalHandler)
         {
-            sigaction(signal, &previous, nullptr);
+            if (sigaction(signal, &previous, nullptr) != 0)
+            {
+                return false;
+            }
+            struct sigaction restored = {};
+            return sigaction(signal, nullptr, &restored) == 0 and signalActionMatches(restored, previous);
         }
+        return false;
     }
 
     static void* interruptedStackPointer(void* rawContext)
@@ -400,6 +456,15 @@ struct StackGrowthPrototype
 #else
         return nullptr;
 #endif
+    }
+
+    [[nodiscard]] bool isTerminalGuardFault(void* faultAddress, void* stackPointer) const
+    {
+        const size_t fault = reinterpret_cast<size_t>(faultAddress);
+        const size_t stack = reinterpret_cast<size_t>(stackPointer);
+        return guardOverflowProbeActive != 0 and committedBegin == guardEnd and
+               fault >= reinterpret_cast<size_t>(reservation) and fault < reinterpret_cast<size_t>(guardEnd) and
+               stack >= reinterpret_cast<size_t>(reservation) and stack < reinterpret_cast<size_t>(stackEnd);
     }
 
     static void forwardSignal(const StackGrowthPrototype& prototype, int signal)
@@ -422,15 +487,20 @@ struct StackGrowthPrototype
     {
         StackGrowthPrototype* prototype = activePrototype;
         StackGrowthPrototype* installer = installedPrototype;
+        void*                 stack     = interruptedStackPointer(context);
         if ((signal == SIGSEGV or signal == SIGBUS) and prototype != nullptr and info != nullptr and
             prototype->handlingFault == 0)
         {
             prototype->handlingFault = 1;
-            const bool grown         = prototype->tryGrow(info->si_addr, interruptedStackPointer(context));
+            const bool grown         = prototype->tryGrow(info->si_addr, stack);
             prototype->handlingFault = 0;
             if (grown)
             {
                 return;
+            }
+            if (prototype->isTerminalGuardFault(info->si_addr, stack))
+            {
+                _exit(GuardOverflowExitCode);
             }
         }
 
@@ -464,6 +534,10 @@ static Result runChildMode(const char* mode)
 #if SC_PLATFORM_WINDOWS
     SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX);
 #else
+    if (strcmp(mode, GuardOverflowMode) == 0)
+    {
+        guardOverflowProbeActive = 1;
+    }
     if (strcmp(mode, ForeignFaultMode) == 0)
     {
         struct sigaction action = {};
@@ -477,7 +551,11 @@ static Result runChildMode(const char* mode)
     StackGrowthPrototype prototype;
     if (strcmp(mode, GuardOverflowMode) == 0)
     {
-        return prototype.runGuardOverflow();
+        Result result = prototype.runGuardOverflow();
+#if !SC_PLATFORM_WINDOWS
+        guardOverflowProbeActive = 0;
+#endif
+        return result;
     }
     if (strcmp(mode, ForeignFaultMode) == 0)
     {
@@ -549,11 +627,95 @@ static Result runChildProbe(const char* executable, const char* mode)
     }
     else
     {
-        SC_TRY_MSG(WIFSIGNALED(status) and (WTERMSIG(status) == SIGSEGV or WTERMSIG(status) == SIGBUS),
-                   "Stack growth prototype guard overflow did not terminate with a memory signal");
+        SC_TRY_MSG(WIFEXITED(status) and WEXITSTATUS(status) == GuardOverflowExitCode,
+                   "Stack growth prototype did not classify terminal guard overflow");
     }
 #endif
     return Result(true);
+}
+#endif
+
+#if !SC_FIBERS_STACK_GROWTH_HAS_ASAN
+static Result runConcurrentGrowthProbe()
+{
+    static constexpr size_t NumWorkers = 4;
+
+    struct Shared
+    {
+        Atomic<int32_t> ready;
+        Atomic<bool>    start;
+    };
+    struct WorkerState
+    {
+        StackGrowthPrototype prototype;
+        Result               result       = Result::Error("Concurrent stack growth worker did not run");
+        size_t               growthEvents = 0;
+    };
+
+    Shared      shared;
+    WorkerState states[NumWorkers];
+    Thread      threads[NumWorkers];
+
+#if !SC_PLATFORM_WINDOWS
+    StackGrowthPrototype processHandlerOwner;
+    SC_TRY(processHandlerOwner.installProcessHandler());
+#endif
+
+    size_t startedThreads = 0;
+    for (; startedThreads < NumWorkers; ++startedThreads)
+    {
+        WorkerState* state       = &states[startedThreads];
+        Result       startResult = threads[startedThreads].start(Function<void(Thread&)>(
+            [state, &shared](Thread&)
+            {
+                shared.ready.fetch_add(1);
+                while (not shared.start.load())
+                {
+                    Thread::Sleep(1);
+                }
+                state->result = state->prototype.run();
+                if (state->result)
+                {
+                    state->growthEvents = state->prototype.growthEvents;
+                }
+                state->prototype.close();
+            }));
+        if (not startResult)
+        {
+            shared.start.store(true);
+            for (size_t threadIndex = 0; threadIndex < startedThreads; ++threadIndex)
+            {
+                SC_THREADING_ASSERT_RELEASE(threads[threadIndex].join());
+            }
+            return startResult;
+        }
+    }
+
+    while (shared.ready.load() != static_cast<int32_t>(NumWorkers))
+    {
+        Thread::Sleep(1);
+    }
+    shared.start.store(true);
+
+    Result probeResult = Result(true);
+    for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
+    {
+        Result joinResult = threads[threadIndex].join();
+        SC_THREADING_ASSERT_RELEASE(joinResult);
+        if (not states[threadIndex].result)
+        {
+            probeResult = states[threadIndex].result;
+        }
+        else if (states[threadIndex].growthEvents < 2)
+        {
+            probeResult = Result::Error("Concurrent stack growth worker did not cross enough commit boundaries");
+        }
+    }
+
+#if !SC_PLATFORM_WINDOWS
+    processHandlerOwner.close();
+#endif
+    return probeResult;
 }
 #endif
 
@@ -576,9 +738,10 @@ static Result runStackGrowthPrototype(const char* executable)
                       static_cast<size_t>(StackGrowthPrototype::GrowthBytes), prototype.growthEvents,
                       prototype.committedBytes());
     }
+    SC_TRY(runConcurrentGrowthProbe());
     SC_TRY(runChildProbe(executable, GuardOverflowMode));
     SC_TRY(runChildProbe(executable, ForeignFaultMode));
-    console.print("  guardOverflowProbe=passed foreignFaultProbe=passed\n");
+    console.print("  concurrentWorkers=4 guardOverflowProbe=passed foreignFaultProbe=passed\n");
     return Result(true);
 #endif
 }
