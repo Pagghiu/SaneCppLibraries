@@ -320,27 +320,26 @@ static Result runForcedStealingBenchmark(Console& console)
     return Result(true);
 }
 
-[[nodiscard]] static Result runMassSuspensionBenchmark(Console& console)
+[[nodiscard]] static Result runMassSuspensionBenchmark(Console& console, size_t numFibers)
 {
-    static constexpr size_t NumFibers     = 10000;
     static constexpr size_t StackSize     = 8 * 1024;
-    static constexpr size_t AllocatorSize = NumFibers * sizeof(FiberTask) * 2 + 4 * 1024 * 1024;
+    const size_t            allocatorSize = numFibers * sizeof(FiberTask) * 2 + 4 * 1024 * 1024;
 
     FiberAllocator               allocator;
     FiberAllocatorVirtualOptions allocatorOptions;
-    allocatorOptions.reserveBytes       = AllocatorSize;
+    allocatorOptions.reserveBytes       = allocatorSize;
     allocatorOptions.initialCommitBytes = 64 * 1024;
     SC_TRY(allocator.createVirtual(allocatorOptions));
 
     FiberTaskClass        taskClass;
     FiberTaskClassOptions taskOptions;
-    taskOptions.maxTasks = NumFibers;
+    taskOptions.maxTasks = numFibers;
     SC_TRY(taskClass.create(allocator, taskOptions));
 
     FiberStackClass        stackClass;
     FiberStackClassOptions stackOptions;
     stackOptions.stackSizeInBytes = StackSize;
-    stackOptions.maxStacks        = NumFibers;
+    stackOptions.maxStacks        = numFibers;
     stackOptions.guardPage        = true;
     SC_TRY(stackClass.reserve(stackOptions));
 
@@ -354,7 +353,7 @@ static Result runForcedStealingBenchmark(Console& console)
 
     Time::HighResolutionCounter spawnStart;
     spawnStart.snap();
-    for (size_t fiberIndex = 0; fiberIndex < NumFibers; ++fiberIndex)
+    for (size_t fiberIndex = 0; fiberIndex < numFibers; ++fiberIndex)
     {
         SC_TRY(taskPool.spawn(scheduler, FiberTask::Procedure([&gate](FiberScheduler& runningScheduler)
                                                               { return runningScheduler.wait(gate); })));
@@ -364,7 +363,7 @@ static Result runForcedStealingBenchmark(Console& console)
 
     Time::HighResolutionCounter suspendStart;
     suspendStart.snap();
-    for (size_t fiberIndex = 0; fiberIndex < NumFibers; ++fiberIndex)
+    for (size_t fiberIndex = 0; fiberIndex < numFibers; ++fiberIndex)
     {
         SC_TRY(scheduler.runNoWait());
     }
@@ -373,10 +372,10 @@ static Result runForcedStealingBenchmark(Console& console)
 
     FiberTaskPoolDiagnostics suspendedDiagnostics;
     taskPool.diagnostics(suspendedDiagnostics);
-    SC_TRY_MSG(scheduler.activeFiberCount() == NumFibers, "Mass-suspension benchmark did not suspend every fiber");
-    SC_TRY_MSG(suspendedDiagnostics.activeTasks == NumFibers,
+    SC_TRY_MSG(scheduler.activeFiberCount() == numFibers, "Mass-suspension benchmark did not suspend every fiber");
+    SC_TRY_MSG(suspendedDiagnostics.activeTasks == numFibers,
                "Mass-suspension benchmark task class did not retain every task");
-    SC_TRY_MSG(suspendedDiagnostics.stackClass.activeStacks == NumFibers,
+    SC_TRY_MSG(suspendedDiagnostics.stackClass.activeStacks == numFibers,
                "Mass-suspension benchmark stack class did not retain every stack");
 
     Time::HighResolutionCounter resumeStart;
@@ -389,13 +388,13 @@ static Result runForcedStealingBenchmark(Console& console)
     FiberTaskPoolDiagnostics completedDiagnostics;
     taskPool.diagnostics(completedDiagnostics);
     SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mass-suspension benchmark left active fibers");
-    SC_TRY_MSG(taskPool.availableCount() == NumFibers, "Mass-suspension benchmark did not recycle every slot");
+    SC_TRY_MSG(taskPool.availableCount() == numFibers, "Mass-suspension benchmark did not recycle every slot");
 
     const Time::HighResolutionCounter spawnElapsed   = spawnFinish.subtractExact(spawnStart);
     const Time::HighResolutionCounter suspendElapsed = suspendFinish.subtractExact(suspendStart);
     const Time::HighResolutionCounter resumeElapsed  = resumeFinish.subtractExact(resumeStart);
-    console.print("FibersBenchmark mass suspension\n");
-    console.print("  fibers={} stackSize={} guardSize={}\n", NumFibers, StackSize,
+    console.print("FibersBenchmark mass suspension milestone\n");
+    console.print("  fibers={} stackSize={} guardSize={}\n", numFibers, StackSize,
                   suspendedDiagnostics.stackClass.guardSizeInBytes);
     console.print("  spawnAndSlotAcquireElapsedMs={} suspendElapsedMs={} resumeElapsedMs={}\n",
                   static_cast<size_t>(spawnElapsed.toMilliseconds().ms),
@@ -546,8 +545,8 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
     const int64_t completed  = state.completed.load(memory_order_relaxed);
     const int64_t jobsPerSec = completed * 1000000000 / elapsedNs;
 
-    FiberWorkerDiagnostics workerDiagnostics;
-    scheduler.workerDiagnostics(workers, workerDiagnostics);
+    FiberWorkerDiagnostics aggregateWorkerDiagnostics;
+    scheduler.workerDiagnostics(workers, aggregateWorkerDiagnostics);
 
     FiberSchedulerDiagnostics schedulerDiagnostics;
     scheduler.schedulerDiagnostics(schedulerDiagnostics);
@@ -562,14 +561,17 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
     console.print(
         "  runAttempts={} idlePolls={} idleSpinIterations={} parkAttempts={} parkedWakeups={} executedFibers={} "
         "completedFibers={}\n",
-        workerDiagnostics.runAttempts, workerDiagnostics.idlePolls, workerDiagnostics.idleSpinIterations,
-        workerDiagnostics.parkAttempts, workerDiagnostics.parkedWakeups, workerDiagnostics.executedFibers,
-        workerDiagnostics.completedFibers);
+        aggregateWorkerDiagnostics.runAttempts, aggregateWorkerDiagnostics.idlePolls,
+        aggregateWorkerDiagnostics.idleSpinIterations, aggregateWorkerDiagnostics.parkAttempts,
+        aggregateWorkerDiagnostics.parkedWakeups, aggregateWorkerDiagnostics.executedFibers,
+        aggregateWorkerDiagnostics.completedFibers);
     console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} stolenBatches={} stolenBatchPeak={} "
                   "failedSteals={}\n",
-                  workerDiagnostics.stealAttempts, workerDiagnostics.stealVictimProbes, workerDiagnostics.stolenFibers,
-                  workerDiagnostics.stolenBatches, workerDiagnostics.stolenBatchPeak, workerDiagnostics.failedSteals);
-    console.print("  queuePeak={} spilled={}\n", workerDiagnostics.readyPeakFibers, workerDiagnostics.spilledFibers);
+                  aggregateWorkerDiagnostics.stealAttempts, aggregateWorkerDiagnostics.stealVictimProbes,
+                  aggregateWorkerDiagnostics.stolenFibers, aggregateWorkerDiagnostics.stolenBatches,
+                  aggregateWorkerDiagnostics.stolenBatchPeak, aggregateWorkerDiagnostics.failedSteals);
+    console.print("  queuePeak={} spilled={}\n", aggregateWorkerDiagnostics.readyPeakFibers,
+                  aggregateWorkerDiagnostics.spilledFibers);
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
                   schedulerDiagnostics.lockSpinRetries);
@@ -875,7 +877,8 @@ static Result runFibersBenchmark()
     printBenchmarkEnvironment(console);
     SC_TRY(runWorkerPoolBenchmark(console));
     SC_TRY(runForcedStealingBenchmark(console));
-    SC_TRY(runMassSuspensionBenchmark(console));
+    SC_TRY(runMassSuspensionBenchmark(console, 10'000));
+    SC_TRY(runMassSuspensionBenchmark(console, 100'000));
     SC_TRY(runFiberAsyncHighWaterBenchmark(console));
     SC_TRY(runMicroTaskBenchmarks(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console));
