@@ -100,6 +100,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
         {
             workerPoolSleepCancelCompleteRace();
         }
+        if (test_section("worker pool owner command race stress"))
+        {
+            workerPoolOwnerCommandRaceStress();
+        }
         if (test_section("command queue overflow"))
         {
             commandQueueOverflow();
@@ -984,6 +988,136 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(canceled > 0);
         SC_TEST_EXPECT(not scheduler.hasActiveFibers());
         SC_TEST_EXPECT(eventLoop.close());
+    }
+
+    void workerPoolOwnerCommandRaceStress()
+    {
+        static constexpr size_t NumRounds  = 12;
+        static constexpr size_t NumTasks   = 8;
+        static constexpr size_t NumWorkers = 2;
+
+        struct TaskState
+        {
+            FiberAsyncIO* io       = nullptr;
+            TimeMs        duration = TimeMs{0};
+
+            Atomic<bool> completed = false;
+            Atomic<bool> canceled  = false;
+        };
+
+        struct State
+        {
+            Atomic<int32_t> entered = 0;
+            TaskState       tasks[NumTasks];
+        };
+
+        struct StopState
+        {
+            FiberWorkerPool* workerPool        = nullptr;
+            uint32_t         delayMilliseconds = 0;
+            Result           result            = Result(true);
+        };
+
+        static char stackMemory[NumTasks][64 * 1024] = {};
+
+        size_t totalCompleted = 0;
+        size_t totalCanceled  = 0;
+        for (size_t round = 0; round < NumRounds; ++round)
+        {
+            AsyncEventLoop eventLoop;
+            SC_TEST_EXPECT(eventLoop.create());
+
+            FiberScheduler    scheduler;
+            FiberAsyncCommand commandStorage[NumTasks * 4];
+            FiberAsyncIO      io(scheduler, eventLoop, commandStorage);
+            FiberTask         tasks[NumTasks];
+            FiberWorker       workers[NumWorkers];
+            FiberWorkerThread threads[NumWorkers];
+            FiberWorkerPool   workerPool;
+
+            State state;
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                TaskState& taskState = state.tasks[taskIndex];
+                taskState.io         = &io;
+                taskState.duration   = taskIndex < NumTasks / 2 ? TimeMs{1} : TimeMs{10 * 1000};
+
+                FiberStack stack({stackMemory[taskIndex], sizeof(stackMemory[taskIndex])});
+                SC_TEST_EXPECT(scheduler.spawn(tasks[taskIndex], stack,
+                                               FiberTask::Procedure(
+                                                   [&state, &taskState](FiberScheduler&)
+                                                   {
+                                                       state.entered.fetch_add(1);
+                                                       Result result = taskState.io->sleep(taskState.duration);
+                                                       taskState.completed.store(static_cast<bool>(result));
+                                                       taskState.canceled.store(not result);
+                                                       return result;
+                                                   })));
+            }
+
+            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+            for (size_t iteration = 0; iteration < 1000 and state.entered.load() != static_cast<int32_t>(NumTasks);
+                 ++iteration)
+            {
+                Thread::Sleep(1);
+            }
+            SC_TEST_EXPECT(state.entered.load() == static_cast<int32_t>(NumTasks));
+
+            if (round == NumRounds - 1)
+            {
+                for (size_t iteration = 0; iteration < 1000 and not state.tasks[0].completed.load(); ++iteration)
+                {
+                    SC_TEST_EXPECT(io.runOwnerNoWait());
+                    Thread::Sleep(1);
+                }
+                SC_TEST_EXPECT(state.tasks[0].completed.load());
+            }
+
+            StopState stopState;
+            stopState.workerPool        = &workerPool;
+            stopState.delayMilliseconds = round % 2 == 0 ? 0 : 4;
+
+            Thread stopThread;
+            auto   stop = [&stopState](Thread&)
+            {
+                Thread::Sleep(stopState.delayMilliseconds);
+                stopState.result = stopState.workerPool->requestStop();
+            };
+            SC_TEST_EXPECT(stopThread.start(stop));
+
+            SC_TEST_EXPECT(io.runOwner());
+            SC_TEST_EXPECT(stopThread.join());
+            SC_TEST_EXPECT(stopState.result);
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+
+            size_t roundCompleted = 0;
+            size_t roundCanceled  = 0;
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                SC_TEST_EXPECT(tasks[taskIndex].isCompleted());
+                if (state.tasks[taskIndex].completed.load())
+                {
+                    roundCompleted += 1;
+                    SC_TEST_EXPECT(tasks[taskIndex].result());
+                }
+                if (state.tasks[taskIndex].canceled.load())
+                {
+                    roundCanceled += 1;
+                    SC_TEST_EXPECT(not tasks[taskIndex].result());
+                }
+            }
+            SC_TEST_EXPECT(roundCompleted + roundCanceled == NumTasks);
+            SC_TEST_EXPECT(roundCanceled > 0);
+            totalCompleted += roundCompleted;
+            totalCanceled += roundCanceled;
+
+            SC_TEST_EXPECT(eventLoop.close());
+        }
+
+        SC_TEST_EXPECT(totalCompleted > 0);
+        SC_TEST_EXPECT(totalCanceled > 0);
+        SC_TEST_EXPECT(totalCompleted + totalCanceled == NumRounds * NumTasks);
     }
 
     void commandQueueOverflow()

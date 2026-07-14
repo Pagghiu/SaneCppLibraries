@@ -118,6 +118,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             cancelWaitingTask();
         }
+        if (test_section("uninterruptible wait cancellation"))
+        {
+            uninterruptibleWaitCancellation();
+        }
         if (test_section("task group"))
         {
             taskGroup();
@@ -1717,6 +1721,62 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(counter.value() == 1);
         SC_TEST_EXPECT(scheduler.done(counter));
         SC_TEST_EXPECT(counter.value() == 0);
+    }
+
+    void uninterruptibleWaitCancellation()
+    {
+        struct State
+        {
+            FiberCounter* counter = nullptr;
+            FiberTask*    waiter  = nullptr;
+
+            bool resumed           = false;
+            bool resumedBeforeDone = false;
+        };
+
+        FiberScheduler scheduler;
+        FiberCounter   counter;
+        FiberTask      waiter;
+        FiberTask      canceller;
+
+        char       waiterStackMemory[64 * 1024]    = {};
+        char       cancellerStackMemory[64 * 1024] = {};
+        FiberStack waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
+        FiberStack cancellerStack({cancellerStackMemory, sizeof(cancellerStackMemory)});
+
+        State state;
+        state.counter = &counter;
+        state.waiter  = &waiter;
+
+        scheduler.add(counter);
+        SC_TEST_EXPECT(scheduler.spawn(waiter, waiterStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler& scheduler)
+                                           {
+                                               SC_TRY(scheduler.waitUninterruptible(*state.counter));
+                                               state.resumed = true;
+                                               return Result(true);
+                                           })));
+        SC_TEST_EXPECT(scheduler.spawn(canceller, cancellerStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler& scheduler)
+                                           {
+                                               SC_TRY(scheduler.requestCancel(*state.waiter));
+                                               SC_TRY(scheduler.yield());
+                                               state.resumedBeforeDone = state.resumed;
+                                               SC_TRY(scheduler.requestCancel(*state.waiter));
+                                               SC_TRY(scheduler.done(*state.counter));
+                                               return Result(true);
+                                           })));
+
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(not state.resumedBeforeDone);
+        SC_TEST_EXPECT(state.resumed);
+        SC_TEST_EXPECT(counter.value() == 0);
+        SC_TEST_EXPECT(waiter.isCompleted());
+        SC_TEST_EXPECT(canceller.isCompleted());
+        SC_TEST_EXPECT(waiter.result());
+        SC_TEST_EXPECT(canceller.result());
     }
 
     void taskGroup()

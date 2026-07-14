@@ -5244,9 +5244,10 @@ void FiberScheduler::publishSuspensionUnlocked(FiberTask& task)
         return;
     }
 
-    task.taskStatus     = FiberTaskStatus::Waiting;
-    task.nextWaiting    = nullptr;
-    task.waitingCounter = counter;
+    task.taskStatus           = FiberTaskStatus::Waiting;
+    task.nextWaiting          = nullptr;
+    task.waitingCounter       = counter;
+    task.suspendInterruptible = interruptible;
     if (counter->waitingTail == nullptr)
     {
         counter->waitingHead = &task;
@@ -5301,11 +5302,12 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
 Result FiberScheduler::cancelTaskUnlocked(FiberTask& task)
 {
     task.cancelRequested = true;
-    if (task.taskStatus == FiberTaskStatus::Waiting and task.waitingCounter != nullptr)
+    if (task.taskStatus == FiberTaskStatus::Waiting and task.waitingCounter != nullptr and task.suspendInterruptible)
     {
         SC_FIBERS_ASSERT_RELEASE(removeCounterWaiterUnlocked(*task.waitingCounter, task));
-        task.waitingCounter = nullptr;
-        task.taskStatus     = FiberTaskStatus::Ready;
+        task.waitingCounter       = nullptr;
+        task.suspendInterruptible = false;
+        task.taskStatus           = FiberTaskStatus::Ready;
         pushReadyUnlocked(task, task.preferredWorker);
     }
     return Result(true);
@@ -5376,10 +5378,11 @@ void FiberScheduler::wakeCounterWaitersUnlocked(FiberCounter& counter)
     FiberTask* task = counter.waitingHead;
     while (task != nullptr)
     {
-        FiberTask* next      = task->nextWaiting;
-        task->nextWaiting    = nullptr;
-        task->waitingCounter = nullptr;
-        task->taskStatus     = FiberTaskStatus::Ready;
+        FiberTask* next            = task->nextWaiting;
+        task->nextWaiting          = nullptr;
+        task->waitingCounter       = nullptr;
+        task->suspendInterruptible = false;
+        task->taskStatus           = FiberTaskStatus::Ready;
         pushReadyUnlocked(*task, task->preferredWorker);
         task = next;
     }
