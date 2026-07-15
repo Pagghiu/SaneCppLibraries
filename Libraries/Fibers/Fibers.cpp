@@ -41,6 +41,31 @@ namespace SC
 {
 namespace
 {
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define SC_FIBERS_HAS_ADDRESS_SANITIZER 1
+#endif
+#endif
+
+#if defined(__SANITIZE_ADDRESS__)
+#define SC_FIBERS_HAS_ADDRESS_SANITIZER 1
+#endif
+
+#if !defined(SC_FIBERS_HAS_ADDRESS_SANITIZER)
+#define SC_FIBERS_HAS_ADDRESS_SANITIZER 0
+#endif
+
+#if SC_FIBERS_HAS_ADDRESS_SANITIZER
+extern "C" void __asan_unpoison_memory_region(void const volatile* address, size_t size);
+
+static void fiberSanitizerUnpoisonMemory(void* memory, size_t size)
+{
+    __asan_unpoison_memory_region(memory, size);
+}
+#else
+static void fiberSanitizerUnpoisonMemory(void*, size_t) {}
+#endif
+
 static void* alignDown(void* pointer, size_t alignment)
 {
     const size_t address        = reinterpret_cast<size_t>(pointer);
@@ -137,6 +162,7 @@ struct FiberVirtualMemory
             return false;
         }
 #endif
+        fiberSanitizerUnpoisonMemory(commitAddress, bytesToCommit);
         committedBytes = targetCommittedBytes;
         return true;
     }
@@ -179,20 +205,6 @@ static FiberAllocationHeader& fiberAllocationHeaderFromMemory(void* memory)
 }
 
 static constexpr char FiberStackHighWaterMark = static_cast<char>(0xA5);
-
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer)
-#define SC_FIBERS_HAS_ADDRESS_SANITIZER 1
-#endif
-#endif
-
-#if defined(__SANITIZE_ADDRESS__)
-#define SC_FIBERS_HAS_ADDRESS_SANITIZER 1
-#endif
-
-#if !defined(SC_FIBERS_HAS_ADDRESS_SANITIZER)
-#define SC_FIBERS_HAS_ADDRESS_SANITIZER 0
-#endif
 
 #if SC_PLATFORM_APPLE
 #define SC_FIBER_CONTEXT_ENTER_SYMBOL "_SC_fiberContextEnter"
@@ -273,6 +285,7 @@ static Result fiberCommitReadWrite(void* memory, size_t size)
         return Result::Error("Failed to commit fiber stack pages");
     }
 #endif
+    fiberSanitizerUnpoisonMemory(memory, size);
     return Result(true);
 }
 
