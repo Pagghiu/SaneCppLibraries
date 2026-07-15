@@ -535,10 +535,10 @@ static Result spawnMicroTaskJob(FiberTaskPool& pool, FiberScheduler& scheduler, 
 }
 
 static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode, size_t numWorkers, size_t numJobs,
-                                    int workIterations, const Time::HighResolutionCounter& elapsed,
-                                    const FiberScheduler& scheduler, Span<FiberWorker> workers,
-                                    const FiberAllocatorStatistics& allocatorStatistics,
-                                    const MicroTaskBenchmarkState&  state)
+                                    int workIterations, size_t configuredInjectionCapacity,
+                                    const Time::HighResolutionCounter& elapsed, const FiberScheduler& scheduler,
+                                    Span<FiberWorker> workers, const FiberAllocatorStatistics& allocatorStatistics,
+                                    const MicroTaskBenchmarkState& state)
 {
     const int64_t elapsedNs  = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
     const int64_t elapsedMs  = elapsed.toMilliseconds().ms;
@@ -575,6 +575,8 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
                   schedulerDiagnostics.lockSpinRetries);
+    console.print("  configuredInjectionCapacity={} injectionPeak={} injectionSpills={}\n", configuredInjectionCapacity,
+                  schedulerDiagnostics.injectionPeak, schedulerDiagnostics.injectionSpills);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
     for (size_t workerIndex = 0; workerIndex < workers.sizeInElements(); ++workerIndex)
@@ -603,6 +605,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     static constexpr size_t InFiberPoolCapacity    = 256;
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
+    static constexpr size_t InjectionCapacity      = NumJobs + 1;
     SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "Invalid micro-task worker count");
 
     FiberScheduler    scheduler;
@@ -611,15 +614,18 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     FiberWorkerPool   workerPool;
 
     FiberAllocator allocator;
-    static char    dequeStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) + 4096] = {};
+    static char
+        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
 
     FiberWorkerPoolOptions workerPoolOptions;
     workerPoolOptions.dequeAllocator         = &allocator;
     workerPoolOptions.dequeCapacityPerWorker = DequeCapacityPerWorker;
+    workerPoolOptions.injectionAllocator     = &allocator;
+    workerPoolOptions.injectionCapacity      = InjectionCapacity;
 
     MicroTaskBenchmarkState state;
     state.workIterations = workIterations;
-    SC_TRY(allocator.createFixed(dequeStorage));
+    SC_TRY(allocator.createFixed(schedulerStorage));
 
     Time::HighResolutionCounter start;
     Time::HighResolutionCounter finish;
@@ -730,8 +736,9 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(allocator.close());
 
-    return printMicroTaskMetrics(console, mode, numWorkers, NumJobs, workIterations, finish.subtractExact(start),
-                                 scheduler, {workers, numWorkers}, allocatorStatistics, state);
+    return printMicroTaskMetrics(console, mode, numWorkers, NumJobs, workIterations, InjectionCapacity,
+                                 finish.subtractExact(start), scheduler, {workers, numWorkers}, allocatorStatistics,
+                                 state);
 }
 
 static Result runMicroTaskBenchmarks(Console& console)
@@ -791,6 +798,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     static constexpr size_t PoolCapacity           = 512;
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
+    static constexpr size_t InjectionCapacity      = PoolCapacity + 1;
     static constexpr int    WorkIterations         = 4;
 
     size_t numWorkers = availableHardwareWorkers();
@@ -813,11 +821,14 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     FiberWorkerPool   workerPool;
 
     FiberAllocator allocator;
-    static char    dequeStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) + 4096] = {};
+    static char
+        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
 
     FiberWorkerPoolOptions workerPoolOptions;
     workerPoolOptions.dequeAllocator         = &allocator;
     workerPoolOptions.dequeCapacityPerWorker = DequeCapacityPerWorker;
+    workerPoolOptions.injectionAllocator     = &allocator;
+    workerPoolOptions.injectionCapacity      = InjectionCapacity;
 
     static FiberTask tasks[PoolCapacity];
     static char      stackMemory[PoolCapacity * StackSize] = {};
@@ -828,7 +839,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     FiberStack producerStack({producerStackMemory, sizeof(producerStackMemory)});
 
     MicroTaskBenchmarkState state;
-    SC_TRY(allocator.createFixed(dequeStorage));
+    SC_TRY(allocator.createFixed(schedulerStorage));
 
     SC_TRY(scheduler.spawn(producerTask, producerStack,
                            FiberTask::Procedure(
@@ -866,8 +877,8 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     console.print("FibersBenchmark sustained micro-tasking\n");
     console.print("  poolCapacity={} dequeCapacityPerWorker={}\n", PoolCapacity, DequeCapacityPerWorker);
     return printMicroTaskMetrics(console, MicroTaskProducerMode::InFiberProducer, numWorkers, NumJobs, WorkIterations,
-                                 finish.subtractExact(start), scheduler, {workers, numWorkers}, allocatorStatistics,
-                                 state);
+                                 InjectionCapacity, finish.subtractExact(start), scheduler, {workers, numWorkers},
+                                 allocatorStatistics, state);
 }
 
 static Result runFibersBenchmark()

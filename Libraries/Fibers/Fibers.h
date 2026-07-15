@@ -372,8 +372,8 @@ struct SC_FIBERS_EXPORT FiberWorker
     size_t          stolenBatchPeak        = 0;
     size_t          failedSteals           = 0;
     size_t          stealCursor            = 0;
-    size_t          runAttempts            = 0;
-    size_t          idlePolls              = 0;
+    volatile size_t runAttempts            = 0;
+    volatile size_t idlePolls              = 0;
     volatile size_t idleSpinIterations     = 0;
     size_t          parkAttempts           = 0;
     size_t          parkedWakeups          = 0;
@@ -1129,8 +1129,8 @@ struct SC_FIBERS_EXPORT FiberScheduler
     [[nodiscard]] FiberTask* stealReadyUnlocked(FiberWorker& worker, Span<FiberWorker> stealWorkers);
     Result                   runReadyTask(FiberTask& task);
     Result                   runReadyTask(FiberTask& task, FiberWorker& worker);
-    [[nodiscard]] bool       preparePreferredWorkerReadyPublishUnlocked(FiberTask& task, FiberWorker& worker,
-                                                                        FiberWorker*& outPreferredWorker);
+    [[nodiscard]] bool       preparePreferredWorkerReadyPublish(FiberTask& task, FiberWorker& worker,
+                                                                FiberWorker*& outPreferredWorker);
     void                     publishSuspensionUnlocked(FiberTask& task);
     void                     finishCurrentTask(FiberTask& task, Result result);
     Result                   cancelTaskUnlocked(FiberTask& task);

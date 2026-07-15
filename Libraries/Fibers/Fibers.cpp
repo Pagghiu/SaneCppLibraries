@@ -4210,11 +4210,11 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
     FiberTask* task = nullptr;
     {
         LockGuard guard(*this);
-        worker.runAttempts += 1;
+        fiberAtomicFetchAddSize(worker.runAttempts, 1);
         task = popReadyUnlocked();
         if (task == nullptr)
         {
-            worker.idlePolls += 1;
+            fiberAtomicFetchAddSize(worker.idlePolls, 1);
             return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
                                                           : Result::Error("FiberScheduler cannot make progress");
         }
@@ -4241,11 +4241,11 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
                 groupWorker.stealCursorInitialized = true;
             }
         }
-        worker.runAttempts += 1;
+        fiberAtomicFetchAddSize(worker.runAttempts, 1);
         task = popReadyUnlocked(worker, workerGroup);
         if (task == nullptr)
         {
-            worker.idlePolls += 1;
+            fiberAtomicFetchAddSize(worker.idlePolls, 1);
             return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
                                                           : Result::Error("FiberScheduler cannot make progress");
         }
@@ -4264,7 +4264,12 @@ Result FiberScheduler::runNoWait(FiberWorker& worker) { return runNoWait(worker,
 
 Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWorkers)
 {
-    FiberTask* task = nullptr;
+    FiberTask* task                 = nullptr;
+    const bool configuredDequeOwner = workerPool != nullptr and workerPool->workers.data() == stealWorkers.data() and
+                                      workerPool->workers.sizeInElements() == stealWorkers.sizeInElements() and
+                                      worker.localDeque != nullptr and worker.localSchedulingActive and
+                                      worker.localQueueScheduler == this;
+    if (not configuredDequeOwner)
     {
         LockGuard guard(*this);
         for (size_t workerIndex = 0; workerIndex < stealWorkers.sizeInElements(); ++workerIndex)
@@ -4280,8 +4285,8 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
                 groupWorker.stealCursorInitialized = true;
             }
         }
-        worker.runAttempts += 1;
     }
+    fiberAtomicFetchAddSize(worker.runAttempts, 1);
 
     if (worker.localDeque != nullptr and worker.localQueueScheduler == this)
     {
@@ -4307,7 +4312,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
         }
         if (task == nullptr)
         {
-            worker.idlePolls += 1;
+            fiberAtomicFetchAddSize(worker.idlePolls, 1);
             if (stealWorkers.sizeInElements() == 0 and fiberAtomicLoadSize(readyFibers) != 0)
             {
                 return Result::Error("FiberScheduler has ready fibers queued on another worker");
@@ -4791,8 +4796,8 @@ void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDia
     diagnostics.stolenBatches      = worker.stolenBatches;
     diagnostics.stolenBatchPeak    = worker.stolenBatchPeak;
     diagnostics.failedSteals       = worker.failedSteals;
-    diagnostics.runAttempts        = worker.runAttempts;
-    diagnostics.idlePolls          = worker.idlePolls;
+    diagnostics.runAttempts        = fiberAtomicLoadSize(worker.runAttempts);
+    diagnostics.idlePolls          = fiberAtomicLoadSize(worker.idlePolls);
     diagnostics.idleSpinIterations = fiberAtomicLoadSize(worker.idleSpinIterations);
     diagnostics.parkAttempts       = worker.parkAttempts;
     diagnostics.parkedWakeups      = worker.parkedWakeups;
@@ -4836,8 +4841,8 @@ void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDia
             diagnostics.stolenBatchPeak = worker.stolenBatchPeak;
         }
         diagnostics.failedSteals += worker.failedSteals;
-        diagnostics.runAttempts += worker.runAttempts;
-        diagnostics.idlePolls += worker.idlePolls;
+        diagnostics.runAttempts += fiberAtomicLoadSize(worker.runAttempts);
+        diagnostics.idlePolls += fiberAtomicLoadSize(worker.idlePolls);
         diagnostics.idleSpinIterations += fiberAtomicLoadSize(worker.idleSpinIterations);
         diagnostics.parkAttempts += worker.parkAttempts;
         diagnostics.parkedWakeups += worker.parkedWakeups;
@@ -4868,8 +4873,8 @@ void FiberScheduler::resetWorkerDiagnostics(FiberWorker& worker)
     worker.stolenBatches      = 0;
     worker.stolenBatchPeak    = 0;
     worker.failedSteals       = 0;
-    worker.runAttempts        = 0;
-    worker.idlePolls          = 0;
+    fiberAtomicStoreSize(worker.runAttempts, 0);
+    fiberAtomicStoreSize(worker.idlePolls, 0);
     fiberAtomicStoreSize(worker.idleSpinIterations, 0);
     worker.parkAttempts  = 0;
     worker.parkedWakeups = 0;
@@ -4901,8 +4906,8 @@ void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
         worker.stolenBatches      = 0;
         worker.stolenBatchPeak    = 0;
         worker.failedSteals       = 0;
-        worker.runAttempts        = 0;
-        worker.idlePolls          = 0;
+        fiberAtomicStoreSize(worker.runAttempts, 0);
+        fiberAtomicStoreSize(worker.idlePolls, 0);
         fiberAtomicStoreSize(worker.idleSpinIterations, 0);
         worker.parkAttempts  = 0;
         worker.parkedWakeups = 0;
@@ -5353,35 +5358,39 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     {
         trace(FiberTraceEventType::TaskCompleted, &task, &worker, task.taskResult ? 1 : 0);
     }
+    const bool preparedOwnerReady = preparePreferredWorkerReadyPublish(task, worker, preferredReadyWorker);
+    if (preparedOwnerReady)
+    {
+        SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
+        SC_FIBERS_ASSERT_RELEASE(worker.workerTask == nullptr);
+    }
+    else
     {
         LockGuard guard(*this);
-        if (not preparePreferredWorkerReadyPublishUnlocked(task, worker, preferredReadyWorker))
+        publishSuspensionUnlocked(task);
+        if (task.status() == FiberTaskStatus::Completing)
         {
-            publishSuspensionUnlocked(task);
-            if (task.status() == FiberTaskStatus::Completing)
+            task.cancellationToken = FiberCancellationToken();
+            worker.completedFibers += 1;
+            unlinkActiveUnlocked(task);
+            if (task.stackOwner != nullptr)
             {
-                task.cancellationToken = FiberCancellationToken();
-                worker.completedFibers += 1;
-                unlinkActiveUnlocked(task);
-                if (task.stackOwner != nullptr)
-                {
-                    static_cast<FiberVirtualStackInternal*>(task.stackOwner)->releaseStack();
-                    task.stackOwner = nullptr;
-                }
-                if (task.completionCounter != nullptr)
-                {
-                    SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
-                }
-                completedOriginPool    = task.originPool;
-                task.originPool        = nullptr;
-                completedTaskClass     = task.originTaskClass;
-                completedStackClass    = task.originStackClass;
-                completedStackMemory   = task.originStackMemory;
-                task.originTaskClass   = nullptr;
-                task.originStackClass  = nullptr;
-                task.originStackMemory = {};
-                completedTask          = true;
+                static_cast<FiberVirtualStackInternal*>(task.stackOwner)->releaseStack();
+                task.stackOwner = nullptr;
             }
+            if (task.completionCounter != nullptr)
+            {
+                SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
+            }
+            completedOriginPool    = task.originPool;
+            task.originPool        = nullptr;
+            completedTaskClass     = task.originTaskClass;
+            completedStackClass    = task.originStackClass;
+            completedStackMemory   = task.originStackMemory;
+            task.originTaskClass   = nullptr;
+            task.originStackClass  = nullptr;
+            task.originStackMemory = {};
+            completedTask          = true;
         }
         if (task.runningWorker == &worker)
         {
@@ -5431,8 +5440,8 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     return Result(true);
 }
 
-bool FiberScheduler::preparePreferredWorkerReadyPublishUnlocked(FiberTask& task, FiberWorker& worker,
-                                                                FiberWorker*& outPreferredWorker)
+bool FiberScheduler::preparePreferredWorkerReadyPublish(FiberTask& task, FiberWorker& worker,
+                                                        FiberWorker*& outPreferredWorker)
 {
     outPreferredWorker = nullptr;
     if (task.suspendAction != FiberTaskSuspendAction::Ready)
@@ -5450,7 +5459,8 @@ bool FiberScheduler::preparePreferredWorkerReadyPublishUnlocked(FiberTask& task,
     task.suspendAction        = FiberTaskSuspendAction::None;
     task.suspendCounter       = nullptr;
     task.suspendInterruptible = false;
-    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
+    SC_FIBERS_ASSERT_RELEASE(
+        fiberTaskStatusCompareExchange(task.taskStatus, FiberTaskStatus::Running, FiberTaskStatus::Ready));
     outPreferredWorker = preferredWorker;
     return true;
 }
