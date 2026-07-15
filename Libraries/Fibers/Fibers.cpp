@@ -5201,6 +5201,10 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     FiberTaskClass*  completedTaskClass   = nullptr;
     FiberStackClass* completedStackClass  = nullptr;
     Span<char>       completedStackMemory;
+    if (task.status() == FiberTaskStatus::Completing)
+    {
+        trace(FiberTraceEventType::TaskCompleted, &task, &worker, task.taskResult ? 1 : 0);
+    }
     {
         LockGuard guard(*this);
         if (not preparePreferredWorkerReadyPublishUnlocked(task, worker, preferredReadyWorker))
@@ -5208,6 +5212,25 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
             publishSuspensionUnlocked(task);
             if (task.status() == FiberTaskStatus::Completing)
             {
+                SC_FIBERS_ASSERT_RELEASE(activeFibers > 0);
+                task.cancellationToken = FiberCancellationToken();
+                activeFibers -= 1;
+                worker.completedFibers += 1;
+                if (activeFibers == 0 and workerPool != nullptr)
+                {
+                    // Every parked worker must recheck the now-empty scheduler before the pool can join.
+                    workerPool->wakeAllWorkers();
+                }
+                unlinkActiveUnlocked(task);
+                if (task.stackOwner != nullptr)
+                {
+                    static_cast<FiberVirtualStackInternal*>(task.stackOwner)->releaseStack();
+                    task.stackOwner = nullptr;
+                }
+                if (task.completionCounter != nullptr)
+                {
+                    SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
+                }
                 fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completed);
                 FiberTaskPool* originPool = task.originPool;
                 task.originPool           = nullptr;
@@ -5334,37 +5357,13 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
     SC_FIBERS_ASSERT_RELEASE(worker != nullptr);
     SC_FIBERS_ASSERT_RELEASE(worker->workerTask == &task);
     SC_FIBERS_ASSERT_RELEASE(worker->scheduler() == this);
-    {
-        LockGuard guard(*this);
-        SC_FIBERS_ASSERT_RELEASE(activeFibers > 0);
 
-        task.taskResult = result;
-        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completing);
-        task.cancellationToken = FiberCancellationToken();
-        task.suspendAction     = FiberTaskSuspendAction::None;
-        task.suspendCounter    = nullptr;
-        task.preferredWorker   = nullptr;
-        activeFibers -= 1;
-        worker->completedFibers += 1;
-        if (activeFibers == 0 and workerPool != nullptr)
-        {
-            // Every parked worker must recheck the now-empty scheduler before the pool can join.
-            workerPool->wakeAllWorkers();
-        }
-        unlinkActiveUnlocked(task);
-        worker->workerTask = nullptr;
-        if (task.stackOwner != nullptr)
-        {
-            static_cast<FiberVirtualStackInternal*>(task.stackOwner)->releaseStack();
-            task.stackOwner = nullptr;
-        }
-
-        if (task.completionCounter != nullptr)
-        {
-            SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
-        }
-    }
-    trace(FiberTraceEventType::TaskCompleted, &task, worker, result ? 1 : 0);
+    task.taskResult      = result;
+    task.suspendAction   = FiberTaskSuspendAction::None;
+    task.suspendCounter  = nullptr;
+    task.preferredWorker = nullptr;
+    SC_FIBERS_ASSERT_RELEASE(
+        fiberTaskStatusCompareExchange(task.taskStatus, FiberTaskStatus::Running, FiberTaskStatus::Completing));
 }
 
 Result FiberScheduler::cancelTaskUnlocked(FiberTask& task)

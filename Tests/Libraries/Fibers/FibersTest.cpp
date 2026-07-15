@@ -4891,11 +4891,13 @@ struct SC::FibersTest : public SC::TestCase
     {
         struct TraceState
         {
-            size_t counts[4]        = {};
-            size_t schedulerMatches = 0;
-            size_t workerMatches    = 0;
-            size_t taskMatches      = 0;
-            size_t completionValues = 0;
+            size_t counts[4]              = {};
+            size_t schedulerMatches       = 0;
+            size_t workerMatches          = 0;
+            size_t taskMatches            = 0;
+            size_t completionValues       = 0;
+            bool   completionWasProtected = false;
+            bool   completionWasActive    = false;
 
             FiberScheduler* expectedScheduler = nullptr;
             FiberTask*      expectedTask      = nullptr;
@@ -4931,6 +4933,8 @@ struct SC::FibersTest : public SC::TestCase
             if (event.type == FiberTraceEventType::TaskCompleted)
             {
                 state.completionValues += event.value;
+                state.completionWasProtected = event.task->status() == FiberTaskStatus::Completing;
+                state.completionWasActive    = event.scheduler->hasActiveFibers();
             }
         };
         scheduler.setTraceHooks(hooks);
@@ -4953,6 +4957,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(state.workerMatches == 4);
         SC_TEST_EXPECT(state.taskMatches == 4);
         SC_TEST_EXPECT(state.completionValues == 1);
+        SC_TEST_EXPECT(state.completionWasProtected);
+        SC_TEST_EXPECT(state.completionWasActive);
 
         scheduler.clearTraceHooks();
     }
