@@ -58,10 +58,7 @@ namespace
 #if SC_FIBERS_HAS_ADDRESS_SANITIZER
 extern "C" void __asan_unpoison_memory_region(void const volatile* address, size_t size);
 
-static void fiberSanitizerUnpoisonMemory(void* memory, size_t size)
-{
-    __asan_unpoison_memory_region(memory, size);
-}
+static void fiberSanitizerUnpoisonMemory(void* memory, size_t size) { __asan_unpoison_memory_region(memory, size); }
 #else
 static void fiberSanitizerUnpoisonMemory(void*, size_t) {}
 #endif
@@ -1571,6 +1568,10 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
     {
         return Result::Error("FiberWorkerPool deque allocator and capacity must be provided together");
     }
+    if ((options.injectionAllocator == nullptr) != (options.injectionCapacity == 0))
+    {
+        return Result::Error("FiberWorkerPool injection allocator and capacity must be provided together");
+    }
     if (not options.affinityMasks.empty() and options.affinityMasks.sizeInElements() != workerStorage.sizeInElements())
     {
         return Result::Error("FiberWorkerPool affinity mask count must match worker count");
@@ -1596,17 +1597,38 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
         createdDeques = true;
     }
 
+    bool createdInjection = false;
+    if (options.injectionAllocator != nullptr)
+    {
+        Result injectionResult = scheduler.createInjectionQueue(*options.injectionAllocator, options.injectionCapacity);
+        if (not injectionResult)
+        {
+            if (createdDeques)
+            {
+                scheduler.releaseWorkerDeques(workerStorage);
+            }
+            return injectionResult;
+        }
+        createdInjection = true;
+    }
+
     poolScheduler      = &scheduler;
     workers            = workerStorage;
     threads            = threadStorage;
     idleSpinAttempts   = options.idleSpinAttempts;
     localDequesCreated = createdDeques;
+    injectionCreated   = createdInjection;
     fiberAtomicStore(stopRequested, 0);
     fiberAtomicStore(running, 1);
     {
         FiberScheduler::LockGuard guard(scheduler);
         if (scheduler.workerPool != nullptr)
         {
+            if (injectionCreated)
+            {
+                scheduler.releaseInjectionQueue();
+                injectionCreated = false;
+            }
             if (localDequesCreated)
             {
                 scheduler.releaseWorkerDeques(workers);
@@ -1691,6 +1713,11 @@ Result FiberWorkerPool::join()
     {
         poolScheduler->releaseWorkerDeques(workers);
         localDequesCreated = false;
+    }
+    if (injectionCreated and poolScheduler != nullptr)
+    {
+        poolScheduler->releaseInjectionQueue();
+        injectionCreated = false;
     }
 
     if (poolScheduler != nullptr)
@@ -4021,7 +4048,11 @@ bool FiberMutex::removeWaiter(WaitNode& node)
 
 FiberScheduler::FiberScheduler() = default;
 
-FiberScheduler::~FiberScheduler() { SC_FIBERS_ASSERT_RELEASE(not hasActiveFibers()); }
+FiberScheduler::~FiberScheduler()
+{
+    SC_FIBERS_ASSERT_RELEASE(not hasActiveFibers());
+    SC_FIBERS_ASSERT_RELEASE(injectionQueue == nullptr);
+}
 
 void FiberScheduler::lock() const
 {
@@ -4084,6 +4115,10 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     if (not procedure.isValid())
     {
         return Result::Error("FiberTask procedure is not valid");
+    }
+    if (injectionQueue != nullptr and injectionReady == injectionCapacity)
+    {
+        return Result::Error("Fiber injection queue is full");
     }
 
     task.procedure         = procedure;
@@ -4153,7 +4188,14 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 
     fiberAtomicFetchAddSize(activeFibers, 1);
     linkActiveUnlocked(task);
-    pushReadyUnlocked(task);
+    if (injectionQueue != nullptr)
+    {
+        SC_FIBERS_ASSERT_RELEASE(tryPushInjectionUnlocked(task));
+    }
+    else
+    {
+        pushReadyUnlocked(task);
+    }
     return Result(true);
 }
 
@@ -4371,6 +4413,57 @@ Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberW
         allocatedWorkers++;
     }
     return Result(true);
+}
+
+Result FiberScheduler::createInjectionQueue(FiberAllocator& allocator, size_t capacity)
+{
+    if (not allocator.isOpen())
+    {
+        return Result::Error("FiberAllocator is not open");
+    }
+    if (capacity == 0)
+    {
+        return Result::Error("Fiber injection queue capacity is zero");
+    }
+    if (injectionQueue != nullptr)
+    {
+        return Result::Error("Fiber injection queue already exists");
+    }
+
+    void* memory = allocator.allocate(this, capacity * sizeof(FiberTask*), alignof(FiberTask*));
+    if (memory == nullptr)
+    {
+        return Result::Error("Fiber injection queue allocation failed");
+    }
+
+    injectionQueue     = static_cast<FiberTask**>(memory);
+    injectionAllocator = &allocator;
+    injectionCapacity  = capacity;
+    injectionHead      = 0;
+    injectionTail      = 0;
+    injectionReady     = 0;
+    injectionPeak      = 0;
+    injectionSpills    = 0;
+    for (size_t index = 0; index < capacity; ++index)
+    {
+        injectionQueue[index] = nullptr;
+    }
+    return Result(true);
+}
+
+void FiberScheduler::releaseInjectionQueue()
+{
+    SC_FIBERS_ASSERT_RELEASE(injectionReady == 0);
+    if (injectionQueue != nullptr and injectionAllocator != nullptr)
+    {
+        injectionAllocator->release(injectionQueue);
+    }
+    injectionQueue     = nullptr;
+    injectionAllocator = nullptr;
+    injectionCapacity  = 0;
+    injectionHead      = 0;
+    injectionTail      = 0;
+    injectionReady     = 0;
 }
 
 void FiberScheduler::releaseWorkerDeques(Span<FiberWorker> workers)
@@ -4647,6 +4740,10 @@ void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics
 
     diagnostics.readyFibers         = fiberAtomicLoadSize(readyFibers);
     diagnostics.activeFibers        = fiberAtomicLoadSize(activeFibers);
+    diagnostics.injectionCapacity   = injectionCapacity;
+    diagnostics.injectionReady      = injectionReady;
+    diagnostics.injectionPeak       = injectionPeak;
+    diagnostics.injectionSpills     = injectionSpills;
     diagnostics.lockAcquisitions    = schedulerLockAcquisitions;
     diagnostics.lockContentions     = schedulerLockContentions;
     diagnostics.lockSpinRetries     = schedulerLockSpinRetries;
@@ -4661,6 +4758,8 @@ void FiberScheduler::resetSchedulerDiagnostics()
     schedulerLockContentions     = 0;
     schedulerLockSpinRetries     = 0;
     schedulerLockPeakSpinRetries = 0;
+    injectionPeak                = injectionReady;
+    injectionSpills              = 0;
 }
 
 void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDiagnostics& diagnostics) const
@@ -4822,8 +4921,56 @@ void FiberScheduler::notifyReadyWorkUnlocked()
     }
 }
 
+bool FiberScheduler::tryPushInjectionUnlocked(FiberTask& task)
+{
+    if (injectionQueue == nullptr or injectionReady == injectionCapacity)
+    {
+        return false;
+    }
+
+    const size_t tailIndex    = injectionTail % injectionCapacity;
+    injectionQueue[tailIndex] = &task;
+    injectionTail += 1;
+    injectionReady += 1;
+    if (injectionReady > injectionPeak)
+    {
+        injectionPeak = injectionReady;
+    }
+    task.nextReady     = nullptr;
+    task.previousReady = nullptr;
+    fiberAtomicFetchAddSize(readyFibers, 1);
+    notifyReadyWorkUnlocked();
+    return true;
+}
+
+FiberTask* FiberScheduler::popInjectionUnlocked()
+{
+    if (injectionReady == 0)
+    {
+        return nullptr;
+    }
+
+    const size_t headIndex = injectionHead % injectionCapacity;
+    FiberTask*   task      = injectionQueue[headIndex];
+    SC_FIBERS_ASSERT_RELEASE(task != nullptr);
+    injectionQueue[headIndex] = nullptr;
+    injectionHead += 1;
+    injectionReady -= 1;
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyFibers) > 0);
+    fiberAtomicFetchSubSize(readyFibers, 1);
+    return task;
+}
+
 void FiberScheduler::pushReadyUnlocked(FiberTask& task)
 {
+    if (tryPushInjectionUnlocked(task))
+    {
+        return;
+    }
+    if (injectionQueue != nullptr)
+    {
+        injectionSpills += 1;
+    }
     task.nextReady     = nullptr;
     task.previousReady = nullptr;
     fiberAtomicFetchAddSize(readyFibers, 1);
@@ -4923,7 +5070,7 @@ FiberTask* FiberScheduler::popReadyUnlocked()
     FiberTask* task = readyHead;
     if (task == nullptr)
     {
-        return nullptr;
+        return popInjectionUnlocked();
     }
 
     readyHead           = task->nextReady;

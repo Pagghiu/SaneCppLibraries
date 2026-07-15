@@ -101,6 +101,8 @@ SC_TRY(allocator.createFixed({allocatorStorage, sizeof(allocatorStorage)}));
 FiberWorkerPoolOptions options;
 options.dequeAllocator         = &allocator;
 options.dequeCapacityPerWorker = 256;
+options.injectionAllocator     = &allocator;
+options.injectionCapacity      = 256;
 
 SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
 SC_TRY(workerPool.join());
@@ -110,6 +112,12 @@ SC_TRY(allocator.close());
 The worker pool owns OS threads while running, but the memory for workers, thread handles, deques, tasks, and stacks is
 still selected by the caller. `join()` waits for scheduled work and worker shutdown; lifecycle ordering is therefore
 part of application shutdown rather than destructor magic.
+
+The optional injection queue is the bounded entry point for tasks submitted from external threads and for cross-worker
+wakeups. A new `spawn()` reports an error if that queue is full. A fiber that is already active never fails merely
+because the queue is full: its wakeup uses the scheduler's intrusive spill path, and workers prioritize that spill so
+existing work continues to make progress. `FiberSchedulerDiagnostics` exposes the configured capacity, current and
+peak occupancy, and spill count; peak and spill values remain available after `join()`.
 
 # Choosing Task and Stack Storage
 

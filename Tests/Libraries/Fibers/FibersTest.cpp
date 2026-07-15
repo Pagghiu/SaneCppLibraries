@@ -206,6 +206,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerPoolDeque();
         }
+        if (test_section("worker pool injection queue"))
+        {
+            workerPoolInjectionQueue();
+        }
         if (test_section("scheduler diagnostics"))
         {
             schedulerDiagnostics();
@@ -3719,6 +3723,8 @@ struct SC::FibersTest : public SC::TestCase
             SC_TRY(allocator.createFixed(allocatorStorage));
             workerPoolOptions.dequeAllocator         = &allocator;
             workerPoolOptions.dequeCapacityPerWorker = DequeCapacity;
+            workerPoolOptions.injectionAllocator     = &allocator;
+            workerPoolOptions.injectionCapacity      = NumTasks;
             workerPoolOptions.idleSpinAttempts       = 0;
 
             scheduler.add(gate);
@@ -3887,6 +3893,8 @@ struct SC::FibersTest : public SC::TestCase
             SC_TRY(allocator.createFixed(allocatorStorage));
             workerPoolOptions.dequeAllocator         = &allocator;
             workerPoolOptions.dequeCapacityPerWorker = DequeCapacity;
+            workerPoolOptions.injectionAllocator     = &allocator;
+            workerPoolOptions.injectionCapacity      = NumTasks;
 
             scheduler.add(gate);
             FiberStack anchorStack({anchorStackMemory, sizeof(anchorStackMemory)});
@@ -4844,6 +4852,140 @@ struct SC::FibersTest : public SC::TestCase
         for (const Atomic<int32_t>& resumes : state.resumes)
         {
             SC_TEST_EXPECT(resumes.load() == NumYields);
+        }
+    }
+
+    void workerPoolInjectionQueue()
+    {
+        static constexpr size_t NumWorkers        = 2;
+        static constexpr size_t NumTasks          = 6;
+        static constexpr size_t InjectionCapacity = 2;
+
+        struct State
+        {
+            Atomic<int32_t> blockersEntered;
+            Atomic<int32_t> blockersCompleted;
+            Atomic<int32_t> completed;
+            Atomic<bool>    allowBlockers;
+        };
+
+        FiberScheduler    scheduler;
+        FiberAllocator    allocator;
+        char              allocatorStorage[4096] = {};
+        static FiberTask  tasks[NumTasks];
+        static char       stackMemory[NumTasks * 64 * 1024] = {};
+        FiberWorker       workers[NumWorkers];
+        FiberWorkerThread threads[NumWorkers];
+        FiberWorkerPool   workerPool;
+        FiberCounter      gate;
+        State             state;
+
+        FiberWorkerPoolOptions badOptions;
+        badOptions.injectionCapacity = InjectionCapacity;
+        Result badStart = workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, badOptions);
+        SC_TEST_EXPECT(not badStart);
+        SC_TEST_EXPECT(not workerPool.isRunning());
+
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        scheduler.add(gate);
+        FiberStack waiterStack({stackMemory, 64 * 1024});
+        SC_TEST_EXPECT(scheduler.spawn(tasks[0], waiterStack,
+                                       FiberTask::Procedure(
+                                           [&state, &gate](FiberScheduler& scheduler)
+                                           {
+                                               SC_TRY(scheduler.wait(gate));
+                                               state.completed.fetch_add(1);
+                                               return Result(true);
+                                           })));
+        for (size_t taskIndex = 1; taskIndex <= NumWorkers; ++taskIndex)
+        {
+            FiberStack stack({stackMemory + taskIndex * 64 * 1024, 64 * 1024});
+            SC_TEST_EXPECT(scheduler.spawn(tasks[taskIndex], stack,
+                                           FiberTask::Procedure(
+                                               [&state](FiberScheduler&)
+                                               {
+                                                   state.blockersEntered.fetch_add(1, memory_order_release);
+                                                   while (not state.allowBlockers.load(memory_order_acquire))
+                                                   {
+                                                       Thread::Sleep(1);
+                                                   }
+                                                   state.blockersCompleted.fetch_add(1);
+                                                   return Result(true);
+                                               })));
+        }
+
+        FiberWorkerPoolOptions options;
+        options.dequeAllocator         = &allocator;
+        options.dequeCapacityPerWorker = InjectionCapacity;
+        options.injectionAllocator     = &allocator;
+        options.injectionCapacity      = InjectionCapacity;
+        options.idleSpinAttempts       = 0;
+        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
+
+        bool workersPinned = false;
+        for (size_t attempt = 0; attempt < 5000; ++attempt)
+        {
+            workersPinned = tasks[0].status() == FiberTaskStatus::Waiting and
+                            state.blockersEntered.load(memory_order_acquire) == static_cast<int32_t>(NumWorkers);
+            if (workersPinned)
+            {
+                break;
+            }
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(workersPinned);
+        if (not workersPinned)
+        {
+            state.allowBlockers.store(true, memory_order_release);
+            SC_TEST_EXPECT(scheduler.requestCancelAll());
+            SC_TEST_EXPECT(scheduler.done(gate));
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(allocator.close());
+            return;
+        }
+
+        for (size_t taskIndex = 3; taskIndex < 5; ++taskIndex)
+        {
+            FiberStack stack({stackMemory + taskIndex * 64 * 1024, 64 * 1024});
+            SC_TEST_EXPECT(scheduler.spawn(tasks[taskIndex], stack,
+                                           FiberTask::Procedure(
+                                               [&state](FiberScheduler&)
+                                               {
+                                                   state.completed.fetch_add(1);
+                                                   return Result(true);
+                                               })));
+        }
+        FiberStack rejectedStack({stackMemory + 5 * 64 * 1024, 64 * 1024});
+        Result     rejectedSpawn = scheduler.spawn(tasks[5], rejectedStack,
+                                                   FiberTask::Procedure([](FiberScheduler&) { return Result(true); }));
+        SC_TEST_EXPECT(not rejectedSpawn);
+        SC_TEST_EXPECT(tasks[5].status() == FiberTaskStatus::Invalid);
+
+        SC_TEST_EXPECT(scheduler.done(gate));
+        FiberSchedulerDiagnostics diagnostics;
+        scheduler.schedulerDiagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.readyFibers == 3);
+        SC_TEST_EXPECT(diagnostics.activeFibers == 5);
+        SC_TEST_EXPECT(diagnostics.injectionCapacity == InjectionCapacity);
+        SC_TEST_EXPECT(diagnostics.injectionReady == InjectionCapacity);
+        SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
+        SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+
+        state.allowBlockers.store(true, memory_order_release);
+        SC_TEST_EXPECT(workerPool.join());
+        scheduler.schedulerDiagnostics(diagnostics);
+        SC_TEST_EXPECT(state.blockersCompleted.load() == static_cast<int32_t>(NumWorkers));
+        SC_TEST_EXPECT(state.completed.load() == 3);
+        SC_TEST_EXPECT(diagnostics.injectionCapacity == 0);
+        SC_TEST_EXPECT(diagnostics.injectionReady == 0);
+        SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
+        SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.close());
+        for (size_t taskIndex = 0; taskIndex < 5; ++taskIndex)
+        {
+            SC_TEST_EXPECT(tasks[taskIndex].result());
         }
     }
 

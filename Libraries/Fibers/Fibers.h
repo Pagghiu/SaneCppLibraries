@@ -440,6 +440,8 @@ struct SC_FIBERS_EXPORT FiberWorkerPoolOptions
 {
     FiberAllocator*           dequeAllocator         = nullptr;
     size_t                    dequeCapacityPerWorker = 0;
+    FiberAllocator*           injectionAllocator     = nullptr;
+    size_t                    injectionCapacity      = 0;
     size_t                    idleSpinAttempts       = 32;
     Span<const uint64_t>      affinityMasks;
     FiberWorkerThreadPriority threadPriority = FiberWorkerThreadPriority::Default;
@@ -472,6 +474,10 @@ struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
 {
     size_t readyFibers         = 0;
     size_t activeFibers        = 0;
+    size_t injectionCapacity   = 0;
+    size_t injectionReady      = 0;
+    size_t injectionPeak       = 0;
+    size_t injectionSpills     = 0;
     size_t lockAcquisitions    = 0;
     size_t lockContentions     = 0;
     size_t lockSpinRetries     = 0;
@@ -550,6 +556,7 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
     mutable volatile int32_t running            = 0;
     size_t                   idleSpinAttempts   = 0;
     bool                     localDequesCreated = false;
+    bool                     injectionCreated   = false;
 
     void                   wakeOneWorker();
     void                   wakeAllWorkers();
@@ -1075,6 +1082,15 @@ struct SC_FIBERS_EXPORT FiberScheduler
     FiberTask* readyTail  = nullptr;
     FiberTask* activeHead = nullptr;
 
+    FiberTask**     injectionQueue     = nullptr;
+    FiberAllocator* injectionAllocator = nullptr;
+    size_t          injectionCapacity  = 0;
+    size_t          injectionHead      = 0;
+    size_t          injectionTail      = 0;
+    size_t          injectionReady     = 0;
+    size_t          injectionPeak      = 0;
+    size_t          injectionSpills    = 0;
+
     FiberWorkerPool* workerPool = nullptr;
 
     volatile size_t readyFibers  = 0;
@@ -1095,12 +1111,16 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void unlock() const;
     void trace(FiberTraceEventType type, FiberTask* task, FiberWorker* worker, size_t value = 0) const;
 
-    void               addUnlocked(FiberCounter& counter);
-    void               notifyReadyWorkUnlocked();
-    void               pushReadyUnlocked(FiberTask& task);
-    void               pushReadyUnlocked(FiberTask& task, FiberWorker* preferredWorker);
-    [[nodiscard]] bool tryPushWorkerReadyDeque(FiberWorker& worker, FiberTask& task);
-    void               pushWorkerReadyUnlocked(FiberWorker& worker, FiberTask& task);
+    void                     addUnlocked(FiberCounter& counter);
+    Result                   createInjectionQueue(FiberAllocator& allocator, size_t capacity);
+    void                     releaseInjectionQueue();
+    [[nodiscard]] bool       tryPushInjectionUnlocked(FiberTask& task);
+    [[nodiscard]] FiberTask* popInjectionUnlocked();
+    void                     notifyReadyWorkUnlocked();
+    void                     pushReadyUnlocked(FiberTask& task);
+    void                     pushReadyUnlocked(FiberTask& task, FiberWorker* preferredWorker);
+    [[nodiscard]] bool       tryPushWorkerReadyDeque(FiberWorker& worker, FiberTask& task);
+    void                     pushWorkerReadyUnlocked(FiberWorker& worker, FiberTask& task);
 
     [[nodiscard]] FiberTask* popReadyUnlocked();
     [[nodiscard]] FiberTask* popReadyUnlocked(FiberWorker& worker, Span<FiberWorker> stealWorkers);
