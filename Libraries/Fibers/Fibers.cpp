@@ -400,14 +400,22 @@ static void fiberSchedulerUnlock(volatile int32_t& lockValue)
 #endif
 }
 
-static FiberTaskStatus fiberTaskStatusLoad(const volatile int32_t& status)
+static int32_t fiberTaskStatusRawLoad(const volatile int32_t& status)
 {
 #if SC_PLATFORM_WINDOWS
-    return static_cast<FiberTaskStatus>(
+    return static_cast<int32_t>(
         InterlockedCompareExchange(reinterpret_cast<volatile long*>(const_cast<volatile int32_t*>(&status)), 0, 0));
 #else
-    return static_cast<FiberTaskStatus>(__atomic_load_n(&status, __ATOMIC_ACQUIRE));
+    return __atomic_load_n(&status, __ATOMIC_ACQUIRE);
 #endif
+}
+
+static constexpr int32_t FiberTaskStatusSuspending = static_cast<int32_t>(FiberTaskStatus::Completed) + 1;
+
+static FiberTaskStatus fiberTaskStatusLoad(const volatile int32_t& status)
+{
+    const int32_t rawStatus = fiberTaskStatusRawLoad(status);
+    return rawStatus == FiberTaskStatusSuspending ? FiberTaskStatus::Running : static_cast<FiberTaskStatus>(rawStatus);
 }
 
 static void fiberTaskStatusStore(volatile int32_t& status, FiberTaskStatus desired)
@@ -417,6 +425,24 @@ static void fiberTaskStatusStore(volatile int32_t& status, FiberTaskStatus desir
 #else
     __atomic_store_n(&status, static_cast<int32_t>(desired), __ATOMIC_RELEASE);
 #endif
+}
+
+static bool fiberTaskStatusCompareExchangeSuspending(volatile int32_t& status)
+{
+#if SC_PLATFORM_WINDOWS
+    return InterlockedCompareExchange(reinterpret_cast<volatile long*>(&status), FiberTaskStatusSuspending,
+                                      static_cast<long>(FiberTaskStatus::Running)) ==
+           static_cast<long>(FiberTaskStatus::Running);
+#else
+    int32_t expected = static_cast<int32_t>(FiberTaskStatus::Running);
+    return __atomic_compare_exchange_n(&status, &expected, FiberTaskStatusSuspending, false, __ATOMIC_ACQ_REL,
+                                       __ATOMIC_ACQUIRE);
+#endif
+}
+
+static bool fiberTaskStatusIsSuspending(const volatile int32_t& status)
+{
+    return fiberTaskStatusRawLoad(status) == FiberTaskStatusSuspending;
 }
 
 static bool fiberTaskStatusCompareExchange(volatile int32_t& status, FiberTaskStatus expected, FiberTaskStatus desired)
@@ -4518,25 +4544,19 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
     }
 
     FiberTask& task = *worker->workerTask;
+    if (interruptible and task.isCancellationRequested())
     {
-        LockGuard guard(*this);
-        if (counter.counterValue == 0)
-        {
-            return Result(true);
-        }
-        if (interruptible and task.isCancellationRequested())
-        {
-            return Result::Error("FiberTask cancelled");
-        }
-
-        task.suspendAction        = FiberTaskSuspendAction::CounterWait;
-        task.suspendCounter       = &counter;
-        task.suspendInterruptible = interruptible;
-        task.preferredWorker      = worker->localSchedulingActive ? worker : nullptr;
-        task.runningWorker        = nullptr;
-        worker->waitingFibers += 1;
-        worker->workerTask = nullptr;
+        return Result::Error("FiberTask cancelled");
     }
+
+    task.suspendAction        = FiberTaskSuspendAction::CounterWait;
+    task.suspendCounter       = &counter;
+    task.suspendInterruptible = interruptible;
+    task.preferredWorker      = worker->localSchedulingActive ? worker : nullptr;
+    SC_FIBERS_ASSERT_RELEASE(fiberTaskStatusCompareExchangeSuspending(task.taskStatus));
+    task.runningWorker = nullptr;
+    worker->waitingFibers += 1;
+    worker->workerTask = nullptr;
 
     trace(FiberTraceEventType::TaskWaiting, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
@@ -5283,6 +5303,7 @@ void FiberScheduler::publishSuspensionUnlocked(FiberTask& task)
     }
 
     SC_FIBERS_ASSERT_RELEASE(suspendAction == FiberTaskSuspendAction::CounterWait);
+    SC_FIBERS_ASSERT_RELEASE(fiberTaskStatusIsSuspending(task.taskStatus));
     SC_FIBERS_ASSERT_RELEASE(counter != nullptr);
     if (counter->counterValue == 0 or (interruptible and task.isCancellationRequested()))
     {

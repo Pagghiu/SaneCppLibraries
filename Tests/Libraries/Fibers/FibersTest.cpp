@@ -66,6 +66,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             cancellationResumeRace();
         }
+        if (test_section("suspension publication races"))
+        {
+            suspensionPublicationRaces();
+        }
         if (test_section("counter wait"))
         {
             counterWait();
@@ -959,6 +963,74 @@ struct SC::FibersTest : public SC::TestCase
         for (FiberTask& task : tasks)
         {
             SC_TEST_EXPECT(not task.result());
+        }
+    }
+
+    void suspensionPublicationRaces()
+    {
+        struct State
+        {
+            FiberScheduler* scheduler       = nullptr;
+            FiberCounter*   counter         = nullptr;
+            FiberTask*      task            = nullptr;
+            Result          callbackResult  = Result(true);
+            bool            cancel          = false;
+            bool            callbackInvoked = false;
+            bool            observedRunning = false;
+            bool            resumed         = false;
+        };
+
+        for (size_t raceIndex = 0; raceIndex < 2; ++raceIndex)
+        {
+            const bool     cancel = raceIndex != 0;
+            FiberScheduler scheduler;
+            FiberCounter   counter;
+            FiberTask      task;
+            char           stackMemory[64 * 1024] = {};
+            FiberStack     stack({stackMemory, sizeof(stackMemory)});
+            State          state;
+
+            state.scheduler = &scheduler;
+            state.counter   = &counter;
+            state.task      = &task;
+            state.cancel    = cancel;
+
+            FiberTraceHooks hooks;
+            hooks.userData = &state;
+            hooks.callback = [](void* userData, const FiberTraceEvent& event)
+            {
+                State& state = *static_cast<State*>(userData);
+                if (event.type != FiberTraceEventType::TaskWaiting)
+                {
+                    return;
+                }
+                state.callbackInvoked = true;
+                state.observedRunning = state.task->status() == FiberTaskStatus::Running;
+                state.callbackResult =
+                    state.cancel ? state.scheduler->requestCancel(*state.task) : state.scheduler->done(*state.counter);
+            };
+            scheduler.setTraceHooks(hooks);
+            scheduler.add(counter);
+            SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                           FiberTask::Procedure(
+                                               [&state, &counter](FiberScheduler& scheduler)
+                                               {
+                                                   Result waitResult = scheduler.wait(counter);
+                                                   state.resumed     = true;
+                                                   return waitResult;
+                                               })));
+            SC_TEST_EXPECT(scheduler.run());
+            SC_TEST_EXPECT(state.callbackInvoked);
+            SC_TEST_EXPECT(state.observedRunning);
+            SC_TEST_EXPECT(state.callbackResult);
+            SC_TEST_EXPECT(state.resumed);
+            SC_TEST_EXPECT(cancel ? not task.result() : task.result());
+            SC_TEST_EXPECT(task.status() == FiberTaskStatus::Completed);
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            if (cancel)
+            {
+                SC_TEST_EXPECT(scheduler.done(counter));
+            }
         }
     }
 
