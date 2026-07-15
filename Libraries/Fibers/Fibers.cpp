@@ -4362,21 +4362,18 @@ Result FiberScheduler::yield()
     }
 
     FiberTask& task = *worker->workerTask;
+    if (task.isCancellationRequested())
     {
-        LockGuard guard(*this);
-        if (task.isCancellationRequested())
-        {
-            return Result::Error("FiberTask cancelled");
-        }
-
-        task.suspendAction        = FiberTaskSuspendAction::Ready;
-        task.suspendCounter       = nullptr;
-        task.suspendInterruptible = false;
-        task.preferredWorker      = worker->localSchedulingActive ? worker : nullptr;
-        task.runningWorker        = nullptr;
-        worker->yieldedFibers += 1;
-        worker->workerTask = nullptr;
+        return Result::Error("FiberTask cancelled");
     }
+
+    task.suspendAction        = FiberTaskSuspendAction::Ready;
+    task.suspendCounter       = nullptr;
+    task.suspendInterruptible = false;
+    task.preferredWorker      = worker->localSchedulingActive ? worker : nullptr;
+    task.runningWorker        = nullptr;
+    fiberAtomicFetchAddSize(worker->yieldedFibers, 1);
+    worker->workerTask = nullptr;
 
     trace(FiberTraceEventType::TaskYielded, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
@@ -4565,7 +4562,6 @@ bool FiberScheduler::isCurrentTaskCancellationRequested() const
     {
         return false;
     }
-    LockGuard guard(*this);
     return worker->workerTask->isCancellationRequested();
 }
 
@@ -4684,7 +4680,7 @@ void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDia
     diagnostics.parkedWakeups      = worker.parkedWakeups;
     diagnostics.executedFibers     = fiberAtomicLoadSize(worker.executedFibers);
     diagnostics.completedFibers    = worker.completedFibers;
-    diagnostics.yieldedFibers      = worker.yieldedFibers;
+    diagnostics.yieldedFibers      = fiberAtomicLoadSize(worker.yieldedFibers);
     diagnostics.waitingFibers      = worker.waitingFibers;
 }
 
@@ -4729,7 +4725,7 @@ void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDia
         diagnostics.parkedWakeups += worker.parkedWakeups;
         diagnostics.executedFibers += fiberAtomicLoadSize(worker.executedFibers);
         diagnostics.completedFibers += worker.completedFibers;
-        diagnostics.yieldedFibers += worker.yieldedFibers;
+        diagnostics.yieldedFibers += fiberAtomicLoadSize(worker.yieldedFibers);
         diagnostics.waitingFibers += worker.waitingFibers;
     }
 }
@@ -4761,8 +4757,8 @@ void FiberScheduler::resetWorkerDiagnostics(FiberWorker& worker)
     worker.parkedWakeups = 0;
     fiberAtomicStoreSize(worker.executedFibers, 0);
     worker.completedFibers = 0;
-    worker.yieldedFibers   = 0;
-    worker.waitingFibers   = 0;
+    fiberAtomicStoreSize(worker.yieldedFibers, 0);
+    worker.waitingFibers = 0;
 }
 
 void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
@@ -4794,8 +4790,8 @@ void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
         worker.parkedWakeups = 0;
         fiberAtomicStoreSize(worker.executedFibers, 0);
         worker.completedFibers = 0;
-        worker.yieldedFibers   = 0;
-        worker.waitingFibers   = 0;
+        fiberAtomicStoreSize(worker.yieldedFibers, 0);
+        worker.waitingFibers = 0;
     }
 }
 

@@ -379,7 +379,7 @@ struct SC_FIBERS_EXPORT FiberWorker
     size_t          parkedWakeups          = 0;
     volatile size_t executedFibers         = 0;
     size_t          completedFibers        = 0;
-    size_t          yieldedFibers          = 0;
+    volatile size_t yieldedFibers          = 0;
     size_t          waitingFibers          = 0;
     bool            workerActive           = false;
     bool            localSchedulingActive  = false;
