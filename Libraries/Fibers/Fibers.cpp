@@ -4662,7 +4662,7 @@ void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDia
     diagnostics.idleSpinIterations = fiberAtomicLoadSize(worker.idleSpinIterations);
     diagnostics.parkAttempts       = worker.parkAttempts;
     diagnostics.parkedWakeups      = worker.parkedWakeups;
-    diagnostics.executedFibers     = worker.executedFibers;
+    diagnostics.executedFibers     = fiberAtomicLoadSize(worker.executedFibers);
     diagnostics.completedFibers    = worker.completedFibers;
     diagnostics.yieldedFibers      = worker.yieldedFibers;
     diagnostics.waitingFibers      = worker.waitingFibers;
@@ -4707,7 +4707,7 @@ void FiberScheduler::workerDiagnostics(Span<FiberWorker> workers, FiberWorkerDia
         diagnostics.idleSpinIterations += fiberAtomicLoadSize(worker.idleSpinIterations);
         diagnostics.parkAttempts += worker.parkAttempts;
         diagnostics.parkedWakeups += worker.parkedWakeups;
-        diagnostics.executedFibers += worker.executedFibers;
+        diagnostics.executedFibers += fiberAtomicLoadSize(worker.executedFibers);
         diagnostics.completedFibers += worker.completedFibers;
         diagnostics.yieldedFibers += worker.yieldedFibers;
         diagnostics.waitingFibers += worker.waitingFibers;
@@ -4737,9 +4737,9 @@ void FiberScheduler::resetWorkerDiagnostics(FiberWorker& worker)
     worker.runAttempts        = 0;
     worker.idlePolls          = 0;
     fiberAtomicStoreSize(worker.idleSpinIterations, 0);
-    worker.parkAttempts    = 0;
-    worker.parkedWakeups   = 0;
-    worker.executedFibers  = 0;
+    worker.parkAttempts  = 0;
+    worker.parkedWakeups = 0;
+    fiberAtomicStoreSize(worker.executedFibers, 0);
     worker.completedFibers = 0;
     worker.yieldedFibers   = 0;
     worker.waitingFibers   = 0;
@@ -4770,9 +4770,9 @@ void FiberScheduler::resetWorkerDiagnostics(Span<FiberWorker> workers)
         worker.runAttempts        = 0;
         worker.idlePolls          = 0;
         fiberAtomicStoreSize(worker.idleSpinIterations, 0);
-        worker.parkAttempts    = 0;
-        worker.parkedWakeups   = 0;
-        worker.executedFibers  = 0;
+        worker.parkAttempts  = 0;
+        worker.parkedWakeups = 0;
+        fiberAtomicStoreSize(worker.executedFibers, 0);
         worker.completedFibers = 0;
         worker.yieldedFibers   = 0;
         worker.waitingFibers   = 0;
@@ -5154,14 +5154,11 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     previousWorker     = currentFiberWorker;
     currentFiberWorker = &worker;
 
-    {
-        LockGuard guard(*this);
-        SC_FIBERS_ASSERT_RELEASE(task.status() == FiberTaskStatus::Running);
-        SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
-        worker.workerTask  = &task;
-        task.runningWorker = &worker;
-        worker.executedFibers += 1;
-    }
+    SC_FIBERS_ASSERT_RELEASE(task.status() == FiberTaskStatus::Running);
+    SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
+    worker.workerTask  = &task;
+    task.runningWorker = &worker;
+    fiberAtomicFetchAddSize(worker.executedFibers, 1);
     trace(FiberTraceEventType::TaskStarted, &task, &worker);
     FiberContextOperations::switchTo(worker.rootContext(), task.context());
     FiberWorker*     preferredReadyWorker = nullptr;

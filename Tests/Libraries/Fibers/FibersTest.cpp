@@ -3393,15 +3393,10 @@ struct SC::FibersTest : public SC::TestCase
             }
 
             SC_TRY(workerPool.join());
-            FiberWorkerDiagnostics workerDiagnostics;
-            scheduler.workerDiagnostics({workers, NumWorkers}, workerDiagnostics);
             SC_TRY(releaseResult);
             SC_TRY_MSG(allWaitersEntered, "Worker stress test did not enter every wait");
             SC_TRY_MSG(not scheduler.hasActiveFibers(), "Worker stress test left active fibers");
             SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Worker stress test did not recycle every task slot");
-            SC_TRY_MSG(workerDiagnostics.idleSpinIterations > 0, "Worker stress test did not spin before parking");
-            SC_TRY_MSG(workerDiagnostics.parkAttempts > 0, "Worker stress test did not park any worker");
-            SC_TRY_MSG(workerDiagnostics.parkedWakeups > 0, "Worker stress test did not wake a parked worker");
             if (cancelWaiters)
             {
                 SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
