@@ -210,6 +210,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerOwnerYieldFastPath();
         }
+        if (test_section("worker completion fast path"))
+        {
+            workerCompletionFastPath();
+        }
         if (test_section("worker pool injection queue"))
         {
             workerPoolInjectionQueue();
@@ -4900,6 +4904,53 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(not scheduler.hasActiveFibers());
         SC_TEST_EXPECT(diagnostics.lockAcquisitions < NumYields / 2);
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.close());
+    }
+
+    void workerCompletionFastPath()
+    {
+        static constexpr size_t NumTasks = 32;
+
+        FiberScheduler    scheduler;
+        FiberAllocator    allocator;
+        char              allocatorStorage[4096] = {};
+        static FiberTask  tasks[NumTasks];
+        static char       stackMemory[NumTasks * 32 * 1024] = {};
+        FiberWorker       worker;
+        FiberWorkerThread thread;
+        FiberWorkerPool   workerPool;
+        Atomic<int32_t>   completed;
+
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        FiberWorkerPoolOptions options;
+        options.dequeAllocator         = &allocator;
+        options.dequeCapacityPerWorker = 4;
+
+        for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+        {
+            FiberStack stack({stackMemory + taskIndex * 32 * 1024, 32 * 1024});
+            SC_TEST_EXPECT(scheduler.spawn(tasks[taskIndex], stack,
+                                           FiberTask::Procedure(
+                                               [&completed](FiberScheduler&)
+                                               {
+                                                   completed.fetch_add(1, memory_order_relaxed);
+                                                   return Result(true);
+                                               })));
+        }
+        scheduler.resetSchedulerDiagnostics();
+        SC_TEST_EXPECT(workerPool.start(scheduler, {&worker, 1}, {&thread, 1}, options));
+        SC_TEST_EXPECT(workerPool.join());
+
+        FiberSchedulerDiagnostics diagnostics;
+        scheduler.schedulerDiagnostics(diagnostics);
+        SC_TEST_EXPECT(completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks));
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(diagnostics.lockAcquisitions < NumTasks + 12);
+        for (FiberTask& task : tasks)
+        {
+            SC_TEST_EXPECT(task.result());
+        }
         SC_TEST_EXPECT(allocator.used() == 0);
         SC_TEST_EXPECT(allocator.close());
     }
