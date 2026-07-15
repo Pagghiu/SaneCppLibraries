@@ -412,6 +412,18 @@ static void fiberTaskStatusStore(volatile int32_t& status, FiberTaskStatus desir
 #endif
 }
 
+static bool fiberTaskStatusCompareExchange(volatile int32_t& status, FiberTaskStatus expected, FiberTaskStatus desired)
+{
+#if SC_PLATFORM_WINDOWS
+    return InterlockedCompareExchange(reinterpret_cast<volatile long*>(&status), static_cast<long>(desired),
+                                      static_cast<long>(expected)) == static_cast<long>(expected);
+#else
+    int32_t expectedValue = static_cast<int32_t>(expected);
+    return __atomic_compare_exchange_n(&status, &expectedValue, static_cast<int32_t>(desired), false, __ATOMIC_ACQ_REL,
+                                       __ATOMIC_ACQUIRE);
+#endif
+}
+
 struct FiberAvailabilityQueue
 {
     using Predicate = bool (*)(const void* owner);
@@ -4169,8 +4181,8 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
 
     if (task != nullptr)
     {
-        LockGuard guard(*this);
-        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
+        SC_FIBERS_ASSERT_RELEASE(
+            fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
     }
     else
     {
