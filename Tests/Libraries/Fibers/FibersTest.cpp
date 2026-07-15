@@ -62,6 +62,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             crossThreadWakeAndCancel();
         }
+        if (test_section("cancellation resume race"))
+        {
+            cancellationResumeRace();
+        }
         if (test_section("counter wait"))
         {
             counterWait();
@@ -772,6 +776,189 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(task.isCompleted());
             SC_TEST_EXPECT(task.result());
             SC_TEST_EXPECT(state.counterWoke);
+        }
+    }
+
+    void cancellationResumeRace()
+    {
+        static constexpr size_t NumTasks   = 32;
+        static constexpr size_t NumWaiters = NumTasks / 2;
+        static constexpr size_t NumWorkers = 4;
+
+        struct State
+        {
+            Atomic<int32_t> entered;
+            Atomic<int32_t> cancelled;
+            Atomic<bool>    startRace;
+            Atomic<bool>    allowExit;
+        };
+        struct Context
+        {
+            State*        state        = nullptr;
+            FiberCounter* counter      = nullptr;
+            FiberCounter* startCounter = nullptr;
+        };
+
+        FiberScheduler    scheduler;
+        static FiberTask  tasks[NumTasks];
+        static char       stackMemory[NumTasks * 64 * 1024] = {};
+        FiberTaskPool     taskPool({tasks, NumTasks}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
+        FiberCounter      counters[NumWaiters];
+        FiberCounter      startCounter;
+        Context           contexts[NumTasks];
+        FiberWorker       workers[NumWorkers];
+        FiberWorkerThread workerThreads[NumWorkers];
+        FiberWorkerPool   workerPool;
+        State             state;
+
+        for (FiberCounter& counter : counters)
+        {
+            scheduler.add(counter);
+        }
+        scheduler.add(startCounter);
+        for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+        {
+            contexts[taskIndex].state = &state;
+            if (taskIndex < NumWaiters)
+            {
+                contexts[taskIndex].counter = &counters[taskIndex];
+            }
+            else
+            {
+                contexts[taskIndex].startCounter = &startCounter;
+            }
+            Context* context = &contexts[taskIndex];
+            SC_TEST_EXPECT(taskPool.spawn(scheduler, FiberTask::Procedure(
+                                                         [context](FiberScheduler& scheduler)
+                                                         {
+                                                             context->state->entered.fetch_add(1);
+                                                             if (context->counter != nullptr)
+                                                             {
+                                                                 Result waitResult = scheduler.wait(*context->counter);
+                                                                 if (not waitResult)
+                                                                 {
+                                                                     context->state->cancelled.fetch_add(1);
+                                                                     return waitResult;
+                                                                 }
+                                                             }
+                                                             else
+                                                             {
+                                                                 Result waitResult =
+                                                                     scheduler.wait(*context->startCounter);
+                                                                 if (not waitResult)
+                                                                 {
+                                                                     context->state->cancelled.fetch_add(1);
+                                                                     return waitResult;
+                                                                 }
+                                                             }
+                                                             while (not context->state->allowExit.load())
+                                                             {
+                                                                 Result yieldResult = scheduler.yield();
+                                                                 if (not yieldResult)
+                                                                 {
+                                                                     context->state->cancelled.fetch_add(1);
+                                                                     return yieldResult;
+                                                                 }
+                                                             }
+                                                             Result yieldResult = scheduler.yield();
+                                                             if (not yieldResult)
+                                                             {
+                                                                 context->state->cancelled.fetch_add(1);
+                                                             }
+                                                             return yieldResult;
+                                                         })));
+        }
+
+        SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {workerThreads, NumWorkers}));
+        bool allTasksWaiting = false;
+        for (size_t attempt = 0; attempt < 5000; ++attempt)
+        {
+            allTasksWaiting = state.entered.load() == static_cast<int32_t>(NumTasks);
+            for (FiberTask& task : tasks)
+            {
+                allTasksWaiting = allTasksWaiting and task.status() == FiberTaskStatus::Waiting;
+            }
+            if (allTasksWaiting)
+            {
+                break;
+            }
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(allTasksWaiting);
+        if (not allTasksWaiting)
+        {
+            for (FiberTask& task : tasks)
+            {
+                SC_TEST_EXPECT(scheduler.requestCancel(task));
+            }
+            for (FiberCounter& counter : counters)
+            {
+                SC_TEST_EXPECT(scheduler.done(counter));
+            }
+            SC_TEST_EXPECT(scheduler.done(startCounter));
+            state.allowExit.store(true);
+            SC_TEST_EXPECT(workerPool.join());
+            return;
+        }
+
+        struct RaceThreadState
+        {
+            FiberScheduler* scheduler = nullptr;
+            FiberTask*      tasks     = nullptr;
+            FiberCounter*   counters  = nullptr;
+            State*          state     = nullptr;
+            Atomic<bool>    succeeded = true;
+        } raceState;
+        raceState.scheduler = &scheduler;
+        raceState.tasks     = tasks;
+        raceState.counters  = counters;
+        raceState.state     = &state;
+
+        Thread wakeThread;
+        Thread cancelThread;
+        SC_TEST_EXPECT(wakeThread.start(
+            [&raceState](Thread&)
+            {
+                while (not raceState.state->startRace.load())
+                {
+                    Thread::Sleep(1);
+                }
+                for (size_t counterIndex = 0; counterIndex < NumWaiters; ++counterIndex)
+                {
+                    if (not raceState.scheduler->done(raceState.counters[counterIndex]))
+                    {
+                        raceState.succeeded.store(false);
+                    }
+                }
+            }));
+        SC_TEST_EXPECT(cancelThread.start(
+            [&raceState](Thread&)
+            {
+                while (not raceState.state->startRace.load())
+                {
+                    Thread::Sleep(1);
+                }
+                for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+                {
+                    if (not raceState.scheduler->requestCancel(raceState.tasks[taskIndex]))
+                    {
+                        raceState.succeeded.store(false);
+                    }
+                }
+                raceState.state->allowExit.store(true);
+            }));
+        SC_TEST_EXPECT(scheduler.done(startCounter));
+        state.startRace.store(true);
+        SC_TEST_EXPECT(wakeThread.join());
+        SC_TEST_EXPECT(cancelThread.join());
+        SC_TEST_EXPECT(workerPool.join());
+        SC_TEST_EXPECT(raceState.succeeded.load());
+        SC_TEST_EXPECT(state.cancelled.load() == static_cast<int32_t>(NumTasks));
+        SC_TEST_EXPECT(taskPool.availableCount() == NumTasks);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        for (FiberTask& task : tasks)
+        {
+            SC_TEST_EXPECT(not task.result());
         }
     }
 

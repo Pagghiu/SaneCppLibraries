@@ -10,6 +10,13 @@
 
 #if SC_PLATFORM_WINDOWS
 #include <windows.h>
+#if SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL
+extern "C"
+{
+    char __stdcall _InterlockedCompareExchange8(char volatile* destination, char exchange, char comparand);
+    char __stdcall _InterlockedExchange8(char volatile* target, char value);
+}
+#endif
 #else
 #include <errno.h>
 #include <pthread.h>
@@ -421,6 +428,25 @@ static bool fiberTaskStatusCompareExchange(volatile int32_t& status, FiberTaskSt
     int32_t expectedValue = static_cast<int32_t>(expected);
     return __atomic_compare_exchange_n(&status, &expectedValue, static_cast<int32_t>(desired), false, __ATOMIC_ACQ_REL,
                                        __ATOMIC_ACQUIRE);
+#endif
+}
+
+static bool fiberTaskCancellationLoad(const volatile bool& requested)
+{
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+    return _InterlockedCompareExchange8(reinterpret_cast<volatile char*>(const_cast<volatile bool*>(&requested)), 0,
+                                        0) != 0;
+#else
+    return __atomic_load_n(&requested, __ATOMIC_ACQUIRE);
+#endif
+}
+
+static void fiberTaskCancellationStore(volatile bool& requested, bool desired)
+{
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+    (void)_InterlockedExchange8(reinterpret_cast<volatile char*>(&requested), static_cast<char>(desired));
+#else
+    __atomic_store_n(&requested, desired, __ATOMIC_RELEASE);
 #endif
 }
 
@@ -2433,7 +2459,7 @@ bool FiberTask::isActive() const
 
 bool FiberTask::isCancellationRequested() const
 {
-    return cancelRequested or cancellationToken.isCancellationRequested();
+    return fiberTaskCancellationLoad(cancelRequested) or cancellationToken.isCancellationRequested();
 }
 
 FiberTaskStatus FiberTask::status() const { return fiberTaskStatusLoad(taskStatus); }
@@ -4041,8 +4067,8 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     task.stackOwner        = nullptr;
     task.taskResult        = Result(true);
     fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
-    task.suspendAction        = FiberTaskSuspendAction::None;
-    task.cancelRequested      = options.cancellationToken.isCancellationRequested();
+    task.suspendAction = FiberTaskSuspendAction::None;
+    fiberTaskCancellationStore(task.cancelRequested, options.cancellationToken.isCancellationRequested());
     task.suspendInterruptible = false;
 
     Result createResult = FiberContextOperations::create(task.context(), stack.memory(), taskEntry, &task);
@@ -4065,8 +4091,8 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         task.runningWorker     = nullptr;
         task.stackOwner        = nullptr;
         fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Invalid);
-        task.suspendAction        = FiberTaskSuspendAction::None;
-        task.cancelRequested      = false;
+        task.suspendAction = FiberTaskSuspendAction::None;
+        fiberTaskCancellationStore(task.cancelRequested, false);
         task.suspendInterruptible = false;
         return createResult;
     }
@@ -4354,10 +4380,7 @@ Result FiberScheduler::yield()
 
     trace(FiberTraceEventType::TaskYielded, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
-    {
-        LockGuard guard(*this);
-        return task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
-    }
+    return task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
 }
 
 Result FiberScheduler::shutdown()
@@ -4520,10 +4543,7 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
 
     trace(FiberTraceEventType::TaskWaiting, &task, worker);
     FiberContextOperations::switchTo(task.context(), worker->rootContext());
-    {
-        LockGuard guard(*this);
-        return interruptible and task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
-    }
+    return interruptible and task.isCancellationRequested() ? Result::Error("FiberTask cancelled") : Result(true);
 }
 
 FiberTask* FiberScheduler::currentTask()
@@ -5332,7 +5352,7 @@ void FiberScheduler::finishCurrentTask(FiberTask& task, Result result)
 
 Result FiberScheduler::cancelTaskUnlocked(FiberTask& task)
 {
-    task.cancelRequested = true;
+    fiberTaskCancellationStore(task.cancelRequested, true);
     if (task.status() == FiberTaskStatus::Waiting and task.waitingCounter != nullptr and task.suspendInterruptible)
     {
         SC_FIBERS_ASSERT_RELEASE(removeCounterWaiterUnlocked(*task.waitingCounter, task));
