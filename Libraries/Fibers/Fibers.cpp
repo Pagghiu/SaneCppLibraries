@@ -4138,7 +4138,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         addUnlocked(*options.counter);
     }
 
-    activeFibers += 1;
+    fiberAtomicFetchAddSize(activeFibers, 1);
     linkActiveUnlocked(task);
     pushReadyUnlocked(task);
     return Result(true);
@@ -4160,7 +4160,8 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
         if (task == nullptr)
         {
             worker.idlePolls += 1;
-            return activeFibers == 0 ? Result(true) : Result::Error("FiberScheduler cannot make progress");
+            return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
+                                                          : Result::Error("FiberScheduler cannot make progress");
         }
         fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
@@ -4190,7 +4191,8 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
         if (task == nullptr)
         {
             worker.idlePolls += 1;
-            return activeFibers == 0 ? Result(true) : Result::Error("FiberScheduler cannot make progress");
+            return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
+                                                          : Result::Error("FiberScheduler cannot make progress");
         }
         fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
     }
@@ -4585,23 +4587,11 @@ bool FiberScheduler::isCurrentTaskCancellationRequested() const
     return worker->workerTask->isCancellationRequested();
 }
 
-bool FiberScheduler::hasReadyFibers() const
-{
-    LockGuard guard(*this);
-    return fiberAtomicLoadSize(readyFibers) != 0;
-}
+bool FiberScheduler::hasReadyFibers() const { return fiberAtomicLoadSize(readyFibers) != 0; }
 
-bool FiberScheduler::hasActiveFibers() const
-{
-    LockGuard guard(*this);
-    return activeFibers != 0;
-}
+bool FiberScheduler::hasActiveFibers() const { return fiberAtomicLoadSize(activeFibers) != 0; }
 
-size_t FiberScheduler::readyFiberCount() const
-{
-    LockGuard guard(*this);
-    return fiberAtomicLoadSize(readyFibers);
-}
+size_t FiberScheduler::readyFiberCount() const { return fiberAtomicLoadSize(readyFibers); }
 
 size_t FiberScheduler::readyFiberCount(const FiberWorker& worker) const
 {
@@ -4636,18 +4626,14 @@ size_t FiberScheduler::stolenFiberCount(Span<FiberWorker> workers) const
     return stolen;
 }
 
-size_t FiberScheduler::activeFiberCount() const
-{
-    LockGuard guard(*this);
-    return activeFibers;
-}
+size_t FiberScheduler::activeFiberCount() const { return fiberAtomicLoadSize(activeFibers); }
 
 void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics) const
 {
     LockGuard guard(*this);
 
     diagnostics.readyFibers         = fiberAtomicLoadSize(readyFibers);
-    diagnostics.activeFibers        = activeFibers;
+    diagnostics.activeFibers        = fiberAtomicLoadSize(activeFibers);
     diagnostics.lockAcquisitions    = schedulerLockAcquisitions;
     diagnostics.lockContentions     = schedulerLockContentions;
     diagnostics.lockSpinRetries     = schedulerLockSpinRetries;
@@ -5198,9 +5184,11 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     trace(FiberTraceEventType::TaskStarted, &task, &worker);
     FiberContextOperations::switchTo(worker.rootContext(), task.context());
     FiberWorker*     preferredReadyWorker = nullptr;
+    FiberTaskPool*   completedOriginPool  = nullptr;
     FiberTaskClass*  completedTaskClass   = nullptr;
     FiberStackClass* completedStackClass  = nullptr;
     Span<char>       completedStackMemory;
+    bool             completedTask = false;
     if (task.status() == FiberTaskStatus::Completing)
     {
         trace(FiberTraceEventType::TaskCompleted, &task, &worker, task.taskResult ? 1 : 0);
@@ -5212,15 +5200,8 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
             publishSuspensionUnlocked(task);
             if (task.status() == FiberTaskStatus::Completing)
             {
-                SC_FIBERS_ASSERT_RELEASE(activeFibers > 0);
                 task.cancellationToken = FiberCancellationToken();
-                activeFibers -= 1;
                 worker.completedFibers += 1;
-                if (activeFibers == 0 and workerPool != nullptr)
-                {
-                    // Every parked worker must recheck the now-empty scheduler before the pool can join.
-                    workerPool->wakeAllWorkers();
-                }
                 unlinkActiveUnlocked(task);
                 if (task.stackOwner != nullptr)
                 {
@@ -5231,23 +5212,15 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
                 {
                     SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
                 }
-                fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completed);
-                FiberTaskPool* originPool = task.originPool;
-                task.originPool           = nullptr;
-                completedTaskClass        = task.originTaskClass;
-                completedStackClass       = task.originStackClass;
-                completedStackMemory      = task.originStackMemory;
-                task.originTaskClass      = nullptr;
-                task.originStackClass     = nullptr;
-                task.originStackMemory    = {};
-                if (originPool != nullptr)
-                {
-                    FiberCounter* availableCounter = originPool->popAvailabilityWaiterForNotification();
-                    if (availableCounter != nullptr)
-                    {
-                        SC_FIBERS_TRUST_RESULT(doneUnlocked(*availableCounter));
-                    }
-                }
+                completedOriginPool    = task.originPool;
+                task.originPool        = nullptr;
+                completedTaskClass     = task.originTaskClass;
+                completedStackClass    = task.originStackClass;
+                completedStackMemory   = task.originStackMemory;
+                task.originTaskClass   = nullptr;
+                task.originStackClass  = nullptr;
+                task.originStackMemory = {};
+                completedTask          = true;
             }
         }
         if (task.runningWorker == &worker)
@@ -5257,6 +5230,25 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         if (worker.workerTask == &task)
         {
             worker.workerTask = nullptr;
+        }
+        if (completedTask)
+        {
+            fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completed);
+            const size_t previousActiveFibers = fiberAtomicFetchSubSize(activeFibers, 1);
+            SC_FIBERS_ASSERT_RELEASE(previousActiveFibers > 0);
+            if (completedOriginPool != nullptr)
+            {
+                FiberCounter* availableCounter = completedOriginPool->popAvailabilityWaiterForNotification();
+                if (availableCounter != nullptr)
+                {
+                    SC_FIBERS_TRUST_RESULT(doneUnlocked(*availableCounter));
+                }
+            }
+            if (previousActiveFibers == 1 and workerPool != nullptr)
+            {
+                // Every parked worker must recheck the now-empty scheduler before the pool can join.
+                workerPool->wakeAllWorkers();
+            }
         }
     }
     if (completedStackClass != nullptr)

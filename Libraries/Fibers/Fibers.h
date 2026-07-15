@@ -1078,7 +1078,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
     FiberWorkerPool* workerPool = nullptr;
 
     volatile size_t readyFibers  = 0;
-    size_t          activeFibers = 0;
+    volatile size_t activeFibers = 0;
 
     mutable volatile int32_t schedulerLock = 0;
 
