@@ -151,6 +151,9 @@ one immediately runnable task plus the thief's observed local capacity, so retai
 unlocked global spill. Failed steals still enter the scheduler-control path to inspect the intrusive ready list and
 bounded injection queue; manual worker groups retain their coordinated behavior.
 
+Per-worker park-attempt and parked-wakeup diagnostics use layout-preserving atomic counters. Updating observability
+therefore does not acquire the scheduler-control lock around the existing wake-generation and OS-wait protocol.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains

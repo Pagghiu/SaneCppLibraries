@@ -376,8 +376,8 @@ struct SC_FIBERS_EXPORT FiberWorker
     volatile size_t  runAttempts            = 0;
     volatile size_t  idlePolls              = 0;
     volatile size_t  idleSpinIterations     = 0;
-    size_t           parkAttempts           = 0;
-    size_t           parkedWakeups          = 0;
+    volatile size_t  parkAttempts           = 0;
+    volatile size_t  parkedWakeups          = 0;
     volatile size_t  executedFibers         = 0;
     size_t           completedFibers        = 0;
     volatile size_t  yieldedFibers          = 0;
