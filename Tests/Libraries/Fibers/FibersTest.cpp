@@ -70,6 +70,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             suspensionPublicationRaces();
         }
+        if (test_section("task state transition matrix"))
+        {
+            taskStateTransitionMatrix();
+        }
         if (test_section("counter wait"))
         {
             counterWait();
@@ -189,6 +193,10 @@ struct SC::FibersTest : public SC::TestCase
         if (test_section("worker pool concurrent external stress"))
         {
             workerPoolConcurrentExternalStress();
+        }
+        if (test_section("worker pool mixed transition stress"))
+        {
+            workerPoolMixedTransitionStress();
         }
         if (test_section("worker stealing"))
         {
@@ -1044,6 +1052,85 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TEST_EXPECT(scheduler.done(counter));
             }
         }
+    }
+
+    void taskStateTransitionMatrix()
+    {
+        struct State
+        {
+            FiberTask* task = nullptr;
+
+            size_t started    = 0;
+            size_t yielded    = 0;
+            size_t waiting    = 0;
+            size_t completed  = 0;
+            bool   validState = true;
+        };
+
+        FiberScheduler scheduler;
+        FiberCounter   counter;
+        FiberTask      task;
+        char           stackMemory[FiberStackSize::SixtyFourKiB] = {};
+        FiberStack     stack({stackMemory, sizeof(stackMemory)});
+        State          state;
+        state.task = &task;
+
+        FiberTraceHooks hooks;
+        hooks.userData = &state;
+        hooks.callback = [](void* userData, const FiberTraceEvent& event)
+        {
+            State& state = *static_cast<State*>(userData);
+            switch (event.type)
+            {
+            case FiberTraceEventType::TaskStarted:
+                state.started += 1;
+                state.validState = state.validState and state.task->status() == FiberTaskStatus::Running;
+                break;
+            case FiberTraceEventType::TaskYielded:
+                state.yielded += 1;
+                state.validState = state.validState and state.task->status() == FiberTaskStatus::Running;
+                break;
+            case FiberTraceEventType::TaskWaiting:
+                state.waiting += 1;
+                state.validState = state.validState and state.task->status() == FiberTaskStatus::Running;
+                break;
+            case FiberTraceEventType::TaskCompleted:
+                state.completed += 1;
+                state.validState = state.validState and state.task->status() == FiberTaskStatus::Completing;
+                break;
+            }
+        };
+        scheduler.setTraceHooks(hooks);
+        scheduler.add(counter);
+
+        SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                       FiberTask::Procedure(
+                                           [&counter](FiberScheduler& currentScheduler)
+                                           {
+                                               SC_TRY(currentScheduler.yield());
+                                               SC_TRY(currentScheduler.wait(counter));
+                                               return Result(true);
+                                           })));
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Ready);
+
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Ready);
+
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Waiting);
+
+        SC_TEST_EXPECT(scheduler.done(counter));
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Ready);
+
+        SC_TEST_EXPECT(scheduler.runOnce());
+        SC_TEST_EXPECT(task.status() == FiberTaskStatus::Completed);
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(state.validState);
+        SC_TEST_EXPECT(state.started == 3);
+        SC_TEST_EXPECT(state.yielded == 1);
+        SC_TEST_EXPECT(state.waiting == 1);
+        SC_TEST_EXPECT(state.completed == 1);
     }
 
     void counterWait()
@@ -4034,6 +4121,185 @@ struct SC::FibersTest : public SC::TestCase
         for (size_t round = 0; round < NumRounds; ++round)
         {
             SC_TEST_EXPECT(runRound());
+        }
+    }
+
+    void workerPoolMixedTransitionStress()
+    {
+        static constexpr size_t NumWorkers    = 4;
+        static constexpr size_t NumTasks      = 64;
+        static constexpr size_t NumRounds     = 5;
+        static constexpr size_t StackSize     = FiberStackSize::ThirtyTwoKiB;
+        static constexpr size_t DequeCapacity = NumTasks;
+
+        struct State
+        {
+            Atomic<bool>    allowFinish;
+            Atomic<int32_t> completed;
+            Atomic<int32_t> cancelled;
+            Atomic<int32_t> deterministicSteps;
+        };
+        struct Context
+        {
+            State*        state     = nullptr;
+            FiberCounter* counter   = nullptr;
+            size_t        numYields = 0;
+        };
+        struct ReleaseContext
+        {
+            FiberTask*    tasks        = nullptr;
+            FiberCounter* counters     = nullptr;
+            size_t*       publishOrder = nullptr;
+            bool*         cancelTask   = nullptr;
+        };
+
+        auto runRound = [](uint32_t seed) -> Result
+        {
+            static FiberTask tasks[NumTasks];
+            static char      stackMemory[NumTasks * StackSize] = {};
+            static char      allocatorStorage[16 * 1024]       = {};
+            static FiberTask releaseTask;
+            static char      releaseStackMemory[StackSize] = {};
+
+            FiberScheduler    scheduler;
+            FiberCounter      counters[NumTasks];
+            FiberWorker       workers[NumWorkers];
+            FiberWorkerThread workerThreads[NumWorkers];
+            FiberWorkerPool   workerPool;
+            FiberAllocator    allocator;
+            Context           contexts[NumTasks];
+            size_t            publishOrder[NumTasks];
+            bool              cancelTask[NumTasks] = {};
+            State             state;
+
+            SC_TRY(allocator.createFixed(allocatorStorage));
+            SC_TRY(scheduler.createWorkerDeques(allocator, {workers, NumWorkers}, DequeCapacity));
+
+            size_t expectedCompleted = 0;
+            size_t expectedCancelled = 0;
+            size_t expectedSteps     = 0;
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                seed                          = seed * 1664525u + 1013904223u;
+                cancelTask[taskIndex]         = (seed & 3u) == 0;
+                contexts[taskIndex].state     = &state;
+                contexts[taskIndex].counter   = &counters[taskIndex];
+                contexts[taskIndex].numYields = 1 + ((seed >> 8u) & 7u);
+                publishOrder[taskIndex]       = taskIndex;
+                expectedCancelled += cancelTask[taskIndex] ? 1 : 0;
+                expectedCompleted += cancelTask[taskIndex] ? 0 : 1;
+                expectedSteps += cancelTask[taskIndex] ? 0 : contexts[taskIndex].numYields;
+
+                scheduler.add(counters[taskIndex]);
+                Context*   context = &contexts[taskIndex];
+                FiberStack stack({stackMemory + taskIndex * StackSize, StackSize});
+                SC_TRY(
+                    scheduler.spawn(tasks[taskIndex], stack,
+                                    FiberTask::Procedure(
+                                        [context](FiberScheduler& currentScheduler)
+                                        {
+                                            Result waitResult = currentScheduler.wait(*context->counter);
+                                            if (not waitResult)
+                                            {
+                                                context->state->cancelled.fetch_add(1, memory_order_relaxed);
+                                                return waitResult;
+                                            }
+                                            while (not context->state->allowFinish.load(memory_order_acquire))
+                                            {
+                                                SC_TRY(currentScheduler.yield());
+                                            }
+                                            for (size_t yieldIndex = 0; yieldIndex < context->numYields; ++yieldIndex)
+                                            {
+                                                context->state->deterministicSteps.fetch_add(1, memory_order_relaxed);
+                                                SC_TRY(currentScheduler.yield());
+                                            }
+                                            context->state->completed.fetch_add(1, memory_order_relaxed);
+                                            return Result(true);
+                                        })));
+                SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
+                SC_TRY_MSG(tasks[taskIndex].status() == FiberTaskStatus::Waiting,
+                           "Mixed transition stress task did not reach its wait");
+            }
+
+            for (size_t index = NumTasks; index > 1; --index)
+            {
+                seed                    = seed * 1664525u + 1013904223u;
+                const size_t swapIdx    = seed % index;
+                const size_t current    = publishOrder[index - 1];
+                publishOrder[index - 1] = publishOrder[swapIdx];
+                publishOrder[swapIdx]   = current;
+            }
+
+            ReleaseContext releaseContext;
+            releaseContext.tasks        = tasks;
+            releaseContext.counters     = counters;
+            releaseContext.publishOrder = publishOrder;
+            releaseContext.cancelTask   = cancelTask;
+            ReleaseContext* release     = &releaseContext;
+            FiberStack      releaseStack({releaseStackMemory, sizeof(releaseStackMemory)});
+            SC_TRY(scheduler.spawn(releaseTask, releaseStack,
+                                   FiberTask::Procedure(
+                                       [release](FiberScheduler& currentScheduler)
+                                       {
+                                           for (size_t publishIndex = 0; publishIndex < NumTasks; ++publishIndex)
+                                           {
+                                               const size_t taskIndex = release->publishOrder[publishIndex];
+                                               if (release->cancelTask[taskIndex])
+                                               {
+                                                   SC_TRY(currentScheduler.requestCancel(release->tasks[taskIndex]));
+                                               }
+                                               SC_TRY(currentScheduler.done(release->counters[taskIndex]));
+                                           }
+                                           return Result(true);
+                                       })));
+            SC_TRY(scheduler.runNoWait(workers[0], {workers, NumWorkers}));
+            SC_TRY(releaseTask.result());
+            SC_TRY_MSG(scheduler.readyFiberCount(workers[0]) == NumTasks,
+                       "Mixed transition stress did not prepare the owner backlog");
+
+            SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {workerThreads, NumWorkers}));
+            bool observedSteal = false;
+            for (size_t attempt = 0; attempt < 1000; ++attempt)
+            {
+                FiberWorkerDiagnostics activeDiagnostics;
+                scheduler.workerDiagnostics({workers, NumWorkers}, activeDiagnostics);
+                if (activeDiagnostics.stolenFibers > 0)
+                {
+                    observedSteal = true;
+                    break;
+                }
+                Thread::Sleep(1);
+            }
+            state.allowFinish.store(true, memory_order_release);
+            SC_TRY(workerPool.join());
+
+            FiberWorkerDiagnostics diagnostics;
+            scheduler.workerDiagnostics({workers, NumWorkers}, diagnostics);
+            scheduler.releaseWorkerDeques({workers, NumWorkers});
+            SC_TRY(allocator.close());
+            SC_TRY_MSG(not scheduler.hasActiveFibers(), "Mixed transition stress left active fibers");
+            SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(expectedCompleted),
+                       "Mixed transition stress completed count mismatch");
+            SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(expectedCancelled),
+                       "Mixed transition stress cancellation count mismatch");
+            SC_TRY_MSG(state.deterministicSteps.load(memory_order_relaxed) == static_cast<int32_t>(expectedSteps),
+                       "Mixed transition stress lost or duplicated a yielded continuation");
+            SC_TRY_MSG(observedSteal and diagnostics.stolenFibers > 0,
+                       "Mixed transition stress did not steal owner work");
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+            {
+                SC_TRY_MSG(cancelTask[taskIndex] ? not tasks[taskIndex].result() : tasks[taskIndex].result(),
+                           "Mixed transition stress task result mismatch");
+                SC_TRY_MSG(counters[taskIndex].value() == 0, "Mixed transition stress counter did not drain");
+            }
+            return Result(true);
+        };
+
+        uint32_t seed = 0xC001CAFEu;
+        for (size_t round = 0; round < NumRounds; ++round)
+        {
+            SC_TEST_EXPECT(runRound(seed));
+            seed = seed * 1664525u + 1013904223u;
         }
     }
 
