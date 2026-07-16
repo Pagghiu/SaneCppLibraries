@@ -112,6 +112,10 @@ static bool isDebuggerAttached()
 #endif
 }
 
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
 struct StackGrowthPrototype
 {
     static constexpr size_t UsableBytes        = 256 * 1024;
@@ -135,6 +139,7 @@ struct StackGrowthPrototype
     void* previousStackBase  = nullptr;
     void* previousStackLimit = nullptr;
     char* growthGuardPage    = nullptr;
+    DWORD handlerThreadId    = 0;
 #else
     struct sigaction      previousSegmentationAction  = {};
     struct sigaction      previousBusAction           = {};
@@ -147,7 +152,7 @@ struct StackGrowthPrototype
     volatile sig_atomic_t handlingFault               = 0;
 #endif
 
-    ~StackGrowthPrototype() { close(); }
+    ~StackGrowthPrototype() { SC_THREADING_ASSERT_RELEASE(close()); }
 
     Result run()
     {
@@ -182,6 +187,20 @@ struct StackGrowthPrototype
         SC_TRY(installHandler());
         *reinterpret_cast<volatile int*>(static_cast<size_t>(1)) = 1;
         return Result::Error("Stack growth foreign-fault probe returned unexpectedly");
+    }
+
+    Result runNestedFault()
+    {
+        SC_TRY(reserve());
+#if !SC_PLATFORM_WINDOWS
+        SC_TRY(installProcessHandler());
+#endif
+        SC_TRY(installHandler());
+#if !SC_PLATFORM_WINDOWS
+        handlingFault = 1;
+#endif
+        *reinterpret_cast<volatile int*>(static_cast<size_t>(1)) = 1;
+        return Result::Error("Stack growth nested-fault probe returned unexpectedly");
     }
 
     Result prepare(FiberContextEntry entry)
@@ -361,13 +380,14 @@ struct StackGrowthPrototype
         signalStack.ss_size = sizeof(signalStackMemory);
         if (sigaltstack(&signalStack, &previousSignalStack) != 0)
         {
-            close();
+            SC_THREADING_ASSERT_RELEASE(close());
             return Result::Error("Stack growth prototype could not install its alternate signal stack");
         }
         signalStackInstalled = true;
 
 #else
         activePrototype = this;
+        handlerThreadId = GetCurrentThreadId();
 #endif
         return Result(true);
     }
@@ -467,32 +487,42 @@ struct StackGrowthPrototype
     }
 #endif
 
-    void close()
+    Result close()
     {
 #if !SC_PLATFORM_WINDOWS
+        if ((signalStackInstalled or threadHandlerRegistered) and activePrototype != this)
+        {
+            return Result::Error("Stack growth prototype must close on its handler-owning thread");
+        }
         if (signalStackInstalled)
         {
             stack_t currentSignalStack = {};
-            SC_THREADING_ASSERT_RELEASE(sigaltstack(nullptr, &currentSignalStack) == 0);
-            SC_THREADING_ASSERT_RELEASE(currentSignalStack.ss_sp == signalStackMemory);
+            SC_TRY_MSG(sigaltstack(nullptr, &currentSignalStack) == 0,
+                       "Stack growth prototype could not query its alternate signal stack");
+            SC_TRY_MSG(currentSignalStack.ss_sp == signalStackMemory,
+                       "Stack growth prototype no longer owns the active alternate signal stack");
             stack_t signalStackToRestore = previousSignalStack;
             if ((signalStackToRestore.ss_flags & SS_DISABLE) != 0)
             {
                 // Darwin validates the size even though disabled-stack storage is ignored.
                 signalStackToRestore.ss_size = sizeof(signalStackMemory);
             }
-            SC_THREADING_ASSERT_RELEASE(sigaltstack(&signalStackToRestore, nullptr) == 0);
+            SC_TRY_MSG(sigaltstack(&signalStackToRestore, nullptr) == 0,
+                       "Stack growth prototype could not restore the previous alternate signal stack");
             stack_t restoredSignalStack = {};
-            SC_THREADING_ASSERT_RELEASE(sigaltstack(nullptr, &restoredSignalStack) == 0);
+            SC_TRY_MSG(sigaltstack(nullptr, &restoredSignalStack) == 0,
+                       "Stack growth prototype could not verify the restored alternate signal stack");
             if ((previousSignalStack.ss_flags & SS_DISABLE) != 0)
             {
-                SC_THREADING_ASSERT_RELEASE((restoredSignalStack.ss_flags & SS_DISABLE) != 0);
+                SC_TRY_MSG((restoredSignalStack.ss_flags & SS_DISABLE) != 0,
+                           "Stack growth prototype did not restore the disabled alternate signal stack");
             }
             else
             {
-                SC_THREADING_ASSERT_RELEASE(restoredSignalStack.ss_sp == previousSignalStack.ss_sp and
-                                            restoredSignalStack.ss_size == previousSignalStack.ss_size and
-                                            restoredSignalStack.ss_flags == previousSignalStack.ss_flags);
+                SC_TRY_MSG(restoredSignalStack.ss_sp == previousSignalStack.ss_sp and
+                               restoredSignalStack.ss_size == previousSignalStack.ss_size and
+                               restoredSignalStack.ss_flags == previousSignalStack.ss_flags,
+                           "Stack growth prototype did not restore the previous alternate signal stack");
             }
             signalStackInstalled = false;
         }
@@ -504,22 +534,30 @@ struct StackGrowthPrototype
         {
             unregisterThreadHandler();
         }
-        SC_THREADING_ASSERT_RELEASE(closeProcessHandler());
+        SC_TRY(closeProcessHandler());
 #else
+        if (handlerThreadId != 0 and handlerThreadId != GetCurrentThreadId())
+        {
+            return Result::Error("Stack growth prototype must close on its handler-owning thread");
+        }
         if (activePrototype == this)
         {
             activePrototype = nullptr;
         }
+        handlerThreadId = 0;
 #endif
         if (reservation != nullptr)
         {
 #if SC_PLATFORM_WINDOWS
-            VirtualFree(reservation, 0, MEM_RELEASE);
+            SC_TRY_MSG(VirtualFree(reservation, 0, MEM_RELEASE) != FALSE,
+                       "Stack growth prototype could not release its reservation");
 #else
-            munmap(reservation, reservationSize);
+            SC_TRY_MSG(munmap(reservation, reservationSize) == 0,
+                       "Stack growth prototype could not release its reservation");
 #endif
             reservation = nullptr;
         }
+        return Result(true);
     }
 
     static void fiberEntry(void* userData)
@@ -656,9 +694,13 @@ struct StackGrowthPrototype
     }
 #endif
 };
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(pop)
+#endif
 
 static constexpr const char* GuardOverflowMode      = "--guard-overflow";
 static constexpr const char* ForeignFaultMode       = "--foreign-fault";
+static constexpr const char* NestedFaultMode        = "--nested-fault";
 static constexpr int         ForeignHandlerExitCode = 73;
 
 #if !SC_PLATFORM_WINDOWS
@@ -674,7 +716,7 @@ static Result runChildMode(const char* mode)
     {
         guardOverflowProbeActive = 1;
     }
-    if (strcmp(mode, ForeignFaultMode) == 0)
+    if (strcmp(mode, ForeignFaultMode) == 0 or strcmp(mode, NestedFaultMode) == 0)
     {
         struct sigaction action = {};
         action.sa_handler       = foreignFaultHandler;
@@ -696,6 +738,10 @@ static Result runChildMode(const char* mode)
     if (strcmp(mode, ForeignFaultMode) == 0)
     {
         return prototype.runForeignFault();
+    }
+    if (strcmp(mode, NestedFaultMode) == 0)
+    {
+        return prototype.runNestedFault();
     }
     return Result::Error("Unknown stack growth prototype child mode");
 }
@@ -734,10 +780,10 @@ static Result runChildProbe(const char* executable, const char* mode)
     SC_TRY_MSG(waitResult == WAIT_OBJECT_0 and gotExitCode == TRUE,
                "Stack growth prototype could not wait for its child process");
 
-    if (strcmp(mode, ForeignFaultMode) == 0)
+    if (strcmp(mode, ForeignFaultMode) == 0 or strcmp(mode, NestedFaultMode) == 0)
     {
         SC_TRY_MSG(exitCode == static_cast<DWORD>(EXCEPTION_ACCESS_VIOLATION),
-                   "Stack growth prototype swallowed a foreign Windows fault");
+                   "Stack growth prototype swallowed a foreign or nested Windows fault");
     }
     else
     {
@@ -759,10 +805,10 @@ static Result runChildProbe(const char* executable, const char* mode)
 
     int status = 0;
     SC_TRY_MSG(waitpid(child, &status, 0) == child, "Stack growth prototype could not wait for its child process");
-    if (strcmp(mode, ForeignFaultMode) == 0)
+    if (strcmp(mode, ForeignFaultMode) == 0 or strcmp(mode, NestedFaultMode) == 0)
     {
         SC_TRY_MSG(WIFEXITED(status) and WEXITSTATUS(status) == ForeignHandlerExitCode,
-                   "Stack growth prototype did not forward a foreign POSIX fault");
+                   "Stack growth prototype did not forward a foreign or nested POSIX fault");
     }
     else
     {
@@ -829,7 +875,15 @@ static Result runConcurrentGrowthProbe()
                 {
                     state->growthEvents = state->prototype.growthEvents;
                 }
-                state->prototype.close();
+                Result closeResult = state->prototype.close();
+                if (state->result)
+                {
+                    state->result = closeResult;
+                }
+                else
+                {
+                    SC_THREADING_ASSERT_RELEASE(closeResult);
+                }
             }));
         if (not startResult)
         {
@@ -847,10 +901,15 @@ static Result runConcurrentGrowthProbe()
         Thread::Sleep(1);
     }
 
-    bool allWorkersPrepared = true;
+    bool allWorkersPrepared  = true;
+    bool foreignCloseRefused = true;
     for (size_t threadIndex = 0; threadIndex < NumWorkers; ++threadIndex)
     {
         allWorkersPrepared = allWorkersPrepared and states[threadIndex].result;
+        if (allWorkersPrepared)
+        {
+            foreignCloseRefused = foreignCloseRefused and not states[threadIndex].prototype.close();
+        }
     }
 #if !SC_PLATFORM_WINDOWS
     bool earlyCloseRefused = false;
@@ -881,8 +940,20 @@ static Result runConcurrentGrowthProbe()
     {
         probeResult = Result::Error("Process signal handler teardown was not refused while workers were active");
     }
-    processHandlerOwner.close();
+    Result processCloseResult = processHandlerOwner.close();
+    if (probeResult)
+    {
+        probeResult = processCloseResult;
+    }
+    else
+    {
+        SC_THREADING_ASSERT_RELEASE(processCloseResult);
+    }
 #endif
+    if (allWorkersPrepared and not foreignCloseRefused)
+    {
+        probeResult = Result::Error("Worker stack teardown was not refused from a foreign thread");
+    }
     return probeResult;
 }
 #endif
@@ -914,10 +985,13 @@ static Result runStackGrowthPrototype(const char* executable)
     SC_TRY(runConcurrentGrowthProbe());
     SC_TRY(runChildProbe(executable, GuardOverflowMode));
     SC_TRY(runChildProbe(executable, ForeignFaultMode));
+    SC_TRY(runChildProbe(executable, NestedFaultMode));
 #if SC_PLATFORM_WINDOWS
-    console.print("  concurrentWorkers=4 guardOverflowProbe=passed foreignFaultProbe=passed\n");
+    console.print("  concurrentWorkers=4 foreignCloseProbe=passed guardOverflowProbe=passed "
+                  "foreignFaultProbe=passed nestedFaultProbe=passed\n");
 #else
-    console.print("  concurrentWorkers=4 earlyCloseProbe=passed guardOverflowProbe=passed foreignFaultProbe=passed\n");
+    console.print("  concurrentWorkers=4 earlyCloseProbe=passed foreignCloseProbe=passed guardOverflowProbe=passed "
+                  "foreignFaultProbe=passed nestedFaultProbe=passed\n");
 #endif
     return Result(true);
 #endif

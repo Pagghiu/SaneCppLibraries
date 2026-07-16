@@ -47,6 +47,18 @@ Any future production incremental-commit mode must remain disabled while a debug
 platform integration proves that managed growth faults can be forwarded safely and that terminal guard and foreign
 faults remain debugger-visible. Full-commit stacks remain the supported debugger-compatible behavior.
 
+## Fault And Teardown Ownership
+
+Thread fault state, alternate signal-stack state, and the reservation may be closed only by the thread that installed
+the thread handler. A foreign-thread close returns an error before mutating any state. The process-level POSIX handler
+may be removed only after every thread handler has unregistered; release-fatal destruction remains the final guard
+against unwinding live fault state.
+
+A fault observed while the POSIX handler's reentrancy guard is active is never treated as another growth opportunity.
+It is forwarded to the previously installed handler, just like an unrelated fault. Windows uses native guard-page
+growth and must surface a nested unrelated fault as its native access violation. The isolated child probes verify both
+behaviors without allowing a failed fault to terminate the parent validation process.
+
 ## Consequences
 
 Current callers retain predictable capacity: each active class-backed stack consumes one page-rounded requested stack
