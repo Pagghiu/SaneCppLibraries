@@ -881,6 +881,97 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
                                  allocatorStatistics, state);
 }
 
+static Result runCounterCompletionBenchmark(Console& console)
+{
+    static constexpr size_t MaxWorkers             = 16;
+    static constexpr size_t NumTasks               = 1024;
+    static constexpr size_t StackSize              = 32 * 1024;
+    static constexpr size_t DequeCapacityPerWorker = 256;
+    static constexpr size_t InjectionCapacity      = NumTasks + 1;
+
+    size_t numWorkers = availableHardwareWorkers();
+    if (numWorkers > 8)
+    {
+        numWorkers = 8;
+    }
+    if (numWorkers > MaxWorkers)
+    {
+        numWorkers = MaxWorkers;
+    }
+    if (numWorkers == 0)
+    {
+        numWorkers = 1;
+    }
+
+    FiberScheduler    scheduler;
+    FiberWorker       workers[MaxWorkers];
+    FiberWorkerThread threads[MaxWorkers];
+    FiberWorkerPool   workerPool;
+    FiberCounter      completionCounter;
+    Atomic<int32_t>   completed;
+
+    static FiberTask tasks[NumTasks];
+    static char      stackMemory[NumTasks * StackSize] = {};
+
+    FiberAllocator allocator;
+    static char
+        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
+
+    FiberWorkerPoolOptions workerPoolOptions;
+    workerPoolOptions.dequeAllocator         = &allocator;
+    workerPoolOptions.dequeCapacityPerWorker = DequeCapacityPerWorker;
+    workerPoolOptions.injectionAllocator     = &allocator;
+    workerPoolOptions.injectionCapacity      = InjectionCapacity;
+
+    SC_TRY(allocator.createFixed(schedulerStorage));
+    for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
+    {
+        FiberStack stack({stackMemory + taskIndex * StackSize, StackSize});
+        SC_TRY(scheduler.spawn(tasks[taskIndex], stack,
+                               FiberTask::Procedure(
+                                   [&completed](FiberScheduler&)
+                                   {
+                                       completed.fetch_add(1, memory_order_relaxed);
+                                       return Result(true);
+                                   }),
+                               &completionCounter));
+    }
+
+    scheduler.resetSchedulerDiagnostics();
+    Time::HighResolutionCounter start;
+    start.snap();
+    SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, workerPoolOptions));
+    SC_TRY(workerPool.join());
+    Time::HighResolutionCounter finish;
+    finish.snap();
+
+    SC_TRY_MSG(completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
+               "Counter completion benchmark did not complete all tasks");
+    SC_TRY_MSG(completionCounter.value() == 0, "Counter completion benchmark counter did not reach zero");
+    SC_TRY_MSG(not scheduler.hasActiveFibers(), "Counter completion benchmark retained active tasks");
+
+    FiberSchedulerDiagnostics schedulerDiagnostics;
+    scheduler.schedulerDiagnostics(schedulerDiagnostics);
+    FiberWorkerDiagnostics workerDiagnostics;
+    scheduler.workerDiagnostics({workers, numWorkers}, workerDiagnostics);
+
+    const Time::HighResolutionCounter elapsed        = finish.subtractExact(start);
+    const int64_t                     elapsedNs      = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
+    const int64_t                     tasksPerSecond = static_cast<int64_t>(NumTasks) * 1000000000 / elapsedNs;
+    console.print("FibersBenchmark counter-backed completion: workers={} tasks={}\n", numWorkers, NumTasks);
+    console.print("  elapsedNs={} tasksPerSec={} completed={} counter={}\n", static_cast<size_t>(elapsedNs),
+                  static_cast<size_t>(tasksPerSecond), static_cast<size_t>(completed.load(memory_order_relaxed)),
+                  completionCounter.value());
+    console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
+                  schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
+                  schedulerDiagnostics.lockSpinRetries);
+    console.print("  executedFibers={} completedFibers={} stolenFibers={}\n", workerDiagnostics.executedFibers,
+                  workerDiagnostics.completedFibers, workerDiagnostics.stolenFibers);
+
+    SC_TRY(allocator.close());
+    return Result(true);
+}
+
 static Result runFibersBenchmark()
 {
     Console console;
@@ -892,6 +983,7 @@ static Result runFibersBenchmark()
     SC_TRY(runMassSuspensionBenchmark(console, 100'000));
     SC_TRY(runFiberAsyncHighWaterBenchmark(console));
     SC_TRY(runMicroTaskBenchmarks(console));
+    SC_TRY(runCounterCompletionBenchmark(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console));
     return Result(true);
 }

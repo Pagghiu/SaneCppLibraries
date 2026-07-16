@@ -125,6 +125,12 @@ This makes these three races explicit test cases: completion-before-link, cancel
 completion-versus-cancellation-after-link. Each must prove exactly one ready publication and no switch to a still
 running stack.
 
+Counter values use atomic transitions independently from their intrusive waiter queue. A decrement known to be
+non-final can complete without scheduler coordination. The final `1 -> 0` transition remains serialized with counter
+increment and waiter publication so a concurrent increment cannot start a new generation before stale waiters are
+woken. Counter-backed task completion publishes `Completed` and leaves its worker active registry before notifying the
+counter; consequently a resumed group waiter cannot observe a child still owned by its completing worker root.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains

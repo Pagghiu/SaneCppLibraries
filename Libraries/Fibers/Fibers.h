@@ -761,9 +761,10 @@ struct SC_FIBERS_EXPORT FiberCounter
   private:
     friend struct FiberScheduler;
 
-    size_t     counterValue = 0;
-    FiberTask* waitingHead  = nullptr;
-    FiberTask* waitingTail  = nullptr;
+    volatile size_t counterValue = 0;
+
+    FiberTask* waitingHead = nullptr;
+    FiberTask* waitingTail = nullptr;
 };
 
 //! One failed task collected from a FiberTaskGroup.

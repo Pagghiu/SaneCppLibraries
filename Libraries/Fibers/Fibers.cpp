@@ -2853,7 +2853,7 @@ FiberCounter::~FiberCounter()
     SC_FIBERS_ASSERT_RELEASE(waitingTail == nullptr);
 }
 
-size_t FiberCounter::value() const { return counterValue; }
+size_t FiberCounter::value() const { return fiberAtomicLoadSize(counterValue); }
 
 static Result fiberTaskGroupSpawnOptions(const FiberTaskSpawnOptions& input, FiberCounter& counter,
                                          FiberTaskSpawnOptions& output)
@@ -4620,25 +4620,41 @@ void FiberScheduler::add(FiberCounter& counter)
 
 Result FiberScheduler::done(FiberCounter& counter)
 {
-    LockGuard guard(*this);
-    return doneUnlocked(counter);
-}
-
-void FiberScheduler::addUnlocked(FiberCounter& counter) { counter.counterValue += 1; }
-
-Result FiberScheduler::doneUnlocked(FiberCounter& counter)
-{
-    if (counter.counterValue == 0)
+    size_t value = fiberAtomicLoadSize(counter.counterValue);
+    while (value > 1)
+    {
+        if (fiberAtomicCompareExchangeSize(counter.counterValue, value, value - 1))
+        {
+            return Result(true);
+        }
+    }
+    if (value == 0)
     {
         return Result::Error("FiberCounter already reached zero");
     }
 
-    counter.counterValue -= 1;
-    if (counter.counterValue == 0)
+    // Serialize the final transition with add() and waiter publication so generations cannot overlap.
+    LockGuard guard(*this);
+    return doneUnlocked(counter);
+}
+
+void FiberScheduler::addUnlocked(FiberCounter& counter) { fiberAtomicFetchAddSize(counter.counterValue, 1); }
+
+Result FiberScheduler::doneUnlocked(FiberCounter& counter)
+{
+    size_t value = fiberAtomicLoadSize(counter.counterValue);
+    while (value != 0)
     {
-        wakeCounterWaitersUnlocked(counter);
+        if (fiberAtomicCompareExchangeSize(counter.counterValue, value, value - 1))
+        {
+            if (value == 1)
+            {
+                wakeCounterWaitersUnlocked(counter);
+            }
+            return Result(true);
+        }
     }
-    return Result(true);
+    return Result::Error("FiberCounter already reached zero");
 }
 
 Result FiberScheduler::wait(FiberCounter& counter) { return waitImpl(counter, true); }
@@ -4661,7 +4677,7 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
 {
     {
         LockGuard guard(*this);
-        if (counter.counterValue == 0)
+        if (fiberAtomicLoadSize(counter.counterValue) == 0)
         {
             return Result(true);
         }
@@ -4674,7 +4690,7 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
         {
             {
                 LockGuard guard(*this);
-                if (counter.counterValue == 0)
+                if (fiberAtomicLoadSize(counter.counterValue) == 0)
                 {
                     return Result(true);
                 }
@@ -5379,6 +5395,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     FiberTaskPool*   completedOriginPool  = nullptr;
     FiberTaskClass*  completedTaskClass   = nullptr;
     FiberStackClass* completedStackClass  = nullptr;
+    FiberCounter*    completedCounter     = nullptr;
     Span<char>       completedStackMemory;
     bool             completedTask = false;
     if (task.status() == FiberTaskStatus::Completing)
@@ -5391,8 +5408,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         SC_FIBERS_ASSERT_RELEASE(task.runningWorker == nullptr);
         SC_FIBERS_ASSERT_RELEASE(worker.workerTask == nullptr);
     }
-    else if (task.status() == FiberTaskStatus::Completing and task.completionCounter == nullptr and
-             task.activeRegistryWorker != nullptr)
+    else if (task.status() == FiberTaskStatus::Completing and task.activeRegistryWorker != nullptr)
     {
         worker.completedFibers += 1;
         unlinkWorkerActive(task);
@@ -5403,6 +5419,8 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         }
         completedOriginPool    = task.originPool;
         task.originPool        = nullptr;
+        completedCounter       = task.completionCounter;
+        task.completionCounter = nullptr;
         completedTaskClass     = task.originTaskClass;
         completedStackClass    = task.originStackClass;
         completedStackMemory   = task.originStackMemory;
@@ -5416,6 +5434,10 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
         fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Completed);
         const size_t previousActiveFibers = fiberAtomicFetchSubSize(activeFibers, 1);
         SC_FIBERS_ASSERT_RELEASE(previousActiveFibers > 0);
+        if (completedCounter != nullptr)
+        {
+            SC_FIBERS_TRUST_RESULT(done(*completedCounter));
+        }
         if (completedOriginPool != nullptr)
         {
             FiberCounter* availableCounter = completedOriginPool->popAvailabilityWaiterForNotification();
@@ -5446,6 +5468,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
             if (task.completionCounter != nullptr)
             {
                 SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
+                task.completionCounter = nullptr;
             }
             completedOriginPool    = task.originPool;
             task.originPool        = nullptr;
@@ -5555,7 +5578,7 @@ void FiberScheduler::publishSuspensionUnlocked(FiberTask& task)
     SC_FIBERS_ASSERT_RELEASE(suspendAction == FiberTaskSuspendAction::CounterWait);
     SC_FIBERS_ASSERT_RELEASE(fiberTaskStatusIsSuspending(task.taskStatus));
     SC_FIBERS_ASSERT_RELEASE(counter != nullptr);
-    if (counter->counterValue == 0 or (interruptible and task.isCancellationRequested()))
+    if (fiberAtomicLoadSize(counter->counterValue) == 0 or (interruptible and task.isCancellationRequested()))
     {
         fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
         pushReadyUnlocked(task, task.preferredWorker);
