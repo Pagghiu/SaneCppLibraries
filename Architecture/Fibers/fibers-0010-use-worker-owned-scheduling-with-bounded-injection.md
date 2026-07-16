@@ -131,6 +131,13 @@ increment and waiter publication so a concurrent increment cannot start a new ge
 woken. Counter-backed task completion publishes `Completed` and leaves its worker active registry before notifying the
 counter; consequently a resumed group waiter cannot observe a child still owned by its completing worker root.
 
+A configured deque owner may claim a fixed batch of up to four tasks while it already holds the scheduler control lock.
+The first task becomes its immediate `Running` claim; retained tasks stay `Ready`, transfer to stable worker-registry
+ownership, and enter the owner's bounded deque in reverse source order so later LIFO owner pops preserve FIFO execution.
+The batch never mixes the intrusive spill source with the injection source, never exceeds available deque capacity, and
+does not change publication backpressure. The fixed bound prevents one worker from draining an unbounded shared backlog
+before peers can steal it.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains

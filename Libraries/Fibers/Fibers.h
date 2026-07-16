@@ -1127,6 +1127,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void                     pushWorkerReadyUnlocked(FiberWorker& worker, FiberTask& task);
 
     [[nodiscard]] FiberTask* popReadyUnlocked();
+    [[nodiscard]] FiberTask* popReadyBatchUnlocked(FiberWorker& worker);
     [[nodiscard]] FiberTask* popReadyUnlocked(FiberWorker& worker, Span<FiberWorker> stealWorkers);
     [[nodiscard]] FiberTask* popWorkerReadyUnlocked(FiberWorker& worker);
     [[nodiscard]] FiberTask* stealWorkerReadyUnlocked(FiberWorker& worker);

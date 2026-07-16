@@ -4313,7 +4313,14 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
     else
     {
         LockGuard guard(*this);
-        task = worker.localDeque != nullptr ? popReadyUnlocked() : popReadyUnlocked(worker, stealWorkers);
+        if (worker.localDeque != nullptr)
+        {
+            task = configuredDequeOwner ? popReadyBatchUnlocked(worker) : popReadyUnlocked();
+        }
+        else
+        {
+            task = popReadyUnlocked(worker, stealWorkers);
+        }
         if (task == nullptr and worker.localDeque != nullptr)
         {
             task = stealReadyUnlocked(worker, stealWorkers);
@@ -5129,6 +5136,62 @@ FiberTask* FiberScheduler::popReadyUnlocked()
     if (readyHead == nullptr)
     {
         readyTail = nullptr;
+    }
+    return task;
+}
+
+FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
+{
+    static constexpr size_t BatchCapacity = 4;
+
+    SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
+    const bool fromReadyList = readyHead != nullptr;
+    FiberTask* task          = fromReadyList ? popReadyUnlocked() : popInjectionUnlocked();
+    if (task == nullptr)
+    {
+        return nullptr;
+    }
+
+    const size_t top          = fiberAtomicLoadSize(worker.localDequeTop);
+    const size_t bottom       = fiberAtomicLoadSize(worker.localDequeBottom);
+    const size_t dequeEntries = bottom >= top ? bottom - top : 0;
+    SC_FIBERS_ASSERT_RELEASE(dequeEntries <= worker.localDequeCapacity);
+    size_t availableEntries = worker.localDequeCapacity - dequeEntries;
+    if (availableEntries > BatchCapacity - 1)
+    {
+        availableEntries = BatchCapacity - 1;
+    }
+
+    FiberTask* retainedTasks[BatchCapacity - 1] = {};
+    size_t     numRetainedTasks                 = 0;
+    while (numRetainedTasks < availableEntries)
+    {
+        FiberTask* retainedTask = nullptr;
+        if (fromReadyList)
+        {
+            if (readyHead == nullptr)
+            {
+                break;
+            }
+            retainedTask = popReadyUnlocked();
+        }
+        else
+        {
+            retainedTask = popInjectionUnlocked();
+        }
+        if (retainedTask == nullptr)
+        {
+            break;
+        }
+        retainedTasks[numRetainedTasks++] = retainedTask;
+    }
+
+    // Reverse insertion preserves the source queue's FIFO order when the owner later pops its LIFO deque.
+    for (size_t retainedIndex = numRetainedTasks; retainedIndex > 0; --retainedIndex)
+    {
+        FiberTask& retainedTask = *retainedTasks[retainedIndex - 1];
+        moveActiveToWorkerUnlocked(retainedTask, worker);
+        SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReadyDeque(worker, retainedTask));
     }
     return task;
 }
