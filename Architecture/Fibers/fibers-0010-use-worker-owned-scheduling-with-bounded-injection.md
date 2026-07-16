@@ -145,6 +145,12 @@ ordering lets cancellation scans linearize either before the child exists or aft
 children, manual workers, and full local deques retain the scheduler-control path and its existing bounded-injection
 capacity error. No fallback allocation or implicit queue growth is introduced.
 
+A configured pool worker may also steal directly from another bounded worker deque without the scheduler-control lock.
+The successful head-slot compare/exchange gives the thief exclusive ownership of each task. A stolen batch is capped at
+one immediately runnable task plus the thief's observed local capacity, so retaining the remainder cannot require an
+unlocked global spill. Failed steals still enter the scheduler-control path to inspect the intrusive ready list and
+bounded injection queue; manual worker groups retain their coordinated behavior.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains

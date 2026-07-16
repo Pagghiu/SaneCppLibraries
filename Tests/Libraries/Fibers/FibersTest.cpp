@@ -4598,6 +4598,105 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(scheduler.runReadyFibers(workers[0], {workers, 2}));
             SC_TEST_EXPECT(not scheduler.hasActiveFibers());
         }
+
+        {
+            static constexpr size_t NumChildren = 32;
+            static constexpr size_t StackSize   = 32 * 1024;
+
+            struct State
+            {
+                FiberTask*    children    = nullptr;
+                char*         childStacks = nullptr;
+                FiberCounter* gate        = nullptr;
+
+                Atomic<int32_t> completed;
+            };
+
+            FiberScheduler    scheduler;
+            FiberAllocator    allocator;
+            char              allocatorStorage[4096] = {};
+            static FiberTask  children[NumChildren];
+            static char       childStacks[NumChildren * StackSize] = {};
+            FiberTask         producer;
+            char              producerStackMemory[StackSize] = {};
+            FiberStack        producerStack({producerStackMemory, sizeof(producerStackMemory)});
+            FiberCounter      gate;
+            FiberWorker       workers[2];
+            FiberWorkerThread threads[2];
+            FiberWorkerPool   workerPool;
+            State             state;
+
+            state.children    = children;
+            state.childStacks = childStacks;
+            state.gate        = &gate;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            FiberWorkerPoolOptions options;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = NumChildren;
+
+            scheduler.add(gate);
+            SC_TEST_EXPECT(scheduler.spawn(
+                producer, producerStack,
+                FiberTask::Procedure(
+                    [&state](FiberScheduler& scheduler)
+                    {
+                        SC_TRY(scheduler.wait(*state.gate));
+                        for (size_t childIndex = 0; childIndex < NumChildren; ++childIndex)
+                        {
+                            FiberStack childStack({state.childStacks + childIndex * StackSize, StackSize});
+                            SC_TRY(scheduler.spawn(state.children[childIndex], childStack,
+                                                   FiberTask::Procedure(
+                                                       [&state](FiberScheduler&)
+                                                       {
+                                                           state.completed.fetch_add(1, memory_order_relaxed);
+                                                           return Result(true);
+                                                       })));
+                        }
+
+                        for (size_t attempt = 0; attempt < 5000; ++attempt)
+                        {
+                            if (state.completed.load(memory_order_acquire) == static_cast<int32_t>(NumChildren))
+                            {
+                                return Result(true);
+                            }
+                            Thread::Sleep(1);
+                        }
+                        return Result::Error("Peer worker did not steal all owner tasks");
+                    })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, 2}, {threads, 2}, options));
+
+            bool producerWaiting = false;
+            for (size_t attempt = 0; attempt < 5000; ++attempt)
+            {
+                producerWaiting = producer.status() == FiberTaskStatus::Waiting;
+                if (producerWaiting)
+                {
+                    break;
+                }
+                Thread::Sleep(1);
+            }
+            SC_TEST_EXPECT(producerWaiting);
+            scheduler.resetSchedulerDiagnostics();
+            SC_TEST_EXPECT(scheduler.done(gate));
+            SC_TEST_EXPECT(workerPool.join());
+
+            FiberSchedulerDiagnostics schedulerDiagnostics;
+            scheduler.schedulerDiagnostics(schedulerDiagnostics);
+            FiberWorkerDiagnostics workerDiagnostics;
+            scheduler.workerDiagnostics({workers, 2}, workerDiagnostics);
+            SC_TEST_EXPECT(producer.result());
+            SC_TEST_EXPECT(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumChildren));
+            SC_TEST_EXPECT(workerDiagnostics.stolenFibers >= NumChildren);
+            SC_TEST_EXPECT(schedulerDiagnostics.lockAcquisitions < NumChildren / 2);
+            for (FiberTask& child : children)
+            {
+                SC_TEST_EXPECT(child.result());
+            }
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(allocator.close());
+        }
     }
 
     void workerDeque()

@@ -4378,7 +4378,17 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
             moveActiveToWorkerUnlocked(*task, worker);
         }
     }
-    else
+    else if (configuredDequeOwner)
+    {
+        task = stealReadyUnlocked(worker, stealWorkers);
+        if (task != nullptr)
+        {
+            SC_FIBERS_ASSERT_RELEASE(
+                fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
+        }
+    }
+
+    if (task == nullptr)
     {
         LockGuard guard(*this);
         if (worker.localDeque != nullptr)
@@ -5452,11 +5462,25 @@ FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWor
         return nullptr;
     }
 
-    FiberTask*   stolenTasks[MaxStolenBatchSize] = {};
-    size_t       numStolenTasks                  = 0;
-    const size_t requestedBatchSize =
-        worker.localDeque == nullptr ? 1
-                                     : (mostReadyFibers < MaxStolenBatchSize ? mostReadyFibers : MaxStolenBatchSize);
+    FiberTask* stolenTasks[MaxStolenBatchSize] = {};
+    size_t     numStolenTasks                  = 0;
+    size_t     requestedBatchSize              = 1;
+    if (worker.localDeque != nullptr)
+    {
+        const size_t top              = fiberAtomicLoadSize(worker.localDequeTop);
+        const size_t bottom           = fiberAtomicLoadSize(worker.localDequeBottom);
+        const size_t localReadyFibers = bottom >= top ? bottom - top : 0;
+        SC_FIBERS_ASSERT_RELEASE(localReadyFibers <= worker.localDequeCapacity);
+        requestedBatchSize = 1 + worker.localDequeCapacity - localReadyFibers;
+        if (requestedBatchSize > MaxStolenBatchSize)
+        {
+            requestedBatchSize = MaxStolenBatchSize;
+        }
+    }
+    if (requestedBatchSize > mostReadyFibers)
+    {
+        requestedBatchSize = mostReadyFibers;
+    }
     while (numStolenTasks < requestedBatchSize)
     {
         FiberTask* stolenTask = stealWorkerReadyUnlocked(*victimWithMostReady);
@@ -5486,11 +5510,7 @@ FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWor
     for (size_t taskIndex = numStolenTasks; taskIndex > 1; --taskIndex)
     {
         FiberTask& task = *stolenTasks[taskIndex - 1];
-        if (not tryPushWorkerReadyDeque(worker, task))
-        {
-            worker.localSpilledFibers += 1;
-            pushReadyUnlocked(task);
-        }
+        SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReadyDeque(worker, task));
     }
     return stolenTasks[0];
 }
