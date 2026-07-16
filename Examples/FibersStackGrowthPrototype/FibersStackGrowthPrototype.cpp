@@ -23,6 +23,12 @@
 #include <windows.h>
 #define SC_FIBERS_STACK_GROWTH_NO_INLINE __declspec(noinline)
 #else
+#if SC_PLATFORM_APPLE
+#include <sys/proc.h>
+#include <sys/sysctl.h>
+#elif SC_PLATFORM_LINUX
+#include <fcntl.h>
+#endif
 #include <signal.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
@@ -59,6 +65,52 @@ alignas(16) static thread_local char signalStackMemory[128 * 1024] = {};
 static Atomic<int32_t>   threadHandlerLifecycle;
 static constexpr int32_t HandlerLifecycleClosing = -1;
 #endif
+
+static bool isDebuggerAttached()
+{
+#if SC_PLATFORM_WINDOWS
+    return IsDebuggerPresent() != FALSE;
+#elif SC_PLATFORM_APPLE
+    int mib[4] = {CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()};
+
+    struct kinfo_proc processInformation = {};
+    size_t            informationSize    = sizeof(processInformation);
+    return sysctl(mib, 4, &processInformation, &informationSize, nullptr, 0) == 0 and
+           (processInformation.kp_proc.p_flag & P_TRACED) != 0;
+#elif SC_PLATFORM_LINUX
+    const int statusFile = open("/proc/self/status", O_RDONLY);
+    if (statusFile < 0)
+    {
+        return false;
+    }
+
+    char          status[4096];
+    const ssize_t statusLength = read(statusFile, status, sizeof(status));
+    close(statusFile);
+    if (statusLength <= 0)
+    {
+        return false;
+    }
+
+    static constexpr char TracerPrefix[] = "TracerPid:";
+    for (size_t index = 0; index + sizeof(TracerPrefix) - 1 < static_cast<size_t>(statusLength); ++index)
+    {
+        if (memcmp(status + index, TracerPrefix, sizeof(TracerPrefix) - 1) != 0)
+        {
+            continue;
+        }
+        index += sizeof(TracerPrefix) - 1;
+        while (index < static_cast<size_t>(statusLength) and (status[index] == ' ' or status[index] == '\t'))
+        {
+            index += 1;
+        }
+        return index < static_cast<size_t>(statusLength) and status[index] >= '1' and status[index] <= '9';
+    }
+    return false;
+#else
+    return false;
+#endif
+}
 
 struct StackGrowthPrototype
 {
@@ -694,12 +746,15 @@ static Result runChildProbe(const char* executable, const char* mode)
                    "Stack growth prototype guard overflow did not terminate with a memory fault");
     }
 #else
+    (void)executable;
+    // Concurrent probes are joined before this fork. Running the mode directly preserves isolation under an explicit
+    // emulator, where asking the kernel to execute the foreign-architecture binary again would require binfmt support.
     const pid_t child = fork();
     SC_TRY_MSG(child >= 0, "Stack growth prototype could not fork its child process");
     if (child == 0)
     {
-        execl(executable, executable, mode, static_cast<char*>(nullptr));
-        _exit(127);
+        const Result childResult = runChildMode(mode);
+        _exit(childResult ? 0 : 127);
     }
 
     int status = 0;
@@ -836,6 +891,11 @@ static Result runStackGrowthPrototype(const char* executable)
 {
     Console console;
     Console::tryAttachingToParentConsole();
+    if (isDebuggerAttached())
+    {
+        console.print("Fibers stack growth prototype skipped: attached debugger owns fault delivery\n");
+        return Result(true);
+    }
 #if SC_FIBERS_STACK_GROWTH_HAS_ASAN
     (void)executable;
     console.print("Fibers stack growth prototype skipped: AddressSanitizer owns stack fault handling\n");

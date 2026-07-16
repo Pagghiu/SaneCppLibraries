@@ -35,6 +35,18 @@ small controlled stacks, and process-level tests that demonstrate growth, guard 
 faults. A subsequent ADR can decide whether the proven mechanism belongs in `Fibers` and what caller-provided metadata
 and platform restrictions it requires.
 
+## Debugger Policy
+
+An attached debugger owns first-chance fault delivery. The prototype detects an attached debugger on macOS, Linux, and
+Windows and skips fault-driven execution before installing handlers or reserving a growth stack. It must not attempt to
+change debugger settings, consume debugger-owned exceptions, or claim that ordinary signal pass-through is sufficient.
+In particular, LLDB on macOS intercepts the Mach `EXC_BAD_ACCESS` before the process receives `SIGSEGV` or `SIGBUS`;
+auto-continuing the exception merely repeats the fault without entering the process handler.
+
+Any future production incremental-commit mode must remain disabled while a debugger is attached unless a separate
+platform integration proves that managed growth faults can be forwarded safely and that terminal guard and foreign
+faults remain debugger-visible. Full-commit stacks remain the supported debugger-compatible behavior.
+
 ## Consequences
 
 Current callers retain predictable capacity: each active class-backed stack consumes one page-rounded requested stack
