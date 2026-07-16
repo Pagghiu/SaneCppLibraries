@@ -4109,8 +4109,26 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
                              const FiberTaskSpawnOptions& options)
 {
-    LockGuard guard(*this);
+    if (task.isActive())
+    {
+        return Result::Error("FiberTask is already active");
+    }
+    if (not procedure.isValid())
+    {
+        return Result::Error("FiberTask procedure is not valid");
+    }
 
+    FiberWorker* ownerWorker = currentWorkerFor(*this);
+    if (ownerWorker != nullptr and canPublishOwnerSpawn(*ownerWorker, options))
+    {
+        SC_TRY(initializeTaskForSpawn(task, stack, procedure, options));
+        fiberAtomicFetchAddSize(activeFibers, 1);
+        linkWorkerActiveForSpawn(task, *ownerWorker);
+        SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReadyDeque(*ownerWorker, task));
+        return Result(true);
+    }
+
+    LockGuard guard(*this);
     if (task.isActive())
     {
         return Result::Error("FiberTask is already active");
@@ -4124,6 +4142,29 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         return Result::Error("Fiber injection queue is full");
     }
 
+    SC_TRY(initializeTaskForSpawn(task, stack, procedure, options));
+    if (options.counter != nullptr)
+    {
+        addUnlocked(*options.counter);
+    }
+
+    fiberAtomicFetchAddSize(activeFibers, 1);
+    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
+    linkActiveUnlocked(task);
+    if (injectionQueue != nullptr)
+    {
+        SC_FIBERS_ASSERT_RELEASE(tryPushInjectionUnlocked(task));
+    }
+    else
+    {
+        pushReadyUnlocked(task);
+    }
+    return Result(true);
+}
+
+Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
+                                              const FiberTaskSpawnOptions& options)
+{
     task.procedure            = procedure;
     task.scheduler            = this;
     task.completionCounter    = options.counter;
@@ -4144,8 +4185,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     task.runningWorker        = nullptr;
     task.stackOwner           = nullptr;
     task.taskResult           = Result(true);
-    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
-    task.suspendAction = FiberTaskSuspendAction::None;
+    task.suspendAction        = FiberTaskSuspendAction::None;
     fiberTaskCancellationStore(task.cancelRequested, options.cancellationToken.isCancellationRequested());
     task.suspendInterruptible = false;
 
@@ -4156,7 +4196,9 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         task.scheduler            = nullptr;
         task.completionCounter    = nullptr;
         task.cancellationToken    = FiberCancellationToken();
+        task.nextReady            = nullptr;
         task.previousReady        = nullptr;
+        task.nextWaiting          = nullptr;
         task.nextActive           = nullptr;
         task.previousActive       = nullptr;
         task.nextGroup            = nullptr;
@@ -4185,23 +4227,49 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     {
         task.taskUserData = options.userData;
     }
-
-    if (options.counter != nullptr)
-    {
-        addUnlocked(*options.counter);
-    }
-
-    fiberAtomicFetchAddSize(activeFibers, 1);
-    linkActiveUnlocked(task);
-    if (injectionQueue != nullptr)
-    {
-        SC_FIBERS_ASSERT_RELEASE(tryPushInjectionUnlocked(task));
-    }
-    else
-    {
-        pushReadyUnlocked(task);
-    }
     return Result(true);
+}
+
+bool FiberScheduler::canPublishOwnerSpawn(FiberWorker& worker, const FiberTaskSpawnOptions& options) const
+{
+    if (options.counter != nullptr or workerPool == nullptr or worker.localDeque == nullptr or
+        not worker.localSchedulingActive or worker.localQueueScheduler != this)
+    {
+        return false;
+    }
+
+    bool belongsToPool = false;
+    for (FiberWorker& poolWorker : workerPool->workers)
+    {
+        if (&poolWorker == &worker)
+        {
+            belongsToPool = true;
+            break;
+        }
+    }
+    if (not belongsToPool)
+    {
+        return false;
+    }
+
+    const size_t top    = fiberAtomicLoadSize(worker.localDequeTop);
+    const size_t bottom = fiberAtomicLoadSize(worker.localDequeBottom);
+    return bottom >= top and bottom - top < worker.localDequeCapacity;
+}
+
+void FiberScheduler::linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker)
+{
+    fiberSchedulerLock(worker.activeRegistryLock);
+    task.nextActive           = worker.activeHead;
+    task.previousActive       = nullptr;
+    task.activeRegistryWorker = &worker;
+    if (worker.activeHead != nullptr)
+    {
+        worker.activeHead->previousActive = &task;
+    }
+    worker.activeHead = &task;
+    fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
+    fiberSchedulerUnlock(worker.activeRegistryLock);
 }
 
 Result FiberScheduler::runOnce()

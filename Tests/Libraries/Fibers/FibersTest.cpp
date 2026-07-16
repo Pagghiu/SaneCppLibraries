@@ -234,6 +234,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerClaimBatchFastPath();
         }
+        if (test_section("worker owner spawn fast path"))
+        {
+            workerOwnerSpawnFastPath();
+        }
         if (test_section("worker pool injection queue"))
         {
             workerPoolInjectionQueue();
@@ -5430,6 +5434,218 @@ struct SC::FibersTest : public SC::TestCase
         }
         SC_TEST_EXPECT(allocator.used() == 0);
         SC_TEST_EXPECT(allocator.close());
+    }
+
+    void workerOwnerSpawnFastPath()
+    {
+        static constexpr size_t NumChildren = 64;
+        static constexpr size_t StackSize   = 32 * 1024;
+
+        {
+            struct State
+            {
+                FiberTask*             children    = nullptr;
+                char*                  childStacks = nullptr;
+                FiberCounter*          gate        = nullptr;
+                FiberCancellationToken cancelledToken;
+
+                Result          spawnResult = Result(true);
+                Atomic<int32_t> entered;
+                Atomic<int32_t> completed;
+                Atomic<int32_t> cancelled;
+            };
+
+            FiberScheduler               scheduler;
+            FiberAllocator               allocator;
+            char                         allocatorStorage[4096] = {};
+            static FiberTask             children[NumChildren];
+            static char                  childStacks[NumChildren * StackSize] = {};
+            FiberTask                    producer;
+            char                         producerStackMemory[StackSize] = {};
+            FiberStack                   producerStack({producerStackMemory, sizeof(producerStackMemory)});
+            FiberCounter                 gate;
+            FiberWorker                  worker;
+            FiberWorkerThread            thread;
+            FiberWorkerPool              workerPool;
+            FiberCancellationTokenSource cancelledSource;
+            State                        state;
+
+            state.children       = children;
+            state.childStacks    = childStacks;
+            state.gate           = &gate;
+            state.cancelledToken = cancelledSource.token();
+            cancelledSource.requestCancel();
+            scheduler.add(gate);
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            FiberWorkerPoolOptions options;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = NumChildren + 1;
+
+            SC_TEST_EXPECT(scheduler.spawn(
+                producer, producerStack,
+                FiberTask::Procedure(
+                    [&state](FiberScheduler& scheduler)
+                    {
+                        state.entered.store(1, memory_order_release);
+                        SC_TRY(scheduler.wait(*state.gate));
+                        for (size_t childIndex = 0; childIndex < NumChildren; ++childIndex)
+                        {
+                            FiberStack childStack({state.childStacks + childIndex * StackSize, StackSize});
+                            Result     spawnResult(true);
+                            if (childIndex == 0)
+                            {
+                                FiberTaskSpawnOptions spawnOptions;
+                                spawnOptions.cancellationToken = state.cancelledToken;
+                                spawnResult =
+                                    scheduler.spawn(state.children[childIndex], childStack,
+                                                    FiberTask::Procedure(
+                                                        [&state](FiberScheduler& scheduler)
+                                                        {
+                                                            Result result =
+                                                                scheduler.isCurrentTaskCancellationRequested()
+                                                                    ? Result::Error("FiberTask cancelled")
+                                                                    : Result(true);
+                                                            if (not result)
+                                                            {
+                                                                state.cancelled.fetch_add(1, memory_order_relaxed);
+                                                            }
+                                                            return result;
+                                                        }),
+                                                    spawnOptions);
+                            }
+                            else
+                            {
+                                spawnResult =
+                                    scheduler.spawn(state.children[childIndex], childStack,
+                                                    FiberTask::Procedure(
+                                                        [&state](FiberScheduler&)
+                                                        {
+                                                            state.completed.fetch_add(1, memory_order_relaxed);
+                                                            return Result(true);
+                                                        }));
+                            }
+                            if (not spawnResult)
+                            {
+                                state.spawnResult = spawnResult;
+                                return spawnResult;
+                            }
+                        }
+                        return Result(true);
+                    })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, {&worker, 1}, {&thread, 1}, options));
+
+            bool producerWaiting = false;
+            for (size_t attempt = 0; attempt < 5000; ++attempt)
+            {
+                producerWaiting =
+                    state.entered.load(memory_order_acquire) == 1 and producer.status() == FiberTaskStatus::Waiting;
+                if (producerWaiting)
+                {
+                    break;
+                }
+                Thread::Sleep(1);
+            }
+            SC_TEST_EXPECT(producerWaiting);
+            scheduler.resetSchedulerDiagnostics();
+            SC_TEST_EXPECT(scheduler.done(gate));
+            SC_TEST_EXPECT(workerPool.join());
+
+            FiberSchedulerDiagnostics diagnostics;
+            scheduler.schedulerDiagnostics(diagnostics);
+            SC_TEST_EXPECT(state.spawnResult);
+            SC_TEST_EXPECT(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumChildren - 1));
+            SC_TEST_EXPECT(state.cancelled.load(memory_order_relaxed) == 1);
+            SC_TEST_EXPECT(producer.result());
+            SC_TEST_EXPECT(not children[0].result());
+            for (size_t childIndex = 1; childIndex < NumChildren; ++childIndex)
+            {
+                SC_TEST_EXPECT(children[childIndex].result());
+            }
+            SC_TEST_EXPECT(diagnostics.lockAcquisitions < NumChildren / 4);
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(allocator.close());
+        }
+
+        {
+            static constexpr size_t NumAttempts = 4;
+
+            struct State
+            {
+                FiberTask* tasks      = nullptr;
+                char*      taskStacks = nullptr;
+
+                Result spawnResults[NumAttempts] = {
+                    Result(true),
+                    Result(true),
+                    Result(true),
+                    Result(true),
+                };
+
+                Atomic<int32_t> completed;
+            };
+
+            FiberScheduler    scheduler;
+            FiberAllocator    allocator;
+            char              allocatorStorage[4096] = {};
+            static FiberTask  tasks[NumAttempts];
+            static char       taskStacks[NumAttempts * StackSize] = {};
+            FiberTask         producer;
+            char              producerStackMemory[StackSize] = {};
+            FiberStack        producerStack({producerStackMemory, sizeof(producerStackMemory)});
+            FiberWorker       worker;
+            FiberWorkerThread thread;
+            FiberWorkerPool   workerPool;
+            State             state;
+
+            state.tasks      = tasks;
+            state.taskStacks = taskStacks;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            FiberWorkerPoolOptions options;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = 2;
+            options.injectionAllocator     = &allocator;
+            options.injectionCapacity      = 1;
+
+            SC_TEST_EXPECT(scheduler.spawn(
+                producer, producerStack,
+                FiberTask::Procedure(
+                    [&state](FiberScheduler& scheduler)
+                    {
+                        for (size_t taskIndex = 0; taskIndex < NumAttempts; ++taskIndex)
+                        {
+                            FiberStack taskStack({state.taskStacks + taskIndex * StackSize, StackSize});
+                            state.spawnResults[taskIndex] =
+                                scheduler.spawn(state.tasks[taskIndex], taskStack,
+                                                FiberTask::Procedure(
+                                                    [&state](FiberScheduler&)
+                                                    {
+                                                        state.completed.fetch_add(1, memory_order_relaxed);
+                                                        return Result(true);
+                                                    }));
+                        }
+                        return Result(true);
+                    })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, {&worker, 1}, {&thread, 1}, options));
+            SC_TEST_EXPECT(workerPool.join());
+
+            SC_TEST_EXPECT(state.spawnResults[0]);
+            SC_TEST_EXPECT(state.spawnResults[1]);
+            SC_TEST_EXPECT(state.spawnResults[2]);
+            SC_TEST_EXPECT(not state.spawnResults[3]);
+            SC_TEST_EXPECT(tasks[3].status() == FiberTaskStatus::Invalid);
+            SC_TEST_EXPECT(state.completed.load(memory_order_relaxed) == 3);
+            SC_TEST_EXPECT(producer.result());
+            for (size_t taskIndex = 0; taskIndex < NumAttempts - 1; ++taskIndex)
+            {
+                SC_TEST_EXPECT(tasks[taskIndex].result());
+            }
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(allocator.close());
+        }
     }
 
     void workerPoolInjectionQueue()

@@ -138,6 +138,13 @@ The batch never mixes the intrusive spill source with the injection source, neve
 does not change publication backpressure. The fixed bound prevents one worker from draining an unbounded shared backlog
 before peers can steal it.
 
+A running configured pool worker may spawn a counter-free child directly into its own deque when bounded capacity is
+already available. Context construction leaves the child inactive; publication atomically increases active work, links
+the child into that worker's stable active registry, changes it to `Ready`, and only then exposes the deque slot. This
+ordering lets cancellation scans linearize either before the child exists or after it is discoverable. Counter-backed
+children, manual workers, and full local deques retain the scheduler-control path and its existing bounded-injection
+capacity error. No fallback allocation or implicit queue growth is introduced.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains

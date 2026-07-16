@@ -1116,6 +1116,10 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void trace(FiberTraceEventType type, FiberTask* task, FiberWorker* worker, size_t value = 0) const;
 
     void                     addUnlocked(FiberCounter& counter);
+    Result                   initializeTaskForSpawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
+                                                    const FiberTaskSpawnOptions& options);
+    [[nodiscard]] bool       canPublishOwnerSpawn(FiberWorker& worker, const FiberTaskSpawnOptions& options) const;
+    void                     linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker);
     Result                   createInjectionQueue(FiberAllocator& allocator, size_t capacity);
     void                     releaseInjectionQueue();
     [[nodiscard]] bool       tryPushInjectionUnlocked(FiberTask& task);
