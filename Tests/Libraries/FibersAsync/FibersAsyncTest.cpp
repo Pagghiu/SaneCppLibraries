@@ -1133,6 +1133,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             Result firstResult  = Result(true);
             Result secondResult = Result(true);
+            Result thirdResult  = Result(true);
             Result workerResult = Result(true);
         };
 
@@ -1203,6 +1204,27 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(not secondTask.result());
         SC_TEST_EXPECT(state.firstResult);
         SC_TEST_EXPECT(not state.secondResult);
+
+        state.workerDone.store(false);
+        state.workerRuns.store(0);
+        SC_TEST_EXPECT(scheduler.spawn(firstTask, firstStack,
+                                       FiberTask::Procedure(
+                                           [&state](FiberScheduler&)
+                                           {
+                                               state.thirdResult = state.io->sleep(TimeMs{1});
+                                               return state.thirdResult;
+                                           })));
+        SC_TEST_EXPECT(workerThread.start(worker));
+        for (int idx = 0; idx < 1000 and not state.workerDone.load(); ++idx)
+        {
+            Thread::Sleep(1);
+        }
+        SC_TEST_EXPECT(workerThread.join());
+        SC_TEST_EXPECT(state.workerResult);
+        SC_TEST_EXPECT(io.run());
+        SC_TEST_EXPECT(firstTask.isCompleted());
+        SC_TEST_EXPECT(firstTask.result());
+        SC_TEST_EXPECT(state.thirdResult);
         SC_TEST_EXPECT(eventLoop.close());
     }
 

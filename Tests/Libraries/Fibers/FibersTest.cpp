@@ -2064,6 +2064,13 @@ struct SC::FibersTest : public SC::TestCase
 
         SC_TEST_EXPECT(counter.value() == 1);
         SC_TEST_EXPECT(scheduler.done(counter));
+
+        SC_TEST_EXPECT(scheduler.shutdown());
+        SC_TEST_EXPECT(scheduler.spawn(yieldingTask, yieldingStack,
+                                       FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(yieldingTask.isCompleted());
+        SC_TEST_EXPECT(yieldingTask.result());
     }
 
     void cancelWaitingTask()

@@ -59,6 +59,12 @@ FiberAsyncIO::FiberAsyncIO(FiberScheduler& fiberScheduler, AsyncEventLoop& async
       ownerThreadID(Thread::CurrentThreadID())
 {}
 
+FiberAsyncIO::~FiberAsyncIO()
+{
+    SC_FIBER_ASYNC_ASSERT_RELEASE(pendingOperations.load() == 0);
+    SC_FIBER_ASYNC_ASSERT_RELEASE(not hasPendingCommands());
+}
+
 FiberScheduler& FiberAsyncIO::fiberScheduler() { return scheduler; }
 
 const FiberScheduler& FiberAsyncIO::fiberScheduler() const { return scheduler; }

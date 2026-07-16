@@ -59,8 +59,8 @@ publication. This is also why cancellation remains cooperative rather than preem
 
 ## Control-Plane Signals And Parking
 
-The replacement for the globally locked counters consists of three control-plane signals. They are implementation
-fields, not new public API.
+The replacement for the globally locked counters consists of two scheduler control-plane signals plus the worker
+pool's separate stop request. They are implementation fields, not new public API.
 
 - `activeFiberCount` is an atomic count. The creating thread increments it before a task's first ready publication;
   the worker root context decrements it exactly once after final completion has made later resume impossible and before
@@ -69,8 +69,10 @@ fields, not new public API.
   deque, injection queue, or intrusive spill. The deque owner or thief decrements it only after successfully claiming
   a visible task. During publication it may temporarily over-count, which is safe: a worker that observes a non-zero
   value must retry work discovery rather than conclude that the scheduler is idle.
-- `shutdownRequested` is an atomic flag. Shutdown publication wakes all workers and prevents accepting further work
-  according to the public shutdown contract; it does not make active fiber state disappear.
+- `FiberWorkerPool::stopRequested` is an atomic pool-lifecycle flag. A stop request wakes all workers and asks them to
+  cancel the scheduler's currently active tasks before joining. It is not a permanent scheduler state:
+  `FiberScheduler::shutdown()` is a reusable cancellation drain, and the scheduler may accept new work after it has
+  returned with no active fibers.
 
 Task initialization happens-before first publication. `activeFiberCount` increments and `readyWorkCount` increments
 use release semantics; readers that decide whether to park or terminate use acquire semantics. A successful task-state
@@ -82,9 +84,9 @@ The worker parking sequence is deliberately prepare, recheck, then park:
 
 1. Explore local work, bounded injection/spill work, and the configured steal attempts.
 2. Capture the wake-event generation while its mutex is held, then release that mutex.
-3. Acquire-load `shutdownRequested`, `readyWorkCount`, and `activeFiberCount`.
-4. Retry discovery when ready work is non-zero. Exit only when shutdown is requested and active work is zero. Otherwise
-   wait only while the wake-event generation is unchanged.
+3. Acquire-load the pool stop request, `readyWorkCount`, and `activeFiberCount`.
+4. Retry discovery when ready work is non-zero. Park only while the pool has not been asked to stop and active work
+   remains. Exit when active work reaches zero; a stop request first cooperatively cancels that active work.
 
 Every ready publisher increments `readyWorkCount` before it advances the queue publication point and then increments
 the wake generation before signaling. Therefore a worker either observes the ready work during the recheck or sees the
@@ -174,7 +176,8 @@ unexpected state.
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains
 bounded and explicit. Existing fibers retain no-allocation yield/wake behavior. Cancellation remains cooperative and
-does not preempt running stacks, but its race rules become explicit enough to test independently.
+does not preempt running stacks, but its race rules become explicit enough to test independently. Scheduler shutdown
+does not create a hidden terminal state: after the cancellation drain completes, the caller-owned scheduler is reusable.
 
 The first implementation intentionally favors one bounded scheduler injection queue over a more complex hierarchy. It
 may still contend under heavy external submission, but it keeps ownership auditable and gives benchmarks a concrete
@@ -199,7 +202,8 @@ allocation, unbounded queues, or an implicit global scheduler.
 A change preserves this decision when normal owner execution does not take the scheduler-global hot-path lock, external
 and cross-owner work never mutates another worker's deque directly, every ready publication has one owner, injection
 capacity is explicit, parking cannot lose work, and cancellation/primitive races prove no task is lost, double-resumed,
-or completed twice.
+or completed twice. Scheduler shutdown must drain current work without preventing a later explicit spawn, while worker
+pool stop and join remain a separate lifecycle.
 
 ## Related
 

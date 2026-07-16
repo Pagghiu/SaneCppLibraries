@@ -108,6 +108,12 @@ resume, and its task, stack, buffers, and request dependencies must remain alive
 `runUntilComplete`/`runOwnerUntilComplete`, task result collection, and `AsyncEventLoop::close` as an ordered shutdown
 sequence.
 
+`FiberAsyncIO` is a non-copyable, non-movable borrowed wrapper. The scheduler, event loop, command storage, operation
+buffers, and descriptors must outlive every operation that uses them. Destroying the wrapper with a pending operation
+or queued owner-thread command is a programming error diagnosed by a release assertion. Command exhaustion is a normal
+bounded-capacity error: it does not consume a slot permanently, and the same wrapper remains usable after the owner
+drains previously queued work.
+
 # Choosing between the neighboring libraries
 
 Use [Async](@ref library_async) directly when callbacks fit the state machine, minimizing per-operation stack memory and

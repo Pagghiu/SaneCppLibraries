@@ -92,6 +92,12 @@ struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
 {
     FiberAsyncIO(FiberScheduler& fiberScheduler, AsyncEventLoop& asyncEventLoop,
                  Span<FiberAsyncCommand> commandStorage = {});
+    ~FiberAsyncIO();
+
+    FiberAsyncIO(const FiberAsyncIO&)            = delete;
+    FiberAsyncIO& operator=(const FiberAsyncIO&) = delete;
+    FiberAsyncIO(FiberAsyncIO&&)                 = delete;
+    FiberAsyncIO& operator=(FiberAsyncIO&&)      = delete;
 
     [[nodiscard]] FiberScheduler&       fiberScheduler();
     [[nodiscard]] const FiberScheduler& fiberScheduler() const;

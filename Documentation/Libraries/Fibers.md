@@ -224,6 +224,11 @@ them must remain alive and at stable addresses until the task completes. A `Fibe
 does not make borrowed state owning. Destroying a scheduler or storage class while work is active is a programming
 error diagnosed by the library.
 
+`FiberScheduler::shutdown()` is a reusable cancellation drain, not a permanent close. It requests cancellation for the
+currently active tasks and drives them back to completion. Calling it again with no active work succeeds, and new tasks
+may be spawned afterward. A worker pool has a separate lifecycle: `requestStop()` wakes its workers and `join()` must
+finish before worker, thread, deque, or injection storage is reused or destroyed.
+
 # Allocation Policy
 
 `Fibers` follows the Sane C++ allocation rules:

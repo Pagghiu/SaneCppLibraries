@@ -15,6 +15,9 @@ Unbounded cross-thread queues would violate SC allocation rules.
 posted through bounded caller-provided command storage and executed by the owner thread. Worker fibers suspend
 cooperatively until the owner-thread async request completes, fails, or is canceled.
 
+`FiberAsyncIO` borrows the scheduler, event loop, and command storage. It is non-copyable and non-movable, and it must
+not be destroyed while an operation or queued owner-thread command is pending.
+
 ## Consequences
 
 `FibersAsync` can support fiber migration across worker threads while preserving `Async`'s thread-affinity assumptions.
@@ -25,7 +28,8 @@ rather than hidden allocation.
 
 A change preserves this decision when `FiberAsyncIO` can identify the owner thread, cross-thread starts/stops go through
 bounded command posting, command queue capacity is visible through `Result` failures for real exhaustion, and tests cover
-worker-fiber I/O submission from non-owner threads.
+worker-fiber I/O submission from non-owner threads. Exhaustion must leave the queue reusable, and destruction must
+diagnose pending operations or commands rather than silently invalidating borrowed state.
 
 ## Related
 
