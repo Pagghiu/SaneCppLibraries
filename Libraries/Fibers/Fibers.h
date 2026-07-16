@@ -475,6 +475,7 @@ struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
 struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
 {
     size_t readyFibers         = 0;
+    size_t globalReadyFibers   = 0;
     size_t activeFibers        = 0;
     size_t injectionCapacity   = 0;
     size_t injectionReady      = 0;
@@ -484,6 +485,11 @@ struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
     size_t lockContentions     = 0;
     size_t lockSpinRetries     = 0;
     size_t lockPeakSpinRetries = 0;
+    size_t lockSpawn           = 0;
+    size_t lockReady           = 0;
+    size_t lockSynchronization = 0;
+    size_t lockCompletion      = 0;
+    size_t lockControl         = 0;
 };
 
 enum class FiberTraceEventType : uint8_t
@@ -1097,8 +1103,9 @@ struct SC_FIBERS_EXPORT FiberScheduler
 
     FiberWorkerPool* workerPool = nullptr;
 
-    volatile size_t readyFibers  = 0;
-    volatile size_t activeFibers = 0;
+    volatile size_t readyFibers       = 0;
+    volatile size_t globalReadyFibers = 0;
+    volatile size_t activeFibers      = 0;
 
     mutable volatile int32_t schedulerLock = 0;
 
@@ -1107,11 +1114,26 @@ struct SC_FIBERS_EXPORT FiberScheduler
     mutable size_t schedulerLockSpinRetries     = 0;
     mutable size_t schedulerLockPeakSpinRetries = 0;
 
+    mutable size_t schedulerLockSpawn           = 0;
+    mutable size_t schedulerLockReady           = 0;
+    mutable size_t schedulerLockSynchronization = 0;
+    mutable size_t schedulerLockCompletion      = 0;
+    mutable size_t schedulerLockControl         = 0;
+
     FiberTraceHooks traceHooks;
+
+    enum class LockCategory : uint8_t
+    {
+        Spawn,
+        Ready,
+        Synchronization,
+        Completion,
+        Control,
+    };
 
     struct LockGuard;
 
-    void lock() const;
+    void lock(LockCategory category) const;
     void unlock() const;
     void trace(FiberTraceEventType type, FiberTask* task, FiberWorker* worker, size_t value = 0) const;
 

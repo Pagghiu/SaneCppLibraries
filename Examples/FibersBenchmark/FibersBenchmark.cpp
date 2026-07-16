@@ -193,6 +193,10 @@ static Result runWorkerPoolBenchmark(Console& console)
     console.print("  schedulerLockContentions={} schedulerLockSpinRetries={} schedulerLockPeakSpinRetries={}\n",
                   schedulerDiagnostics.lockContentions, schedulerDiagnostics.lockSpinRetries,
                   schedulerDiagnostics.lockPeakSpinRetries);
+    console.print("  schedulerLocksByCategory: spawn={} ready={} synchronization={} completion={} control={}\n",
+                  schedulerDiagnostics.lockSpawn, schedulerDiagnostics.lockReady,
+                  schedulerDiagnostics.lockSynchronization, schedulerDiagnostics.lockCompletion,
+                  schedulerDiagnostics.lockControl);
     console.print("  allocatorPeakBytes={} allocatorFailures={} maxStackUsed={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures, maxStackUsed);
 
@@ -575,6 +579,10 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
                   schedulerDiagnostics.lockSpinRetries);
+    console.print("  schedulerLocksByCategory: spawn={} ready={} synchronization={} completion={} control={}\n",
+                  schedulerDiagnostics.lockSpawn, schedulerDiagnostics.lockReady,
+                  schedulerDiagnostics.lockSynchronization, schedulerDiagnostics.lockCompletion,
+                  schedulerDiagnostics.lockControl);
     console.print("  configuredInjectionCapacity={} injectionPeak={} injectionSpills={}\n", configuredInjectionCapacity,
                   schedulerDiagnostics.injectionPeak, schedulerDiagnostics.injectionSpills);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
@@ -965,6 +973,10 @@ static Result runCounterCompletionBenchmark(Console& console)
     console.print("  schedulerLockAcquisitions={} schedulerLockContentions={} schedulerLockSpinRetries={}\n",
                   schedulerDiagnostics.lockAcquisitions, schedulerDiagnostics.lockContentions,
                   schedulerDiagnostics.lockSpinRetries);
+    console.print("  schedulerLocksByCategory: spawn={} ready={} synchronization={} completion={} control={}\n",
+                  schedulerDiagnostics.lockSpawn, schedulerDiagnostics.lockReady,
+                  schedulerDiagnostics.lockSynchronization, schedulerDiagnostics.lockCompletion,
+                  schedulerDiagnostics.lockControl);
     console.print("  executedFibers={} completedFibers={} stolenFibers={}\n", workerDiagnostics.executedFibers,
                   workerDiagnostics.completedFibers, workerDiagnostics.stolenFibers);
 

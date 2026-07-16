@@ -1331,7 +1331,11 @@ void FiberWorkerPool::WakeEventOpaque::destruct(Object& obj)
 
 struct FiberScheduler::LockGuard
 {
-    explicit LockGuard(const FiberScheduler& fiberScheduler) : scheduler(fiberScheduler) { scheduler.lock(); }
+    explicit LockGuard(const FiberScheduler& fiberScheduler, LockCategory category = LockCategory::Control)
+        : scheduler(fiberScheduler)
+    {
+        scheduler.lock(category);
+    }
     ~LockGuard() { scheduler.unlock(); }
 
     LockGuard(const LockGuard&)            = delete;
@@ -4053,7 +4057,7 @@ FiberScheduler::~FiberScheduler()
     SC_FIBERS_ASSERT_RELEASE(injectionQueue == nullptr);
 }
 
-void FiberScheduler::lock() const
+void FiberScheduler::lock(LockCategory category) const
 {
     const size_t spinRetries = fiberSchedulerLock(schedulerLock);
     schedulerLockAcquisitions += 1;
@@ -4065,6 +4069,14 @@ void FiberScheduler::lock() const
     if (spinRetries > schedulerLockPeakSpinRetries)
     {
         schedulerLockPeakSpinRetries = spinRetries;
+    }
+    switch (category)
+    {
+    case LockCategory::Spawn: schedulerLockSpawn += 1; break;
+    case LockCategory::Ready: schedulerLockReady += 1; break;
+    case LockCategory::Synchronization: schedulerLockSynchronization += 1; break;
+    case LockCategory::Completion: schedulerLockCompletion += 1; break;
+    case LockCategory::Control: schedulerLockControl += 1; break;
     }
 }
 
@@ -4124,7 +4136,7 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         return Result(true);
     }
 
-    LockGuard guard(*this);
+    LockGuard guard(*this, LockCategory::Spawn);
     if (task.isActive())
     {
         return Result::Error("FiberTask is already active");
@@ -4278,7 +4290,7 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
 {
     FiberTask* task = nullptr;
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Ready);
         fiberAtomicFetchAddSize(worker.runAttempts, 1);
         task = popReadyUnlocked();
         if (task == nullptr)
@@ -4287,7 +4299,8 @@ Result FiberScheduler::runOnce(FiberWorker& worker)
             return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
                                                           : Result::Error("FiberScheduler cannot make progress");
         }
-        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
+        SC_FIBERS_ASSERT_RELEASE(
+            fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
         moveActiveToWorkerUnlocked(*task, worker);
     }
     return runReadyTask(*task, worker);
@@ -4297,7 +4310,7 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
 {
     FiberTask* task = nullptr;
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Ready);
         for (size_t workerIndex = 0; workerIndex < workerGroup.sizeInElements(); ++workerIndex)
         {
             FiberWorker& groupWorker = workerGroup[workerIndex];
@@ -4319,7 +4332,8 @@ Result FiberScheduler::runOnce(FiberWorker& worker, Span<FiberWorker> workerGrou
             return fiberAtomicLoadSize(activeFibers) == 0 ? Result(true)
                                                           : Result::Error("FiberScheduler cannot make progress");
         }
-        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
+        SC_FIBERS_ASSERT_RELEASE(
+            fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
         moveActiveToWorkerUnlocked(*task, worker);
     }
     return runReadyTask(*task, worker);
@@ -4342,7 +4356,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
                                       worker.localQueueScheduler == this;
     if (not configuredDequeOwner)
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Ready);
         for (size_t workerIndex = 0; workerIndex < stealWorkers.sizeInElements(); ++workerIndex)
         {
             FiberWorker& groupWorker = stealWorkers[workerIndex];
@@ -4370,7 +4384,7 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
             fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
         if (task->activeRegistryWorker == nullptr)
         {
-            LockGuard guard(*this);
+            LockGuard guard(*this, LockCategory::Ready);
             moveActiveToWorkerUnlocked(*task, worker);
         }
     }
@@ -4384,9 +4398,15 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
         }
     }
 
+    if (task == nullptr and configuredDequeOwner and fiberAtomicLoadSize(globalReadyFibers) == 0)
+    {
+        fiberAtomicFetchAddSize(worker.idlePolls, 1);
+        return Result(true);
+    }
+
     if (task == nullptr)
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Ready);
         if (worker.localDeque != nullptr)
         {
             task = configuredDequeOwner ? popReadyBatchUnlocked(worker) : popReadyUnlocked();
@@ -4412,7 +4432,8 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
             }
             return Result(true);
         }
-        fiberTaskStatusStore(task->taskStatus, FiberTaskStatus::Running);
+        SC_FIBERS_ASSERT_RELEASE(
+            fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
         moveActiveToWorkerUnlocked(*task, worker);
     }
     return runReadyTask(*task, worker);
@@ -4695,7 +4716,7 @@ Result FiberScheduler::requestCancelAll()
 
 void FiberScheduler::add(FiberCounter& counter)
 {
-    LockGuard guard(*this);
+    LockGuard guard(*this, LockCategory::Synchronization);
     addUnlocked(counter);
 }
 
@@ -4715,7 +4736,7 @@ Result FiberScheduler::done(FiberCounter& counter)
     }
 
     // Serialize the final transition with add() and waiter publication so generations cannot overlap.
-    LockGuard guard(*this);
+    LockGuard guard(*this, LockCategory::Synchronization);
     return doneUnlocked(counter);
 }
 
@@ -4757,7 +4778,7 @@ void FiberScheduler::clearTraceHooks()
 Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
 {
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Synchronization);
         if (fiberAtomicLoadSize(counter.counterValue) == 0)
         {
             return Result(true);
@@ -4770,7 +4791,7 @@ Result FiberScheduler::waitImpl(FiberCounter& counter, bool interruptible)
         while (true)
         {
             {
-                LockGuard guard(*this);
+                LockGuard guard(*this, LockCategory::Synchronization);
                 if (fiberAtomicLoadSize(counter.counterValue) == 0)
                 {
                     return Result(true);
@@ -4868,6 +4889,7 @@ void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics
     LockGuard guard(*this);
 
     diagnostics.readyFibers         = fiberAtomicLoadSize(readyFibers);
+    diagnostics.globalReadyFibers   = fiberAtomicLoadSize(globalReadyFibers);
     diagnostics.activeFibers        = fiberAtomicLoadSize(activeFibers);
     diagnostics.injectionCapacity   = injectionCapacity;
     diagnostics.injectionReady      = injectionReady;
@@ -4877,6 +4899,11 @@ void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics
     diagnostics.lockContentions     = schedulerLockContentions;
     diagnostics.lockSpinRetries     = schedulerLockSpinRetries;
     diagnostics.lockPeakSpinRetries = schedulerLockPeakSpinRetries;
+    diagnostics.lockSpawn           = schedulerLockSpawn;
+    diagnostics.lockReady           = schedulerLockReady;
+    diagnostics.lockSynchronization = schedulerLockSynchronization;
+    diagnostics.lockCompletion      = schedulerLockCompletion;
+    diagnostics.lockControl         = schedulerLockControl;
 }
 
 void FiberScheduler::resetSchedulerDiagnostics()
@@ -4887,6 +4914,11 @@ void FiberScheduler::resetSchedulerDiagnostics()
     schedulerLockContentions     = 0;
     schedulerLockSpinRetries     = 0;
     schedulerLockPeakSpinRetries = 0;
+    schedulerLockSpawn           = 0;
+    schedulerLockReady           = 0;
+    schedulerLockSynchronization = 0;
+    schedulerLockCompletion      = 0;
+    schedulerLockControl         = 0;
     injectionPeak                = injectionReady;
     injectionSpills              = 0;
 }
@@ -5068,6 +5100,7 @@ bool FiberScheduler::tryPushInjectionUnlocked(FiberTask& task)
     task.nextReady     = nullptr;
     task.previousReady = nullptr;
     fiberAtomicFetchAddSize(readyFibers, 1);
+    fiberAtomicFetchAddSize(globalReadyFibers, 1);
     notifyReadyWorkUnlocked();
     return true;
 }
@@ -5087,6 +5120,8 @@ FiberTask* FiberScheduler::popInjectionUnlocked()
     injectionReady -= 1;
     SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyFibers) > 0);
     fiberAtomicFetchSubSize(readyFibers, 1);
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(globalReadyFibers) > 0);
+    fiberAtomicFetchSubSize(globalReadyFibers, 1);
     return task;
 }
 
@@ -5103,6 +5138,7 @@ void FiberScheduler::pushReadyUnlocked(FiberTask& task)
     task.nextReady     = nullptr;
     task.previousReady = nullptr;
     fiberAtomicFetchAddSize(readyFibers, 1);
+    fiberAtomicFetchAddSize(globalReadyFibers, 1);
     if (readyTail == nullptr)
     {
         readyHead = &task;
@@ -5207,6 +5243,8 @@ FiberTask* FiberScheduler::popReadyUnlocked()
     task->previousReady = nullptr;
     SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyFibers) > 0);
     fiberAtomicFetchSubSize(readyFibers, 1);
+    SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(globalReadyFibers) > 0);
+    fiberAtomicFetchSubSize(globalReadyFibers, 1);
     if (readyHead == nullptr)
     {
         readyTail = nullptr;
@@ -5600,7 +5638,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     }
     else
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Completion);
         publishSuspensionUnlocked(task);
         if (task.status() == FiberTaskStatus::Completing)
         {
@@ -5666,7 +5704,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     }
     if (preferredReadyWorker != nullptr and not tryPushWorkerReadyDeque(*preferredReadyWorker, task))
     {
-        LockGuard guard(*this);
+        LockGuard guard(*this, LockCategory::Completion);
         preferredReadyWorker->localSpilledFibers += 1;
         pushReadyUnlocked(task);
     }
@@ -5951,7 +5989,10 @@ bool FiberScheduler::removeCounterWaiterUnlocked(FiberCounter& counter, FiberTas
 
 void FiberScheduler::wakeCounterWaitersUnlocked(FiberCounter& counter)
 {
-    FiberTask* task = counter.waitingHead;
+    FiberTask* task     = counter.waitingHead;
+    counter.waitingHead = nullptr;
+    counter.waitingTail = nullptr;
+
     while (task != nullptr)
     {
         FiberTask* next            = task->nextWaiting;
@@ -5962,9 +6003,6 @@ void FiberScheduler::wakeCounterWaitersUnlocked(FiberCounter& counter)
         pushReadyUnlocked(*task, task->preferredWorker);
         task = next;
     }
-
-    counter.waitingHead = nullptr;
-    counter.waitingTail = nullptr;
 }
 
 Result FiberContextOperations::captureCurrent(FiberContext& context)

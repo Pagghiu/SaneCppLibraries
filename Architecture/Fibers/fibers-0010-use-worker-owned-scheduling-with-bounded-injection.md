@@ -154,6 +154,22 @@ bounded injection queue; manual worker groups retain their coordinated behavior.
 Per-worker park-attempt and parked-wakeup diagnostics use layout-preserving atomic counters. Updating observability
 therefore does not acquire the scheduler-control lock around the existing wake-generation and OS-wait protocol.
 
+Scheduler-lock diagnostics classify every acquisition as spawn publication, ready/steal fallback, synchronization,
+completion fallback, or control-plane work. The categories are observational and sum to the existing acquisition
+count; they do not add locks, allocation, or a new scheduling state.
+
+An atomic global-ready count tracks the exact subset of ready tasks held by the intrusive fallback list and bounded
+injection queue. After a configured owner misses its local deque and sampled victims, a zero count proves there is no
+global queue to inspect under the scheduler-control lock; the worker can retry its bounded victim cursor directly. A
+concurrent global publisher updates the count while holding the control lock and wakes a worker, so observing zero may
+delay that publication only until the normal wake/retry boundary and cannot lose work.
+
+Counter completion detaches the entire intrusive waiter list before publishing any waiter to a local or global ready
+queue. A local publication can be stolen and resumed without the scheduler-control lock, so leaving the counter linked
+until after publication would allow a resumed fiber to unwind stack-local counter storage before completion finished
+traversing it. Every ready-source claim also proves `Ready -> Running` with compare/exchange rather than overwriting an
+unexpected state.
+
 ## Consequences
 
 The common CPU path no longer needs one scheduler lock per fiber state change, while externally initiated work remains
