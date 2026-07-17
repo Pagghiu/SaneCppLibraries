@@ -204,7 +204,7 @@ struct SC::BuildTest : public SC::TestCase
                                                  Build::RunnerSpec::Wine));
         }
 
-        if (test_section("Native backend support matrix documentation"))
+        if (test_section("Native backend support matrix discovery documentation"))
         {
             FileSystem fs;
             SC_TRUST_RESULT(fs.init(report.libraryRootDirectory.view()));
@@ -212,20 +212,8 @@ struct SC::BuildTest : public SC::TestCase
             String buildDocument = StringEncoding::Utf8;
             SC_TRUST_RESULT(fs.read("Documentation/Pages/Build.md", buildDocument));
             const StringView documentView(buildDocument.view());
-
-            for (const Build::SupportMatrixEntry& entry : Build::getNativeBackendSupportMatrix())
-            {
-                String expectedRow = StringEncoding::Utf8;
-                SC_TRUST_RESULT(StringBuilder::format(
-                    expectedRow, "| {} | {} | {} | {} | {} | {} | {} |",
-                    supportMatrixHostName(entry.hostMachine.platform),
-                    Build::TargetEnvironment::toString(entry.targetMachine.environment),
-                    supportMatrixArchitectureName(entry.targetMachine.architecture),
-                    Build::SupportStatus::toString(entry.buildSupport),
-                    Build::SupportStatus::toString(entry.runSupport), Build::RunnerSpec::toString(entry.runner),
-                    Build::SupportTier::toString(entry.tier)));
-                SC_TEST_EXPECT(documentView.containsString(expectedRow.view()));
-            }
+            SC_TEST_EXPECT(documentView.containsString("./SC.sh build compile --help"));
+            SC_TEST_EXPECT(documentView.containsString("./SC.sh build run --help"));
         }
 
         if (test_section("Build CLI reserves ABI option"))
@@ -279,18 +267,31 @@ struct SC::BuildTest : public SC::TestCase
 
         if (test_section("Build CLI help reflects support matrix"))
         {
-            String help = StringEncoding::Utf8;
-            SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, help));
-            SC_TEST_EXPECT(StringView(help.view()).containsString("Current native-backend support matrix"));
-            SC_TEST_EXPECT(
-                StringView(help.view()).containsString("macOS -> linux-glibc-arm64: build=supported, run=not-yet"));
-            SC_TEST_EXPECT(
-                StringView(help.view()).containsString("macOS -> linux-musl-x86_64: build=supported, run=not-yet"));
-            SC_TEST_EXPECT(
-                StringView(help.view()).containsString("Windows -> linux-musl-x86_64: build=supported, run=not-yet"));
-            SC_TEST_EXPECT(
-                StringView(help.view()).containsString("--abi is reserved for a future public ABI selector"));
-            SC_TEST_EXPECT(StringView(help.view()).containsString("Fil-C is toolchain-only for now"));
+            String compileHelp = StringEncoding::Utf8;
+            String runHelp     = StringEncoding::Utf8;
+            SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Compile, compileHelp));
+            SC_TEST_EXPECT(writeBuildHelpAddendumToString(Build::Action::Run, runHelp));
+
+            const StringView compileHelpView(compileHelp.view());
+            const StringView runHelpView(runHelp.view());
+            SC_TEST_EXPECT(compileHelpView.containsString("Current native-backend support matrix"));
+            SC_TEST_EXPECT(runHelpView.containsString("Current native-backend support matrix"));
+            for (const Build::SupportMatrixEntry& entry : Build::getNativeBackendSupportMatrix())
+            {
+                String expectedRow = StringEncoding::Utf8;
+                SC_TRUST_RESULT(StringBuilder::format(
+                    expectedRow, "{} -> {}-{}: build={}, run={}, runner={}, tier={}",
+                    supportMatrixHostName(entry.hostMachine.platform),
+                    Build::TargetEnvironment::toString(entry.targetMachine.environment),
+                    supportMatrixArchitectureName(entry.targetMachine.architecture),
+                    Build::SupportStatus::toString(entry.buildSupport),
+                    Build::SupportStatus::toString(entry.runSupport), Build::RunnerSpec::toString(entry.runner),
+                    Build::SupportTier::toString(entry.tier)));
+                SC_TEST_EXPECT(compileHelpView.containsString(expectedRow.view()));
+                SC_TEST_EXPECT(runHelpView.containsString(expectedRow.view()));
+            }
+            SC_TEST_EXPECT(compileHelpView.containsString("--abi is reserved for a future public ABI selector"));
+            SC_TEST_EXPECT(compileHelpView.containsString("Fil-C is toolchain-only for now"));
         }
 
         if (test_section("Visual Studio 2022"))
