@@ -3190,6 +3190,28 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TEST_EXPECT(not thread.wasStarted());
             }
 
+            char           allocatorStorage[4096] = {};
+            FiberAllocator allocator;
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            FiberWorkerPoolOptions exhaustedOptions;
+            exhaustedOptions.dequeAllocator         = &allocator;
+            exhaustedOptions.dequeCapacityPerWorker = 64;
+            exhaustedOptions.injectionAllocator     = &allocator;
+            exhaustedOptions.injectionCapacity      = 1024;
+            Result exhausted =
+                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, exhaustedOptions);
+            SC_TEST_EXPECT(not exhausted);
+            SC_TEST_EXPECT(not workerPool.isRunning());
+            SC_TEST_EXPECT(allocator.used() == 0);
+            for (FiberWorkerThread& thread : threads)
+            {
+                SC_TEST_EXPECT(not thread.wasStarted());
+            }
+            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(not workerPool.isRunning());
+            SC_TEST_EXPECT(allocator.close());
+
             uint64_t               mismatchedAffinityMasks[1] = {1};
             FiberWorkerPoolOptions badAffinityOptions;
             FiberWorkerThread      affinityThreads[NumWorkers];

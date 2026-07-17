@@ -111,7 +111,9 @@ SC_TRY(allocator.close());
 
 The worker pool owns OS threads while running, but the memory for workers, thread handles, deques, tasks, and stacks is
 still selected by the caller. `join()` waits for scheduled work and worker shutdown; lifecycle ordering is therefore
-part of application shutdown rather than destructor magic.
+part of application shutdown rather than destructor magic. If `start()` fails after creating allocator-backed queues,
+it releases every partial queue allocation and leaves the pool, scheduler, worker/thread storage, and allocator
+reusable.
 
 The optional injection queue is the bounded entry point for tasks submitted from external threads and for cross-worker
 wakeups. A new `spawn()` reports an error if that queue is full. A fiber that is already active never fails merely
