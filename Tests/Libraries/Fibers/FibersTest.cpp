@@ -3190,6 +3190,37 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TEST_EXPECT(not thread.wasStarted());
             }
 
+            char           dequeAllocatorStorage[4096]   = {};
+            char           existingAllocatorStorage[256] = {};
+            FiberAllocator dequeAllocator;
+            FiberAllocator existingAllocator;
+            SC_TEST_EXPECT(dequeAllocator.createFixed(dequeAllocatorStorage));
+            SC_TEST_EXPECT(existingAllocator.createFixed(existingAllocatorStorage));
+            SC_TEST_EXPECT(scheduler.createWorkerDeques(existingAllocator, {workers + 1, 1}, 4));
+
+            FiberWorkerPoolOptions partialDequeOptions;
+            partialDequeOptions.dequeAllocator         = &dequeAllocator;
+            partialDequeOptions.dequeCapacityPerWorker = 4;
+            Result partialDequeStart =
+                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions);
+            SC_TEST_EXPECT(not partialDequeStart);
+            SC_TEST_EXPECT(not workerPool.isRunning());
+            SC_TEST_EXPECT(dequeAllocator.used() == 0);
+            SC_TEST_EXPECT(existingAllocator.used() != 0);
+            for (FiberWorkerThread& thread : threads)
+            {
+                SC_TEST_EXPECT(not thread.wasStarted());
+            }
+
+            scheduler.releaseWorkerDeques({workers + 1, 1});
+            SC_TEST_EXPECT(existingAllocator.used() == 0);
+            SC_TEST_EXPECT(
+                workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, partialDequeOptions));
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(dequeAllocator.used() == 0);
+            SC_TEST_EXPECT(dequeAllocator.close());
+            SC_TEST_EXPECT(existingAllocator.close());
+
             char           allocatorStorage[4096] = {};
             FiberAllocator allocator;
             SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));

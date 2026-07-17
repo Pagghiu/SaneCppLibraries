@@ -4632,10 +4632,12 @@ Result FiberScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberW
     {
         if (worker.localDeque != nullptr)
         {
+            releaseWorkerDeques({workers.data(), allocatedWorkers});
             return Result::Error("FiberWorker already has a local deque");
         }
         if (worker.localReadyFibers != 0)
         {
+            releaseWorkerDeques({workers.data(), allocatedWorkers});
             return Result::Error("FiberWorker local queue is not empty");
         }
 
