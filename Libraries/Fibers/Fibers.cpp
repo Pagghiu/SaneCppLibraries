@@ -3733,7 +3733,15 @@ Result FiberAutoResetEvent::wait(FiberScheduler& scheduler)
         SC_FIBERS_TRUST_RESULT(scheduler.done(node.counter));
         return waitResult;
     }
-    fiberSchedulerUnlock(primitiveLock);
+    if (not waitResult)
+    {
+        fiberSchedulerUnlock(primitiveLock);
+        SC_TRY(signal(scheduler));
+    }
+    else
+    {
+        fiberSchedulerUnlock(primitiveLock);
+    }
     return waitResult;
 }
 

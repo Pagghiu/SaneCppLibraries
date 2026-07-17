@@ -6785,6 +6785,50 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            FiberScheduler      scheduler;
+            FiberTask           tasks[2];
+            FiberAutoResetEvent event;
+            char                stackMemory[2][64 * 1024] = {};
+            FiberStack          stacks[2]                 = {
+                FiberStack({stackMemory[0], sizeof(stackMemory[0])}),
+                FiberStack({stackMemory[1], sizeof(stackMemory[1])}),
+            };
+            bool                 completed[2]  = {};
+            FiberTask::Procedure procedures[2] = {
+                FiberTask::Procedure(
+                    [&event, outCompleted = &completed[0]](FiberScheduler& currentScheduler)
+                    {
+                        SC_TRY(event.wait(currentScheduler));
+                        *outCompleted = true;
+                        return Result(true);
+                    }),
+                FiberTask::Procedure(
+                    [&event, outCompleted = &completed[1]](FiberScheduler& currentScheduler)
+                    {
+                        SC_TRY(event.wait(currentScheduler));
+                        *outCompleted = true;
+                        return Result(true);
+                    }),
+            };
+
+            for (size_t idx = 0; idx < 2; ++idx)
+            {
+                SC_TEST_EXPECT(scheduler.spawn(tasks[idx], stacks[idx], procedures[idx]));
+                SC_TEST_EXPECT(scheduler.runOnce());
+                SC_TEST_EXPECT(tasks[idx].status() == FiberTaskStatus::Waiting);
+            }
+
+            SC_TEST_EXPECT(event.signal(scheduler));
+            SC_TEST_EXPECT(scheduler.requestCancel(tasks[0]));
+            SC_TEST_EXPECT(scheduler.run());
+            SC_TEST_EXPECT(not tasks[0].result());
+            SC_TEST_EXPECT(tasks[1].result());
+            SC_TEST_EXPECT(not completed[0]);
+            SC_TEST_EXPECT(completed[1]);
+            SC_TEST_EXPECT(not event.isSignaled());
+        }
+
+        {
             struct State
             {
                 FiberSemaphore* semaphore = nullptr;

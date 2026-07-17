@@ -43,6 +43,13 @@ benchmark protocol, particularly for periodic external submissions and `FibersAs
 - Poll scheduler state under the global lock while spinning: rejected because it would add the contention this roadmap
   is intended to remove.
 
+## Confirmation
+
+A change preserves this decision when `idleSpinAttempts` remains a caller-selected finite bound, zero attempts reach
+the existing park protocol without a spin iteration, idle probing does not acquire the scheduler-control lock or
+allocate, diagnostics distinguish spin iterations from park attempts and wakeups, and publication or shutdown wakes a
+parked worker without losing ready work.
+
 ## Related
 
 - [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
