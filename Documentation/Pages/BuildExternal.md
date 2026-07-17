@@ -10,15 +10,8 @@ access to the Sane C++ libraries without copying this repository's project struc
 An external project owns its `SC-build.cpp`. The launcher finds a compatible SaneCppLibraries checkout, compiles the
 build description, and executes the requested action from the external project directory.
 
-```text
-MyProject/SC-build.cpp
-        |
-        v
-SC-build launcher ----> resolve a SaneCppLibraries revision
-        |
-        v
-compile the definition ----> build MyProject
-```
+The launcher resolves the requested SaneCppLibraries revision, compiles the project's definition when necessary, and
+then builds the selected target. The project remains the entry point throughout that process.
 
 The external project remains in control of its sources and revision pin. SaneCppLibraries supplies the build API,
 bootstrap, and any libraries selected by the definition.

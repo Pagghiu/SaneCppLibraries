@@ -95,14 +95,9 @@ Every package has three useful layers:
 2. A receipt records what was installed and which recipe version produced it.
 3. Exports name the tools, sysroots, runners, include directories, or libraries that another tool may consume.
 
-```text
-package recipe -> install or import -> validate -> receipt -> named exports
-                                                        |
-                                                        +--> SC::Build
-```
-
-This allows `SC::Build` to ask for a capability such as an LLVM compiler or QEMU runner without reconstructing an
-installation path from directory naming conventions.
+After installation or import, validation produces a receipt and a set of named exports. This allows `SC::Build` to ask
+for a capability such as an LLVM compiler or QEMU runner without reconstructing an installation path from directory
+naming conventions.
 
 ## Inspect before changing package state
 
@@ -187,16 +182,9 @@ validation. Both actions use the package-managed formatter version expected by t
 
 # How does it work
 
-The bootstrap keeps startup work incremental:
-
-```text
-SC.sh / SC.bat
-  -> build ToolsBootstrap when stale
-  -> locate the selected tool source
-  -> build shared Tools.cpp support when stale
-  -> build the selected tool when stale
-  -> run it with the original action and arguments
-```
+The bootstrap keeps startup work incremental. It rebuilds `ToolsBootstrap` only when stale, locates the selected tool
+source, reuses unchanged `Tools.cpp` support objects, compiles the tool when needed, and then runs it with the original
+action and arguments.
 
 `ToolsBootstrap` is deliberately small. The selected tool is linked with the Sane C++ unity build, so custom tools can
 use the libraries without maintaining another project definition. Build products remain below `_Build/_Tools`.

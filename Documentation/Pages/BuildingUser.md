@@ -76,4 +76,4 @@ Your existing build system remains a valid choice. Use [SC::Build](@ref page_bui
 native backend, cross-target profiles, or package-managed toolchains remove work from your project. The external-use
 guide shows a minimal adoption that does not copy the Sane C++ repository layout.
 
-For a single self-contained library, open the [Single File Amalgamation](@ref page_single_file_libs) tool instead.
+For a single self-contained library, download the released header from the relevant library page.

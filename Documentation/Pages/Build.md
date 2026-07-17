@@ -10,19 +10,9 @@ system. This guide explains that model and the shortest useful workflow.
 An `SC-build.cpp` file is an executable build description. The repository launcher compiles it when needed, asks it to
 create a graph of workspaces, projects, configurations, and files, then hands that graph to a backend.
 
-```text
-SC.sh / SC.bat
-      |
-      v
-compile SC-build.cpp when it changed
-      |
-      v
-create the project graph
-      |
-      +----> Native backend ----> compile and link now
-      |
-      +----> Generated backend -> Xcode, Visual Studio, or Make projects
-```
+The pipeline has three stages: the launcher compiles a stale `SC-build.cpp`, the definition creates the project graph,
+and the selected backend consumes that graph. The native backend compiles and links immediately; generated backends
+write Xcode, Visual Studio, or Make projects for another tool to build.
 
 This is why changing build logic does not require a separate scripting language or installed package manager. The build
 description uses the same compiler, result handling, strings, paths, and process APIs as the rest of Sane C++.
