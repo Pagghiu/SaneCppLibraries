@@ -6368,6 +6368,12 @@ struct SC::FibersTest : public SC::TestCase
 
         State state;
         state.event = &event;
+        SC_TEST_EXPECT(not event.wait(scheduler));
+
+        FiberEvent signaledEvent(true);
+        SC_TEST_EXPECT(not signaledEvent.wait(scheduler));
+        SC_TEST_EXPECT(signaledEvent.isSignaled());
+
         SC_TEST_EXPECT(scheduler.spawn(task, stack,
                                        FiberTask::Procedure(
                                            [&state](FiberScheduler& scheduler)
@@ -6406,6 +6412,8 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack          firstStack({firstStackMemory, sizeof(firstStackMemory)});
         FiberStack          secondStack({secondStackMemory, sizeof(secondStackMemory)});
 
+        SC_TEST_EXPECT(event.isSignaled());
+        SC_TEST_EXPECT(not event.wait(scheduler));
         SC_TEST_EXPECT(event.isSignaled());
         State state;
         state.event = &event;
@@ -6461,6 +6469,11 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack     secondStack({secondStackMemory, sizeof(secondStackMemory)});
         State          state;
         state.semaphore = &semaphore;
+        SC_TEST_EXPECT(not semaphore.wait(scheduler));
+
+        FiberSemaphore availableSemaphore(1);
+        SC_TEST_EXPECT(not availableSemaphore.wait(scheduler));
+        SC_TEST_EXPECT(availableSemaphore.available() == 1);
 
         FiberTask::Procedure procedure = FiberTask::Procedure(
             [&state](FiberScheduler& scheduler)

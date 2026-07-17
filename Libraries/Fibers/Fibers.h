@@ -909,6 +909,7 @@ struct SC_FIBERS_EXPORT FiberEvent
     FiberEvent(const FiberEvent&)            = delete;
     FiberEvent& operator=(const FiberEvent&) = delete;
 
+    //! Must be called from a fiber owned by scheduler.
     Result wait(FiberScheduler& scheduler);
     Result signal(FiberScheduler& scheduler);
     void   reset();
@@ -941,6 +942,7 @@ struct SC_FIBERS_EXPORT FiberAutoResetEvent
     FiberAutoResetEvent(const FiberAutoResetEvent&)            = delete;
     FiberAutoResetEvent& operator=(const FiberAutoResetEvent&) = delete;
 
+    //! Must be called from a fiber owned by scheduler.
     Result wait(FiberScheduler& scheduler);
     Result signal(FiberScheduler& scheduler);
     void   reset();
@@ -974,6 +976,7 @@ struct SC_FIBERS_EXPORT FiberSemaphore
     FiberSemaphore(const FiberSemaphore&)            = delete;
     FiberSemaphore& operator=(const FiberSemaphore&) = delete;
 
+    //! Must be called from a fiber owned by scheduler.
     Result wait(FiberScheduler& scheduler);
     Result signal(FiberScheduler& scheduler, size_t count = 1);
 

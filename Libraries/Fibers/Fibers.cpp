@@ -3597,6 +3597,10 @@ FiberEvent::~FiberEvent()
 
 Result FiberEvent::wait(FiberScheduler& scheduler)
 {
+    if (scheduler.currentTask() == nullptr)
+    {
+        return Result::Error("FiberEvent::wait must be called from a fiber");
+    }
     fiberSchedulerLock(primitiveLock);
     if (signaled)
     {
@@ -3711,6 +3715,10 @@ FiberAutoResetEvent::~FiberAutoResetEvent()
 
 Result FiberAutoResetEvent::wait(FiberScheduler& scheduler)
 {
+    if (scheduler.currentTask() == nullptr)
+    {
+        return Result::Error("FiberAutoResetEvent::wait must be called from a fiber");
+    }
     fiberSchedulerLock(primitiveLock);
     if (signaled)
     {
@@ -3847,6 +3855,10 @@ FiberSemaphore::~FiberSemaphore()
 
 Result FiberSemaphore::wait(FiberScheduler& scheduler)
 {
+    if (scheduler.currentTask() == nullptr)
+    {
+        return Result::Error("FiberSemaphore::wait must be called from a fiber");
+    }
     fiberSchedulerLock(primitiveLock);
     if (availableCount != 0)
     {
