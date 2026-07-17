@@ -152,7 +152,9 @@ SC_TRY(pool.create(taskClass, stackClass));
 
 `FiberStackClass` reserves fixed-size virtual slots, optionally with guard pages, and reports committed and high-water
 usage. `FiberTaskClass` bounds reusable task records. Both must outlive every slot acquired from them, and close-time
-validation rejects live allocations or task/stack slots.
+validation rejects live allocations or task/stack slots. A class-backed `FiberTaskPool::spawn()` owns both a task and
+a stack or neither: failed stack acquisition or scheduler publication returns every acquired slot, clears a provided
+`outTask`, and leaves the pool reusable.
 
 # Stack Class Sizing
 

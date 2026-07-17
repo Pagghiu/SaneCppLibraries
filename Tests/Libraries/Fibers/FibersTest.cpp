@@ -1611,10 +1611,33 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not secondPool.create(taskClass, stackClass));
 
         FiberScheduler scheduler;
-        FiberTask      producer;
-        char           producerStackMemory[64 * 1024] = {};
-        FiberStack     producerStack({producerStackMemory, sizeof(producerStackMemory)});
-        State          state;
+
+        FiberTask  rejectedTaskStorage;
+        FiberTask* rejectedTask = &rejectedTaskStorage;
+        SC_TEST_EXPECT(not pool.spawn(scheduler, FiberTask::Procedure(), &rejectedTask));
+        SC_TEST_EXPECT(rejectedTask == nullptr);
+        SC_TEST_EXPECT(taskClass.activeCount() == 0);
+        SC_TEST_EXPECT(stackClass.activeCount() == 0);
+        SC_TEST_EXPECT(pool.availableCount() == 2);
+
+        FiberStack heldStacks[2] = {FiberStack({}), FiberStack({})};
+        SC_TEST_EXPECT(stackClass.acquire(heldStacks[0]));
+        SC_TEST_EXPECT(stackClass.acquire(heldStacks[1]));
+        rejectedTask = &rejectedTaskStorage;
+        SC_TEST_EXPECT(not pool.spawn(scheduler, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
+                                      &rejectedTask));
+        SC_TEST_EXPECT(rejectedTask == nullptr);
+        SC_TEST_EXPECT(taskClass.activeCount() == 0);
+        SC_TEST_EXPECT(stackClass.activeCount() == 2);
+        SC_TEST_EXPECT(pool.availableCount() == 0);
+        SC_TEST_EXPECT(stackClass.release(heldStacks[0]));
+        SC_TEST_EXPECT(stackClass.release(heldStacks[1]));
+        SC_TEST_EXPECT(pool.availableCount() == 2);
+
+        FiberTask  producer;
+        char       producerStackMemory[64 * 1024] = {};
+        FiberStack producerStack({producerStackMemory, sizeof(producerStackMemory)});
+        State      state;
         state.pool = &pool;
         SC_TEST_EXPECT(scheduler.spawn(producer, producerStack,
                                        FiberTask::Procedure(
