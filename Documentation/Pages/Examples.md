@@ -1,107 +1,127 @@
 @page page_examples Examples
 # Examples
 
-## Building
+The examples are complete programs built from the same library sources as the test suite. Use them to see how the
+libraries fit together, then follow the links to the source when you need the implementation details.
 
-@note Examples now build directly through native `build compile` / `build run` without a prior `configure`.
-Use `build configure` only when you explicitly want generated Visual Studio, XCode, or Make projects.
+## Quick start
 
-@note Projects will be generated in `_Build/_Projects`.  
-After compiling (`SC build compile`) executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.
+Build and run an example from the repository root:
 
-## SCExample
+```bash
+./SC.sh build compile AwaitEcho Debug
+./SC.sh build run AwaitEcho Debug
+```
 
-| Property      | Value                                                                                                                             |
-|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
-| Location      | `Examples/SCExample`                                                                                                              |
-| Description   | Simple immediate mode gui application using sokol and dear imgui libraries pausing in absence of inputs and I/O to save CPU time  |
-| Purposes      | Use [SC::Build](@ref page_build) to build on macOS, windows and linux and [SC::Async](@ref library_async) as I/O event Loop       |
-|               | Use [Plugin](@ref library_plugin) and [FileSystemWatcher](@ref library_file_system_watcher) libraries implementing hot-reload     |
-| Prerequisites | Linux - Fedora: `sudo dnf install mesa-libGL-devel mesa-libEGL-devel libX11-devel libXi-devel libXcursor-devel`                   |
-|               | Linux - Ubuntu: `sudo apt-get install libgles2-mesa-dev libx11-dev libxi-dev libxcursor-dev`                                      |
-|               | Windows: None                                                                                                                     |
-|               | macOS: None                                                                                                                       |
-| Dependencies  | `sokol` and `dear-imgui` are automatically downloaded during the first `build compile` / `build run`, or during `build configure` if you are generating projects explicitly |
-| Run (Posix)   | `./SC.sh build run SCExample` (will also compile before running)                                                                  |
-| Run (Windows) | `SC.bat build run SCExample`  (will also compile before running)                                                                  |
-| Run (Native)  | `./SC.sh build run SCExample --config Debug` or `SC.bat build run SCExample --config Debug`                                       |
-| Debug (VSCode)| Select correct `SCExample $ARCH ($PLATFORM)` for your system and press `Start Debugging` (F5)                                     |
-| Debug (XCode) | Run `./SC.sh build configure`, then open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `SCExample` scheme |
-| Debug (VS2022)| Run `SC.bat build configure`, then open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5) |
+Use `SC.bat` instead of `./SC.sh` on Windows. Project generation, IDE setup, and platform prerequisites are covered in
+[Building (Contributor)](@ref page_building_contributor).
 
-## AsyncWebServerExample
+## HTTP and networking
 
-| Property      | Value                                                                                                                             |
-|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
-| Location      | `Examples/AsyncWebServer`                                                                                                         |
-| Description   | Simple Http server listening on port 8090 by default, serving a folder for a static website.                                      |
-| Purposes      | Show how to create an http server with a runtime configurable set of buffers                                                      |
-| Prerequisites | Linux: None                                                                                                                       |
-|               | Windows: None                                                                                                                     |
-|               | macOS: None                                                                                                                       |
-| Dependencies  | None                                                                                                                              |
-| Run (Posix)   | `Examples/AsyncWebServer/BuildAndRun.sh` (will also compile before running)                                                       |
-| Run (Windows) | `Examples/AsyncWebServer/BuildAndRun.bat` (will also compile before running)                                                      |
-| Parameters    | All parameters can be added after `BuildAndRun` for example `BuildAndRun.sh --directory /somedir`:                                |
-|               | `--directory /path/to/dir`: Serves the given folder                                                                               |
-| Debug (XCode) | Run `./SC.sh build configure`, then open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace` and choose the `AsyncWebServer` scheme |
-| Debug (VS2022)| Run `SC.bat build configure`, then open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln` and start Debugging (F5) |
+- [ApiServer](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/ApiServer) is a small routed HTTP API with
+  health, query, and streaming echo endpoints.
+- [SaneHttpGet](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/SaneHttpGet) is the shortest blocking
+  `HttpClient` example.
+- [HttpClientPollSession](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/HttpClientPollSession) shows a
+  poll-driven client session with caller-owned storage.
+- [HttpClientAsyncGet](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/HttpClientAsyncGet) connects
+  `HttpClient` to `AsyncStreams` and an `AsyncEventLoop`.
+- [AsyncWebServer](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/AsyncWebServer) is the advanced HTTP
+  laboratory for static files, uploads, WebSockets, configurable connection storage, and Linux backend selection.
 
-# Blog
+To serve a directory with `AsyncWebServer`, pass an absolute path after `--`:
 
-Some relevant blog posts are:
+```bash
+./SC.sh build compile AsyncWebServer Debug
+./SC.sh build run AsyncWebServer Debug -- --directory /absolute/path/to/site
+```
 
-- [June 2024 Update](https://pagghiu.github.io/site/blog/2024-06-30-SaneCppLibrariesUpdate.html)
-- [July 2024 Update](https://pagghiu.github.io/site/blog/2024-07-31-SaneCppLibrariesUpdate.html)
-- [August 2024 Update](https://pagghiu.github.io/site/blog/2024-08-30-SaneCppLibrariesUpdate.html)
+## Await cookbook
 
-### Examples
+> **Warning:** `Await` is currently experimental. These examples are complete programs for exploring the coroutine API,
+> not a stable compatibility promise.
 
-| Example       | Description                                                                                                                       |
-|:--------------|:----------------------------------------------------------------------------------------------------------------------------------|
-| AwaitBackgroundDigest | Shows ThreadPool-backed CPU work with `AwaitEventLoop::loopWork()` and caller-owned result jobs                            |
-| AwaitBackgroundJobs | Shows detached background coroutines through fixed caller-owned `AwaitTaskRegistry` slots                                   |
-| AwaitCallbackBridge | Shows callback-style `Async` and coroutine-style `Await` sharing one caller-owned event loop                                |
-| AwaitConfigReload | Shows `spawnAndWait()` for a single child coroutine that loads a config file                                                |
-| AwaitDatagramPing | Shows UDP request/reply with `AwaitEventLoop::sendTo()` and `receiveFrom()`                                                   |
-| AwaitDeadline | Shows a child coroutine deadline with `waitFor()` and cooperative cancellation                                                  |
-| AwaitEcho     | Shows a tiny TCP echo conversation with `AwaitTaskGroup` and caller-owned allocator storage                                      |
-| AwaitFileCourier | Shows file copy followed by `AwaitEventLoop::fileSend()` over a socket                                                     |
-| AwaitFilePatch | Shows offset `fileWrite()` followed by `fileRead()` using caller-owned buffers                                             |
-| AwaitFirstResponse | Races two caller-owned registry jobs with `waitAny()` and cancels the slower response                                    |
-| AwaitLineProtocol | Shows a tiny CRLF text protocol with `receiveLine()`, `sendAll()`, and caller-owned allocator storage                    |
-| AwaitManifestPreview | Shows bounded `fileReadUntilFullOrEOF()` into caller-owned preview storage                                           |
-| AwaitProcessExitCodes | Shows concurrent child-process exit waits with `processExit()` and fixed job storage                                  |
-| AwaitServiceProbe | Shows a TCP service probe with task groups, timeout cancellation, and fixed allocator diagnostics                    |
-| AwaitTaskGroupFiles | Shows `AwaitTaskGroup` fan-out over two file reads with caller-owned task storage                                        |
-| AwaitThreadWakeUp | Shows another thread waking an Await coroutine through `AwaitLoopWakeUp`                                                   |
-| Serialization | Use [Reflection](@ref library_reflection) and [Serialization](@ref library_serialization_binary) to persist application state     |
-| WebServer     | Use [Http](@ref library_http) to statically host a website from a specified directory                                             |
+### Task ownership and coordination
 
-# Where can I find more examples?
+- `AwaitBackgroundJobs` manages detached work in fixed caller-owned registry slots.
+- `AwaitDeadline` applies a deadline and cooperative cancellation to a child task.
+- `AwaitFirstResponse` races two jobs and cancels the slower one.
 
-- The test suite is the closest thing to additional examples you can find in this project.
-- The second best thing to do is looking at [SC::Tools](@ref page_tools) implementation.
-- Documentation for each library has some examples and / or code snippets that you can look at.
+### Networking
 
+- `AwaitEcho` is the baseline TCP client/server conversation.
+- `AwaitDatagramPing` demonstrates a bounded UDP request and reply.
+- `AwaitLineProtocol` builds a small CRLF-framed protocol.
 
-# Where can I learn more?
+### File I/O
 
-There are many way to learn about the library:
-- Read the [introductory blog post](https://pagghiu.github.io/site/blog/2023-12-23-SaneCppLibrariesRelease.html)
-- Take a look at videos from [Youtube Channel](https://www.youtube.com/@Pagghiu)
-- Read and / or step through the extensive set of unit tests (current test code coverage is > 90%).
-- Ask in the [Discord](https://discord.gg/tyBfFp33Z6)
+- `AwaitConfigReload` composes a child task that reads a configuration file.
+- `AwaitFilePatch` performs explicit offset writes and reads.
+- `AwaitManifestPreview` reads into a bounded preview buffer until full or EOF.
+- `AwaitTaskGroupFiles` reads multiple files with a task group.
+- `AwaitFileCourier` combines file operations with file-to-socket transfer.
 
-https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d
-https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717
+### System integration
+
+- `AwaitBackgroundDigest` moves bounded CPU work to a thread pool.
+- `AwaitCallbackBridge` runs callback-style `Async` and coroutine-style `Await` on the same event loop.
+- `AwaitProcessExitCodes` waits for multiple child processes.
+- `AwaitThreadWakeUp` delivers another thread's signal to an Await coroutine.
+
+### Composed workflow
+
+- `AwaitServiceProbe` combines networking, task groups, background work, timeouts, and explicit shutdown.
+
+All Await sources are under the
+[Examples directory](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples) and use their directory name as the
+build target.
+
+## Fibers
+
+- [FibersDemo](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersDemo) demonstrates CPU fibers,
+  `FibersAsync` sleeps, and worker-pool work in three focused sections.
+- [FibersBenchmark](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersBenchmark) is a maintainer
+  benchmark for scheduler, contention, and sustained micro-task workloads.
+- [FibersStackGrowthPrototype](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersStackGrowthPrototype)
+  is a maintainer prototype for stack-growth behavior.
+
+Benchmark results depend on the machine and build configuration; they are development measurements rather than portable
+performance claims.
+
+## Native integration and hot reload
+
+[SCExample](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/SCExample) is the native Sokol and Dear ImGui
+host used to exercise `Async`, plugins, file watching, state handoff, and hot reload. Its plugins are:
+
+- `CollaborativeCanvasExample`, which hosts a browser canvas through HTTP and WebSockets;
+- `SerializationExample`, which demonstrates reflected state and binary/JSON serialization;
+- `WebServerExample`, which configures a static file server from the native UI.
+
+SCExample is an integration testbed rather than the shortest introduction to any individual library. Start with a
+focused console example when learning one API.
+
+## Videos
+
+### Serialization and state
 
 \htmlonly
-<iframe width="700" height="400" src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" frameborder="0" allowfullscreen>
-</iframe>
+<video controls playsinline preload="metadata" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d">Open the serialization example video</a>.
+</video>
 \endhtmlonly
 
+### Plugin loading and hot reload
+
 \htmlonly
-<iframe width="700" height="400" src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" frameborder="0" allowfullscreen>
-</iframe>
+<video controls playsinline preload="metadata" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+</video>
 \endhtmlonly
+
+## More source-backed examples
+
+The library pages contain compiled snippets for individual APIs. The tests provide broader executable reference code,
+including error paths and platform-specific behavior. See [Tests](@ref page_tests) and the
+[library catalog](@ref libraries) when an example above is broader than the question you are trying to answer.
