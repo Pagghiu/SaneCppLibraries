@@ -1,150 +1,109 @@
 @page page_building_contributor Building (Contributor)
 
-Follow this guide if you need to build the library locally, validate a code pull request, reproduce an issue, or run the test suite. Check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md) for the current contribution workflow and [Coding Style](@ref page_coding_style) for formatting and code rules.
+Contributor builds are organized around a short feedback loop: compile the affected target, run the narrowest relevant
+test, then expand validation before committing. Project generation is optional.
 
 [TOC]
 
-# Build and run directly
+# Prepare the checkout
 
-The test suite and example projects use the handmade / self-hosted [SC::Build](@ref page_build) system, and the
-default workflow now builds them directly through the native backend.
+Use a recent C++ compiler supported by the host platform and make sure Git subcommands and the repository bootstrap can
+run. The first tool invocation compiles the small bootstrap and may download pinned development tools into `_Build`.
 
-## Command-line
-- Build the test suite
-    - **Windows**: `SC.bat build compile SCTest --config Debug`
-    - **Posix**: `SC.sh build compile SCTest --config Debug`
-- Run focused build-system coverage
-    - **Windows**: `SC.bat build run SCBuildTest --config Debug`
-    - **Posix**: `SC.sh build run SCBuildTest --config Debug`
+Read [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md) before changing code. It
+defines the issue-first workflow, commit format, and agent guidance. Read [Coding Style](@ref page_coding_style) before
+writing a new API.
 
-@note Check the [Tools](@ref page_tools) page for more details on invoking `SC.sh build`.
+# Use the focused feedback loop
 
-## VSCode / IDE project generation
+Compile the test executable before running it:
 
-Under VSCode select `Tasks: Run Task` and choose:
-- `Generate Projects`
+```bash
+./SC.sh build compile SCTest Debug
+./SC.sh build run SCTest Debug -- --test "StringsTest"
+```
 
-Generated projects are still useful for Visual Studio, XCode, and Make workflows, but they are no longer required
-before normal `build compile` / `build run` usage.
+Replace `StringsTest` with the test relevant to the change. To isolate one named section:
 
-# Build the test suite
+```bash
+./SC.sh build run SCTest Debug -- --test "HttpClientTest" --test-section "basic GET"
+```
 
-## Command-line
+Arguments after `--` belong to the test executable. Arguments before it belong to `SC::Build`.
 
-Intel Machines
-- **Windows**: `SC.bat build compile SCTest --config Debug --arch intel64`
-- **Posix**: `SC.sh build compile SCTest --config Debug --arch intel64`
+Network tests can run alongside other worktrees by adding a unique `--port-offset`. A hang usually means an async
+handle, task, or reference count was not closed; reduce the run to one section before adding temporary tracing.
 
-Arm Machines
-- **Windows**: `SC.bat build compile SCTest --config Debug --arch arm64`
-- **Posix**: `SC.sh build compile SCTest --config Debug --arch arm64`
+# Expand validation deliberately
 
-## Command-line Native Backend
+After focused tests pass:
 
-- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug`
-- **macOS / Linux**: `./SC.sh build compile SCTest --config Debug --arch arm64 --verbose`
-- **macOS / Linux**: `./SC.sh build run SCBuildTest --config Debug`
-- **Windows**: `SC.bat build compile SCTest --config Debug`
-- **Windows**: `SC.bat build run SCBuildTest --config Debug`
+1. Compile and run `SCTest` in Debug.
+2. Repeat in Release when the change affects library behavior, templates, assertions, or optimization-sensitive code.
+3. Compile the relevant examples or tools.
+4. Compile `SCSingleFileLibs:` when library dependencies or public headers changed.
+5. Test the other supported operating systems when the implementation or build logic is platform-specific.
 
-@note The native backend currently supports direct host builds on macOS, Linux, and Windows. Windows sysroot selection is
-not implemented yet, and the exact toolchain combinations available still depend on the installed host tools.
-@note Native `compile` and `run` commands also accept `--output quiet|normal|verbose`, or the `--quiet`, `--normal`,
-and `--verbose` shortcuts. Legacy positional syntax is still accepted for compatibility.
+Representative commands:
 
-## Visual Studio 2022
-- Generate projects first: `SC.bat build configure`
-- Open `_Build/_Projects/VisualStudio2022/SCWorkspace/SCWorkspace.sln`
-- Build the default configuration target (or another one you prefer)
+```bash
+./SC.sh build compile SCTest Release
+./SC.sh build run SCTest Release
+./SC.sh build compile "SCSingleFileLibs:" Release
+```
 
-## XCode
-- Generate projects first: `./SC.sh build configure`
-- Open `_Build/_Projects/XCode/SCWorkspace/SCWorkspace.xcworkspace`
-- Build the default configuration target (or another one you prefer)
+`BuildTest` is omitted from ordinary local `SCTest` runs because it exercises broader toolchain flows. Use `--all-tests`
+when the change touches SC::Build, package resolution, bootstrap behavior, or CI-equivalent validation:
 
-## Makefile
-- Generate projects first: `./SC.sh build configure`
-- Linux: `cd _Build/_Projects/Make/SCWorkspace/linux`
-- macOS: `cd _Build/_Projects/Make/SCWorkspace/apple`
-- Build Debug: `make -j SCTest`
-- Build Release: `make -j SCTest CONFIG=Release`
+```bash
+./SC.sh build run SCTest Debug -- --all-tests
+```
 
-## VScode on macOS
-Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug intel64` [1]
-- `Build SCTest Debug arm64` [1]
-- `Build SCTest Release intel64` [1]
-- `Build SCTest Release arm64` [1]
+# Format and inspect the change
 
-@note
-[1] Uses `make` and `c++` command (can be switched to be `clang` or `gcc`). Builds only current host architecture (`arm64` or `x86_64`). Still needs XCode installed for the sysroot.  
+Format supported source files with the pinned formatter:
 
-## VSCode on Linux
-Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug intel64` [1]
-- `Build SCTest Debug arm64` [1]
-- `Build SCTest Release intel64` [1]
-- `Build SCTest Release arm64` [1]
+```bash
+./SC.sh format execute
+```
 
-@note
-[1] Uses `make` and `c++` commands. Builds only current host architecture (`arm64` or `x86_64`).
+Then inspect the diff. Formatting is necessary but does not catch accidental generated files, over-wide declaration
+alignment, stale comments, or unrelated edits.
 
-## VSCode on Windows
-Under VSCode select `Tasks: Run Task` and choose an appropriate targets like:
-- `Build SCTest Debug intel64` [1]
-- `Build SCTest Debug arm64` [1]
-- `Build SCTest Release intel64` [1]
-- `Build SCTest Release arm64` [1]
+# Generate IDE projects only when useful
 
-@note
-[1] Needs `Visual Studio 2022` installed
+The native backend is the default command-line workflow. Generate projects when you want an IDE's project model or a
+generated Make flow:
 
-# Run the tests
-Executables will be at `_Build/_Outputs/${platform}-${arch}-${build}-${compiler}-${config}/${EXAMPLE_NAME}`.  
-For example assuming host to be ARM64 Linux, compiling with the native backend through Clang in Debug will cause the folder to be `_Build/_Outputs/linux-arm64-Native-clang-Debug/SCTest`.
+```bash
+./SC.sh build configure SCTest
+```
 
+Generated projects are placed below `_Build/_Projects`. They are disposable and should not become the source of truth
+for target definitions; edit `Tools/SC-build.cpp` instead.
 
-# Debug the tests
+# Debug a failing test
 
-## Visual Studio or XCode
+Build Debug, reduce the test selection, and launch the produced executable through LLDB, GDB, Visual Studio, or the
+repository's VS Code configuration. The output directory printed by SC::Build identifies the exact executable for the
+selected platform, architecture, toolchain, and configuration.
 
-Running the default target should work out of the box, as paths are already generated accordingly.
+When debugging async code, reconstruct ownership and completion in order:
 
-## VSCode on macOS or Linux
+1. Which operation acquired a reference or task slot?
+2. Which callback or coroutine releases it?
+3. Which close operation allows the event loop to finish?
+4. Does every error path perform the same cleanup?
 
-Select one of the appropriate `Run and Debug` configuration like:
+Remove temporary logging after the behavior is understood.
 
-- `SCTest intel64 [apple] (gdb)` [1]
-- `SCTest intel64 [apple] (lldb)` [2]
-- `SCTest arm64 [apple] (gdb)` [1]
-- `SCTest arm64 [apple] (lldb)` [2]
-- `SCTest intel64 [linux] (gdb)` [1]
-- `SCTest intel64 [linux] (lldb)` [2]
-- `SCTest arm64 [linux] (gdb)` [1]
-- `SCTest arm64 [linux] (lldb)` [2]
+# Build documentation
 
-@note
-[1] Uses `gdb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable.  
-[2] Uses `lldb` debugger. Implicitly invokes `Build SCTest Debug` to build the executable. You need `CodeLLDB` or similar extension installed in VSCode.
+Documentation is part of validation when changing public headers or Markdown pages:
 
-## VSCode on Windows
+```bash
+./SC.sh build documentation
+```
 
-Select one of the appropriate `Run and Debug` configuration like:
-
-- `SCTest intel64 [windows]` [1]
-- `SCTest arm64 [windows]` [1]
-
-@note
-[1] Needs `Visual Studio 2022` installed
-
-# Build the documentation
-
-The `SC-build.cpp` from [SC::Tool](@ref page_tools) downloads Doxygen and some customization themes and then builds the documentation in `_Build/_Documentation`.
-
-## Command-line
-- **Windows**: `SC.bat build documentation`
-- **Posix**: `SC.sh build documentation`
-
-## VSCode
-Under VSCode select `Tasks: Run Task` and choose:
-- `Build Documentation`
+Doxygen warnings fail the build. Check the generated page as well as the source because snippets, links, tables, and
+embedded HTML are transformed during generation.

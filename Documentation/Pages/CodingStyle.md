@@ -1,301 +1,122 @@
 @page page_coding_style Coding Style
 
+The style rules make ownership, failure, and platform behavior visible in ordinary C++ code. Consistency matters, but
+the deeper goal is code that a reviewer or coding agent can change without guessing at hidden contracts.
+
 [TOC]
 
-> Note: this document will be updated regularly clarifying existing rules and adding missing guidelines that will emerge from discussions or pull requests being reviewed.
+# Start from the repository constraints
 
-@note
-If you would like to contribute, check [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md) for the current issue-first and agent-friendly workflow.
+Library code does not use STL containers, exceptions, RTTI, or hidden allocation. Public headers do not include system
+headers. APIs return errors and accept caller-owned storage. These constraints are architectural; formatting should make
+them easier to see rather than disguise them.
 
-# Formatting
-All files should be formatted according to the `.clang-format` file using `clang-format` version 20.1.8.  
+Before editing a subsystem, read its neighboring headers, tests, and any local `AGENTS.md`. Prefer an existing type or
+pattern over introducing a second vocabulary for the same operation.
 
+# Let the formatter establish the baseline
 
-Generated, regenerated, or maintainer-merged code must still be formatted. GitHub CI will fail on pull requests that are not properly formatted.
+The repository uses the pinned clang-format version installed by SC::Package:
 
-In some specific cases use `// clang-format off` and `// clang-format on` where a custom formatting can improve code look.
-For example many template specializations in the `SC::Reflection` library are better manually formatted/aligned to highlight the pattern.
+```bash
+./SC.sh format execute
+```
 
-All headers must have a trailing newline.
+CI checks the same format. Use `// clang-format off` only around a small structure whose manual alignment communicates a
+real pattern, such as a dense reflection table. Turn formatting back on immediately afterward.
 
-@note You can easily format files using the `SC.sh format execute` (or `SC.bat format execute`) command
+Formatting can create excessive horizontal padding when unrelated declarations are aligned together. Split fields or
+methods into short semantic groups before formatting rather than accepting a wide block of whitespace.
 
-# Casing
+# Name by role
 
-- `CamelCase` must be used for:
-    - structs
-    - namespaces
-    - Template parameters
-    - file names (both .h and .cpp and .inl)
-- `camelCase` must be used for:
-    - variables
-    - methods
-- `SCREAMING_CASE` muse be used for
-    - Preprocessor `#define`
-    
-# [[nodiscard]]
+- Use `CamelCase` for structs, namespaces, template parameters, and source file names.
+- Use `camelCase` for functions, methods, variables, and fields.
+- Use `SCREAMING_CASE` for preprocessor macros.
+- Put public library types in `SC` or, for a cohesive subsystem, a nested namespace below `SC`.
+- Keep `using namespace` inside function scope.
 
-Function and methods returning a value must always be marked as `[[nodiscard]]`
+The `SC` namespace is intentionally flat in many libraries. Search before adding a public name so two independent
+libraries do not collide when amalgamated into one translation unit.
 
-# Error checking
+# Make failure part of the type
 
-When using system API try to handle at least the basic error codes in the very first draft implementation and leave `TODO:` to remember handling additional errors that can occur.
+Operations that can fail return `Result` or another checked value. Propagate failures with the `SC_TRY` family rather
+than ignoring them:
 
-Always use `SC_TRY` family of macros to check report errors to the caller.
-Some very specific use cases may be exempted from this rule when it's unreasonable and useless.
-When the specific use case has been approved, the method that doesn't want to do any error checking should use the `SC_COMPILER_WARNING_*` macros.
-
-Example:
 ```cpp
-struct MyClass
+Result loadConfiguration(StringView path, String& output)
 {
-    [[nodiscard]] bool canFail(){ ... }
-    SC::Result alsoThisCanFail(){ ... }
-}
-
-void myFunction(MyClass& stuff)
-{
-    SC_COMPILER_WARNING_PUSH_UNUSED_RESULT;
-    stuff.canFail();
-    stuff.alsoThisCanFail();
-    SC_COMPILER_WARNING_POP_UNUSED_RESULT;
+    File file;
+    SC_TRY(file.open(path, File::OpenMode::Read));
+    return file.readUntilEOF(output);
 }
 ```
 
-For example `SC::Build` writers disable unused result warnings for ignoring the potential failure of appending strings in the `SC::StringBuilder` being used.
+Value-returning functions should normally be `[[nodiscard]]`. If a deliberately best-effort operation must ignore a
+result, keep the warning suppression narrow and explain why the result cannot affect correctness.
 
-# Return values
+Do not use exceptions for control flow. A cleanup path must be visible on every return path, usually through
+`MakeDeferred` or an explicit close operation.
 
-If the return value of a function is already returning `bool` or `SC::Result`, consider adding an `out` parameter, that can be a `pointer` or a `reference.`
+# Keep outputs and ownership explicit
 
-Example of mandatory out value:
+When a function already needs to return status, write its value through an output parameter:
 
-```cpp
-bool formatZeroValue(int parameter, String& mandatoryOutValue)
-{
-    if(parameter == 0)
-    {
-        return mandatoryOutValue.assign("zero");
-    }
-    return mandatoryOutValue.assign("non zero");
-}
+- use a reference for required output;
+- use a pointer for optional output;
+- document when the output is written and whether it remains unchanged on failure.
 
-// ... usage
-int someParameter = 123;
-SmallString<20> myString;
+Views such as `StringView` and `Span` borrow memory. Owning containers and storage objects must outlive every borrowed
+view. APIs that may grow should accept an `IGrowableBuffer` or another explicit storage interface instead of allocating
+internally.
 
-SC_TRY(formatZeroValue(someParameter, myString));
+Pointers mean “optional” unless a more specific contract says otherwise. References mean “required”. Avoid raw owning
+pointers.
 
-SC_ASSERT_RELEASE(myString.view() == "non zero");
-```
+# Design public headers as boundaries
 
-Example of optional out value:
+Public headers:
 
-```cpp
-template<typename T>
-struct Vector
-{
+- include other public Sane C++ headers with repository-relative paths;
+- avoid operating-system headers and third-party implementation headers;
+- expose platform-neutral types;
+- keep platform handles behind Sane C++ descriptors or private storage;
+- end with a trailing newline.
 
-    /// ...
-    /// @brief Check if the current vector contains a given value.
-    /// @tparam U Type of the object being searched
-    /// @param value Value being searched
-    /// @param foundIndex if passed in != `nullptr`, receives index where item was found.
-    /// Only written if function returns `true`
-    /// @return `true` if the vector contains the given value.
-    template <typename U>
-    [[nodiscard]] bool contains(const U& value, size_t* foundIndex = nullptr) const;
+Put operating-system includes and implementation details in `.cpp`, `.inl`, or `Internal` files. Isolate platform
+branches in focused functions rather than scattering `#if` blocks through an algorithm.
 
-    /// ...
-};
+Use `struct` for consistency with the existing codebase. Order a struct so a reader sees its public contract before
+implementation details: types and constants, lifecycle, operations, then storage.
 
-///. usage
+# Prefer small, testable operations
 
-Vector<int> myVector = {1,2,3};
+Functions should do one coherent job and return enough information for the caller to decide what happens next. Avoid
+boolean parameters that silently switch between unrelated modes; use an options struct or distinct operation when the
+behavior deserves a name.
 
-if(myVector.contains(1))
-{
-    // do stuff with knowing this
-}
+Comments should explain a constraint, invariant, or non-obvious platform choice. Do not narrate syntax. Public API
+documentation should state ownership, failure behavior, and important lifetime rules.
 
-size_t foundIndex;
-if(myVector.contains(2, &foundIndex))
-{
-    // we know also at what index the item was found
-    myVector[foundIndex]++;
-}
-```
+# Write tests as contract examples
 
-# struct vs class
-`struct` is preferred to `class` due to an arbitrary initial choice made during the very first phases of the project.
+Add or update the test in `Tests/Libraries/<Library>`. Name sections after behavior rather than implementation steps.
+Cover the successful path, caller-storage exhaustion, invalid input, and relevant platform differences.
 
-Using `struct` is now necessary for consistency with the existing code.
+Tests often become the most precise usage examples in the repository. Keep setup explicit enough that a reader can see
+which object owns each buffer, task, handle, and callback.
 
-# Namespaces
+# Review checklist
 
-All functions and structs must be defined in the namespace `SC`.  
-Some libraries defining many related classes may group them in a nested namespace inside `SC`.
+Before committing, ask:
 
-`using namespace` is only allowed inside a function or method scope.
+- Does every fallible result get checked or intentionally suppressed?
+- Can the caller see who owns memory and how long borrowed views remain valid?
+- Did a system or third-party header leak into a public header?
+- Does the change create an unnecessary dependency between libraries?
+- Are Debug, Release, single-file, and platform-sensitive paths covered as appropriate?
+- Did formatting improve the structure, and did you inspect the resulting diff?
 
-# Platform specific or internal code
-
-Platform specific code should be isolated with proper `#ifdef` inside a specific function if it's a small amount of code.  
-Bigger platform specific re-implementation should be separated in specific `.inl` files included by the library `.cpp` file and placed into library-specific `Internal` subfolder.
-
-# Header inclusion
-
-Each header and compile unit should include what's necessary to use or compile it in isolation.
-> The unity build is a distribution mechanism detail.
-
-# Public Headers
-
-Public headers are meant to be included by users of the library.
-Such headers should have the smallest amount of code that is needed to use them.
-Everywhere possible, write the implementation code in a .cpp file rather than an header.
-
-> Public headers are not allowed to include any OS specific or System / compiler provided header.
-
-# Forward declarations
-
-Use forward declarations everywhere possible to reduce the number of header dependencies.
-
-# Functions
-
-Free functions should be defined as `static` inside a struct (or nested namespace) with very few specific exceptions.
-
-# Member variables
-
-Member variables should not start with lowercase `m` to indicate it's a member variable (so `someThing` is good but `mSomeThing` is not)
-
-Good:
-```cpp
-int myVariable;
-```
-
-Bad 1:
-```cpp
-int mMyVariable;
-```
-
-Bad 2:
-```cpp
-int m_myVariable;
-```
-
-# Testing
-
-All newly added code must have associated tests.
-
-# Documentation
-
-All public classes should be documented, possibly with an usage example.  
-Documentation website will be automatically updated when changes are merged to master.
-
-# Comments
-
-Comments should in general avoid repeating what's stated in the code.  
-Please, take some time to find a good variable and method name that can avoid a comment.  
-Also restructuring code into a function with a proper name can sometimes avoid a comment.
-
-When a comment is necessary, it's better for it to comprehensively explain a piece of code that is doing something not immediately obvious.
-
-`TODO:` (without specific attribution) are welcome to signal incomplete error handling, missing code paths and future development.
-
-```cpp
-SC_TRY(converter.appendNullTerminated(currentWorkingDirectory));
-// TODO: Assert if path is not absolute
-return Result(existsAndIsDirectory("."));
-```
-
-# Braces
-
-Braces may be omitted only if a single statement guarded by the if and only if there are no else clauses.
-
-Good:
-```cpp
-if (someCondition)
-    myVariable += 1;
-```
-Good:
-```cpp
-if (someCondition)
-{
-    myVariable += 1;
-}
-```
-Good:
-```cpp
-if (someCondition)
-{
-    myVariable += 1;
-}
-else
-{
-    myVariable = 0;
-    otherStuff();
-}
-```
-
-
-Bad:
-```cpp
-if (someCondition)
-    myVariable += 1;
-else
-{
-    myVariable = 0;
-    otherStuff();
-}
-```
-
-# Parameters
-
-Pointer parameters always indicate that such parameter _can_ be null.  
-Use references to indicate that a parameter is mandatory.
-
-Example:
-```cpp
-struct Value
-{
-    int value;
-};
-
-int someFunction(int parameter, Value* optionalParameter)
-{
-    if (optionalParameter != nullptr)
-    {
-        // This is now safe to use
-        return parameter + optionalParameter->value;
-    }
-    return parameter;
-}
-
-int someOtherFunction(int parameter, Value& mandatoryParameter)
-{
-    return parameter + mandatoryParameter.value;
-}
-```
-
-# Casts
-
-Try writing code that can avoid casts, by using correct integer types where possible.
-
-> When cast is needed, do not use C-style casts but ONLY C++ style casts (`static_cast`, `reinterpret_cast`).
-
-# Globals / Static member variables
-
-Globals and static member variables should be avoided at all costs.  
-
-> Special exemption allowing usage of globals will need to be discussed and approved on a case by case basis.
-
-# Virtual 
-
-Usage of `virtual` should be avoided if possible.  
-Prefer static dispatch (using `enums`) and for runtime-only use cases consider using `SC::Function`
-
-> Special exemption allowing `virtual` usage will need to be discussed and approved on a case by case basis.
-
-# Exceptions / RTTI
-
-Exceptions and RTTI are not allowed.
+The contribution workflow and required validation are described in [CONTRIBUTING.md](https://github.com/Pagghiu/SaneCppLibraries/blob/main/CONTRIBUTING.md)
+and [Building (Contributor)](@ref page_building_contributor).

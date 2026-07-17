@@ -1,73 +1,79 @@
 @page page_building_user Building (User)
 
+Sane C++ libraries are source libraries: add the code you need to your program and compile it with the rest of your
+sources. You do not install a prebuilt runtime or adopt a mandatory build system.
+
 [TOC]
 
-This is the guide to follow if you just want to use the libraries in your project, without running the test suite.  
-If you want to contribute or run the test suite, check the [Building (Contributor)](@ref page_building_contributor) page.
+# Choose an integration form
 
-# Principles
-- Libraries always meant to be compiled together with your existing project
-- All libraries do not require any build system (you're free to use your favorite!)
-- For the above reasons you don't really _build_ the libraries
-- You _add_ or _use_ them to your project just as another source file
+The repository offers three forms of the same code. Pick the one that matches how much control your project needs.
 
-# Use in your project
+| Form | Use it when | What you add |
+|:--|:--|:--|
+| Unity build | You want the simplest complete integration | `SC.cpp` plus public headers from `Includes/` |
+| Separate sources | Your build needs per-library or per-file compilation | Selected files under `Libraries/` plus public headers |
+| Amalgamated library | You want one standalone library header/source pair | A generated file from the amalgamation tool |
 
-- Add the `SC.cpp` unity build file to your build system of choice (if any!).
-- Headers in `Libraries/**SomeLibrary**/*.h` are public.  
-- Headers in `Libraries/**SomeLibrary**/[Internal | Tests]` are **NOT** public.
+Start with `SC.cpp` unless you already know why separate compilation is useful. The public library entry points are
+headers such as `SaneCppStrings.h` and `SaneCppFile.h`. Files below `Internal` and `Tests` are not public API.
 
-@note
-Libraries can be used from normal C++ projects by default. SC library code still avoids STL containers, exceptions,
-RTTI, and hidden allocations, but public integration no longer requires an opt-in macro for standard C/C++ headers.
-SC-build also defaults to normal C++ runtime linkage; set `project.link.linkStdCpp = false` only when you intentionally
-want to avoid linking the C++ standard-library runtime.
-If you want the stricter historical no-stdlib mode, define `SC_INCLUDE_STD_CPP=0` and
-`SC_PROVIDE_CPP_RUNTIME_SHIMS=1`, then check
-[Disable the C++ standard library](@ref page_faq).
+# Add one library to an existing program
 
-## macOS
-- Add `SC.cpp` (located in project root) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
-- Link:
-    - `CoreFoundation.framework`
-    - `CoreServices.framework`
+1. Add `SC.cpp` to the target's source files.
+2. Add the repository `Includes` directory to the target's include paths.
+3. Include the entry-point header for the library you use.
+4. Add the small set of platform link dependencies required by your selected libraries.
 
-## Linux
-- Add `SC.cpp` (located in project root) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
-- Link:
-    - `libdl` (`-ldl`) 
-    - `libpthread` (`-lpthread`)
+For example:
 
-## Windows
-- Add `SC.cpp` (located in project root) to your build
-- Include any public header located at `Libraries/**SomeLibrary**/SomeHeader.h`
+```cpp
+#include "SaneCppStrings.h"
 
-@note on Windows the following libraries are already implicitly linked through `#pragma comment(lib, ...)`
-- `Ws2_32.lib`
-- `ntdll.lib`
-- `Rstrtmgr.lib`
-- `DbgHelp.lib`
-
-If you use the [Plugin](@ref library_plugin) library without `SC::Build`, make sure the host executable defines
-`SC_EXPORT_LIBRARY_<LIBRARY>=1` for each Sane C++ library that must be visible to plugins; on Linux also add
-`-rdynamic` to the host executable link step.
-
-# Single Files Amalgamation
-
-Sane C++ Libraries can be consumed also as single-file amalgamated files.
-
-To generate them in `_Build/_SingleFileLibraries` run:
-
-```sh
-python3 Support/SingleFileLibs/python/amalgamate_single_file_libs.py
+int main()
+{
+    SC::Console console;
+    console.print("{1} {0}!\n", "world", "Hello");
+    return 0;
+}
 ```
 
-alternatively if you have node.js installed run:
+The [library catalog](@ref libraries) identifies each library's dependencies and standalone download. The
+[Platforms](@ref page_platforms) guide describes supported operating systems.
 
-```sh
-node Support/SingleFileLibs/javascript/cli.js --repo-root . --ref HEAD --all --out _Build/_SingleFileLibrariesJS
-```
+# Use normal C++ around Sane C++
 
-As a third alternative you can assemble them in the browser at the [SingleFileLibs](@ref page_single_file_libs) page
+Normal projects may include C and C++ standard headers. Sane C++ library code still avoids STL containers, exceptions,
+RTTI, and hidden allocation, but your application is free to use them.
+
+The APIs are designed to accept views and caller-provided storage, so application containers can interoperate without
+becoming library dependencies. For example, an application can expose writable storage from its own string type to a
+file read or formatter.
+
+Strict no-standard-library compilation is an optional pressure mode, not the default integration path. The [FAQ](@ref
+page_faq) explains the compile and link settings when you intentionally need it.
+
+# Account for platform libraries
+
+The unity build selects platform implementations at compile time. Depending on the libraries used, a target may need:
+
+- Apple system frameworks such as CoreFoundation or CoreServices;
+- Linux system libraries such as `dl` and `pthread`;
+- Windows system libraries, many of which are selected by the headers with `#pragma comment(lib, ...)`.
+
+Start from the link settings used by the corresponding repository example or test rather than adding every possible
+system library. This keeps a small consumer target honest about what it actually uses.
+
+# Plugins need exported library symbols
+
+When using [Plugin](@ref library_plugin) without `SC::Build`, define `SC_EXPORT_LIBRARY_<LIBRARY>=1` in the host for
+each Sane C++ library that a plugin must resolve. Linux hosts also need exported executable symbols, normally through
+`-rdynamic`.
+
+# When to use SC::Build
+
+Your existing build system remains a valid choice. Use [SC::Build](@ref page_build) when its C++ build descriptions,
+native backend, cross-target profiles, or package-managed toolchains remove work from your project. The external-use
+guide shows a minimal adoption that does not copy the Sane C++ repository layout.
+
+For a single self-contained library, open the [Single File Amalgamation](@ref page_single_file_libs) tool instead.
