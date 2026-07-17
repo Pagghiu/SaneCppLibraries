@@ -3349,6 +3349,47 @@ struct SC::FibersTest : public SC::TestCase
         {
             struct State
             {
+                FiberCounter* counter = nullptr;
+                Atomic<bool>  waiting;
+            };
+
+            FiberScheduler    scheduler;
+            FiberCounter      counter;
+            FiberTask         task;
+            char              stackMemory[64 * 1024] = {};
+            FiberStack        stack({stackMemory, sizeof(stackMemory)});
+            FiberWorker       workers[NumWorkers];
+            FiberWorkerThread threads[NumWorkers];
+            FiberWorkerPool   workerPool;
+            State             state;
+            state.counter = &counter;
+
+            scheduler.add(counter);
+            SC_TEST_EXPECT(scheduler.spawn(task, stack,
+                                           FiberTask::Procedure(
+                                               [&state](FiberScheduler& scheduler)
+                                               {
+                                                   state.waiting.store(true);
+                                                   return scheduler.wait(*state.counter);
+                                               })));
+            SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+            for (int loop = 0; loop < 1000 and not state.waiting.load(); ++loop)
+            {
+                Thread::Sleep(1);
+            }
+            SC_TEST_EXPECT(state.waiting.load());
+            SC_TEST_EXPECT(workerPool.shutdown());
+            SC_TEST_EXPECT(task.isCompleted());
+            SC_TEST_EXPECT(not task.result());
+            SC_TEST_EXPECT(counter.value() == 1);
+            SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+            SC_TEST_EXPECT(scheduler.done(counter));
+            SC_TEST_EXPECT(counter.value() == 0);
+        }
+
+        {
+            struct State
+            {
                 Atomic<int32_t> step;
                 FiberCounter*   counter = nullptr;
             };
