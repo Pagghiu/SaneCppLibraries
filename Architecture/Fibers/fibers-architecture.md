@@ -114,3 +114,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0013 - Use bounded deterministic work-stealing victim sampling](fibers-0013-use-bounded-deterministic-work-stealing-victim-sampling.md)
 - [FIBERS-0014 - Use bounded worker idle spinning](fibers-0014-use-bounded-worker-idle-spinning.md)
 - [FIBERS-0015 - Retain task group records until explicit reset](fibers-0015-retain-task-group-records-until-explicit-reset.md)
+- [FIBERS-0016 - Transfer fiber mutex ownership before wake publication](fibers-0016-transfer-fiber-mutex-ownership-before-wake-publication.md)

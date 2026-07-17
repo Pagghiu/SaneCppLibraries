@@ -6432,6 +6432,49 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not mutex.isLocked());
         SC_TEST_EXPECT(firstTask.result());
         SC_TEST_EXPECT(secondTask.result());
+        SC_TEST_EXPECT(not mutex.lock(scheduler));
+        SC_TEST_EXPECT(not mutex.unlock(scheduler));
+
+        struct HandoffState
+        {
+            FiberMutex* mutex            = nullptr;
+            bool        waiterOwnedMutex = false;
+        };
+
+        FiberScheduler handoffScheduler;
+        FiberTask      ownerTask;
+        FiberTask      waiterTask;
+        FiberMutex     handoffMutex;
+
+        char       ownerStackMemory[64 * 1024]  = {};
+        char       waiterStackMemory[64 * 1024] = {};
+        FiberStack ownerStack({ownerStackMemory, sizeof(ownerStackMemory)});
+        FiberStack waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
+
+        HandoffState handoffState;
+        handoffState.mutex = &handoffMutex;
+        SC_TEST_EXPECT(handoffScheduler.spawn(ownerTask, ownerStack,
+                                              FiberTask::Procedure(
+                                                  [&handoffState](FiberScheduler& scheduler)
+                                                  {
+                                                      SC_TRY(handoffState.mutex->lock(scheduler));
+                                                      SC_TRY(scheduler.yield());
+                                                      return handoffState.mutex->unlock(scheduler);
+                                                  })));
+        SC_TEST_EXPECT(handoffScheduler.spawn(waiterTask, waiterStack,
+                                              FiberTask::Procedure(
+                                                  [&handoffState](FiberScheduler& scheduler)
+                                                  {
+                                                      SC_TRY(handoffState.mutex->lock(scheduler));
+                                                      handoffState.waiterOwnedMutex =
+                                                          handoffState.mutex->isOwnedByCurrentTask(scheduler);
+                                                      return handoffState.mutex->unlock(scheduler);
+                                                  })));
+        SC_TEST_EXPECT(handoffScheduler.run());
+        SC_TEST_EXPECT(ownerTask.result());
+        SC_TEST_EXPECT(waiterTask.result());
+        SC_TEST_EXPECT(handoffState.waiterOwnedMutex);
+        SC_TEST_EXPECT(not handoffMutex.isLocked());
     }
 
     void multiWorkerPrimitives()

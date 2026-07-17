@@ -177,6 +177,11 @@ Fiber primitives suspend the current fiber instead of blocking the OS thread:
 - `FiberMutex` protects cooperative fiber critical sections and diagnoses recursive or wrong-owner use.
 - `FiberTaskGroup` spawns child tasks and collects errors without dynamic allocation.
 
+Primitive waits and `FiberMutex::lock()` / `unlock()` must run inside a fiber owned by the supplied scheduler. Event and
+semaphore signals may be published from another thread through that scheduler. Mutex ownership transfers to the chosen
+waiter before its wake is published, so the previous owner cannot unlock twice or let another fiber enter during the
+handoff window.
+
 A task group retains the completed task records from one wave so `countErrors()` and `collectErrors()` can report stable
 task identities even when the tasks came from a reusable pool. After waiting and inspecting results, call
 `FiberTaskGroup::reset()` to release those records back to fixed or class-backed pools. Reset fails while tasks are

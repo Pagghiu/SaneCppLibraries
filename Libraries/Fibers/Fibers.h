@@ -1017,6 +1017,7 @@ struct SC_FIBERS_EXPORT FiberMutex
     {
         FiberCounter counter;
         WaitNode*    next     = nullptr;
+        FiberTask*   task     = nullptr;
         bool         notified = false;
     };
 

@@ -3975,6 +3975,10 @@ FiberMutex::~FiberMutex()
 Result FiberMutex::lock(FiberScheduler& scheduler)
 {
     FiberTask* currentTask = scheduler.currentTask();
+    if (currentTask == nullptr)
+    {
+        return Result::Error("FiberMutex::lock must be called from a fiber");
+    }
     fiberSchedulerLock(primitiveLock);
     if (not locked)
     {
@@ -3991,6 +3995,7 @@ Result FiberMutex::lock(FiberScheduler& scheduler)
     }
 
     WaitNode node;
+    node.task = currentTask;
     scheduler.add(node.counter);
     queueWaiter(node);
     fiberSchedulerUnlock(primitiveLock);
@@ -4011,6 +4016,7 @@ Result FiberMutex::lock(FiberScheduler& scheduler)
     }
     else
     {
+        SC_FIBERS_ASSERT_RELEASE(owner == currentTask);
         owner = currentTask;
         fiberSchedulerUnlock(primitiveLock);
     }
@@ -4019,13 +4025,18 @@ Result FiberMutex::lock(FiberScheduler& scheduler)
 
 Result FiberMutex::unlock(FiberScheduler& scheduler)
 {
+    FiberTask* currentTask = scheduler.currentTask();
+    if (currentTask == nullptr)
+    {
+        return Result::Error("FiberMutex::unlock must be called from a fiber");
+    }
     fiberSchedulerLock(primitiveLock);
     if (not locked)
     {
         fiberSchedulerUnlock(primitiveLock);
         return Result::Error("FiberMutex is not locked");
     }
-    if (owner != nullptr and owner != scheduler.currentTask())
+    if (owner != currentTask)
     {
         fiberSchedulerUnlock(primitiveLock);
         SC_FIBERS_ASSERT_RELEASE(false);
@@ -4041,7 +4052,8 @@ Result FiberMutex::unlock(FiberScheduler& scheduler)
     }
     else
     {
-        owner          = nullptr;
+        SC_FIBERS_ASSERT_RELEASE(node->task != nullptr);
+        owner          = node->task;
         node->notified = true;
         fiberSchedulerUnlock(primitiveLock);
         SC_TRY(scheduler.done(node->counter));
