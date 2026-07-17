@@ -4,6 +4,29 @@
 The examples are complete programs built from the same library sources as the test suite. Use them to see how the
 libraries fit together, then follow the links to the source when you need the implementation details.
 
+## Videos
+
+These two recordings show SCExample exercising several libraries together. They are useful for seeing the finished
+integration before exploring the smaller examples below.
+
+### Serialization and state
+
+\htmlonly
+<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/serialization-and-state.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d">Open the serialization example video</a>.
+</video>
+\endhtmlonly
+
+### Plugin loading and hot reload
+
+\htmlonly
+<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+</video>
+\endhtmlonly
+
 ## Quick start
 
 Build and run an example from the repository root:
@@ -99,26 +122,6 @@ host used to exercise `Async`, plugins, file watching, state handoff, and hot re
 
 SCExample is an integration testbed rather than the shortest introduction to any individual library. Start with a
 focused console example when learning one API.
-
-## Videos
-
-### Serialization and state
-
-\htmlonly
-<video controls playsinline preload="metadata" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d">Open the serialization example video</a>.
-</video>
-\endhtmlonly
-
-### Plugin loading and hot reload
-
-\htmlonly
-<video controls playsinline preload="metadata" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
-</video>
-\endhtmlonly
 
 ## More source-backed examples
 
