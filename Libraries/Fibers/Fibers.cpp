@@ -2503,7 +2503,11 @@ void FiberScheduler::taskEntry(void* userData)
 
 FiberTask::FiberTask() = default;
 
-FiberTask::~FiberTask() { SC_FIBERS_ASSERT_RELEASE(not isActive()); }
+FiberTask::~FiberTask()
+{
+    SC_FIBERS_ASSERT_RELEASE(not isActive());
+    SC_FIBERS_ASSERT_RELEASE(originGroup == nullptr);
+}
 
 bool FiberTask::isValid() const { return status() != FiberTaskStatus::Invalid; }
 
@@ -2657,6 +2661,11 @@ struct FiberTaskClassInternal
         {
             fiberSchedulerUnlock(availabilityQueue.lock);
             return Result::Error("FiberTaskClass cannot release active task");
+        }
+        if (task.originGroup != nullptr)
+        {
+            fiberSchedulerUnlock(availabilityQueue.lock);
+            return Result::Error("FiberTaskClass cannot release a task retained by FiberTaskGroup");
         }
 
         taskStates[index] = 0;
@@ -2869,21 +2878,30 @@ static Result fiberTaskGroupSpawnOptions(const FiberTaskSpawnOptions& input, Fib
 
 FiberTaskGroup::FiberTaskGroup(FiberScheduler& fiberScheduler) : scheduler(fiberScheduler) {}
 
-FiberTaskGroup::~FiberTaskGroup() { SC_FIBERS_ASSERT_RELEASE(counter.value() == 0); }
+FiberTaskGroup::~FiberTaskGroup()
+{
+    Result result = reset();
+    SC_FIBERS_ASSERT_RELEASE(result);
+}
 
 Result FiberTaskGroup::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure)
 {
-    SC_TRY(scheduler.spawn(task, stack, procedure, &counter));
-    linkTask(task);
-    return Result(true);
+    FiberTaskSpawnOptions options;
+    SC_TRY(fiberTaskGroupSpawnOptions(options, counter, options));
+    options.originGroup = this;
+    SC_TRY(prepareSpawn());
+    return scheduler.spawn(task, stack, procedure, options);
 }
 
 Result FiberTaskGroup::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
                              FiberCancellationToken token)
 {
-    SC_TRY(scheduler.spawn(task, stack, procedure, token, &counter));
-    linkTask(task);
-    return Result(true);
+    FiberTaskSpawnOptions options;
+    options.cancellationToken = token;
+    SC_TRY(fiberTaskGroupSpawnOptions(options, counter, options));
+    options.originGroup = this;
+    SC_TRY(prepareSpawn());
+    return scheduler.spawn(task, stack, procedure, options);
 }
 
 Result FiberTaskGroup::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
@@ -2891,9 +2909,9 @@ Result FiberTaskGroup::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 {
     FiberTaskSpawnOptions groupOptions;
     SC_TRY(fiberTaskGroupSpawnOptions(options, counter, groupOptions));
-    SC_TRY(scheduler.spawn(task, stack, procedure, groupOptions));
-    linkTask(task);
-    return Result(true);
+    groupOptions.originGroup = this;
+    SC_TRY(prepareSpawn());
+    return scheduler.spawn(task, stack, procedure, groupOptions);
 }
 
 Result FiberTaskGroup::spawn(FiberTaskPool& pool, FiberTask::Procedure procedure, FiberTask** outTask)
@@ -2902,10 +2920,13 @@ Result FiberTaskGroup::spawn(FiberTaskPool& pool, FiberTask::Procedure procedure
     {
         *outTask = nullptr;
     }
-    FiberTask* task = nullptr;
-    SC_TRY(pool.spawn(scheduler, procedure, &task, &counter));
+    SC_TRY(prepareSpawn());
+    FiberTask*            task = nullptr;
+    FiberTaskSpawnOptions options;
+    SC_TRY(fiberTaskGroupSpawnOptions(options, counter, options));
+    options.originGroup = this;
+    SC_TRY(pool.spawn(scheduler, procedure, options, &task));
     SC_FIBERS_ASSERT_RELEASE(task != nullptr);
-    linkTask(*task);
     if (outTask != nullptr)
     {
         *outTask = task;
@@ -2920,10 +2941,14 @@ Result FiberTaskGroup::spawn(FiberTaskPool& pool, FiberTask::Procedure procedure
     {
         *outTask = nullptr;
     }
-    FiberTask* task = nullptr;
-    SC_TRY(pool.spawn(scheduler, procedure, token, &task, &counter));
+    SC_TRY(prepareSpawn());
+    FiberTask*            task = nullptr;
+    FiberTaskSpawnOptions options;
+    options.cancellationToken = token;
+    SC_TRY(fiberTaskGroupSpawnOptions(options, counter, options));
+    options.originGroup = this;
+    SC_TRY(pool.spawn(scheduler, procedure, options, &task));
     SC_FIBERS_ASSERT_RELEASE(task != nullptr);
-    linkTask(*task);
     if (outTask != nullptr)
     {
         *outTask = task;
@@ -2938,13 +2963,14 @@ Result FiberTaskGroup::spawn(FiberTaskPool& pool, FiberTask::Procedure procedure
     {
         *outTask = nullptr;
     }
+    SC_TRY(prepareSpawn());
     FiberTaskSpawnOptions groupOptions;
     SC_TRY(fiberTaskGroupSpawnOptions(options, counter, groupOptions));
+    groupOptions.originGroup = this;
 
     FiberTask* task = nullptr;
     SC_TRY(pool.spawn(scheduler, procedure, groupOptions, &task));
     SC_FIBERS_ASSERT_RELEASE(task != nullptr);
-    linkTask(*task);
     if (outTask != nullptr)
     {
         *outTask = task;
@@ -3018,8 +3044,50 @@ Result FiberTaskGroup::cancelAll()
     FiberTask* task = taskHead;
     while (task != nullptr)
     {
-        SC_TRY(scheduler.requestCancel(*task));
+        if (task->isActive())
+        {
+            SC_TRY(scheduler.requestCancel(*task));
+        }
         task = task->nextGroup;
+    }
+    return Result(true);
+}
+
+Result FiberTaskGroup::reset()
+{
+    if (counter.value() != 0)
+    {
+        return Result::Error("FiberTaskGroup cannot reset with pending tasks");
+    }
+
+    FiberTask* task = taskHead;
+    taskHead        = nullptr;
+    while (task != nullptr)
+    {
+        FiberTask* next = task->nextGroup;
+        SC_FIBERS_ASSERT_RELEASE(task->originGroup == this);
+        SC_FIBERS_ASSERT_RELEASE(task->isCompleted());
+
+        FiberTaskPool*  pool      = task->originPool;
+        FiberTaskClass* taskClass = task->originTaskClass;
+        task->nextGroup           = nullptr;
+        task->originGroup         = nullptr;
+        task->originPool          = nullptr;
+        task->originTaskClass     = nullptr;
+
+        if (taskClass != nullptr)
+        {
+            SC_FIBERS_TRUST_RESULT(taskClass->release(*task));
+        }
+        if (pool != nullptr)
+        {
+            FiberCounter* availableCounter = pool->popAvailabilityWaiterForNotification();
+            if (availableCounter != nullptr)
+            {
+                SC_FIBERS_TRUST_RESULT(scheduler.done(*availableCounter));
+            }
+        }
+        task = next;
     }
     return Result(true);
 }
@@ -3062,8 +3130,17 @@ Result FiberTaskGroup::collectErrors(Span<FiberTaskGroupError> errors, size_t& o
     return Result(true);
 }
 
+Result FiberTaskGroup::prepareSpawn() const
+{
+    return taskHead != nullptr and counter.value() == 0
+               ? Result::Error("FiberTaskGroup must be reset before starting another task wave")
+               : Result(true);
+}
+
 void FiberTaskGroup::linkTask(FiberTask& task)
 {
+    SC_FIBERS_ASSERT_RELEASE(task.originGroup == this);
+    SC_FIBERS_ASSERT_RELEASE(task.nextGroup == nullptr);
     task.nextGroup = taskHead;
     taskHead       = &task;
 }
@@ -3211,7 +3288,7 @@ Result FiberTaskPool::spawn(FiberScheduler& scheduler, FiberTask::Procedure proc
     {
         const size_t candidateIndex = (nextTask + offset) % numTasks;
         FiberTask&   candidate      = tasks[candidateIndex];
-        if (not candidate.isActive())
+        if (not candidate.isActive() and candidate.originGroup == nullptr)
         {
             task      = &candidate;
             taskIndex = candidateIndex;
@@ -3271,7 +3348,7 @@ size_t FiberTaskPool::activeCount() const
     size_t       active   = 0;
     for (size_t idx = 0; idx < numTasks; ++idx)
     {
-        if (tasks[idx].isActive())
+        if (tasks[idx].isActive() or tasks[idx].originGroup != nullptr)
         {
             active++;
         }
@@ -4117,6 +4194,10 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
 Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
                              const FiberTaskSpawnOptions& options)
 {
+    if (task.originGroup != nullptr)
+    {
+        return Result::Error("FiberTask is retained by a FiberTaskGroup");
+    }
     if (task.isActive())
     {
         return Result::Error("FiberTask is already active");
@@ -4137,6 +4218,10 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
     }
 
     LockGuard guard(*this, LockCategory::Spawn);
+    if (task.originGroup != nullptr)
+    {
+        return Result::Error("FiberTask is retained by a FiberTaskGroup");
+    }
     if (task.isActive())
     {
         return Result::Error("FiberTask is already active");
@@ -4183,6 +4268,7 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
     task.nextActive           = nullptr;
     task.previousActive       = nullptr;
     task.nextGroup            = nullptr;
+    task.originGroup          = options.originGroup;
     task.waitingCounter       = nullptr;
     task.suspendCounter       = nullptr;
     task.originPool           = options.originPool;
@@ -4210,6 +4296,7 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
         task.nextActive           = nullptr;
         task.previousActive       = nullptr;
         task.nextGroup            = nullptr;
+        task.originGroup          = nullptr;
         task.waitingCounter       = nullptr;
         task.suspendCounter       = nullptr;
         task.originPool           = nullptr;
@@ -4234,6 +4321,10 @@ Result FiberScheduler::initializeTaskForSpawn(FiberTask& task, FiberStack& stack
     if (options.setUserData)
     {
         task.taskUserData = options.userData;
+    }
+    if (task.originGroup != nullptr)
+    {
+        task.originGroup->linkTask(task);
     }
     return Result(true);
 }
@@ -5580,6 +5671,7 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
     FiberTaskPool*   completedOriginPool  = nullptr;
     FiberTaskClass*  completedTaskClass   = nullptr;
     FiberStackClass* completedStackClass  = nullptr;
+    FiberTaskGroup*  completedGroup       = nullptr;
     FiberCounter*    completedCounter     = nullptr;
     Span<char>       completedStackMemory;
     bool             completedTask = false;
@@ -5602,14 +5694,18 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
             static_cast<FiberVirtualStackInternal*>(task.stackOwner)->releaseStack();
             task.stackOwner = nullptr;
         }
-        completedOriginPool    = task.originPool;
-        task.originPool        = nullptr;
+        completedGroup = task.originGroup;
+        if (completedGroup == nullptr)
+        {
+            completedOriginPool  = task.originPool;
+            completedTaskClass   = task.originTaskClass;
+            task.originPool      = nullptr;
+            task.originTaskClass = nullptr;
+        }
         completedCounter       = task.completionCounter;
         task.completionCounter = nullptr;
-        completedTaskClass     = task.originTaskClass;
         completedStackClass    = task.originStackClass;
         completedStackMemory   = task.originStackMemory;
-        task.originTaskClass   = nullptr;
         task.originStackClass  = nullptr;
         task.originStackMemory = {};
         task.runningWorker     = nullptr;
@@ -5655,12 +5751,16 @@ Result FiberScheduler::runReadyTask(FiberTask& task, FiberWorker& worker)
                 SC_FIBERS_TRUST_RESULT(doneUnlocked(*task.completionCounter));
                 task.completionCounter = nullptr;
             }
-            completedOriginPool    = task.originPool;
-            task.originPool        = nullptr;
-            completedTaskClass     = task.originTaskClass;
+            completedGroup = task.originGroup;
+            if (completedGroup == nullptr)
+            {
+                completedOriginPool  = task.originPool;
+                completedTaskClass   = task.originTaskClass;
+                task.originPool      = nullptr;
+                task.originTaskClass = nullptr;
+            }
             completedStackClass    = task.originStackClass;
             completedStackMemory   = task.originStackMemory;
-            task.originTaskClass   = nullptr;
             task.originStackClass  = nullptr;
             task.originStackMemory = {};
             completedTask          = true;

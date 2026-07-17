@@ -1666,6 +1666,21 @@ struct SC::FibersTest : public SC::TestCase
         pool.diagnostics(diagnostics);
         SC_TEST_EXPECT(diagnostics.taskClass.peakActiveTasks == 2);
         SC_TEST_EXPECT(diagnostics.stackClass.peakActiveStacks == 2);
+
+        FiberTaskGroup group(scheduler);
+        FiberTask*     groupedTask = nullptr;
+        SC_TEST_EXPECT(
+            group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &groupedTask));
+        SC_TEST_EXPECT(group.waitAll());
+        SC_TEST_EXPECT(groupedTask != nullptr);
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+        SC_TEST_EXPECT(taskClass.activeCount() == 1);
+        SC_TEST_EXPECT(stackClass.activeCount() == 0);
+        SC_TEST_EXPECT(not taskClass.release(*groupedTask));
+        SC_TEST_EXPECT(group.reset());
+        SC_TEST_EXPECT(pool.availableCount() == 2);
+        SC_TEST_EXPECT(taskClass.activeCount() == 0);
+
         SC_TEST_EXPECT(pool.close());
         SC_TEST_EXPECT(taskClass.close());
         stackClass.release();
@@ -2244,6 +2259,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(optionsState.sawTask);
             SC_TEST_EXPECT(optionsState.completed == 1);
             SC_TEST_EXPECT(optionsTask.result());
+            SC_TEST_EXPECT(optionsGroup.reset());
 
             FiberTask     poolTasks[1];
             char          poolStackMemory[64 * 1024] = {};
@@ -2279,6 +2295,7 @@ struct SC::FibersTest : public SC::TestCase
             }
             SC_TEST_EXPECT(optionsState.sawTask);
             SC_TEST_EXPECT(optionsState.completed == 2);
+            SC_TEST_EXPECT(optionsGroup.reset());
 
             FiberCounter invalidCounter;
             options.counter       = &invalidCounter;
@@ -2498,6 +2515,56 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(not noSlot);
             SC_TEST_EXPECT(noSlotTask == nullptr);
             SC_TEST_EXPECT(group.waitAll());
+        }
+
+        {
+            FiberScheduler scheduler;
+            FiberTask      task;
+            char           stackMemory[64 * 1024] = {};
+            FiberTaskPool  pool({&task, 1}, {stackMemory, sizeof(stackMemory)}, sizeof(stackMemory));
+            FiberTaskGroup group(scheduler);
+
+            FiberTask* firstTask = nullptr;
+            SC_TEST_EXPECT(group.spawn(
+                pool, FiberTask::Procedure([](FiberScheduler&) { return Result::Error("Expected retained error"); }),
+                &firstTask));
+            SC_TEST_EXPECT(firstTask == &task);
+            SC_TEST_EXPECT(not group.reset());
+
+            Result firstWait = group.waitAll();
+            SC_TEST_EXPECT(not firstWait);
+            SC_TEST_EXPECT(group.pending() == 0);
+            SC_TEST_EXPECT(group.countErrors() == 1);
+            SC_TEST_EXPECT(pool.availableCount() == 0);
+
+            FiberTaskGroupError errors[1];
+            size_t              numErrors = 0;
+            SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
+            SC_TEST_EXPECT(numErrors == 1);
+            SC_TEST_EXPECT(errors[0].task == firstTask);
+            SC_TEST_EXPECT(not errors[0].result);
+
+            FiberTask* unavailableTask = &task;
+            SC_TEST_EXPECT(not pool.spawn(scheduler, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
+                                          &unavailableTask));
+            SC_TEST_EXPECT(unavailableTask == nullptr);
+            FiberStack directStack({stackMemory, sizeof(stackMemory)});
+            SC_TEST_EXPECT(not scheduler.spawn(task, directStack,
+                                               FiberTask::Procedure([](FiberScheduler&) { return Result(true); })));
+
+            FiberTask* nextWaveTask = &task;
+            SC_TEST_EXPECT(not group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }),
+                                           &nextWaveTask));
+            SC_TEST_EXPECT(nextWaveTask == nullptr);
+
+            SC_TEST_EXPECT(group.reset());
+            SC_TEST_EXPECT(pool.availableCount() == 1);
+            SC_TEST_EXPECT(
+                group.spawn(pool, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }), &nextWaveTask));
+            SC_TEST_EXPECT(nextWaveTask == &task);
+            SC_TEST_EXPECT(group.waitAll());
+            SC_TEST_EXPECT(group.reset());
+            SC_TEST_EXPECT(pool.availableCount() == 1);
         }
     }
 

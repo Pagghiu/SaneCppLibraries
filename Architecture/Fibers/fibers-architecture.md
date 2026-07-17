@@ -112,3 +112,5 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0011 - Keep fiber stack-size classes explicit](fibers-0011-keep-fiber-stack-size-classes-explicit.md)
 - [FIBERS-0012 - Require a prototype before incremental fiber stack commitment](fibers-0012-require-a-prototype-before-incremental-fiber-stack-commitment.md)
 - [FIBERS-0013 - Use bounded deterministic work-stealing victim sampling](fibers-0013-use-bounded-deterministic-work-stealing-victim-sampling.md)
+- [FIBERS-0014 - Use bounded worker idle spinning](fibers-0014-use-bounded-worker-idle-spinning.md)
+- [FIBERS-0015 - Retain task group records until explicit reset](fibers-0015-retain-task-group-records-until-explicit-reset.md)

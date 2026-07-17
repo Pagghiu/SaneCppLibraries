@@ -177,6 +177,12 @@ Fiber primitives suspend the current fiber instead of blocking the OS thread:
 - `FiberMutex` protects cooperative fiber critical sections and diagnoses recursive or wrong-owner use.
 - `FiberTaskGroup` spawns child tasks and collects errors without dynamic allocation.
 
+A task group retains the completed task records from one wave so `countErrors()` and `collectErrors()` can report stable
+task identities even when the tasks came from a reusable pool. After waiting and inspecting results, call
+`FiberTaskGroup::reset()` to release those records back to fixed or class-backed pools. Reset fails while tasks are
+pending, and a group does not accept a new wave until the completed wave has been reset. Stack slots are released at
+normal root-context completion; only the smaller task records remain retained for result inspection.
+
 For example, a semaphore can bound how many fibers enter a cooperative region:
 
 ```cpp

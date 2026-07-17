@@ -624,9 +624,11 @@ struct SC_FIBERS_EXPORT FiberTaskSpawnOptions
     bool                   setUserData = false;
 
   private:
+    friend struct FiberTaskGroup;
     friend struct FiberScheduler;
     friend struct FiberTaskPool;
 
+    FiberTaskGroup*  originGroup      = nullptr;
     FiberTaskPool*   originPool       = nullptr;
     FiberTaskClass*  originTaskClass  = nullptr;
     FiberStackClass* originStackClass = nullptr;
@@ -662,6 +664,8 @@ struct SC_FIBERS_EXPORT FiberTask
 
   private:
     friend struct FiberTaskGroup;
+    friend struct FiberTaskClassInternal;
+    friend struct FiberTaskPool;
     friend struct FiberScheduler;
 
     AlignedStorage<FiberContextStorageSize, FiberContextStorageAlignment> contextStorage;
@@ -676,6 +680,7 @@ struct SC_FIBERS_EXPORT FiberTask
     FiberTask*             nextActive       = nullptr;
     FiberTask*             previousActive   = nullptr;
     FiberTask*             nextGroup        = nullptr;
+    FiberTaskGroup*        originGroup      = nullptr;
     FiberCounter*          waitingCounter   = nullptr;
     FiberCounter*          suspendCounter   = nullptr;
     FiberTaskPool*         originPool       = nullptr;
@@ -803,16 +808,21 @@ struct SC_FIBERS_EXPORT FiberTaskGroup
     Result waitAllCancelOnParentCancel(Result* outFirstError = nullptr);
     Result waitCancelOnError(Result* outFirstError = nullptr);
     Result cancelAll();
+    //! Releases completed task records after result/error inspection. Fails while tasks are pending.
+    Result reset();
 
     [[nodiscard]] size_t pending() const;
     [[nodiscard]] size_t countErrors() const;
     Result               collectErrors(Span<FiberTaskGroupError> errors, size_t& outErrors) const;
 
   private:
+    friend struct FiberScheduler;
+
     FiberScheduler& scheduler;
     FiberCounter    counter;
     FiberTask*      taskHead = nullptr;
 
+    Result prepareSpawn() const;
     void   linkTask(FiberTask& task);
     Result findFirstError(Result* outFirstError) const;
 };
@@ -861,6 +871,7 @@ struct SC_FIBERS_EXPORT FiberTaskPool
     Result               stackHighWaterUnusedBytes(size_t stackIndex, size_t& outBytes) const;
 
   private:
+    friend struct FiberTaskGroup;
     friend struct FiberScheduler;
 
     struct WaitNode
