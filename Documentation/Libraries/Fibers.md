@@ -305,6 +305,10 @@ diagnostics types.
 
 🟥 Draft
 
+This Draft does not promise binary compatibility. The stabilization candidate changes public caller-sized layouts,
+including task and spawn metadata, so binary consumers must recompile against the matching headers. No compatibility
+shim is provided or required while the library remains Draft.
+
 Current support includes:
 
 - caller-provided `FiberStack` memory;

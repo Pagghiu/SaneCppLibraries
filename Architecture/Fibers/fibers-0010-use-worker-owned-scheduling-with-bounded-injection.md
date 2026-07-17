@@ -50,12 +50,16 @@ The target state transition rules are:
 | `Suspending` | `Ready` | root context observes a completion or cancellation that raced with suspension and publishes the task only after the old stack is inactive |
 | `Waiting` | `Ready` | primitive completion or cancellation claims the task once, unlinks it, then publishes it |
 | `Running` | `Completing` | current worker records final `Result` and switches to its root context |
-| `Completing` | `Completed` | worker root context reduces active work, performs post-switch pool/class release, and notifies availability |
+| `Completing` | `Completed` | worker root context reduces active work, releases reusable execution storage, and notifies availability |
 
 `Suspending` is an internal state, not a new public `FiberTaskStatus`. It models the existing two-phase suspension
 invariant explicitly: an external completion or cancellation may record that it won, but must never queue a task while
 its stack is still executing. The root context is the only code that turns such a recorded outcome into a ready
 publication. This is also why cancellation remains cooperative rather than preempting a running stack.
+
+Root-context completion releases stack storage and normally releases task storage. FIBERS-0015 defines the explicit
+grouped-task exception: a `FiberTaskGroup` retains the completed task record, including a class-backed task slot, until
+the group wave is reset. This retention does not keep the task active and does not delay stack reuse.
 
 ## Control-Plane Signals And Parking
 
@@ -72,7 +76,7 @@ pool's separate stop request. They are implementation fields, not new public API
 - `FiberWorkerPool::stopRequested` is an atomic pool-lifecycle flag. A stop request wakes all workers and asks them to
   cancel the scheduler's currently active tasks before joining. It is not a permanent scheduler state:
   `FiberScheduler::shutdown()` is a reusable cancellation drain, and the scheduler may accept new work after it has
-  returned with no active fibers.
+  returned with no active fibers. A completed grouped task may still retain its inactive task record until group reset.
 
 Task initialization happens-before first publication. `activeFiberCount` increments and `readyWorkCount` increments
 use release semantics; readers that decide whether to park or terminate use acquire semantics. A successful task-state
@@ -211,5 +215,6 @@ pool stop and join remain a separate lifecycle.
 - [FIBERS-0006 - Keep cancellation cooperative and wake-based](fibers-0006-keep-cancellation-cooperative-and-wake-based.md)
 - [FIBERS-0007 - Model spawn backpressure as explicit capacity waiting](fibers-0007-model-spawn-backpressure-as-explicit-capacity-waiting.md)
 - [FIBERS-0008 - Use stack-local waiter nodes for cooperative waits](fibers-0008-use-stack-local-waiter-nodes-for-cooperative-waits.md)
+- [FIBERS-0015 - Retain task group records until explicit reset](fibers-0015-retain-task-group-records-until-explicit-reset.md)
 - [Fibers active runtime roadmap](../../Documentation/Plans/FibersPlan.md)
 - [Fibers architecture](fibers-architecture.md)
