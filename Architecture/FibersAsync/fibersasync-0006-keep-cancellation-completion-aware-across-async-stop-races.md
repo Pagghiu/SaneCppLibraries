@@ -11,9 +11,11 @@ can leave fibers waiting forever, reuse stack-local command state too early, or 
 
 ## Decision
 
-`FibersAsync` cancellation is cooperative and completion-aware. Once an operation starts or a start command is queued, the
-bridge must balance operation counters exactly once, acknowledge cancellation-before-start on the owner thread, and treat
-backend completion and stop completion as racing outcomes where one final result wins.
+`FibersAsync` cancellation is cooperative and completion-aware. Before creating pending-operation state or starting an
+`AsyncRequest`, the bridge requires a currently running fiber of its scheduler so all stack-local request and callback
+state can remain alive across suspension. Once an operation starts or a start command is queued, the bridge must balance
+operation counters exactly once, acknowledge cancellation-before-start on the owner thread, and treat backend completion
+and stop completion as racing outcomes where one final result wins.
 
 ## Consequences
 
@@ -25,8 +27,9 @@ touching producer stack state after it may have gone out of scope.
 
 A change preserves this decision when start/stop/complete interleavings cannot leak pending operation counters, queued
 commands never retain invalid producer stack state, cancellation-before-start is handled by the owner thread, and tests
-cover cancel-after-submit, cancel-before-start, failed-start, completion-wins, and post-exhaustion reuse. The bridge
-must not be destroyed until both pending-operation accounting and queued command state are empty.
+cover rejection outside a fiber, cancel-after-submit, cancel-before-start, failed-start, completion-wins, and
+post-exhaustion reuse. The bridge must not be destroyed until both pending-operation accounting and queued command state
+are empty.
 
 ## Related
 

@@ -235,6 +235,17 @@ them must remain alive and at stable addresses until the task completes. A `Fibe
 does not make borrowed state owning. Destroying a scheduler or storage class while work is active is a programming
 error diagnosed by the library.
 
+Cancellation tokens borrow their `FiberCancellationTokenSource`; the source must outlive every token and every task
+spawned with one. Treat `FiberCancellationTokenSource::reset()` as a between-wave lifecycle operation after all prior
+token users have completed, not as a way to revoke cancellation from active work.
+
+`FiberScheduler` serializes task publication, cancellation, and wake operations used by external producers. A fixed
+span-backed `FiberTaskPool` does not serialize its slot scan or `nextTask` cursor, so calls that acquire/spawn pool slots
+must come from one producer or be externally serialized; task execution and completion may still happen on many
+workers. Class acquire/release operations have their own internal serialization. Reserve/create/close/release and
+worker-pool start/join are quiescent lifecycle operations; `FiberWorkerPool::requestStop()` is the cross-thread stop
+signal.
+
 `FiberScheduler::shutdown()` is a reusable cancellation drain, not a permanent close. It requests cancellation for the
 currently active tasks and drives them back to completion. Calling it again with no active work succeeds, and new tasks
 may be spawned afterward. A worker pool has a separate lifecycle: `requestStop()` wakes its workers and `join()` must

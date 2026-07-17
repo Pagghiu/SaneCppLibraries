@@ -3145,6 +3145,12 @@ struct SC::FibersTest : public SC::TestCase
             FiberWorkerThread threads[NumWorkers];
             FiberWorkerPool   workerPool;
 
+            SC_TEST_EXPECT(workerPool.requestStop());
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(workerPool.shutdown());
+            SC_TEST_EXPECT(workerPool.shutdown());
+            SC_TEST_EXPECT(not workerPool.isRunning());
+
             Result noWorkers = workerPool.start(scheduler, {}, {threads, NumWorkers});
             SC_TEST_EXPECT(not noWorkers);
             SC_TEST_EXPECT(not workerPool.isRunning());
@@ -3220,6 +3226,9 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(workerPool.isRunning());
             SC_TEST_EXPECT(workerPool.workerCount() == NumWorkers);
             SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(not workerPool.isRunning());
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(workerPool.shutdown());
             SC_TEST_EXPECT(not workerPool.isRunning());
             SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumTasks));
             SC_TEST_EXPECT(not scheduler.hasActiveFibers());
@@ -6432,6 +6441,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not mutex.isLocked());
         SC_TEST_EXPECT(firstTask.result());
         SC_TEST_EXPECT(secondTask.result());
+        SC_TEST_EXPECT(not mutex.isOwnedByCurrentTask(scheduler));
         SC_TEST_EXPECT(not mutex.lock(scheduler));
         SC_TEST_EXPECT(not mutex.unlock(scheduler));
 

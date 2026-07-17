@@ -343,6 +343,14 @@ struct SC::FibersAsyncTest : public SC::TestCase
         FiberScheduler scheduler;
         FiberAsyncIO   io(scheduler, eventLoop);
 
+        FiberAsyncSocketSendResult emptySendResult;
+        emptySendResult.numBytes = 42;
+        SocketDescriptor invalidSocket;
+        SC_TEST_EXPECT(not io.sleep(TimeMs{0}));
+        SC_TEST_EXPECT(not io.send(invalidSocket, {}, &emptySendResult));
+        SC_TEST_EXPECT(emptySendResult.numBytes == 42);
+        SC_TEST_EXPECT(io.runNoWait());
+
         FiberTask idleTask;
         FiberTask completeTask;
 

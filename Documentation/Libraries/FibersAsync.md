@@ -96,6 +96,11 @@ not scratch space sized only for one call. If simultaneous cross-thread starts a
 operation fails rather than allocating. Size it from the intended concurrency or impose producer backpressure. For a
 single-threaded scheduler, command storage can be omitted.
 
+All `run*`, `runOwner*`, and `cancelAll()` methods are event-loop-owner calls. Every I/O operation method, including a
+zero-length fast path, must be called by a currently running fiber of the bridge's scheduler. The bridge rejects an
+operation before creating pending state or starting an `AsyncRequest` when that fiber context is absent; this keeps its
+stack-local request and callback state valid for the entire suspension.
+
 # Cancellation and shutdown
 
 Cancellation is cooperative. SC::FiberScheduler::requestCancel wakes an interruptible fiber wait; the bridge stops the

@@ -257,6 +257,7 @@ Result FiberAsyncIO::connect(const SocketDescriptor& socket, SocketIPAddress add
 
 Result FiberAsyncIO::send(const SocketDescriptor& socket, Span<const char> data, FiberAsyncSocketSendResult* outResult)
 {
+    SC_TRY(checkFiberContext());
     if (data.empty())
     {
         if (outResult != nullptr)
@@ -334,6 +335,7 @@ Result FiberAsyncIO::receive(const SocketDescriptor& socket, Span<char> buffer,
 Result FiberAsyncIO::sendAll(const SocketDescriptor& socket, Span<const char> data,
                              FiberAsyncSocketSendResult* outResult)
 {
+    SC_TRY(checkFiberContext());
     if (data.empty())
     {
         if (outResult != nullptr)
@@ -593,6 +595,7 @@ Result FiberAsyncIO::signal(int signalNumber, FiberAsyncSignalResult& outResult)
 Result FiberAsyncIO::sendTo(const SocketDescriptor& socket, SocketIPAddress address, Span<const char> data,
                             FiberAsyncSocketSendResult* outResult)
 {
+    SC_TRY(checkFiberContext());
     if (data.empty())
     {
         if (outResult != nullptr)
@@ -713,6 +716,7 @@ Result FiberAsyncIO::fileReadImpl(const FileDescriptor& file, Span<char> buffer,
 Result FiberAsyncIO::fileReadExactImpl(const FileDescriptor& file, Span<char> buffer,
                                        FiberAsyncFileReadResult& outResult, uint64_t offset, bool useOffset)
 {
+    SC_TRY(checkFiberContext());
     outResult = {};
     if (buffer.empty())
     {
@@ -748,6 +752,7 @@ Result FiberAsyncIO::fileReadExactImpl(const FileDescriptor& file, Span<char> bu
 Result FiberAsyncIO::fileWriteImpl(const FileDescriptor& file, Span<const char> data,
                                    FiberAsyncFileWriteResult* outResult, uint64_t offset, bool useOffset)
 {
+    SC_TRY(checkFiberContext());
     if (data.empty())
     {
         if (outResult != nullptr)
@@ -801,6 +806,12 @@ Result FiberAsyncIO::checkOwnerThread() const
     SC_FIBER_ASYNC_ASSERT_RELEASE(isOwnerThread());
     SC_TRY_MSG(isOwnerThread(), "FiberAsyncIO used from a thread different than its owner thread");
     return Result(true);
+}
+
+Result FiberAsyncIO::checkFiberContext() const
+{
+    return scheduler.currentTask() != nullptr ? Result(true)
+                                              : Result::Error("FiberAsyncIO operation must be called from a fiber");
 }
 
 void FiberAsyncIO::operationStarted() { pendingOperations.fetch_add(1); }
@@ -888,6 +899,7 @@ Result FiberAsyncIO::drainCommandQueue()
 Result FiberAsyncIO::startOperation(FiberCounter& counter, AsyncRequest& request, Result& operationResult,
                                     Function<Result(AsyncEventLoop&)>& startProcedure)
 {
+    SC_TRY(checkFiberContext());
     if (scheduler.isCurrentTaskCancellationRequested())
     {
         operationResult = FiberAsyncTaskCancelled();

@@ -88,6 +88,7 @@ struct FiberAsyncSignalResult
 };
 
 //! Synchronous-looking fiber I/O wrapper around an externally owned AsyncEventLoop.
+//! Operation methods require a currently running fiber of the supplied FiberScheduler.
 struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
 {
     FiberAsyncIO(FiberScheduler& fiberScheduler, AsyncEventLoop& asyncEventLoop,
@@ -160,6 +161,7 @@ struct SC_FIBER_ASYNC_EXPORT FiberAsyncIO
     uint64_t        ownerThreadID     = 0;
 
     Result checkOwnerThread() const;
+    Result checkFiberContext() const;
     void   operationStarted();
     void   operationFinished();
     void   lockCommands() const;

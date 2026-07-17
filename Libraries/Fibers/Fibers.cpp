@@ -4071,8 +4071,13 @@ bool FiberMutex::isLocked() const
 
 bool FiberMutex::isOwnedByCurrentTask(FiberScheduler& scheduler) const
 {
+    FiberTask* currentTask = scheduler.currentTask();
+    if (currentTask == nullptr)
+    {
+        return false;
+    }
     fiberSchedulerLock(primitiveLock);
-    const bool result = owner == scheduler.currentTask();
+    const bool result = owner == currentTask;
     fiberSchedulerUnlock(primitiveLock);
     return result;
 }
