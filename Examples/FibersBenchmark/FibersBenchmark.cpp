@@ -6,7 +6,9 @@
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/Fibers/Fibers.h"
 #include "../../Libraries/FibersAsync/FibersAsync.h"
+#include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
+#include "../../Libraries/Strings/StringFormat.h"
 #include "../../Libraries/Threading/Atomic.h"
 #include "../../Libraries/Threading/Threading.h"
 #include "../../Libraries/Time/Time.h"
@@ -86,54 +88,6 @@ static void printBenchmarkEnvironment(Console& console)
     console.print("FibersBenchmark environment: platform={} architecture={} compiler={} hardwareWorkers={}\n",
                   benchmarkPlatformName(), benchmarkArchitectureName(), benchmarkCompilerName(),
                   availableHardwareWorkers());
-}
-
-static bool benchmarkArgumentEquals(const char* argument, const char* expected)
-{
-    if (argument == nullptr or expected == nullptr)
-    {
-        return false;
-    }
-    while (*argument != '\0' and *expected != '\0')
-    {
-        if (*argument != *expected)
-        {
-            return false;
-        }
-        ++argument;
-        ++expected;
-    }
-    return *argument == *expected;
-}
-
-static Result parsePositiveSize(const char* argument, size_t& outValue)
-{
-    if (argument == nullptr or *argument == '\0')
-    {
-        return Result::Error("Missing mass-suspension fiber count");
-    }
-
-    size_t value = 0;
-    while (*argument != '\0')
-    {
-        if (*argument < '0' or *argument > '9')
-        {
-            return Result::Error("Mass-suspension fiber count must be a positive integer");
-        }
-        const size_t digit = static_cast<size_t>(*argument - '0');
-        if (value > (static_cast<size_t>(-1) - digit) / 10)
-        {
-            return Result::Error("Mass-suspension fiber count is too large");
-        }
-        value = value * 10 + digit;
-        ++argument;
-    }
-    if (value == 0)
-    {
-        return Result::Error("Mass-suspension fiber count must be greater than zero");
-    }
-    outValue = value;
-    return Result(true);
 }
 
 static Result runWorkerPoolBenchmark(Console& console)
@@ -1038,23 +992,62 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     Console::tryAttachingToParentConsole();
     printBenchmarkEnvironment(console);
 
-    if (argc != 1)
+    bool    schedulerThroughput = false;
+    int32_t massSuspensionCount = 0;
+
+    CommandLineOption options[2];
+    options[0].longName = "scheduler-throughput";
+    options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
+    options[0].value    = CommandLineValue::boolean(schedulerThroughput);
+
+    options[1].longName  = "mass-suspension";
+    options[1].help      = "Run one mass-suspension workload with the requested live fiber count";
+    options[1].valueName = "COUNT";
+    options[1].value     = CommandLineValue::int32(massSuspensionCount);
+
+    CommandLineSpec spec;
+    spec.programName = "FibersBenchmark";
+    spec.summary     = "Measure Fibers scheduler throughput, contention, and live-fiber density.";
+    spec.options     = options;
+
+    StringSpan           argumentStorage[8];
+    CommandLineArguments arguments;
+    SC_TRY(arguments.setFromMainArguments(argc, argv, argumentStorage));
+    const CommandLineParseResult parseResult = spec.parse(arguments.values);
+    if (parseResult.status == CommandLineParseResult::Status::HelpRequested)
     {
-        if (argc == 2 and benchmarkArgumentEquals(argv[1], "--scheduler-throughput"))
-        {
-            SC_TRY(runWorkerPoolBenchmark(console));
-            SC_TRY(runForcedStealingBenchmark(console));
-            SC_TRY(runMicroTaskBenchmarks(console));
-            SC_TRY(runCounterCompletionBenchmark(console));
-            return runSustainedMicroTaskBenchmark(console);
-        }
-        if (argc != 3 or not benchmarkArgumentEquals(argv[1], "--mass-suspension"))
-        {
-            return Result::Error("Usage: FibersBenchmark [--scheduler-throughput | --mass-suspension <count>]");
-        }
-        size_t numFibers = 0;
-        SC_TRY(parsePositiveSize(argv[2], numFibers));
-        return runMassSuspensionBenchmark(console, numFibers);
+        StringFormatOutput output(StringEncoding::Utf8, console, true);
+        SC_TRY_MSG(spec.writeHelp(output), "Failed writing FibersBenchmark help");
+        console.flush();
+        return Result(true);
+    }
+    if (parseResult.status == CommandLineParseResult::Status::Error)
+    {
+        StringFormatOutput output(StringEncoding::Utf8, console, false);
+        SC_TRY_MSG(spec.writeError(parseResult, output), "Failed writing FibersBenchmark parse error");
+        console.flushStdErr();
+        return Result::Error("Invalid FibersBenchmark arguments");
+    }
+    if (schedulerThroughput and massSuspensionCount != 0)
+    {
+        return Result::Error("--scheduler-throughput and --mass-suspension are mutually exclusive");
+    }
+    if (massSuspensionCount < 0 or
+        (not schedulerThroughput and arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
+    {
+        return Result::Error("Mass-suspension fiber count must be greater than zero");
+    }
+    if (massSuspensionCount > 0)
+    {
+        return runMassSuspensionBenchmark(console, static_cast<size_t>(massSuspensionCount));
+    }
+    if (schedulerThroughput)
+    {
+        SC_TRY(runWorkerPoolBenchmark(console));
+        SC_TRY(runForcedStealingBenchmark(console));
+        SC_TRY(runMicroTaskBenchmarks(console));
+        SC_TRY(runCounterCompletionBenchmark(console));
+        return runSustainedMicroTaskBenchmark(console);
     }
 
     SC_TRY(runWorkerPoolBenchmark(console));

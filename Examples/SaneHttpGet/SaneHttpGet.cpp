@@ -13,6 +13,7 @@
 //   Example: SaneHttpGet https://example.com
 //---------------------------------------------------------------------------------------------------------------------
 #include "../../Libraries/HttpClient/HttpClient.h"
+#include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
@@ -86,9 +87,12 @@ Result saneMain(Span<StringSpan> args)
 int main(int argc, char** argv)
 {
     using namespace SC;
-    constexpr auto NUM_ARGS_MAX = 10;
-    StringSpan     args[NUM_ARGS_MAX];
-    for (int idx = 1; idx < min(argc, NUM_ARGS_MAX); ++idx)
-        args[idx - 1] = StringSpan::fromNullTerminated(argv[idx], StringEncoding::Utf8);
-    return SC::saneMain({args, static_cast<size_t>(min(argc - 1, NUM_ARGS_MAX))}) ? 0 : -1;
+    constexpr auto       NumArgsMax = 10;
+    StringSpan           argumentStorage[NumArgsMax];
+    CommandLineArguments arguments;
+    if (not arguments.setFromMainArguments(argc, argv, argumentStorage))
+    {
+        return -1;
+    }
+    return SC::saneMain(arguments.values) ? 0 : -1;
 }

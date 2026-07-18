@@ -11,6 +11,7 @@
 #include "../../Libraries/HttpClient/HttpClient.h"
 #include "../../Libraries/HttpClient/HttpClientScheduler.h"
 #include "../../Libraries/HttpClient/HttpClientSession.h"
+#include "../../Libraries/Strings/CommandLine.h"
 #include "../../Libraries/Strings/Console.h"
 #include "../../Libraries/Strings/StringView.h"
 
@@ -144,11 +145,12 @@ Result saneMain(Span<StringSpan> args)
 int main(int argc, char** argv)
 {
     using namespace SC;
-    constexpr auto NumArgsMax = 10;
-    StringSpan     args[NumArgsMax];
-    for (int idx = 1; idx < min(argc, NumArgsMax); ++idx)
+    constexpr auto       NumArgsMax = 10;
+    StringSpan           argumentStorage[NumArgsMax];
+    CommandLineArguments arguments;
+    if (not arguments.setFromMainArguments(argc, argv, argumentStorage))
     {
-        args[idx - 1] = StringSpan::fromNullTerminated(argv[idx], StringEncoding::Utf8);
+        return -1;
     }
-    return SC::saneMain({args, static_cast<size_t>(min(argc - 1, NumArgsMax))}) ? 0 : -1;
+    return SC::saneMain(arguments.values) ? 0 : -1;
 }
