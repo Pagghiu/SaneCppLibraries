@@ -88,6 +88,54 @@ static void printBenchmarkEnvironment(Console& console)
                   availableHardwareWorkers());
 }
 
+static bool benchmarkArgumentEquals(const char* argument, const char* expected)
+{
+    if (argument == nullptr or expected == nullptr)
+    {
+        return false;
+    }
+    while (*argument != '\0' and *expected != '\0')
+    {
+        if (*argument != *expected)
+        {
+            return false;
+        }
+        ++argument;
+        ++expected;
+    }
+    return *argument == *expected;
+}
+
+static Result parsePositiveSize(const char* argument, size_t& outValue)
+{
+    if (argument == nullptr or *argument == '\0')
+    {
+        return Result::Error("Missing mass-suspension fiber count");
+    }
+
+    size_t value = 0;
+    while (*argument != '\0')
+    {
+        if (*argument < '0' or *argument > '9')
+        {
+            return Result::Error("Mass-suspension fiber count must be a positive integer");
+        }
+        const size_t digit = static_cast<size_t>(*argument - '0');
+        if (value > (static_cast<size_t>(-1) - digit) / 10)
+        {
+            return Result::Error("Mass-suspension fiber count is too large");
+        }
+        value = value * 10 + digit;
+        ++argument;
+    }
+    if (value == 0)
+    {
+        return Result::Error("Mass-suspension fiber count must be greater than zero");
+    }
+    outValue = value;
+    return Result(true);
+}
+
 static Result runWorkerPoolBenchmark(Console& console)
 {
     static constexpr size_t NumWorkers             = 4;
@@ -984,11 +1032,23 @@ static Result runCounterCompletionBenchmark(Console& console)
     return Result(true);
 }
 
-static Result runFibersBenchmark()
+static Result runFibersBenchmark(int argc, const char* const* argv)
 {
     Console console;
     Console::tryAttachingToParentConsole();
     printBenchmarkEnvironment(console);
+
+    if (argc != 1)
+    {
+        if (argc != 3 or not benchmarkArgumentEquals(argv[1], "--mass-suspension"))
+        {
+            return Result::Error("Usage: FibersBenchmark [--mass-suspension <count>]");
+        }
+        size_t numFibers = 0;
+        SC_TRY(parsePositiveSize(argv[2], numFibers));
+        return runMassSuspensionBenchmark(console, numFibers);
+    }
+
     SC_TRY(runWorkerPoolBenchmark(console));
     SC_TRY(runForcedStealingBenchmark(console));
     SC_TRY(runMassSuspensionBenchmark(console, 10'000));
@@ -1001,9 +1061,9 @@ static Result runFibersBenchmark()
 }
 } // namespace SC
 
-int main()
+int main(int argc, const char* argv[])
 {
-    SC::Result result = SC::runFibersBenchmark();
+    SC::Result result = SC::runFibersBenchmark(argc, argv);
     if (not result)
     {
         SC::Console console;
