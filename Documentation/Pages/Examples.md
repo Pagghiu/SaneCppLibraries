@@ -32,12 +32,12 @@ integration before exploring the smaller examples below.
 
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1">Open the plugin hot-reload video</a>.
+  <source src="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
 
-<iframe width="700" height="400" src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" frameborder="0" allowfullscreen>
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932" frameborder="0" allowfullscreen>
 </iframe>
 
 ### SC::Build Standalone backend
@@ -45,12 +45,12 @@ SC::Build Standalone
 
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c">Open the plugin hot-reload video</a>.
+  <source src="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
 
-<iframe width="700" height="400" src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" frameborder="0" allowfullscreen>
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b" frameborder="0" allowfullscreen>
 </iframe>
 
 
@@ -59,12 +59,12 @@ SC::Build Standalone
 
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970">Open the plugin hot-reload video</a>.
+  <source src="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
 
-<iframe width="700" height="400" src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" frameborder="0" allowfullscreen>
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde" frameborder="0" allowfullscreen>
 </iframe>
 
 
@@ -175,3 +175,15 @@ https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad
 https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1
 https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c
 https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970
+
+https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b
+https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde
+https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932
+
+
+
+
+
+
+
+
