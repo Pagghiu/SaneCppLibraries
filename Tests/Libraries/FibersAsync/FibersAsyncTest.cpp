@@ -1007,7 +1007,6 @@ struct SC::FibersAsyncTest : public SC::TestCase
             Atomic<int32_t> entered   = 0;
             Atomic<int32_t> completed = 0;
             Semaphore       tasksEntered;
-            EventObject     taskCompleted;
             TaskState       tasks[NumTasks];
         };
 
@@ -1043,7 +1042,11 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                    if (result)
                                                    {
                                                        state.completed.fetch_add(1);
-                                                       state.taskCompleted.signal();
+                                                       // Wake the owner after publishing the predicate so it cannot
+                                                       // block on the long-running operations while completion races
+                                                       // it.
+                                                       SC_TRY(
+                                                           taskState->io->asyncEventLoop().wakeUpFromExternalThread());
                                                    }
                                                    return result;
                                                })));
@@ -1057,8 +1060,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(state.entered.load() == static_cast<int32_t>(NumTasks));
 
         SC_TEST_EXPECT(io.runOwnerNoWait());
-        SC_TEST_EXPECT(io.runOwnerOnce());
-        state.taskCompleted.wait();
+        while (state.completed.load() == 0)
+        {
+            SC_TEST_EXPECT(io.runOwnerOnce());
+        }
         SC_TEST_EXPECT(io.cancelAll());
         SC_TEST_EXPECT(io.runOwner());
 
@@ -1104,9 +1109,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            Atomic<int32_t> entered = 0;
+            Atomic<int32_t> entered   = 0;
+            Atomic<int32_t> completed = 0;
             Semaphore       tasksEntered;
-            EventObject     taskCompleted;
             TaskState       tasks[NumTasks];
         };
 
@@ -1142,21 +1147,23 @@ struct SC::FibersAsyncTest : public SC::TestCase
                 taskState.duration   = taskIndex < NumTasks / 2 ? TimeMs{1} : TimeMs{10 * 1000};
 
                 FiberStack stack({stackMemory[taskIndex], sizeof(stackMemory[taskIndex])});
-                SC_TEST_EXPECT(scheduler.spawn(tasks[taskIndex], stack,
-                                               FiberTask::Procedure(
-                                                   [&state, &taskState](FiberScheduler&)
-                                                   {
-                                                       state.entered.fetch_add(1);
-                                                       state.tasksEntered.release();
-                                                       Result result = taskState.io->sleep(taskState.duration);
-                                                       taskState.completed.store(static_cast<bool>(result));
-                                                       taskState.canceled.store(not result);
-                                                       if (result)
-                                                       {
-                                                           state.taskCompleted.signal();
-                                                       }
-                                                       return result;
-                                                   })));
+                SC_TEST_EXPECT(
+                    scheduler.spawn(tasks[taskIndex], stack,
+                                    FiberTask::Procedure(
+                                        [&state, &taskState](FiberScheduler&)
+                                        {
+                                            state.entered.fetch_add(1);
+                                            state.tasksEntered.release();
+                                            Result result = taskState.io->sleep(taskState.duration);
+                                            taskState.completed.store(static_cast<bool>(result));
+                                            taskState.canceled.store(not result);
+                                            if (result)
+                                            {
+                                                state.completed.fetch_add(1);
+                                                SC_TRY(taskState.io->asyncEventLoop().wakeUpFromExternalThread());
+                                            }
+                                            return result;
+                                        })));
             }
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
@@ -1169,8 +1176,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
             if (round == NumRounds - 1)
             {
                 SC_TEST_EXPECT(io.runOwnerNoWait());
-                SC_TEST_EXPECT(io.runOwnerOnce());
-                state.taskCompleted.wait();
+                while (state.completed.load() == 0)
+                {
+                    SC_TEST_EXPECT(io.runOwnerOnce());
+                }
             }
 
             StopState stopState;
