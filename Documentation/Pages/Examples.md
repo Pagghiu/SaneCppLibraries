@@ -4,64 +4,63 @@
 The examples are complete programs built from the same library sources as the test suite. Use them to see how the
 libraries fit together, then follow the links to the source when you need the implementation details.
 
-## Videos
+## See the examples in action
 
-These two recordings show SCExample exercising several libraries together. They are useful for seeing the finished
-integration before exploring the smaller examples below.
+These recordings show the larger examples running before you explore their source or the focused command-line programs
+below.
 
-### Serialization and state
+### Applications and runtime behavior
 
 \htmlonly
-<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/serialization-and-state.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d">Open the serialization example video</a>.
-</video>
+<div class="example-video-grid">
+  <article class="example-video-card example-video-featured">
+    <h3>AsyncWebServer</h3>
+    <p>Static files, streamed uploads, and a shared WebSocket canvas running in two browser windows.</p>
+    <video controls playsinline preload="none" poster="/images/examples/async-web-server.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+      <source src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" type="video/mp4">
+      Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1">Open the AsyncWebServer video</a>.
+    </video>
+  </article>
+  <article class="example-video-card">
+    <h3>Serialization and state</h3>
+    <p>Reflected application state moving between binary and JSON representations.</p>
+    <video controls playsinline preload="none" poster="/images/examples/serialization-and-state.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+      <source src="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d" type="video/mp4">
+      Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d">Open the serialization example video</a>.
+    </video>
+  </article>
+  <article class="example-video-card">
+    <h3>Plugin loading and hot reload</h3>
+    <p>SCExample loading native plugins and replacing them while the host keeps running.</p>
+    <video controls playsinline preload="none" poster="/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+      <source src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" type="video/mp4">
+      Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+    </video>
+  </article>
+</div>
 \endhtmlonly
 
-### Plugin loading and hot reload
+### SC::Build workflows
 
 \htmlonly
-<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
-</video>
-\endhtmlonly
-
-
-
-### AsyncWebServer
-
-\htmlonly
-<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1">Open the plugin hot-reload video</a>.
-</video>
-\endhtmlonly
-
-
-
-### SC::Build Standalone backend
-SC::Build Standalone
-
-\htmlonly
-<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c">Open the plugin hot-reload video</a>.
-</video>
-\endhtmlonly
-
-
-
-
-
-### SC::Build for external use (CURL bootstrap)
-SC::Build Standalone
-
-\htmlonly
-<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
-  <source src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970">Open the plugin hot-reload video</a>.
-</video>
+<div class="example-video-grid">
+  <article class="example-video-card">
+    <h3>Native standalone build</h3>
+    <p>The native backend compiling and linking the repository directly, without generating an IDE project first.</p>
+    <video controls playsinline preload="none" poster="/images/examples/build-standalone.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+      <source src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" type="video/mp4">
+      Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c">Open the native SC::Build video</a>.
+    </video>
+  </article>
+  <article class="example-video-card">
+    <h3>External project bootstrap</h3>
+    <p>A small external project fetching the launcher with curl and building from its own <code>SC-build.cpp</code>.</p>
+    <video controls playsinline preload="none" poster="/images/examples/build-external.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+      <source src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" type="video/mp4">
+      Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970">Open the external SC::Build video</a>.
+    </video>
+  </article>
+</div>
 \endhtmlonly
 
 ## Quick start
