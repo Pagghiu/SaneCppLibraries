@@ -28,17 +28,17 @@ integration before exploring the smaller examples below.
 \endhtmlonly
 
 
-
 ### AsyncWebServer
 
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
   <source src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
 
-
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" frameborder="0" allowfullscreen>
+</iframe>
 
 ### SC::Build Standalone backend
 SC::Build Standalone
@@ -46,12 +46,12 @@ SC::Build Standalone
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
   <source src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
 
-
-
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" frameborder="0" allowfullscreen>
+</iframe>
 
 
 ### SC::Build for external use (CURL bootstrap)
@@ -60,9 +60,13 @@ SC::Build Standalone
 \htmlonly
 <video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
   <source src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" type="video/mp4">
-  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+  Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970">Open the plugin hot-reload video</a>.
 </video>
 \endhtmlonly
+
+<iframe width="700" height="400" src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" frameborder="0" allowfullscreen>
+</iframe>
+
 
 ## Quick start
 
@@ -165,3 +169,9 @@ focused console example when learning one API.
 The library pages contain compiled snippets for individual APIs. The tests provide broader executable reference code,
 including error paths and platform-specific behavior. See [Tests](@ref page_tests) and the
 [library catalog](@ref libraries) when an example above is broader than the question you are trying to answer.
+
+https://github.com/user-attachments/assets/2a38310c-6a28-4f86-a0f3-665dc15b126d
+https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717
+https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1
+https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c
+https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970
