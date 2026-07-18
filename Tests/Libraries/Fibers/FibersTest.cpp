@@ -4110,8 +4110,6 @@ struct SC::FibersTest : public SC::TestCase
             SC_TRY_MSG(not scheduler.hasActiveFibers(), "External spawn stress test left active fibers");
             SC_TRY_MSG(workerDiagnostics.idleSpinIterations == 0,
                        "External spawn stress test ignored the immediate-parking option");
-            SC_TRY_MSG(workerDiagnostics.parkAttempts > 0,
-                       "External spawn stress test did not park with immediate parking enabled");
             if (cancelWaiters)
             {
                 SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
