@@ -27,6 +27,43 @@ integration before exploring the smaller examples below.
 </video>
 \endhtmlonly
 
+
+
+### AsyncWebServer
+
+\htmlonly
+<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/user-attachments/assets/d6ad7ecf-8c98-430d-84e0-93ebbfb05dc1" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+</video>
+\endhtmlonly
+
+
+
+### SC::Build Standalone backend
+SC::Build Standalone
+
+\htmlonly
+<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/user-attachments/assets/8b0cf915-6a26-4e17-b774-7b2f44dc1d5c" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+</video>
+\endhtmlonly
+
+
+
+
+
+### SC::Build for external use (CURL bootstrap)
+SC::Build Standalone
+
+\htmlonly
+<video controls playsinline preload="metadata" poster="/SaneCppLibraries/images/examples/plugin-hot-reload.jpg" style="display:block; width:100%; max-width:960px; height:auto;">
+  <source src="https://github.com/user-attachments/assets/0b3ca57f-6c48-4931-bdef-c1e97201c970" type="video/mp4">
+  Your browser cannot play this video. <a href="https://github.com/Pagghiu/SaneCppLibraries/assets/5406873/5c7d4036-6e0c-4262-ad57-9ef84c214717">Open the plugin hot-reload video</a>.
+</video>
+\endhtmlonly
+
 ## Quick start
 
 Build and run an example from the repository root:
