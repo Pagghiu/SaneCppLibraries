@@ -1669,7 +1669,19 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
         thread.workerIndex  = idx;
         thread.affinityMask = options.affinityMasks.empty() ? 0 : options.affinityMasks[idx];
         thread.priority     = static_cast<uint8_t>(options.threadPriority);
-        Result result       = thread.startThread();
+    }
+
+    {
+        FiberScheduler::LockGuard guard(scheduler);
+        for (FiberWorker& worker : workers)
+        {
+            scheduler.adoptWorkerReadyUnlocked(worker);
+        }
+    }
+
+    for (FiberWorkerThread& thread : threads)
+    {
+        Result result = thread.startThread();
         if (not result)
         {
             SC_FIBERS_TRUST_RESULT(requestStop());
@@ -5652,6 +5664,7 @@ FiberTask* FiberScheduler::stealReadyUnlocked(FiberWorker& worker, Span<FiberWor
         {
             break;
         }
+        SC_FIBERS_ASSERT_RELEASE(workerPool == nullptr or stolenTask->activeRegistryWorker != nullptr);
         stolenTask->preferredWorker = &worker;
         stolenTasks[numStolenTasks] = stolenTask;
         numStolenTasks += 1;
@@ -6053,6 +6066,31 @@ void FiberScheduler::moveActiveToWorkerUnlocked(FiberTask& task, FiberWorker& wo
     }
     worker.activeHead = &task;
     fiberSchedulerUnlock(worker.activeRegistryLock);
+}
+
+void FiberScheduler::adoptWorkerReadyUnlocked(FiberWorker& worker)
+{
+    if (worker.localDeque != nullptr)
+    {
+        const size_t top    = fiberAtomicLoadSize(worker.localDequeTop);
+        const size_t bottom = fiberAtomicLoadSize(worker.localDequeBottom);
+        SC_FIBERS_ASSERT_RELEASE(bottom >= top and bottom - top <= worker.localDequeCapacity);
+        for (size_t index = top; index < bottom; ++index)
+        {
+            FiberTask* task = worker.localDeque[index % worker.localDequeCapacity];
+            SC_FIBERS_ASSERT_RELEASE(task != nullptr);
+            moveActiveToWorkerUnlocked(*task, worker);
+        }
+        return;
+    }
+
+    FiberTask* task = worker.localReadyHead;
+    while (task != nullptr)
+    {
+        FiberTask* next = task->nextReady;
+        moveActiveToWorkerUnlocked(*task, worker);
+        task = next;
+    }
 }
 
 void FiberScheduler::unlinkWorkerActive(FiberTask& task)

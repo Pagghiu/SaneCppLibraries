@@ -1183,6 +1183,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void                     linkActiveUnlocked(FiberTask& task);
     void                     unlinkActiveUnlocked(FiberTask& task);
     void                     moveActiveToWorkerUnlocked(FiberTask& task, FiberWorker& worker);
+    void                     adoptWorkerReadyUnlocked(FiberWorker& worker);
     void                     unlinkWorkerActive(FiberTask& task);
     void                     cancelWorkerActiveUnlocked(FiberWorker& worker, FiberCancellationTokenSource* tokenSource);
     bool                     removeCounterWaiterUnlocked(FiberCounter& counter, FiberTask& task);
