@@ -5,18 +5,30 @@ sources. You do not install a prebuilt runtime or adopt a mandatory build system
 
 [TOC]
 
-# Choose an integration form
+# Small, medium, or big?
 
-The repository offers three forms of the same code. Pick the one that matches how much control your project needs.
+There is no mandatory package manager or project layout. Choose an integration size that matches the amount of Sane C++
+your program uses, and change it later if the program grows.
 
-| Form | Use it when | What you add |
-|:--|:--|:--|
-| Unity build | You want the simplest complete integration | `SC.cpp` plus public headers from `Includes/` |
-| Separate sources | Your build needs per-library or per-file compilation | Selected files under `Libraries/` plus public headers |
-| Amalgamated library | You want one standalone library header/source pair | A generated file from the amalgamation tool |
+## Small: one standalone library
 
-Start with `SC.cpp` unless you already know why separate compilation is useful. The public library entry points are
-headers such as `SaneCppStrings.h` and `SaneCppFile.h`. Files below `Internal` and `Tests` are not public API.
+Download the released `SaneCpp<Library>.h` file when you need one self-contained library and do not want a repository
+checkout. The download link on each library page is the shortest route from an existing program to a Sane C++ API.
+
+## Medium: the unity build
+
+Add `SC.cpp` to your target and add `Includes/` to its header search paths. `SC.cpp` selects the platform implementation
+and compiles the repository libraries as one translation unit. This is the simplest complete integration and the best
+default when several libraries work together.
+
+## Big: separate compilation
+
+Compile selected files under `Libraries/` separately when your build needs per-library targets, incremental compilation,
+or precise ownership of source groups. Keep using the public headers from `Includes/`; files under `Internal/` and
+`Tests/` are implementation details rather than public API.
+
+These forms contain the same library code. They change how the code enters your build, not the APIs your application
+uses.
 
 # Add one library to an existing program
 
