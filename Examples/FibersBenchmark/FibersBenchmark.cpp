@@ -657,7 +657,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                                         int workIterations)
 {
     static constexpr size_t MaxWorkers             = 16;
-    static constexpr size_t NumJobs                = 1024;
+    static constexpr size_t NumJobs                = 8192;
     static constexpr size_t InFiberPoolCapacity    = 256;
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
