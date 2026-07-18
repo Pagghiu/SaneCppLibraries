@@ -253,6 +253,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
     [[nodiscard]] bool waitForAllWorkersToPark(const FiberWorkerPool& workerPool)
     {
+        // Parking exposes a count but no blocking notification; bounded polling avoids burning a core in this
+        // diagnostic test.
         for (size_t iteration = 0; iteration < 1000; ++iteration)
         {
             if (workerPool.parkedWorkerCount() == workerPool.workerCount())
@@ -745,6 +747,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
             Atomic<bool> entered        = false;
             Atomic<bool> blockerEntered = false;
 
+            EventObject taskEntered;
+            EventObject blockerTaskEntered;
+            EventObject taskCompleted;
+
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
             uint64_t resumeThreadID = 0;
@@ -779,8 +785,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            {
                                                state.startThreadID = Thread::CurrentThreadID();
                                                state.entered.store(true);
+                                               state.taskEntered.signal();
                                                SC_TRY(state.io->sleep(TimeMs{1}));
                                                state.resumeThreadID = Thread::CurrentThreadID();
+                                               state.taskCompleted.signal();
                                                return Result(true);
                                            })));
         SC_TEST_EXPECT(scheduler.spawn(blockerTask, blockerStack,
@@ -788,14 +796,13 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            [&state](FiberScheduler&)
                                            {
                                                state.blockerEntered.store(true);
+                                               state.blockerTaskEntered.signal();
                                                return state.io->sleep(TimeMs{10 * 1000});
                                            })));
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, workerPoolOptions));
-        for (int idx = 0; idx < 1000 and (not state.entered.load() or not state.blockerEntered.load()); ++idx)
-        {
-            Thread::Sleep(1);
-        }
+        state.taskEntered.wait();
+        state.blockerTaskEntered.wait();
         SC_TEST_EXPECT(state.entered.load());
         SC_TEST_EXPECT(state.blockerEntered.load());
         SC_TEST_EXPECT(waitForAllWorkersToPark(workerPool));
@@ -804,11 +811,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
         scheduler.workerDiagnostics({workers, NumWorkers}, beforeIODiagnostics);
         SC_TEST_EXPECT(beforeIODiagnostics.idleSpinIterations == 0);
 
-        for (int idx = 0; idx < 1000 and not task.isCompleted(); ++idx)
-        {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
-        }
+        SC_TEST_EXPECT(io.runOwnerNoWait());
+        SC_TEST_EXPECT(io.runOwnerOnce());
+        state.taskCompleted.wait();
         SC_TEST_EXPECT(task.isCompleted());
 
         FiberWorkerDiagnostics afterIODiagnostics;
@@ -843,6 +848,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             Atomic<bool> entered = false;
 
+            EventObject taskEntered;
+
             bool     canceled       = false;
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
@@ -872,6 +879,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            {
                                                state.startThreadID = Thread::CurrentThreadID();
                                                state.entered.store(true);
+                                               state.taskEntered.signal();
                                                Result result        = state.io->sleep(TimeMs{10 * 1000});
                                                state.resumeThreadID = Thread::CurrentThreadID();
                                                state.canceled       = not result;
@@ -879,10 +887,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            })));
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and not state.entered.load(); ++idx)
-        {
-            Thread::Sleep(1);
-        }
+        state.taskEntered.wait();
         SC_TEST_EXPECT(state.entered.load());
 
         SC_TEST_EXPECT(io.runOwnerNoWait());
@@ -919,6 +924,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             Atomic<int32_t> entered = 0;
+            Semaphore       tasksEntered;
             TaskState       tasks[NumTasks];
         };
 
@@ -946,6 +952,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                {
                                                    taskState->startThreadID = Thread::CurrentThreadID();
                                                    state.entered.fetch_add(1);
+                                                   state.tasksEntered.release();
                                                    Result result             = taskState->io->sleep(TimeMs{1000});
                                                    taskState->resumeThreadID = Thread::CurrentThreadID();
                                                    taskState->canceled       = not result;
@@ -954,10 +961,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
         }
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and state.entered.load() != static_cast<int32_t>(NumTasks); ++idx)
+        for (size_t idx = 0; idx < NumTasks; ++idx)
         {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
+            state.tasksEntered.acquire();
         }
         SC_TEST_EXPECT(state.entered.load() == static_cast<int32_t>(NumTasks));
 
@@ -998,7 +1004,10 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            Atomic<int32_t> entered = 0;
+            Atomic<int32_t> entered   = 0;
+            Atomic<int32_t> completed = 0;
+            Semaphore       tasksEntered;
+            EventObject     taskCompleted;
             TaskState       tasks[NumTasks];
         };
 
@@ -1027,26 +1036,29 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                [&state, taskState](FiberScheduler&)
                                                {
                                                    state.entered.fetch_add(1);
+                                                   state.tasksEntered.release();
                                                    Result result        = taskState->io->sleep(taskState->duration);
                                                    taskState->completed = result;
                                                    taskState->canceled  = not result;
+                                                   if (result)
+                                                   {
+                                                       state.completed.fetch_add(1);
+                                                       state.taskCompleted.signal();
+                                                   }
                                                    return result;
                                                })));
         }
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and state.entered.load() != static_cast<int32_t>(NumTasks); ++idx)
+        for (size_t idx = 0; idx < NumTasks; ++idx)
         {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
+            state.tasksEntered.acquire();
         }
         SC_TEST_EXPECT(state.entered.load() == static_cast<int32_t>(NumTasks));
 
-        for (int idx = 0; idx < 8; ++idx)
-        {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
-        }
+        SC_TEST_EXPECT(io.runOwnerNoWait());
+        SC_TEST_EXPECT(io.runOwnerOnce());
+        state.taskCompleted.wait();
         SC_TEST_EXPECT(io.cancelAll());
         SC_TEST_EXPECT(io.runOwner());
 
@@ -1093,6 +1105,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
         struct State
         {
             Atomic<int32_t> entered = 0;
+            Semaphore       tasksEntered;
+            EventObject     taskCompleted;
             TaskState       tasks[NumTasks];
         };
 
@@ -1133,29 +1147,30 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                    [&state, &taskState](FiberScheduler&)
                                                    {
                                                        state.entered.fetch_add(1);
+                                                       state.tasksEntered.release();
                                                        Result result = taskState.io->sleep(taskState.duration);
                                                        taskState.completed.store(static_cast<bool>(result));
                                                        taskState.canceled.store(not result);
+                                                       if (result)
+                                                       {
+                                                           state.taskCompleted.signal();
+                                                       }
                                                        return result;
                                                    })));
             }
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            for (size_t iteration = 0; iteration < 1000 and state.entered.load() != static_cast<int32_t>(NumTasks);
-                 ++iteration)
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
-                Thread::Sleep(1);
+                state.tasksEntered.acquire();
             }
             SC_TEST_EXPECT(state.entered.load() == static_cast<int32_t>(NumTasks));
 
             if (round == NumRounds - 1)
             {
-                for (size_t iteration = 0; iteration < 1000 and not state.tasks[0].completed.load(); ++iteration)
-                {
-                    SC_TEST_EXPECT(io.runOwnerNoWait());
-                    Thread::Sleep(1);
-                }
-                SC_TEST_EXPECT(state.tasks[0].completed.load());
+                SC_TEST_EXPECT(io.runOwnerNoWait());
+                SC_TEST_EXPECT(io.runOwnerOnce());
+                state.taskCompleted.wait();
             }
 
             StopState stopState;
@@ -1165,6 +1180,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
             Thread stopThread;
             auto   stop = [&stopState](Thread&)
             {
+                // Alternate immediate and delayed stop requests to cover both sides of completion races.
                 Thread::Sleep(stopState.delayMilliseconds);
                 stopState.result = stopState.workerPool->requestStop();
             };
@@ -1213,8 +1229,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
             FiberAsyncIO*   io        = nullptr;
 
             Atomic<int32_t> attempted  = 0;
-            Atomic<bool>    workerDone = false;
             Atomic<int32_t> workerRuns = 0;
+
+            EventObject workerFinished;
 
             Result firstResult  = Result(true);
             Result secondResult = Result(true);
@@ -1267,17 +1284,12 @@ struct SC::FibersAsyncTest : public SC::TestCase
                     break;
                 if (hadReady)
                     ++state.workerRuns;
-                Thread::Sleep(1);
             }
-            state.workerDone.store(true);
+            state.workerFinished.signal();
         };
         SC_TEST_EXPECT(workerThread.start(worker));
 
-        for (int idx = 0; idx < 1000 and not state.workerDone.load(); ++idx)
-        {
-            Thread::Sleep(1);
-        }
-
+        state.workerFinished.wait();
         SC_TEST_EXPECT(workerThread.join());
         SC_TEST_EXPECT(state.attempted.load() == 2);
         SC_TEST_EXPECT(state.workerRuns.load() >= 2);
@@ -1290,7 +1302,6 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(state.firstResult);
         SC_TEST_EXPECT(not state.secondResult);
 
-        state.workerDone.store(false);
         state.workerRuns.store(0);
         SC_TEST_EXPECT(scheduler.spawn(firstTask, firstStack,
                                        FiberTask::Procedure(
@@ -1300,10 +1311,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                return state.thirdResult;
                                            })));
         SC_TEST_EXPECT(workerThread.start(worker));
-        for (int idx = 0; idx < 1000 and not state.workerDone.load(); ++idx)
-        {
-            Thread::Sleep(1);
-        }
+        state.workerFinished.wait();
         SC_TEST_EXPECT(workerThread.join());
         SC_TEST_EXPECT(state.workerResult);
         SC_TEST_EXPECT(io.run());
@@ -1771,13 +1779,19 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         struct State
         {
-            FiberAsyncIO* io = nullptr;
+            FiberScheduler* scheduler = nullptr;
+            FiberAsyncIO*   io        = nullptr;
+            FiberTask*      blocker   = nullptr;
 
             SocketDescriptor* sender   = nullptr;
             SocketDescriptor* receiver = nullptr;
 
             Atomic<int32_t> attempted      = 0;
+            Atomic<int32_t> completed      = 0;
             Atomic<bool>    blockerEntered = false;
+
+            Semaphore   operationsStarted;
+            EventObject blockerTaskEntered;
 
             uint64_t ownerThreadID         = 0;
             uint64_t sendStartThreadID     = 0;
@@ -1819,7 +1833,9 @@ struct SC::FibersAsyncTest : public SC::TestCase
         workerPoolOptions.idleSpinAttempts = 0;
 
         State state;
+        state.scheduler     = &scheduler;
         state.io            = &io;
+        state.blocker       = &blockerTask;
         state.sender        = &client;
         state.receiver      = &serverSideClient;
         state.ownerThreadID = Thread::CurrentThreadID();
@@ -1829,11 +1845,16 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            [&state](FiberScheduler&)
                                            {
                                                ++state.attempted;
+                                               state.operationsStarted.release();
                                                state.receiveStartThreadID = Thread::CurrentThreadID();
                                                SC_TRY(state.io->receive(
                                                    *state.receiver, {state.receiveBuffer, sizeof(state.receiveBuffer)},
                                                    state.receiveResult));
                                                state.receiveResumeThreadID = Thread::CurrentThreadID();
+                                               if (state.completed.fetch_add(1) == 1)
+                                               {
+                                                   SC_TRY(state.scheduler->requestCancel(*state.blocker));
+                                               }
                                                return Result(true);
                                            })));
         SC_TEST_EXPECT(scheduler.spawn(sendTask, sendStack,
@@ -1841,11 +1862,16 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            [&state](FiberScheduler&)
                                            {
                                                ++state.attempted;
+                                               state.operationsStarted.release();
                                                state.sendStartThreadID = Thread::CurrentThreadID();
                                                SC_TRY(state.io->send(*state.sender,
                                                                      {state.sendBuffer, sizeof(state.sendBuffer)},
                                                                      &state.sendResult));
                                                state.sendResumeThreadID = Thread::CurrentThreadID();
+                                               if (state.completed.fetch_add(1) == 1)
+                                               {
+                                                   SC_TRY(state.scheduler->requestCancel(*state.blocker));
+                                               }
                                                return Result(true);
                                            })));
         SC_TEST_EXPECT(scheduler.spawn(blockerTask, blockerStack,
@@ -1853,14 +1879,16 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            [&state](FiberScheduler&)
                                            {
                                                state.blockerEntered.store(true);
+                                               state.blockerTaskEntered.signal();
                                                return state.io->sleep(TimeMs{10 * 1000});
                                            })));
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, workerPoolOptions));
-        for (int idx = 0; idx < 1000 and (state.attempted.load() < 2 or not state.blockerEntered.load()); ++idx)
+        for (size_t idx = 0; idx < 2; ++idx)
         {
-            Thread::Sleep(1);
+            state.operationsStarted.acquire();
         }
+        state.blockerTaskEntered.wait();
         SC_TEST_EXPECT(state.attempted.load() == 2);
         SC_TEST_EXPECT(state.blockerEntered.load());
         SC_TEST_EXPECT(waitForAllWorkersToPark(workerPool));
@@ -1869,11 +1897,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         scheduler.workerDiagnostics({workers, NumWorkers}, beforeIODiagnostics);
         SC_TEST_EXPECT(beforeIODiagnostics.idleSpinIterations == 0);
 
-        for (int idx = 0; idx < 1000 and (not sendTask.isCompleted() or not receiveTask.isCompleted()); ++idx)
-        {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
-        }
+        SC_TEST_EXPECT(io.runOwner());
         SC_TEST_EXPECT(sendTask.isCompleted());
         SC_TEST_EXPECT(receiveTask.isCompleted());
 
@@ -1881,10 +1905,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         scheduler.workerDiagnostics({workers, NumWorkers}, afterIODiagnostics);
         SC_TEST_EXPECT(afterIODiagnostics.idleSpinIterations == 0);
         SC_TEST_EXPECT(afterIODiagnostics.parkedWakeups > beforeIODiagnostics.parkedWakeups);
-        SC_TEST_EXPECT(scheduler.activeFiberCount() == 1);
-
-        SC_TEST_EXPECT(scheduler.requestCancel(blockerTask));
-        SC_TEST_EXPECT(io.runOwner());
+        SC_TEST_EXPECT(scheduler.activeFiberCount() == 0);
 
         SC_TEST_EXPECT(workerPool.join());
         SC_TEST_EXPECT(workerPool.parkedWorkerCount() == 0);
@@ -1926,6 +1947,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             Atomic<bool> entered = false;
 
+            EventObject taskEntered;
+
             bool                          canceled = false;
             char                          buffer[8];
             FiberAsyncSocketReceiveResult receiveResult;
@@ -1963,6 +1986,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            {
                                                state.startThreadID = Thread::CurrentThreadID();
                                                state.entered.store(true);
+                                               state.taskEntered.signal();
                                                Result result        = state.io->receive(*state.receiver,
                                                                                         {state.buffer, sizeof(state.buffer)},
                                                                                         state.receiveResult);
@@ -1972,10 +1996,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            })));
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and not state.entered.load(); ++idx)
-        {
-            Thread::Sleep(1);
-        }
+        state.taskEntered.wait();
         SC_TEST_EXPECT(state.entered.load());
 
         SC_TEST_EXPECT(io.runOwnerNoWait());
@@ -3271,6 +3292,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
         SC_TEST_EXPECT(
             process.launch(childArguments, Process::StdOut::Ignore(), Process::StdIn(), Process::StdErr::Ignore()));
 
+        // The child must install its console handler before CTRL_BREAK is delivered.
         Thread::Sleep(1000);
         SC_TEST_EXPECT(::GenerateConsoleCtrlEvent(CTRL_BREAK_EVENT, static_cast<DWORD>(process.processID.pid)) !=
                        FALSE);
@@ -3420,6 +3442,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             Atomic<bool> entered = false;
 
+            EventObject taskEntered;
+
             bool     canceled       = false;
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
@@ -3451,6 +3475,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            {
                                                state.startThreadID = Thread::CurrentThreadID();
                                                state.entered.store(true);
+                                               state.taskEntered.signal();
                                                Result result        = state.io->signal(SIGINT, state.result);
                                                state.resumeThreadID = Thread::CurrentThreadID();
                                                state.canceled       = not result;
@@ -3458,11 +3483,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                            })));
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-        for (int idx = 0; idx < 1000 and not state.entered.load(); ++idx)
-        {
-            SC_TEST_EXPECT(io.runOwnerNoWait());
-            Thread::Sleep(1);
-        }
+        state.taskEntered.wait();
         SC_TEST_EXPECT(state.entered.load());
 
         SC_TEST_EXPECT(io.runOwnerNoWait());

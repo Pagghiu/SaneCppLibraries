@@ -911,6 +911,7 @@ struct SC::FibersTest : public SC::TestCase
 
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {workerThreads, NumWorkers}));
         bool allTasksWaiting = false;
+        // Task status has no blocking notification; bounded polling observes the fully suspended race setup.
         for (size_t attempt = 0; attempt < 5000; ++attempt)
         {
             allTasksWaiting = state.entered.load() == static_cast<int32_t>(NumTasks);
@@ -947,22 +948,22 @@ struct SC::FibersTest : public SC::TestCase
             FiberTask*      tasks     = nullptr;
             FiberCounter*   counters  = nullptr;
             State*          state     = nullptr;
+            Barrier*        start     = nullptr;
             Atomic<bool>    succeeded = true;
         } raceState;
+        Barrier raceStart(3);
         raceState.scheduler = &scheduler;
         raceState.tasks     = tasks;
         raceState.counters  = counters;
         raceState.state     = &state;
+        raceState.start     = &raceStart;
 
         Thread wakeThread;
         Thread cancelThread;
         SC_TEST_EXPECT(wakeThread.start(
             [&raceState](Thread&)
             {
-                while (not raceState.state->startRace.load())
-                {
-                    Thread::Sleep(1);
-                }
+                raceState.start->wait();
                 for (size_t counterIndex = 0; counterIndex < NumWaiters; ++counterIndex)
                 {
                     if (not raceState.scheduler->done(raceState.counters[counterIndex]))
@@ -974,10 +975,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(cancelThread.start(
             [&raceState](Thread&)
             {
-                while (not raceState.state->startRace.load())
-                {
-                    Thread::Sleep(1);
-                }
+                raceState.start->wait();
                 for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
                 {
                     if (not raceState.scheduler->requestCancel(raceState.tasks[taskIndex]))
@@ -989,6 +987,7 @@ struct SC::FibersTest : public SC::TestCase
             }));
         SC_TEST_EXPECT(scheduler.done(startCounter));
         state.startRace.store(true);
+        raceStart.wait();
         SC_TEST_EXPECT(wakeThread.join());
         SC_TEST_EXPECT(cancelThread.join());
         SC_TEST_EXPECT(workerPool.join());
@@ -3318,6 +3317,7 @@ struct SC::FibersTest : public SC::TestCase
             struct State
             {
                 Atomic<int32_t> iterations;
+                EventObject     iterationsReached;
                 bool            canceled = false;
             };
 
@@ -3337,7 +3337,10 @@ struct SC::FibersTest : public SC::TestCase
                                                    while (true)
                                                    {
                                                        Result result = scheduler.yield();
-                                                       state.iterations.fetch_add(1);
+                                                       if (state.iterations.fetch_add(1) == 3)
+                                                       {
+                                                           state.iterationsReached.signal();
+                                                       }
                                                        if (not result)
                                                        {
                                                            state.canceled = true;
@@ -3347,10 +3350,7 @@ struct SC::FibersTest : public SC::TestCase
                                                })));
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            for (int loop = 0; loop < 1000 and state.iterations.load() < 4; ++loop)
-            {
-                Thread::Sleep(1);
-            }
+            state.iterationsReached.wait();
             SC_TEST_EXPECT(state.iterations.load() >= 4);
             SC_TEST_EXPECT(workerPool.shutdown());
             SC_TEST_EXPECT(state.canceled);
@@ -3362,6 +3362,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 Atomic<int32_t> step;
                 FiberCounter*   counter = nullptr;
+                EventObject     waiting;
             };
 
             FiberScheduler    scheduler;
@@ -3381,16 +3382,14 @@ struct SC::FibersTest : public SC::TestCase
                                                [&state](FiberScheduler& scheduler)
                                                {
                                                    state.step.store(1);
+                                                   state.waiting.signal();
                                                    SC_TRY(scheduler.wait(*state.counter));
                                                    state.step.store(2);
                                                    return Result(true);
                                                })));
 
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            for (int loop = 0; loop < 1000 and state.step.load() < 1; ++loop)
-            {
-                Thread::Sleep(1);
-            }
+            state.waiting.wait();
             SC_TEST_EXPECT(state.step.load() == 1);
             SC_TEST_EXPECT(scheduler.done(counter));
             SC_TEST_EXPECT(workerPool.join());
@@ -3404,6 +3403,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 FiberCounter* counter = nullptr;
                 Atomic<bool>  waiting;
+                EventObject   enteredWait;
             };
 
             FiberScheduler    scheduler;
@@ -3423,13 +3423,11 @@ struct SC::FibersTest : public SC::TestCase
                                                [&state](FiberScheduler& scheduler)
                                                {
                                                    state.waiting.store(true);
+                                                   state.enteredWait.signal();
                                                    return scheduler.wait(*state.counter);
                                                })));
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
-            for (int loop = 0; loop < 1000 and not state.waiting.load(); ++loop)
-            {
-                Thread::Sleep(1);
-            }
+            state.enteredWait.wait();
             SC_TEST_EXPECT(state.waiting.load());
             SC_TEST_EXPECT(workerPool.shutdown());
             SC_TEST_EXPECT(task.isCompleted());
@@ -3445,6 +3443,7 @@ struct SC::FibersTest : public SC::TestCase
             {
                 Atomic<int32_t> step;
                 FiberCounter*   counter = nullptr;
+                EventObject     waiting;
             };
 
             FiberScheduler    scheduler;
@@ -3467,16 +3466,14 @@ struct SC::FibersTest : public SC::TestCase
                                                [&state](FiberScheduler& scheduler)
                                                {
                                                    state.step.store(1);
+                                                   state.waiting.signal();
                                                    SC_TRY(scheduler.wait(*state.counter));
                                                    state.step.store(2);
                                                    return Result(true);
                                                })));
 
             SC_TEST_EXPECT(firstPool.start(scheduler, {firstWorkers, NumWorkers}, {firstThreads, NumWorkers}));
-            for (int loop = 0; loop < 1000 and state.step.load() < 1; ++loop)
-            {
-                Thread::Sleep(1);
-            }
+            state.waiting.wait();
             SC_TEST_EXPECT(state.step.load() == 1);
 
             Result secondStart = secondPool.start(scheduler, {secondWorkers, NumWorkers}, {secondThreads, NumWorkers});
@@ -3886,6 +3883,7 @@ struct SC::FibersTest : public SC::TestCase
             Atomic<int32_t> entered   = 0;
             Atomic<int32_t> completed = 0;
             Atomic<int32_t> cancelled = 0;
+            Semaphore       tasksEntered;
         };
 
         auto runRound = [](bool cancelWaiters) -> Result
@@ -3923,6 +3921,7 @@ struct SC::FibersTest : public SC::TestCase
                                           [&state](FiberScheduler& currentScheduler)
                                           {
                                               state.entered.fetch_add(1, memory_order_release);
+                                              state.tasksEntered.release();
                                               Result waitResult = currentScheduler.wait(*state.gate);
                                               if (not waitResult)
                                               {
@@ -3941,11 +3940,9 @@ struct SC::FibersTest : public SC::TestCase
 
             SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
 
-            size_t waitIterations = 0;
-            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
-                Thread::Sleep(1);
-                waitIterations += 1;
+                state.tasksEntered.acquire();
             }
 
             const bool allWaitersEntered = state.entered.load(memory_order_acquire) == static_cast<int32_t>(NumTasks);
@@ -4010,6 +4007,8 @@ struct SC::FibersTest : public SC::TestCase
             Atomic<int32_t> entered   = 0;
             Atomic<int32_t> completed = 0;
             Atomic<int32_t> cancelled = 0;
+            Semaphore       tasksEntered;
+            Semaphore       tasksCancelled;
         };
 
         auto runRound = [](bool cancelWaiters) -> Result
@@ -4058,10 +4057,12 @@ struct SC::FibersTest : public SC::TestCase
                                            [&state](FiberScheduler& currentScheduler)
                                            {
                                                state.entered.fetch_add(1, memory_order_release);
+                                               state.tasksEntered.release();
                                                Result waitResult = currentScheduler.wait(*state.gate);
                                                if (not waitResult)
                                                {
                                                    state.cancelled.fetch_add(1, memory_order_relaxed);
+                                                   state.tasksCancelled.release();
                                                    return waitResult;
                                                }
                                                for (size_t yieldIndex = 0; yieldIndex < NumYields; ++yieldIndex)
@@ -4074,11 +4075,9 @@ struct SC::FibersTest : public SC::TestCase
                                        spawnOptions));
             }
 
-            size_t waitIterations = 0;
-            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
-                Thread::Sleep(1);
-                waitIterations += 1;
+                state.tasksEntered.acquire();
             }
 
             const bool allWaitersEntered  = state.entered.load(memory_order_acquire) == static_cast<int32_t>(NumTasks);
@@ -4092,14 +4091,11 @@ struct SC::FibersTest : public SC::TestCase
                 cancellationResult = scheduler.requestCancelAll();
             }
 
-            size_t cancellationWaitIterations = 0;
             if (cancelWaiters)
             {
-                while (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and
-                       cancellationWaitIterations < 1000)
+                for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
                 {
-                    Thread::Sleep(1);
-                    cancellationWaitIterations += 1;
+                    state.tasksCancelled.acquire();
                 }
             }
             const Result releaseResult = scheduler.done(gate);
@@ -4118,8 +4114,6 @@ struct SC::FibersTest : public SC::TestCase
                        "External spawn stress test did not park with immediate parking enabled");
             if (cancelWaiters)
             {
-                SC_TRY_MSG(cancellationWaitIterations < 1000,
-                           "External spawn stress test did not observe every cancellation before releasing its anchor");
                 SC_TRY_MSG(state.completed.load(memory_order_relaxed) == 0,
                            "Cancelled external spawn stress tasks completed normally");
                 SC_TRY_MSG(state.cancelled.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
@@ -4165,13 +4159,15 @@ struct SC::FibersTest : public SC::TestCase
             Atomic<int32_t> entered   = 0;
             Atomic<int32_t> completed = 0;
             Atomic<int32_t> cancelled = 0;
+            Semaphore       tasksEntered;
+            Semaphore       tasksCancelled;
         };
 
         struct Producer
         {
             FiberScheduler*        scheduler = nullptr;
             FiberCancellationToken cancellationToken;
-            Atomic<bool>*          mayStart    = nullptr;
+            Barrier*               start       = nullptr;
             State*                 state       = nullptr;
             FiberTask*             tasks       = nullptr;
             char*                  stackMemory = nullptr;
@@ -4197,7 +4193,7 @@ struct SC::FibersTest : public SC::TestCase
             FiberWorkerPoolOptions       workerPoolOptions;
             Thread                       producerThreads[NumProducers];
             Producer                     producers[NumProducers];
-            Atomic<bool>                 producersMayStart = false;
+            Barrier                      producersStart(NumProducers + 1);
             State                        state;
             state.gate = &gate;
 
@@ -4219,7 +4215,7 @@ struct SC::FibersTest : public SC::TestCase
                 Producer& producer         = producers[producerIndex];
                 producer.scheduler         = &scheduler;
                 producer.cancellationToken = cancellationSource.token();
-                producer.mayStart          = &producersMayStart;
+                producer.start             = &producersStart;
                 producer.state             = &state;
                 producer.tasks             = tasks + producerIndex * NumTasksPerProducer;
                 producer.stackMemory       = stackMemory + producerIndex * NumTasksPerProducer * StackSize;
@@ -4228,10 +4224,7 @@ struct SC::FibersTest : public SC::TestCase
                 SC_TRY(producerThreads[producerIndex].start(
                     [&producer](Thread&)
                     {
-                        while (not producer.mayStart->load(memory_order_acquire))
-                        {
-                            Thread::Sleep(1);
-                        }
+                        producer.start->wait();
 
                         FiberTaskSpawnOptions spawnOptions;
                         if (producer.cancelTasks)
@@ -4247,10 +4240,12 @@ struct SC::FibersTest : public SC::TestCase
                                     [state = producer.state](FiberScheduler& currentScheduler)
                                     {
                                         state->entered.fetch_add(1, memory_order_release);
+                                        state->tasksEntered.release();
                                         Result waitResult = currentScheduler.wait(*state->gate);
                                         if (not waitResult)
                                         {
                                             state->cancelled.fetch_add(1, memory_order_relaxed);
+                                            state->tasksCancelled.release();
                                             return waitResult;
                                         }
                                         for (size_t yieldIndex = 0; yieldIndex < NumYields; ++yieldIndex)
@@ -4269,7 +4264,7 @@ struct SC::FibersTest : public SC::TestCase
                     }));
             }
 
-            producersMayStart.store(true, memory_order_release);
+            producersStart.wait();
             bool producerFailed = false;
             for (size_t producerIndex = 0; producerIndex < NumProducers; ++producerIndex)
             {
@@ -4283,11 +4278,9 @@ struct SC::FibersTest : public SC::TestCase
                 return Result::Error("Concurrent external stress producer failed");
             }
 
-            size_t waitIterations = 0;
-            while (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks) and waitIterations < 1000)
+            for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
             {
-                Thread::Sleep(1);
-                waitIterations += 1;
+                state.tasksEntered.acquire();
             }
             if (state.entered.load(memory_order_acquire) != static_cast<int32_t>(NumTasks))
             {
@@ -4298,12 +4291,9 @@ struct SC::FibersTest : public SC::TestCase
 
             SC_TRY(scheduler.requestCancel(cancellationSource));
 
-            size_t cancellationWaitIterations = 0;
-            while (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumCancelledTasks) and
-                   cancellationWaitIterations < 1000)
+            for (size_t taskIndex = 0; taskIndex < NumCancelledTasks; ++taskIndex)
             {
-                Thread::Sleep(1);
-                cancellationWaitIterations += 1;
+                state.tasksCancelled.acquire();
             }
             if (state.cancelled.load(memory_order_acquire) != static_cast<int32_t>(NumCancelledTasks))
             {
@@ -4484,6 +4474,7 @@ struct SC::FibersTest : public SC::TestCase
                     observedSteal = true;
                     break;
                 }
+                // Give peer workers time to steal before releasing tasks from this deliberately staged stress round.
                 Thread::Sleep(1);
             }
             state.allowFinish.store(true, memory_order_release);
@@ -4860,6 +4851,7 @@ struct SC::FibersTest : public SC::TestCase
                             {
                                 return Result(true);
                             }
+                            // Keep the producer's worker occupied so the peer must steal its owner-local children.
                             Thread::Sleep(1);
                         }
                         return Result::Error("Peer worker did not steal all owner tasks");
@@ -4867,6 +4859,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, 2}, {threads, 2}, options));
 
             bool producerWaiting = false;
+            // FiberTask status has no blocking notification; observe suspension before opening the gate.
             for (size_t attempt = 0; attempt < 5000; ++attempt)
             {
                 producerWaiting = producer.status() == FiberTaskStatus::Waiting;
@@ -5553,7 +5546,8 @@ struct SC::FibersTest : public SC::TestCase
         };
         struct ThreadContext
         {
-            State* state = nullptr;
+            State*   state = nullptr;
+            Barrier* start = nullptr;
         };
 
         FiberScheduler scheduler;
@@ -5563,6 +5557,7 @@ struct SC::FibersTest : public SC::TestCase
         FiberStack     waiterStack({waiterStackMemory, sizeof(waiterStackMemory)});
         Thread         threads[NumThreads];
         ThreadContext  contexts[NumThreads];
+        Barrier        start(NumThreads + 1);
         State          state;
 
         state.scheduler = &scheduler;
@@ -5586,14 +5581,12 @@ struct SC::FibersTest : public SC::TestCase
         for (size_t threadIndex = 0; threadIndex < NumThreads; ++threadIndex)
         {
             contexts[threadIndex].state = &state;
+            contexts[threadIndex].start = &start;
             ThreadContext* context      = &contexts[threadIndex];
             SC_TEST_EXPECT(threads[threadIndex].start(
                 [context](Thread&)
                 {
-                    while (not context->state->start.load(memory_order_acquire))
-                    {
-                        Thread::Sleep(1);
-                    }
+                    context->start->wait();
                     for (size_t completionIndex = 0; completionIndex < NumCompletions / NumThreads; ++completionIndex)
                     {
                         if (context->state->scheduler->done(*context->state->counter))
@@ -5608,6 +5601,7 @@ struct SC::FibersTest : public SC::TestCase
                 }));
         }
         state.start.store(true, memory_order_release);
+        start.wait();
         for (Thread& thread : threads)
         {
             SC_TEST_EXPECT(thread.join());
@@ -5835,6 +5829,7 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(workerPool.start(scheduler, {&worker, 1}, {&thread, 1}, options));
 
             bool producerWaiting = false;
+            // FiberTask status has no blocking notification; observe suspension before measuring the fast path.
             for (size_t attempt = 0; attempt < 5000; ++attempt)
             {
                 producerWaiting =
@@ -5958,7 +5953,9 @@ struct SC::FibersTest : public SC::TestCase
             Atomic<int32_t> blockersEntered;
             Atomic<int32_t> blockersCompleted;
             Atomic<int32_t> completed;
-            Atomic<bool>    allowBlockers;
+            Semaphore       blockersStarted;
+            EventObject     waiterStarted;
+            Semaphore       releaseBlockers;
         };
 
         FiberScheduler    scheduler;
@@ -5985,6 +5982,7 @@ struct SC::FibersTest : public SC::TestCase
                                        FiberTask::Procedure(
                                            [&state, &gate](FiberScheduler& scheduler)
                                            {
+                                               state.waiterStarted.signal();
                                                SC_TRY(scheduler.wait(gate));
                                                state.completed.fetch_add(1);
                                                return Result(true);
@@ -5997,10 +5995,8 @@ struct SC::FibersTest : public SC::TestCase
                                                [&state](FiberScheduler&)
                                                {
                                                    state.blockersEntered.fetch_add(1, memory_order_release);
-                                                   while (not state.allowBlockers.load(memory_order_acquire))
-                                                   {
-                                                       Thread::Sleep(1);
-                                                   }
+                                                   state.blockersStarted.release();
+                                                   state.releaseBlockers.acquire();
                                                    state.blockersCompleted.fetch_add(1);
                                                    return Result(true);
                                                })));
@@ -6014,21 +6010,20 @@ struct SC::FibersTest : public SC::TestCase
         options.idleSpinAttempts       = 0;
         SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
 
-        bool workersPinned = false;
-        for (size_t attempt = 0; attempt < 5000; ++attempt)
+        state.waiterStarted.wait();
+        for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
         {
-            workersPinned = tasks[0].status() == FiberTaskStatus::Waiting and
-                            state.blockersEntered.load(memory_order_acquire) == static_cast<int32_t>(NumWorkers);
-            if (workersPinned)
-            {
-                break;
-            }
-            Thread::Sleep(1);
+            state.blockersStarted.acquire();
         }
+        const bool workersPinned = tasks[0].status() == FiberTaskStatus::Waiting and
+                                   state.blockersEntered.load(memory_order_acquire) == static_cast<int32_t>(NumWorkers);
         SC_TEST_EXPECT(workersPinned);
         if (not workersPinned)
         {
-            state.allowBlockers.store(true, memory_order_release);
+            for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
+            {
+                state.releaseBlockers.release();
+            }
             SC_TEST_EXPECT(scheduler.requestCancelAll());
             SC_TEST_EXPECT(scheduler.done(gate));
             SC_TEST_EXPECT(workerPool.join());
@@ -6064,7 +6059,10 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
 
-        state.allowBlockers.store(true, memory_order_release);
+        for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
+        {
+            state.releaseBlockers.release();
+        }
         SC_TEST_EXPECT(workerPool.join());
         scheduler.schedulerDiagnostics(diagnostics);
         SC_TEST_EXPECT(state.blockersCompleted.load() == static_cast<int32_t>(NumWorkers));
