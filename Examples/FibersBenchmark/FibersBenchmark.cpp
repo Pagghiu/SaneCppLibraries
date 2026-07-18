@@ -1040,9 +1040,17 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
 
     if (argc != 1)
     {
+        if (argc == 2 and benchmarkArgumentEquals(argv[1], "--scheduler-throughput"))
+        {
+            SC_TRY(runWorkerPoolBenchmark(console));
+            SC_TRY(runForcedStealingBenchmark(console));
+            SC_TRY(runMicroTaskBenchmarks(console));
+            SC_TRY(runCounterCompletionBenchmark(console));
+            return runSustainedMicroTaskBenchmark(console);
+        }
         if (argc != 3 or not benchmarkArgumentEquals(argv[1], "--mass-suspension"))
         {
-            return Result::Error("Usage: FibersBenchmark [--mass-suspension <count>]");
+            return Result::Error("Usage: FibersBenchmark [--scheduler-throughput | --mass-suspension <count>]");
         }
         size_t numFibers = 0;
         SC_TRY(parsePositiveSize(argv[2], numFibers));
