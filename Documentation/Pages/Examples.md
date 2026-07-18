@@ -35,10 +35,10 @@ integration before exploring the smaller examples below.
   <source src="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932" type="video/mp4">
   Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932">Open the plugin hot-reload video</a>.
 </video>
-\endhtmlonly
 
 <iframe width="700" height="400" src="https://github.com/user-attachments/assets/6c9d35a3-f8c9-4f7f-b147-e5ec6b61b932" frameborder="0" allowfullscreen>
 </iframe>
+\endhtmlonly
 
 ### SC::Build Standalone backend
 SC::Build Standalone
@@ -48,10 +48,9 @@ SC::Build Standalone
   <source src="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b" type="video/mp4">
   Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b">Open the plugin hot-reload video</a>.
 </video>
-\endhtmlonly
-
 <iframe width="700" height="400" src="https://github.com/user-attachments/assets/c764eb3e-3cdb-4bc9-a520-d277f781963b" frameborder="0" allowfullscreen>
 </iframe>
+\endhtmlonly
 
 
 ### SC::Build for external use (CURL bootstrap)
@@ -62,11 +61,10 @@ SC::Build Standalone
   <source src="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde" type="video/mp4">
   Your browser cannot play this video. <a href="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde">Open the plugin hot-reload video</a>.
 </video>
-\endhtmlonly
 
 <iframe width="700" height="400" src="https://github.com/user-attachments/assets/e122578e-dbb2-4c26-aa29-72ebaff09bde" frameborder="0" allowfullscreen>
 </iframe>
-
+\endhtmlonly
 
 ## Quick start
 
