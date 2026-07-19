@@ -86,7 +86,7 @@ FiberWorker    workers[NumWorkers];
 FiberWorkerThread threads[NumWorkers];
 FiberWorkerPool workerPool;
 
-SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+SC_TRY(workerPool.start(scheduler, workers, threads));
 SC_TRY(workerPool.join());
 ```
 
@@ -96,7 +96,7 @@ uses a caller buffer; the virtual allocator reserves a caller-selected address-s
 ```cpp
 char           allocatorStorage[64 * 1024] = {};
 FiberAllocator allocator;
-SC_TRY(allocator.createFixed({allocatorStorage, sizeof(allocatorStorage)}));
+SC_TRY(allocator.createFixed(allocatorStorage));
 
 FiberWorkerPoolOptions options;
 options.dequeAllocator         = &allocator;
@@ -104,7 +104,7 @@ options.dequeCapacityPerWorker = 256;
 options.injectionAllocator     = &allocator;
 options.injectionCapacity      = 256;
 
-SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}, options));
+SC_TRY(workerPool.start(scheduler, workers, threads, options));
 SC_TRY(workerPool.join());
 SC_TRY(allocator.close());
 ```

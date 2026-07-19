@@ -19,27 +19,28 @@ static Result runCpuFibers(Console& console)
     struct State
     {
         int partials[3] = {};
-    };
+    } state;
+
+    constexpr size_t NumTasks = 3;
 
     FiberScheduler scheduler;
-    FiberTask      tasks[3];
-    char           stackMemory[3 * 64 * 1024] = {};
-    FiberTaskPool  pool({tasks, 3}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
+    FiberTask      tasks[NumTasks];
+    char           stackMemory[NumTasks * 64 * 1024] = {};
+    FiberTaskPool  pool(tasks, stackMemory, sizeof(stackMemory) / NumTasks);
     FiberTaskGroup group(scheduler);
-    State          state;
 
-    for (size_t taskIndex = 0; taskIndex < 3; ++taskIndex)
+    for (size_t taskIndex = 0; taskIndex < NumTasks; ++taskIndex)
     {
-        SC_TRY(group.spawn(pool, FiberTask::Procedure(
-                                     [&state, taskIndex](FiberScheduler& scheduler)
-                                     {
-                                         for (int value = 0; value < 5; ++value)
-                                         {
-                                             state.partials[taskIndex] += static_cast<int>(taskIndex + 1) * value;
-                                             SC_TRY(scheduler.yield());
-                                         }
-                                         return Result(true);
-                                     })));
+        auto task = [&state, taskIndex](FiberScheduler& scheduler)
+        {
+            for (int value = 0; value < 5; ++value)
+            {
+                state.partials[taskIndex] += static_cast<int>(taskIndex + 1) * value;
+                SC_TRY(scheduler.yield());
+            }
+            return Result(true);
+        };
+        SC_TRY(group.spawn(pool, move(task)));
     }
 
     SC_TRY(group.waitAll());
@@ -63,40 +64,35 @@ static Result runAsyncFibers(Console& console)
     {
         FiberAsyncIO* io        = nullptr;
         int           completed = 0;
-    };
+    } state;
 
     AsyncEventLoop eventLoop;
     SC_TRY(eventLoop.create());
+    constexpr size_t NumTasks = 2;
 
-    FiberScheduler      scheduler;
-    FiberAsyncCommand   commands[8];
-    FiberAsyncIO        io(scheduler, eventLoop, commands);
-    FiberTask           tasks[2];
-    char                stackMemory[2 * 64 * 1024] = {};
-    FiberTaskPool       pool({tasks, 2}, {stackMemory, sizeof(stackMemory)}, 64 * 1024);
-    FiberTaskGroup      group(scheduler);
-    FiberTaskGroupError errors[2];
-    State               state;
-    state.io = &io;
+    FiberScheduler scheduler;
+    FiberTask      tasks[NumTasks];
+    char           stackMemory[NumTasks * 64 * 1024] = {};
+    FiberTaskPool  pool(tasks, stackMemory, 64 * 1024);
+    FiberTaskGroup group(scheduler);
 
-    SC_TRY(group.spawn(pool, FiberTask::Procedure(
-                                 [&state](FiberScheduler&)
-                                 {
-                                     SC_TRY(state.io->sleep(TimeMs{1}));
-                                     state.completed++;
-                                     return Result(true);
-                                 })));
-    SC_TRY(group.spawn(pool, FiberTask::Procedure(
-                                 [&state](FiberScheduler&)
-                                 {
-                                     SC_TRY(state.io->sleep(TimeMs{1}));
-                                     state.completed++;
-                                     return Result(true);
-                                 })));
+    FiberAsyncCommand commands[8];
+    FiberAsyncIO      io(scheduler, eventLoop, commands);
+
+    state.io  = &io;
+    auto proc = [&state](FiberScheduler&)
+    {
+        SC_TRY(state.io->sleep(TimeMs{1}));
+        state.completed++;
+        return Result(true);
+    };
+    SC_TRY(group.spawn(pool, proc));
+    SC_TRY(group.spawn(pool, proc));
 
     SC_TRY(io.runUntilComplete());
 
-    size_t numErrors = 0;
+    size_t              numErrors = 0;
+    FiberTaskGroupError errors[NumTasks];
     SC_TRY(group.collectErrors(errors, numErrors));
     if (numErrors != 0)
     {
@@ -118,33 +114,33 @@ static Result runWorkerPoolAsyncFibers(Console& console)
     {
         FiberAsyncIO* io        = nullptr;
         int           completed = 0;
-    };
+    } state;
 
     AsyncEventLoop eventLoop;
     SC_TRY(eventLoop.create());
 
     FiberScheduler    scheduler;
-    FiberAsyncCommand commands[8];
-    FiberAsyncIO      io(scheduler, eventLoop, commands);
     FiberTask         task;
     char              stackMemory[64 * 1024] = {};
-    FiberStack        stack({stackMemory, sizeof(stackMemory)});
+    FiberStack        stack(stackMemory);
     FiberWorker       workers[NumWorkers];
     FiberWorkerThread threads[NumWorkers];
     FiberWorkerPool   workerPool;
-    State             state;
-    state.io = &io;
 
-    SC_TRY(scheduler.spawn(task, stack,
-                           FiberTask::Procedure(
-                               [&state](FiberScheduler&)
-                               {
-                                   SC_TRY(state.io->sleep(TimeMs{1}));
-                                   state.completed++;
-                                   return Result(true);
-                               })));
+    FiberAsyncCommand commands[8];
+    FiberAsyncIO      io(scheduler, eventLoop, commands);
 
-    SC_TRY(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
+    state.io  = &io;
+    auto proc = [&state](FiberScheduler&)
+    {
+        SC_TRY(state.io->sleep(TimeMs{1}));
+        state.completed++;
+        return Result(true);
+    };
+
+    SC_TRY(scheduler.spawn(task, stack, proc));
+
+    SC_TRY(workerPool.start(scheduler, workers, threads));
     SC_TRY(io.runOwnerUntilComplete());
     SC_TRY(workerPool.join());
     SC_TRY(task.result());
