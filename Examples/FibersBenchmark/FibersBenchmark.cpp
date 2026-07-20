@@ -516,6 +516,7 @@ struct MicroTaskExternalProducerState
     FiberScheduler*          scheduler      = nullptr;
     FiberTaskPool*           taskPool       = nullptr;
     MicroTaskBenchmarkState* benchmarkState = nullptr;
+    FiberEvent*              producerDone   = nullptr;
 };
 
 static Result runCpuPayload(MicroTaskBenchmarkState& state, int workIterations)
@@ -696,17 +697,11 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             FiberTask  keepAliveTask;
             char       keepAliveStackMemory[StackSize] = {};
             FiberStack keepAliveStack({keepAliveStackMemory, sizeof(keepAliveStackMemory)});
+            FiberEvent producerDone;
 
             SC_TRY(scheduler.spawn(keepAliveTask, keepAliveStack,
-                                   FiberTask::Procedure(
-                                       [&state](FiberScheduler& scheduler)
-                                       {
-                                           while (not state.producerDone.load(memory_order_acquire))
-                                           {
-                                               SC_TRY(scheduler.yield());
-                                           }
-                                           return Result(true);
-                                       })));
+                                   FiberTask::Procedure([&producerDone](FiberScheduler& scheduler)
+                                                        { return producerDone.wait(scheduler); })));
             SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, workerPoolOptions));
 
             Thread producerThread;
@@ -715,6 +710,7 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
             producerState.scheduler      = &scheduler;
             producerState.taskPool       = &taskPool;
             producerState.benchmarkState = &state;
+            producerState.producerDone   = &producerDone;
             SC_TRY(producerThread.start(
                 [&producerState](Thread&)
                 {
@@ -730,6 +726,11 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                         }
                     }
                     producerState.benchmarkState->producerDone.store(true, memory_order_release);
+                    Result signalResult = producerState.producerDone->signal(*producerState.scheduler);
+                    if (producerState.benchmarkState->producerResult and not signalResult)
+                    {
+                        producerState.benchmarkState->producerResult = signalResult;
+                    }
                 }));
             SC_TRY(producerThread.join());
             SC_TRY(state.producerResult);
