@@ -430,6 +430,8 @@ Result installWineStableRunner(StringView packagesCacheDirectory, StringView pac
 Result installLinuxWineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);
 Result installLinuxNativeArm64WineRunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
                                          Package& package);
+Result installTaskflowBenchmarks(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                 Package& package);
 Result installQEMURunner(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package,
                          StringView importDirectory = {});
 Result installLLVMToolchain(StringView packagesCacheDirectory, StringView packagesInstallDirectory, Package& package);

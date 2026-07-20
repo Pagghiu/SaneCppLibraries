@@ -1819,6 +1819,33 @@ Result installDoxygenAwesomeCss(StringView packagesCacheDirectory, StringView pa
     return installPackageRecipe(recipe, package);
 }
 
+Result installTaskflowBenchmarks(StringView packagesCacheDirectory, StringView packagesInstallDirectory,
+                                 Package& package)
+{
+    const PackageReceiptExport exports[] = {
+        {PackageExportKind::Asset, PackageExport::TaskflowBenchmarksRoot, "."},
+    };
+
+    PackageRecipe recipe;
+    recipe.download.packagesCacheDirectory   = packagesCacheDirectory;
+    recipe.download.packagesInstallDirectory = packagesInstallDirectory;
+    recipe.download.packageName              = "taskflow-benchmarks";
+    recipe.download.packageVersion           = "ec97c00";
+    recipe.download.shallowClone             = "ec97c0095bd10907584a3b408e181410796b48fe";
+    recipe.download.url                      = "https://github.com/taskflow/taskflow.git";
+    recipe.download.isGitClone               = true;
+    recipe.package.packageBaseName           = "taskflow-benchmarks";
+    recipe.functions.testFunction            = &verifyGitCommitHashInstall;
+    static constexpr StringView phases[]     = {
+        "fetchGitRevision",
+        "validateGitCommit",
+        "writeReceipt",
+    };
+    recipe.exports = exports;
+    recipe.phases  = phases;
+    return installPackageRecipe(recipe, package);
+}
+
 Result clangFormatMatchesVersion(StringView versionString, StringView wantedVersion)
 {
     StringViewTokenizer tokenizer(versionString);

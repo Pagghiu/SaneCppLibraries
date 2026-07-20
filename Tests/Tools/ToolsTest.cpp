@@ -1079,6 +1079,21 @@ struct SupportToolsTest : public TestCase
             arguments.arguments = {args, 1};
             SC_TEST_EXPECT(runPackageTool(arguments));
         }
+        if (test_section("package info describes Taskflow benchmarks"))
+        {
+            arguments.tool      = "package";
+            arguments.action    = "info";
+            args[0]             = "taskflow-benchmarks";
+            arguments.arguments = {args, 1};
+            SC_TEST_EXPECT(runPackageTool(arguments));
+
+            const PackageRegistryEntry* entry = builtinPackageRegistry().find("taskflow-benchmarks");
+            SC_TEST_EXPECT(entry != nullptr);
+            SC_TEST_EXPECT(entry->kind == PackageKind::Asset);
+            SC_TEST_EXPECT(entry->exports.sizeInElements() == 1);
+            SC_TEST_EXPECT(entry->exports[0].kind == PackageExportKind::Asset);
+            SC_TEST_EXPECT(entry->exports[0].name == PackageExport::TaskflowBenchmarksRoot);
+        }
         if (test_section("package info rejects unknown package"))
         {
             arguments.tool      = "package";

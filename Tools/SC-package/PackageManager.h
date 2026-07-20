@@ -87,6 +87,7 @@ constexpr StringView LLVMMinGWClang_X86_64   = "x86_64-w64-mingw32-clang";
 constexpr StringView LLVMMinGWClangArm64     = "aarch64-w64-mingw32-clang";
 constexpr StringView LLVMMinGWClangXX_X86_64 = "x86_64-w64-mingw32-clang++";
 constexpr StringView LLVMMinGWClangXXArm64   = "aarch64-w64-mingw32-clang++";
+constexpr StringView TaskflowBenchmarksRoot  = "taskflow-benchmarks.root";
 } // namespace PackageExport
 
 namespace PackageExportKind

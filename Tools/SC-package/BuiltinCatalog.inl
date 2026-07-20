@@ -12,6 +12,12 @@ static Result installDoxygenAwesomeCssEntry(StringView cache, StringView install
     return installDoxygenAwesomeCss(cache, install, package);
 }
 
+static Result installTaskflowBenchmarksEntry(StringView cache, StringView install, Package& package,
+                                             Span<const StringView>)
+{
+    return installTaskflowBenchmarks(cache, install, package);
+}
+
 static Result installClangEntry(StringView cache, StringView install, Package& package, Span<const StringView>)
 {
     return installClangBinaries(cache, install, package);
@@ -110,6 +116,14 @@ static constexpr PackageRegistryExport DoxygenAwesomeExports[] = {
     {PackageExportKind::Asset, "doxygen-awesome-css"},
 };
 static constexpr StringView DoxygenAwesomePhases[] = {
+    "fetchGitRevision",
+    "validateGitCommit",
+    "writeReceipt",
+};
+static constexpr PackageRegistryExport TaskflowBenchmarksExports[] = {
+    {PackageExportKind::Asset, PackageExport::TaskflowBenchmarksRoot},
+};
+static constexpr StringView TaskflowBenchmarksPhases[] = {
     "fetchGitRevision",
     "validateGitCommit",
     "writeReceipt",
@@ -230,6 +244,8 @@ static constexpr PackageRegistryEntry BuiltinPackageRegistryEntries[] = {
      DoxygenExports, DoxygenPhases, installDoxygenEntry},
     {"doxygen-awesome-css", "doxygen-awesome-css", PackageKind::Asset, "Doxygen Awesome CSS theme checkout", "host",
      "Pinned Git revision", false, DoxygenAwesomeExports, DoxygenAwesomePhases, installDoxygenAwesomeCssEntry},
+    {"taskflow-benchmarks", "taskflow-benchmarks", PackageKind::Asset, "Pinned Taskflow benchmark suite", "host",
+     "Pinned Git revision", false, TaskflowBenchmarksExports, TaskflowBenchmarksPhases, installTaskflowBenchmarksEntry},
     {"clang", "clang-binaries", PackageKind::Tool, "Pinned host clang-format binary", "host",
      "Official LLVM release archive", false, ClangExports, ClangPhases, installClangEntry},
     {"llvm", "llvm", PackageKind::Toolchain, "Pinned host LLVM toolchain", "host", "Official LLVM release archive",
