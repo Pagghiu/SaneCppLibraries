@@ -589,8 +589,9 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   schedulerDiagnostics.lockSpawn, schedulerDiagnostics.lockReady,
                   schedulerDiagnostics.lockSynchronization, schedulerDiagnostics.lockCompletion,
                   schedulerDiagnostics.lockControl);
-    console.print("  configuredInjectionCapacity={} injectionPeak={} injectionSpills={}\n", configuredInjectionCapacity,
-                  schedulerDiagnostics.injectionPeak, schedulerDiagnostics.injectionSpills);
+    console.print("  configuredInjectionCapacity={} injectionPeak={} injectionSpills={} injectionClaimBatchPeak={}\n",
+                  configuredInjectionCapacity, schedulerDiagnostics.injectionPeak, schedulerDiagnostics.injectionSpills,
+                  schedulerDiagnostics.injectionClaimBatchPeak);
     console.print("  injectionLockAcquisitions={} injectionLockContentions={} injectionLockSpinRetries={}\n",
                   schedulerDiagnostics.injectionLockAcquisitions, schedulerDiagnostics.injectionLockContentions,
                   schedulerDiagnostics.injectionLockSpinRetries);

@@ -6057,6 +6057,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.injectionReady == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+        SC_TEST_EXPECT(diagnostics.injectionClaimBatchPeak == 0);
         SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions >= 3);
         SC_TEST_EXPECT(diagnostics.lockSpawn == 0);
 
@@ -6073,6 +6074,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.globalReadyFibers == 0);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+        SC_TEST_EXPECT(diagnostics.injectionClaimBatchPeak > 0);
+        SC_TEST_EXPECT(diagnostics.injectionClaimBatchPeak <= 2);
         SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions >= 3);
         SC_TEST_EXPECT(diagnostics.lockSpawn == 0);
         SC_TEST_EXPECT(not scheduler.hasActiveFibers());

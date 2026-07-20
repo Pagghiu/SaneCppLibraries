@@ -481,6 +481,7 @@ struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
     size_t injectionReady               = 0;
     size_t injectionPeak                = 0;
     size_t injectionSpills              = 0;
+    size_t injectionClaimBatchPeak      = 0;
     size_t injectionLockAcquisitions    = 0;
     size_t injectionLockContentions     = 0;
     size_t injectionLockSpinRetries     = 0;
@@ -1112,14 +1113,15 @@ struct SC_FIBERS_EXPORT FiberScheduler
     FiberTask* readyTail  = nullptr;
     FiberTask* activeHead = nullptr;
 
-    FiberTask**     injectionQueue     = nullptr;
-    FiberAllocator* injectionAllocator = nullptr;
-    size_t          injectionCapacity  = 0;
-    size_t          injectionHead      = 0;
-    size_t          injectionTail      = 0;
-    size_t          injectionReady     = 0;
-    size_t          injectionPeak      = 0;
-    size_t          injectionSpills    = 0;
+    FiberTask**     injectionQueue          = nullptr;
+    FiberAllocator* injectionAllocator      = nullptr;
+    size_t          injectionCapacity       = 0;
+    size_t          injectionHead           = 0;
+    size_t          injectionTail           = 0;
+    size_t          injectionReady          = 0;
+    size_t          injectionPeak           = 0;
+    size_t          injectionSpills         = 0;
+    size_t          injectionClaimBatchPeak = 0;
 
     mutable volatile int32_t injectionLock = 0;
 

@@ -4763,14 +4763,15 @@ Result FiberScheduler::createInjectionQueue(FiberAllocator& allocator, size_t ca
         return Result::Error("Fiber injection queue allocation failed");
     }
 
-    injectionQueue     = static_cast<FiberTask**>(memory);
-    injectionAllocator = &allocator;
-    injectionCapacity  = capacity;
-    injectionHead      = 0;
-    injectionTail      = 0;
-    injectionReady     = 0;
-    injectionPeak      = 0;
-    injectionSpills    = 0;
+    injectionQueue          = static_cast<FiberTask**>(memory);
+    injectionAllocator      = &allocator;
+    injectionCapacity       = capacity;
+    injectionHead           = 0;
+    injectionTail           = 0;
+    injectionReady          = 0;
+    injectionPeak           = 0;
+    injectionSpills         = 0;
+    injectionClaimBatchPeak = 0;
     for (size_t index = 0; index < capacity; ++index)
     {
         injectionQueue[index] = nullptr;
@@ -5108,6 +5109,7 @@ void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics
     diagnostics.injectionReady               = injectionReady;
     diagnostics.injectionPeak                = injectionPeak;
     diagnostics.injectionSpills              = injectionSpills;
+    diagnostics.injectionClaimBatchPeak      = injectionClaimBatchPeak;
     diagnostics.injectionLockAcquisitions    = injectionLockAcquisitions;
     diagnostics.injectionLockContentions     = injectionLockContentions;
     diagnostics.injectionLockSpinRetries     = injectionLockSpinRetries;
@@ -5139,6 +5141,7 @@ void FiberScheduler::resetSchedulerDiagnostics()
     schedulerLockControl         = 0;
     injectionPeak                = injectionReady;
     injectionSpills              = 0;
+    injectionClaimBatchPeak      = 0;
     injectionLockAcquisitions    = 0;
     injectionLockContentions     = 0;
     injectionLockSpinRetries     = 0;
@@ -5478,7 +5481,8 @@ FiberTask* FiberScheduler::popReadyUnlocked()
 
 FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
 {
-    static constexpr size_t BatchCapacity = 4;
+    static constexpr size_t SpillBatchCapacity     = 4;
+    static constexpr size_t InjectionBatchCapacity = 16;
 
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
     const bool fromReadyList = readyHead != nullptr;
@@ -5492,14 +5496,16 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
     const size_t bottom       = fiberAtomicLoadSize(worker.localDequeBottom);
     const size_t dequeEntries = bottom >= top ? bottom - top : 0;
     SC_FIBERS_ASSERT_RELEASE(dequeEntries <= worker.localDequeCapacity);
-    size_t availableEntries = worker.localDequeCapacity - dequeEntries;
-    if (availableEntries > BatchCapacity - 1)
+    size_t       availableEntries = worker.localDequeCapacity - dequeEntries;
+    const bool   hasPeerWorkers   = workerPool != nullptr and workerPool->workers.sizeInElements() > 1;
+    const size_t batchCapacity    = fromReadyList or not hasPeerWorkers ? SpillBatchCapacity : InjectionBatchCapacity;
+    if (availableEntries > batchCapacity - 1)
     {
-        availableEntries = BatchCapacity - 1;
+        availableEntries = batchCapacity - 1;
     }
 
-    FiberTask* retainedTasks[BatchCapacity - 1] = {};
-    size_t     numRetainedTasks                 = 0;
+    FiberTask* retainedTasks[InjectionBatchCapacity - 1] = {};
+    size_t     numRetainedTasks                          = 0;
     while (numRetainedTasks < availableEntries)
     {
         FiberTask* retainedTask = nullptr;
@@ -5520,6 +5526,10 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
             break;
         }
         retainedTasks[numRetainedTasks++] = retainedTask;
+    }
+    if (not fromReadyList and numRetainedTasks + 1 > injectionClaimBatchPeak)
+    {
+        injectionClaimBatchPeak = numRetainedTasks + 1;
     }
 
     // Reverse insertion preserves the source queue's FIFO order when the owner later pops its LIFO deque.
