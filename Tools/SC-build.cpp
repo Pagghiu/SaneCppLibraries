@@ -609,6 +609,37 @@ Result configureTestSTLInterop(const Parameters& parameters, Workspace& workspac
 
 static constexpr StringView EXAMPLE_PROJECT_NAME = "SCExample";
 
+namespace detail
+{
+Result findTaskflowBenchmarks(const Parameters& parameters, String& root, bool& found)
+{
+    found = false;
+
+    Tools::Download download;
+    download.packageName = "taskflow-benchmarks";
+
+    String packageDirectory = StringEncoding::Utf8;
+    SC_TRY(StringBuilder::format(packageDirectory, "{}_{}", download.packageName, download.packagePlatform));
+
+    String packageRoot = StringEncoding::Utf8;
+    SC_TRY(Path::join(packageRoot, {parameters.directories.packagesInstallDirectory.view(), packageDirectory.view()}));
+
+    String receiptPath = StringEncoding::Utf8;
+    SC_TRY(Path::join(receiptPath, {packageRoot.view(), Tools::PackageReceiptFileName}));
+
+    FileSystem fs;
+    SC_TRY(fs.init("."));
+    if (not fs.existsAndIsFile(receiptPath.view()))
+    {
+        return Result(true);
+    }
+
+    SC_TRY(Tools::resolvePackageExportPath(packageRoot.view(), Tools::PackageExport::TaskflowBenchmarksRoot, root));
+    found = true;
+    return Result(true);
+}
+} // namespace detail
+
 Result configureExamplesGUI(const Parameters& parameters, Workspace& workspace)
 {
     Project    project            = {EXAMPLE_PROJECT_NAME, TargetType::GUIApplication};
@@ -712,6 +743,17 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         StringView name, extension;
         SC_TRY(Path::parseNameExtension(entry.name, name, extension));
 
+        String taskflowBenchmarksRoot = StringEncoding::Utf8;
+        bool   hasTaskflowBenchmarks  = false;
+        if (name == "FibersSkynetBenchmark")
+        {
+            SC_TRY(detail::findTaskflowBenchmarks(parameters, taskflowBenchmarksRoot, hasTaskflowBenchmarks));
+            if (not hasTaskflowBenchmarks)
+            {
+                continue;
+            }
+        }
+
         Project project;
         project.targetType = TargetType::ConsoleExecutable;
         project.name       = name;
@@ -720,7 +762,24 @@ Result configureExamplesConsole(const Parameters& parameters, Workspace& workspa
         project.addPresetConfiguration(Configuration::Preset::Debug, parameters);
         project.addPresetConfiguration(Configuration::Preset::Release, parameters);
 
-        if (name.startsWith("Await"))
+        if (name == "FibersSkynetBenchmark")
+        {
+            project.files.compile.enableExceptions = true;
+            project.files.compile.enableRTTI       = true;
+            project.files.compile.cppStandard      = CppStandard::CPP20;
+            project.files.compile.includeStdCpp    = true;
+            project.files.compile.disableClangWarnings({"implicit-int-float-conversion"});
+            project.link.linkStdCpp = true;
+            SC_TRY(addSaneCppLibraries(project, parameters));
+
+            String skynetRoot     = StringEncoding::Utf8;
+            String taskflowSource = StringEncoding::Utf8;
+            SC_TRY(Path::join(skynetRoot, {taskflowBenchmarksRoot.view(), "benchmarks", "skynet"}));
+            SC_TRY(Path::join(taskflowSource, {skynetRoot.view(), "taskflow.cpp"}));
+            SC_TRY(project.addIncludePaths({taskflowBenchmarksRoot.view(), skynetRoot.view()}));
+            project.addFile(taskflowSource.view());
+        }
+        else if (name.startsWith("Await"))
         {
             project.files.compile.cppStandard = CppStandard::CPP20;
             configureSaneStdHeadersNoRuntime(project);

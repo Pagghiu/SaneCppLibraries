@@ -141,6 +141,9 @@ build target.
   `FibersAsync` sleeps, and worker-pool work in three focused sections.
 - [FibersBenchmark](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersBenchmark) is a maintainer
   benchmark for scheduler, contention, and sustained micro-task workloads.
+- [FibersSkynetBenchmark](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersSkynetBenchmark) is an
+  opt-in comparison with Taskflow's upstream Skynet backend. Install it with
+  `./SC.sh package install taskflow-benchmarks` before configuring the benchmark target.
 - [FibersStackGrowthPrototype](https://github.com/Pagghiu/SaneCppLibraries/tree/main/Examples/FibersStackGrowthPrototype)
   is a maintainer prototype for stack-growth behavior.
 

@@ -12,6 +12,14 @@
 extern SC::Console* globalConsole;
 namespace SC
 {
+namespace Build
+{
+namespace detail
+{
+Result findTaskflowBenchmarks(const Parameters& parameters, String& root, bool& found);
+}
+} // namespace Build
+
 static bool writeBuildHelpAddendumToString(Build::Action::Type actionType, String& text)
 {
     GrowableBuffer<String> growable(text);
@@ -1538,6 +1546,42 @@ struct SupportToolsTest : public TestCase
             SC_TEST_EXPECT(
                 resolvePackageCapabilityPath(msvcRoot.view(), PackageCapability::ToolchainWindowsMSVCArm64, resolved));
             SC_TEST_EXPECT(StringView(resolved.view()).endsWith("cl"));
+        }
+        if (test_section("build discovers Taskflow benchmarks from installed package receipt"))
+        {
+            String packagesRoot     = StringEncoding::Utf8;
+            String packageDirectory = StringEncoding::Utf8;
+            String packageRoot      = StringEncoding::Utf8;
+            SC_TEST_EXPECT(Path::join(packagesRoot, {outputDirectory.view(), PackagesInstallDirectory}));
+
+            Download download;
+            download.packageName = "taskflow-benchmarks";
+            SC_TEST_EXPECT(
+                StringBuilder::format(packageDirectory, "{}_{}", download.packageName, download.packagePlatform));
+            SC_TEST_EXPECT(Path::join(packageRoot, {packagesRoot.view(), packageDirectory.view()}));
+
+            FileSystem fs;
+            SC_TEST_EXPECT(fs.init("."));
+            if (fs.existsAndIsDirectory(packageRoot.view()))
+            {
+                SC_TEST_EXPECT(fs.removeDirectoriesRecursive(packageRoot.view()));
+            }
+
+            Build::Parameters parameters;
+            parameters.directories.packagesInstallDirectory = packagesRoot.view();
+
+            String benchmarkRoot = StringEncoding::Utf8;
+            bool   found         = false;
+            SC_TEST_EXPECT(Build::detail::findTaskflowBenchmarks(parameters, benchmarkRoot, found));
+            SC_TEST_EXPECT(not found);
+
+            const PackageReceiptExport exports[] = {
+                {PackageExportKind::Asset, PackageExport::TaskflowBenchmarksRoot, "."},
+            };
+            SC_TEST_EXPECT(writePackageReceiptFixture(packageRoot.view(), "taskflow-benchmarks", exports));
+            SC_TEST_EXPECT(Build::detail::findTaskflowBenchmarks(parameters, benchmarkRoot, found));
+            SC_TEST_EXPECT(found);
+            SC_TEST_EXPECT(StringView(benchmarkRoot.view()).containsString("taskflow-benchmarks"));
         }
         if (test_section("package receipt rejects invalid source hash"))
         {
