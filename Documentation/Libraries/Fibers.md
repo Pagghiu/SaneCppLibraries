@@ -119,7 +119,10 @@ The optional injection queue is the bounded entry point for tasks submitted from
 wakeups. A new `spawn()` reports an error if that queue is full. A fiber that is already active never fails merely
 because the queue is full: its wakeup uses the scheduler's intrusive spill path, and workers prioritize that spill so
 existing work continues to make progress. `FiberSchedulerDiagnostics` exposes the configured capacity, current and
-peak occupancy, and spill count; peak and spill values remain available after `join()`.
+peak occupancy, spill count, and injection-control contention separately from scheduler coordination; peak and spill
+values remain available after `join()`. Ordinary counter-free external spawns use this isolated control path. The
+current Draft implementation permits concurrent producers but serializes their short publication transactions; a
+slot-sequenced lock-free MPSC queue remains a measured future optimization rather than part of the API contract.
 
 # Choosing Task and Stack Storage
 

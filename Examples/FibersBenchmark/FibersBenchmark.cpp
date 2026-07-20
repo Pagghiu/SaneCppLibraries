@@ -199,6 +199,9 @@ static Result runWorkerPoolBenchmark(Console& console)
                   schedulerDiagnostics.lockSpawn, schedulerDiagnostics.lockReady,
                   schedulerDiagnostics.lockSynchronization, schedulerDiagnostics.lockCompletion,
                   schedulerDiagnostics.lockControl);
+    console.print("  injectionLockAcquisitions={} injectionLockContentions={} injectionLockSpinRetries={}\n",
+                  schedulerDiagnostics.injectionLockAcquisitions, schedulerDiagnostics.injectionLockContentions,
+                  schedulerDiagnostics.injectionLockSpinRetries);
     console.print("  allocatorPeakBytes={} allocatorFailures={} maxStackUsed={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures, maxStackUsed);
 
@@ -588,6 +591,9 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   schedulerDiagnostics.lockControl);
     console.print("  configuredInjectionCapacity={} injectionPeak={} injectionSpills={}\n", configuredInjectionCapacity,
                   schedulerDiagnostics.injectionPeak, schedulerDiagnostics.injectionSpills);
+    console.print("  injectionLockAcquisitions={} injectionLockContentions={} injectionLockSpinRetries={}\n",
+                  schedulerDiagnostics.injectionLockAcquisitions, schedulerDiagnostics.injectionLockContentions,
+                  schedulerDiagnostics.injectionLockSpinRetries);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
     for (size_t workerIndex = 0; workerIndex < workers.sizeInElements(); ++workerIndex)

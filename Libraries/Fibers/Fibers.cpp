@@ -1344,6 +1344,20 @@ struct FiberScheduler::LockGuard
     const FiberScheduler& scheduler;
 };
 
+struct FiberScheduler::InjectionLockGuard
+{
+    explicit InjectionLockGuard(const FiberScheduler& fiberScheduler) : scheduler(fiberScheduler)
+    {
+        scheduler.lockInjection();
+    }
+    ~InjectionLockGuard() { scheduler.unlockInjection(); }
+
+    InjectionLockGuard(const InjectionLockGuard&)            = delete;
+    InjectionLockGuard& operator=(const InjectionLockGuard&) = delete;
+
+    const FiberScheduler& scheduler;
+};
+
 FiberWorker::FiberWorker() = default;
 
 FiberWorker::~FiberWorker()
@@ -4208,6 +4222,23 @@ void FiberScheduler::lock(LockCategory category) const
 
 void FiberScheduler::unlock() const { fiberSchedulerUnlock(schedulerLock); }
 
+void FiberScheduler::lockInjection() const
+{
+    const size_t spinRetries = fiberSchedulerLock(injectionLock);
+    injectionLockAcquisitions += 1;
+    injectionLockSpinRetries += spinRetries;
+    if (spinRetries > 0)
+    {
+        injectionLockContentions += 1;
+    }
+    if (spinRetries > injectionLockPeakSpinRetries)
+    {
+        injectionLockPeakSpinRetries = spinRetries;
+    }
+}
+
+void FiberScheduler::unlockInjection() const { fiberSchedulerUnlock(injectionLock); }
+
 void FiberScheduler::trace(FiberTraceEventType type, FiberTask* task, FiberWorker* worker, size_t value) const
 {
     if (traceHooks.callback == nullptr)
@@ -4266,7 +4297,36 @@ Result FiberScheduler::spawn(FiberTask& task, FiberStack& stack, FiberTask::Proc
         return Result(true);
     }
 
-    LockGuard guard(*this, LockCategory::Spawn);
+    if (canPublishInjectionSpawn(options))
+    {
+        InjectionLockGuard guard(*this);
+        if (task.originGroup != nullptr)
+        {
+            return Result::Error("FiberTask is retained by a FiberTaskGroup");
+        }
+        if (task.isActive())
+        {
+            return Result::Error("FiberTask is already active");
+        }
+        if (not procedure.isValid())
+        {
+            return Result::Error("FiberTask procedure is not valid");
+        }
+        if (injectionReady == injectionCapacity)
+        {
+            return Result::Error("Fiber injection queue is full");
+        }
+
+        SC_TRY(initializeTaskForSpawn(task, stack, procedure, options));
+        fiberAtomicFetchAddSize(activeFibers, 1);
+        fiberTaskStatusStore(task.taskStatus, FiberTaskStatus::Ready);
+        linkActiveUnlocked(task);
+        SC_FIBERS_ASSERT_RELEASE(tryPushInjectionUnlocked(task));
+        return Result(true);
+    }
+
+    LockGuard          guard(*this, LockCategory::Spawn);
+    InjectionLockGuard injectionGuard(*this);
     if (task.originGroup != nullptr)
     {
         return Result::Error("FiberTask is retained by a FiberTaskGroup");
@@ -4403,6 +4463,11 @@ bool FiberScheduler::canPublishOwnerSpawn(FiberWorker& worker, const FiberTaskSp
     const size_t top    = fiberAtomicLoadSize(worker.localDequeTop);
     const size_t bottom = fiberAtomicLoadSize(worker.localDequeBottom);
     return bottom >= top and bottom - top < worker.localDequeCapacity;
+}
+
+bool FiberScheduler::canPublishInjectionSpawn(const FiberTaskSpawnOptions& options) const
+{
+    return injectionQueue != nullptr and options.counter == nullptr and options.originGroup == nullptr;
 }
 
 void FiberScheduler::linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker)
@@ -4814,16 +4879,19 @@ Result FiberScheduler::requestCancel(FiberCancellationTokenSource& tokenSource)
 {
     tokenSource.requestCancel();
 
-    LockGuard  guard(*this);
-    FiberTask* task = activeHead;
-    while (task != nullptr)
+    LockGuard guard(*this);
     {
-        FiberTask* next = task->nextActive;
-        if (task->cancellationToken.source == &tokenSource)
+        InjectionLockGuard injectionGuard(*this);
+        FiberTask*         task = activeHead;
+        while (task != nullptr)
         {
-            SC_TRY(cancelTaskUnlocked(*task));
+            FiberTask* next = task->nextActive;
+            if (task->cancellationToken.source == &tokenSource)
+            {
+                SC_TRY(cancelTaskUnlocked(*task));
+            }
+            task = next;
         }
-        task = next;
     }
     if (workerPool != nullptr)
     {
@@ -4838,13 +4906,15 @@ Result FiberScheduler::requestCancel(FiberCancellationTokenSource& tokenSource)
 Result FiberScheduler::requestCancelAll()
 {
     LockGuard guard(*this);
-
-    FiberTask* task = activeHead;
-    while (task != nullptr)
     {
-        FiberTask* next = task->nextActive;
-        SC_TRY(cancelTaskUnlocked(*task));
-        task = next;
+        InjectionLockGuard injectionGuard(*this);
+        FiberTask*         task = activeHead;
+        while (task != nullptr)
+        {
+            FiberTask* next = task->nextActive;
+            SC_TRY(cancelTaskUnlocked(*task));
+            task = next;
+        }
     }
     if (workerPool != nullptr)
     {
@@ -5028,29 +5098,35 @@ size_t FiberScheduler::activeFiberCount() const { return fiberAtomicLoadSize(act
 
 void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics) const
 {
-    LockGuard guard(*this);
+    LockGuard          guard(*this);
+    InjectionLockGuard injectionGuard(*this);
 
-    diagnostics.readyFibers         = fiberAtomicLoadSize(readyFibers);
-    diagnostics.globalReadyFibers   = fiberAtomicLoadSize(globalReadyFibers);
-    diagnostics.activeFibers        = fiberAtomicLoadSize(activeFibers);
-    diagnostics.injectionCapacity   = injectionCapacity;
-    diagnostics.injectionReady      = injectionReady;
-    diagnostics.injectionPeak       = injectionPeak;
-    diagnostics.injectionSpills     = injectionSpills;
-    diagnostics.lockAcquisitions    = schedulerLockAcquisitions;
-    diagnostics.lockContentions     = schedulerLockContentions;
-    diagnostics.lockSpinRetries     = schedulerLockSpinRetries;
-    diagnostics.lockPeakSpinRetries = schedulerLockPeakSpinRetries;
-    diagnostics.lockSpawn           = schedulerLockSpawn;
-    diagnostics.lockReady           = schedulerLockReady;
-    diagnostics.lockSynchronization = schedulerLockSynchronization;
-    diagnostics.lockCompletion      = schedulerLockCompletion;
-    diagnostics.lockControl         = schedulerLockControl;
+    diagnostics.readyFibers                  = fiberAtomicLoadSize(readyFibers);
+    diagnostics.globalReadyFibers            = fiberAtomicLoadSize(globalReadyFibers);
+    diagnostics.activeFibers                 = fiberAtomicLoadSize(activeFibers);
+    diagnostics.injectionCapacity            = injectionCapacity;
+    diagnostics.injectionReady               = injectionReady;
+    diagnostics.injectionPeak                = injectionPeak;
+    diagnostics.injectionSpills              = injectionSpills;
+    diagnostics.injectionLockAcquisitions    = injectionLockAcquisitions;
+    diagnostics.injectionLockContentions     = injectionLockContentions;
+    diagnostics.injectionLockSpinRetries     = injectionLockSpinRetries;
+    diagnostics.injectionLockPeakSpinRetries = injectionLockPeakSpinRetries;
+    diagnostics.lockAcquisitions             = schedulerLockAcquisitions;
+    diagnostics.lockContentions              = schedulerLockContentions;
+    diagnostics.lockSpinRetries              = schedulerLockSpinRetries;
+    diagnostics.lockPeakSpinRetries          = schedulerLockPeakSpinRetries;
+    diagnostics.lockSpawn                    = schedulerLockSpawn;
+    diagnostics.lockReady                    = schedulerLockReady;
+    diagnostics.lockSynchronization          = schedulerLockSynchronization;
+    diagnostics.lockCompletion               = schedulerLockCompletion;
+    diagnostics.lockControl                  = schedulerLockControl;
 }
 
 void FiberScheduler::resetSchedulerDiagnostics()
 {
-    LockGuard guard(*this);
+    LockGuard          guard(*this);
+    InjectionLockGuard injectionGuard(*this);
 
     schedulerLockAcquisitions    = 0;
     schedulerLockContentions     = 0;
@@ -5063,6 +5139,10 @@ void FiberScheduler::resetSchedulerDiagnostics()
     schedulerLockControl         = 0;
     injectionPeak                = injectionReady;
     injectionSpills              = 0;
+    injectionLockAcquisitions    = 0;
+    injectionLockContentions     = 0;
+    injectionLockSpinRetries     = 0;
+    injectionLockPeakSpinRetries = 0;
 }
 
 void FiberScheduler::workerDiagnostics(const FiberWorker& worker, FiberWorkerDiagnostics& diagnostics) const
@@ -5247,8 +5327,9 @@ bool FiberScheduler::tryPushInjectionUnlocked(FiberTask& task)
     return true;
 }
 
-FiberTask* FiberScheduler::popInjectionUnlocked()
+FiberTask* FiberScheduler::popInjection()
 {
+    InjectionLockGuard guard(*this);
     if (injectionReady == 0)
     {
         return nullptr;
@@ -5269,12 +5350,13 @@ FiberTask* FiberScheduler::popInjectionUnlocked()
 
 void FiberScheduler::pushReadyUnlocked(FiberTask& task)
 {
-    if (tryPushInjectionUnlocked(task))
-    {
-        return;
-    }
     if (injectionQueue != nullptr)
     {
+        InjectionLockGuard guard(*this);
+        if (tryPushInjectionUnlocked(task))
+        {
+            return;
+        }
         injectionSpills += 1;
     }
     task.nextReady     = nullptr;
@@ -5377,7 +5459,7 @@ FiberTask* FiberScheduler::popReadyUnlocked()
     FiberTask* task = readyHead;
     if (task == nullptr)
     {
-        return popInjectionUnlocked();
+        return popInjection();
     }
 
     readyHead           = task->nextReady;
@@ -5400,7 +5482,7 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
 
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
     const bool fromReadyList = readyHead != nullptr;
-    FiberTask* task          = fromReadyList ? popReadyUnlocked() : popInjectionUnlocked();
+    FiberTask* task          = fromReadyList ? popReadyUnlocked() : popInjection();
     if (task == nullptr)
     {
         return nullptr;
@@ -5431,7 +5513,7 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
         }
         else
         {
-            retainedTask = popInjectionUnlocked();
+            retainedTask = popInjection();
         }
         if (retainedTask == nullptr)
         {
@@ -6041,6 +6123,8 @@ void FiberScheduler::moveActiveToWorkerUnlocked(FiberTask& task, FiberWorker& wo
     {
         return;
     }
+
+    InjectionLockGuard injectionGuard(*this);
 
     if (task.previousActive != nullptr)
     {

@@ -75,6 +75,8 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - Preserve the two-phase suspension model so a fiber is not made ready again until after it switches to the worker root.
 - Keep logical task state out of OS-thread-local storage because fibers may migrate between worker threads.
 - Keep diagnostics and tracing allocation-free and cheap enough to leave compiled into normal builds.
+- Isolate bounded external injection and its pre-claim active registry from scheduler-global coordination; retain exact
+  capacity and cancellation behavior while measuring the path independently.
 
 ## Explicitly Excluded Targets
 
@@ -115,3 +117,5 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0014 - Use bounded worker idle spinning](fibers-0014-use-bounded-worker-idle-spinning.md)
 - [FIBERS-0015 - Retain task group records until explicit reset](fibers-0015-retain-task-group-records-until-explicit-reset.md)
 - [FIBERS-0016 - Transfer fiber mutex ownership before wake publication](fibers-0016-transfer-fiber-mutex-ownership-before-wake-publication.md)
+- [FIBERS-0017 - Gate external benchmarks behind optional packages](fibers-0017-package-gated-external-benchmarks.md)
+- [FIBERS-0018 - Separate injection control from scheduler coordination](fibers-0018-separate-injection-control-from-scheduler-coordination.md)

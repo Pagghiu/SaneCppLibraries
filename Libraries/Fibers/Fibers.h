@@ -474,13 +474,18 @@ struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
 
 struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
 {
-    size_t readyFibers         = 0;
-    size_t globalReadyFibers   = 0;
-    size_t activeFibers        = 0;
-    size_t injectionCapacity   = 0;
-    size_t injectionReady      = 0;
-    size_t injectionPeak       = 0;
-    size_t injectionSpills     = 0;
+    size_t readyFibers                  = 0;
+    size_t globalReadyFibers            = 0;
+    size_t activeFibers                 = 0;
+    size_t injectionCapacity            = 0;
+    size_t injectionReady               = 0;
+    size_t injectionPeak                = 0;
+    size_t injectionSpills              = 0;
+    size_t injectionLockAcquisitions    = 0;
+    size_t injectionLockContentions     = 0;
+    size_t injectionLockSpinRetries     = 0;
+    size_t injectionLockPeakSpinRetries = 0;
+
     size_t lockAcquisitions    = 0;
     size_t lockContentions     = 0;
     size_t lockSpinRetries     = 0;
@@ -1116,6 +1121,13 @@ struct SC_FIBERS_EXPORT FiberScheduler
     size_t          injectionPeak      = 0;
     size_t          injectionSpills    = 0;
 
+    mutable volatile int32_t injectionLock = 0;
+
+    mutable size_t injectionLockAcquisitions    = 0;
+    mutable size_t injectionLockContentions     = 0;
+    mutable size_t injectionLockSpinRetries     = 0;
+    mutable size_t injectionLockPeakSpinRetries = 0;
+
     FiberWorkerPool* workerPool = nullptr;
 
     volatile size_t readyFibers       = 0;
@@ -1147,20 +1159,24 @@ struct SC_FIBERS_EXPORT FiberScheduler
     };
 
     struct LockGuard;
+    struct InjectionLockGuard;
 
     void lock(LockCategory category) const;
     void unlock() const;
+    void lockInjection() const;
+    void unlockInjection() const;
     void trace(FiberTraceEventType type, FiberTask* task, FiberWorker* worker, size_t value = 0) const;
 
     void                     addUnlocked(FiberCounter& counter);
     Result                   initializeTaskForSpawn(FiberTask& task, FiberStack& stack, FiberTask::Procedure procedure,
                                                     const FiberTaskSpawnOptions& options);
     [[nodiscard]] bool       canPublishOwnerSpawn(FiberWorker& worker, const FiberTaskSpawnOptions& options) const;
+    [[nodiscard]] bool       canPublishInjectionSpawn(const FiberTaskSpawnOptions& options) const;
     void                     linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker);
     Result                   createInjectionQueue(FiberAllocator& allocator, size_t capacity);
     void                     releaseInjectionQueue();
     [[nodiscard]] bool       tryPushInjectionUnlocked(FiberTask& task);
-    [[nodiscard]] FiberTask* popInjectionUnlocked();
+    [[nodiscard]] FiberTask* popInjection();
     void                     notifyReadyWorkUnlocked();
     void                     pushReadyUnlocked(FiberTask& task);
     void                     pushReadyUnlocked(FiberTask& task, FiberWorker* preferredWorker);

@@ -6029,6 +6029,7 @@ struct SC::FibersTest : public SC::TestCase
             return;
         }
 
+        scheduler.resetSchedulerDiagnostics();
         for (size_t taskIndex = 3; taskIndex < 5; ++taskIndex)
         {
             FiberStack stack({stackMemory + taskIndex * 64 * 1024, 64 * 1024});
@@ -6056,6 +6057,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.injectionReady == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+        SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions >= 3);
+        SC_TEST_EXPECT(diagnostics.lockSpawn == 0);
 
         for (size_t workerIndex = 0; workerIndex < NumWorkers; ++workerIndex)
         {
@@ -6070,6 +6073,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.globalReadyFibers == 0);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
+        SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions >= 3);
+        SC_TEST_EXPECT(diagnostics.lockSpawn == 0);
         SC_TEST_EXPECT(not scheduler.hasActiveFibers());
         SC_TEST_EXPECT(allocator.used() == 0);
         SC_TEST_EXPECT(allocator.close());
@@ -6090,6 +6095,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.lockAcquisitions > 0);
         SC_TEST_EXPECT(diagnostics.lockContentions <= diagnostics.lockAcquisitions);
         SC_TEST_EXPECT(diagnostics.lockPeakSpinRetries <= diagnostics.lockSpinRetries);
+        SC_TEST_EXPECT(diagnostics.injectionLockContentions <= diagnostics.injectionLockAcquisitions);
+        SC_TEST_EXPECT(diagnostics.injectionLockPeakSpinRetries <= diagnostics.injectionLockSpinRetries);
         SC_TEST_EXPECT(diagnostics.lockSpawn + diagnostics.lockReady + diagnostics.lockSynchronization +
                            diagnostics.lockCompletion + diagnostics.lockControl ==
                        diagnostics.lockAcquisitions);
@@ -6105,6 +6112,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.lockSynchronization == 0);
         SC_TEST_EXPECT(diagnostics.lockCompletion == 0);
         SC_TEST_EXPECT(diagnostics.lockControl == 1);
+        SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions == 1);
 
         FiberTask  task;
         char       stackMemory[64 * 1024] = {};
