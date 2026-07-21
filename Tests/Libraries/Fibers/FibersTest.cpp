@@ -5186,10 +5186,10 @@ struct SC::FibersTest : public SC::TestCase
 
             FiberWorkerDiagnostics diagnostics;
             scheduler.workerDiagnostics(workers[0], diagnostics);
-            SC_TEST_EXPECT(diagnostics.stealAttempts == 1);
-            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 1);
+            SC_TEST_EXPECT(diagnostics.stealAttempts == 0);
+            SC_TEST_EXPECT(diagnostics.stealVictimProbes == 0);
             SC_TEST_EXPECT(diagnostics.stolenFibers == 0);
-            SC_TEST_EXPECT(diagnostics.failedSteals == 1);
+            SC_TEST_EXPECT(diagnostics.failedSteals == 0);
 
             scheduler.resetWorkerDiagnostics(workers[0]);
             scheduler.workerDiagnostics(workers[0], diagnostics);

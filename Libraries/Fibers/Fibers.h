@@ -1127,7 +1127,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
     volatile size_t injectionPublishing     = 0;
     volatile size_t injectionPeak           = 0;
     size_t          injectionSpills         = 0;
-    size_t          injectionClaimBatchPeak = 0;
+    volatile size_t injectionClaimBatchPeak = 0;
 
     mutable volatile int32_t injectionLock = 0;
 
@@ -1196,6 +1196,7 @@ struct SC_FIBERS_EXPORT FiberScheduler
 
     [[nodiscard]] FiberTask* popReadyUnlocked();
     [[nodiscard]] FiberTask* popReadyBatchUnlocked(FiberWorker& worker);
+    [[nodiscard]] FiberTask* popInjectionBatch(FiberWorker& worker);
     [[nodiscard]] FiberTask* popReadyUnlocked(FiberWorker& worker, Span<FiberWorker> stealWorkers);
     [[nodiscard]] FiberTask* popWorkerReadyUnlocked(FiberWorker& worker);
     [[nodiscard]] FiberTask* stealWorkerReadyUnlocked(FiberWorker& worker);

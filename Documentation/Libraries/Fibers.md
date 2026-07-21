@@ -125,8 +125,10 @@ through a slot-sequenced bounded queue, so producers and workers do not serializ
 remains only around the pre-claim cancellation registry. Fixed allocator budgets should include
 `injectionCapacity * FiberInjectionSlotStorageSize` bytes in addition to worker deque storage and allocator alignment.
 Configured pools with peer workers transfer a bounded injection backlog into local stealable deques in larger batches
-than the latency-sensitive spill path. `injectionClaimBatchPeak` exposes the observed transfer size for tuning and
-regression analysis.
+than the latency-sensitive spill path. Workers claim these slot-sequenced batches without taking the scheduler-global
+ready lock; per-task injection control still transfers cancellation-registry ownership safely. The intrusive spill path
+retains scheduler coordination. `injectionClaimBatchPeak` exposes the observed transfer size for tuning and regression
+analysis.
 
 # Choosing Task and Stack Storage
 

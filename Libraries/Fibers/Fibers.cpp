@@ -4644,7 +4644,20 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
     }
     else if (configuredDequeOwner)
     {
-        task = stealReadyUnlocked(worker, stealWorkers);
+        if (fiberAtomicLoadSize(readyFibers) != 0)
+        {
+            task = stealReadyUnlocked(worker, stealWorkers);
+        }
+        if (task != nullptr)
+        {
+            SC_FIBERS_ASSERT_RELEASE(
+                fiberTaskStatusCompareExchange(task->taskStatus, FiberTaskStatus::Ready, FiberTaskStatus::Running));
+        }
+    }
+
+    if (task == nullptr and configuredDequeOwner and fiberAtomicLoadSize(injectionReady) != 0)
+    {
+        task = popInjectionBatch(worker);
         if (task != nullptr)
         {
             SC_FIBERS_ASSERT_RELEASE(
@@ -4671,7 +4684,10 @@ Result FiberScheduler::runNoWait(FiberWorker& worker, Span<FiberWorker> stealWor
         }
         if (task == nullptr and worker.localDeque != nullptr)
         {
-            task = stealReadyUnlocked(worker, stealWorkers);
+            if (fiberAtomicLoadSize(readyFibers) != 0)
+            {
+                task = stealReadyUnlocked(worker, stealWorkers);
+            }
         }
         if (task == nullptr and worker.localDeque != nullptr)
         {
@@ -5165,7 +5181,7 @@ void FiberScheduler::schedulerDiagnostics(FiberSchedulerDiagnostics& diagnostics
     diagnostics.injectionPublishing          = fiberAtomicLoadSize(injectionPublishing);
     diagnostics.injectionPeak                = fiberAtomicLoadSize(injectionPeak);
     diagnostics.injectionSpills              = injectionSpills;
-    diagnostics.injectionClaimBatchPeak      = injectionClaimBatchPeak;
+    diagnostics.injectionClaimBatchPeak      = fiberAtomicLoadSize(injectionClaimBatchPeak);
     diagnostics.injectionLockAcquisitions    = injectionLockAcquisitions;
     diagnostics.injectionLockContentions     = injectionLockContentions;
     diagnostics.injectionLockSpinRetries     = injectionLockSpinRetries;
@@ -5196,8 +5212,9 @@ void FiberScheduler::resetSchedulerDiagnostics()
     schedulerLockCompletion      = 0;
     schedulerLockControl         = 0;
     fiberAtomicStoreSize(injectionPeak, fiberAtomicLoadSize(injectionReady));
-    injectionSpills              = 0;
-    injectionClaimBatchPeak      = 0;
+    injectionSpills = 0;
+
+    fiberAtomicStoreSize(injectionClaimBatchPeak, 0);
     injectionLockAcquisitions    = 0;
     injectionLockContentions     = 0;
     injectionLockSpinRetries     = 0;
@@ -5638,12 +5655,59 @@ FiberTask* FiberScheduler::popReadyUnlocked()
 
 FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
 {
-    static constexpr size_t SpillBatchCapacity     = 4;
-    static constexpr size_t InjectionBatchCapacity = 16;
+    static constexpr size_t SpillBatchCapacity = 4;
 
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
-    const bool fromReadyList = readyHead != nullptr;
-    FiberTask* task          = fromReadyList ? popReadyUnlocked() : popInjection();
+    if (readyHead == nullptr)
+    {
+        return popInjectionBatch(worker);
+    }
+
+    FiberTask* task = popReadyUnlocked();
+    if (task == nullptr)
+    {
+        return nullptr;
+    }
+
+    const size_t top          = fiberAtomicLoadSize(worker.localDequeTop);
+    const size_t bottom       = fiberAtomicLoadSize(worker.localDequeBottom);
+    const size_t dequeEntries = bottom >= top ? bottom - top : 0;
+    SC_FIBERS_ASSERT_RELEASE(dequeEntries <= worker.localDequeCapacity);
+    size_t availableEntries = worker.localDequeCapacity - dequeEntries;
+    if (availableEntries > SpillBatchCapacity - 1)
+    {
+        availableEntries = SpillBatchCapacity - 1;
+    }
+
+    FiberTask* retainedTasks[SpillBatchCapacity - 1] = {};
+    size_t     numRetainedTasks                      = 0;
+    while (numRetainedTasks < availableEntries and readyHead != nullptr)
+    {
+        FiberTask* retainedTask = popReadyUnlocked();
+        if (retainedTask == nullptr)
+        {
+            break;
+        }
+        retainedTasks[numRetainedTasks++] = retainedTask;
+    }
+
+    // Reverse insertion preserves the source queue's FIFO order when the owner later pops its LIFO deque.
+    for (size_t retainedIndex = numRetainedTasks; retainedIndex > 0; --retainedIndex)
+    {
+        FiberTask& retainedTask = *retainedTasks[retainedIndex - 1];
+        moveActiveToWorkerUnlocked(retainedTask, worker);
+        SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReadyDeque(worker, retainedTask));
+    }
+    return task;
+}
+
+FiberTask* FiberScheduler::popInjectionBatch(FiberWorker& worker)
+{
+    static constexpr size_t InjectionBatchCapacity = 16;
+    static constexpr size_t SingleWorkerCapacity   = 4;
+
+    SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
+    FiberTask* task = popInjection();
     if (task == nullptr)
     {
         return nullptr;
@@ -5655,7 +5719,7 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
     SC_FIBERS_ASSERT_RELEASE(dequeEntries <= worker.localDequeCapacity);
     size_t       availableEntries = worker.localDequeCapacity - dequeEntries;
     const bool   hasPeerWorkers   = workerPool != nullptr and workerPool->workers.sizeInElements() > 1;
-    const size_t batchCapacity    = fromReadyList or not hasPeerWorkers ? SpillBatchCapacity : InjectionBatchCapacity;
+    const size_t batchCapacity    = hasPeerWorkers ? InjectionBatchCapacity : SingleWorkerCapacity;
     if (availableEntries > batchCapacity - 1)
     {
         availableEntries = batchCapacity - 1;
@@ -5665,31 +5729,20 @@ FiberTask* FiberScheduler::popReadyBatchUnlocked(FiberWorker& worker)
     size_t     numRetainedTasks                          = 0;
     while (numRetainedTasks < availableEntries)
     {
-        FiberTask* retainedTask = nullptr;
-        if (fromReadyList)
-        {
-            if (readyHead == nullptr)
-            {
-                break;
-            }
-            retainedTask = popReadyUnlocked();
-        }
-        else
-        {
-            retainedTask = popInjection();
-        }
+        FiberTask* retainedTask = popInjection();
         if (retainedTask == nullptr)
         {
             break;
         }
         retainedTasks[numRetainedTasks++] = retainedTask;
     }
-    if (not fromReadyList and numRetainedTasks + 1 > injectionClaimBatchPeak)
-    {
-        injectionClaimBatchPeak = numRetainedTasks + 1;
-    }
 
-    // Reverse insertion preserves the source queue's FIFO order when the owner later pops its LIFO deque.
+    const size_t claimed = numRetainedTasks + 1;
+    size_t       peak    = fiberAtomicLoadSize(injectionClaimBatchPeak);
+    while (claimed > peak and not fiberAtomicCompareExchangeSize(injectionClaimBatchPeak, peak, claimed)) {}
+
+    moveActiveToWorkerUnlocked(*task, worker);
+    // Reverse insertion preserves FIFO injection order when the owner later pops its LIFO deque.
     for (size_t retainedIndex = numRetainedTasks; retainedIndex > 0; --retainedIndex)
     {
         FiberTask& retainedTask = *retainedTasks[retainedIndex - 1];
@@ -5713,7 +5766,7 @@ FiberTask* FiberScheduler::popReadyUnlocked(FiberWorker& worker, Span<FiberWorke
         return task;
     }
 
-    return stealReadyUnlocked(worker, stealWorkers);
+    return fiberAtomicLoadSize(readyFibers) != 0 ? stealReadyUnlocked(worker, stealWorkers) : nullptr;
 }
 
 FiberTask* FiberScheduler::popWorkerReadyUnlocked(FiberWorker& worker)
