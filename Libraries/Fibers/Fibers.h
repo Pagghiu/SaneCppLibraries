@@ -76,6 +76,8 @@ static constexpr int FiberContextStorageSize = 128;
 static constexpr int FiberContextStorageAlignment = 16;
 static constexpr int FiberStackAlignment          = 16;
 static constexpr int FiberStackMinimumSize        = 4096;
+//! Fixed allocator cost of each configured bounded injection slot.
+static constexpr int FiberInjectionSlotStorageSize = sizeof(void*) + sizeof(size_t);
 
 //! Common requested sizes for virtual fiber stack classes.
 //! Actual usable and committed size is page-rounded by the active platform.
@@ -479,6 +481,7 @@ struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
     size_t activeFibers                 = 0;
     size_t injectionCapacity            = 0;
     size_t injectionReady               = 0;
+    size_t injectionPublishing          = 0;
     size_t injectionPeak                = 0;
     size_t injectionSpills              = 0;
     size_t injectionClaimBatchPeak      = 0;
@@ -1109,17 +1112,20 @@ struct SC_FIBERS_EXPORT FiberScheduler
   private:
     friend struct FiberWorkerPool;
 
+    struct InjectionSlot;
+
     FiberTask* readyHead  = nullptr;
     FiberTask* readyTail  = nullptr;
     FiberTask* activeHead = nullptr;
 
-    FiberTask**     injectionQueue          = nullptr;
+    InjectionSlot*  injectionQueue          = nullptr;
     FiberAllocator* injectionAllocator      = nullptr;
     size_t          injectionCapacity       = 0;
-    size_t          injectionHead           = 0;
-    size_t          injectionTail           = 0;
-    size_t          injectionReady          = 0;
-    size_t          injectionPeak           = 0;
+    volatile size_t injectionHead           = 0;
+    volatile size_t injectionTail           = 0;
+    volatile size_t injectionReady          = 0;
+    volatile size_t injectionPublishing     = 0;
+    volatile size_t injectionPeak           = 0;
     size_t          injectionSpills         = 0;
     size_t          injectionClaimBatchPeak = 0;
 
@@ -1177,6 +1183,9 @@ struct SC_FIBERS_EXPORT FiberScheduler
     void                     linkWorkerActiveForSpawn(FiberTask& task, FiberWorker& worker);
     Result                   createInjectionQueue(FiberAllocator& allocator, size_t capacity);
     void                     releaseInjectionQueue();
+    [[nodiscard]] bool       tryReserveInjection(size_t& position);
+    void                     publishInjection(size_t position, FiberTask* task);
+    void                     discardInjectionTombstones();
     [[nodiscard]] bool       tryPushInjectionUnlocked(FiberTask& task);
     [[nodiscard]] FiberTask* popInjection();
     void                     notifyReadyWorkUnlocked();

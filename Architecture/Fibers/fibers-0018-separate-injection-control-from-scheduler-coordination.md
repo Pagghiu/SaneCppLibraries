@@ -1,6 +1,6 @@
 # FIBERS-0018 - Separate Injection Control From Scheduler Coordination
 
-Status: Accepted
+Status: Superseded in part by FIBERS-0020
 Date: 2026-07-20
 
 ## Context

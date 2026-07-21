@@ -652,8 +652,9 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     FiberWorkerPool   workerPool;
 
     FiberAllocator allocator;
-    static char
-        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
+
+    static char schedulerStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) +
+                                 InjectionCapacity * FiberInjectionSlotStorageSize + 4096] = {};
 
     FiberWorkerPoolOptions workerPoolOptions;
     workerPoolOptions.dequeAllocator         = &allocator;
@@ -916,8 +917,9 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     FiberWorkerPool   workerPool;
 
     FiberAllocator allocator;
-    static char
-        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
+
+    static char schedulerStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) +
+                                 InjectionCapacity * FiberInjectionSlotStorageSize + 4096] = {};
 
     FiberWorkerPoolOptions workerPoolOptions;
     workerPoolOptions.dequeAllocator         = &allocator;
@@ -1009,8 +1011,9 @@ static Result runCounterCompletionBenchmark(Console& console)
     static char      stackMemory[NumTasks * StackSize] = {};
 
     FiberAllocator allocator;
-    static char
-        schedulerStorage[(MaxWorkers * DequeCapacityPerWorker + InjectionCapacity) * sizeof(FiberTask*) + 4096] = {};
+
+    static char schedulerStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberTask*) +
+                                 InjectionCapacity * FiberInjectionSlotStorageSize + 4096] = {};
 
     FiberWorkerPoolOptions workerPoolOptions;
     workerPoolOptions.dequeAllocator         = &allocator;

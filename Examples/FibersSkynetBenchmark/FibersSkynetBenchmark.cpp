@@ -136,10 +136,9 @@ static Result measureFibersSkynet(uint32_t numWorkers, uint32_t maxDepth, uint64
     options.injectionCapacity      = numNodes + 1;
 
     FiberAllocatorVirtualOptions allocatorOptions;
-    allocatorOptions.reserveBytes =
-        static_cast<size_t>(numNodes) * sizeof(FiberTask) * 2 +
-        (static_cast<size_t>(numWorkers) * DequeCapacityPerWorker + numNodes + 1) * sizeof(FiberTask*) +
-        4 * 1024 * 1024;
+    allocatorOptions.reserveBytes = static_cast<size_t>(numNodes) * sizeof(FiberTask) * 2 +
+                                    static_cast<size_t>(numWorkers) * DequeCapacityPerWorker * sizeof(FiberTask*) +
+                                    static_cast<size_t>(numNodes + 1) * FiberInjectionSlotStorageSize + 4 * 1024 * 1024;
     allocatorOptions.initialCommitBytes = 64 * 1024;
 
     Result benchmarkResult = allocator.createVirtual(allocatorOptions);

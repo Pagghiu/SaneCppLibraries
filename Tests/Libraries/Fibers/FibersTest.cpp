@@ -194,6 +194,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             workerPoolConcurrentExternalStress();
         }
+        if (test_section("worker pool duplicate external spawn"))
+        {
+            workerPoolDuplicateExternalSpawn();
+        }
         if (test_section("worker pool mixed transition stress"))
         {
             workerPoolMixedTransitionStress();
@@ -4328,6 +4332,106 @@ struct SC::FibersTest : public SC::TestCase
         }
     }
 
+    void workerPoolDuplicateExternalSpawn()
+    {
+        static constexpr size_t StackSize = FiberStackSize::ThirtyTwoKiB;
+
+        struct State
+        {
+            Semaphore       entered;
+            Semaphore       release;
+            Atomic<int32_t> completed;
+        };
+
+        struct Producer
+        {
+            FiberScheduler* scheduler   = nullptr;
+            FiberTask*      task        = nullptr;
+            char*           stackMemory = nullptr;
+            Barrier*        start       = nullptr;
+            State*          state       = nullptr;
+            Result          result      = Result(true);
+        };
+
+        FiberScheduler    scheduler;
+        FiberAllocator    allocator;
+        char              allocatorStorage[4096] = {};
+        FiberTask         anchor;
+        char              anchorStackMemory[StackSize] = {};
+        FiberTask         task;
+        char              taskStackMemory[StackSize] = {};
+        FiberCounter      anchorGate;
+        FiberWorker       worker;
+        FiberWorkerThread workerThread;
+        FiberWorkerPool   workerPool;
+        Thread            producerThreads[2];
+        Producer          producers[2];
+        Barrier           producerStart(3);
+        State             state;
+
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        FiberWorkerPoolOptions options;
+        options.dequeAllocator         = &allocator;
+        options.dequeCapacityPerWorker = 2;
+        options.injectionAllocator     = &allocator;
+        options.injectionCapacity      = 2;
+
+        scheduler.add(anchorGate);
+        FiberStack anchorStack({anchorStackMemory, sizeof(anchorStackMemory)});
+        SC_TEST_EXPECT(scheduler.spawn(anchor, anchorStack,
+                                       FiberTask::Procedure([&anchorGate](FiberScheduler& currentScheduler)
+                                                            { return currentScheduler.wait(anchorGate); })));
+        SC_TEST_EXPECT(workerPool.start(scheduler, {&worker, 1}, {&workerThread, 1}, options));
+
+        for (Producer& producer : producers)
+        {
+            producer.scheduler   = &scheduler;
+            producer.task        = &task;
+            producer.stackMemory = taskStackMemory;
+            producer.start       = &producerStart;
+            producer.state       = &state;
+            SC_TEST_EXPECT(producerThreads[&producer - producers].start(
+                [&producer](Thread&)
+                {
+                    producer.start->wait();
+                    FiberStack stack({producer.stackMemory, StackSize});
+                    producer.result =
+                        producer.scheduler->spawn(*producer.task, stack,
+                                                  FiberTask::Procedure(
+                                                      [state = producer.state](FiberScheduler&)
+                                                      {
+                                                          state->entered.release();
+                                                          state->release.acquire();
+                                                          state->completed.fetch_add(1, memory_order_relaxed);
+                                                          return Result(true);
+                                                      }));
+                }));
+        }
+
+        producerStart.wait();
+        for (Thread& producerThread : producerThreads)
+        {
+            SC_TEST_EXPECT(producerThread.join());
+        }
+        const size_t successfulSpawns = (producers[0].result ? 1u : 0u) + (producers[1].result ? 1u : 0u);
+        SC_TEST_EXPECT(successfulSpawns == 1);
+
+        state.entered.acquire();
+        state.release.release();
+        SC_TEST_EXPECT(scheduler.done(anchorGate));
+        SC_TEST_EXPECT(workerPool.join());
+
+        FiberSchedulerDiagnostics diagnostics;
+        scheduler.schedulerDiagnostics(diagnostics);
+        SC_TEST_EXPECT(state.completed.load(memory_order_relaxed) == 1);
+        SC_TEST_EXPECT(task.result());
+        SC_TEST_EXPECT(anchor.result());
+        SC_TEST_EXPECT(diagnostics.injectionPublishing == 0);
+        SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(allocator.close());
+    }
+
     void workerPoolMixedTransitionStress()
     {
         static constexpr size_t NumWorkers    = 4;
@@ -6030,6 +6134,16 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         scheduler.resetSchedulerDiagnostics();
+        FiberStack invalidStack({});
+        Result     invalidSpawn =
+            scheduler.spawn(tasks[3], invalidStack, FiberTask::Procedure([](FiberScheduler&) { return Result(true); }));
+        SC_TEST_EXPECT(not invalidSpawn);
+        SC_TEST_EXPECT(tasks[3].status() == FiberTaskStatus::Invalid);
+        FiberSchedulerDiagnostics failedInitializationDiagnostics;
+        scheduler.schedulerDiagnostics(failedInitializationDiagnostics);
+        SC_TEST_EXPECT(failedInitializationDiagnostics.injectionReady == 0);
+        SC_TEST_EXPECT(failedInitializationDiagnostics.injectionPublishing == 0);
+
         for (size_t taskIndex = 3; taskIndex < 5; ++taskIndex)
         {
             FiberStack stack({stackMemory + taskIndex * 64 * 1024, 64 * 1024});
@@ -6055,6 +6169,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.activeFibers == 5);
         SC_TEST_EXPECT(diagnostics.injectionCapacity == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionReady == InjectionCapacity);
+        SC_TEST_EXPECT(diagnostics.injectionPublishing == 0);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
         SC_TEST_EXPECT(diagnostics.injectionClaimBatchPeak == 0);
@@ -6071,6 +6186,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(state.completed.load() == 3);
         SC_TEST_EXPECT(diagnostics.injectionCapacity == 0);
         SC_TEST_EXPECT(diagnostics.injectionReady == 0);
+        SC_TEST_EXPECT(diagnostics.injectionPublishing == 0);
         SC_TEST_EXPECT(diagnostics.globalReadyFibers == 0);
         SC_TEST_EXPECT(diagnostics.injectionPeak == InjectionCapacity);
         SC_TEST_EXPECT(diagnostics.injectionSpills == 1);
@@ -6116,6 +6232,7 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(diagnostics.lockCompletion == 0);
         SC_TEST_EXPECT(diagnostics.lockControl == 1);
         SC_TEST_EXPECT(diagnostics.injectionLockAcquisitions == 1);
+        SC_TEST_EXPECT(diagnostics.injectionPublishing == 0);
 
         FiberTask  task;
         char       stackMemory[64 * 1024] = {};
