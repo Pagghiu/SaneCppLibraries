@@ -511,15 +511,20 @@ struct MicroTaskBenchmarkState
     Atomic<int32_t> checksum;
     Atomic<bool>    producerDone;
     int             workIterations = 0;
-    Result          producerResult = Result(true);
 };
 
 struct MicroTaskExternalProducerState
 {
     FiberScheduler*          scheduler      = nullptr;
-    FiberTaskPool*           taskPool       = nullptr;
     MicroTaskBenchmarkState* benchmarkState = nullptr;
     FiberEvent*              producerDone   = nullptr;
+    Atomic<int32_t>*         producersLeft  = nullptr;
+    Semaphore*               startGate      = nullptr;
+    FiberTask*               tasks          = nullptr;
+    char*                    stackMemory    = nullptr;
+    size_t                   numJobs        = 0;
+    size_t                   stackSize      = 0;
+    Result                   producerResult = Result(true);
 };
 
 static Result runCpuPayload(MicroTaskBenchmarkState& state, int workIterations)
@@ -544,11 +549,23 @@ static Result spawnMicroTaskJob(FiberTaskPool& pool, FiberScheduler& scheduler, 
     return Result(true);
 }
 
-static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode, size_t numWorkers, size_t numJobs,
-                                    int workIterations, size_t configuredInjectionCapacity,
-                                    const Time::HighResolutionCounter& elapsed, const FiberScheduler& scheduler,
-                                    Span<FiberWorker> workers, const FiberAllocatorStatistics& allocatorStatistics,
-                                    const MicroTaskBenchmarkState& state)
+static Result spawnExternalMicroTaskJob(FiberTask& task, Span<char> stackMemory, FiberScheduler& scheduler,
+                                        MicroTaskBenchmarkState& state, int workIterations)
+{
+    FiberStack stack(stackMemory);
+    SC_TRY(scheduler.spawn(task, stack,
+                           FiberTask::Procedure([&state, workIterations](FiberScheduler&)
+                                                { return runCpuPayload(state, workIterations); })));
+    state.submitted.fetch_add(1, memory_order_relaxed);
+    return Result(true);
+}
+
+static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode, size_t numWorkers,
+                                    size_t numExternalProducers, size_t numJobs, int workIterations,
+                                    size_t configuredInjectionCapacity, const Time::HighResolutionCounter& elapsed,
+                                    const FiberScheduler& scheduler, Span<FiberWorker> workers,
+                                    const FiberAllocatorStatistics& allocatorStatistics,
+                                    const MicroTaskBenchmarkState&  state)
 {
     const int64_t elapsedNs  = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
     const int64_t elapsedMs  = elapsed.toMilliseconds().ms;
@@ -561,8 +578,8 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
     FiberSchedulerDiagnostics schedulerDiagnostics;
     scheduler.schedulerDiagnostics(schedulerDiagnostics);
 
-    console.print("FibersBenchmark micro-tasking: mode={} workers={} jobs={}\n", microTaskProducerModeName(mode),
-                  numWorkers, numJobs);
+    console.print("FibersBenchmark micro-tasking: mode={} workers={} externalProducers={} jobs={}\n",
+                  microTaskProducerModeName(mode), numWorkers, numExternalProducers, numJobs);
     console.print("  workIterations={} elapsedMs={} elapsedNs={}\n", static_cast<size_t>(workIterations),
                   static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs));
     console.print("  submitted={} completed={} jobsPerSec={} checksum={}\n",
@@ -616,15 +633,18 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
 }
 
 static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode mode, size_t numWorkers,
-                                        int workIterations)
+                                        size_t numExternalProducers, int workIterations)
 {
     static constexpr size_t MaxWorkers             = 16;
+    static constexpr size_t MaxExternalProducers   = 8;
     static constexpr size_t NumJobs                = 8192;
     static constexpr size_t InFiberPoolCapacity    = 256;
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
     static constexpr size_t InjectionCapacity      = NumJobs + 1;
     SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "Invalid micro-task worker count");
+    SC_TRY_MSG(numExternalProducers > 0 and numExternalProducers <= MaxExternalProducers,
+               "Invalid micro-task external producer count");
 
     FiberScheduler    scheduler;
     FiberWorker       workers[MaxWorkers];
@@ -711,37 +731,92 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
                                                         { return producerDone.wait(scheduler); })));
             SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, workerPoolOptions));
 
-            Thread producerThread;
+            Thread          producerThreads[MaxExternalProducers];
+            Atomic<int32_t> producersLeft(static_cast<int32_t>(numExternalProducers));
+            Semaphore       producerStartGate;
             start.snap();
-            MicroTaskExternalProducerState producerState;
-            producerState.scheduler      = &scheduler;
-            producerState.taskPool       = &taskPool;
-            producerState.benchmarkState = &state;
-            producerState.producerDone   = &producerDone;
-            SC_TRY(producerThread.start(
-                [&producerState](Thread&)
-                {
-                    for (size_t idx = 0; idx < NumJobs; ++idx)
+            MicroTaskExternalProducerState producerStates[MaxExternalProducers];
+            size_t                         firstJob            = 0;
+            size_t                         numStartedProducers = 0;
+            Result                         producerStartResult = Result(true);
+            for (size_t producerIndex = 0; producerIndex < numExternalProducers; ++producerIndex)
+            {
+                const size_t numProducerJobs =
+                    NumJobs / numExternalProducers + (producerIndex < NumJobs % numExternalProducers ? 1 : 0);
+                MicroTaskExternalProducerState& producerState = producerStates[producerIndex];
+                producerState.scheduler                       = &scheduler;
+                producerState.benchmarkState                  = &state;
+                producerState.producerDone                    = &producerDone;
+                producerState.producersLeft                   = &producersLeft;
+                producerState.startGate                       = &producerStartGate;
+                producerState.tasks                           = tasks + firstJob;
+                producerState.stackMemory                     = stackMemory + firstJob * StackSize;
+                producerState.numJobs                         = numProducerJobs;
+                producerState.stackSize                       = StackSize;
+                firstJob += numProducerJobs;
+
+                Result startResult = producerThreads[producerIndex].start(
+                    [&producerState](Thread&)
                     {
-                        Result result = spawnMicroTaskJob(*producerState.taskPool, *producerState.scheduler,
-                                                          *producerState.benchmarkState,
-                                                          producerState.benchmarkState->workIterations);
-                        if (not result)
+                        producerState.startGate->acquire();
+                        for (size_t idx = 0; idx < producerState.numJobs; ++idx)
                         {
-                            producerState.benchmarkState->producerResult = result;
-                            break;
+                            Result result = spawnExternalMicroTaskJob(
+                                producerState.tasks[idx],
+                                {producerState.stackMemory + idx * producerState.stackSize, producerState.stackSize},
+                                *producerState.scheduler, *producerState.benchmarkState,
+                                producerState.benchmarkState->workIterations);
+                            if (not result)
+                            {
+                                producerState.producerResult = result;
+                                break;
+                            }
                         }
-                    }
-                    producerState.benchmarkState->producerDone.store(true, memory_order_release);
-                    Result signalResult = producerState.producerDone->signal(*producerState.scheduler);
-                    if (producerState.benchmarkState->producerResult and not signalResult)
-                    {
-                        producerState.benchmarkState->producerResult = signalResult;
-                    }
-                }));
-            SC_TRY(producerThread.join());
-            SC_TRY(state.producerResult);
+                        if (producerState.producersLeft->fetch_sub(1, memory_order_acq_rel) == 1)
+                        {
+                            producerState.benchmarkState->producerDone.store(true, memory_order_release);
+                            Result signalResult = producerState.producerDone->signal(*producerState.scheduler);
+                            if (producerState.producerResult and not signalResult)
+                            {
+                                producerState.producerResult = signalResult;
+                            }
+                        }
+                    });
+                if (not startResult)
+                {
+                    producerStartResult = startResult;
+                    break;
+                }
+                numStartedProducers += 1;
+            }
+            producersLeft.store(static_cast<int32_t>(numStartedProducers), memory_order_release);
+            if (numStartedProducers == 0)
+            {
+                SC_TRY(producerDone.signal(scheduler));
+            }
+            for (size_t producerIndex = 0; producerIndex < numStartedProducers; ++producerIndex)
+            {
+                producerStartGate.release();
+            }
+            Result producerJoinResult = Result(true);
+            Result producerRunResult  = Result(true);
+            for (size_t producerIndex = 0; producerIndex < numStartedProducers; ++producerIndex)
+            {
+                Result joinResult = producerThreads[producerIndex].join();
+                if (producerJoinResult and not joinResult)
+                {
+                    producerJoinResult = joinResult;
+                }
+                if (producerRunResult and not producerStates[producerIndex].producerResult)
+                {
+                    producerRunResult = producerStates[producerIndex].producerResult;
+                }
+            }
             SC_TRY(workerPool.join());
+            SC_TRY(producerJoinResult);
+            SC_TRY(producerRunResult);
+            SC_TRY(producerStartResult);
+            SC_TRY_MSG(firstJob == NumJobs, "Micro-task producer ranges did not cover all jobs");
             finish.snap();
         }
     }
@@ -754,12 +829,12 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
     SC_TRY(allocator.close());
 
-    return printMicroTaskMetrics(console, mode, numWorkers, NumJobs, workIterations, InjectionCapacity,
-                                 finish.subtractExact(start), scheduler, {workers, numWorkers}, allocatorStatistics,
-                                 state);
+    return printMicroTaskMetrics(console, mode, numWorkers, numExternalProducers, NumJobs, workIterations,
+                                 InjectionCapacity, finish.subtractExact(start), scheduler, {workers, numWorkers},
+                                 allocatorStatistics, state);
 }
 
-static Result runMicroTaskBenchmarks(Console& console)
+static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers)
 {
     static constexpr size_t MaxBenchmarkCounts = 5;
     static constexpr size_t MaxWorkers         = 16;
@@ -796,7 +871,9 @@ static Result runMicroTaskBenchmarks(Console& console)
     {
         for (size_t idx = 0; idx < numWorkerCounts; ++idx)
         {
-            SC_TRY(runMicroTaskBenchmarkCase(console, mode, workerCountsStorage[idx], TinyWorkIterations));
+            const size_t producers =
+                mode == MicroTaskProducerMode::ExternalWhileWorkersRunning ? numExternalProducers : 1;
+            SC_TRY(runMicroTaskBenchmarkCase(console, mode, workerCountsStorage[idx], producers, TinyWorkIterations));
         }
     }
 
@@ -804,7 +881,7 @@ static Result runMicroTaskBenchmarks(Console& console)
     for (size_t idx = 0; idx < numWorkerCounts; ++idx)
     {
         SC_TRY(runMicroTaskBenchmarkCase(console, MicroTaskProducerMode::ExternalBeforeWorkers,
-                                         workerCountsStorage[idx], CpuWorkIterations));
+                                         workerCountsStorage[idx], 1, CpuWorkIterations));
     }
     return Result(true);
 }
@@ -894,9 +971,9 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
 
     console.print("FibersBenchmark sustained micro-tasking\n");
     console.print("  poolCapacity={} dequeCapacityPerWorker={}\n", PoolCapacity, DequeCapacityPerWorker);
-    return printMicroTaskMetrics(console, MicroTaskProducerMode::InFiberProducer, numWorkers, NumJobs, WorkIterations,
-                                 InjectionCapacity, finish.subtractExact(start), scheduler, {workers, numWorkers},
-                                 allocatorStatistics, state);
+    return printMicroTaskMetrics(console, MicroTaskProducerMode::InFiberProducer, numWorkers, 1, NumJobs,
+                                 WorkIterations, InjectionCapacity, finish.subtractExact(start), scheduler,
+                                 {workers, numWorkers}, allocatorStatistics, state);
 }
 
 static Result runCounterCompletionBenchmark(Console& console)
@@ -1002,8 +1079,9 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
 
     bool    schedulerThroughput = false;
     int32_t massSuspensionCount = 0;
+    int32_t externalProducers   = 1;
 
-    CommandLineOption options[2];
+    CommandLineOption options[3];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1012,6 +1090,11 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[1].help      = "Run one mass-suspension workload with the requested live fiber count";
     options[1].valueName = "COUNT";
     options[1].value     = CommandLineValue::int32(massSuspensionCount);
+
+    options[2].longName  = "external-producers";
+    options[2].help      = "Use concurrent external producers in scheduler throughput workloads";
+    options[2].valueName = "COUNT";
+    options[2].value     = CommandLineValue::int32(externalProducers);
 
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
@@ -1040,6 +1123,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         return Result::Error("--scheduler-throughput and --mass-suspension are mutually exclusive");
     }
+    if (externalProducers <= 0 or externalProducers > 8)
+    {
+        return Result::Error("External producer count must be between one and eight");
+    }
     if (massSuspensionCount < 0 or
         (not schedulerThroughput and arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
     {
@@ -1053,7 +1140,7 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         SC_TRY(runWorkerPoolBenchmark(console));
         SC_TRY(runForcedStealingBenchmark(console));
-        SC_TRY(runMicroTaskBenchmarks(console));
+        SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers)));
         SC_TRY(runCounterCompletionBenchmark(console));
         return runSustainedMicroTaskBenchmark(console);
     }
@@ -1063,7 +1150,7 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     SC_TRY(runMassSuspensionBenchmark(console, 10'000));
     SC_TRY(runMassSuspensionBenchmark(console, 100'000));
     SC_TRY(runFiberAsyncHighWaterBenchmark(console));
-    SC_TRY(runMicroTaskBenchmarks(console));
+    SC_TRY(runMicroTaskBenchmarks(console, static_cast<size_t>(externalProducers)));
     SC_TRY(runCounterCompletionBenchmark(console));
     SC_TRY(runSustainedMicroTaskBenchmark(console));
     return Result(true);
