@@ -3538,6 +3538,12 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(workerPool.start(scheduler, {workers, NumWorkers}, {threads, NumWorkers}));
             SC_TEST_EXPECT(workerPool.join());
             SC_TEST_EXPECT(not scheduler.hasActiveFibers());
+
+            FiberWorkerPoolWakeDiagnostics wakeDiagnostics;
+            workerPool.wakeDiagnostics(wakeDiagnostics);
+            SC_TEST_EXPECT(wakeDiagnostics.wakeNotifications == NumTasks * NumYields + 1);
+            SC_TEST_EXPECT(wakeDiagnostics.wakeSignals <= NumTasks * NumYields);
+
             SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>((wave + 1) * NumTasks));
             for (size_t idx = 0; idx < NumTasks; ++idx)
             {

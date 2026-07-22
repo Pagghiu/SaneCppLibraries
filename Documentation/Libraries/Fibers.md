@@ -266,6 +266,12 @@ currently active tasks and drives them back to completion. Calling it again with
 may be spawned afterward. A worker pool has a separate lifecycle: `requestStop()` wakes its workers and `join()` must
 finish before worker, thread, deque, or injection storage is reused or destroyed.
 
+Normal ready publication logically requests one worker wake. The pool coalesces redundant operating-system signals
+while an earlier signal is still pending, but always advances its wake generation so publication racing with parking
+cannot be lost. Shutdown and the transition to no active fibers remain wake-all operations. Use
+`FiberWorkerPool::wakeDiagnostics()` to compare logical `wakeNotifications` with the individual `wakeSignals` that
+remain after coalescing; broadcasts are included only in `wakeNotifications`.
+
 # Allocation Policy
 
 `Fibers` follows the Sane C++ allocation rules:

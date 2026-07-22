@@ -563,9 +563,9 @@ static Result spawnExternalMicroTaskJob(FiberTask& task, Span<char> stackMemory,
 static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode, size_t numWorkers,
                                     size_t numExternalProducers, size_t numJobs, int workIterations,
                                     size_t configuredInjectionCapacity, const Time::HighResolutionCounter& elapsed,
-                                    const FiberScheduler& scheduler, Span<FiberWorker> workers,
-                                    const FiberAllocatorStatistics& allocatorStatistics,
-                                    const MicroTaskBenchmarkState&  state)
+                                    const FiberScheduler& scheduler, const FiberWorkerPool& workerPool,
+                                    Span<FiberWorker> workers, const FiberAllocatorStatistics& allocatorStatistics,
+                                    const MicroTaskBenchmarkState& state)
 {
     const int64_t elapsedNs  = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
     const int64_t elapsedMs  = elapsed.toMilliseconds().ms;
@@ -577,6 +577,9 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
 
     FiberSchedulerDiagnostics schedulerDiagnostics;
     scheduler.schedulerDiagnostics(schedulerDiagnostics);
+
+    FiberWorkerPoolWakeDiagnostics wakeDiagnostics;
+    workerPool.wakeDiagnostics(wakeDiagnostics);
 
     console.print("FibersBenchmark micro-tasking: mode={} workers={} externalProducers={} jobs={}\n",
                   microTaskProducerModeName(mode), numWorkers, numExternalProducers, numJobs);
@@ -614,6 +617,8 @@ static Result printMicroTaskMetrics(Console& console, MicroTaskProducerMode mode
                   schedulerDiagnostics.injectionLockSpinRetries);
     console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
                   allocatorStatistics.numAllocationFailures);
+    console.print("  wakeNotifications={} wakeSignals={}\n", wakeDiagnostics.wakeNotifications,
+                  wakeDiagnostics.wakeSignals);
     for (size_t workerIndex = 0; workerIndex < workers.sizeInElements(); ++workerIndex)
     {
         FiberWorkerDiagnostics workerDiagnostics;
@@ -831,8 +836,8 @@ static Result runMicroTaskBenchmarkCase(Console& console, MicroTaskProducerMode 
     SC_TRY(allocator.close());
 
     return printMicroTaskMetrics(console, mode, numWorkers, numExternalProducers, NumJobs, workIterations,
-                                 InjectionCapacity, finish.subtractExact(start), scheduler, {workers, numWorkers},
-                                 allocatorStatistics, state);
+                                 InjectionCapacity, finish.subtractExact(start), scheduler, workerPool,
+                                 {workers, numWorkers}, allocatorStatistics, state);
 }
 
 static Result runMicroTaskBenchmarks(Console& console, size_t numExternalProducers)
@@ -974,7 +979,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     console.print("FibersBenchmark sustained micro-tasking\n");
     console.print("  poolCapacity={} dequeCapacityPerWorker={}\n", PoolCapacity, DequeCapacityPerWorker);
     return printMicroTaskMetrics(console, MicroTaskProducerMode::InFiberProducer, numWorkers, 1, NumJobs,
-                                 WorkIterations, InjectionCapacity, finish.subtractExact(start), scheduler,
+                                 WorkIterations, InjectionCapacity, finish.subtractExact(start), scheduler, workerPool,
                                  {workers, numWorkers}, allocatorStatistics, state);
 }
 

@@ -474,6 +474,14 @@ struct SC_FIBERS_EXPORT FiberWorkerDiagnostics
     size_t waitingFibers      = 0;
 };
 
+struct SC_FIBERS_EXPORT FiberWorkerPoolWakeDiagnostics
+{
+    //! Normal ready publications plus terminal/shutdown broadcasts since the latest valid start attempt.
+    size_t wakeNotifications = 0;
+    //! Individual operating-system wake signals issued after coalescing; broadcasts are not included.
+    size_t wakeSignals = 0;
+};
+
 struct SC_FIBERS_EXPORT FiberSchedulerDiagnostics
 {
     size_t readyFibers                  = 0;
@@ -546,6 +554,8 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
     [[nodiscard]] size_t workerCount() const;
     //! Workers currently blocked in the pool wake wait.
     [[nodiscard]] size_t parkedWorkerCount() const;
+    //! Returns wake diagnostics for the current or most recently joined run.
+    void wakeDiagnostics(FiberWorkerPoolWakeDiagnostics& outDiagnostics) const;
 
     struct WakeEventDefinition
     {
@@ -577,6 +587,7 @@ struct SC_FIBERS_EXPORT FiberWorkerPool
 
     void                   wakeOneWorker();
     void                   wakeAllWorkers();
+    void                   resetWakeDiagnostics();
     [[nodiscard]] bool     waitForWork(uint32_t observedGeneration);
     [[nodiscard]] uint32_t wakeGeneration() const;
 

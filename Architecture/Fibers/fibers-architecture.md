@@ -120,3 +120,6 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0017 - Gate external benchmarks behind optional packages](fibers-0017-package-gated-external-benchmarks.md)
 - [FIBERS-0018 - Separate injection control from scheduler coordination](fibers-0018-separate-injection-control-from-scheduler-coordination.md)
 - [FIBERS-0019 - Use backlog-aware injection claim batches](fibers-0019-use-backlog-aware-injection-claim-batches.md)
+- [FIBERS-0020 - Use slot-sequenced bounded injection](fibers-0020-use-slot-sequenced-bounded-injection.md)
+- [FIBERS-0021 - Claim injection batches without scheduler coordination](fibers-0021-claim-injection-batches-without-scheduler-coordination.md)
+- [FIBERS-0022 - Coalesce redundant worker wake signals](fibers-0022-coalesce-redundant-worker-wake-signals.md)

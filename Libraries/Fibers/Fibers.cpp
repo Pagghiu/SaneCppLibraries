@@ -1213,8 +1213,10 @@ struct FiberWorkerPoolWakeEvent
 #if SC_PLATFORM_WINDOWS
     mutable CRITICAL_SECTION mutex;
     CONDITION_VARIABLE       condition;
-    uint32_t                 generation = 0;
-    uint32_t                 parked     = 0;
+    uint32_t                 generation     = 0;
+    uint32_t                 parked         = 0;
+    uint32_t                 pendingSignals = 0;
+    uint32_t                 wakeSignals    = 0;
 
     FiberWorkerPoolWakeEvent()
     {
@@ -1228,7 +1230,12 @@ struct FiberWorkerPoolWakeEvent
     {
         ::EnterCriticalSection(&mutex);
         generation += 1;
-        ::WakeConditionVariable(&condition);
+        if (pendingSignals < parked)
+        {
+            pendingSignals += 1;
+            wakeSignals += 1;
+            ::WakeConditionVariable(&condition);
+        }
         ::LeaveCriticalSection(&mutex);
     }
 
@@ -1236,6 +1243,7 @@ struct FiberWorkerPoolWakeEvent
     {
         ::EnterCriticalSection(&mutex);
         generation += 1;
+        pendingSignals = parked;
         ::WakeAllConditionVariable(&condition);
         ::LeaveCriticalSection(&mutex);
     }
@@ -1251,14 +1259,20 @@ struct FiberWorkerPoolWakeEvent
             ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
             parked -= 1;
         }
+        if (waited and pendingSignals > 0)
+        {
+            pendingSignals -= 1;
+        }
         ::LeaveCriticalSection(&mutex);
         return waited;
     }
 #else
     mutable pthread_mutex_t mutex;
     pthread_cond_t          condition;
-    uint32_t                generation = 0;
-    uint32_t                parked     = 0;
+    uint32_t                generation     = 0;
+    uint32_t                parked         = 0;
+    uint32_t                pendingSignals = 0;
+    uint32_t                wakeSignals    = 0;
 
     FiberWorkerPoolWakeEvent()
     {
@@ -1276,7 +1290,12 @@ struct FiberWorkerPoolWakeEvent
     {
         ::pthread_mutex_lock(&mutex);
         generation += 1;
-        ::pthread_cond_signal(&condition);
+        if (pendingSignals < parked)
+        {
+            pendingSignals += 1;
+            wakeSignals += 1;
+            ::pthread_cond_signal(&condition);
+        }
         ::pthread_mutex_unlock(&mutex);
     }
 
@@ -1284,6 +1303,7 @@ struct FiberWorkerPoolWakeEvent
     {
         ::pthread_mutex_lock(&mutex);
         generation += 1;
+        pendingSignals = parked;
         ::pthread_cond_broadcast(&condition);
         ::pthread_mutex_unlock(&mutex);
     }
@@ -1299,6 +1319,10 @@ struct FiberWorkerPoolWakeEvent
             const int res = ::pthread_cond_wait(&condition, &mutex);
             parked -= 1;
             (void)res;
+        }
+        if (waited and pendingSignals > 0)
+        {
+            pendingSignals -= 1;
         }
         ::pthread_mutex_unlock(&mutex);
         return waited;
@@ -1332,6 +1356,40 @@ struct FiberWorkerPoolWakeEvent
         const uint32_t current = parked;
         ::pthread_mutex_unlock(&mutex);
         return current;
+#endif
+    }
+
+    void getDiagnostics(FiberWorkerPoolWakeDiagnostics& outDiagnostics) const
+    {
+#if SC_PLATFORM_WINDOWS
+        ::EnterCriticalSection(&mutex);
+#else
+        ::pthread_mutex_lock(&mutex);
+#endif
+        outDiagnostics.wakeNotifications = generation;
+        outDiagnostics.wakeSignals       = wakeSignals;
+#if SC_PLATFORM_WINDOWS
+        ::LeaveCriticalSection(&mutex);
+#else
+        ::pthread_mutex_unlock(&mutex);
+#endif
+    }
+
+    void resetDiagnostics()
+    {
+#if SC_PLATFORM_WINDOWS
+        ::EnterCriticalSection(&mutex);
+#else
+        ::pthread_mutex_lock(&mutex);
+#endif
+        SC_FIBERS_ASSERT_RELEASE(parked == 0 and pendingSignals == 0);
+        generation     = 0;
+        pendingSignals = 0;
+        wakeSignals    = 0;
+#if SC_PLATFORM_WINDOWS
+        ::LeaveCriticalSection(&mutex);
+#else
+        ::pthread_mutex_unlock(&mutex);
 #endif
     }
 };
@@ -1637,6 +1695,8 @@ Result FiberWorkerPool::start(FiberScheduler& scheduler, Span<FiberWorker> worke
     }
 #endif
 
+    resetWakeDiagnostics();
+
     bool createdDeques = false;
     if (options.dequeAllocator != nullptr)
     {
@@ -1811,9 +1871,16 @@ size_t FiberWorkerPool::workerCount() const { return workers.sizeInElements(); }
 
 size_t FiberWorkerPool::parkedWorkerCount() const { return wakeEvent.get().parkedCount(); }
 
+void FiberWorkerPool::wakeDiagnostics(FiberWorkerPoolWakeDiagnostics& outDiagnostics) const
+{
+    wakeEvent.get().getDiagnostics(outDiagnostics);
+}
+
 void FiberWorkerPool::wakeOneWorker() { wakeEvent.get().notifyOne(); }
 
 void FiberWorkerPool::wakeAllWorkers() { wakeEvent.get().notifyAll(); }
+
+void FiberWorkerPool::resetWakeDiagnostics() { wakeEvent.get().resetDiagnostics(); }
 
 bool FiberWorkerPool::waitForWork(uint32_t observedGeneration) { return wakeEvent.get().wait(observedGeneration); }
 
