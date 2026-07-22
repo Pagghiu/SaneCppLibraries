@@ -288,6 +288,14 @@ static Result runForcedStealingBenchmark(Console& console)
     SC_TRY_MSG(state.completed.load(memory_order_relaxed) == static_cast<int32_t>(NumTasks),
                "Forced-steal benchmark did not complete every task");
     SC_TRY_MSG(diagnostics.stolenFibers > 0, "Forced-steal benchmark did not steal work");
+    size_t peerExecutions = 0;
+    for (size_t workerIndex = 1; workerIndex < NumWorkers; ++workerIndex)
+    {
+        FiberWorkerDiagnostics workerDiagnostics;
+        scheduler.workerDiagnostics(workers[workerIndex], workerDiagnostics);
+        peerExecutions += workerDiagnostics.executedFibers;
+    }
+    SC_TRY_MSG(peerExecutions > 0, "Forced-steal benchmark did not execute work on a peer worker");
     SC_TRY_MSG(taskPool.availableCount() == NumTasks, "Forced-steal benchmark task pool did not fully recycle");
     SC_TRY_MSG(not scheduler.hasActiveFibers(), "Forced-steal benchmark left active fibers");
 
@@ -303,6 +311,7 @@ static Result runForcedStealingBenchmark(Console& console)
                   static_cast<size_t>(elapsedMs), static_cast<size_t>(elapsedNs), static_cast<size_t>(tasksPerSec),
                   static_cast<size_t>(state.completed.load(memory_order_relaxed)),
                   static_cast<size_t>(state.checksum.load(memory_order_relaxed)));
+    console.print("  peerExecutions={}\n", peerExecutions);
     console.print("  stealAttempts={} stealVictimProbes={} stolenFibers={} stolenBatches={} stolenBatchPeak={} "
                   "failedSteals={} queuePeak={} spilled={}\n",
                   diagnostics.stealAttempts, diagnostics.stealVictimProbes, diagnostics.stolenFibers,
