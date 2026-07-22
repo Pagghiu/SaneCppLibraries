@@ -1105,6 +1105,45 @@ static void fiberAtomicStore(volatile int32_t& value, int32_t newValue)
 #endif
 }
 
+static uint32_t fiberAtomicLoadUInt32(const volatile uint32_t& value)
+{
+#if SC_PLATFORM_WINDOWS
+    return static_cast<uint32_t>(
+        InterlockedCompareExchange(reinterpret_cast<volatile long*>(const_cast<volatile uint32_t*>(&value)), 0, 0));
+#else
+    return __atomic_load_n(&value, __ATOMIC_ACQUIRE);
+#endif
+}
+
+static void fiberAtomicStoreUInt32(volatile uint32_t& value, uint32_t newValue)
+{
+#if SC_PLATFORM_WINDOWS
+    InterlockedExchange(reinterpret_cast<volatile long*>(&value), static_cast<long>(newValue));
+#else
+    __atomic_store_n(&value, newValue, __ATOMIC_RELEASE);
+#endif
+}
+
+static uint32_t fiberAtomicFetchAddUInt32(volatile uint32_t& value, uint32_t amount)
+{
+#if SC_PLATFORM_WINDOWS
+    return static_cast<uint32_t>(
+        InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&value), static_cast<long>(amount)));
+#else
+    return __atomic_fetch_add(&value, amount, __ATOMIC_ACQ_REL);
+#endif
+}
+
+static uint32_t fiberAtomicFetchSubUInt32(volatile uint32_t& value, uint32_t amount)
+{
+#if SC_PLATFORM_WINDOWS
+    return static_cast<uint32_t>(
+        InterlockedExchangeAdd(reinterpret_cast<volatile long*>(&value), -static_cast<long>(amount)));
+#else
+    return __atomic_fetch_sub(&value, amount, __ATOMIC_ACQ_REL);
+#endif
+}
+
 static size_t fiberAtomicLoadSize(const volatile size_t& value)
 {
 #if SC_PLATFORM_WINDOWS
@@ -1213,8 +1252,8 @@ struct FiberWorkerPoolWakeEvent
 #if SC_PLATFORM_WINDOWS
     mutable CRITICAL_SECTION mutex;
     CONDITION_VARIABLE       condition;
-    uint32_t                 generation     = 0;
-    uint32_t                 parked         = 0;
+    volatile uint32_t        generation     = 0;
+    volatile uint32_t        parked         = 0;
     uint32_t                 pendingSignals = 0;
     uint32_t                 wakeSignals    = 0;
 
@@ -1228,9 +1267,13 @@ struct FiberWorkerPoolWakeEvent
 
     void notifyOne()
     {
+        fiberAtomicFetchAddUInt32(generation, 1);
+        if (fiberAtomicLoadUInt32(parked) == 0)
+        {
+            return;
+        }
         ::EnterCriticalSection(&mutex);
-        generation += 1;
-        if (pendingSignals < parked)
+        if (pendingSignals < fiberAtomicLoadUInt32(parked))
         {
             pendingSignals += 1;
             wakeSignals += 1;
@@ -1241,9 +1284,9 @@ struct FiberWorkerPoolWakeEvent
 
     void notifyAll()
     {
+        fiberAtomicFetchAddUInt32(generation, 1);
         ::EnterCriticalSection(&mutex);
-        generation += 1;
-        pendingSignals = parked;
+        pendingSignals = fiberAtomicLoadUInt32(parked);
         ::WakeAllConditionVariable(&condition);
         ::LeaveCriticalSection(&mutex);
     }
@@ -1251,26 +1294,31 @@ struct FiberWorkerPoolWakeEvent
     [[nodiscard]] bool wait(uint32_t observedGeneration)
     {
         ::EnterCriticalSection(&mutex);
-        bool waited = false;
-        while (generation == observedGeneration)
+        bool conditionWaited = false;
+        while (fiberAtomicLoadUInt32(generation) == observedGeneration)
         {
-            waited = true;
-            parked += 1;
-            ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
-            parked -= 1;
+            // Publish park intent before the final generation check. A racing notifier either changes the generation
+            // first or observes this worker and signals after the condition wait atomically releases the mutex.
+            fiberAtomicFetchAddUInt32(parked, 1);
+            if (fiberAtomicLoadUInt32(generation) == observedGeneration)
+            {
+                conditionWaited = true;
+                ::SleepConditionVariableCS(&condition, &mutex, INFINITE);
+            }
+            fiberAtomicFetchSubUInt32(parked, 1);
         }
-        if (waited and pendingSignals > 0)
+        if (conditionWaited and pendingSignals > 0)
         {
             pendingSignals -= 1;
         }
         ::LeaveCriticalSection(&mutex);
-        return waited;
+        return conditionWaited;
     }
 #else
     mutable pthread_mutex_t mutex;
     pthread_cond_t          condition;
-    uint32_t                generation     = 0;
-    uint32_t                parked         = 0;
+    volatile uint32_t       generation     = 0;
+    volatile uint32_t       parked         = 0;
     uint32_t                pendingSignals = 0;
     uint32_t                wakeSignals    = 0;
 
@@ -1288,9 +1336,13 @@ struct FiberWorkerPoolWakeEvent
 
     void notifyOne()
     {
+        fiberAtomicFetchAddUInt32(generation, 1);
+        if (fiberAtomicLoadUInt32(parked) == 0)
+        {
+            return;
+        }
         ::pthread_mutex_lock(&mutex);
-        generation += 1;
-        if (pendingSignals < parked)
+        if (pendingSignals < fiberAtomicLoadUInt32(parked))
         {
             pendingSignals += 1;
             wakeSignals += 1;
@@ -1301,9 +1353,9 @@ struct FiberWorkerPoolWakeEvent
 
     void notifyAll()
     {
+        fiberAtomicFetchAddUInt32(generation, 1);
         ::pthread_mutex_lock(&mutex);
-        generation += 1;
-        pendingSignals = parked;
+        pendingSignals = fiberAtomicLoadUInt32(parked);
         ::pthread_cond_broadcast(&condition);
         ::pthread_mutex_unlock(&mutex);
     }
@@ -1311,53 +1363,32 @@ struct FiberWorkerPoolWakeEvent
     [[nodiscard]] bool wait(uint32_t observedGeneration)
     {
         ::pthread_mutex_lock(&mutex);
-        bool waited = false;
-        while (generation == observedGeneration)
+        bool conditionWaited = false;
+        while (fiberAtomicLoadUInt32(generation) == observedGeneration)
         {
-            waited = true;
-            parked += 1;
-            const int res = ::pthread_cond_wait(&condition, &mutex);
-            parked -= 1;
-            (void)res;
+            // Publish park intent before the final generation check. A racing notifier either changes the generation
+            // first or observes this worker and signals after the condition wait atomically releases the mutex.
+            fiberAtomicFetchAddUInt32(parked, 1);
+            if (fiberAtomicLoadUInt32(generation) == observedGeneration)
+            {
+                conditionWaited = true;
+                const int res   = ::pthread_cond_wait(&condition, &mutex);
+                (void)res;
+            }
+            fiberAtomicFetchSubUInt32(parked, 1);
         }
-        if (waited and pendingSignals > 0)
+        if (conditionWaited and pendingSignals > 0)
         {
             pendingSignals -= 1;
         }
         ::pthread_mutex_unlock(&mutex);
-        return waited;
+        return conditionWaited;
     }
 #endif
 
-    uint32_t currentGeneration() const
-    {
-#if SC_PLATFORM_WINDOWS
-        ::EnterCriticalSection(&mutex);
-        const uint32_t current = generation;
-        ::LeaveCriticalSection(&mutex);
-        return current;
-#else
-        ::pthread_mutex_lock(&mutex);
-        const uint32_t current = generation;
-        ::pthread_mutex_unlock(&mutex);
-        return current;
-#endif
-    }
+    uint32_t currentGeneration() const { return fiberAtomicLoadUInt32(generation); }
 
-    [[nodiscard]] uint32_t parkedCount() const
-    {
-#if SC_PLATFORM_WINDOWS
-        ::EnterCriticalSection(&mutex);
-        const uint32_t current = parked;
-        ::LeaveCriticalSection(&mutex);
-        return current;
-#else
-        ::pthread_mutex_lock(&mutex);
-        const uint32_t current = parked;
-        ::pthread_mutex_unlock(&mutex);
-        return current;
-#endif
-    }
+    [[nodiscard]] uint32_t parkedCount() const { return fiberAtomicLoadUInt32(parked); }
 
     void getDiagnostics(FiberWorkerPoolWakeDiagnostics& outDiagnostics) const
     {
@@ -1366,7 +1397,7 @@ struct FiberWorkerPoolWakeEvent
 #else
         ::pthread_mutex_lock(&mutex);
 #endif
-        outDiagnostics.wakeNotifications = generation;
+        outDiagnostics.wakeNotifications = fiberAtomicLoadUInt32(generation);
         outDiagnostics.wakeSignals       = wakeSignals;
 #if SC_PLATFORM_WINDOWS
         ::LeaveCriticalSection(&mutex);
@@ -1382,8 +1413,8 @@ struct FiberWorkerPoolWakeEvent
 #else
         ::pthread_mutex_lock(&mutex);
 #endif
-        SC_FIBERS_ASSERT_RELEASE(parked == 0 and pendingSignals == 0);
-        generation     = 0;
+        SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadUInt32(parked) == 0 and pendingSignals == 0);
+        fiberAtomicStoreUInt32(generation, 0);
         pendingSignals = 0;
         wakeSignals    = 0;
 #if SC_PLATFORM_WINDOWS

@@ -274,8 +274,9 @@ may be spawned afterward. A worker pool has a separate lifecycle: `requestStop()
 finish before worker, thread, deque, or injection storage is reused or destroyed.
 
 Normal ready publication logically requests one worker wake. The pool coalesces redundant operating-system signals
-while an earlier signal is still pending, but always advances its wake generation so publication racing with parking
-cannot be lost. Shutdown and the transition to no active fibers remain wake-all operations. Use
+while an earlier signal is still pending, and skips the condition-variable mutex entirely when no worker has published
+park intent. Every publication still atomically advances the wake generation so publication racing with parking cannot
+be lost. Shutdown and the transition to no active fibers remain wake-all operations. Use
 `FiberWorkerPool::wakeDiagnostics()` to compare logical `wakeNotifications` with the individual `wakeSignals` that
 remain after coalescing; broadcasts are included only in `wakeNotifications`.
 

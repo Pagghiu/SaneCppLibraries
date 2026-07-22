@@ -124,3 +124,4 @@ authorizes it because the dependency replaces substantial duplicated implementat
 - [FIBERS-0021 - Claim injection batches without scheduler coordination](fibers-0021-claim-injection-batches-without-scheduler-coordination.md)
 - [FIBERS-0022 - Coalesce redundant worker wake signals](fibers-0022-coalesce-redundant-worker-wake-signals.md)
 - [FIBERS-0023 - Batch fiber task pool capacity waits](fibers-0023-batch-fiber-task-pool-capacity-waits.md)
+- [FIBERS-0024 - Reject unnecessary wake locking atomically](fibers-0024-reject-unnecessary-wake-locking-atomically.md)

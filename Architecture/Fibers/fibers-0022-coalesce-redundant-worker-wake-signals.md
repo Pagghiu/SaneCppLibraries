@@ -33,6 +33,9 @@ The runtime preserves wake-one semantics while bounding redundant signal fan-out
 Notification generation still takes the wake mutex, so this decision does not remove wake-event serialization. The
 diagnostic notification count includes wake-all operations; `wakeSignals` intentionally excludes broadcasts.
 
+FIBERS-0024 later removes that notification-mutex requirement while preserving this decision's generation and pending
+signal contracts.
+
 A quiet macOS ARM64 Release comparison used one warm-up and five measured runs, followed by a complete confirmation
 set. In the confirmation set, individual signals fell by 85-99.7% for high-worker tiny-work cases. Sustained
 eight-worker throughput improved 8.9%, useful-payload four/eight-worker throughput remained within 1.4% of the prior
@@ -57,5 +60,6 @@ reset across pool reuse, and shutdown or terminal completion still wakes every p
 
 - [FIBERS-0010 - Use worker-owned scheduling with bounded injection](fibers-0010-use-worker-owned-scheduling-with-bounded-injection.md)
 - [FIBERS-0014 - Use bounded worker idle spinning](fibers-0014-use-bounded-worker-idle-spinning.md)
+- [FIBERS-0024 - Reject unnecessary wake locking atomically](fibers-0024-reject-unnecessary-wake-locking-atomically.md)
 - [Fibers architecture](fibers-architecture.md)
 - [Fibers documentation](../../Documentation/Libraries/Fibers.md)
