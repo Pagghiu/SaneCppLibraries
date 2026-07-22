@@ -749,7 +749,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
             EventObject taskEntered;
             EventObject blockerTaskEntered;
-            EventObject taskCompleted;
+            EventObject taskResumed;
 
             uint64_t ownerThreadID  = 0;
             uint64_t startThreadID  = 0;
@@ -788,7 +788,7 @@ struct SC::FibersAsyncTest : public SC::TestCase
                                                state.taskEntered.signal();
                                                SC_TRY(state.io->sleep(TimeMs{1}));
                                                state.resumeThreadID = Thread::CurrentThreadID();
-                                               state.taskCompleted.signal();
+                                               state.taskResumed.signal();
                                                return Result(true);
                                            })));
         SC_TEST_EXPECT(scheduler.spawn(blockerTask, blockerStack,
@@ -813,7 +813,8 @@ struct SC::FibersAsyncTest : public SC::TestCase
 
         SC_TEST_EXPECT(io.runOwnerNoWait());
         SC_TEST_EXPECT(io.runOwnerOnce());
-        state.taskCompleted.wait();
+        state.taskResumed.wait();
+        SC_TEST_EXPECT(waitForAllWorkersToPark(workerPool));
         SC_TEST_EXPECT(task.isCompleted());
 
         FiberWorkerDiagnostics afterIODiagnostics;
