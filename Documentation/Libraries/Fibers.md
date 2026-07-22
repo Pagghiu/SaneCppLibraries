@@ -124,6 +124,13 @@ coordination; peak and spill values remain available after `join()`. Ordinary co
 through a slot-sequenced bounded queue, so producers and workers do not serialize on queue indices. Injection control
 remains only around the pre-claim cancellation registry. Fixed allocator budgets should include
 `injectionCapacity * FiberInjectionSlotStorageSize` bytes in addition to worker deque storage and allocator alignment.
+
+`FiberTaskPool::waitForAvailableTask()` provides one-slot backpressure. Producers that refill in batches can instead
+call `waitForAvailableTasks(scheduler, minimumAvailable)` to suspend until that many task/stack pairs are reusable,
+reducing wake/resuspend churn without allocating. The minimum must be between one and the pool capacity. Multiple
+waiters remain FIFO, so a larger threshold at the head preserves arrival order rather than allowing a later smaller
+request to bypass it. Cancellation removes a waiting fiber through the same cooperative waiter path.
+
 Configured pools with peer workers transfer a bounded injection backlog into local stealable deques in larger batches
 than the latency-sensitive spill path. Workers claim these slot-sequenced batches without taking the scheduler-global
 ready lock; per-task injection control still transfers cancellation-registry ownership safely. The intrusive spill path

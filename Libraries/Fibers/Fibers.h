@@ -885,6 +885,8 @@ struct SC_FIBERS_EXPORT FiberTaskPool
     void                 diagnostics(FiberTaskPoolDiagnostics& outDiagnostics) const;
     Result               waitForSpawnCapacity(FiberScheduler& scheduler);
     Result               waitForAvailableTask(FiberScheduler& scheduler);
+    //! Suspends until at least minimumAvailable task/stack pairs can be acquired.
+    Result               waitForAvailableTasks(FiberScheduler& scheduler, size_t minimumAvailable);
     [[nodiscard]] size_t stackSizeInBytes() const;
     void                 fillHighWaterMarks();
     Result               stackHighWaterUsedBytes(size_t stackIndex, size_t& outBytes) const;
@@ -897,8 +899,10 @@ struct SC_FIBERS_EXPORT FiberTaskPool
     struct WaitNode
     {
         FiberCounter counter;
-        WaitNode*    next     = nullptr;
-        bool         notified = false;
+        WaitNode*    next = nullptr;
+
+        size_t minimumAvailable = 1;
+        bool   notified         = false;
     };
 
     Span<FiberTask> tasks;

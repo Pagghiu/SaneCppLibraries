@@ -1647,7 +1647,11 @@ struct SC::FibersTest : public SC::TestCase
                                            [&state](FiberScheduler& currentScheduler)
                                            {
                                                state.producerWaited = state.pool->availableCount() == 0;
-                                               SC_TRY(state.pool->waitForSpawnCapacity(currentScheduler));
+                                               SC_TRY(state.pool->waitForAvailableTasks(currentScheduler, 2));
+                                               if (state.completed != 2)
+                                               {
+                                                   return Result::Error("FiberTaskPool batch wait resumed too early");
+                                               }
                                                return state.pool->spawn(currentScheduler, FiberTask::Procedure(
                                                                                               [&state](FiberScheduler&)
                                                                                               {
@@ -2746,10 +2750,11 @@ struct SC::FibersTest : public SC::TestCase
                                                    return Result::Error("FiberTaskPool should be full");
                                                }
 
-                                               SC_TRY(pool.waitForAvailableTask(scheduler));
-                                               if (not pool.hasAvailableTask())
+                                               SC_TRY(pool.waitForAvailableTasks(scheduler, 2));
+                                               if (pool.availableCount() != 2 or state.completed != 2)
                                                {
-                                                   return Result::Error("FiberTaskPool should have a completed slot");
+                                                   return Result::Error(
+                                                       "FiberTaskPool should have the requested slots");
                                                }
                                                state.waited++;
                                                SC_TRY(pool.spawn(scheduler, FiberTask::Procedure(
@@ -2766,6 +2771,8 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(state.waited == 1);
         SC_TEST_EXPECT(state.completed == 3);
         SC_TEST_EXPECT(pool.availableCount() == 2);
+        SC_TEST_EXPECT(not pool.waitForAvailableTasks(scheduler, 0));
+        SC_TEST_EXPECT(not pool.waitForAvailableTasks(scheduler, 3));
     }
 
     void taskPoolAvailabilityCancellation()
@@ -2777,9 +2784,9 @@ struct SC::FibersTest : public SC::TestCase
         };
 
         FiberScheduler scheduler;
-        FiberTask      poolTasks[1];
-        char           poolStacks[64 * 1024] = {};
-        FiberTaskPool  pool({poolTasks, 1}, {poolStacks, sizeof(poolStacks)}, 64 * 1024);
+        FiberTask      poolTasks[2];
+        char           poolStacks[2 * 64 * 1024] = {};
+        FiberTaskPool  pool({poolTasks, 2}, {poolStacks, sizeof(poolStacks)}, 64 * 1024);
         FiberCounter   blocker;
         FiberTask      producerTask;
         FiberTask      cancellerTask;
@@ -2798,32 +2805,40 @@ struct SC::FibersTest : public SC::TestCase
         Context context = {&pool, &blocker, &producerTask, &state};
 
         scheduler.add(blocker);
-        SC_TEST_EXPECT(
-            scheduler.spawn(producerTask, producerStack,
-                            FiberTask::Procedure(
-                                [&context](FiberScheduler& scheduler)
-                                {
-                                    SC_TRY(context.pool->spawn(scheduler, FiberTask::Procedure(
-                                                                              [&context](FiberScheduler& scheduler)
-                                                                              {
-                                                                                  SC_TRY(scheduler.waitUninterruptible(
-                                                                                      *context.blocker));
-                                                                                  context.state->childCompleted++;
-                                                                                  return Result(true);
-                                                                              })));
-                                    if (context.pool->hasAvailableTask())
-                                    {
-                                        return Result::Error("FiberTaskPool should be full");
-                                    }
+        SC_TEST_EXPECT(scheduler.spawn(
+            producerTask, producerStack,
+            FiberTask::Procedure(
+                [&context](FiberScheduler& scheduler)
+                {
+                    SC_TRY(context.pool->spawn(scheduler, FiberTask::Procedure(
+                                                              [&context](FiberScheduler& scheduler)
+                                                              {
+                                                                  SC_TRY(
+                                                                      scheduler.waitUninterruptible(*context.blocker));
+                                                                  context.state->childCompleted++;
+                                                                  return Result(true);
+                                                              })));
+                    SC_TRY(context.pool->spawn(scheduler, FiberTask::Procedure(
+                                                              [&context](FiberScheduler& scheduler)
+                                                              {
+                                                                  SC_TRY(
+                                                                      scheduler.waitUninterruptible(*context.blocker));
+                                                                  context.state->childCompleted++;
+                                                                  return Result(true);
+                                                              })));
+                    if (context.pool->hasAvailableTask())
+                    {
+                        return Result::Error("FiberTaskPool should be full");
+                    }
 
-                                    Result waitResult = context.pool->waitForAvailableTask(scheduler);
-                                    if (waitResult)
-                                    {
-                                        return Result::Error("FiberTaskPool wait should be cancelled");
-                                    }
-                                    context.state->producerCancelled++;
-                                    return Result(true);
-                                })));
+                    Result waitResult = context.pool->waitForAvailableTasks(scheduler, 2);
+                    if (waitResult)
+                    {
+                        return Result::Error("FiberTaskPool wait should be cancelled");
+                    }
+                    context.state->producerCancelled++;
+                    return Result(true);
+                })));
         SC_TEST_EXPECT(scheduler.spawn(cancellerTask, cancellerStack,
                                        FiberTask::Procedure(
                                            [&context](FiberScheduler& runningScheduler)
@@ -2838,9 +2853,10 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(producerTask.result());
         SC_TEST_EXPECT(cancellerTask.result());
         SC_TEST_EXPECT(poolTasks[0].result());
+        SC_TEST_EXPECT(poolTasks[1].result());
         SC_TEST_EXPECT(state.producerCancelled == 1);
-        SC_TEST_EXPECT(state.childCompleted == 1);
-        SC_TEST_EXPECT(pool.availableCount() == 1);
+        SC_TEST_EXPECT(state.childCompleted == 2);
+        SC_TEST_EXPECT(pool.availableCount() == 2);
     }
 
     void taskPoolAvailabilityWorkerPool()

@@ -909,6 +909,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
     static constexpr size_t StackSize              = 32 * 1024;
     static constexpr size_t DequeCapacityPerWorker = 256;
     static constexpr size_t InjectionCapacity      = PoolCapacity + 1;
+    static constexpr size_t AvailabilityBatch      = 64;
     static constexpr int    WorkIterations         = 4;
 
     size_t numWorkers = availableHardwareWorkers();
@@ -964,7 +965,7 @@ static Result runSustainedMicroTaskBenchmark(Console& console)
                                        {
                                            continue;
                                        }
-                                       SC_TRY(taskPool.waitForAvailableTask(scheduler));
+                                       SC_TRY(taskPool.waitForAvailableTasks(scheduler, AvailabilityBatch));
                                    }
                                    state.producerDone.store(true, memory_order_release);
                                    return Result(true);

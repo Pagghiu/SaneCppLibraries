@@ -3523,17 +3523,25 @@ void FiberTaskPool::diagnostics(FiberTaskPoolDiagnostics& outDiagnostics) const
     outDiagnostics.stackClass.peakCommittedBytes = stackBytes;
 }
 
-Result FiberTaskPool::waitForSpawnCapacity(FiberScheduler& scheduler)
+Result FiberTaskPool::waitForSpawnCapacity(FiberScheduler& scheduler) { return waitForAvailableTasks(scheduler, 1); }
+
+Result FiberTaskPool::waitForAvailableTask(FiberScheduler& scheduler) { return waitForAvailableTasks(scheduler, 1); }
+
+Result FiberTaskPool::waitForAvailableTasks(FiberScheduler& scheduler, size_t minimumAvailable)
 {
+    if (minimumAvailable == 0 or minimumAvailable > capacity())
+    {
+        return Result::Error("FiberTaskPool minimum available count is invalid");
+    }
     if (taskClass != nullptr and stackClass != nullptr)
     {
-        while (availableCount() == 0)
+        while (availableCount() < minimumAvailable)
         {
-            if (taskClass->availableCount() == 0)
+            if (taskClass->availableCount() < minimumAvailable)
             {
                 SC_TRY(taskClass->waitForAvailableSlot(scheduler));
             }
-            if (stackClass->activeCount() == stackClass->capacity())
+            if (stackClass->capacity() - stackClass->activeCount() < minimumAvailable)
             {
                 SC_TRY(stackClass->waitForAvailableSlot(scheduler));
             }
@@ -3542,10 +3550,11 @@ Result FiberTaskPool::waitForSpawnCapacity(FiberScheduler& scheduler)
     }
 
     WaitNode node;
+    node.minimumAvailable = minimumAvailable;
     scheduler.add(node.counter);
 
     fiberSchedulerLock(primitiveLock);
-    if (hasAvailableTask())
+    if (availableCount() >= minimumAvailable)
     {
         fiberSchedulerUnlock(primitiveLock);
         SC_FIBERS_TRUST_RESULT(scheduler.done(node.counter));
@@ -3575,8 +3584,6 @@ Result FiberTaskPool::waitForSpawnCapacity(FiberScheduler& scheduler)
     }
     return waitResult;
 }
-
-Result FiberTaskPool::waitForAvailableTask(FiberScheduler& scheduler) { return waitForSpawnCapacity(scheduler); }
 
 size_t FiberTaskPool::stackSizeInBytes() const
 {
@@ -3650,7 +3657,7 @@ FiberCounter* FiberTaskPool::popAvailabilityWaiterForNotification()
 {
     fiberSchedulerLock(primitiveLock);
     WaitNode* node = availabilityWaitHead;
-    if (node == nullptr or not hasAvailableTask())
+    if (node == nullptr or availableCount() < node->minimumAvailable)
     {
         fiberSchedulerUnlock(primitiveLock);
         return nullptr;
