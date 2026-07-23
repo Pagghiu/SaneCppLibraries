@@ -19,7 +19,7 @@
 #include "../Common/Span.h"
 
 //! @defgroup group_fibers Fibers
-//! Experimental stackful cooperative task runtime.
+//! Experimental cooperative runtime for stackful fibers and stackless jobs.
 
 //! @addtogroup group_fibers
 //! @{
@@ -35,6 +35,9 @@ struct FiberCounter;
 struct FiberAutoResetEvent;
 struct FiberContext;
 struct FiberEvent;
+struct FiberJob;
+struct FiberJobContext;
+struct FiberJobScheduler;
 struct FiberMutex;
 struct FiberSemaphore;
 struct FiberScheduler;
@@ -611,6 +614,7 @@ struct SC_FIBERS_EXPORT FiberCancellationTokenSource
 
   private:
     friend struct FiberCancellationToken;
+    friend struct FiberJobScheduler;
     friend struct FiberScheduler;
 
     mutable volatile int32_t requested = 0;
@@ -628,11 +632,113 @@ struct SC_FIBERS_EXPORT FiberCancellationToken
 
   private:
     friend struct FiberCancellationTokenSource;
+    friend struct FiberJobScheduler;
     friend struct FiberScheduler;
 
     explicit FiberCancellationToken(const FiberCancellationTokenSource& tokenSource);
 
     const FiberCancellationTokenSource* source = nullptr;
+};
+
+//! Execution state of a caller-owned stackless job.
+enum class FiberJobStatus
+{
+    Invalid,
+    Ready,
+    Running,
+    Completed
+};
+
+//! Restricted execution context passed to a run-to-completion FiberJob.
+struct SC_FIBERS_EXPORT FiberJobContext
+{
+    [[nodiscard]] FiberJobScheduler& scheduler() const;
+    [[nodiscard]] FiberJob&          job() const;
+    [[nodiscard]] bool               isCancellationRequested() const;
+    Result                           checkCancellation() const;
+
+  private:
+    friend struct FiberJobScheduler;
+
+    FiberJobContext(FiberJobScheduler& scheduler, FiberJob& job);
+
+    FiberJobScheduler* jobScheduler = nullptr;
+    FiberJob*          currentJob   = nullptr;
+};
+
+//! Caller-owned stackless CPU job. Its address must remain stable while active.
+struct SC_FIBERS_EXPORT FiberJob
+{
+    using Procedure = Function<Result(FiberJobContext&)>;
+
+    FiberJob();
+    ~FiberJob();
+
+    FiberJob(const FiberJob&)            = delete;
+    FiberJob& operator=(const FiberJob&) = delete;
+    FiberJob(FiberJob&&)                 = delete;
+    FiberJob& operator=(FiberJob&&)      = delete;
+
+    [[nodiscard]] bool           isActive() const;
+    [[nodiscard]] bool           isCompleted() const;
+    [[nodiscard]] bool           isCancellationRequested() const;
+    [[nodiscard]] FiberJobStatus status() const;
+    [[nodiscard]] Result         result() const;
+
+  private:
+    friend struct FiberJobContext;
+    friend struct FiberJobScheduler;
+
+    Procedure              procedure;
+    FiberJobScheduler*     ownerScheduler = nullptr;
+    FiberCancellationToken cancellationToken;
+    Result                 jobResult       = Result(true);
+    volatile int32_t       jobStatus       = static_cast<int32_t>(FiberJobStatus::Invalid);
+    volatile bool          cancelRequested = false;
+};
+
+//! Single-thread-driven, fixed-capacity scheduler for stackless run-to-completion jobs.
+//!
+//! This first concrete scheduler intentionally does not create worker threads. Calls must not overlap across threads.
+//! A later worker-pool topology can build on the same FiberJob state and ownership contract without adding stacks.
+struct SC_FIBERS_EXPORT FiberJobScheduler
+{
+    FiberJobScheduler();
+    ~FiberJobScheduler();
+
+    FiberJobScheduler(const FiberJobScheduler&)            = delete;
+    FiberJobScheduler& operator=(const FiberJobScheduler&) = delete;
+
+    Result create(Span<FiberJob*> readyStorage);
+    Result close();
+
+    Result spawn(FiberJob& job, FiberJob::Procedure procedure);
+    Result spawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
+    Result runOne(bool& outRanJob);
+    Result run();
+    Result shutdown();
+
+    Result requestCancel(FiberJob& job);
+    Result requestCancel(FiberCancellationTokenSource& tokenSource);
+    Result requestCancelAll();
+
+    [[nodiscard]] bool      isOpen() const;
+    [[nodiscard]] bool      hasReadyJobs() const;
+    [[nodiscard]] bool      hasActiveJobs() const;
+    [[nodiscard]] size_t    capacity() const;
+    [[nodiscard]] size_t    readyJobCount() const;
+    [[nodiscard]] size_t    activeJobCount() const;
+    [[nodiscard]] FiberJob* currentJob();
+
+  private:
+    Span<FiberJob*> queueStorage;
+    FiberJob*       runningJob = nullptr;
+    size_t          queueHead  = 0;
+    size_t          queueTail  = 0;
+    size_t          queueCount = 0;
+    size_t          activeJobs = 0;
+
+    Result complete(FiberJob& job, Result result);
 };
 
 //! Optional scheduling inputs used when the short spawn overloads are not expressive enough.

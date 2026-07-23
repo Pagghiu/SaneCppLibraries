@@ -2637,6 +2637,258 @@ bool FiberCancellationToken::isCancellationRequested() const
     return source != nullptr and source->isCancellationRequested();
 }
 
+FiberJobContext::FiberJobContext(FiberJobScheduler& scheduler, FiberJob& job)
+    : jobScheduler(&scheduler), currentJob(&job)
+{}
+
+FiberJobScheduler& FiberJobContext::scheduler() const
+{
+    SC_FIBERS_ASSERT_RELEASE(jobScheduler != nullptr);
+    return *jobScheduler;
+}
+
+FiberJob& FiberJobContext::job() const
+{
+    SC_FIBERS_ASSERT_RELEASE(currentJob != nullptr);
+    return *currentJob;
+}
+
+bool FiberJobContext::isCancellationRequested() const { return job().isCancellationRequested(); }
+
+Result FiberJobContext::checkCancellation() const
+{
+    return isCancellationRequested() ? Result::Error("FiberJob cancelled") : Result(true);
+}
+
+FiberJob::FiberJob() = default;
+
+FiberJob::~FiberJob() { SC_FIBERS_ASSERT_RELEASE(not isActive()); }
+
+bool FiberJob::isActive() const
+{
+    const FiberJobStatus currentStatus = status();
+    return currentStatus == FiberJobStatus::Ready or currentStatus == FiberJobStatus::Running;
+}
+
+bool FiberJob::isCompleted() const { return status() == FiberJobStatus::Completed; }
+
+bool FiberJob::isCancellationRequested() const
+{
+    return fiberTaskCancellationLoad(cancelRequested) or cancellationToken.isCancellationRequested();
+}
+
+FiberJobStatus FiberJob::status() const { return static_cast<FiberJobStatus>(fiberTaskStatusRawLoad(jobStatus)); }
+
+Result FiberJob::result() const { return jobResult; }
+
+FiberJobScheduler::FiberJobScheduler() = default;
+
+FiberJobScheduler::~FiberJobScheduler()
+{
+    SC_FIBERS_ASSERT_RELEASE(not hasActiveJobs());
+    SC_FIBERS_ASSERT_RELEASE(runningJob == nullptr);
+}
+
+Result FiberJobScheduler::create(Span<FiberJob*> readyStorage)
+{
+    if (isOpen())
+    {
+        return Result::Error("FiberJobScheduler is already open");
+    }
+    if (readyStorage.sizeInElements() == 0)
+    {
+        return Result::Error("FiberJobScheduler ready capacity is zero");
+    }
+
+    queueStorage = readyStorage;
+    queueHead    = 0;
+    queueTail    = 0;
+    queueCount   = 0;
+    activeJobs   = 0;
+    runningJob   = nullptr;
+    for (FiberJob*& entry : queueStorage)
+    {
+        entry = nullptr;
+    }
+    return Result(true);
+}
+
+Result FiberJobScheduler::close()
+{
+    if (hasActiveJobs() or runningJob != nullptr)
+    {
+        return Result::Error("FiberJobScheduler still has active jobs");
+    }
+    queueStorage = {};
+    queueHead    = 0;
+    queueTail    = 0;
+    queueCount   = 0;
+    return Result(true);
+}
+
+Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure)
+{
+    return spawn(job, procedure, FiberCancellationToken());
+}
+
+Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token)
+{
+    if (not isOpen())
+    {
+        return Result::Error("FiberJobScheduler is not open");
+    }
+    if (job.isActive())
+    {
+        return Result::Error("FiberJob is already active");
+    }
+    if (not procedure.isValid())
+    {
+        return Result::Error("FiberJob procedure is not valid");
+    }
+    if (queueCount == queueStorage.sizeInElements())
+    {
+        return Result::Error("FiberJobScheduler ready queue is full");
+    }
+
+    job.procedure         = procedure;
+    job.ownerScheduler    = this;
+    job.cancellationToken = token;
+    job.jobResult         = Result(true);
+    fiberTaskCancellationStore(job.cancelRequested, token.isCancellationRequested());
+    fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Ready));
+
+    queueStorage[queueTail] = &job;
+    queueTail               = (queueTail + 1) % queueStorage.sizeInElements();
+    queueCount += 1;
+    activeJobs += 1;
+    return Result(true);
+}
+
+Result FiberJobScheduler::runOne(bool& outRanJob)
+{
+    outRanJob = false;
+    if (not isOpen())
+    {
+        return Result::Error("FiberJobScheduler is not open");
+    }
+    if (runningJob != nullptr)
+    {
+        return Result::Error("FiberJobScheduler is already running a job");
+    }
+    if (queueCount == 0)
+    {
+        return Result(true);
+    }
+
+    FiberJob* job           = queueStorage[queueHead];
+    queueStorage[queueHead] = nullptr;
+    queueHead               = (queueHead + 1) % queueStorage.sizeInElements();
+    queueCount -= 1;
+    SC_FIBERS_ASSERT_RELEASE(job != nullptr);
+    SC_FIBERS_ASSERT_RELEASE(job->ownerScheduler == this);
+    SC_FIBERS_ASSERT_RELEASE(job->status() == FiberJobStatus::Ready);
+
+    runningJob = job;
+    fiberAtomicStore(job->jobStatus, static_cast<int32_t>(FiberJobStatus::Running));
+    FiberJobContext context(*this, *job);
+    const Result    result =
+        job->isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
+    outRanJob = true;
+    return complete(*job, result);
+}
+
+Result FiberJobScheduler::run()
+{
+    while (hasReadyJobs())
+    {
+        bool ranJob = false;
+        SC_TRY(runOne(ranJob));
+        SC_FIBERS_ASSERT_RELEASE(ranJob);
+    }
+    return Result(true);
+}
+
+Result FiberJobScheduler::shutdown()
+{
+    SC_TRY(requestCancelAll());
+    return run();
+}
+
+Result FiberJobScheduler::requestCancel(FiberJob& job)
+{
+    if (not job.isActive())
+    {
+        return Result(true);
+    }
+    if (job.ownerScheduler != this)
+    {
+        return Result::Error("FiberJob belongs to another scheduler");
+    }
+    fiberTaskCancellationStore(job.cancelRequested, true);
+    return Result(true);
+}
+
+Result FiberJobScheduler::requestCancel(FiberCancellationTokenSource& tokenSource)
+{
+    tokenSource.requestCancel();
+    for (FiberJob* job : queueStorage)
+    {
+        if (job != nullptr and job->cancellationToken.source == &tokenSource)
+        {
+            fiberTaskCancellationStore(job->cancelRequested, true);
+        }
+    }
+    if (runningJob != nullptr and runningJob->cancellationToken.source == &tokenSource)
+    {
+        fiberTaskCancellationStore(runningJob->cancelRequested, true);
+    }
+    return Result(true);
+}
+
+Result FiberJobScheduler::requestCancelAll()
+{
+    for (FiberJob* job : queueStorage)
+    {
+        if (job != nullptr)
+        {
+            fiberTaskCancellationStore(job->cancelRequested, true);
+        }
+    }
+    if (runningJob != nullptr)
+    {
+        fiberTaskCancellationStore(runningJob->cancelRequested, true);
+    }
+    return Result(true);
+}
+
+bool FiberJobScheduler::isOpen() const { return queueStorage.sizeInElements() != 0; }
+
+bool FiberJobScheduler::hasReadyJobs() const { return queueCount != 0; }
+
+bool FiberJobScheduler::hasActiveJobs() const { return activeJobs != 0; }
+
+size_t FiberJobScheduler::capacity() const { return queueStorage.sizeInElements(); }
+
+size_t FiberJobScheduler::readyJobCount() const { return queueCount; }
+
+size_t FiberJobScheduler::activeJobCount() const { return activeJobs; }
+
+FiberJob* FiberJobScheduler::currentJob() { return runningJob; }
+
+Result FiberJobScheduler::complete(FiberJob& job, Result result)
+{
+    SC_FIBERS_ASSERT_RELEASE(runningJob == &job);
+    SC_FIBERS_ASSERT_RELEASE(activeJobs > 0);
+    job.jobResult         = result;
+    job.procedure         = FiberJob::Procedure();
+    job.cancellationToken = FiberCancellationToken();
+    fiberTaskCancellationStore(job.cancelRequested, false);
+    fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Completed));
+    runningJob = nullptr;
+    activeJobs -= 1;
+    return Result(true);
+}
+
 void FiberScheduler::taskEntry(void* userData)
 {
     FiberTask&      task      = *static_cast<FiberTask*>(userData);

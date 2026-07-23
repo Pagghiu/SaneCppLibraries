@@ -38,6 +38,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             schedulerYield();
         }
+        if (test_section("fiber jobs"))
+        {
+            fiberJobs();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -371,6 +375,118 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(task.result());
         SC_TEST_EXPECT(state.index == 2);
         SC_TEST_EXPECT(state.steps[1] == 2);
+    }
+
+    void fiberJobs()
+    {
+        struct State
+        {
+            FiberJobScheduler* scheduler      = nullptr;
+            FiberJob*          child          = nullptr;
+            int                order[3]       = {};
+            size_t             orderSize      = 0;
+            bool               sawCurrentJob  = false;
+            bool               canceledJobRan = false;
+            bool               nestedRanJob   = false;
+
+            Result nestedRunResult = Result(true);
+        };
+
+        FiberJobScheduler scheduler;
+        FiberJob*         readyStorage[2] = {};
+        FiberJob          first;
+        FiberJob          second;
+        FiberJob          child;
+        State             state;
+        state.scheduler = &scheduler;
+        state.child     = &child;
+
+        SC_TEST_EXPECT(not scheduler.create({readyStorage, 0}));
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(not scheduler.create(readyStorage));
+        SC_TEST_EXPECT(scheduler.isOpen());
+        SC_TEST_EXPECT(scheduler.capacity() == 2);
+
+        SC_TEST_EXPECT(scheduler.spawn(
+            first, FiberJob::Procedure(
+                       [&state](FiberJobContext& context)
+                       {
+                           state.sawCurrentJob = state.scheduler->currentJob() == &context.job() and
+                                                 &context.scheduler() == state.scheduler;
+                           state.order[state.orderSize++] = 1;
+                           SC_TRY(state.scheduler->spawn(*state.child, FiberJob::Procedure(
+                                                                           [&state](FiberJobContext&)
+                                                                           {
+                                                                               state.order[state.orderSize++] = 3;
+                                                                               return Result(true);
+                                                                           })));
+                           state.nestedRunResult = state.scheduler->runOne(state.nestedRanJob);
+                           return Result(true);
+                       })));
+        SC_TEST_EXPECT(scheduler.spawn(second, FiberJob::Procedure(
+                                                   [&state](FiberJobContext&)
+                                                   {
+                                                       state.order[state.orderSize++] = 2;
+                                                       return Result::Error("Expected FiberJob failure");
+                                                   })));
+        SC_TEST_EXPECT(not scheduler.spawn(child, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+        SC_TEST_EXPECT(not scheduler.close());
+        SC_TEST_EXPECT(scheduler.readyJobCount() == 2);
+        SC_TEST_EXPECT(scheduler.activeJobCount() == 2);
+
+        bool ranJob = false;
+        SC_TEST_EXPECT(scheduler.runOne(ranJob));
+        SC_TEST_EXPECT(ranJob);
+        SC_TEST_EXPECT(first.isCompleted());
+        SC_TEST_EXPECT(first.result());
+        SC_TEST_EXPECT(state.sawCurrentJob);
+        SC_TEST_EXPECT(not state.nestedRunResult);
+        SC_TEST_EXPECT(not state.nestedRanJob);
+        SC_TEST_EXPECT(scheduler.readyJobCount() == 2);
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(state.orderSize == 3);
+        SC_TEST_EXPECT(state.order[0] == 1);
+        SC_TEST_EXPECT(state.order[1] == 2);
+        SC_TEST_EXPECT(state.order[2] == 3);
+        SC_TEST_EXPECT(not second.result());
+        SC_TEST_EXPECT(child.result());
+        SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+
+        ranJob = true;
+        SC_TEST_EXPECT(scheduler.runOne(ranJob));
+        SC_TEST_EXPECT(not ranJob);
+
+        FiberCancellationTokenSource cancellation;
+        SC_TEST_EXPECT(scheduler.spawn(first,
+                                       FiberJob::Procedure(
+                                           [&state](FiberJobContext&)
+                                           {
+                                               state.canceledJobRan = true;
+                                               return Result(true);
+                                           }),
+                                       cancellation.token()));
+        SC_TEST_EXPECT(scheduler.requestCancel(cancellation));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(not state.canceledJobRan);
+        SC_TEST_EXPECT(first.isCompleted());
+        SC_TEST_EXPECT(not first.result());
+
+        SC_TEST_EXPECT(scheduler.spawn(first, FiberJob::Procedure(
+                                                  [](FiberJobContext& context)
+                                                  {
+                                                      SC_TRY(context.scheduler().requestCancel(context.job()));
+                                                      return context.checkCancellation();
+                                                  })));
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(not first.result());
+
+        SC_TEST_EXPECT(scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+        SC_TEST_EXPECT(scheduler.shutdown());
+        SC_TEST_EXPECT(first.isCompleted());
+        SC_TEST_EXPECT(not first.result());
+        SC_TEST_EXPECT(scheduler.close());
+        SC_TEST_EXPECT(not scheduler.isOpen());
+        SC_TEST_EXPECT(not scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
     }
 
     void explicitWorker()

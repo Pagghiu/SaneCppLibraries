@@ -8,6 +8,10 @@
 stackful task runtime: code can suspend from an ordinary nested call stack without blocking the OS thread that runs it.
 Tasks, stacks, workers, and bounded queues remain explicit program-owned resources.
 
+For CPU work that never suspends, the library also includes an early `FiberJob` prototype. Jobs are stackless,
+run-to-completion records with a separately bounded scheduler, so they do not pay for fiber stacks or weaken the
+stackful scheduling contract.
+
 @warning
 The library is a draft. The implementation has broad test coverage, including multi-worker execution, but its API and
 operational experience are not yet mature enough to treat it as a stable general-purpose job system.
@@ -63,6 +67,36 @@ pool does not grow: if all slots are active, producers can wait for capacity and
 
 This is still ordinary C++ control flow. The call to `yield()` cooperatively gives another ready fiber a chance to run,
 but no OS thread is blocked waiting for preemption.
+
+# Stackless Jobs
+
+`FiberJob` is for small CPU callbacks that never yield or wait. The first Draft scheduler is intentionally
+single-thread-driven: the caller supplies fixed ready-queue storage and explicitly runs it. Job failures remain on the
+completed job, while `run()` reports scheduler failures.
+
+```cpp
+FiberJobScheduler jobScheduler;
+FiberJob*         readyStorage[32] = {};
+FiberJob          jobs[32];
+
+SC_TRY(jobScheduler.create(readyStorage));
+for (FiberJob& job : jobs)
+{
+    SC_TRY(jobScheduler.spawn(
+        job, FiberJob::Procedure([](FiberJobContext& context)
+                                 {
+                                     SC_TRY(context.checkCancellation());
+                                     return Result(true);
+                                 })));
+}
+SC_TRY(jobScheduler.run());
+SC_TRY(jobScheduler.close());
+```
+
+The queue never allocates or grows. `spawn()` reports capacity exhaustion, and a running job may submit children only
+while a slot is available. `FiberJobContext` intentionally has no `yield()` or fiber synchronization API. Parallel job
+workers, groups, allocator-backed pools, and help-while-full fan-out remain future Draft work; use `FiberTask` whenever
+the callback must suspend or call `FibersAsync`.
 
 # Capacity Is Part of Control Flow
 
@@ -313,7 +347,8 @@ ordinary nested functions. Await trades that stack for compiler-generated corout
 
 The complete class and method reference is in [the Fibers API group](@ref group_fibers). Start with
 [FiberScheduler](@ref SC::FiberScheduler), [FiberTaskPool](@ref SC::FiberTaskPool),
-[FiberTaskGroup](@ref SC::FiberTaskGroup), and [FiberWorkerPool](@ref SC::FiberWorkerPool). Storage-heavy deployments
+[FiberTaskGroup](@ref SC::FiberTaskGroup), [FiberWorkerPool](@ref SC::FiberWorkerPool), and the stackless
+[FiberJobScheduler](@ref SC::FiberJobScheduler). Storage-heavy deployments
 should also read [FiberTaskClass](@ref SC::FiberTaskClass), [FiberStackClass](@ref SC::FiberStackClass), and their
 diagnostics types.
 
@@ -341,6 +376,7 @@ Current support includes:
 - virtual stack reservation and fixed-size `FiberStackClass` pools;
 - internal context creation and switching on macOS, Linux, and Windows for supported 64-bit architectures;
 - caller-owned `FiberTask` objects and allocator-backed `FiberTaskClass` storage;
+- caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;
