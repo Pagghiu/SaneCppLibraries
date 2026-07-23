@@ -29,6 +29,11 @@ operations. Pending cancellation skips the procedure and stores a cancellation e
 preempted, but may observe cancellation through its context. Completed result storage remains in the caller-owned job
 until that object is explicitly spawned again.
 
+`FiberJobPool` is the first reusable fixed-storage facade. It acquires records from a caller-provided `Span<FiberJob>`
+in O(1), but does not recycle a completed record automatically. The caller inspects its retained result and explicitly
+calls `release()`. Failed publication returns the acquired record immediately, so queue backpressure cannot silently
+consume pool capacity. Allocator-backed job classes remain a later extension of the same retention contract.
+
 The initial scheduler is deliberately not thread-safe. Parallel workers, job groups, reusable job pools/classes, and
 help-while-full backpressure require a subsequent ADR informed by this API and benchmark. This is a topology boundary,
 not permission to funnel jobs through stackful task queues.
@@ -38,6 +43,9 @@ not permission to funnel jobs through stackful task queues.
 The prototype requires one pointer of ready capacity per simultaneously queued job and no stack memory. Capacity
 failure is immediate and deterministic. Nested submission naturally consumes the slot freed when the current job was
 claimed, but a callback cannot recursively drive the scheduler while it is already running.
+
+Pool capacity counts retained records, including completed results awaiting explicit release. This intentionally keeps
+result lifetime visible and prevents a later spawn from overwriting a record that the caller still holds.
 
 An initial macOS ARM64 Release run of ten million jobs in reusable 8,192-job batches measured five samples from 57.2
 million to 78.2 million jobs per second, with a median of 74.0 million. This measures the manually driven stackless
@@ -60,7 +68,8 @@ Draft ABI policy. No dependency, hidden allocation, exception, RTTI, STL type, o
 
 A change preserves this decision when every active job has stable caller ownership, ready capacity is explicit,
 procedures cannot suspend through the job API, nested submission cannot grow storage, cancellation remains
-cooperative, completion retains plain `Result`, and the stackful scheduler hot path is unchanged.
+cooperative, completion retains plain `Result`, pooled results are not reused before explicit release, and the
+stackful scheduler hot path is unchanged.
 
 ## Related
 

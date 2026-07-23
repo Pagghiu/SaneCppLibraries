@@ -95,8 +95,13 @@ SC_TRY(jobScheduler.close());
 
 The queue never allocates or grows. `spawn()` reports capacity exhaustion, and a running job may submit children only
 while a slot is available. `FiberJobContext` intentionally has no `yield()` or fiber synchronization API. Parallel job
-workers, groups, allocator-backed pools, and help-while-full fan-out remain future Draft work; use `FiberTask` whenever
-the callback must suspend or call `FibersAsync`.
+workers, groups, allocator-backed classes, and help-while-full fan-out remain future Draft work; use `FiberTask`
+whenever the callback must suspend or call `FibersAsync`.
+
+`FiberJobPool` provides O(1) acquisition from a fixed `Span<FiberJob>`. A completed job remains retained until the
+caller has inspected `result()` and calls `release()`. This makes result lifetime and backpressure explicit: failed
+scheduler publication immediately returns the attempted record, while unreleased completed records continue to count
+against pool capacity.
 
 # Capacity Is Part of Control Flow
 
@@ -377,6 +382,7 @@ Current support includes:
 - internal context creation and switching on macOS, Linux, and Windows for supported 64-bit architectures;
 - caller-owned `FiberTask` objects and allocator-backed `FiberTaskClass` storage;
 - caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
+- fixed-storage `FiberJobPool` reuse with explicit completed-result retention and release;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;

@@ -37,6 +37,7 @@ struct FiberContext;
 struct FiberEvent;
 struct FiberJob;
 struct FiberJobContext;
+struct FiberJobPool;
 struct FiberJobScheduler;
 struct FiberMutex;
 struct FiberSemaphore;
@@ -687,14 +688,18 @@ struct SC_FIBERS_EXPORT FiberJob
 
   private:
     friend struct FiberJobContext;
+    friend struct FiberJobPool;
     friend struct FiberJobScheduler;
 
     Procedure              procedure;
     FiberJobScheduler*     ownerScheduler = nullptr;
+    FiberJobPool*          ownerPool      = nullptr;
+    FiberJob*              nextAvailable  = nullptr;
     FiberCancellationToken cancellationToken;
     Result                 jobResult       = Result(true);
     volatile int32_t       jobStatus       = static_cast<int32_t>(FiberJobStatus::Invalid);
     volatile bool          cancelRequested = false;
+    bool                   poolRetained    = false;
 };
 
 //! Single-thread-driven, fixed-capacity scheduler for stackless run-to-completion jobs.
@@ -739,6 +744,48 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     size_t          activeJobs = 0;
 
     Result complete(FiberJob& job, Result result);
+};
+
+struct SC_FIBERS_EXPORT FiberJobPoolDiagnostics
+{
+    size_t capacity      = 0;
+    size_t retainedJobs  = 0;
+    size_t availableJobs = 0;
+    //! High-water count of successfully published jobs retained by the pool.
+    size_t peakRetainedJobs = 0;
+};
+
+//! Fixed-capacity owner of reusable FiberJob records with explicit completed-result release.
+struct SC_FIBERS_EXPORT FiberJobPool
+{
+    FiberJobPool();
+    ~FiberJobPool();
+
+    FiberJobPool(const FiberJobPool&)            = delete;
+    FiberJobPool& operator=(const FiberJobPool&) = delete;
+
+    Result create(Span<FiberJob> jobStorage);
+    Result close();
+    Result spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberJob*& outJob);
+    Result spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberCancellationToken token,
+                 FiberJob*& outJob);
+    Result release(FiberJob& job);
+
+    [[nodiscard]] bool   isOpen() const;
+    [[nodiscard]] bool   owns(const FiberJob& job) const;
+    [[nodiscard]] size_t capacity() const;
+    [[nodiscard]] size_t retainedCount() const;
+    [[nodiscard]] size_t availableCount() const;
+    void                 diagnostics(FiberJobPoolDiagnostics& outDiagnostics) const;
+
+  private:
+    Span<FiberJob> jobs;
+    FiberJob*      availableHead    = nullptr;
+    size_t         retainedJobs     = 0;
+    size_t         peakRetainedJobs = 0;
+
+    Result acquire(FiberJob*& outJob);
+    void   releaseAcquired(FiberJob& job);
 };
 
 //! Optional scheduling inputs used when the short spawn overloads are not expressive enough.

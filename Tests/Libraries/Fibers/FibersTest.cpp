@@ -42,6 +42,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobs();
         }
+        if (test_section("fiber job pool"))
+        {
+            fiberJobPool();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -487,6 +491,80 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(not scheduler.isOpen());
         SC_TEST_EXPECT(not scheduler.spawn(first, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+    }
+
+    void fiberJobPool()
+    {
+        FiberJob          jobs[2];
+        FiberJobPool      pool;
+        FiberJobScheduler scheduler;
+        FiberJob*         readyStorage[1] = {};
+        FiberJob*         first           = nullptr;
+        FiberJob*         second          = nullptr;
+        size_t            completed       = 0;
+
+        SC_TEST_EXPECT(not pool.create({jobs, 0}));
+        SC_TEST_EXPECT(pool.create(jobs));
+        SC_TEST_EXPECT(not pool.create(jobs));
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(pool.capacity() == 2);
+        SC_TEST_EXPECT(pool.availableCount() == 2);
+        SC_TEST_EXPECT(pool.retainedCount() == 0);
+        SC_TEST_EXPECT(pool.owns(jobs[0]));
+        SC_TEST_EXPECT(
+            not scheduler.spawn(jobs[0], FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+
+        SC_TEST_EXPECT(pool.spawn(scheduler,
+                                  FiberJob::Procedure(
+                                      [&completed](FiberJobContext&)
+                                      {
+                                          completed += 1;
+                                          return Result(true);
+                                      }),
+                                  first));
+        SC_TEST_EXPECT(first != nullptr);
+        SC_TEST_EXPECT(pool.retainedCount() == 1);
+        SC_TEST_EXPECT(not pool.release(*first));
+        SC_TEST_EXPECT(not pool.close());
+
+        SC_TEST_EXPECT(
+            not pool.spawn(scheduler, FiberJob::Procedure([](FiberJobContext&) { return Result(true); }), second));
+        SC_TEST_EXPECT(second == nullptr);
+        SC_TEST_EXPECT(pool.retainedCount() == 1);
+        SC_TEST_EXPECT(pool.availableCount() == 1);
+
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(completed == 1);
+        SC_TEST_EXPECT(first->result());
+        SC_TEST_EXPECT(pool.release(*first));
+        SC_TEST_EXPECT(pool.availableCount() == 2);
+
+        FiberCancellationTokenSource cancellation;
+        SC_TEST_EXPECT(pool.spawn(scheduler,
+                                  FiberJob::Procedure(
+                                      [&completed](FiberJobContext&)
+                                      {
+                                          completed += 1;
+                                          return Result(true);
+                                      }),
+                                  cancellation.token(), first));
+        cancellation.requestCancel();
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(completed == 1);
+        SC_TEST_EXPECT(not first->result());
+        SC_TEST_EXPECT(pool.release(*first));
+
+        FiberJobPoolDiagnostics diagnostics;
+        pool.diagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.capacity == 2);
+        SC_TEST_EXPECT(diagnostics.retainedJobs == 0);
+        SC_TEST_EXPECT(diagnostics.availableJobs == 2);
+        SC_TEST_EXPECT(diagnostics.peakRetainedJobs == 1);
+
+        SC_TEST_EXPECT(pool.close());
+        SC_TEST_EXPECT(not pool.isOpen());
+        SC_TEST_EXPECT(not pool.owns(jobs[0]));
+        SC_TEST_EXPECT(scheduler.close());
     }
 
     void explicitWorker()

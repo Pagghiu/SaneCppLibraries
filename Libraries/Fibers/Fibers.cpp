@@ -2741,6 +2741,10 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     {
         return Result::Error("FiberJob is already active");
     }
+    if (job.ownerPool != nullptr and not job.poolRetained)
+    {
+        return Result::Error("FiberJob must be acquired from its pool before spawning");
+    }
     if (not procedure.isValid())
     {
         return Result::Error("FiberJob procedure is not valid");
@@ -2887,6 +2891,167 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
     runningJob = nullptr;
     activeJobs -= 1;
     return Result(true);
+}
+
+FiberJobPool::FiberJobPool() = default;
+
+FiberJobPool::~FiberJobPool()
+{
+    SC_FIBERS_ASSERT_RELEASE(not isOpen());
+    SC_FIBERS_ASSERT_RELEASE(retainedJobs == 0);
+}
+
+Result FiberJobPool::create(Span<FiberJob> jobStorage)
+{
+    if (isOpen())
+    {
+        return Result::Error("FiberJobPool is already open");
+    }
+    if (jobStorage.sizeInElements() == 0)
+    {
+        return Result::Error("FiberJobPool capacity is zero");
+    }
+    for (FiberJob& job : jobStorage)
+    {
+        if (job.isActive() or job.ownerPool != nullptr)
+        {
+            return Result::Error("FiberJobPool storage is already in use");
+        }
+    }
+
+    jobs             = jobStorage;
+    availableHead    = nullptr;
+    retainedJobs     = 0;
+    peakRetainedJobs = 0;
+    for (size_t index = jobs.sizeInElements(); index > 0; --index)
+    {
+        FiberJob& job         = jobs[index - 1];
+        job.ownerPool         = this;
+        job.ownerScheduler    = nullptr;
+        job.nextAvailable     = availableHead;
+        job.poolRetained      = false;
+        job.procedure         = FiberJob::Procedure();
+        job.jobResult         = Result(true);
+        job.cancellationToken = FiberCancellationToken();
+        fiberTaskCancellationStore(job.cancelRequested, false);
+        fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Invalid));
+        availableHead = &job;
+    }
+    return Result(true);
+}
+
+Result FiberJobPool::close()
+{
+    if (retainedJobs != 0)
+    {
+        return Result::Error("FiberJobPool still has retained jobs");
+    }
+    for (FiberJob& job : jobs)
+    {
+        SC_FIBERS_ASSERT_RELEASE(not job.isActive());
+        SC_FIBERS_ASSERT_RELEASE(not job.poolRetained);
+        job.ownerPool     = nullptr;
+        job.nextAvailable = nullptr;
+    }
+    jobs             = {};
+    availableHead    = nullptr;
+    peakRetainedJobs = 0;
+    return Result(true);
+}
+
+Result FiberJobPool::spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberJob*& outJob)
+{
+    return spawn(scheduler, procedure, FiberCancellationToken(), outJob);
+}
+
+Result FiberJobPool::spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberCancellationToken token,
+                           FiberJob*& outJob)
+{
+    outJob        = nullptr;
+    FiberJob* job = nullptr;
+    SC_TRY(acquire(job));
+    Result spawnResult = scheduler.spawn(*job, procedure, token);
+    if (not spawnResult)
+    {
+        releaseAcquired(*job);
+        return spawnResult;
+    }
+    if (retainedJobs > peakRetainedJobs)
+    {
+        peakRetainedJobs = retainedJobs;
+    }
+    outJob = job;
+    return Result(true);
+}
+
+Result FiberJobPool::release(FiberJob& job)
+{
+    if (job.ownerPool != this or not job.poolRetained)
+    {
+        return Result::Error("FiberJob is not retained by this pool");
+    }
+    if (not job.isCompleted())
+    {
+        return Result::Error("FiberJob is not completed");
+    }
+    releaseAcquired(job);
+    return Result(true);
+}
+
+bool FiberJobPool::isOpen() const { return jobs.sizeInElements() != 0; }
+
+bool FiberJobPool::owns(const FiberJob& job) const { return job.ownerPool == this; }
+
+size_t FiberJobPool::capacity() const { return jobs.sizeInElements(); }
+
+size_t FiberJobPool::retainedCount() const { return retainedJobs; }
+
+size_t FiberJobPool::availableCount() const { return capacity() - retainedJobs; }
+
+void FiberJobPool::diagnostics(FiberJobPoolDiagnostics& outDiagnostics) const
+{
+    outDiagnostics.capacity         = capacity();
+    outDiagnostics.retainedJobs     = retainedJobs;
+    outDiagnostics.availableJobs    = availableCount();
+    outDiagnostics.peakRetainedJobs = peakRetainedJobs;
+}
+
+Result FiberJobPool::acquire(FiberJob*& outJob)
+{
+    outJob = nullptr;
+    if (not isOpen())
+    {
+        return Result::Error("FiberJobPool is not open");
+    }
+    if (availableHead == nullptr)
+    {
+        return Result::Error("FiberJobPool has no available job");
+    }
+
+    FiberJob* job      = availableHead;
+    availableHead      = job->nextAvailable;
+    job->nextAvailable = nullptr;
+    job->poolRetained  = true;
+    retainedJobs += 1;
+    outJob = job;
+    return Result(true);
+}
+
+void FiberJobPool::releaseAcquired(FiberJob& job)
+{
+    SC_FIBERS_ASSERT_RELEASE(job.ownerPool == this);
+    SC_FIBERS_ASSERT_RELEASE(job.poolRetained);
+    SC_FIBERS_ASSERT_RELEASE(retainedJobs > 0);
+    job.procedure         = FiberJob::Procedure();
+    job.ownerScheduler    = nullptr;
+    job.cancellationToken = FiberCancellationToken();
+    job.jobResult         = Result(true);
+    fiberTaskCancellationStore(job.cancelRequested, false);
+    fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Invalid));
+    job.poolRetained  = false;
+    job.nextAvailable = availableHead;
+    availableHead     = &job;
+    retainedJobs -= 1;
 }
 
 void FiberScheduler::taskEntry(void* userData)
