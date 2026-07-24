@@ -35,6 +35,10 @@ calls `release()`. Failed publication returns the acquired record immediately, s
 consume pool capacity. `FiberJobClass` optionally obtains the same stable records from an explicit `FiberAllocator`;
 it binds to one pool at a time and does not change acquisition, retention, or release semantics.
 
+`FiberJobGroup` owns no job storage. It links one wave of pooled records, drives the same concrete scheduler until that
+wave completes, retains each plain `Result` for aggregate inspection, and returns every record to its originating pool
+on explicit `reset()`. Cancellation remains cooperative and uses the scheduler's existing job cancellation path.
+
 The initial scheduler is deliberately not thread-safe. Parallel workers, job groups, reusable job pools/classes, and
 help-while-full backpressure require a subsequent ADR informed by this API and benchmark. This is a topology boundary,
 not permission to funnel jobs through stackful task queues.
@@ -69,8 +73,8 @@ Draft ABI policy. No dependency, hidden allocation, exception, RTTI, STL type, o
 
 A change preserves this decision when every active job has stable caller ownership, ready capacity is explicit,
 procedures cannot suspend through the job API, nested submission cannot grow storage, cancellation remains
-cooperative, completion retains plain `Result`, pooled results are not reused before explicit release, and the
-stackful scheduler hot path is unchanged.
+cooperative, completion retains plain `Result`, pooled and grouped results are not reused before explicit release or
+group reset, and the stackful scheduler hot path is unchanged.
 
 ## Related
 

@@ -41,6 +41,7 @@ struct FiberJobClassDiagnostics;
 struct FiberJobClassInternal;
 struct FiberJobClassOptions;
 struct FiberJobContext;
+struct FiberJobGroup;
 struct FiberJobPool;
 struct FiberJobScheduler;
 struct FiberMutex;
@@ -692,6 +693,7 @@ struct SC_FIBERS_EXPORT FiberJob
 
   private:
     friend struct FiberJobContext;
+    friend struct FiberJobGroup;
     friend struct FiberJobPool;
     friend struct FiberJobScheduler;
 
@@ -699,6 +701,8 @@ struct SC_FIBERS_EXPORT FiberJob
     FiberJobScheduler*     ownerScheduler = nullptr;
     FiberJobPool*          ownerPool      = nullptr;
     FiberJob*              nextAvailable  = nullptr;
+    FiberJobGroup*         originGroup    = nullptr;
+    FiberJob*              nextGroup      = nullptr;
     FiberCancellationToken cancellationToken;
     Result                 jobResult       = Result(true);
     volatile int32_t       jobStatus       = static_cast<int32_t>(FiberJobStatus::Invalid);
@@ -841,6 +845,46 @@ struct SC_FIBERS_EXPORT FiberJobPool
 
     Result acquire(FiberJob*& outJob);
     void   releaseAcquired(FiberJob& job);
+};
+
+struct SC_FIBERS_EXPORT FiberJobGroupError
+{
+    FiberJob* job    = nullptr;
+    Result    result = Result(true);
+};
+
+//! Retains one bounded wave of pooled FiberJob results for aggregate inspection.
+struct SC_FIBERS_EXPORT FiberJobGroup
+{
+    explicit FiberJobGroup(FiberJobScheduler& scheduler);
+    ~FiberJobGroup();
+
+    FiberJobGroup(const FiberJobGroup&)            = delete;
+    FiberJobGroup& operator=(const FiberJobGroup&) = delete;
+
+    Result spawn(FiberJobPool& pool, FiberJob::Procedure procedure, FiberJob** outJob = nullptr);
+    Result spawn(FiberJobPool& pool, FiberJob::Procedure procedure, FiberCancellationToken token,
+                 FiberJob** outJob = nullptr);
+    Result run();
+    Result requestCancel();
+    Result reset();
+
+    [[nodiscard]] size_t pendingCount() const;
+    [[nodiscard]] size_t jobCount() const;
+    [[nodiscard]] size_t countErrors() const;
+    Result               collectErrors(Span<FiberJobGroupError> errors, size_t& outErrors) const;
+
+  private:
+    friend struct FiberJobScheduler;
+
+    FiberJobScheduler& jobScheduler;
+    FiberJob*          jobHead     = nullptr;
+    size_t             pendingJobs = 0;
+    size_t             totalJobs   = 0;
+
+    Result prepareSpawn() const;
+    void   linkJob(FiberJob& job);
+    void   complete(FiberJob& job);
 };
 
 //! Optional scheduling inputs used when the short spawn overloads are not expressive enough.

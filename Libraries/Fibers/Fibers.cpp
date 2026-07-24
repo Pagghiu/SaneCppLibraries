@@ -2741,9 +2741,9 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
     {
         return Result::Error("FiberJob is already active");
     }
-    if (job.ownerPool != nullptr and not job.poolRetained)
+    if (job.ownerPool != nullptr and (not job.poolRetained or job.status() != FiberJobStatus::Invalid))
     {
-        return Result::Error("FiberJob must be acquired from its pool before spawning");
+        return Result::Error("FiberJob must be newly acquired from its pool before spawning");
     }
     if (not procedure.isValid())
     {
@@ -2888,6 +2888,10 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
     job.cancellationToken = FiberCancellationToken();
     fiberTaskCancellationStore(job.cancelRequested, false);
     fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Completed));
+    if (job.originGroup != nullptr)
+    {
+        job.originGroup->complete(job);
+    }
     runningJob = nullptr;
     activeJobs -= 1;
     return Result(true);
@@ -3092,6 +3096,8 @@ Result FiberJobPool::create(Span<FiberJob> jobStorage)
         job.ownerPool         = this;
         job.ownerScheduler    = nullptr;
         job.nextAvailable     = availableHead;
+        job.originGroup       = nullptr;
+        job.nextGroup         = nullptr;
         job.poolRetained      = false;
         job.procedure         = FiberJob::Procedure();
         job.jobResult         = Result(true);
@@ -3180,6 +3186,10 @@ Result FiberJobPool::release(FiberJob& job)
     {
         return Result::Error("FiberJob is not completed");
     }
+    if (job.originGroup != nullptr)
+    {
+        return Result::Error("FiberJob is retained by FiberJobGroup");
+    }
     releaseAcquired(job);
     return Result(true);
 }
@@ -3232,12 +3242,163 @@ void FiberJobPool::releaseAcquired(FiberJob& job)
     job.ownerScheduler    = nullptr;
     job.cancellationToken = FiberCancellationToken();
     job.jobResult         = Result(true);
+    job.originGroup       = nullptr;
+    job.nextGroup         = nullptr;
     fiberTaskCancellationStore(job.cancelRequested, false);
     fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Invalid));
     job.poolRetained  = false;
     job.nextAvailable = availableHead;
     availableHead     = &job;
     retainedJobs -= 1;
+}
+
+FiberJobGroup::FiberJobGroup(FiberJobScheduler& scheduler) : jobScheduler(scheduler) {}
+
+FiberJobGroup::~FiberJobGroup()
+{
+    SC_FIBERS_ASSERT_RELEASE(jobHead == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(pendingJobs == 0);
+    SC_FIBERS_ASSERT_RELEASE(totalJobs == 0);
+}
+
+Result FiberJobGroup::spawn(FiberJobPool& pool, FiberJob::Procedure procedure, FiberJob** outJob)
+{
+    return spawn(pool, procedure, FiberCancellationToken(), outJob);
+}
+
+Result FiberJobGroup::spawn(FiberJobPool& pool, FiberJob::Procedure procedure, FiberCancellationToken token,
+                            FiberJob** outJob)
+{
+    if (outJob != nullptr)
+    {
+        *outJob = nullptr;
+    }
+    SC_TRY(prepareSpawn());
+
+    FiberJob* job = nullptr;
+    SC_TRY(pool.spawn(jobScheduler, procedure, token, job));
+    linkJob(*job);
+    if (outJob != nullptr)
+    {
+        *outJob = job;
+    }
+    return Result(true);
+}
+
+Result FiberJobGroup::run()
+{
+    while (pendingJobs != 0)
+    {
+        bool ranJob = false;
+        SC_TRY(jobScheduler.runOne(ranJob));
+        if (not ranJob)
+        {
+            return Result::Error("FiberJobGroup made no progress");
+        }
+    }
+    return Result(true);
+}
+
+Result FiberJobGroup::requestCancel()
+{
+    FiberJob* job = jobHead;
+    while (job != nullptr)
+    {
+        if (job->isActive())
+        {
+            SC_TRY(jobScheduler.requestCancel(*job));
+        }
+        job = job->nextGroup;
+    }
+    return Result(true);
+}
+
+Result FiberJobGroup::reset()
+{
+    if (pendingJobs != 0)
+    {
+        return Result::Error("FiberJobGroup cannot reset with pending jobs");
+    }
+
+    FiberJob* job = jobHead;
+    while (job != nullptr)
+    {
+        FiberJob* next = job->nextGroup;
+        SC_FIBERS_ASSERT_RELEASE(job->originGroup == this);
+        SC_FIBERS_ASSERT_RELEASE(job->ownerPool != nullptr);
+        job->originGroup = nullptr;
+        job->nextGroup   = nullptr;
+        SC_TRY(job->ownerPool->release(*job));
+        job = next;
+    }
+    jobHead   = nullptr;
+    totalJobs = 0;
+    return Result(true);
+}
+
+size_t FiberJobGroup::pendingCount() const { return pendingJobs; }
+
+size_t FiberJobGroup::jobCount() const { return totalJobs; }
+
+size_t FiberJobGroup::countErrors() const
+{
+    size_t    errors = 0;
+    FiberJob* job    = jobHead;
+    while (job != nullptr)
+    {
+        if (job->isCompleted() and not job->result())
+        {
+            errors += 1;
+        }
+        job = job->nextGroup;
+    }
+    return errors;
+}
+
+Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& outErrors) const
+{
+    outErrors     = 0;
+    FiberJob* job = jobHead;
+    while (job != nullptr)
+    {
+        if (job->isCompleted() and not job->result())
+        {
+            if (outErrors >= errors.sizeInElements())
+            {
+                return Result::Error("FiberJobGroup error storage is too small");
+            }
+            errors[outErrors].job    = job;
+            errors[outErrors].result = job->result();
+            outErrors += 1;
+        }
+        job = job->nextGroup;
+    }
+    return Result(true);
+}
+
+Result FiberJobGroup::prepareSpawn() const
+{
+    return jobHead != nullptr and pendingJobs == 0
+               ? Result::Error("FiberJobGroup must be reset before starting another job wave")
+               : Result(true);
+}
+
+void FiberJobGroup::linkJob(FiberJob& job)
+{
+    SC_FIBERS_ASSERT_RELEASE(job.originGroup == nullptr);
+    SC_FIBERS_ASSERT_RELEASE(job.nextGroup == nullptr);
+    job.originGroup = this;
+    job.nextGroup   = jobHead;
+    jobHead         = &job;
+    pendingJobs += 1;
+    totalJobs += 1;
+}
+
+void FiberJobGroup::complete(FiberJob& job)
+{
+    SC_FIBERS_ASSERT_RELEASE(job.originGroup == this);
+    SC_FIBERS_ASSERT_RELEASE(pendingJobs > 0);
+    pendingJobs -= 1;
 }
 
 void FiberScheduler::taskEntry(void* userData)

@@ -104,6 +104,10 @@ scheduler publication immediately returns the attempted record, while unreleased
 against pool capacity. For allocator-backed storage, create a `FiberJobClass` with an explicit `FiberAllocator` and
 bind the pool with `pool.create(jobClass)`. The class owns only stable record storage; the pool contract stays the same.
 
+`FiberJobGroup` submits one bounded wave through a pool, drives its scheduler with `run()`, and retains every job result
+for `countErrors()` or caller-provided `collectErrors()` storage. Call `reset()` after inspection to return all records
+to their originating pools. A group never allocates and cannot start another completed wave before reset.
+
 # Capacity Is Part of Control Flow
 
 When producing more work than the pool can hold at once, capacity pressure is explicit. From inside a fiber,
@@ -384,6 +388,7 @@ Current support includes:
 - caller-owned `FiberTask` objects and allocator-backed `FiberTaskClass` storage;
 - caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
 - fixed-storage or allocator-backed `FiberJobPool` reuse with explicit completed-result retention and release;
+- bounded `FiberJobGroup` waves with cancellation, aggregate errors, and explicit pooled-record reset;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;

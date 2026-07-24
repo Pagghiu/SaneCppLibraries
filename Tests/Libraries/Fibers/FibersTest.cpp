@@ -50,6 +50,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobClass();
         }
+        if (test_section("fiber job group"))
+        {
+            fiberJobGroup();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -628,6 +632,73 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not jobClass.isOpen());
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(allocator.close());
+    }
+
+    void fiberJobGroup()
+    {
+        FiberJob          jobs[3];
+        FiberJobPool      pool;
+        FiberJobScheduler scheduler;
+        FiberJobGroup     group(scheduler);
+        FiberJob*         readyStorage[3] = {};
+        FiberJob*         first           = nullptr;
+        size_t            completed       = 0;
+
+        SC_TEST_EXPECT(pool.create(jobs));
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(group.spawn(pool,
+                                   FiberJob::Procedure(
+                                       [&completed](FiberJobContext&)
+                                       {
+                                           completed += 1;
+                                           return Result(true);
+                                       }),
+                                   &first));
+        SC_TEST_EXPECT(group.spawn(
+            pool, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Expected job error"); })));
+        SC_TEST_EXPECT(group.pendingCount() == 2);
+        SC_TEST_EXPECT(group.jobCount() == 2);
+        SC_TEST_EXPECT(not group.reset());
+        SC_TEST_EXPECT(not pool.release(*first));
+        SC_TEST_EXPECT(not scheduler.spawn(
+            *first, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Must not replace result"); })));
+
+        SC_TEST_EXPECT(group.run());
+        SC_TEST_EXPECT(completed == 1);
+        SC_TEST_EXPECT(group.pendingCount() == 0);
+        SC_TEST_EXPECT(group.countErrors() == 1);
+        SC_TEST_EXPECT(not group.spawn(
+            pool, FiberJob::Procedure([](FiberJobContext&) { return Result::Error("Group requires reset"); })));
+
+        FiberJobGroupError errors[1];
+        size_t             numErrors = 0;
+        SC_TEST_EXPECT(not group.collectErrors({}, numErrors));
+        SC_TEST_EXPECT(group.collectErrors(errors, numErrors));
+        SC_TEST_EXPECT(numErrors == 1);
+        SC_TEST_EXPECT(errors[0].job != nullptr);
+        SC_TEST_EXPECT(not errors[0].result);
+
+        SC_TEST_EXPECT(group.reset());
+        SC_TEST_EXPECT(group.jobCount() == 0);
+        SC_TEST_EXPECT(pool.availableCount() == 3);
+
+        FiberCancellationTokenSource cancellation;
+        SC_TEST_EXPECT(group.spawn(pool,
+                                   FiberJob::Procedure(
+                                       [&completed](FiberJobContext&)
+                                       {
+                                           completed += 1;
+                                           return Result(true);
+                                       }),
+                                   cancellation.token()));
+        SC_TEST_EXPECT(group.requestCancel());
+        SC_TEST_EXPECT(group.run());
+        SC_TEST_EXPECT(completed == 1);
+        SC_TEST_EXPECT(group.countErrors() == 1);
+        SC_TEST_EXPECT(group.reset());
+
+        SC_TEST_EXPECT(pool.close());
+        SC_TEST_EXPECT(scheduler.close());
     }
 
     void explicitWorker()
