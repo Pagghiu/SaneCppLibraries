@@ -2893,6 +2893,169 @@ Result FiberJobScheduler::complete(FiberJob& job, Result result)
     return Result(true);
 }
 
+struct FiberJobClassInternal
+{
+    FiberAllocator* allocator = nullptr;
+    FiberJob*       jobs      = nullptr;
+    FiberJobPool*   boundPool = nullptr;
+    size_t          maxJobs   = 0;
+
+    ~FiberJobClassInternal()
+    {
+        Result result = close();
+        SC_FIBERS_ASSERT_RELEASE(result);
+    }
+
+    Result create(FiberAllocator& jobAllocator, const FiberJobClassOptions& options)
+    {
+        if (isOpen())
+        {
+            return Result::Error("FiberJobClass is already open");
+        }
+        if (not jobAllocator.isOpen())
+        {
+            return Result::Error("FiberJobClass allocator is not open");
+        }
+        if (options.maxJobs == 0)
+        {
+            return Result::Error("FiberJobClass max jobs is zero");
+        }
+        if (options.maxJobs > static_cast<size_t>(-1) / sizeof(FiberJob))
+        {
+            return Result::Error("FiberJobClass job storage size overflow");
+        }
+
+        FiberJob* jobStorage =
+            static_cast<FiberJob*>(jobAllocator.allocate(this, options.maxJobs * sizeof(FiberJob), alignof(FiberJob)));
+        if (jobStorage == nullptr)
+        {
+            return Result::Error("FiberJobClass job allocation failed");
+        }
+
+        allocator = &jobAllocator;
+        jobs      = jobStorage;
+        maxJobs   = options.maxJobs;
+        for (size_t index = 0; index < maxJobs; ++index)
+        {
+            placementNew(jobs[index]);
+        }
+        return Result(true);
+    }
+
+    Result bind(FiberJobPool& pool, Span<FiberJob>& outJobs)
+    {
+        outJobs = {};
+        if (not isOpen() or boundPool != nullptr)
+        {
+            return Result::Error("FiberJobClass cannot be bound");
+        }
+        boundPool = &pool;
+        outJobs   = {jobs, maxJobs};
+        return Result(true);
+    }
+
+    Result unbind(FiberJobPool& pool)
+    {
+        if (boundPool != &pool)
+        {
+            return Result::Error("FiberJobClass cannot be unbound");
+        }
+        boundPool = nullptr;
+        return Result(true);
+    }
+
+    Result validateClose() const
+    {
+        return boundPool == nullptr ? Result(true) : Result::Error("FiberJobClass is bound to a pool");
+    }
+
+    Result close()
+    {
+        SC_TRY(validateClose());
+        if (not isOpen())
+        {
+            return Result(true);
+        }
+        for (size_t index = 0; index < maxJobs; ++index)
+        {
+            jobs[index].~FiberJob();
+        }
+        allocator->release(jobs);
+        allocator = nullptr;
+        jobs      = nullptr;
+        maxJobs   = 0;
+        return Result(true);
+    }
+
+    void diagnostics(FiberJobClassDiagnostics& outDiagnostics) const
+    {
+        outDiagnostics.capacity = maxJobs;
+        outDiagnostics.bound    = boundPool != nullptr;
+    }
+
+    bool isOpen() const { return allocator != nullptr; }
+
+    bool owns(const FiberJob& job) const
+    {
+        if (not isOpen())
+        {
+            return false;
+        }
+        const size_t jobAddress   = reinterpret_cast<size_t>(&job);
+        const size_t firstAddress = reinterpret_cast<size_t>(jobs);
+        const size_t endAddress   = firstAddress + maxJobs * sizeof(FiberJob);
+        if (jobAddress < firstAddress or jobAddress >= endAddress)
+        {
+            return false;
+        }
+        return (jobAddress - firstAddress) % sizeof(FiberJob) == 0;
+    }
+};
+
+static_assert(sizeof(FiberJobClassInternal) <= FiberJobClassDefinition::Default,
+              "Increase FiberJobClassDefinition opaque storage size");
+
+template <>
+void FiberJobClassOpaque::construct(Handle& buffer)
+{
+    placementNew(buffer.reinterpret_as<Object>());
+}
+
+template <>
+void FiberJobClassOpaque::destruct(Object& obj)
+{
+    obj.~Object();
+}
+
+FiberJobClass::FiberJobClass() = default;
+
+FiberJobClass::~FiberJobClass() = default;
+
+Result FiberJobClass::create(FiberAllocator& allocator, const FiberJobClassOptions& options)
+{
+    return internal.get().create(allocator, options);
+}
+
+Result FiberJobClass::validateClose() const { return internal.get().validateClose(); }
+
+Result FiberJobClass::close() { return internal.get().close(); }
+
+void FiberJobClass::diagnostics(FiberJobClassDiagnostics& outDiagnostics) const
+{
+    internal.get().diagnostics(outDiagnostics);
+}
+
+bool FiberJobClass::isOpen() const { return internal.get().isOpen(); }
+
+bool FiberJobClass::owns(const FiberJob& job) const { return internal.get().owns(job); }
+
+size_t FiberJobClass::capacity() const
+{
+    FiberJobClassDiagnostics currentDiagnostics;
+    diagnostics(currentDiagnostics);
+    return currentDiagnostics.capacity;
+}
+
 FiberJobPool::FiberJobPool() = default;
 
 FiberJobPool::~FiberJobPool()
@@ -2940,11 +3103,33 @@ Result FiberJobPool::create(Span<FiberJob> jobStorage)
     return Result(true);
 }
 
+Result FiberJobPool::create(FiberJobClass& newJobClass)
+{
+    if (isOpen())
+    {
+        return Result::Error("FiberJobPool is already open");
+    }
+    Span<FiberJob> jobStorage;
+    SC_TRY(newJobClass.internal.get().bind(*this, jobStorage));
+    Result createResult = create(jobStorage);
+    if (not createResult)
+    {
+        SC_FIBERS_TRUST_RESULT(newJobClass.internal.get().unbind(*this));
+        return createResult;
+    }
+    jobClass = &newJobClass;
+    return Result(true);
+}
+
 Result FiberJobPool::close()
 {
     if (retainedJobs != 0)
     {
         return Result::Error("FiberJobPool still has retained jobs");
+    }
+    if (jobClass != nullptr)
+    {
+        SC_TRY(jobClass->internal.get().unbind(*this));
     }
     for (FiberJob& job : jobs)
     {
@@ -2954,6 +3139,7 @@ Result FiberJobPool::close()
         job.nextAvailable = nullptr;
     }
     jobs             = {};
+    jobClass         = nullptr;
     availableHead    = nullptr;
     peakRetainedJobs = 0;
     return Result(true);

@@ -32,7 +32,8 @@ until that object is explicitly spawned again.
 `FiberJobPool` is the first reusable fixed-storage facade. It acquires records from a caller-provided `Span<FiberJob>`
 in O(1), but does not recycle a completed record automatically. The caller inspects its retained result and explicitly
 calls `release()`. Failed publication returns the acquired record immediately, so queue backpressure cannot silently
-consume pool capacity. Allocator-backed job classes remain a later extension of the same retention contract.
+consume pool capacity. `FiberJobClass` optionally obtains the same stable records from an explicit `FiberAllocator`;
+it binds to one pool at a time and does not change acquisition, retention, or release semantics.
 
 The initial scheduler is deliberately not thread-safe. Parallel workers, job groups, reusable job pools/classes, and
 help-while-full backpressure require a subsequent ADR informed by this API and benchmark. This is a topology boundary,

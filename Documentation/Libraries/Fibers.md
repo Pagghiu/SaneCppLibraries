@@ -101,7 +101,8 @@ whenever the callback must suspend or call `FibersAsync`.
 `FiberJobPool` provides O(1) acquisition from a fixed `Span<FiberJob>`. A completed job remains retained until the
 caller has inspected `result()` and calls `release()`. This makes result lifetime and backpressure explicit: failed
 scheduler publication immediately returns the attempted record, while unreleased completed records continue to count
-against pool capacity.
+against pool capacity. For allocator-backed storage, create a `FiberJobClass` with an explicit `FiberAllocator` and
+bind the pool with `pool.create(jobClass)`. The class owns only stable record storage; the pool contract stays the same.
 
 # Capacity Is Part of Control Flow
 
@@ -382,7 +383,7 @@ Current support includes:
 - internal context creation and switching on macOS, Linux, and Windows for supported 64-bit architectures;
 - caller-owned `FiberTask` objects and allocator-backed `FiberTaskClass` storage;
 - caller-owned stackless `FiberJob` records with a fixed-capacity, single-thread-driven scheduler prototype;
-- fixed-storage `FiberJobPool` reuse with explicit completed-result retention and release;
+- fixed-storage or allocator-backed `FiberJobPool` reuse with explicit completed-result retention and release;
 - fixed-storage and class-backed `FiberTaskPool`;
 - single-threaded `FiberScheduler` spawn, run, yield, and no-progress detection;
 - worker-pool execution with work stealing and optional allocator-backed worker deques;

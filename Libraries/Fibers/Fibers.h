@@ -36,6 +36,10 @@ struct FiberAutoResetEvent;
 struct FiberContext;
 struct FiberEvent;
 struct FiberJob;
+struct FiberJobClass;
+struct FiberJobClassDiagnostics;
+struct FiberJobClassInternal;
+struct FiberJobClassOptions;
 struct FiberJobContext;
 struct FiberJobPool;
 struct FiberJobScheduler;
@@ -755,6 +759,55 @@ struct SC_FIBERS_EXPORT FiberJobPoolDiagnostics
     size_t peakRetainedJobs = 0;
 };
 
+struct FiberJobClassDefinition
+{
+    static constexpr int    Windows   = 48;
+    static constexpr int    Apple     = 48;
+    static constexpr int    Linux     = 48;
+    static constexpr int    Default   = 48;
+    static constexpr size_t Alignment = alignof(void*);
+
+    using Object = FiberJobClassInternal;
+};
+using FiberJobClassOpaque = OpaqueObject<FiberJobClassDefinition>;
+
+struct SC_FIBERS_EXPORT FiberJobClassOptions
+{
+    size_t maxJobs = 0;
+};
+
+struct SC_FIBERS_EXPORT FiberJobClassDiagnostics
+{
+    size_t capacity = 0;
+    bool   bound    = false;
+};
+
+//! Allocator-backed fixed-capacity storage for stable FiberJob records.
+struct SC_FIBERS_EXPORT FiberJobClass
+{
+    FiberJobClass();
+    ~FiberJobClass();
+
+    FiberJobClass(const FiberJobClass&)            = delete;
+    FiberJobClass& operator=(const FiberJobClass&) = delete;
+    FiberJobClass(FiberJobClass&&)                 = delete;
+    FiberJobClass& operator=(FiberJobClass&&)      = delete;
+
+    [[nodiscard]] Result create(FiberAllocator& allocator, const FiberJobClassOptions& options);
+    [[nodiscard]] Result validateClose() const;
+    [[nodiscard]] Result close();
+    void                 diagnostics(FiberJobClassDiagnostics& outDiagnostics) const;
+
+    [[nodiscard]] bool   isOpen() const;
+    [[nodiscard]] bool   owns(const FiberJob& job) const;
+    [[nodiscard]] size_t capacity() const;
+
+  private:
+    friend struct FiberJobPool;
+
+    FiberJobClassOpaque internal;
+};
+
 //! Fixed-capacity owner of reusable FiberJob records with explicit completed-result release.
 struct SC_FIBERS_EXPORT FiberJobPool
 {
@@ -765,6 +818,7 @@ struct SC_FIBERS_EXPORT FiberJobPool
     FiberJobPool& operator=(const FiberJobPool&) = delete;
 
     Result create(Span<FiberJob> jobStorage);
+    Result create(FiberJobClass& jobClass);
     Result close();
     Result spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberJob*& outJob);
     Result spawn(FiberJobScheduler& scheduler, FiberJob::Procedure procedure, FiberCancellationToken token,
@@ -780,6 +834,7 @@ struct SC_FIBERS_EXPORT FiberJobPool
 
   private:
     Span<FiberJob> jobs;
+    FiberJobClass* jobClass         = nullptr;
     FiberJob*      availableHead    = nullptr;
     size_t         retainedJobs     = 0;
     size_t         peakRetainedJobs = 0;

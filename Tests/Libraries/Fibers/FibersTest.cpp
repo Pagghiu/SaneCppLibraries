@@ -46,6 +46,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobPool();
         }
+        if (test_section("fiber job class"))
+        {
+            fiberJobClass();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -565,6 +569,65 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not pool.isOpen());
         SC_TEST_EXPECT(not pool.owns(jobs[0]));
         SC_TEST_EXPECT(scheduler.close());
+    }
+
+    void fiberJobClass()
+    {
+        char                 allocatorStorage[4096];
+        FiberAllocator       allocator;
+        FiberAllocator       closedAllocator;
+        FiberJobClass        jobClass;
+        FiberJobClassOptions options;
+        FiberJobPool         pool;
+        FiberJobPool         secondPool;
+        FiberJobScheduler    scheduler;
+        FiberJob*            readyStorage[1] = {};
+        FiberJob*            job             = nullptr;
+        size_t               completed       = 0;
+
+        options.maxJobs = 2;
+        SC_TEST_EXPECT(not jobClass.create(closedAllocator, options));
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        options.maxJobs = 0;
+        SC_TEST_EXPECT(not jobClass.create(allocator, options));
+        options.maxJobs = 2;
+        SC_TEST_EXPECT(jobClass.create(allocator, options));
+        SC_TEST_EXPECT(not jobClass.create(allocator, options));
+        SC_TEST_EXPECT(jobClass.capacity() == 2);
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(pool.create(jobClass));
+        SC_TEST_EXPECT(not secondPool.create(jobClass));
+        SC_TEST_EXPECT(not jobClass.validateClose());
+        SC_TEST_EXPECT(not jobClass.close());
+
+        SC_TEST_EXPECT(pool.spawn(scheduler,
+                                  FiberJob::Procedure(
+                                      [&completed](FiberJobContext&)
+                                      {
+                                          completed += 1;
+                                          return Result(true);
+                                      }),
+                                  job));
+        SC_TEST_EXPECT(job != nullptr);
+        SC_TEST_EXPECT(jobClass.owns(*job));
+        SC_TEST_EXPECT(not pool.close());
+        SC_TEST_EXPECT(scheduler.run());
+        SC_TEST_EXPECT(completed == 1);
+        SC_TEST_EXPECT(pool.release(*job));
+
+        FiberJobClassDiagnostics diagnostics;
+        jobClass.diagnostics(diagnostics);
+        SC_TEST_EXPECT(diagnostics.capacity == 2);
+        SC_TEST_EXPECT(diagnostics.bound);
+
+        SC_TEST_EXPECT(pool.close());
+        jobClass.diagnostics(diagnostics);
+        SC_TEST_EXPECT(not diagnostics.bound);
+        SC_TEST_EXPECT(jobClass.validateClose());
+        SC_TEST_EXPECT(jobClass.close());
+        SC_TEST_EXPECT(not jobClass.isOpen());
+        SC_TEST_EXPECT(scheduler.close());
+        SC_TEST_EXPECT(allocator.close());
     }
 
     void explicitWorker()
