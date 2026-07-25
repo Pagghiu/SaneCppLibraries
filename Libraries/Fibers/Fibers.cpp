@@ -3168,29 +3168,31 @@ Result FiberJobPool::spawn(FiberJobScheduler& scheduler, FiberJob::Procedure pro
         releaseAcquired(*job);
         return spawnResult;
     }
-    if (retainedJobs > peakRetainedJobs)
-    {
-        peakRetainedJobs = retainedJobs;
-    }
+    recordPublished();
     outJob = job;
     return Result(true);
 }
 
 Result FiberJobPool::release(FiberJob& job)
 {
+    fiberSchedulerLock(poolLock);
     if (job.ownerPool != this or not job.poolRetained)
     {
+        fiberSchedulerUnlock(poolLock);
         return Result::Error("FiberJob is not retained by this pool");
     }
     if (not job.isCompleted())
     {
+        fiberSchedulerUnlock(poolLock);
         return Result::Error("FiberJob is not completed");
     }
     if (job.originGroup != nullptr)
     {
+        fiberSchedulerUnlock(poolLock);
         return Result::Error("FiberJob is retained by FiberJobGroup");
     }
-    releaseAcquired(job);
+    releaseAcquiredUnlocked(job);
+    fiberSchedulerUnlock(poolLock);
     return Result(true);
 }
 
@@ -3200,27 +3202,44 @@ bool FiberJobPool::owns(const FiberJob& job) const { return job.ownerPool == thi
 
 size_t FiberJobPool::capacity() const { return jobs.sizeInElements(); }
 
-size_t FiberJobPool::retainedCount() const { return retainedJobs; }
+size_t FiberJobPool::retainedCount() const
+{
+    fiberSchedulerLock(poolLock);
+    const size_t result = retainedJobs;
+    fiberSchedulerUnlock(poolLock);
+    return result;
+}
 
-size_t FiberJobPool::availableCount() const { return capacity() - retainedJobs; }
+size_t FiberJobPool::availableCount() const
+{
+    fiberSchedulerLock(poolLock);
+    const size_t result = capacity() - retainedJobs;
+    fiberSchedulerUnlock(poolLock);
+    return result;
+}
 
 void FiberJobPool::diagnostics(FiberJobPoolDiagnostics& outDiagnostics) const
 {
+    fiberSchedulerLock(poolLock);
     outDiagnostics.capacity         = capacity();
     outDiagnostics.retainedJobs     = retainedJobs;
-    outDiagnostics.availableJobs    = availableCount();
+    outDiagnostics.availableJobs    = capacity() - retainedJobs;
     outDiagnostics.peakRetainedJobs = peakRetainedJobs;
+    fiberSchedulerUnlock(poolLock);
 }
 
 Result FiberJobPool::acquire(FiberJob*& outJob)
 {
     outJob = nullptr;
+    fiberSchedulerLock(poolLock);
     if (not isOpen())
     {
+        fiberSchedulerUnlock(poolLock);
         return Result::Error("FiberJobPool is not open");
     }
     if (availableHead == nullptr)
     {
+        fiberSchedulerUnlock(poolLock);
         return Result::Error("FiberJobPool has no available job");
     }
 
@@ -3230,10 +3249,18 @@ Result FiberJobPool::acquire(FiberJob*& outJob)
     job->poolRetained  = true;
     retainedJobs += 1;
     outJob = job;
+    fiberSchedulerUnlock(poolLock);
     return Result(true);
 }
 
 void FiberJobPool::releaseAcquired(FiberJob& job)
+{
+    fiberSchedulerLock(poolLock);
+    releaseAcquiredUnlocked(job);
+    fiberSchedulerUnlock(poolLock);
+}
+
+void FiberJobPool::releaseAcquiredUnlocked(FiberJob& job)
 {
     SC_FIBERS_ASSERT_RELEASE(job.ownerPool == this);
     SC_FIBERS_ASSERT_RELEASE(job.poolRetained);
@@ -3250,6 +3277,16 @@ void FiberJobPool::releaseAcquired(FiberJob& job)
     job.nextAvailable = availableHead;
     availableHead     = &job;
     retainedJobs -= 1;
+}
+
+void FiberJobPool::recordPublished()
+{
+    fiberSchedulerLock(poolLock);
+    if (retainedJobs > peakRetainedJobs)
+    {
+        peakRetainedJobs = retainedJobs;
+    }
+    fiberSchedulerUnlock(poolLock);
 }
 
 FiberJobGroup::FiberJobGroup(FiberJobScheduler& scheduler) : jobScheduler(scheduler) {}
@@ -3273,21 +3310,44 @@ Result FiberJobGroup::spawn(FiberJobPool& pool, FiberJob::Procedure procedure, F
     {
         *outJob = nullptr;
     }
-    SC_TRY(prepareSpawn());
+    fiberSchedulerLock(groupLock);
+    Result prepareResult = prepareSpawn();
+    if (not prepareResult)
+    {
+        fiberSchedulerUnlock(groupLock);
+        return prepareResult;
+    }
 
-    FiberJob* job = nullptr;
-    SC_TRY(pool.spawn(jobScheduler, procedure, token, job));
+    FiberJob* job           = nullptr;
+    Result    acquireResult = pool.acquire(job);
+    if (not acquireResult)
+    {
+        fiberSchedulerUnlock(groupLock);
+        return acquireResult;
+    }
+
+    // Establish completion ownership before a future worker can claim the published job.
     linkJob(*job);
+    Result spawnResult = jobScheduler.spawn(*job, procedure, token);
+    if (not spawnResult)
+    {
+        unlinkSpawnFailure(*job);
+        pool.releaseAcquired(*job);
+        fiberSchedulerUnlock(groupLock);
+        return spawnResult;
+    }
+    pool.recordPublished();
     if (outJob != nullptr)
     {
         *outJob = job;
     }
+    fiberSchedulerUnlock(groupLock);
     return Result(true);
 }
 
 Result FiberJobGroup::run()
 {
-    while (pendingJobs != 0)
+    while (pendingCount() != 0)
     {
         bool ranJob = false;
         SC_TRY(jobScheduler.runOne(ranJob));
@@ -3301,22 +3361,31 @@ Result FiberJobGroup::run()
 
 Result FiberJobGroup::requestCancel()
 {
+    fiberSchedulerLock(groupLock);
     FiberJob* job = jobHead;
     while (job != nullptr)
     {
         if (job->isActive())
         {
-            SC_TRY(jobScheduler.requestCancel(*job));
+            Result cancelResult = jobScheduler.requestCancel(*job);
+            if (not cancelResult)
+            {
+                fiberSchedulerUnlock(groupLock);
+                return cancelResult;
+            }
         }
         job = job->nextGroup;
     }
+    fiberSchedulerUnlock(groupLock);
     return Result(true);
 }
 
 Result FiberJobGroup::reset()
 {
+    fiberSchedulerLock(groupLock);
     if (pendingJobs != 0)
     {
+        fiberSchedulerUnlock(groupLock);
         return Result::Error("FiberJobGroup cannot reset with pending jobs");
     }
 
@@ -3326,22 +3395,41 @@ Result FiberJobGroup::reset()
         FiberJob* next = job->nextGroup;
         SC_FIBERS_ASSERT_RELEASE(job->originGroup == this);
         SC_FIBERS_ASSERT_RELEASE(job->ownerPool != nullptr);
-        job->originGroup = nullptr;
-        job->nextGroup   = nullptr;
-        SC_TRY(job->ownerPool->release(*job));
+        job->originGroup     = nullptr;
+        job->nextGroup       = nullptr;
+        Result releaseResult = job->ownerPool->release(*job);
+        if (not releaseResult)
+        {
+            fiberSchedulerUnlock(groupLock);
+            return releaseResult;
+        }
         job = next;
     }
     jobHead   = nullptr;
     totalJobs = 0;
+    fiberSchedulerUnlock(groupLock);
     return Result(true);
 }
 
-size_t FiberJobGroup::pendingCount() const { return pendingJobs; }
+size_t FiberJobGroup::pendingCount() const
+{
+    fiberSchedulerLock(groupLock);
+    const size_t result = pendingJobs;
+    fiberSchedulerUnlock(groupLock);
+    return result;
+}
 
-size_t FiberJobGroup::jobCount() const { return totalJobs; }
+size_t FiberJobGroup::jobCount() const
+{
+    fiberSchedulerLock(groupLock);
+    const size_t result = totalJobs;
+    fiberSchedulerUnlock(groupLock);
+    return result;
+}
 
 size_t FiberJobGroup::countErrors() const
 {
+    fiberSchedulerLock(groupLock);
     size_t    errors = 0;
     FiberJob* job    = jobHead;
     while (job != nullptr)
@@ -3352,11 +3440,13 @@ size_t FiberJobGroup::countErrors() const
         }
         job = job->nextGroup;
     }
+    fiberSchedulerUnlock(groupLock);
     return errors;
 }
 
 Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& outErrors) const
 {
+    fiberSchedulerLock(groupLock);
     outErrors     = 0;
     FiberJob* job = jobHead;
     while (job != nullptr)
@@ -3365,6 +3455,7 @@ Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& out
         {
             if (outErrors >= errors.sizeInElements())
             {
+                fiberSchedulerUnlock(groupLock);
                 return Result::Error("FiberJobGroup error storage is too small");
             }
             errors[outErrors].job    = job;
@@ -3373,6 +3464,7 @@ Result FiberJobGroup::collectErrors(Span<FiberJobGroupError> errors, size_t& out
         }
         job = job->nextGroup;
     }
+    fiberSchedulerUnlock(groupLock);
     return Result(true);
 }
 
@@ -3394,11 +3486,26 @@ void FiberJobGroup::linkJob(FiberJob& job)
     totalJobs += 1;
 }
 
+void FiberJobGroup::unlinkSpawnFailure(FiberJob& job)
+{
+    SC_FIBERS_ASSERT_RELEASE(jobHead == &job);
+    SC_FIBERS_ASSERT_RELEASE(job.originGroup == this);
+    SC_FIBERS_ASSERT_RELEASE(pendingJobs > 0);
+    SC_FIBERS_ASSERT_RELEASE(totalJobs > 0);
+    jobHead         = job.nextGroup;
+    job.originGroup = nullptr;
+    job.nextGroup   = nullptr;
+    pendingJobs -= 1;
+    totalJobs -= 1;
+}
+
 void FiberJobGroup::complete(FiberJob& job)
 {
+    fiberSchedulerLock(groupLock);
     SC_FIBERS_ASSERT_RELEASE(job.originGroup == this);
     SC_FIBERS_ASSERT_RELEASE(pendingJobs > 0);
     pendingJobs -= 1;
+    fiberSchedulerUnlock(groupLock);
 }
 
 void FiberScheduler::taskEntry(void* userData)

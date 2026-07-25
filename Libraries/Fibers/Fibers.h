@@ -837,14 +837,20 @@ struct SC_FIBERS_EXPORT FiberJobPool
     void                 diagnostics(FiberJobPoolDiagnostics& outDiagnostics) const;
 
   private:
+    friend struct FiberJobGroup;
+
     Span<FiberJob> jobs;
     FiberJobClass* jobClass         = nullptr;
     FiberJob*      availableHead    = nullptr;
     size_t         retainedJobs     = 0;
     size_t         peakRetainedJobs = 0;
 
+    mutable volatile int32_t poolLock = 0;
+
     Result acquire(FiberJob*& outJob);
     void   releaseAcquired(FiberJob& job);
+    void   releaseAcquiredUnlocked(FiberJob& job);
+    void   recordPublished();
 };
 
 struct SC_FIBERS_EXPORT FiberJobGroupError
@@ -882,8 +888,11 @@ struct SC_FIBERS_EXPORT FiberJobGroup
     size_t             pendingJobs = 0;
     size_t             totalJobs   = 0;
 
+    mutable volatile int32_t groupLock = 0;
+
     Result prepareSpawn() const;
     void   linkJob(FiberJob& job);
+    void   unlinkSpawnFailure(FiberJob& job);
     void   complete(FiberJob& job);
 };
 

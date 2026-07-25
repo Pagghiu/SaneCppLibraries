@@ -703,6 +703,30 @@ struct SC::FibersTest : public SC::TestCase
 
         SC_TEST_EXPECT(pool.close());
         SC_TEST_EXPECT(scheduler.close());
+
+        {
+            FiberJob          constrainedJobs[2];
+            FiberJob*         constrainedReadyStorage[1] = {};
+            FiberJobPool      constrainedPool;
+            FiberJobScheduler constrainedScheduler;
+            FiberJobGroup     constrainedGroup(constrainedScheduler);
+
+            SC_TEST_EXPECT(constrainedPool.create(constrainedJobs));
+            SC_TEST_EXPECT(constrainedScheduler.create(constrainedReadyStorage));
+            SC_TEST_EXPECT(constrainedGroup.spawn(constrainedPool,
+                                                  FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+            SC_TEST_EXPECT(not constrainedGroup.spawn(
+                constrainedPool, FiberJob::Procedure([](FiberJobContext&) { return Result(true); })));
+            SC_TEST_EXPECT(constrainedGroup.pendingCount() == 1);
+            SC_TEST_EXPECT(constrainedGroup.jobCount() == 1);
+            SC_TEST_EXPECT(constrainedPool.retainedCount() == 1);
+            SC_TEST_EXPECT(constrainedPool.availableCount() == 1);
+            SC_TEST_EXPECT(constrainedGroup.run());
+            SC_TEST_EXPECT(constrainedGroup.reset());
+            SC_TEST_EXPECT(constrainedPool.availableCount() == 2);
+            SC_TEST_EXPECT(constrainedPool.close());
+            SC_TEST_EXPECT(constrainedScheduler.close());
+        }
     }
 
     void fiberJobRecursiveFanout()

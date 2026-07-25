@@ -51,6 +51,11 @@ the stackful hot path.
 continuation or auto-recycling counter model. That model must preserve plain `Result`, explicit storage, and stable
 failure aggregation; it must not emulate suspension inside a run-to-completion callback.
 
+Pool retention and group membership bookkeeping are serialized before parallel workers are introduced. A grouped job
+is linked to its group before scheduler publication, so a worker can never report completion to an uninitialized owner.
+If publication fails after record acquisition, group membership and pool retention both roll back before `spawn()`
+returns. This does not make the manually driven `FiberJobScheduler` itself safe for overlapping calls.
+
 ## Consequences
 
 Parallel job workers can scale CPU callbacks independently from stackful fibers and can be sized without reserving

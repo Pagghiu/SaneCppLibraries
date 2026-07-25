@@ -95,8 +95,8 @@ SC_TRY(jobScheduler.close());
 
 The queue never allocates or grows. `spawn()` reports capacity exhaustion, and a running job may submit children only
 while a slot is available. `FiberJobContext` intentionally has no `yield()` or fiber synchronization API. Parallel job
-workers, groups, allocator-backed classes, and help-while-full fan-out remain future Draft work; use `FiberTask`
-whenever the callback must suspend or call `FibersAsync`.
+workers and help-while-full fan-out remain future Draft work; use `FiberTask` whenever the callback must suspend or
+call `FibersAsync`.
 
 `FiberJobPool` provides O(1) acquisition from a fixed `Span<FiberJob>`. A completed job remains retained until the
 caller has inspected `result()` and calls `release()`. This makes result lifetime and backpressure explicit: failed
@@ -106,7 +106,10 @@ bind the pool with `pool.create(jobClass)`. The class owns only stable record st
 
 `FiberJobGroup` submits one bounded wave through a pool, drives its scheduler with `run()`, and retains every job result
 for `countErrors()` or caller-provided `collectErrors()` storage. Call `reset()` after inspection to return all records
-to their originating pools. A group never allocates and cannot start another completed wave before reset.
+to their originating pools. A group never allocates and cannot start another completed wave before reset. Internal pool
+retention and group membership are serialized in preparation for parallel workers, and group ownership is established
+before scheduler publication. The current `FiberJobScheduler` remains single-thread-driven; its calls must not overlap
+across threads.
 
 # Capacity Is Part of Control Flow
 
