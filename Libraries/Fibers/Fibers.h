@@ -841,7 +841,6 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result    complete(FiberJob& job, Result result);
     bool      tryPushWorkerDeque(FiberJobWorker& worker, FiberJob& job);
-    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job);
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);

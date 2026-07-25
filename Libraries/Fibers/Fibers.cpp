@@ -3036,9 +3036,8 @@ bool FiberJob::isCompleted() const { return status() == FiberJobStatus::Complete
 
 bool FiberJob::isCancellationRequested() const
 {
-    const bool schedulerCancelled =
-        isActive() and ownerScheduler != nullptr and
-        cancelGeneration != fiberAtomicLoadUInt32(ownerScheduler->cancelGeneration);
+    const bool schedulerCancelled = isActive() and ownerScheduler != nullptr and
+                                    cancelGeneration != fiberAtomicLoadUInt32(ownerScheduler->cancelGeneration);
     return schedulerCancelled or fiberTaskCancellationLoad(cancelRequested) or
            cancellationToken.isCancellationRequested();
 }
@@ -3312,16 +3311,6 @@ bool FiberJobScheduler::tryPushWorkerDeque(FiberJobWorker& worker, FiberJob& job
     return true;
 }
 
-bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job)
-{
-    if (not tryPushWorkerDeque(worker, job))
-    {
-        return false;
-    }
-    fiberAtomicFetchAddSize(readyJobs, 1);
-    return true;
-}
-
 FiberJob* FiberJobScheduler::popWorkerReady(FiberJobWorker& worker)
 {
     size_t bottom = fiberAtomicLoadSize(worker.localDequeBottom);
@@ -3440,8 +3429,10 @@ Result FiberJobScheduler::spawn(FiberJob& job, FiberJob::Procedure procedure, Fi
         if (bottom - top < worker->localDequeCapacity)
         {
             initializeJobForSpawn(job, procedure, token);
-            SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReady(*worker, job));
+            // Exact accounting must be visible before the release-store publishes the deque bottom to thieves.
+            fiberAtomicFetchAddSize(readyJobs, 1);
             fiberAtomicFetchAddSize(activeJobs, 1);
+            SC_FIBERS_ASSERT_RELEASE(tryPushWorkerDeque(*worker, job));
             if (workerPool != nullptr)
             {
                 workerPool->wakeOneWorker();

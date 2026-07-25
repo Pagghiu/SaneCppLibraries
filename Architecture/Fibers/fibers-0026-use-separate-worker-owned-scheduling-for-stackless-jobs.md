@@ -81,6 +81,11 @@ observes cancellation whether it remains in external storage, has moved into a w
 jobs published after the request capture the new generation and remain valid. This avoids unsafe third-party scans of
 owner/thief deque slots and keeps cancellation independent from queue location.
 
+Owner-local child publication commits ready and active accounting before the release-store advances the worker deque
+bottom. A thief can therefore never observe or complete a child before its exact scheduler counts exist. The owner has
+already proved deque capacity immediately before this sequence; thieves can only increase available capacity, so the
+final publication cannot require rollback.
+
 `FiberJobWorkerPool` owns no hidden memory. It receives caller-owned worker/thread spans, obtains each deque from the
 explicit allocator in its options, and duplicates the contained private OS-thread lifecycle needed to keep Fibers
 independent from Threading. Workers spin for a bounded caller-selected interval and then park on the generation-based
