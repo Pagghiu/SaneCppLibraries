@@ -113,8 +113,11 @@ across threads.
 
 `FiberJobWorker` is the caller-owned record reserved for the parallel runtime. Its bounded local deque storage is
 created explicitly through `FiberJobScheduler::createWorkerDeques()` and a `FiberAllocator`; partial setup failure
-rolls back every deque allocated by that call. Thread startup, stealing, and worker-driven execution are not part of
-the current Draft slice yet.
+rolls back every deque allocated by that call. The worker overloads of `runOne()` and `run()` provide deterministic
+manual execution: jobs spawned by a running worker publish to its local deque, and another supplied worker can steal
+from the opposite end. Once worker-local work exists, callers must continue with a worker overload; plain `run()`
+reports that it cannot drain local deques. OS-thread startup, concurrent external publication, wake/parking, and
+parallel execution are not part of the current Draft slice yet.
 
 # Capacity Is Part of Control Flow
 

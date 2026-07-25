@@ -58,7 +58,10 @@ returns. This does not make the manually driven `FiberJobScheduler` itself safe 
 
 The parallel runtime starts from separate caller-owned `FiberJobWorker` records. Each worker deque is obtained from an
 explicit `FiberAllocator`; startup validation or allocation failure releases only the deques acquired by that attempt
-and leaves every input immediately reusable. Worker records and diagnostics do not reuse or enlarge `FiberWorker`.
+and leaves every input immediately reusable. Owner-local publication and pop use the bottom of that bounded deque;
+another worker claims from the top. The deterministic manually driven worker API proves nested local publication,
+opposite-end stealing, and ready-count ownership before OS threads and wake/parking are introduced. Worker records and
+diagnostics do not reuse or enlarge `FiberWorker`.
 
 ## Consequences
 

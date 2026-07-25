@@ -716,6 +716,9 @@ struct SC_FIBERS_EXPORT FiberJobWorkerDiagnostics
     size_t readyJobs     = 0;
     size_t readyPeakJobs = 0;
     size_t dequeCapacity = 0;
+    size_t stealAttempts = 0;
+    size_t stolenJobs    = 0;
+    size_t failedSteals  = 0;
 };
 
 //! Caller-owned execution agent for the future parallel FiberJob runtime.
@@ -736,7 +739,11 @@ struct SC_FIBERS_EXPORT FiberJobWorker
   private:
     friend struct FiberJobScheduler;
 
+    Result begin(FiberJobScheduler& scheduler);
+    void   end();
+
     FiberJobScheduler* workerScheduler     = nullptr;
+    FiberJobScheduler* localQueueScheduler = nullptr;
     FiberJob*          workerJob           = nullptr;
     FiberJob**         localDeque          = nullptr;
     FiberAllocator*    localDequeAllocator = nullptr;
@@ -744,6 +751,10 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     volatile size_t    localDequeTop       = 0;
     volatile size_t    localDequeBottom    = 0;
     size_t             localReadyPeakJobs  = 0;
+    size_t             stealCursor         = 0;
+    size_t             stealAttempts       = 0;
+    size_t             stolenJobs          = 0;
+    size_t             failedSteals        = 0;
     bool               workerActive        = false;
 };
 
@@ -768,7 +779,9 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     Result spawn(FiberJob& job, FiberJob::Procedure procedure);
     Result spawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result runOne(bool& outRanJob);
+    Result runOne(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup, bool& outRanJob);
     Result run();
+    Result run(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
     Result shutdown();
 
     Result requestCancel(FiberJob& job);
@@ -790,9 +803,14 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     size_t          queueHead  = 0;
     size_t          queueTail  = 0;
     size_t          queueCount = 0;
-    size_t          activeJobs = 0;
+    volatile size_t readyJobs  = 0;
+    volatile size_t activeJobs = 0;
 
-    Result complete(FiberJob& job, Result result);
+    Result    complete(FiberJob& job, Result result);
+    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job);
+    FiberJob* popWorkerReady(FiberJobWorker& worker);
+    FiberJob* stealWorkerReady(FiberJobWorker& worker);
+    FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
 };
 
 struct SC_FIBERS_EXPORT FiberJobPoolDiagnostics

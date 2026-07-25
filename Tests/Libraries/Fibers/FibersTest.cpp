@@ -62,6 +62,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobWorkerStorage();
         }
+        if (test_section("fiber job worker stealing"))
+        {
+            fiberJobWorkerStealing();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -866,6 +870,88 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(allocator.used() == 0);
         SC_TEST_EXPECT(allocator.close());
         SC_TEST_EXPECT(existingAllocator.close());
+    }
+
+    void fiberJobWorkerStealing()
+    {
+        struct State
+        {
+            FiberJobScheduler* scheduler = nullptr;
+            FiberJobWorker*    owner     = nullptr;
+            FiberJob*          parent    = nullptr;
+            FiberJob*          children  = nullptr;
+            size_t             completed = 0;
+            bool               sawOwner  = false;
+
+            Result spawnChildren()
+            {
+                sawOwner = scheduler->currentJob() == parent and owner->runningJob() == parent and owner->isActive();
+                for (size_t index = 0; index < 3; ++index)
+                {
+                    State* state = this;
+                    SC_TRY(scheduler->spawn(children[index], FiberJob::Procedure(
+                                                                 [state](FiberJobContext&)
+                                                                 {
+                                                                     state->completed += 1;
+                                                                     return Result(true);
+                                                                 })));
+                }
+                return Result(true);
+            }
+        };
+
+        FiberJob          jobs[4];
+        FiberJob*         readyStorage[1] = {};
+        FiberJobScheduler scheduler;
+        FiberJobWorker    workers[2];
+        char              allocatorStorage[1024] = {};
+        FiberAllocator    allocator;
+        State             state;
+        state.scheduler = &scheduler;
+        state.owner     = &workers[0];
+        state.parent    = &jobs[0];
+        state.children  = &jobs[1];
+
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, workers, 4));
+        State* statePointer = &state;
+        SC_TEST_EXPECT(scheduler.spawn(
+            jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
+
+        bool ranJob = false;
+        SC_TEST_EXPECT(scheduler.runOne(workers[0], workers, ranJob));
+        SC_TEST_EXPECT(ranJob);
+        SC_TEST_EXPECT(state.sawOwner);
+        SC_TEST_EXPECT(state.completed == 0);
+        SC_TEST_EXPECT(scheduler.readyJobCount() == 3);
+        SC_TEST_EXPECT(not scheduler.run());
+        SC_TEST_EXPECT(scheduler.readyJobCount() == 3);
+
+        FiberJobWorkerDiagnostics ownerDiagnostics;
+        scheduler.workerDiagnostics(workers[0], ownerDiagnostics);
+        SC_TEST_EXPECT(ownerDiagnostics.readyJobs == 3);
+        SC_TEST_EXPECT(ownerDiagnostics.readyPeakJobs == 3);
+
+        ranJob = false;
+        SC_TEST_EXPECT(scheduler.runOne(workers[1], workers, ranJob));
+        SC_TEST_EXPECT(ranJob);
+        SC_TEST_EXPECT(state.completed == 1);
+
+        FiberJobWorkerDiagnostics thiefDiagnostics;
+        scheduler.workerDiagnostics(workers[1], thiefDiagnostics);
+        SC_TEST_EXPECT(thiefDiagnostics.stealAttempts == 1);
+        SC_TEST_EXPECT(thiefDiagnostics.stolenJobs == 1);
+        SC_TEST_EXPECT(thiefDiagnostics.failedSteals == 0);
+
+        SC_TEST_EXPECT(scheduler.run(workers[0], workers));
+        SC_TEST_EXPECT(state.completed == 3);
+        SC_TEST_EXPECT(not scheduler.hasReadyJobs());
+        SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+        scheduler.releaseWorkerDeques(workers);
+        SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(scheduler.close());
+        SC_TEST_EXPECT(allocator.close());
     }
 
     void explicitWorker()
