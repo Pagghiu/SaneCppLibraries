@@ -3036,7 +3036,11 @@ bool FiberJob::isCompleted() const { return status() == FiberJobStatus::Complete
 
 bool FiberJob::isCancellationRequested() const
 {
-    return fiberTaskCancellationLoad(cancelRequested) or cancellationToken.isCancellationRequested();
+    const bool schedulerCancelled =
+        isActive() and ownerScheduler != nullptr and
+        cancelGeneration != fiberAtomicLoadUInt32(ownerScheduler->cancelGeneration);
+    return schedulerCancelled or fiberTaskCancellationLoad(cancelRequested) or
+           cancellationToken.isCancellationRequested();
 }
 
 FiberJobStatus FiberJob::status() const { return static_cast<FiberJobStatus>(fiberTaskStatusRawLoad(jobStatus)); }
@@ -3141,6 +3145,7 @@ Result FiberJobScheduler::create(Span<FiberJob*> readyStorage)
     queueCount   = 0;
     fiberAtomicStoreSize(readyJobs, 0);
     fiberAtomicStoreSize(activeJobs, 0);
+    fiberAtomicStoreUInt32(cancelGeneration, 0);
     runningJob = nullptr;
     for (FiberJob*& entry : queueStorage)
     {
@@ -3286,7 +3291,7 @@ void FiberJobScheduler::workerDiagnostics(const FiberJobWorker& worker, FiberJob
     outDiagnostics.failedSteals   = worker.failedSteals;
 }
 
-bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job, bool incrementReadyJobs)
+bool FiberJobScheduler::tryPushWorkerDeque(FiberJobWorker& worker, FiberJob& job)
 {
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
     SC_FIBERS_ASSERT_RELEASE(worker.localQueueScheduler == this);
@@ -3298,16 +3303,22 @@ bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job
     }
 
     worker.localDeque[bottom % worker.localDequeCapacity] = &job;
-    if (incrementReadyJobs)
-    {
-        fiberAtomicFetchAddSize(readyJobs, 1);
-    }
     fiberAtomicStoreSize(worker.localDequeBottom, bottom + 1);
     const size_t workerReady = bottom + 1 - top;
     if (workerReady > worker.localReadyPeakJobs)
     {
         worker.localReadyPeakJobs = workerReady;
     }
+    return true;
+}
+
+bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job)
+{
+    if (not tryPushWorkerDeque(worker, job))
+    {
+        return false;
+    }
+    fiberAtomicFetchAddSize(readyJobs, 1);
     return true;
 }
 
@@ -3467,6 +3478,7 @@ void FiberJobScheduler::initializeJobForSpawn(FiberJob& job, FiberJob::Procedure
     job.procedure         = procedure;
     job.ownerScheduler    = this;
     job.cancellationToken = token;
+    job.cancelGeneration  = fiberAtomicLoadUInt32(cancelGeneration);
     job.jobResult         = Result(true);
     fiberTaskCancellationStore(job.cancelRequested, token.isCancellationRequested());
     fiberAtomicStore(job.jobStatus, static_cast<int32_t>(FiberJobStatus::Ready));
@@ -3549,7 +3561,7 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
                 queueStorage[queueHead] = nullptr;
                 queueHead               = (queueHead + 1) % queueStorage.sizeInElements();
                 queueCount -= 1;
-                SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReady(worker, *localJob, false));
+                SC_FIBERS_ASSERT_RELEASE(tryPushWorkerDeque(worker, *localJob));
                 claimedJobs += 1;
             }
             worker.claimBatches += 1;
@@ -3652,18 +3664,7 @@ Result FiberJobScheduler::requestCancel(FiberCancellationTokenSource& tokenSourc
 
 Result FiberJobScheduler::requestCancelAll()
 {
-    QueueLockGuard guard(*this);
-    for (FiberJob* job : queueStorage)
-    {
-        if (job != nullptr)
-        {
-            fiberTaskCancellationStore(job->cancelRequested, true);
-        }
-    }
-    if (runningJob != nullptr)
-    {
-        fiberTaskCancellationStore(runningJob->cancelRequested, true);
-    }
+    fiberAtomicFetchAddUInt32(cancelGeneration, 1);
     return Result(true);
 }
 

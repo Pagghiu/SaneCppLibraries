@@ -1157,6 +1157,75 @@ struct SC::FibersTest : public SC::TestCase
         }
 
         {
+            static constexpr size_t CancelWorkers = 2;
+            static constexpr size_t CancelJobs    = 64;
+
+            struct CancelState
+            {
+                Atomic<int32_t> invoked;
+                Atomic<int32_t> entered;
+                Atomic<bool>    release;
+            };
+
+            FiberJob                  jobs[CancelJobs];
+            FiberJob*                 readyStorage[CancelJobs] = {};
+            FiberJobScheduler         scheduler;
+            FiberJobWorker            workers[CancelWorkers];
+            FiberJobWorkerThread      threads[CancelWorkers];
+            FiberJobWorkerPool        workerPool;
+            FiberJobWorkerPoolOptions options;
+            char                      allocatorStorage[CancelWorkers * CancelJobs * sizeof(FiberJob*) + 4096] = {};
+            FiberAllocator            allocator;
+            CancelState               state;
+            options.dequeAllocator         = &allocator;
+            options.dequeCapacityPerWorker = CancelJobs;
+
+            SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+            SC_TEST_EXPECT(scheduler.create(readyStorage));
+            for (FiberJob& job : jobs)
+            {
+                SC_TEST_EXPECT(scheduler.spawn(job, FiberJob::Procedure(
+                                                        [&state](FiberJobContext& context)
+                                                        {
+                                                            const int32_t ticket = state.invoked.fetch_add(1);
+                                                            if (ticket < static_cast<int32_t>(CancelWorkers))
+                                                            {
+                                                                state.entered.fetch_add(1);
+                                                                while (not state.release.load()) {}
+                                                            }
+                                                            return context.checkCancellation();
+                                                        })));
+            }
+            SC_TEST_EXPECT(workerPool.start(scheduler, workers, threads, options));
+            while (state.entered.load() != static_cast<int32_t>(CancelWorkers)) {}
+            SC_TEST_EXPECT(scheduler.requestCancelAll());
+            state.release.store(true);
+            SC_TEST_EXPECT(workerPool.join());
+            SC_TEST_EXPECT(state.invoked.load() == static_cast<int32_t>(CancelWorkers));
+            SC_TEST_EXPECT(not scheduler.hasReadyJobs());
+            SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            size_t claimBatchPeak = 0;
+            for (FiberJobWorker& worker : workers)
+            {
+                FiberJobWorkerDiagnostics diagnostics;
+                scheduler.workerDiagnostics(worker, diagnostics);
+                if (diagnostics.claimBatchPeak > claimBatchPeak)
+                {
+                    claimBatchPeak = diagnostics.claimBatchPeak;
+                }
+            }
+            SC_TEST_EXPECT(claimBatchPeak > 1);
+            for (FiberJob& job : jobs)
+            {
+                SC_TEST_EXPECT(job.isCompleted());
+                SC_TEST_EXPECT(not job.result());
+            }
+            SC_TEST_EXPECT(allocator.used() == 0);
+            SC_TEST_EXPECT(scheduler.close());
+            SC_TEST_EXPECT(allocator.close());
+        }
+
+        {
             struct StopState
             {
                 Atomic<bool> entered;

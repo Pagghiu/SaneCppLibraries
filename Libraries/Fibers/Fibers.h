@@ -708,10 +708,11 @@ struct SC_FIBERS_EXPORT FiberJob
     FiberJobGroup*         originGroup    = nullptr;
     FiberJob*              nextGroup      = nullptr;
     FiberCancellationToken cancellationToken;
-    Result                 jobResult       = Result(true);
-    volatile int32_t       jobStatus       = static_cast<int32_t>(FiberJobStatus::Invalid);
-    volatile bool          cancelRequested = false;
-    bool                   poolRetained    = false;
+    Result                 jobResult        = Result(true);
+    volatile int32_t       jobStatus        = static_cast<int32_t>(FiberJobStatus::Invalid);
+    uint32_t               cancelGeneration = 0;
+    volatile bool          cancelRequested  = false;
+    bool                   poolRetained     = false;
 };
 
 struct SC_FIBERS_EXPORT FiberJobWorkerDiagnostics
@@ -774,6 +775,10 @@ struct SC_FIBERS_EXPORT FiberJobWorker
 //!
 //! Plain run calls are single-thread-driven. External spawn and worker run calls may overlap while a
 //! FiberJobWorkerPool or caller-managed FiberJobWorker threads own execution.
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
 struct SC_FIBERS_EXPORT FiberJobScheduler
 {
     FiberJobScheduler();
@@ -807,10 +812,14 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     [[nodiscard]] size_t    readyJobCount() const;
     [[nodiscard]] size_t    activeJobCount() const;
     [[nodiscard]] FiberJob* currentJob();
+
+    //! Diagnostics remain available after a worker pool joins and reset when its deque is configured again.
+    //! The caller must not read diagnostics while that worker can execute jobs.
     void workerDiagnostics(const FiberJobWorker& worker, FiberJobWorkerDiagnostics& outDiagnostics) const;
 
   private:
     friend struct FiberJobContext;
+    friend struct FiberJob;
     friend struct FiberJobWorkerPool;
 
     Span<FiberJob*> queueStorage;
@@ -823,6 +832,7 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     alignas(128) volatile size_t activeJobs = 0;
 
     alignas(128) mutable volatile int32_t queueLock = 0;
+    volatile uint32_t cancelGeneration              = 0;
 
     FiberJobWorkerPool* workerPool = nullptr;
 
@@ -830,12 +840,16 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
 
     void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result    complete(FiberJob& job, Result result);
-    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job, bool incrementReadyJobs = true);
+    bool      tryPushWorkerDeque(FiberJobWorker& worker, FiberJob& job);
+    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job);
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);
     bool      isWorkerStopRequested() const;
 };
+#if SC_PLATFORM_WINDOWS && (SC_COMPILER_MSVC || SC_COMPILER_CLANG_CL)
+#pragma warning(pop)
+#endif
 
 //! Caller-owned OS thread storage used by FiberJobWorkerPool.
 struct SC_FIBERS_EXPORT FiberJobWorkerThread

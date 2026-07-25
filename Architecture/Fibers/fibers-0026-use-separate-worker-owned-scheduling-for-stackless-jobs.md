@@ -73,7 +73,13 @@ claiming worker's caller-funded deque without changing the scheduler's total rea
 The batch never exceeds the deque's available capacity, and the one-worker path continues claiming directly. Ready,
 active, and injection-lock state occupy distinct cache lines so independent claim and completion writes do not create
 avoidable false sharing. Worker execution, claim, and steal diagnostics remain readable after `join()` releases deque
-storage and reset when that worker is configured for its next run.
+storage and reset when that worker is configured for its next run. Diagnostics are a quiescent snapshot API and must
+not be read while the corresponding worker can still execute jobs.
+
+Scheduler-wide cancellation advances a generation captured by every job at publication. Every already-active job then
+observes cancellation whether it remains in external storage, has moved into a worker deque, or is currently running;
+jobs published after the request capture the new generation and remain valid. This avoids unsafe third-party scans of
+owner/thief deque slots and keeps cancellation independent from queue location.
 
 `FiberJobWorkerPool` owns no hidden memory. It receives caller-owned worker/thread spans, obtains each deque from the
 explicit allocator in its options, and duplicates the contained private OS-thread lifecycle needed to keep Fibers
