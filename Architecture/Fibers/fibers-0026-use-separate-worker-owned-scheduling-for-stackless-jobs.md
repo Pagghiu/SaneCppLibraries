@@ -68,6 +68,13 @@ therefore claim external work concurrently, publish children to their owner dequ
 funneling owner-local work through a global queue. This lock is an initial bounded external-publication mechanism, not
 permission to replace worker-owned scheduling with a globally locked production queue.
 
+Workers claim preloaded external work in bounded batches. One job executes immediately and the remainder move to the
+claiming worker's caller-funded deque without changing the scheduler's total ready count; peers may steal those jobs.
+The batch never exceeds the deque's available capacity, and the one-worker path continues claiming directly. Ready,
+active, and injection-lock state occupy distinct cache lines so independent claim and completion writes do not create
+avoidable false sharing. Worker execution, claim, and steal diagnostics remain readable after `join()` releases deque
+storage and reset when that worker is configured for its next run.
+
 `FiberJobWorkerPool` owns no hidden memory. It receives caller-owned worker/thread spans, obtains each deque from the
 explicit allocator in its options, and duplicates the contained private OS-thread lifecycle needed to keep Fibers
 independent from Threading. Workers spin for a bounded caller-selected interval and then park on the generation-based
@@ -110,6 +117,13 @@ Before declaring the topology complete, focused tests must cover local saturatio
 stealing, cancellation-before-claim, cancellation while running, stop/drain, startup rollback, immediate storage reuse,
 and the all-workers-fan-out record-exhaustion case. Release benchmarks must cover one, two, four, eight, and available
 workers with balanced, forced-steal, recursive fan-out, and tiny sustained workloads.
+
+The first preloaded million-job benchmark reduced external claim transactions from one million to 3,907 with 256-entry
+worker deques. On the same macOS ARM64 Release host, cache-line isolation raised representative 2/4/8-worker samples
+from approximately 7.7M/2.6M/1.3M jobs/sec to 16.0M/11.5M/9.7M jobs/sec while preserving approximately 60M jobs/sec
+with one worker. These are diagnostic samples rather than a quiet-machine baseline. The remaining tiny-job scaling
+limit is the exact shared active-job completion count and requires a separate ownership decision rather than relaxed
+count semantics.
 
 ## Related
 

@@ -1139,6 +1139,18 @@ struct SC::FibersTest : public SC::TestCase
             SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(NumChildren));
             SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumChildren));
             SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+            size_t executedJobs = 0;
+            size_t claimedJobs  = 0;
+            for (FiberJobWorker& worker : workers)
+            {
+                FiberJobWorkerDiagnostics diagnostics;
+                scheduler.workerDiagnostics(worker, diagnostics);
+                executedJobs += diagnostics.executedJobs;
+                claimedJobs += diagnostics.claimedJobs;
+                SC_TEST_EXPECT(diagnostics.dequeCapacity == NumChildren);
+            }
+            SC_TEST_EXPECT(executedJobs == NumChildren + 1);
+            SC_TEST_EXPECT(claimedJobs > 0);
             SC_TEST_EXPECT(allocator.used() == 0);
             SC_TEST_EXPECT(scheduler.close());
             SC_TEST_EXPECT(allocator.close());

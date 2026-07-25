@@ -3166,6 +3166,19 @@ Result FiberJobScheduler::close()
 Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<FiberJobWorker> workers,
                                              size_t capacityPerWorker)
 {
+    const auto resetDiagnostics = [](FiberJobWorker& worker)
+    {
+        worker.lastDequeCapacity  = 0;
+        worker.localReadyPeakJobs = 0;
+        worker.executedJobs       = 0;
+        worker.claimBatches       = 0;
+        worker.claimedJobs        = 0;
+        worker.claimBatchPeak     = 0;
+        worker.stealCursor        = 0;
+        worker.stealAttempts      = 0;
+        worker.stolenJobs         = 0;
+        worker.failedSteals       = 0;
+    };
     if (not allocator.isOpen())
     {
         return Result::Error("FiberAllocator is not open");
@@ -3189,12 +3202,20 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
         if (worker.localDeque != nullptr)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
+            for (size_t index = 0; index < allocatedWorkers; ++index)
+            {
+                resetDiagnostics(workers[index]);
+            }
             return Result::Error("FiberJobWorker already has a local deque");
         }
         if (worker.workerActive or worker.workerScheduler != nullptr or worker.localQueueScheduler != nullptr or
             worker.workerJob != nullptr)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
+            for (size_t index = 0; index < allocatedWorkers; ++index)
+            {
+                resetDiagnostics(workers[index]);
+            }
             return Result::Error("FiberJobWorker is active");
         }
 
@@ -3203,18 +3224,19 @@ Result FiberJobScheduler::createWorkerDeques(FiberAllocator& allocator, Span<Fib
         if (memory == nullptr)
         {
             releaseWorkerDeques({workers.data(), allocatedWorkers});
+            for (size_t index = 0; index < allocatedWorkers; ++index)
+            {
+                resetDiagnostics(workers[index]);
+            }
             return Result::Error("FiberJobWorker deque allocation failed");
         }
 
+        resetDiagnostics(worker);
         worker.localDeque          = static_cast<FiberJob**>(memory);
         worker.localDequeAllocator = &allocator;
         worker.localQueueScheduler = this;
         worker.localDequeCapacity  = capacityPerWorker;
-        worker.localReadyPeakJobs  = 0;
-        worker.stealCursor         = 0;
-        worker.stealAttempts       = 0;
-        worker.stolenJobs          = 0;
-        worker.failedSteals        = 0;
+        worker.lastDequeCapacity   = capacityPerWorker;
         fiberAtomicStoreSize(worker.localDequeTop, 0);
         fiberAtomicStoreSize(worker.localDequeBottom, 0);
         for (size_t index = 0; index < capacityPerWorker; ++index)
@@ -3243,11 +3265,6 @@ void FiberJobScheduler::releaseWorkerDeques(Span<FiberJobWorker> workers)
         worker.localDequeAllocator = nullptr;
         worker.localQueueScheduler = nullptr;
         worker.localDequeCapacity  = 0;
-        worker.localReadyPeakJobs  = 0;
-        worker.stealCursor         = 0;
-        worker.stealAttempts       = 0;
-        worker.stolenJobs          = 0;
-        worker.failedSteals        = 0;
         fiberAtomicStoreSize(worker.localDequeTop, 0);
         fiberAtomicStoreSize(worker.localDequeBottom, 0);
     }
@@ -3255,17 +3272,21 @@ void FiberJobScheduler::releaseWorkerDeques(Span<FiberJobWorker> workers)
 
 void FiberJobScheduler::workerDiagnostics(const FiberJobWorker& worker, FiberJobWorkerDiagnostics& outDiagnostics) const
 {
-    const size_t top             = fiberAtomicLoadSize(worker.localDequeTop);
-    const size_t bottom          = fiberAtomicLoadSize(worker.localDequeBottom);
-    outDiagnostics.readyJobs     = bottom >= top ? bottom - top : 0;
-    outDiagnostics.readyPeakJobs = worker.localReadyPeakJobs;
-    outDiagnostics.dequeCapacity = worker.localDequeCapacity;
-    outDiagnostics.stealAttempts = worker.stealAttempts;
-    outDiagnostics.stolenJobs    = worker.stolenJobs;
-    outDiagnostics.failedSteals  = worker.failedSteals;
+    const size_t top              = fiberAtomicLoadSize(worker.localDequeTop);
+    const size_t bottom           = fiberAtomicLoadSize(worker.localDequeBottom);
+    outDiagnostics.readyJobs      = bottom >= top ? bottom - top : 0;
+    outDiagnostics.readyPeakJobs  = worker.localReadyPeakJobs;
+    outDiagnostics.dequeCapacity  = worker.lastDequeCapacity;
+    outDiagnostics.executedJobs   = worker.executedJobs;
+    outDiagnostics.claimBatches   = worker.claimBatches;
+    outDiagnostics.claimedJobs    = worker.claimedJobs;
+    outDiagnostics.claimBatchPeak = worker.claimBatchPeak;
+    outDiagnostics.stealAttempts  = worker.stealAttempts;
+    outDiagnostics.stolenJobs     = worker.stolenJobs;
+    outDiagnostics.failedSteals   = worker.failedSteals;
 }
 
-bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job)
+bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job, bool incrementReadyJobs)
 {
     SC_FIBERS_ASSERT_RELEASE(worker.localDeque != nullptr);
     SC_FIBERS_ASSERT_RELEASE(worker.localQueueScheduler == this);
@@ -3277,7 +3298,10 @@ bool FiberJobScheduler::tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job
     }
 
     worker.localDeque[bottom % worker.localDequeCapacity] = &job;
-    fiberAtomicFetchAddSize(readyJobs, 1);
+    if (incrementReadyJobs)
+    {
+        fiberAtomicFetchAddSize(readyJobs, 1);
+    }
     fiberAtomicStoreSize(worker.localDequeBottom, bottom + 1);
     const size_t workerReady = bottom + 1 - top;
     if (workerReady > worker.localReadyPeakJobs)
@@ -3489,6 +3513,8 @@ Result FiberJobScheduler::runOne(bool& outRanJob)
 
 Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup, bool& outRanJob)
 {
+    static constexpr size_t MaxClaimBatch = 256;
+
     outRanJob = false;
     if (not isOpen())
     {
@@ -3502,12 +3528,36 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
         QueueLockGuard guard(*this);
         if (queueCount != 0)
         {
+            size_t claimedJobs      = 0;
             job                     = queueStorage[queueHead];
             queueStorage[queueHead] = nullptr;
             queueHead               = (queueHead + 1) % queueStorage.sizeInElements();
             queueCount -= 1;
             SC_FIBERS_ASSERT_RELEASE(fiberAtomicLoadSize(readyJobs) > 0);
             fiberAtomicFetchSubSize(readyJobs, 1);
+            claimedJobs += 1;
+
+            while (workerGroup.sizeInElements() > 1 and queueCount != 0 and claimedJobs < MaxClaimBatch)
+            {
+                const size_t localTop    = fiberAtomicLoadSize(worker.localDequeTop);
+                const size_t localBottom = fiberAtomicLoadSize(worker.localDequeBottom);
+                if (localBottom - localTop >= worker.localDequeCapacity)
+                {
+                    break;
+                }
+                FiberJob* localJob      = queueStorage[queueHead];
+                queueStorage[queueHead] = nullptr;
+                queueHead               = (queueHead + 1) % queueStorage.sizeInElements();
+                queueCount -= 1;
+                SC_FIBERS_ASSERT_RELEASE(tryPushWorkerReady(worker, *localJob, false));
+                claimedJobs += 1;
+            }
+            worker.claimBatches += 1;
+            worker.claimedJobs += claimedJobs;
+            if (claimedJobs > worker.claimBatchPeak)
+            {
+                worker.claimBatchPeak = claimedJobs;
+            }
         }
     }
     if (job == nullptr)
@@ -3529,6 +3579,7 @@ Result FiberJobScheduler::runOne(FiberJobWorker& worker, Span<FiberJobWorker> wo
         context.isCancellationRequested() ? Result::Error("FiberJob cancelled") : job->procedure(context);
     outRanJob              = true;
     const Result runResult = complete(*job, procedureResult);
+    worker.executedJobs += 1;
     worker.end();
     return runResult;
 }

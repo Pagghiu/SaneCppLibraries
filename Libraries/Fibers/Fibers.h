@@ -716,12 +716,16 @@ struct SC_FIBERS_EXPORT FiberJob
 
 struct SC_FIBERS_EXPORT FiberJobWorkerDiagnostics
 {
-    size_t readyJobs     = 0;
-    size_t readyPeakJobs = 0;
-    size_t dequeCapacity = 0;
-    size_t stealAttempts = 0;
-    size_t stolenJobs    = 0;
-    size_t failedSteals  = 0;
+    size_t readyJobs      = 0;
+    size_t readyPeakJobs  = 0;
+    size_t dequeCapacity  = 0;
+    size_t executedJobs   = 0;
+    size_t claimBatches   = 0;
+    size_t claimedJobs    = 0;
+    size_t claimBatchPeak = 0;
+    size_t stealAttempts  = 0;
+    size_t stolenJobs     = 0;
+    size_t failedSteals   = 0;
 };
 
 //! Caller-owned execution agent for the future parallel FiberJob runtime.
@@ -751,9 +755,14 @@ struct SC_FIBERS_EXPORT FiberJobWorker
     FiberJob**         localDeque          = nullptr;
     FiberAllocator*    localDequeAllocator = nullptr;
     size_t             localDequeCapacity  = 0;
+    size_t             lastDequeCapacity   = 0;
     volatile size_t    localDequeTop       = 0;
     volatile size_t    localDequeBottom    = 0;
     size_t             localReadyPeakJobs  = 0;
+    size_t             executedJobs        = 0;
+    size_t             claimBatches        = 0;
+    size_t             claimedJobs         = 0;
+    size_t             claimBatchPeak      = 0;
     size_t             stealCursor         = 0;
     size_t             stealAttempts       = 0;
     size_t             stolenJobs          = 0;
@@ -809,10 +818,11 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     size_t          queueHead  = 0;
     size_t          queueTail  = 0;
     size_t          queueCount = 0;
-    volatile size_t readyJobs  = 0;
-    volatile size_t activeJobs = 0;
 
-    mutable volatile int32_t queueLock = 0;
+    alignas(128) volatile size_t readyJobs  = 0;
+    alignas(128) volatile size_t activeJobs = 0;
+
+    alignas(128) mutable volatile int32_t queueLock = 0;
 
     FiberJobWorkerPool* workerPool = nullptr;
 
@@ -820,7 +830,7 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
 
     void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result    complete(FiberJob& job, Result result);
-    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job);
+    bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job, bool incrementReadyJobs = true);
     FiberJob* popWorkerReady(FiberJobWorker& worker);
     FiberJob* stealWorkerReady(FiberJobWorker& worker);
     FiberJob* stealReady(FiberJobWorker& worker, Span<FiberJobWorker> workerGroup);

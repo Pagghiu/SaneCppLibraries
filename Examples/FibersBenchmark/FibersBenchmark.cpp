@@ -319,6 +319,105 @@ static Result runFiberJobPoolBenchmark(Console& console)
     return Result(true);
 }
 
+static Result runFiberJobWorkerPoolBenchmark(Console& console, size_t numWorkers)
+{
+    static constexpr size_t MaxWorkers             = 64;
+    static constexpr size_t TotalJobs              = 1'000'000;
+    static constexpr size_t DequeCapacityPerWorker = 256;
+
+    SC_TRY_MSG(numWorkers > 0 and numWorkers <= MaxWorkers, "FiberJob worker count must be between one and 64");
+
+    static FiberJob  jobs[TotalJobs];
+    static FiberJob* readyStorage[TotalJobs] = {};
+    static uint32_t  results[TotalJobs]      = {};
+
+    FiberJobScheduler         scheduler;
+    FiberJobWorker            workers[MaxWorkers];
+    FiberJobWorkerThread      threads[MaxWorkers];
+    FiberJobWorkerPool        workerPool;
+    FiberJobWorkerPoolOptions options;
+    FiberAllocator            allocator;
+    static char allocatorStorage[MaxWorkers * DequeCapacityPerWorker * sizeof(FiberJob*) + MaxWorkers * 128] = {};
+
+    options.dequeAllocator         = &allocator;
+    options.dequeCapacityPerWorker = DequeCapacityPerWorker;
+
+    SC_TRY(allocator.createFixed(allocatorStorage));
+    SC_TRY(scheduler.create(readyStorage));
+    for (size_t index = 0; index < TotalJobs; ++index)
+    {
+        uint32_t* result = &results[index];
+        SC_TRY(scheduler.spawn(jobs[index], FiberJob::Procedure(
+                                                [result, index](FiberJobContext&)
+                                                {
+                                                    *result = static_cast<uint32_t>(index + 1);
+                                                    return Result(true);
+                                                })));
+    }
+
+    Time::HighResolutionCounter start;
+    start.snap();
+    SC_TRY(workerPool.start(scheduler, {workers, numWorkers}, {threads, numWorkers}, options));
+    SC_TRY(workerPool.join());
+    Time::HighResolutionCounter finish;
+    finish.snap();
+
+    size_t checksum = 0;
+    for (size_t index = 0; index < TotalJobs; ++index)
+    {
+        SC_TRY_MSG(results[index] == index + 1, "FiberJob worker-pool benchmark result mismatch");
+        checksum += results[index];
+        results[index] = 0;
+    }
+    SC_TRY_MSG(checksum == TotalJobs * (TotalJobs + 1) / 2, "FiberJob worker-pool benchmark checksum mismatch");
+    SC_TRY_MSG(not scheduler.hasActiveJobs(), "FiberJob worker-pool benchmark left active jobs");
+
+    size_t stealAttempts = 0;
+    size_t stolenJobs    = 0;
+    size_t failedSteals  = 0;
+    size_t executedJobs  = 0;
+    size_t claimBatches  = 0;
+    size_t claimedJobs   = 0;
+    for (size_t workerIndex = 0; workerIndex < numWorkers; ++workerIndex)
+    {
+        FiberJobWorkerDiagnostics diagnostics;
+        scheduler.workerDiagnostics(workers[workerIndex], diagnostics);
+        executedJobs += diagnostics.executedJobs;
+        claimBatches += diagnostics.claimBatches;
+        claimedJobs += diagnostics.claimedJobs;
+        stealAttempts += diagnostics.stealAttempts;
+        stolenJobs += diagnostics.stolenJobs;
+        failedSteals += diagnostics.failedSteals;
+    }
+
+    const FiberAllocatorStatistics allocatorStatistics = allocator.statistics();
+    SC_TRY(scheduler.close());
+    SC_TRY(allocator.close());
+    SC_TRY_MSG(executedJobs == TotalJobs, "FiberJob worker-pool benchmark execution count mismatch");
+
+    const Time::HighResolutionCounter elapsed       = finish.subtractExact(start);
+    const int64_t                     elapsedNs     = elapsed.toNanoseconds().ns > 0 ? elapsed.toNanoseconds().ns : 1;
+    const size_t                      jobsPerSecond = static_cast<size_t>(TotalJobs * 1000000000ull / elapsedNs);
+    console.print("FibersBenchmark stackless job worker pool\n");
+    console.print("  workers={} jobs={} timing=preloaded-start-through-drain elapsedNs={} jobsPerSec={} checksum={}\n",
+                  numWorkers, TotalJobs, static_cast<size_t>(elapsedNs), jobsPerSecond, checksum);
+    console.print("  executedJobs={} claimBatches={} claimedJobs={} stealAttempts={} stolenJobs={} failedSteals={}\n",
+                  executedJobs, claimBatches, claimedJobs, stealAttempts, stolenJobs, failedSteals);
+    console.print("  allocatorPeakBytes={} allocatorFailures={}\n", allocatorStatistics.peakBytesInUse,
+                  allocatorStatistics.numAllocationFailures);
+    for (size_t workerIndex = 0; workerIndex < numWorkers; ++workerIndex)
+    {
+        FiberJobWorkerDiagnostics diagnostics;
+        scheduler.workerDiagnostics(workers[workerIndex], diagnostics);
+        console.print("  worker[{}] executed={} queuePeak={} dequeCapacity={} claimBatches={} claimedJobs={} "
+                      "claimBatchPeak={} stealAttempts={} stolenJobs={} failedSteals={}\n",
+                      workerIndex, diagnostics.executedJobs, diagnostics.readyPeakJobs, diagnostics.dequeCapacity,
+                      diagnostics.claimBatches, diagnostics.claimedJobs, diagnostics.claimBatchPeak,
+                      diagnostics.stealAttempts, diagnostics.stolenJobs, diagnostics.failedSteals);
+    }
+    return Result(true);
+}
+
 static Result runForcedStealingBenchmark(Console& console)
 {
     static constexpr size_t NumWorkers             = 4;
@@ -1209,10 +1308,12 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     bool    schedulerThroughput = false;
     bool    jobThroughput       = false;
     bool    jobPoolThroughput   = false;
+    bool    jobWorkerThroughput = false;
+    int32_t jobWorkers          = 4;
     int32_t massSuspensionCount = 0;
     int32_t externalProducers   = 1;
 
-    CommandLineOption options[5];
+    CommandLineOption options[7];
     options[0].longName = "scheduler-throughput";
     options[0].help     = "Run scheduler throughput workloads without density or I/O cases";
     options[0].value    = CommandLineValue::boolean(schedulerThroughput);
@@ -1225,15 +1326,24 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     options[2].help     = "Run stackless FiberJob acquire, execute, retain, and release batches";
     options[2].value    = CommandLineValue::boolean(jobPoolThroughput);
 
-    options[3].longName  = "mass-suspension";
-    options[3].help      = "Run one mass-suspension workload with the requested live fiber count";
-    options[3].valueName = "COUNT";
-    options[3].value     = CommandLineValue::int32(massSuspensionCount);
+    options[3].longName = "job-worker-throughput";
+    options[3].help     = "Run preloaded stackless FiberJobs on the OS-thread worker pool";
+    options[3].value    = CommandLineValue::boolean(jobWorkerThroughput);
 
-    options[4].longName  = "external-producers";
-    options[4].help      = "Use concurrent external producers in scheduler throughput workloads";
+    options[4].longName  = "job-workers";
+    options[4].help      = "Set the worker count for the stackless FiberJob worker-pool workload";
     options[4].valueName = "COUNT";
-    options[4].value     = CommandLineValue::int32(externalProducers);
+    options[4].value     = CommandLineValue::int32(jobWorkers);
+
+    options[5].longName  = "mass-suspension";
+    options[5].help      = "Run one mass-suspension workload with the requested live fiber count";
+    options[5].valueName = "COUNT";
+    options[5].value     = CommandLineValue::int32(massSuspensionCount);
+
+    options[6].longName  = "external-producers";
+    options[6].help      = "Use concurrent external producers in scheduler throughput workloads";
+    options[6].valueName = "COUNT";
+    options[6].value     = CommandLineValue::int32(externalProducers);
 
     CommandLineSpec spec;
     spec.programName = "FibersBenchmark";
@@ -1259,7 +1369,8 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
         return Result::Error("Invalid FibersBenchmark arguments");
     }
     const size_t selectedModes = static_cast<size_t>(schedulerThroughput) + static_cast<size_t>(jobThroughput) +
-                                 static_cast<size_t>(jobPoolThroughput) + static_cast<size_t>(massSuspensionCount != 0);
+                                 static_cast<size_t>(jobPoolThroughput) + static_cast<size_t>(jobWorkerThroughput) +
+                                 static_cast<size_t>(massSuspensionCount != 0);
     if (selectedModes > 1)
     {
         return Result::Error("Throughput and mass-suspension modes are mutually exclusive");
@@ -1268,8 +1379,13 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     {
         return Result::Error("External producer count must be between one and eight");
     }
-    if (massSuspensionCount < 0 or (not schedulerThroughput and not jobThroughput and not jobPoolThroughput and
-                                    arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
+    if (jobWorkers <= 0 or jobWorkers > 64)
+    {
+        return Result::Error("FiberJob worker count must be between one and 64");
+    }
+    if (massSuspensionCount < 0 or
+        (not schedulerThroughput and not jobThroughput and not jobPoolThroughput and not jobWorkerThroughput and
+         arguments.values.sizeInElements() != 0 and massSuspensionCount == 0))
     {
         return Result::Error("Mass-suspension fiber count must be greater than zero");
     }
@@ -1284,6 +1400,10 @@ static Result runFibersBenchmark(int argc, const char* const* argv)
     if (jobPoolThroughput)
     {
         return runFiberJobPoolBenchmark(console);
+    }
+    if (jobWorkerThroughput)
+    {
+        return runFiberJobWorkerPoolBenchmark(console, static_cast<size_t>(jobWorkers));
     }
     if (schedulerThroughput)
     {
