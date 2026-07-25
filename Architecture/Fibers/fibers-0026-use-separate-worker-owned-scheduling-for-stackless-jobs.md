@@ -63,6 +63,11 @@ another worker claims from the top. The deterministic manually driven worker API
 opposite-end stealing, and ready-count ownership before OS threads and wake/parking are introduced. Worker records and
 diagnostics do not reuse or enlarge `FiberWorker`.
 
+The prototype external injection ring is spin-serialized independently from worker deques. Test-owned OS threads can
+therefore claim external work concurrently, publish children to their owner deque, and steal from active peers without
+funneling owner-local work through a global queue. This lock is an initial bounded external-publication mechanism, not
+permission to replace worker-owned scheduling with a globally locked production queue.
+
 ## Consequences
 
 Parallel job workers can scale CPU callbacks independently from stackful fibers and can be sized without reserving

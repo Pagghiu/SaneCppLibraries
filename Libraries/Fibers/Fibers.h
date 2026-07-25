@@ -806,6 +806,11 @@ struct SC_FIBERS_EXPORT FiberJobScheduler
     volatile size_t readyJobs  = 0;
     volatile size_t activeJobs = 0;
 
+    mutable volatile int32_t queueLock = 0;
+
+    struct QueueLockGuard;
+
+    void      initializeJobForSpawn(FiberJob& job, FiberJob::Procedure procedure, FiberCancellationToken token);
     Result    complete(FiberJob& job, Result result);
     bool      tryPushWorkerReady(FiberJobWorker& worker, FiberJob& job);
     FiberJob* popWorkerReady(FiberJobWorker& worker);

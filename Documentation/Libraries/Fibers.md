@@ -116,8 +116,9 @@ created explicitly through `FiberJobScheduler::createWorkerDeques()` and a `Fibe
 rolls back every deque allocated by that call. The worker overloads of `runOne()` and `run()` provide deterministic
 manual execution: jobs spawned by a running worker publish to its local deque, and another supplied worker can steal
 from the opposite end. Once worker-local work exists, callers must continue with a worker overload; plain `run()`
-reports that it cannot drain local deques. OS-thread startup, concurrent external publication, wake/parking, and
-parallel execution are not part of the current Draft slice yet.
+reports that it cannot drain local deques. The bounded external queue is serialized independently, so caller-managed
+threads may invoke worker `runOne()` concurrently and execute jobs in parallel. Library-owned OS-thread startup,
+wake/parking, stop, and join are not part of the current Draft slice yet.
 
 # Capacity Is Part of Control Flow
 

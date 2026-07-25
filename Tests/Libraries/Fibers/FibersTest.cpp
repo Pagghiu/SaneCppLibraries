@@ -66,6 +66,10 @@ struct SC::FibersTest : public SC::TestCase
         {
             fiberJobWorkerStealing();
         }
+        if (test_section("fiber job concurrent stealing"))
+        {
+            fiberJobConcurrentStealing();
+        }
         if (test_section("explicit worker"))
         {
             explicitWorker();
@@ -950,6 +954,118 @@ struct SC::FibersTest : public SC::TestCase
         SC_TEST_EXPECT(not scheduler.hasActiveJobs());
         scheduler.releaseWorkerDeques(workers);
         SC_TEST_EXPECT(allocator.used() == 0);
+        SC_TEST_EXPECT(scheduler.close());
+        SC_TEST_EXPECT(allocator.close());
+    }
+
+    void fiberJobConcurrentStealing()
+    {
+        static constexpr size_t NumWorkers  = 4;
+        static constexpr size_t NumChildren = 64;
+
+        struct State
+        {
+            FiberJobScheduler* scheduler       = nullptr;
+            FiberJobWorker*    workers         = nullptr;
+            FiberJob*          children        = nullptr;
+            Atomic<int32_t>*   runCounts       = nullptr;
+            bool*              workerSucceeded = nullptr;
+            Atomic<int32_t>    started;
+            Atomic<int32_t>    completed;
+
+            Result spawnChildren()
+            {
+                for (size_t index = 0; index < NumChildren; ++index)
+                {
+                    State* state = this;
+                    SC_TRY(scheduler->spawn(children[index], FiberJob::Procedure(
+                                                                 [state, index](FiberJobContext&)
+                                                                 {
+                                                                     const int32_t ticket = state->started.fetch_add(1);
+                                                                     if (ticket < static_cast<int32_t>(NumWorkers))
+                                                                     {
+                                                                         while (state->started.load() <
+                                                                                static_cast<int32_t>(NumWorkers))
+                                                                         {}
+                                                                     }
+                                                                     state->runCounts[index].fetch_add(1);
+                                                                     state->completed.fetch_add(1);
+                                                                     return Result(true);
+                                                                 })));
+                }
+                return Result(true);
+            }
+        };
+
+        FiberJob          jobs[NumChildren + 1];
+        FiberJob*         readyStorage[1] = {};
+        FiberJobScheduler scheduler;
+        FiberJobWorker    workers[NumWorkers];
+        Thread            threads[NumWorkers];
+        char              allocatorStorage[NumWorkers * NumChildren * sizeof(FiberJob*) + 4096] = {};
+        FiberAllocator    allocator;
+        Atomic<int32_t>   runCounts[NumChildren];
+        bool              workerSucceeded[NumWorkers] = {true, true, true, true};
+        State             state;
+        state.scheduler       = &scheduler;
+        state.workers         = workers;
+        state.children        = &jobs[1];
+        state.runCounts       = runCounts;
+        state.workerSucceeded = workerSucceeded;
+
+        for (Atomic<int32_t>& runCount : runCounts)
+        {
+            runCount.store(0);
+        }
+        SC_TEST_EXPECT(allocator.createFixed(allocatorStorage));
+        SC_TEST_EXPECT(scheduler.create(readyStorage));
+        SC_TEST_EXPECT(scheduler.createWorkerDeques(allocator, workers, NumChildren));
+        State* statePointer = &state;
+        SC_TEST_EXPECT(scheduler.spawn(
+            jobs[0], FiberJob::Procedure([statePointer](FiberJobContext&) { return statePointer->spawnChildren(); })));
+
+        for (size_t index = 0; index < NumWorkers; ++index)
+        {
+            State* threadState = &state;
+            SC_TEST_EXPECT(threads[index].start(
+                [threadState, index](Thread&)
+                {
+                    while (threadState->scheduler->hasActiveJobs())
+                    {
+                        bool   ranJob = false;
+                        Result result = threadState->scheduler->runOne(threadState->workers[index],
+                                                                       {threadState->workers, NumWorkers}, ranJob);
+                        if (not result)
+                        {
+                            threadState->workerSucceeded[index] = false;
+                            return;
+                        }
+                    }
+                }));
+        }
+        for (size_t index = 0; index < NumWorkers; ++index)
+        {
+            SC_TEST_EXPECT(threads[index].join());
+            SC_TEST_EXPECT(workerSucceeded[index]);
+        }
+
+        SC_TEST_EXPECT(state.started.load() == static_cast<int32_t>(NumChildren));
+        SC_TEST_EXPECT(state.completed.load() == static_cast<int32_t>(NumChildren));
+        for (Atomic<int32_t>& runCount : runCounts)
+        {
+            SC_TEST_EXPECT(runCount.load() == 1);
+        }
+        size_t stolenJobs = 0;
+        for (FiberJobWorker& worker : workers)
+        {
+            FiberJobWorkerDiagnostics diagnostics;
+            scheduler.workerDiagnostics(worker, diagnostics);
+            stolenJobs += diagnostics.stolenJobs;
+        }
+        SC_TEST_EXPECT(stolenJobs > 0);
+        SC_TEST_EXPECT(not scheduler.hasReadyJobs());
+        SC_TEST_EXPECT(not scheduler.hasActiveJobs());
+        scheduler.releaseWorkerDeques(workers);
         SC_TEST_EXPECT(scheduler.close());
         SC_TEST_EXPECT(allocator.close());
     }
